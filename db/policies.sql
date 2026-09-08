@@ -347,6 +347,28 @@ grant select on v_share_links, v_gallery_progress to authenticated;
 -- selection_ops is idempotency bookkeeping written only by the service role.
 -- Deliberately no grant.
 
+-- ---------------------------------------------------------------------------
+-- Table privileges for service_role.
+--
+-- service_role bypasses RLS, but Postgres still checks PRIVILEGES first, and
+-- with "Automatically expose new tables" disabled it starts with none. Without
+-- these grants every customer-facing request fails with
+-- "permission denied for table ..." while the policies look perfectly correct.
+--
+-- Full access is intended here: service_role never reaches the browser, and
+-- the customer paths (session lookup, selection writes, image proxy) run
+-- through it after the app layer has checked the signed session cookie.
+-- ---------------------------------------------------------------------------
+
+grant usage on schema public to service_role;
+grant all privileges on all tables    in schema public to service_role;
+grant all privileges on all sequences in schema public to service_role;
+grant execute  on all functions in schema public to service_role;
+
+-- Tables added by later migrations inherit the same access.
+alter default privileges in schema public grant all privileges on tables    to service_role;
+alter default privileges in schema public grant all privileges on sequences to service_role;
+
 -- Policy expressions are evaluated as the querying role, so `authenticated`
 -- must be able to call the helpers. They are SECURITY DEFINER and expose
 -- nothing beyond the caller's own role/branches.
