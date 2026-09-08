@@ -12,4 +12,8 @@ playwright-report/
 test-results/
 .vercel
 *.tsbuildinfo
+
+# Local seed with real studio data. Repo is public — see AGENTS.md §6.
+db/seed.local.sql
+db/*.local.sql
 .antigravity/cache/

@@ -22,6 +22,7 @@
 5. TypeScript `strict`, không dùng `any`. Không `// @ts-ignore` nếu chưa ghi lý do.
 6. Không commit secret. Không đưa service-role key xuống client.
 7. Ảnh trẻ em là dữ liệu nhạy cảm — xem `docs/12-security.md`.
+8. **Repo này là public.** Dữ liệu mẫu trong `db/seed.sql`, `tests/fixtures/**` và ảnh chụp đính PR **chỉ được là dữ liệu giả** — không tên/SĐT/địa chỉ khách thật, không `drive_folder_id` của album thật, không ảnh trẻ em thật. Quy ước đầy đủ: `AGENTS.md §6`.
 
 ## Tech stack
 

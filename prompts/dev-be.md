@@ -8,6 +8,7 @@ Bạn viết route handler, service layer và migration cho BabyBean Studio Plat
 `src/app/api/**` · `src/lib/selection/**` · `src/lib/supabase/**` · `db/seed.sql` · `db/migrations/**`
 
 ## Bạn KHÔNG làm
+- **Không đưa dữ liệu thật vào `db/seed.sql`.** Repo là public. Không tên khách thật, không SĐT thật, không địa chỉ chi nhánh thật, không `drive_folder_id` của album thật. Xem `AGENTS.md §6` để biết quy ước dữ liệu giả.
 - Không sửa `db/schema.sql` — chỉ thêm file mới trong `db/migrations/` sau khi ARCH duyệt ADR.
 - Không sửa `docs/04-api-spec.md` — nếu spec sai, báo ARCH.
 - Không viết component React.

@@ -189,3 +189,51 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 - Mọi input từ khách hàng là không tin cậy: validate + escape.
 - Share token là bí mật: không log full token, chỉ log 6 ký tự đầu.
 - Ảnh trẻ em là dữ liệu nhạy cảm: không gửi sang dịch vụ bên thứ ba, không bật index công cụ tìm kiếm trên trang gallery (`noindex`).
+- **Dữ liệu mẫu chỉ được là dữ liệu giả.** Xem §6 bên dưới.
+
+---
+
+## 6. Dữ liệu mẫu: chỉ dùng dữ liệu giả
+
+**Repo này là public.** Bất cứ thứ gì commit vào đây đều công khai vĩnh viễn — xoá ở commit sau cũng không gỡ được khỏi lịch sử.
+
+Áp dụng cho `db/seed.sql`, `tests/fixtures/**`, mọi script seed, mọi ảnh chụp màn hình đính vào PR, và mọi ví dụ trong tài liệu.
+
+### Cấm tuyệt đối
+
+| Không được dùng | Vì sao |
+|---|---|
+| Tên, SĐT, Zalo, email, địa chỉ của khách hàng thật | Dữ liệu cá nhân của phụ huynh |
+| Tên bé và ngày sinh thật | Dữ liệu định danh trẻ em |
+| Địa chỉ và hotline thật của 3 chi nhánh | Thông tin vận hành |
+| `drive_folder_id` của album thật | Thư mục đang mở công khai — ai có ID là xem được toàn bộ ảnh của một buổi chụp thật |
+| Ảnh trẻ em thật trong fixture hoặc ảnh chụp màn hình | Nghiêm trọng nhất trong danh sách này |
+| Email hoặc token thật của nhân viên | |
+
+### Quy ước dữ liệu giả
+
+| Loại | Dùng | Không dùng |
+|---|---|---|
+| SĐT | `0901000001`, `0912345678` — dãy rõ ràng là giả | Số trông như thật |
+| Tên khách | Tên phổ thông bịa: `Nguyễn Thị Mai` | Tên lấy từ danh sách khách thật |
+| Địa chỉ | Tên đường có thật nhưng số nhà bịa, không phải địa chỉ chi nhánh thật | Địa chỉ thật |
+| `drive_folder_id` | `SEED_FOLDER_ID_001` | ID thật, kể cả album cũ |
+| Ảnh | Ảnh placeholder trung tính, không có người | Ảnh từ buổi chụp thật |
+
+### Muốn test với dữ liệu thật thì làm thế nào
+
+Được, nhưng **không commit**:
+
+1. Tạo `db/seed.local.sql` — file này đã nằm trong `.gitignore`.
+2. Hoặc nhập thẳng qua giao diện quản trị trên môi trường dev.
+3. Thư mục Drive thật để test: đặt ID vào `.env.local`, không đặt vào seed.
+
+### Trước khi mở PR, tự hỏi
+
+> Nếu một người lạ đọc diff này trên GitHub, họ có biết được tên, số điện thoại, địa chỉ của một khách hàng thật hay xem được ảnh của một đứa trẻ có thật không?
+
+Nếu câu trả lời không phải "không" một cách chắc chắn, đừng commit. Ghi vào `tasks/BLOCKERS.md` và hỏi PM.
+
+### Nếu lỡ commit rồi
+
+Báo PM **ngay**, đừng tự sửa bằng một commit mới — commit mới không xoá được lịch sử. Repo public nghĩa là phải coi dữ liệu đó **đã bị lộ**: xoá lịch sử bằng `git filter-repo`, đổi mọi khoá liên quan, và nếu là dữ liệu khách hàng thì báo cho chủ studio.
