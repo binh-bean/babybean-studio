@@ -200,8 +200,19 @@ Một thư mục chỉ checkout được một nhánh. Hai agent cùng làm tron
 | `babybean-studio/` | `main` | PM — nơi review và merge |
 | `babybean-dev-be/` | `agent/dev-be` | DEV-BE |
 | `babybean-sec-arch/` | `agent/sec-arch` | SEC-ARCH |
+| `babybean-dev-ops/` | `agent/dev-ops` | DEV-OPS |
+| `babybean-dev-ui/` | `agent/dev-ui` | DEV-UI |
 
-Cả ba nằm cạnh nhau trong `Downloads/claude code/`. Trong Antigravity, mỗi agent mở **đúng thư mục của mình**.
+Tất cả nằm cạnh nhau trong `Downloads/claude code/`. Trong Antigravity, mỗi agent mở **đúng thư mục của mình**.
+
+**Bắt đầu mỗi task, đồng bộ với `main` trước:**
+
+```bash
+git fetch origin
+git merge origin/main
+```
+
+Nhánh agent không tự cập nhật khi `main` tiến lên. Bỏ qua bước này thì agent làm trên nền cũ và sinh xung đột lúc merge.
 
 Thêm worktree cho agent mới:
 
