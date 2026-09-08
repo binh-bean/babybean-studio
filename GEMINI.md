@@ -109,6 +109,7 @@ Mọi lệnh bạn chạy đều đi qua **PowerShell 7 trên Windows**. Viết 
 ## Lệnh thường dùng
 
 ```bash
+npm run verify:own -- <AGENT>  # kiểm thay đổi có trong vùng sở hữu của mình
 npm run verify:db      # kiểm database: cấu trúc, RLS, quyền, rò rỉ khoá công khai
 npm run verify:db:seed # như trên, kèm yêu cầu phải có dữ liệu mẫu
 npm run dev          # chạy dev
@@ -128,5 +129,6 @@ npm run drive:sync   # đồng bộ thủ công 1 album
 - [ ] Đã chạy thật trên browser agent, có ảnh chụp
 - [ ] Tài liệu liên quan đã cập nhật
 - [ ] Không có secret trong diff
+- [ ] `npm run verify:own -- <TÊN AGENT>` xanh — không sửa file của agent khác
 - [ ] `npm run verify:db` xanh (bắt buộc nếu task đụng database) — dán kết quả vào báo cáo
 - [ ] Trạng thái task trong `tasks/TASK-INDEX.md` đã đổi

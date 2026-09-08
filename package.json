@@ -20,7 +20,8 @@
     "verify": "npm run typecheck && npm run lint && npm run test",
     "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
     "verify:db": "node --env-file-if-exists=.env.local scripts/verify-db.mjs",
-    "verify:db:seed": "node --env-file-if-exists=.env.local scripts/verify-db.mjs --seed"
+    "verify:db:seed": "node --env-file-if-exists=.env.local scripts/verify-db.mjs --seed",
+    "verify:own": "node scripts/verify-ownership.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -44,6 +45,7 @@
     "@playwright/test": "^1.49.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",

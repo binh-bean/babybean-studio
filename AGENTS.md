@@ -10,7 +10,7 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 1. **Không agent nào được tự ý đổi hợp đồng chung.** Hợp đồng chung = `db/schema.sql`, `docs/04-api-spec.md`, `src/types/domain.ts`. Muốn đổi thì mở ADR trong `docs/adr/` và chờ Tech Lead duyệt.
 2. **Mỗi agent chỉ làm việc trong "vùng sở hữu" của mình.** File ngoài vùng: được đề xuất, không được tự sửa.
 3. **Mọi task bắt đầu từ một mã `BB-xxx`** trong `tasks/TASK-INDEX.md`. Không có mã thì không code.
-4. **Definition of Done** (bắt buộc đủ 7): code chạy · type-check sạch · test đơn vị cho logic mới · **`npm run verify:db` xanh nếu task đụng database** · verify bằng browser agent kèm ảnh chụp · cập nhật tài liệu liên quan · walkthrough artifact mô tả thay đổi.
+4. **Definition of Done** (bắt buộc đủ 8): code chạy · type-check sạch · test đơn vị cho logic mới · **`npm run verify:own -- <TÊN AGENT>` xanh** · **`npm run verify:db` xanh nếu task đụng database** · verify bằng browser agent kèm ảnh chụp · cập nhật tài liệu liên quan · walkthrough artifact mô tả thay đổi.
 5. **Không báo xong khi chưa tự kiểm.** Chạy một lệnh rồi đi tiếp không phải là bằng chứng nó chạy đúng. Task đụng database thì phải chạy `npm run verify:db` (thêm `:seed` nếu có ghi dữ liệu) và **dán kết quả vào báo cáo**. Quy tắc này sinh ra sau khi một agent báo đã seed xong trong lúc mọi bảng còn 0 dòng.
 6. **Ngân sách suy luận**: chỉ nâng thinking level khi task đánh dấu `complexity: high`. Task CRUD dùng model rẻ.
 
@@ -157,6 +157,17 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 | `public/brand/**` | R | - | R | R | - | - | - | R |
 
 `W` được ghi · `R` chỉ đọc (được đề xuất qua ADR/issue) · `-` không chạm
+
+**Bảng này được cưỡng chế bằng lệnh, không chỉ là chữ:**
+
+```bash
+npm run verify:own -- SEC-ARCH   # kiểm thay đổi có nằm trong vùng của mình không
+npm run verify:own               # xem file nào thuộc về ai
+```
+
+Bản máy đọc được nằm ở `scripts/ownership.mjs`. Hai bên lệch nhau thì **file script thắng**, vì nó là bên thật sự chạy.
+
+Chạy lệnh này **trước khi báo xong**. Sửa file của agent khác trong lúc họ đang làm sẽ ghi đè lên nhau — chuyện đã xảy ra: SEC-ARCH sửa `scripts/db-seed.mjs` sáu lần trong khi DEV-BE đang ở trong đúng file đó.
 
 ---
 

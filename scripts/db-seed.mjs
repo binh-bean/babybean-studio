@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import pg from 'pg';
 import { createClient } from '@supabase/supabase-js';
 
@@ -37,24 +38,29 @@ const DEMO_STAFF = [
 
 async function run() {
   console.log("--- 1. Creating Auth Users ---");
-  const staffRecords = [];
+  let seedPassword = process.env.SEED_PASSWORD;
+  if (!seedPassword) {
+    seedPassword = crypto.randomBytes(8).toString('hex') + 'A1!';
+    console.log(`Generated random seed password: ${seedPassword}`);
+  }
 
+  const staffRecords = [];
   for (const staff of DEMO_STAFF) {
     let user;
-    // Check if user exists
     const { data: users, error: listError } = await supabase.auth.admin.listUsers();
     if (listError) {
       console.error("Error listing users:", listError.message);
       process.exit(1);
     }
     const existing = users.users.find(u => u.email === staff.email);
+
     if (existing) {
       user = existing;
       console.log(`User ${staff.email} already exists (id: ${user.id}).`);
     } else {
       const { data: created, error: createError } = await supabase.auth.admin.createUser({
         email: staff.email,
-        password: 'SeedPassword123!',
+        password: seedPassword,
         email_confirm: true,
       });
       if (createError) {
@@ -146,8 +152,9 @@ async function run() {
           photoCounter++;
         }
       }
+      await client.query('UPDATE galleries SET photo_count = (SELECT count(*) FROM photos WHERE photos.gallery_id = galleries.id)');
       await client.query('COMMIT');
-      console.log("Photos inserted.");
+      console.log("Photos inserted and photo_count updated.");
     } catch (e) {
       await client.query('ROLLBACK');
       console.error("Error inserting photos:", e.message);
@@ -157,19 +164,41 @@ async function run() {
     console.log("--- 5. Inserting primary selection & items for Gallery 1 ---");
     await client.query('BEGIN');
     try {
-      const shareLinkId = 'ffffffff-0000-0000-0000-000000000001';
+      const shareLinkId1 = 'ffffffff-0000-0000-0000-000000000001';
+      const token1 = 'DEMO-TOKEN-NO-PIN';
+      const hash1 = crypto.createHash('sha256').update(token1).digest('hex');
+      
       await client.query(`
         INSERT INTO share_links (id, gallery_id, token_hash, token_prefix, role, label, requires_pin, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (id) DO NOTHING;
       `, [
-        shareLinkId,
+        shareLinkId1,
         'dddddddd-0000-0000-0000-000000000001',
-        'FAKE_HASH', // sha256 mock
-        'FAKE_T',
+        hash1,
+        token1.substring(0, 6),
         'owner',
         'Mẹ bé',
         false,
+        'active'
+      ]);
+
+      const shareLinkId2 = 'ffffffff-0000-0000-0000-000000000002';
+      const token2 = 'dev_token_with_pin_123';
+      const tokenHash2 = crypto.createHash('sha256').update(token2).digest('hex');
+      
+      await client.query(`
+        INSERT INTO share_links (id, gallery_id, token_hash, token_prefix, role, label, requires_pin, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (id) DO NOTHING;
+      `, [
+        shareLinkId2,
+        'dddddddd-0000-0000-0000-000000000001',
+        tokenHash2,
+        'dev_pi',
+        'co_editor',
+        'Bố bé',
+        true,
         'active'
       ]);
 
@@ -181,7 +210,7 @@ async function run() {
       `, [
         selectionId,
         'dddddddd-0000-0000-0000-000000000001',
-        shareLinkId,
+        shareLinkId1,
         true,
         'Mẹ bé Bơ'
       ]);
@@ -213,7 +242,8 @@ async function run() {
     console.log("--- 6. Reporting row counts ---");
     const tables = ['staff_profiles', 'staff_branches', 'galleries', 'photos', 'selections', 'selection_items', 'share_links'];
     for (const t of tables) {
-      const res = await client.query(`SELECT COUNT(*) FROM ${t}`);
+      if (!tables.includes(t)) throw new Error("Invalid table");
+      const res = await client.query(`SELECT COUNT(*) as count FROM ${t}`);
       console.log(`${t}: ${res.rows[0].count} rows`);
     }
 
