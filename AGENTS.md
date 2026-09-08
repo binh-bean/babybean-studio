@@ -193,9 +193,22 @@ Một thư mục chỉ checkout được một nhánh. Hai agent cùng làm tron
 
 **Từ hai agent trở lên: mỗi agent một worktree riêng.**
 
+**Bố cục hiện tại** (đã dựng sẵn):
+
+| Thư mục | Nhánh | Agent |
+|---|---|---|
+| `babybean-studio/` | `main` | PM — nơi review và merge |
+| `babybean-dev-be/` | `agent/dev-be` | DEV-BE |
+| `babybean-sec-arch/` | `agent/sec-arch` | SEC-ARCH |
+
+Cả ba nằm cạnh nhau trong `Downloads/claude code/`. Trong Antigravity, mỗi agent mở **đúng thư mục của mình**.
+
+Thêm worktree cho agent mới:
+
 ```bash
-git worktree add ../bb-008 -b feat/BB-008-seed
-git worktree add ../bb-020 -b feat/BB-020-auth
+git worktree add ../babybean-dev-fe -b agent/dev-fe
+cp .env.local ../babybean-dev-fe/.env.local   # gitignore nên không tự sang
+cd ../babybean-dev-fe && npm install          # node_modules cũng không dùng chung
 ```
 
 Mỗi worktree cần `npm install` và bản `.env.local` riêng (file này bị gitignore nên không tự sang). Trong Antigravity, trỏ project của mỗi agent vào đúng thư mục worktree của nó.
