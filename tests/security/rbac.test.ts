@@ -98,7 +98,7 @@ describe("Database RLS Policies & Security (BB-020)", () => {
       error = e;
     }
     expect(error).toBeDefined();
-    expect(error.code).toBe("FORBIDDEN");
+    expect((error as { code?: string }).code).toBe("FORBIDDEN");
   });
 
   it("Đối chứng dương: cs SỬA được khách hàng của chính chi nhánh mình", async () => {
