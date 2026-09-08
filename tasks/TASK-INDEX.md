@@ -30,7 +30,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-005 | Nối Vercel, cấu hình env cho 3 môi trường, deploy trang trắng | DEV-OPS | BB-001 | low | TODO |
 | BB-006 | Đối chiếu `src/types/domain.ts` với `schema.sql`, bổ sung type còn thiếu | ARCH | BB-003 | med | TODO |
 | BB-007 | Hoàn thiện `lib/supabase/{server,admin,client}.ts` + ESLint rule cấm import `admin.ts` ngoài `api/` và `scripts/` | DEV-BE | BB-003 | med | TODO |
-| BB-008 | Hoàn thiện seed. `db/seed.sql` **đã có** chi nhánh, gói, khách, bé, album, settings. **Còn thiếu**: `staff_profiles` + `staff_branches` (phải tạo `auth.users` trước qua Auth admin API), `photos` cho 3 album, và 1 `selection` primary kèm ~18 `selection_items` để `v_gallery_progress` không rỗng. Viết `scripts/db-seed.mjs` làm cả hai bước. **Dữ liệu giả 100%** — `AGENTS.md §6` | DEV-BE | BB-003 ✅ | low | **SẴN SÀNG** |
+| BB-008 | Hoàn thiện seed. `db/seed.sql` **đã có** chi nhánh, gói, khách, bé, album, settings. **Còn thiếu**: `staff_profiles` + `staff_branches` (phải tạo `auth.users` trước qua Auth admin API), `photos` cho 3 album, và 1 `selection` primary kèm ~18 `selection_items` để `v_gallery_progress` không rỗng. Viết `scripts/db-seed.mjs` làm cả hai bước. **Dữ liệu giả 100%** — `AGENTS.md §6` . **Nghiệm thu: `npm run verify:db:seed` phải xanh 19/19, dán kết quả vào báo cáo** | DEV-BE | BB-003 ✅ | low | **SẴN SÀNG** |
 
 **Cổng ra Phase 0**: `npm run verify` xanh · deploy Vercel thành công · đăng nhập Supabase hoạt động.
 
