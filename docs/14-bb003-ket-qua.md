@@ -13,7 +13,7 @@ Ngày: 2026-09-08 · Môi trường: `bb-dev` (`ap-southeast-1` Singapore)
 
 ## 2. Kết quả kiểm chứng
 
-Kiểm bằng REST API với hai khoá, không dùng kết nối Postgres trực tiếp.
+Kiểm hai lớp: qua REST API bằng hai khoá, và qua kết nối Postgres trực tiếp.
 
 ### 2.1 Cấu trúc
 
@@ -63,16 +63,14 @@ Tạo 2 chi nhánh, 2 nhân sự thật (một `cs` ở CN A, một `photographe
 | # | Kịch bản | Kết quả |
 |---|---|---|
 | 1 | `cs` chi nhánh A đọc album chi nhánh B | 0 dòng — RLS lọc đúng |
-| 2 | `photographer` UPDATE `customers` | **HỎNG lần đầu — sửa được 1 dòng** → xem §3.4 |
+| 2 | `photographer` UPDATE `customers` | **HỎNG lần đầu — sửa được 1 dòng** → xem §3.2 |
 | 3 | Nhân viên UPDATE `selection_items` | permission denied |
 | 4 | Nhân viên tự nâng mình lên `owner` | vi phạm RLS policy |
 | 5 | `anon` SELECT `galleries` | permission denied |
 | 6 | `cs` DELETE `activity_logs` | permission denied |
 | 7 | `cs` sửa khách của **chính chi nhánh mình** | sửa 1 dòng — quyền hợp lệ không bị cắt nhầm |
 
-Sau khi vá: **7/7 đạt**. Toàn bộ dữ liệu và tài khoản kiểm thử đã xoá;  hiện rỗng.
-
-Dữ liệu và tài khoản kiểm thử đã xoá sau khi chạy.
+Sau khi vá: **7/7 đạt**. Toàn bộ dữ liệu và tài khoản kiểm thử đã xoá; `bb-dev` hiện rỗng.
 
 ## 3. Lỗi phát hiện trong scaffold và đã sửa
 
@@ -84,7 +82,7 @@ Nguyên nhân gốc: Supabase bình thường tự cấp quyền cho bảng mớ
 
 Đã thêm vào cuối `db/policies.sql`, kèm `alter default privileges` để bảng do migration sau này tạo ra không lặp lại lỗi này.
 
-### 3.4 Thợ ảnh sửa được hồ sơ khách hàng — lỗ hổng phân quyền
+### 3.2 Thợ ảnh sửa được hồ sơ khách hàng — lỗ hổng phân quyền
 
 Test phủ định số 2 bắt được: một `photographer` UPDATE thành công một dòng trong `customers`, trong khi `docs/05-rbac.md §2` cho vai này quyền **đọc**, không phải sửa.
 
@@ -103,11 +101,11 @@ Kiểm lại sau khi vá: test 2 đạt, và test 7 xác nhận `cs` vẫn sửa
 
 **Bài học**: một vị từ quyền dùng chung cho nhiều loại dữ liệu sẽ rò quyền giữa các loại đó. Mỗi nhóm dữ liệu có ma trận quyền riêng thì phải có vị từ riêng.
 
-### 3.2 Script `node` không nạp `.env.local`
+### 3.3 Script `node` không nạp `.env.local`
 
 Next.js tự nạp, script chạy thẳng bằng `node` thì không. `db:push`, `db:seed`, `drive:sync`, `db:backup` giờ đều kèm `--env-file-if-exists=.env.local`.
 
-### 3.3 Bản giao việc thiếu cách kết nối
+### 3.4 Bản giao việc thiếu cách kết nối
 
 BB-003 ban đầu chỉ nói "áp schema lên bb-dev" mà không nói kết nối bằng cách nào. Agent phải tự đoán, thử Supabase CLI rồi `psql`, tốn ba vòng phê duyệt. Đã bổ sung `docs/11-deployment.md §1c`.
 
