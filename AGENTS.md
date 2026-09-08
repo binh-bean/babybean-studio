@@ -10,8 +10,9 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 1. **Không agent nào được tự ý đổi hợp đồng chung.** Hợp đồng chung = `db/schema.sql`, `docs/04-api-spec.md`, `src/types/domain.ts`. Muốn đổi thì mở ADR trong `docs/adr/` và chờ Tech Lead duyệt.
 2. **Mỗi agent chỉ làm việc trong "vùng sở hữu" của mình.** File ngoài vùng: được đề xuất, không được tự sửa.
 3. **Mọi task bắt đầu từ một mã `BB-xxx`** trong `tasks/TASK-INDEX.md`. Không có mã thì không code.
-4. **Definition of Done** (bắt buộc đủ 6): code chạy · type-check sạch · test đơn vị cho logic mới · verify bằng browser agent kèm ảnh chụp · cập nhật tài liệu liên quan · walkthrough artifact mô tả thay đổi.
-5. **Ngân sách suy luận**: chỉ nâng thinking level khi task đánh dấu `complexity: high`. Task CRUD dùng model rẻ.
+4. **Definition of Done** (bắt buộc đủ 7): code chạy · type-check sạch · test đơn vị cho logic mới · **`npm run verify:db` xanh nếu task đụng database** · verify bằng browser agent kèm ảnh chụp · cập nhật tài liệu liên quan · walkthrough artifact mô tả thay đổi.
+5. **Không báo xong khi chưa tự kiểm.** Chạy một lệnh rồi đi tiếp không phải là bằng chứng nó chạy đúng. Task đụng database thì phải chạy `npm run verify:db` (thêm `:seed` nếu có ghi dữ liệu) và **dán kết quả vào báo cáo**. Quy tắc này sinh ra sau khi một agent báo đã seed xong trong lúc mọi bảng còn 0 dòng.
+6. **Ngân sách suy luận**: chỉ nâng thinking level khi task đánh dấu `complexity: high`. Task CRUD dùng model rẻ.
 
 ---
 

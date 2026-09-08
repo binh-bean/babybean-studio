@@ -127,7 +127,7 @@ async function run() {
       let photoCounter = 1;
       for (const gal of galleries) {
         for (let i = 0; i < gal.count; i++) {
-          const photoId = \`eeeeeeee-0000-0000-0000-\${String(photoCounter).padStart(12, '0')}\`;
+          const photoId = `eeeeeeee-0000-0000-0000-${String(photoCounter).padStart(12, '0')}`;
           if (gal.id === 'dddddddd-0000-0000-0000-000000000001') {
             photoIds.push(photoId); // Save for selection_items later
           }
@@ -138,8 +138,8 @@ async function run() {
           `, [
             photoId,
             gal.id,
-            \`FAKE_FILE_\${photoId}\`,
-            \`IMG_\${photoCounter}.jpg\`,
+            `FAKE_FILE_${photoId}`,
+            `IMG_${photoCounter}.jpg`,
             'image/jpeg',
             i
           ]);
@@ -213,8 +213,8 @@ async function run() {
     console.log("--- 6. Reporting row counts ---");
     const tables = ['staff_profiles', 'staff_branches', 'galleries', 'photos', 'selections', 'selection_items', 'share_links'];
     for (const t of tables) {
-      const res = await client.query(`SELECT COUNT(*) FROM \${t}`);
-      console.log(`\${t}: \${res.rows[0].count} rows`);
+      const res = await client.query(`SELECT COUNT(*) FROM ${t}`);
+      console.log(`${t}: ${res.rows[0].count} rows`);
     }
 
     console.log("--- 7. Querying v_gallery_progress ---");

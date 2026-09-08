@@ -18,7 +18,9 @@
     "db:seed": "node --env-file-if-exists=.env.local scripts/db-seed.mjs",
     "drive:sync": "node --env-file-if-exists=.env.local --import tsx scripts/sync-drive.ts",
     "verify": "npm run typecheck && npm run lint && npm run test",
-    "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs"
+    "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
+    "verify:db": "node --env-file-if-exists=.env.local scripts/verify-db.mjs",
+    "verify:db:seed": "node --env-file-if-exists=.env.local scripts/verify-db.mjs --seed"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
