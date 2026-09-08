@@ -37,6 +37,32 @@ Bốn lựa chọn ở màn hình "Create a new project" quyết định mô hì
 
 **GitHub integration**: bỏ qua ở Phase 0. Tính năng đó kỳ vọng bố cục `supabase/migrations/`, còn repo này dùng `db/`. Xem lại nếu sau này chuyển sang Supabase CLI migrations.
 
+## 1c. Cách chạy SQL lên Supabase — chỉ một đường duy nhất
+
+Agent **không được tự chọn cách khác**. Ba đường dưới đây đã bị loại, có lý do:
+
+| Cách | Vì sao KHÔNG dùng |
+|---|---|
+| `npx supabase ...` (Supabase CLI) | CLI điều khiển stack Supabase chạy local bằng Docker. Repo này không có `supabase/`, không có `config.toml`, và database nằm trên mây. Lệnh sẽ tải cả CLI về rồi báo lỗi "not a Supabase project". |
+| `psql` | Không cài trên máy dev, và không nên bắt mỗi người tự cài Postgres client chỉ để chạy hai file SQL. |
+| Dán tay vào SQL Editor | Chạy được nhưng không lặp lại được. Migration về sau cần một lệnh, không cần một người ngồi copy. |
+
+**Đường được chọn: gói `pg` của Node + biến `SUPABASE_DB_URL`.**
+
+- `SUPABASE_DB_URL` lấy ở dashboard → **Connect** → **Connection string** → **URI**, ưu tiên **Session pooler** (chạy được trên mạng chỉ có IPv4). Đặt trong `.env.local`, không commit.
+- `pg` cài dưới dạng devDependency: `npm i -D pg`.
+- Script chạy qua npm để `.env.local` được nạp: `npm run db:push` (đã kèm `--env-file-if-exists`).
+
+Yêu cầu với `scripts/db-push.mjs`:
+
+1. Đọc `SUPABASE_DB_URL` từ `process.env`. Thiếu thì dừng với thông báo rõ ràng. **Không hard-code, không in giá trị ra log.**
+2. Chạy `db/schema.sql` rồi `db/policies.sql`, theo đúng thứ tự đó.
+3. Mỗi file chạy trong **một transaction**. Lỗi thì rollback toàn bộ file, không để database ở trạng thái nửa vời.
+4. Giữ nguyên chốt chặn từ chối chạy khi URL trỏ tới production.
+5. In ra tiến trình dạng người đọc được: đang chạy file nào, bao nhiêu câu lệnh, lỗi ở câu nào.
+
+**Lưu ý cho lần chạy đầu**: cả hai file SQL này chưa từng chạy trên Postgres thật. Gặp lỗi cú pháp hoặc lỗi thứ tự tạo đối tượng là chuyện bình thường — sửa file SQL, ghi rõ đã sửa gì, **không** bỏ qua câu lệnh lỗi và **không** nới lỏng RLS để cho chạy được.
+
 ## 2. Biến môi trường
 
 | Biến | Local | Preview | Prod | Ghi chú |
