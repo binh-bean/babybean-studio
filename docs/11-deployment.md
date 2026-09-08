@@ -22,11 +22,18 @@ Bốn lựa chọn ở màn hình "Create a new project" quyết định mô hì
 | **Enable Data API** | **Bật** | `@supabase/supabase-js` gọi qua PostgREST. Tắt là toàn bộ truy cập của nhân viên hỏng. |
 | **Automatically expose new tables** | **Tắt** | Mặc định của Supabase là cấp quyền cho mọi bảng mới ngay khi nó ra đời. Với dự án này, một bảng do migration Phase 3 tạo ra sẽ lộ qua REST API **trước khi** ai đó kịp viết policy cho nó. Tắt đi thì bảng mới không ai với tới được cho tới khi có `grant` tường minh trong `db/policies.sql` — quên là hỏng về phía an toàn. |
 | **Enable automatic RLS** | **Bật** | Event trigger tự bật RLS cho mọi bảng mới trong schema `public`. `schema.sql` đã bật thủ công cho 17 bảng, nhưng đây là lưới an toàn cho những bảng agent thêm về sau. |
-| **Region** | **Singapore (ap-southeast-1)** | Gần Việt Nam nhất trong nhóm Asia-Pacific. |
+| **Region** | **Singapore (ap-southeast-1)** | **Không đổi được sau khi tạo project.** Đo thật từ TP.HCM: Singapore ~65 ms, Sydney ~253 ms cho một vòng TCP — chênh ~190 ms. |
 
 **Hệ quả của việc tắt "Automatically expose new tables"**: `db/policies.sql` phải cấp quyền bảng tường minh cho vai `authenticated`. Postgres kiểm tra **quyền trước, policy sau** — vai không có quyền bị từ chối ngay, kèm lỗi `permission denied for table ...` trông không giống lỗi RLS chút nào. Mục "Table privileges for staff" ở cuối `db/policies.sql` lo phần này. **Migration thêm bảng mới thì phải thêm `grant` ở đó.**
 
 **Mật khẩu database**: dùng nút "Generate a password" của Supabase, lưu vào trình quản lý mật khẩu. Mật khẩu này **không** dùng trong `.env.local` (ứng dụng dùng API key), nhưng cần khi kết nối trực tiếp bằng `psql` hoặc chuỗi kết nối.
+
+**Region của Vercel phải khớp region của Supabase.** Đây là ràng buộc dễ bỏ sót nhất. Hai lý do:
+
+1. `/api/img` nằm trên đường đi của **từng thumbnail** — album 600 ảnh là 600 request. Điện thoại khách nối thẳng tới Vercel function, nên function đặt xa là mỗi ảnh đắt thêm một vòng.
+2. Mỗi route handler còn phải đi tiếp tới Supabase. Function ở Singapore mà database ở Sydney thì cộng thêm ~90 ms cho **mọi** truy vấn, và các endpoint chạy transaction nhiều câu lệnh (`/api/g/submit`) trả giá nhiều lần.
+
+Đặt cả hai ở Singapore: Supabase region `ap-southeast-1`, và Vercel Project Settings → Functions → Region → **Singapore (sin1)**.
 
 **GitHub integration**: bỏ qua ở Phase 0. Tính năng đó kỳ vọng bố cục `supabase/migrations/`, còn repo này dùng `db/`. Xem lại nếu sau này chuyển sang Supabase CLI migrations.
 
