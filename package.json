@@ -14,10 +14,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "db:push": "node scripts/db-push.mjs",
-    "db:seed": "node scripts/db-seed.mjs",
-    "drive:sync": "tsx scripts/sync-drive.ts",
-    "verify": "npm run typecheck && npm run lint && npm run test"
+    "db:push": "node --env-file-if-exists=.env.local scripts/db-push.mjs",
+    "db:seed": "node --env-file-if-exists=.env.local scripts/db-seed.mjs",
+    "drive:sync": "node --env-file-if-exists=.env.local --import tsx scripts/sync-drive.ts",
+    "verify": "npm run typecheck && npm run lint && npm run test",
+    "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
