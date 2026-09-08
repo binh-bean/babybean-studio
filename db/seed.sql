@@ -20,7 +20,12 @@ insert into branches (id, code, name, address, hotline, timezone) values
    'BabyBean Thủ Đức', '45 Võ Văn Ngân, Thủ Đức, TP.HCM',    '0901000002', 'Asia/Ho_Chi_Minh'),
   ('33333333-3333-3333-3333-333333333333', 'BB-GV',
    'BabyBean Gò Vấp',  '88 Quang Trung, Gò Vấp, TP.HCM',     '0901000003', 'Asia/Ho_Chi_Minh')
-on conflict (code) do nothing;
+on conflict (id) do update set
+  code = excluded.code,
+  name = excluded.name,
+  address = excluded.address,
+  hotline = excluded.hotline,
+  timezone = excluded.timezone;
 
 -- ---------------------------------------------------------------------------
 -- Packages — one shared, three branch-specific
@@ -39,7 +44,14 @@ insert into packages (id, branch_id, code, name, price, included_quota, extra_ph
    'PREMIUM', 'Gói Cao cấp',     4500000, 35, 40000, 20),
   ('aaaaaaaa-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111',
    'Q1-NEWBORN', 'Newborn Quận 1', 3800000, 30, 45000, 15)
-on conflict do nothing;
+on conflict (id) do update set
+  branch_id = excluded.branch_id,
+  code = excluded.code,
+  name = excluded.name,
+  price = excluded.price,
+  included_quota = excluded.included_quota,
+  extra_photo_price = excluded.extra_photo_price,
+  printed_photo_count = excluded.printed_photo_count;
 
 -- ---------------------------------------------------------------------------
 -- Customers and babies
@@ -56,7 +68,12 @@ insert into customers (id, branch_id, full_name, phone, zalo, source) values
    'Phạm Minh Tuấn',   '0945678901', null,         'walk_in'),
   ('cccccccc-0000-0000-0000-000000000005', '33333333-3333-3333-3333-333333333333',
    'Võ Thị Lan Anh',   '0956789012', '0956789012', 'facebook')
-on conflict do nothing;
+on conflict (id) do update set
+  branch_id = excluded.branch_id,
+  full_name = excluded.full_name,
+  phone = excluded.phone,
+  zalo = excluded.zalo,
+  source = excluded.source;
 
 insert into babies (id, customer_id, full_name, nickname, birth_date, gender) values
   ('bbbbbbbb-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000001',
@@ -65,7 +82,12 @@ insert into babies (id, customer_id, full_name, nickname, birth_date, gender) va
    'Trần Gia Khang', 'Bin',  '2026-05-15', 'male'),
   ('bbbbbbbb-0000-0000-0000-000000000003', 'cccccccc-0000-0000-0000-000000000003',
    'Lê Minh Châu',   'Sóc',  '2026-07-20', 'female')
-on conflict do nothing;
+on conflict (id) do update set
+  customer_id = excluded.customer_id,
+  full_name = excluded.full_name,
+  nickname = excluded.nickname,
+  birth_date = excluded.birth_date,
+  gender = excluded.gender;
 
 -- ---------------------------------------------------------------------------
 -- Galleries — three states so the dashboard has something to show
@@ -108,7 +130,21 @@ insert into galleries (
    'Bé Bin 100 ngày', 'submitted',
    'SEED_FOLDER_ID_003', 'https://drive.google.com/drive/folders/SEED_FOLDER_ID_003',
    35, 40000, now() - interval '1 day', now() - interval '8 days', 910, now() - interval '8 days')
-on conflict do nothing;
+on conflict (id) do update set
+  branch_id = excluded.branch_id,
+  customer_id = excluded.customer_id,
+  baby_id = excluded.baby_id,
+  package_id = excluded.package_id,
+  title = excluded.title,
+  status = excluded.status,
+  drive_folder_id = excluded.drive_folder_id,
+  drive_folder_url = excluded.drive_folder_url,
+  included_quota = excluded.included_quota,
+  extra_photo_price = excluded.extra_photo_price,
+  due_at = excluded.due_at,
+  sent_at = excluded.sent_at,
+  photo_count = excluded.photo_count,
+  last_synced_at = excluded.last_synced_at;
 
 update galleries
 set submitted_at = now() - interval '1 day'

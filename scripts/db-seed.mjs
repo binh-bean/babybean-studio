@@ -140,7 +140,11 @@ async function run() {
           await client.query(`
             INSERT INTO photos (id, gallery_id, drive_file_id, file_name, mime_type, sort_index)
             VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (id) DO NOTHING;
+            ON CONFLICT (id) DO UPDATE SET 
+              file_name = EXCLUDED.file_name,
+              drive_file_id = EXCLUDED.drive_file_id,
+              mime_type = EXCLUDED.mime_type,
+              sort_index = EXCLUDED.sort_index;
           `, [
             photoId,
             gal.id,
@@ -171,7 +175,13 @@ async function run() {
       await client.query(`
         INSERT INTO share_links (id, gallery_id, token_hash, token_prefix, role, label, requires_pin, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT (id) DO NOTHING;
+        ON CONFLICT (id) DO UPDATE SET
+          token_hash = EXCLUDED.token_hash,
+          token_prefix = EXCLUDED.token_prefix,
+          role = EXCLUDED.role,
+          label = EXCLUDED.label,
+          requires_pin = EXCLUDED.requires_pin,
+          status = EXCLUDED.status;
       `, [
         shareLinkId1,
         'dddddddd-0000-0000-0000-000000000001',
@@ -190,7 +200,13 @@ async function run() {
       await client.query(`
         INSERT INTO share_links (id, gallery_id, token_hash, token_prefix, role, label, requires_pin, status)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT (id) DO NOTHING;
+        ON CONFLICT (id) DO UPDATE SET
+          token_hash = EXCLUDED.token_hash,
+          token_prefix = EXCLUDED.token_prefix,
+          role = EXCLUDED.role,
+          label = EXCLUDED.label,
+          requires_pin = EXCLUDED.requires_pin,
+          status = EXCLUDED.status;
       `, [
         shareLinkId2,
         'dddddddd-0000-0000-0000-000000000001',
@@ -206,7 +222,9 @@ async function run() {
       await client.query(`
         INSERT INTO selections (id, gallery_id, share_link_id, is_primary, display_name)
         VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (id) DO NOTHING;
+        ON CONFLICT (id) DO UPDATE SET
+          is_primary = EXCLUDED.is_primary,
+          display_name = EXCLUDED.display_name;
       `, [
         selectionId,
         'dddddddd-0000-0000-0000-000000000001',
@@ -222,7 +240,8 @@ async function run() {
         await client.query(`
           INSERT INTO selection_items (selection_id, photo_id, gallery_id, mark)
           VALUES ($1, $2, $3, $4)
-          ON CONFLICT (selection_id, photo_id) DO NOTHING;
+          ON CONFLICT (selection_id, photo_id) DO UPDATE SET
+            mark = EXCLUDED.mark;
         `, [
           selectionId,
           photoIds[i],
@@ -240,16 +259,31 @@ async function run() {
     }
 
     console.log("--- 6. Reporting row counts ---");
-    const tables = ['staff_profiles', 'staff_branches', 'galleries', 'photos', 'selections', 'selection_items', 'share_links'];
-    for (const t of tables) {
-      if (!tables.includes(t)) throw new Error("Invalid table");
-      const res = await client.query(`SELECT COUNT(*) as count FROM ${t}`);
-      console.log(`${t}: ${res.rows[0].count} rows`);
+    const countQueries = {
+      staff_profiles: 'SELECT COUNT(*) as count FROM staff_profiles',
+      staff_branches: 'SELECT COUNT(*) as count FROM staff_branches',
+      galleries: 'SELECT COUNT(*) as count FROM galleries',
+      photos: 'SELECT COUNT(*) as count FROM photos',
+      selections: 'SELECT COUNT(*) as count FROM selections',
+      selection_items: 'SELECT COUNT(*) as count FROM selection_items',
+      share_links: 'SELECT COUNT(*) as count FROM share_links'
+    };
+
+    for (const [table, query] of Object.entries(countQueries)) {
+      const res = await client.query(query);
+      console.log(`${table}: ${res.rows[0].count} rows`);
     }
 
     console.log("--- 7. Querying v_gallery_progress ---");
     const progressRes = await client.query('SELECT * FROM v_gallery_progress');
     console.table(progressRes.rows);
+
+    console.log("\n============================================================");
+    console.log("SEEDING COMPLETED. USE THESE CREDENTIALS FOR TESTING:");
+    console.log(`Staff Password : ${seedPassword}`);
+    console.log(`Gallery Link 1 : /g/DEMO-TOKEN-NO-PIN`);
+    console.log(`Gallery Link 2 : /g/dev_token_with_pin_123 (PIN: 1234)`);
+    console.log("============================================================\n");
 
   } catch (err) {
     console.error("DB connection error:", err.message);

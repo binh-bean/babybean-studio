@@ -1,91 +1,142 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
-import { requireRole, requireBranch, AuthError } from "../../src/lib/auth/staff";
-import type { StaffSession } from "../../src/types/domain";
+import { requireRole, PERMISSIONS } from "../../src/lib/auth/staff";
 import { Client } from "pg";
 
-describe("Application Layer RBAC (Ca 1, 2, 3)", () => {
-  const mockSession = (role: any, branchIds: string[] = ["branch-A"]): StaffSession => ({
-    staffId: "user-1",
-    role,
-    branchIds,
-  });
-
-  it("Ca 1: cs chi nhánh A không đọc được album chi nhánh B (qua requireBranch)", () => {
-    const session = mockSession("cs", ["branch-A"]);
-    expect(() => requireBranch(session, "branch-A")).not.toThrow();
-    
-    let error;
-    try {
-      requireBranch(session, "branch-B");
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(AuthError);
-    expect((error as AuthError).code).toBe("FORBIDDEN");
-  });
-
-  it("Ca 2: photographer gọi PATCH /admin/galleries/:id (sửa album)", () => {
-    const session = mockSession("photographer");
-    // requireRole(staff, ['owner', 'admin', 'branch_manager', 'cs']) cho việc sửa album
-    let error;
-    try {
-      requireRole(session, ["owner", "admin", "branch_manager", "cs"]);
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(AuthError);
-    expect((error as AuthError).code).toBe("FORBIDDEN");
-  });
-
-  it("Ca 3: cs gọi POST /admin/galleries/:id/reopen (mở lại album)", () => {
-    const session = mockSession("cs");
-    // requireRole(staff, ['owner', 'admin', 'branch_manager'])
-    let error;
-    try {
-      requireRole(session, ["owner", "admin", "branch_manager"]);
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(AuthError);
-    expect((error as AuthError).code).toBe("FORBIDDEN");
-  });
-});
-
-describe("Database RLS Policies (Ca 4, 5, 6)", () => {
+describe("Database RLS Policies & Security (BB-020)", () => {
   let client: Client;
 
   beforeAll(async () => {
-    // Requires process.env.SUPABASE_DB_URL to be set
     client = new Client({
       connectionString: process.env.SUPABASE_DB_URL,
     });
     await client.connect();
+
+    const { rows } = await client.query("SELECT COUNT(*) FROM staff_profiles");
+    if (parseInt(rows[0].count, 10) === 0) {
+      throw new Error("Dữ liệu trống, cần chạy npm run db:seed trước khi chạy test");
+    }
   });
 
   afterAll(async () => {
     await client.end();
   });
 
-  it("Ca 1: cs chi nhánh A đọc album chi nhánh B -> 0 dòng (RLS lọc)", async () => {
+  it("Ca 1: cs chi nhánh thấy album chi nhánh mình và KHÔNG thấy album chi nhánh khác", async () => {
     await client.query("BEGIN");
+    
+    // Tìm 1 nhân viên CS
+    const csRes = await client.query("SELECT id FROM staff_profiles WHERE role = 'cs' LIMIT 1");
+    expect(csRes.rows.length).toBe(1);
+    const csId = csRes.rows[0].id;
+
+    // Tìm branch mà CS này quản lý
+    const sbRes = await client.query("SELECT branch_id FROM staff_branches WHERE staff_id = $1 LIMIT 1", [csId]);
+    expect(sbRes.rows.length).toBe(1);
+    const csBranchId = sbRes.rows[0].branch_id;
+
+    // Đăng nhập làm CS này
     await client.query("SET LOCAL ROLE authenticated");
-    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}'`);
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${csId}", "role": "authenticated"}'`);
     
-    // Create a mock branch and assign it to this user? Wait, the seed script already has branches and galleries!
-    // But we don't know the branch UUIDs exactly. We can just run a SELECT and ensure we get 0 or only our own branch's data.
-    // If we just select galleries as a user who is NOT in any staff_branches (since ID is fake), it should return 0 rows!
+    // Đọc galleries
     const res = await client.query("SELECT * FROM galleries");
-    expect(res.rows.length).toBe(0);
     
+    // Phải thấy ít nhất 1 album của chi nhánh mình (từ seed)
+    const ownGalleries = res.rows.filter(g => g.branch_id === csBranchId);
+    expect(ownGalleries.length).toBeGreaterThan(0);
+    
+    // Không được có album nào thuộc chi nhánh khác
+    const otherGalleries = res.rows.filter(g => g.branch_id !== csBranchId);
+    expect(otherGalleries.length).toBe(0);
+    
+    await client.query("ROLLBACK");
+  });
+
+  it("Ca 2 (Lỗ hổng 0001): photographer KHÔNG được phép sửa hồ sơ khách hàng", async () => {
+    await client.query("BEGIN");
+
+    // Lấy 1 photographer và 1 customer của chính photographer đó (cùng branch)
+    const photoRes = await client.query("SELECT id FROM staff_profiles WHERE role = 'photographer' LIMIT 1");
+    expect(photoRes.rows.length).toBe(1);
+    const photoId = photoRes.rows[0].id;
+
+    const sbRes = await client.query("SELECT branch_id FROM staff_branches WHERE staff_id = $1 LIMIT 1", [photoId]);
+    const photoBranchId = sbRes.rows[0].branch_id;
+
+    const custRes = await client.query("SELECT id FROM customers WHERE branch_id = $1 LIMIT 1", [photoBranchId]);
+    expect(custRes.rows.length).toBe(1);
+    const custId = custRes.rows[0].id;
+
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${photoId}", "role": "authenticated"}'`);
+
+    const updateRes = await client.query("UPDATE customers SET full_name = 'Hacked Name' WHERE id = $1", [custId]);
+    // RLS sẽ chặn update, do USING clause của policy false nên không tìm thấy dòng để update
+    expect(updateRes.rowCount).toBe(0);
+
+    // Kiểm tra lại bằng cách vượt quyền, đảm bảo tên không đổi
+    await client.query("SET LOCAL ROLE postgres");
+    const checkRes = await client.query("SELECT full_name FROM customers WHERE id = $1", [custId]);
+    expect(checkRes.rows[0].full_name).not.toBe('Hacked Name');
+
+    await client.query("ROLLBACK");
+  });
+
+  it("Ca 3: cs gọi POST /admin/galleries/:id/reopen (mở lại album) -> 403 ở tầng ứng dụng", () => {
+    // Tránh lập luận vòng tròn bằng cách sử dụng PERMISSIONS export từ src/lib/auth/staff
+    const session = {
+      staffId: "user-cs",
+      role: "cs" as const,
+      branchIds: []
+    };
+    let error: unknown;
+    try {
+      requireRole(session, PERMISSIONS.REOPEN_GALLERY);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeDefined();
+    expect(error.code).toBe("FORBIDDEN");
+  });
+
+  it("Đối chứng dương: cs SỬA được khách hàng của chính chi nhánh mình", async () => {
+    await client.query("BEGIN");
+
+    // Lấy 1 cs
+    const csRes = await client.query("SELECT id FROM staff_profiles WHERE role = 'cs' LIMIT 1");
+    const csId = csRes.rows[0].id;
+
+    const sbRes = await client.query("SELECT branch_id FROM staff_branches WHERE staff_id = $1 LIMIT 1", [csId]);
+    const csBranchId = sbRes.rows[0].branch_id;
+
+    // Lấy 1 khách hàng của cùng chi nhánh
+    const custRes = await client.query("SELECT id, full_name FROM customers WHERE branch_id = $1 LIMIT 1", [csBranchId]);
+    const custId = custRes.rows[0].id;
+
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${csId}", "role": "authenticated"}'`);
+
+    // Sửa khách hàng thành công
+    await client.query("UPDATE customers SET full_name = 'New Name' WHERE id = $1", [custId]);
+    
+    // Đọc lại xem có sửa được không
+    const checkRes = await client.query("SELECT full_name FROM customers WHERE id = $1", [custId]);
+    expect(checkRes.rows[0].full_name).toBe("New Name");
+
     await client.query("ROLLBACK");
   });
 
   it("Ca 4: Nhân viên bất kỳ UPDATE selection_items -> lỗi RLS/quyền", async () => {
     await client.query("BEGIN");
+    
+    // Lấy 1 cs
+    const csRes = await client.query("SELECT id FROM staff_profiles WHERE role = 'cs' LIMIT 1");
+    const csId = csRes.rows[0].id;
+    
     await client.query("SET LOCAL ROLE authenticated");
-    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}'`);
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${csId}", "role": "authenticated"}'`);
     
     let error;
     try {
@@ -102,29 +153,24 @@ describe("Database RLS Policies (Ca 4, 5, 6)", () => {
 
   it("Ca 5: Nhân viên tự UPDATE role của mình -> lỗi RLS", async () => {
     await client.query("BEGIN");
+
+    // Lấy 1 cs
+    const csRes = await client.query("SELECT id FROM staff_profiles WHERE role = 'cs' LIMIT 1");
+    const csId = csRes.rows[0].id;
+
     await client.query("SET LOCAL ROLE authenticated");
-    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "00000000-0000-0000-0000-000000000001", "role": "authenticated"}'`);
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${csId}", "role": "authenticated"}'`);
 
     let error;
     try {
-      // Trying to update role on themselves
-      await client.query("UPDATE staff_profiles SET role = 'owner' WHERE id = '00000000-0000-0000-0000-000000000001'");
+      await client.query("UPDATE staff_profiles SET role = 'owner' WHERE id = $1", [csId]);
     } catch (e) {
       error = e;
     }
     
-    // Might not throw if 0 rows updated due to RLS filter, but with CHECK it throws if they try to change the role
-    if (error) {
-       expect((error as Error).message).toMatch(/new row violates row-level security policy/i);
-    } else {
-       // Wait, if no row is found, it just succeeds with 0 rows updated.
-       // However, the test is to prove they CANNOT update. So long as it doesn't actually update it to owner, we are good.
-       // We can assert error is defined since we expect a violation, but if 0 rows it's also a form of failure.
-       // Let's just expect the query to throw a check violation if the row exists, or silently do nothing if it doesn't.
-       // The requirement says "lỗi RLS", so we expect an error.
-       // If the row doesn't exist in dev db, it updates 0 rows and doesn't throw check violation!
-       // Let's insert a dummy row to ensure it throws!
-    }
+    expect(error).toBeDefined();
+    expect((error as Error).message).toMatch(/new row violates row-level security policy|permission denied/i);
+    
     await client.query("ROLLBACK");
   });
 

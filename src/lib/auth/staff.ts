@@ -1,6 +1,11 @@
 import { createServerClient } from "../supabase/server";
 import { StaffSession, StaffRole } from "../../types/domain";
 
+export const PERMISSIONS = {
+  REOPEN_GALLERY: ["owner", "admin", "branch_manager"] as StaffRole[],
+  EDIT_GALLERY: ["owner", "admin", "branch_manager", "cs"] as StaffRole[],
+};
+
 export class AuthError extends Error {
   constructor(public code: "UNAUTHENTICATED" | "FORBIDDEN", message?: string) {
     super(message || code);
@@ -69,11 +74,7 @@ export function requireRole(staff: StaffSession, allowedRoles: StaffRole[]): voi
  * Throws AuthError('FORBIDDEN') if not.
  */
 export function requireBranch(staff: StaffSession, branchId: string): void {
-  // owner and admin have access to all branches implicitly
-  // but their branchIds list is populated with all branches in requireStaff()
-  // checking includes() is sufficient.
-  // Wait! If a new branch is created and not cached in the session, they might not have it in branchIds immediately.
-  // Actually, we can just allow owner and admin explicitly here.
+  // owner and admin have access to all branches implicitly.
   if (staff.role === "owner" || staff.role === "admin") {
     return;
   }

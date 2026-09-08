@@ -187,6 +187,29 @@ Chạy lệnh này **trước khi báo xong**. Sửa file của agent khác tron
 **Nhánh**: `feat/BB-012-photo-grid`, `fix/BB-031-quota-race`, `chore/BB-004-ci`
 **Commit**: `feat(BB-012): virtualized photo grid for 1000+ images`
 
+### Chạy nhiều agent song song
+
+Một thư mục chỉ checkout được một nhánh. Hai agent cùng làm trong một thư mục sẽ ghi đè lên nhau, và `verify:own` không phân biệt được ai sửa gì — chuyện đã xảy ra ở BB-008/BB-020.
+
+**Từ hai agent trở lên: mỗi agent một worktree riêng.**
+
+```bash
+git worktree add ../bb-008 -b feat/BB-008-seed
+git worktree add ../bb-020 -b feat/BB-020-auth
+```
+
+Mỗi worktree cần `npm install` và bản `.env.local` riêng (file này bị gitignore nên không tự sang). Trong Antigravity, trỏ project của mỗi agent vào đúng thư mục worktree của nó.
+
+Khi đó cổng kiểm chạy chính xác:
+
+```bash
+npm run verify:own -- DEV-BE --base main
+```
+
+Xong việc thì merge về `main` rồi `git worktree remove ../bb-008`.
+
+**Nếu buộc phải dùng chung một thư mục** (chỉ nên khi có đúng một agent chạy): dùng `--only` liệt kê đúng file mình sửa, vì chế độ mặc định sẽ tính cả file của agent khác.
+
 **Khi bị chặn**: ghi vào `tasks/BLOCKERS.md` theo mẫu
 `BB-xxx | agent | mô tả chặn | cần ai quyết` — không tự đoán rồi làm tiếp.
 
