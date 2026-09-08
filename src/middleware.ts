@@ -19,7 +19,7 @@ interface CookieToSet {
   options?: Record<string, unknown>;
 }
 
-const PUBLIC_PATHS = ["/login", "/api/auth", "/api/webhooks", "/api/cron"];
+const PUBLIC_PATHS = ["/api/auth", "/api/webhooks", "/api/cron"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
