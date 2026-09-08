@@ -56,6 +56,22 @@ Có một dòng `branches` thật trong bảng lúc kiểm, nên "0 dòng" là d
 |---|---|---|
 | `INSERT` vào `selection_items` | 403 | Bị chặn đúng — quy tắc "không ai sửa lựa chọn của khách" (`docs/05-rbac.md §2`) hoạt động |
 
+### 2.4 Sáu test phủ định — chạy bằng kết nối Postgres trực tiếp
+
+Tạo 2 chi nhánh, 2 nhân sự thật (một `cs` ở CN A, một `photographer` ở CN B), rồi giả lập từng vai bằng `set local role authenticated` cộng `request.jwt.claims`.
+
+| # | Kịch bản | Kết quả |
+|---|---|---|
+| 1 | `cs` chi nhánh A đọc album chi nhánh B | 0 dòng — RLS lọc đúng |
+| 2 | `photographer` UPDATE `customers` | **HỎNG lần đầu — sửa được 1 dòng** → xem §3.4 |
+| 3 | Nhân viên UPDATE `selection_items` | permission denied |
+| 4 | Nhân viên tự nâng mình lên `owner` | vi phạm RLS policy |
+| 5 | `anon` SELECT `galleries` | permission denied |
+| 6 | `cs` DELETE `activity_logs` | permission denied |
+| 7 | `cs` sửa khách của **chính chi nhánh mình** | sửa 1 dòng — quyền hợp lệ không bị cắt nhầm |
+
+Sau khi vá: **7/7 đạt**. Toàn bộ dữ liệu và tài khoản kiểm thử đã xoá;  hiện rỗng.
+
 Dữ liệu và tài khoản kiểm thử đã xoá sau khi chạy.
 
 ## 3. Lỗi phát hiện trong scaffold và đã sửa
@@ -67,6 +83,25 @@ Dữ liệu và tài khoản kiểm thử đã xoá sau khi chạy.
 Nguyên nhân gốc: Supabase bình thường tự cấp quyền cho bảng mới, nhưng dự án này **cố ý tắt** "Automatically expose new tables". Đó là lựa chọn đúng, nhưng nó có nghĩa là **mọi vai trò đều phải được cấp quyền tường minh** — tôi viết ra cảnh báo đó trong `docs/11-deployment.md §1b` rồi lại quên áp cho `service_role`.
 
 Đã thêm vào cuối `db/policies.sql`, kèm `alter default privileges` để bảng do migration sau này tạo ra không lặp lại lỗi này.
+
+### 3.4 Thợ ảnh sửa được hồ sơ khách hàng — lỗ hổng phân quyền
+
+Test phủ định số 2 bắt được: một `photographer` UPDATE thành công một dòng trong `customers`, trong khi `docs/05-rbac.md §2` cho vai này quyền **đọc**, không phải sửa.
+
+Nguyên nhân: `app.can_write()` gộp `photographer` vào nhóm được ghi — đúng, vì thợ ảnh cần tạo album và đồng bộ ảnh. Nhưng policy của `customers` và `babies` dùng chung hàm đó, nên quyền bị cấp lây sang dữ liệu khách hàng.
+
+Đây là leo thang quyền trong nội bộ: thợ ảnh sửa được số điện thoại, ghi chú, thậm chí tên của khách ở chi nhánh mình — không ai phát hiện được vì hành động đó trông hợp lệ.
+
+Sửa bằng `db/migrations/0001-fix-customer-write-permission.sql`: tách thành hai vị từ.
+
+| Hàm | Dùng cho | Có `photographer`? |
+|---|---|---|
+| `app.can_write()` | album, ảnh, buổi chụp | có |
+| `app.can_manage_customers()` | khách hàng, bé | **không** |
+
+Kiểm lại sau khi vá: test 2 đạt, và test 7 xác nhận `cs` vẫn sửa được khách của chi nhánh mình — bản vá không cắt nhầm quyền hợp lệ.
+
+**Bài học**: một vị từ quyền dùng chung cho nhiều loại dữ liệu sẽ rò quyền giữa các loại đó. Mỗi nhóm dữ liệu có ma trận quyền riêng thì phải có vị từ riêng.
 
 ### 3.2 Script `node` không nạp `.env.local`
 
@@ -80,9 +115,9 @@ BB-003 ban đầu chỉ nói "áp schema lên bb-dev" mà không nói kết nố
 
 | Việc | Trạng thái |
 |---|---|
-| `scripts/db-push.mjs` | Agent đã viết, **chưa chạy thử được** vì `SUPABASE_DB_URL` chưa xác thực — xem `tasks/BLOCKERS.md` |
+| `scripts/db-push.mjs` | Agent đã viết, chưa chạy thử. `SUPABASE_DB_URL` **đã thông** — kiểm được rồi |
 | Seed dữ liệu mẫu | BB-008, chưa làm |
-| 6 test phủ định đầy đủ trong `tests/security/` | BB-054; hiện mới kiểm thủ công các ca quan trọng nhất |
+| Tự động hoá 7 test phủ định vào `tests/security/` | BB-054 — hiện đã chạy thủ công, đạt 7/7 |
 
 **Không việc nào trong số này chặn Phase 0.** Schema đã có, RLS đã đúng, các task phụ thuộc (BB-006, BB-007, BB-008, BB-020) mở khoá được.
 

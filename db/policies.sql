@@ -47,12 +47,25 @@ language sql stable security definer set search_path = public as $$
   select p_branch is null or p_branch in (select app.my_branches());
 $$;
 
--- Vai trò được phép ghi dữ liệu nghiệp vụ (không chỉ đọc).
+-- Được ghi dữ liệu SẢN XUẤT: album, ảnh, buổi chụp. Thợ ảnh nằm trong nhóm này
+-- vì họ tạo album và đồng bộ ảnh.
 create or replace function app.can_write()
 returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce(
     app.my_role() in ('owner','admin','branch_manager','cs','photographer'),
+    false);
+$$;
+
+-- Được ghi dữ liệu KHÁCH HÀNG: customers, babies. KHÔNG có thợ ảnh —
+-- docs/05-rbac.md §2 cho photographer quyền đọc, không phải sửa.
+-- Tách khỏi can_write() sau khi test phủ định số 2 của BB-003 bắt được lỗi
+-- thợ ảnh sửa được hồ sơ khách.
+create or replace function app.can_manage_customers()
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select coalesce(
+    app.my_role() in ('owner','admin','branch_manager','cs'),
     false);
 $$;
 
@@ -127,8 +140,8 @@ create policy customers_select on customers for select to authenticated
   using (app.can_see_branch(branch_id));
 
 create policy customers_write on customers for all to authenticated
-  using (app.can_see_branch(branch_id) and app.can_write())
-  with check (app.can_see_branch(branch_id) and app.can_write());
+  using (app.can_see_branch(branch_id) and app.can_manage_customers())
+  with check (app.can_see_branch(branch_id) and app.can_manage_customers());
 
 create policy babies_select on babies for select to authenticated
   using (exists (
@@ -139,11 +152,11 @@ create policy babies_write on babies for all to authenticated
   using (exists (
     select 1 from customers c
     where c.id = babies.customer_id and app.can_see_branch(c.branch_id))
-    and app.can_write())
+    and app.can_manage_customers())
   with check (exists (
     select 1 from customers c
     where c.id = babies.customer_id and app.can_see_branch(c.branch_id))
-    and app.can_write());
+    and app.can_manage_customers());
 
 -- ---------------------------------------------------------------------------
 -- packages
