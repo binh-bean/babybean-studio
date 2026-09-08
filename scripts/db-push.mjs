@@ -39,6 +39,20 @@ async function run() {
   try {
     await client.connect();
     console.log("Connected to database successfully.");
+
+    // Check if database is already initialized
+    const checkRes = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'branches'
+      );
+    `);
+
+    if (checkRes.rows[0].exists) {
+      console.log("Database đã được khởi tạo. Bỏ qua chạy schema.");
+      process.exit(0);
+    }
     
     // Push schema
     const schemaPath = path.resolve(__dirname, '../db/schema.sql');
