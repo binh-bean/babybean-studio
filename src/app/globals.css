@@ -1,0 +1,9 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+body {
+  background: var(--bb-bg);
+  color: var(--bb-fg);
+  font-family: var(--bb-font-sans);
+  -webkit-font-smoothing: antialiased;
+}

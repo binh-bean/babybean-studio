@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          APP_SECRET: placeholder-secret-at-least-32-characters
+
+      # Secrets must never reach the browser bundle. See docs/12-security.md §5.
+      - name: Scan client bundle for secrets
+        run: |
+          if grep -rlE "SUPABASE_SERVICE_ROLE_KEY|GOOGLE_DRIVE_API_KEY|APP_SECRET" .next/static/ 2>/dev/null; then
+            echo "::error::Secret name found in client bundle"
+            exit 1
+          fi
+          echo "Client bundle clean"

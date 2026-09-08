@@ -1,0 +1,42 @@
+/* Design tokens — OWNER: DEV-UI. Task BB-002.
+   Source of truth: docs/07-ui-ux.md §2. Keep the two in sync. */
+
+:root {
+  --bb-primary: #e8a598;
+  --bb-primary-fg: #ffffff;
+  --bb-accent: #7fa99b;
+  --bb-cream: #fbf7f2;
+
+  --bb-bg: #fbf7f2;
+  --bb-surface: #ffffff;
+  --bb-surface-2: #f3ede6;
+  --bb-border: #e5dcd2;
+
+  --bb-fg: #2e2a27;
+  --bb-fg-muted: #7a716a;
+
+  --bb-success: #4e9a6b;
+  --bb-warning: #d9932b;
+  --bb-danger: #c4553f;
+
+  /* The lightbox is always dark so the photo carries the screen. */
+  --bb-viewer-bg: #16130f;
+
+  --bb-radius: 12px;
+  --bb-radius-sm: 8px;
+  --bb-shadow: 0 1px 3px rgb(46 42 39 / 8%), 0 8px 24px rgb(46 42 39 / 6%);
+
+  --bb-font-sans: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+  --bb-font-display: "Playfair Display", Georgia, serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bb-bg: #16130f;
+    --bb-surface: #211d19;
+    --bb-surface-2: #2b2621;
+    --bb-border: #3a332c;
+    --bb-fg: #f2ede7;
+    --bb-fg-muted: #a69b91;
+  }
+}
