@@ -308,6 +308,45 @@ revoke all on all tables in schema public from anon;
 revoke all on all functions in schema public from anon;
 revoke all on schema app from anon;
 
+-- ---------------------------------------------------------------------------
+-- Table privileges for staff.
+--
+-- The Supabase project is created with "Automatically expose new tables"
+-- DISABLED, so nothing is granted by default. Policies alone are not enough:
+-- Postgres checks privileges BEFORE it evaluates any policy, so a role with no
+-- privilege is refused outright and the error looks nothing like an RLS denial
+-- ("permission denied for table galleries").
+--
+-- Grants say which operations may be ATTEMPTED. The policies above decide which
+-- rows are actually visible or writable. Both layers are required.
+--
+-- When a migration adds a table, it must add its grant here too. Forgetting is
+-- safe in the right direction: the table is unreachable until someone does.
+-- ---------------------------------------------------------------------------
+
+grant usage on schema public to authenticated;
+
+grant select, insert, update, delete on
+  branches, staff_profiles, staff_branches, customers, babies, packages,
+  shoots, galleries, photos, share_links, selections, deliveries,
+  notifications, settings
+to authenticated;
+
+-- Read-only for staff: a customer's selection is evidence in a dispute and
+-- nobody edits it (docs/05-rbac.md §2). The policy denies writes; withholding
+-- the privilege means the attempt fails even if that policy is ever changed.
+grant select on selection_items to authenticated;
+
+-- Append-only audit log. No update, no delete, for anyone.
+grant select, insert on activity_logs to authenticated;
+grant usage, select on sequence activity_logs_id_seq to authenticated;
+
+-- Views used by the admin screens.
+grant select on v_share_links, v_gallery_progress to authenticated;
+
+-- selection_ops is idempotency bookkeeping written only by the service role.
+-- Deliberately no grant.
+
 -- Policy expressions are evaluated as the querying role, so `authenticated`
 -- must be able to call the helpers. They are SECURITY DEFINER and expose
 -- nothing beyond the caller's own role/branches.
