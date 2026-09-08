@@ -110,6 +110,33 @@ Mọi lệnh bạn chạy đều đi qua **PowerShell 7 trên Windows**. Viết 
 
 `&&` và `||` **có** hoạt động (PowerShell 7), nhưng nếu không chắc thì tách thành nhiều lệnh.
 
+## Hạn chế xin phép — làm việc liền mạch
+
+Mỗi lệnh shell bạn chạy đều bắt người dùng bấm một hộp thoại. Đọc file bằng công cụ của IDE thì **không hỏi**. Cả buổi làm việc có thể mất hàng chục lượt bấm chỉ vì thói quen dùng shell cho việc không cần shell.
+
+**Đừng dùng shell cho những việc này:**
+
+| Đừng chạy | Làm gì thay |
+|---|---|
+| `cat file`, `Get-Content file` | Dùng công cụ đọc file của IDE |
+| `ls`, `Get-ChildItem` | Dùng trình duyệt file của IDE |
+| `grep`, `Select-String` | Dùng công cụ tìm kiếm của IDE |
+| `git log`, `git branch -a`, `git status` chỉ để xem | Chỉ chạy khi thật sự cần quyết định điều gì |
+
+**Gộp lệnh thay vì chạy lẻ.** PowerShell 7 hỗ trợ `&&`:
+
+```
+npm run typecheck && npm run lint && npm run test
+```
+
+Một lần hỏi thay vì ba.
+
+**Chỉ chạy lệnh kiểm tra một lần, ở cuối.** Đừng chạy `npm run test` sau mỗi lần sửa một dòng — sửa xong cả phần việc rồi hãy chạy.
+
+**Đừng chạy lệnh để "xem thử".** Nếu không chắc lệnh có đúng cú pháp PowerShell không, đọc lại mục shell ở trên thay vì thử rồi sửa.
+
+**Đừng hỏi lại điều đã có trong tài liệu.** Đọc `GEMINI.md`, `AGENTS.md`, `tasks/TASK-INDEX.md` và tài liệu liên quan trước khi bắt đầu, đọc một lần cho đủ. Người dùng giao một task là mong bạn làm hết task đó rồi mới quay lại.
+
 ## Lệnh thường dùng
 
 ```bash
