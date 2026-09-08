@@ -30,7 +30,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-005 | Nối Vercel, cấu hình env cho 3 môi trường, deploy trang trắng | DEV-OPS | BB-001 | low | TODO |
 | BB-006 | Đối chiếu `src/types/domain.ts` với `schema.sql`, bổ sung type còn thiếu | ARCH | BB-003 | med | TODO |
 | BB-007 | Hoàn thiện `lib/supabase/{server,admin,client}.ts` + ESLint rule cấm import `admin.ts` ngoài `api/` và `scripts/` | DEV-BE | BB-003 | med | TODO |
-| BB-008 | Hoàn thiện seed. `db/seed.sql` **đã có** chi nhánh, gói, khách, bé, album, settings. **Còn thiếu**: `staff_profiles` + `staff_branches` (phải tạo `auth.users` trước qua Auth admin API), `photos` cho 3 album, và 1 `selection` primary kèm ~18 `selection_items` để `v_gallery_progress` không rỗng. Viết `scripts/db-seed.mjs` làm cả hai bước. **Dữ liệu giả 100%** — `AGENTS.md §6` . **Nghiệm thu: `npm run verify:db:seed` phải xanh 19/19, dán kết quả vào báo cáo** | DEV-BE | BB-003 ✅ | low | DONE |
+| BB-008 | Hoàn thiện seed. `db/seed.sql` **đã có** chi nhánh, gói, khách, bé, album, settings. **Còn thiếu**: `staff_profiles` + `staff_branches` (phải tạo `auth.users` trước qua Auth admin API), `photos` cho 3 album, và 1 `selection` primary kèm ~18 `selection_items` để `v_gallery_progress` không rỗng. Viết `scripts/db-seed.mjs` làm cả hai bước. **Dữ liệu giả 100%** — `AGENTS.md §6` . **Nghiệm thu: `npm run verify:db:seed` phải xanh 19/19, dán kết quả vào báo cáo** | DEV-BE | BB-003 ✅ | low | ✅ **DONE** — verify:db:seed 19/19, 2 token dev khớp sha256, dữ liệu giả 100% |
 
 **Cổng ra Phase 0**: `npm run verify` xanh · deploy Vercel thành công · đăng nhập Supabase hoạt động.
 
@@ -55,7 +55,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
-| BB-020 | Đăng nhập nhân viên + `middleware.ts` + `src/lib/auth/staff.ts` (`requireStaff`/`requireRole`/`requireBranch`). Vai trò phải khớp `docs/05-rbac.md §2` — chú ý `photographer` **không** được sửa khách hàng (xem migration 0001) | SEC-ARCH | BB-003 ✅ | high | **SẴN SÀNG** |
+| BB-020 | Đăng nhập nhân viên + `middleware.ts` + `src/lib/auth/staff.ts` (`requireStaff`/`requireRole`/`requireBranch`). Vai trò phải khớp `docs/05-rbac.md §2` — chú ý `photographer` **không** được sửa khách hàng (xem migration 0001) | SEC-ARCH | BB-003 ✅ | high | ✅ **DONE** — 7 test RLS chạy trên db thật, mutation-test xác nhận có tác dụng |
 | BB-021 | Layout admin: sidebar, bộ chọn chi nhánh, breadcrumb | DEV-FE | BB-002, BB-020 | low | TODO |
 | BB-022 | Wizard tạo album 3 bước (nguồn ảnh → thông tin → luật chọn) | DEV-FE | BB-013, BB-021 | med | TODO |
 | BB-023 | `POST /api/admin/galleries`: tạo gallery + share_link, sinh token 22 ký tự, hash PIN | DEV-BE | BB-007, BB-020 | high | TODO |
