@@ -88,6 +88,24 @@ tasks/                         # backlog BB-xxx
 tests/                         # QA-BOT
 ```
 
+## Shell trên máy dev là PowerShell, không phải bash
+
+Mọi lệnh bạn chạy đều đi qua **PowerShell 7 trên Windows**. Viết lệnh theo phản xạ bash sẽ lỗi.
+
+| Đừng dùng | Vì sao | Dùng thay |
+|---|---|---|
+| `cat << 'EOF' > file` | PowerShell không có heredoc; `<<` là toán tử bị cấm, lỗi cú pháp | **Công cụ sửa file của Antigravity** — chạy được mọi nền và hiện diff để review |
+| `ls -la` | `ls` là bí danh của `Get-ChildItem`, không có cờ `-la` | `ls` hoặc `Get-ChildItem -Force` |
+| `touch file` | không tồn tại | `New-Item -ItemType File path` (đừng dùng `-Force` với file — nó xoá sạch nội dung) |
+| `which x` | không tồn tại | `(Get-Command x).Source` |
+| `head` / `tail` | không tồn tại | `Get-Content f -TotalCount N` / `-Tail N` |
+| `export VAR=x` | không tồn tại | `$env:VAR = 'x'` |
+| `2>/dev/null` | không tồn tại | `2>$null` |
+
+**Ghi file: luôn dùng công cụ sửa file, không dùng chuyển hướng shell.** Đây là quy tắc quan trọng nhất ở đây — ghi file bằng `>` trên PowerShell vừa dễ lỗi mã hoá, vừa không để lại diff cho người review.
+
+`&&` và `||` **có** hoạt động (PowerShell 7), nhưng nếu không chắc thì tách thành nhiều lệnh.
+
 ## Lệnh thường dùng
 
 ```bash
