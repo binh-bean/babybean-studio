@@ -18,7 +18,11 @@
 1. Đọc `AGENTS.md` để biết mình được ghi file nào. **Không ghi ngoài vùng sở hữu.**
 2. Hợp đồng chung không được đổi tuỳ tiện: `db/schema.sql`, `docs/04-api-spec.md`, `src/types/domain.ts`.
 3. Không có mã task `BB-xxx` thì không code.
-4. Ngôn ngữ: **tài liệu tiếng Việt**, **code/identifier/commit tiếng Anh**.
+4. Ngôn ngữ:
+   - **Nói chuyện với người dùng: luôn bằng tiếng Việt.** Áp dụng cho mọi thứ người dùng đọc — câu hỏi xin phép chạy lệnh, mô tả ngắn của lệnh, báo cáo, giải thích, thông báo lỗi bạn viết ra. Người quản trị dự án không đọc tiếng Anh.
+   - **Tài liệu trong repo: tiếng Việt.**
+   - **Code, tên biến/hàm, comment trong code, commit message: tiếng Anh.** Đây là ranh giới cố định, đừng dịch code sang tiếng Việt.
+   - Thuật ngữ kỹ thuật giữ nguyên tiếng Anh khi không có từ tiếng Việt gọn hơn (RLS, policy, migration, commit, worktree...) — đừng dịch cưỡng ép.
 5. TypeScript `strict`, không dùng `any`. Không `// @ts-ignore` nếu chưa ghi lý do.
 6. Không commit secret. Không đưa service-role key xuống client.
 7. Ảnh trẻ em là dữ liệu nhạy cảm — xem `docs/12-security.md`.
