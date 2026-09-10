@@ -13,6 +13,21 @@ Chủ sở hữu: **DEV-OPS**.
 
 **Quy tắc**: Preview và Staging **không bao giờ** trỏ vào `bb-prod`. Dữ liệu khách thật không được lọt sang môi trường thử.
 
+## 1a. Vercel — thông tin thật
+
+| Mục | Giá trị |
+|---|---|
+| Vercel team | `Binh-Bean` (gói Hobby) |
+| Project | `babybean-studio` |
+| URL production | `https://babybean-studio.vercel.app` |
+| Nguồn | GitHub `binh-bean/babybean-studio`, nhánh `main` |
+| Function Region | **Singapore `sin1`** — phải khớp region Supabase, xem §1b |
+
+Deploy được kích hoạt bằng cách **push lên `main`**. Vercel không tự chạy lần đầu sau khi nối repo; phải có một commit mới.
+
+Biến môi trường đã đặt trên Vercel (5 biến, không có `SUPABASE_DB_URL` — biến đó chỉ dùng cho script chạy ở máy dev):
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_SECRET`, `NEXT_PUBLIC_APP_URL`, `CUSTOMER_SESSION_TTL`.
+
 ## 1b. Cài đặt khi tạo project Supabase
 
 Bốn lựa chọn ở màn hình "Create a new project" quyết định mô hình bảo mật. Đặt giống nhau cho cả `bb-dev`, `bb-staging`, `bb-prod`.
