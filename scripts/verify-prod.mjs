@@ -19,7 +19,14 @@
  */
 
 const DEFAULT_URL = "https://babybean-studio.vercel.app";
-const base = (process.argv[2] || process.env.NEXT_PUBLIC_APP_URL || DEFAULT_URL).replace(/\/$/, "");
+
+/**
+ * Deliberately NOT NEXT_PUBLIC_APP_URL: on a dev machine that points at
+ * localhost:3000, and a "production" check that quietly tests your own laptop
+ * is worse than no check at all. Explicit argument, then an explicit PROD_URL,
+ * then the real production site.
+ */
+const base = (process.argv[2] || process.env.PROD_URL || DEFAULT_URL).replace(/\/$/, "");
 
 /** Seeded in bb-dev, contains no real customer data. */
 const DEMO_TOKEN = "DEMO-TOKEN-NO-PIN";
