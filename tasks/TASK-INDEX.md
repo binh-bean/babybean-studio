@@ -118,6 +118,9 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-073 | Migration `0003`: accountant không xem được ảnh — đồng bộ `policies.sql` sang `db/migrations/` | ARCH | BB-020 | low | TODO |
 | BB-074 | Font thương hiệu không nạp trên production: `@import` trong `tokens.css` bị CSS optimizer loại bỏ | DEV-UI | BB-040 | high | TODO |
 | BB-075 | `middleware.ts` `return` redirect trước khi gắn header an ninh — `/admin` ra ngoài không CSP, không `Referrer-Policy` | SEC-ARCH | BB-020 | med | TODO |
+| BB-076 | Seed hỏng: `dev_token_with_pin_123` có `requires_pin=true` mà `pin_hash` NULL; link 2 không có `selections`; thiếu link revoked/expired/locked để test | DEV-BE | BB-008 | med | TODO |
+| BB-077 | Tài liệu mâu thuẫn code: `02-architecture.md` §2.2 thiếu `selection_id` trong cookie; `05-rbac.md` §5 hứa "đổi PIN thu hồi phiên" mà schema không làm được | ARCH | BB-030 | med | TODO |
+| BB-078 | Một cookie `bb_gs` cho mọi album: khách quay lại lần 2 mở album mới sẽ bị đăng xuất khỏi album cũ | SEC-ARCH + DEV-BE | BB-030 | med | HOÃN — quyết định sau Phase 1 |
 
 ---
 
