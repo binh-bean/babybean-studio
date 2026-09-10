@@ -76,6 +76,13 @@ export const en: Messages = {
     sheet: {
       closeAria: "Close",
     },
+    pwa: {
+      installTitle: "Install BabyBean App",
+      installDesc: "Add BabyBean to your home screen for quicker and easier photo viewing and selection.",
+      installCta: "Add to home screen",
+      installLater: "Maybe later",
+      iosInstructions: "To add to home screen: tap the Share button in Safari, then select 'Add to Home Screen'.",
+    },
   },
   gallery: {
     pinTitle: "Enter the last 4 digits of your registered phone number",

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDFBF7"/>
+      <stop offset="100%" stop-color="#F3ECE3"/>
+    </linearGradient>
+
+    <!-- Primary Bean Gradient -->
+    <linearGradient id="beanGrad" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#F2B7AC"/>
+      <stop offset="100%" stop-color="#DE9385"/>
+    </linearGradient>
+
+    <!-- Sprout Leaf Gradient -->
+    <linearGradient id="leafGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6F998B"/>
+      <stop offset="100%" stop-color="#93BEB0"/>
+    </linearGradient>
+
+    <!-- Drop Shadow Filter -->
+    <filter id="softShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#2E2A27" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect x="24" y="24" width="464" height="464" rx="120" fill="url(#bgGrad)" stroke="#E5DCD2" stroke-width="4"/>
+
+  <!-- Subtle inner circle highlight -->
+  <circle cx="256" cy="256" r="180" fill="#FFFFFF" opacity="0.6"/>
+
+  <!-- Baby Bean Illustration Group -->
+  <g filter="url(#softShadow)" transform="translate(0, 10)">
+    <!-- Little Sprout Leaves -->
+    <path d="M 256 180 C 256 120 290 90 330 95 C 335 135 300 170 256 180 Z" fill="url(#leafGrad)"/>
+    <path d="M 256 180 C 256 130 220 110 190 120 C 190 155 220 175 256 180 Z" fill="#7FA99B" opacity="0.85"/>
+
+    <!-- Main Bean Body (gentle kidney / baby shape) -->
+    <path d="M 210 170 
+             C 275 160, 345 200, 345 275 
+             C 345 350, 280 395, 210 395 
+             C 140 395, 120 310, 150 250 
+             C 170 210, 185 175, 210 170 Z" 
+          fill="url(#beanGrad)"/>
+
+    <!-- Baby cheek highlight -->
+    <circle cx="215" cy="305" r="28" fill="#FBF7F2" opacity="0.25"/>
+
+    <!-- Happy Sleeping Eyes (Gentle arcs) -->
+    <path d="M 225 245 Q 240 258 255 245" fill="none" stroke="#683B32" stroke-width="7" stroke-linecap="round"/>
+    <path d="M 275 250 Q 290 263 305 250" fill="none" stroke="#683B32" stroke-width="7" stroke-linecap="round"/>
+
+    <!-- Cute Little Smile -->
+    <path d="M 255 275 Q 268 288 280 275" fill="none" stroke="#683B32" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>

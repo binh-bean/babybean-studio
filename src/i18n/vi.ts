@@ -76,6 +76,13 @@ export const vi = {
     sheet: {
       closeAria: "Đóng",
     },
+    pwa: {
+      installTitle: "Cài đặt ứng dụng BabyBean",
+      installDesc: "Thêm BabyBean vào màn hình chính để ba mẹ mở xem và chọn ảnh cho bé tiện lợi hơn.",
+      installCta: "Thêm vào màn hình chính",
+      installLater: "Để sau",
+      iosInstructions: "Để thêm vào màn hình chính: chạm vào biểu tượng Chia sẻ ở thanh dưới rồi chọn 'Thêm vào MH chính'.",
+    },
   },
   gallery: {
     pinTitle: "Nhập 4 số cuối số điện thoại đã đăng ký",

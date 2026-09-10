@@ -10,7 +10,7 @@ const badgeVariants = cva(
         default:
           "bg-[var(--bb-primary)] text-[var(--bb-primary-fg)]",
         accent:
-          "bg-[var(--bb-accent)] text-white",
+          "bg-[var(--bb-accent)] text-[var(--bb-accent-fg)]",
         secondary:
           "bg-[var(--bb-surface-2)] text-[var(--bb-fg)]",
         outline:

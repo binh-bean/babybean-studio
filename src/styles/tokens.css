@@ -6,8 +6,9 @@
 :root {
   /* Thương hiệu — pastel ấm, hợp studio ảnh em bé */
   --bb-primary: #e8a598; /* hồng đất */
-  --bb-primary-fg: #ffffff;
+  --bb-primary-fg: #2e2a27; /* Đảm bảo tương phản ≥ 4.5:1 trên nền pastel */
   --bb-accent: #7fa99b; /* xanh sage */
+  --bb-accent-fg: #142e25; /* Đảm bảo tương phản ≥ 4.5:1 trên nền sage */
   --bb-cream: #fbf7f2;
 
   /* Nền */
@@ -22,8 +23,11 @@
 
   /* Trạng thái */
   --bb-success: #4e9a6b;
+  --bb-success-fg: #ffffff;
   --bb-warning: #d9932b;
+  --bb-warning-fg: #2e2211;
   --bb-danger: #c4553f;
+  --bb-danger-fg: #ffffff;
 
   /* Chế độ xem ảnh — luôn nền tối để mắt tập trung vào ảnh */
   --bb-viewer-bg: #16130f;
@@ -49,9 +53,9 @@
   --muted: var(--bb-surface-2);
   --muted-foreground: var(--bb-fg-muted);
   --accent: var(--bb-accent);
-  --accent-foreground: var(--bb-primary-fg);
+  --accent-foreground: var(--bb-accent-fg);
   --destructive: var(--bb-danger);
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: var(--bb-danger-fg);
   --border: var(--bb-border);
   --input: var(--bb-border);
   --ring: var(--bb-primary);
@@ -66,6 +70,16 @@
   --bb-border: #3a332c;
   --bb-fg: #f2ede7;
   --bb-fg-muted: #a69b91;
+  --bb-primary: #e8a598;
+  --bb-primary-fg: #16130f;
+  --bb-accent: #7fa99b;
+  --bb-accent-fg: #0e1f19;
+  --bb-success: #4e9a6b;
+  --bb-success-fg: #ffffff;
+  --bb-warning: #d9932b;
+  --bb-warning-fg: #1a1309;
+  --bb-danger: #c4553f;
+  --bb-danger-fg: #ffffff;
 
   --background: var(--bb-bg);
   --foreground: var(--bb-fg);
@@ -80,9 +94,9 @@
   --muted: var(--bb-surface-2);
   --muted-foreground: var(--bb-fg-muted);
   --accent: var(--bb-accent);
-  --accent-foreground: var(--bb-primary-fg);
+  --accent-foreground: var(--bb-accent-fg);
   --destructive: var(--bb-danger);
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: var(--bb-danger-fg);
   --border: var(--bb-border);
   --input: var(--bb-border);
   --ring: var(--bb-primary);
@@ -96,6 +110,16 @@
     --bb-border: #3a332c;
     --bb-fg: #f2ede7;
     --bb-fg-muted: #a69b91;
+    --bb-primary: #e8a598;
+    --bb-primary-fg: #16130f;
+    --bb-accent: #7fa99b;
+    --bb-accent-fg: #0e1f19;
+    --bb-success: #4e9a6b;
+    --bb-success-fg: #ffffff;
+    --bb-warning: #d9932b;
+    --bb-warning-fg: #1a1309;
+    --bb-danger: #c4553f;
+    --bb-danger-fg: #ffffff;
 
     --background: var(--bb-bg);
     --foreground: var(--bb-fg);
@@ -110,9 +134,9 @@
     --muted: var(--bb-surface-2);
     --muted-foreground: var(--bb-fg-muted);
     --accent: var(--bb-accent);
-    --accent-foreground: var(--bb-primary-fg);
+    --accent-foreground: var(--bb-accent-fg);
     --destructive: var(--bb-danger);
-    --destructive-foreground: #ffffff;
+    --destructive-foreground: var(--bb-danger-fg);
     --border: var(--bb-border);
     --input: var(--bb-border);
     --ring: var(--bb-primary);
@@ -123,6 +147,7 @@
   --color-bb-primary: var(--bb-primary);
   --color-bb-primary-fg: var(--bb-primary-fg);
   --color-bb-accent: var(--bb-accent);
+  --color-bb-accent-fg: var(--bb-accent-fg);
   --color-bb-cream: var(--bb-cream);
   --color-bb-bg: var(--bb-bg);
   --color-bb-surface: var(--bb-surface);
@@ -131,8 +156,11 @@
   --color-bb-fg: var(--bb-fg);
   --color-bb-fg-muted: var(--bb-fg-muted);
   --color-bb-success: var(--bb-success);
+  --color-bb-success-fg: var(--bb-success-fg);
   --color-bb-warning: var(--bb-warning);
+  --color-bb-warning-fg: var(--bb-warning-fg);
   --color-bb-danger: var(--bb-danger);
+  --color-bb-danger-fg: var(--bb-danger-fg);
   --color-bb-viewer-bg: var(--bb-viewer-bg);
 
   --color-background: var(--background);

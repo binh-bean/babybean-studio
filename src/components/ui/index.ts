@@ -28,3 +28,4 @@ export * from "./progress-bar";
 export * from "./data-table";
 export * from "./pagination";
 export * from "./stat-card";
+export * from "./pwa-install-prompt";
