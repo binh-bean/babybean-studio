@@ -203,8 +203,12 @@ Một thư mục chỉ checkout được một nhánh. Hai agent cùng làm tron
 | `babybean-dev-ops/` | `agent/dev-ops` | DEV-OPS |
 | `babybean-dev-ui/` | `agent/dev-ui` | DEV-UI |
 | `babybean-arch/` | `agent/arch` | ARCH |
+| `babybean-dev-int/` | `agent/dev-int` | DEV-INT |
+| `babybean-dev-fe/` | `agent/dev-fe` | DEV-FE |
 
 Tất cả nằm cạnh nhau trong `Downloads/claude code/`. Trong Antigravity, mỗi agent mở **đúng thư mục của mình**.
+
+**Mỗi nhánh chỉ được checkout ở một worktree.** Mở nhầm agent trong thư mục của agent khác sẽ đẩy worktree kia sang detached HEAD — đã xảy ra khi ARCH chạy trong `babybean-sec-arch`. Kiểm breadcrumb trước khi giao việc: tên project phải khớp tên worktree.
 
 **Bắt đầu mỗi task, đồng bộ với `main` trước:**
 
