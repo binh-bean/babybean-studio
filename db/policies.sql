@@ -191,9 +191,13 @@ create policy galleries_write on galleries for all to authenticated
   with check (app.can_see_branch(branch_id) and app.can_write());
 
 create policy photos_select on photos for select to authenticated
-  using (exists (
-    select 1 from galleries g
-    where g.id = photos.gallery_id and app.can_see_branch(g.branch_id)));
+  using (
+    app.my_role() != 'accountant' and
+    exists (
+      select 1 from galleries g
+      where g.id = photos.gallery_id and app.can_see_branch(g.branch_id)
+    )
+  );
 
 create policy photos_write on photos for all to authenticated
   using (exists (

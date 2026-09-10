@@ -190,4 +190,65 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     
     await client.query("ROLLBACK");
   });
+
+  it.todo("Ca 7: Khách dùng cookie album A gọi /api/g/photos khi cookie trỏ album B -> chỉ ra ảnh album trong cookie (Chờ BB-032)");
+
+  it.todo("Ca 8: viewer link gọi PATCH /api/g/selection -> 403 (Chờ BB-035)");
+
+  it.todo("Ca 9: suggester gửi mark: 'selected' -> lưu thành 'suggested' (Chờ BB-035)");
+
+  it.todo("Ca 10: Gọi /api/g/submit hai lần -> lần hai GALLERY_LOCKED (Chờ BB-039)");
+
+  it.todo("Ca 11: Sai PIN 6 lần -> lần 6 trả PIN_LOCKED (Chờ BB-031)");
+
+  it.todo("Ca 12: GET /api/img/<photo của album khác> -> 403 (Chờ BB-015)");
+
+  it("Ca 13: accountant không thấy ảnh (SELECT photos trả về 0 dòng)", async () => {
+    await client.query("BEGIN");
+
+    // Lấy 1 staff bất kỳ (ví dụ cs) và ép thành accountant trong transaction này
+    const staffRes = await client.query("SELECT id FROM staff_profiles WHERE role = 'cs' LIMIT 1");
+    expect(staffRes.rows.length).toBeGreaterThan(0);
+    const accId = staffRes.rows[0].id;
+    
+    await client.query("UPDATE staff_profiles SET role = 'accountant' WHERE id = $1", [accId]);
+
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${accId}", "role": "authenticated"}'`);
+
+    // SELECT photos phải trả về 0 dòng vì chính sách photos_select chặn accountant
+    const photosRes = await client.query("SELECT * FROM photos");
+    expect(photosRes.rows.length).toBe(0);
+
+    await client.query("ROLLBACK");
+  });
+
+  it("Đối chứng dương cho Ca 13: accountant VẪN thấy được album, và cs VẪN thấy được ảnh", async () => {
+    await client.query("BEGIN");
+
+    // Lấy 2 staff: ép 1 người làm accountant, người kia làm cs
+    const staffsRes = await client.query("SELECT id FROM staff_profiles WHERE role IN ('cs', 'photographer', 'branch_manager') LIMIT 2");
+    expect(staffsRes.rows.length).toBeGreaterThanOrEqual(2);
+    
+    const accId = staffsRes.rows[0].id;
+    const csId = staffsRes.rows[1].id;
+    
+    await client.query("UPDATE staff_profiles SET role = 'accountant' WHERE id = $1", [accId]);
+    await client.query("UPDATE staff_profiles SET role = 'cs' WHERE id = $1", [csId]);
+
+    // Kiểm tra accountant thấy album
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${accId}", "role": "authenticated"}'`);
+    const galleriesRes = await client.query("SELECT * FROM galleries");
+    expect(galleriesRes.rows.length).toBeGreaterThan(0);
+
+    // Kiểm tra CS thấy ảnh
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${csId}", "role": "authenticated"}'`);
+    const photosRes = await client.query("SELECT * FROM photos");
+    expect(photosRes.rows.length).toBeGreaterThan(0);
+
+    await client.query("ROLLBACK");
+  });
+
+  it.todo("Ca 14: Token đã revoked -> 410 LINK_EXPIRED (Chờ BB-030)");
 });
