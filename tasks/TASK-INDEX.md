@@ -117,6 +117,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-072 | Sentry + trang lỗi 404/500 tiếng Việt | DEV-OPS | BB-005 | low | TODO |
 | BB-073 | Migration `0003`: accountant không xem được ảnh — đồng bộ `policies.sql` sang `db/migrations/` | ARCH | BB-020 | low | TODO |
 | BB-074 | Font thương hiệu không nạp trên production: `@import` trong `tokens.css` bị CSS optimizer loại bỏ | DEV-UI | BB-040 | high | TODO |
+| BB-075 | `middleware.ts` `return` redirect trước khi gắn header an ninh — `/admin` ra ngoài không CSP, không `Referrer-Policy` | SEC-ARCH | BB-020 | med | TODO |
 
 ---
 
