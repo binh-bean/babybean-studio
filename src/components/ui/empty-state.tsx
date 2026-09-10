@@ -1,17 +1,18 @@
 import * as React from "react";
 import { ImageOff } from "lucide-react";
 import { cn } from "./utils";
+import { vi } from "../../i18n";
 
 export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode;
-  title: string;
+  title?: string;
   description?: string;
   action?: React.ReactNode;
 }
 
 function EmptyState({
   icon,
-  title,
+  title = vi.ui.emptyState.defaultTitle,
   description,
   action,
   className,

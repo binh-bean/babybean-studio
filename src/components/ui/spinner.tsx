@@ -2,6 +2,7 @@ import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "./utils";
+import { vi } from "../../i18n";
 
 const spinnerVariants = cva("animate-spin text-[var(--bb-primary)]", {
   variants: {
@@ -23,7 +24,12 @@ export interface SpinnerProps
   label?: string;
 }
 
-function Spinner({ className, size, label = "Đang tải…", ...props }: SpinnerProps) {
+function Spinner({
+  className,
+  size,
+  label = vi.ui.spinner.label,
+  ...props
+}: SpinnerProps) {
   return (
     <div role="status" className="inline-flex items-center justify-center">
       <Loader2
