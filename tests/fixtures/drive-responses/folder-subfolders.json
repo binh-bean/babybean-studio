@@ -1,0 +1,81 @@
+{
+  "root": {
+    "files": [
+      {
+        "id": "file_root_001",
+        "name": "BB_001.jpg",
+        "mimeType": "image/jpeg",
+        "size": "2048000",
+        "modifiedTime": "2026-09-01T08:00:00.000Z",
+        "imageMediaMetadata": { "width": 2048, "height": 1365 }
+      },
+      {
+        "id": "file_root_002",
+        "name": "BB_002.jpg",
+        "mimeType": "image/jpeg",
+        "size": "2048000",
+        "modifiedTime": "2026-09-01T08:01:00.000Z",
+        "imageMediaMetadata": { "width": 2048, "height": 1365 }
+      },
+      {
+        "id": "subfolder_c1",
+        "name": "Concept 1 - Studio",
+        "mimeType": "application/vnd.google-apps.folder"
+      },
+      {
+        "id": "subfolder_c2",
+        "name": "Concept 2 - Ngoai canh",
+        "mimeType": "application/vnd.google-apps.folder"
+      }
+    ]
+  },
+  "subfolder_c1": {
+    "files": [
+      {
+        "id": "file_c1_001",
+        "name": "BB_010.jpg",
+        "mimeType": "image/jpeg",
+        "size": "2048000",
+        "modifiedTime": "2026-09-01T08:10:00.000Z",
+        "imageMediaMetadata": { "width": 2048, "height": 1365 }
+      },
+      {
+        "id": "file_c1_002",
+        "name": "BB_011.jpg",
+        "mimeType": "image/jpeg",
+        "size": "2048000",
+        "modifiedTime": "2026-09-01T08:11:00.000Z",
+        "imageMediaMetadata": { "width": 2048, "height": 1365 }
+      }
+    ]
+  },
+  "subfolder_c2": {
+    "files": [
+      {
+        "id": "file_c2_001",
+        "name": "BB_020.jpg",
+        "mimeType": "image/jpeg",
+        "size": "2048000",
+        "modifiedTime": "2026-09-01T08:20:00.000Z",
+        "imageMediaMetadata": { "width": 2048, "height": 1365 }
+      },
+      {
+        "id": "subfolder_c3",
+        "name": "Cấp 3 - Không được duyệt",
+        "mimeType": "application/vnd.google-apps.folder"
+      }
+    ]
+  },
+  "subfolder_c3": {
+    "files": [
+      {
+        "id": "file_c3_001",
+        "name": "BB_030_should_not_appear.jpg",
+        "mimeType": "image/jpeg",
+        "size": "2048000",
+        "modifiedTime": "2026-09-01T08:30:00.000Z",
+        "imageMediaMetadata": { "width": 2048, "height": 1365 }
+      }
+    ]
+  }
+}

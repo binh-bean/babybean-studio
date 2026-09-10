@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": 429,
+    "message": "User Rate Limit Exceeded. Rate of requests for user exceed configured project quota.",
+    "errors": [
+      {
+        "message": "User Rate Limit Exceeded. Rate of requests for user exceed configured project quota.",
+        "domain": "usageLimits",
+        "reason": "rateLimitExceeded"
+      }
+    ]
+  }
+}
