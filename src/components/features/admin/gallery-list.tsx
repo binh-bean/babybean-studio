@@ -5,7 +5,7 @@ import { vi } from "@/i18n";
 import { DataTable, Column } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Copy, Download } from "lucide-react";
+import { Eye, Copy, Download, Bell, CalendarPlus, Unlock } from "lucide-react";
 
 
 type GalleryRow = {
@@ -81,15 +81,24 @@ export function GalleryList() {
       key: "actions",
       header: "",
       cell: () => (
-        <div className="flex items-center gap-2 justify-end">
+        <div className="flex items-center gap-1 justify-end">
           <Button variant="ghost" size="sm" title={vi.admin.galleries.menuView}>
             <Eye className="w-4 h-4" />
           </Button>
           <Button variant="ghost" size="sm" title={vi.admin.galleries.menuCopyLink}>
             <Copy className="w-4 h-4" />
           </Button>
+          <Button variant="ghost" size="sm" title={vi.admin.galleries.menuRemind}>
+            <Bell className="w-4 h-4" />
+          </Button>
           <Button variant="ghost" size="sm" title={vi.admin.galleries.menuExport}>
             <Download className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" title={vi.admin.galleries.menuExtend}>
+            <CalendarPlus className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="sm" title={vi.admin.galleries.menuReopen}>
+            <Unlock className="w-4 h-4" />
           </Button>
         </div>
       ),
