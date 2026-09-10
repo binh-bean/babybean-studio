@@ -121,7 +121,9 @@ export async function POST(request: Request): Promise<Response> {
 
   } catch (err) {
     if (err instanceof AuthError) {
-      return fail(err.code, err.message);
+      // err.message mặc định chính là mã lỗi, nên truyền thẳng vào đây thì người
+      // dùng nhận được chuỗi "UNAUTHENTICATED" thay vì một câu tiếng Việt.
+      return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);
     }
     return failUnexpected(err, requestId);
   }
