@@ -156,6 +156,10 @@ feat/BB-xxx  ──PR──►  develop  ──PR──►  main
   ]
 }
 ```
+**Gói Hobby chỉ cho cron chạy một lần mỗi ngày.** Bất kỳ biểu thức nào chạy dày hơn — kể cả `*/5 * * * *` — làm **toàn bộ deployment bị từ chối**, và Vercel không hiện lỗi đó trên dashboard: bản deploy đơn giản không bao giờ xuất hiện. Chỉ `vercel --prod` qua CLI mới in ra nguyên nhân.
+
+Vì vậy `flush-notifications` (mỗi 5 phút, đẩy hàng đợi Lark/Zalo) đã **bị gỡ khỏi `vercel.json`**. Nó chỉ cần từ Phase 3. Khi tới đó, chọn một trong hai: nâng lên gói Pro, hoặc chuyển việc đẩy hàng đợi sang một dịch vụ cron ngoài gọi vào `/api/cron/flush-notifications`.
+
 Giờ trong `vercel.json` là **UTC**. `0 18 * * *` UTC = 01:00 giờ Việt Nam. `0 2 * * *` UTC = 09:00 giờ Việt Nam.
 Mọi handler cron kiểm `Authorization: Bearer <CRON_SECRET>` trước khi làm gì.
 
