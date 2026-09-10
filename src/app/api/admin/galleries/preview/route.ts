@@ -70,11 +70,37 @@ export async function POST(request: Request): Promise<Response> {
     const fileCount = images.length;
     const subfolders = Array.from(new Set(images.map((img) => img.subfolder).filter((s): s is string => s !== null)));
     
-    const sample = images.slice(0, 6).map((img) => ({
-      driveFileId: img.id,
-      fileName: img.name,
-      thumbnailUrl: `https://lh3.googleusercontent.com/d/${img.id}=w400`
-    }));
+    // Ảnh mẫu trả về dưới dạng data URI chứ không phải link lh3.
+    //
+    // CSP của ứng dụng là `img-src 'self' data: blob:` — trình duyệt sẽ chặn
+    // thẳng một thẻ <img> trỏ sang googleusercontent.com, và người dùng chỉ
+    // thấy sáu ô trống mà không có lỗi nào giải thích.
+    //
+    // Cách khác là thêm lh3 vào img-src, nhưng làm vậy thì trang của khách cũng
+    // nạp được ảnh Drive trực tiếp, đi vòng qua proxy — mà proxy chính là chỗ
+    // sẽ đóng dấu mờ (BB-066) và kiểm quyền. Nới CSP cho một màn hình quản trị
+    // mà mở đường cho cả cổng khách hàng là cái giá quá đắt.
+    //
+    // Sáu ảnh nhỏ, bấm một lần khi tạo album. Nhét thẳng vào phản hồi là xong.
+    const sample = await Promise.all(
+      images.slice(0, 6).map(async (img) => {
+        let thumbnailUrl: string | null = null;
+        try {
+          const res = await fetch(`https://lh3.googleusercontent.com/d/${img.id}=w400`, {
+            signal: AbortSignal.timeout(8000),
+            cache: "no-store",
+          });
+          if (res.ok) {
+            const buf = Buffer.from(await res.arrayBuffer());
+            const mime = res.headers.get("content-type") ?? "image/jpeg";
+            thumbnailUrl = `data:${mime};base64,${buf.toString("base64")}`;
+          }
+        } catch {
+          // Một ảnh mẫu không tải được không đáng làm hỏng cả bước xem trước.
+        }
+        return { fileName: img.name, thumbnailUrl };
+      }),
+    );
 
     return NextResponse.json({
       data: {
