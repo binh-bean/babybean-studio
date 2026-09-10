@@ -23,7 +23,7 @@ Chủ sở hữu: **DEV-OPS**.
 | Nguồn | GitHub `binh-bean/babybean-studio`, nhánh `main` |
 | Function Region | **Singapore `sin1`** — phải khớp region Supabase, xem §1b |
 
-**Cách deploy đang dùng: `npx vercel --prod` từ máy.** Webhook GitHub → Vercel không kích hoạt build (đã thử hai lần import và một deploy hook, không lần nào tạo được deployment). Chưa truy ra nguyên nhân; CLI chạy ổn nên chưa chặn gì.
+**Deploy tự động khi push lên `main`.** Trước đây tưởng webhook hỏng, thực ra nó vẫn chạy: mỗi lần nó kích hoạt, Vercel bắt đầu build rồi từ chối ngay ở bước kiểm cấu hình vì dòng cron sai, nên không có deployment nào xuất hiện để nhìn thấy. Sửa cron xong là webhook hoạt động bình thường. `npx vercel --prod` vẫn dùng được khi cần deploy tay.
 
 Bài học đắt nhất của lần dựng này: **Vercel không hiện lỗi cấu hình lên dashboard.** Một dòng cron sai làm mọi deployment bị từ chối, mà giao diện chỉ ghi "No Production Deployment" — không có mục nào báo lỗi. Chỉ `vercel --prod` qua CLI mới in ra lý do. Lần sau deploy hỏng mà dashboard im lặng, chạy CLI trước tiên.
 
