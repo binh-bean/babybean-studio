@@ -124,6 +124,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-079 | Bỏ tên miền bịa `https://chon-anh.babybean.vn` làm giá trị dự phòng trong `api/admin/galleries/route.ts:139` — thiếu `NEXT_PUBLIC_APP_URL` phải báo lỗi, không được đoán | DEV-BE | BB-023 | high | TODO |
 | BB-080b | Gắn tên miền `babybeanstudio.vn`: đổi `NEXT_PUBLIC_APP_URL`, cập nhật `verify-prod.mjs`, kiểm HTTPS và link chia sẻ | DEV-OPS | BB-079 | med | ĐANG CHỜ DNS |
 | BB-081 | **CHẶN BB-035/BB-033.** `selection_items.mark` là một cột loại trừ nên "Yêu thích" xoá mất "Đã chọn", trong khi `07-ui-ux.md:127` là hai nút riêng. Thêm `is_favorite boolean` + migration | ARCH | BB-006 | high | TODO |
+| BB-082 | **NGHIÊM TRỌNG.** 4 hàm `security definer` trong schema `public` cho `anon` gọi: chỉ cần khoá công khai + UUID album là đọc/ghi được mọi album, bỏ qua token, PIN, cookie và RLS. Đã chứng minh HTTP 200 | SEC-ARCH | BB-023 | high | TODO |
 
 ---
 

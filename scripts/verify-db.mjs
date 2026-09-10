@@ -146,6 +146,32 @@ async function main() {
 
   // --- seed data (only when asked) ----------------------------------------
 
+
+    // A SECURITY DEFINER function runs as its owner, so RLS does not apply to
+    // what it touches. If `anon` may execute one, then anyone holding the
+    // publishable key — which ships inside every browser bundle by design —
+    // can reach past the share token, the PIN, the session cookie and RLS in
+    // one call. On 2026-09-10 get_gallery_photos, patch_selection_batch and
+    // create_gallery_bundle were all reachable that way: passing a gallery id
+    // as a parameter returned that gallery's photos with HTTP 200.
+    // These functions are meant to be called by the server with the service
+    // key. Nothing else should be able to call them at all.
+    const definerFns = await client.query(`
+      select p.proname,
+             has_function_privilege('anon', p.oid, 'EXECUTE') as anon_can
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.prosecdef
+    `);
+    const reachable = definerFns.rows.filter((r) => r.anon_can).map((r) => r.proname);
+    check(
+      "Khoá công khai không gọi được hàm SECURITY DEFINER",
+      reachable.length === 0,
+      reachable.length
+        ? `GỌI ĐƯỢC: ${reachable.join(", ")} — đi vòng qua token, PIN, cookie và RLS`
+        : `${definerFns.rows.length} hàm, đã chặn hết`,
+    );
+
   if (REQUIRE_SEED) {
     const counts = {};
     for (const t of ["branches", "packages", "customers", "galleries", "photos",
