@@ -10,9 +10,12 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 1. **Không agent nào được tự ý đổi hợp đồng chung.** Hợp đồng chung = `db/schema.sql`, `docs/04-api-spec.md`, `src/types/domain.ts`. Muốn đổi thì mở ADR trong `docs/adr/` và chờ Tech Lead duyệt.
 2. **Mỗi agent chỉ làm việc trong "vùng sở hữu" của mình.** File ngoài vùng: được đề xuất, không được tự sửa.
 3. **Mọi task bắt đầu từ một mã `BB-xxx`** trong `tasks/TASK-INDEX.md`. Không có mã thì không code.
-4. **Definition of Done** (bắt buộc đủ 8): code chạy · type-check sạch · test đơn vị cho logic mới · **`npm run verify:own -- <TÊN AGENT>` xanh** · **`npm run verify:db` xanh nếu task đụng database** · verify bằng browser agent kèm ảnh chụp · cập nhật tài liệu liên quan · walkthrough artifact mô tả thay đổi.
-5. **Không báo xong khi chưa tự kiểm.** Chạy một lệnh rồi đi tiếp không phải là bằng chứng nó chạy đúng. Task đụng database thì phải chạy `npm run verify:db` (thêm `:seed` nếu có ghi dữ liệu) và **dán kết quả vào báo cáo**. Quy tắc này sinh ra sau khi một agent báo đã seed xong trong lúc mọi bảng còn 0 dòng.
-6. **Ngân sách suy luận**: chỉ nâng thinking level khi task đánh dấu `complexity: high`. Task CRUD dùng model rẻ.
+4. **Definition of Done** (bắt buộc đủ 9): code chạy · type-check sạch · test đơn vị cho logic mới · **`npm run verify:own -- <TÊN AGENT>` xanh** · **`npm run verify:db` xanh nếu task đụng database** · **`npm run verify:build` xanh nếu task đụng giao diện, style hoặc biến môi trường** · verify bằng browser agent kèm ảnh chụp · cập nhật tài liệu liên quan · walkthrough artifact mô tả thay đổi.
+5. **Cổng kiểm tra đọc kết quả, không đọc lời hứa.** `npm run build` thoát 0 chỉ có nghĩa là trình biên dịch hài lòng. Ngày 10/09/2026 build xanh, 39 test xanh, mà production phục vụ `font-family: "Be Vietnam Pro"` trong khi không hề tải một file font nào — trình tối ưu CSS đã lặng lẽ vứt bỏ dòng `@import`. Vì vậy có `npm run verify:build`: nó mở file đã build ra đọc, tìm bí mật lọt vào bundle trình duyệt và tìm font được khai mà không được nạp.
+
+   > **Đang biết trước một dòng HỎNG:** *"Font được khai báo đều thật sự được nạp"* đỏ vì lỗi BB-074, DEV-UI đang sửa. Nếu bạn không phải DEV-UI thì dòng đó không phải do bạn — mọi dòng còn lại vẫn phải xanh. Xoá ghi chú này khi BB-074 xong và nối `verify:build` vào `npm run verify`.
+6. **Không báo xong khi chưa tự kiểm.** Chạy một lệnh rồi đi tiếp không phải là bằng chứng nó chạy đúng. Task đụng database thì phải chạy `npm run verify:db` (thêm `:seed` nếu có ghi dữ liệu) và **dán kết quả vào báo cáo**. Quy tắc này sinh ra sau khi một agent báo đã seed xong trong lúc mọi bảng còn 0 dòng.
+7. **Ngân sách suy luận**: chỉ nâng thinking level khi task đánh dấu `complexity: high`. Task CRUD dùng model rẻ.
 
 ---
 
@@ -101,7 +104,8 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 |---|---|
 | **Model** | Gemini 3 **Deep Think** (chỉ bật cho task `complexity: high`) |
 | **Nhiệm vụ** | Thiết kế và kiểm chứng RLS policy, mô hình token chia sẻ, chống dò link, rate limit, chống rò ảnh giữa album/chi nhánh. Threat model. |
-| **Sở hữu** | `db/policies.sql`, `docs/12-security.md`, `src/lib/auth/**`, `middleware.ts` |
+| **Sở hữu** | `db/policies.sql`, `db/migrations/**`, `docs/12-security.md`, `src/lib/auth/**`, `middleware.ts` |
+| **Lưu ý** | Sửa `db/policies.sql` thì **phải kèm một file `db/migrations/NNNN-*.sql`** trong cùng lần thay đổi. `policies.sql` chỉ là ảnh chụp để dựng môi trường mới; production chỉ chạy lại migrations. `verify:own` sẽ chặn nếu thiếu. |
 | **Đầu ra bắt buộc** | Với mỗi bảng: bảng chứng minh "ai đọc được gì" + test case phủ định trong `tests/security/`. |
 | **Prompt pack** | `prompts/sec-arch.md` |
 
@@ -141,7 +145,7 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 | Đường dẫn | ARCH | DEV-BE | DEV-FE | DEV-UI | DEV-INT | SEC | OPS | QA |
 |---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
 | `db/schema.sql` | W | R | - | - | - | R | - | - |
-| `db/migrations/**` | W | W | - | - | - | R | - | - |
+| `db/migrations/**` | W | W | - | - | - | W | - | - |
 | `db/policies.sql` | R | R | - | - | - | W | - | - |
 | `src/types/domain.ts` | W | R | R | R | R | R | - | R |
 | `src/app/api/**` | R | W | - | - | R | R | - | R |

@@ -37,6 +37,8 @@ export const PROTECTED = [
   "scripts/ownership.mjs",
   "scripts/verify-ownership.mjs",
   "scripts/verify-db.mjs",
+  "scripts/verify-build.mjs",
+  "scripts/verify-prod.mjs",
 ];
 
 export const OWNERSHIP = {
@@ -72,8 +74,18 @@ export const OWNERSHIP = {
     "src/app/api/img/**",
     "scripts/sync-drive.ts",
   ],
+  // db/migrations/** on purpose: the agent that fixes a policy has to be able
+  // to ship it to production. Splitting those two created a handoff, and the
+  // handoff dropped the accountant-photo fix. verify:own now refuses a change
+  // to policies.sql that arrives without a migration beside it.
+  // src/app/api/auth/** belongs here, not with the rest of the API. Without it
+  // SEC-ARCH had to hide the customer auth route inside the (auth) page group
+  // to stay in its lane, which works only because route groups do not appear
+  // in the URL. Two homes for API routes is how one of them gets forgotten.
   "SEC-ARCH": [
     "db/policies.sql",
+    "src/app/api/auth/**",
+    "db/migrations/**",
     "docs/12-security.md",
     "src/lib/auth/**",
     "src/middleware.ts",
