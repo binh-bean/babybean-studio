@@ -139,21 +139,36 @@ export async function requireGallerySession(
     throw new GallerySessionError("FORBIDDEN");
   }
   
+  await assertShareLinkUsable(session.shareLinkId);
+
+  return session;
+}
+
+/**
+ * Is this share link still good, right now?
+ *
+ * Split out of requireGallerySession() so it can be tested: that function
+ * needs a live request context for cookies(), this one needs nothing but the
+ * database. Revoking a link has to end sessions that are already open, and a
+ * rule that is never exercised is a rule that quietly stops working.
+ *
+ * Both halves matter. Checking only `status` would let an expired link work
+ * forever, because the cron that would flip status to 'expired' (BB-068) does
+ * not exist yet.
+ */
+export async function assertShareLinkUsable(shareLinkId: string): Promise<void> {
   const admin = await createAdminClient();
   const { data } = await admin
     .from("share_links")
     .select("status, expires_at")
-    .eq("id", session.shareLinkId)
-    .single();
-    
+    .eq("id", shareLinkId)
+    .maybeSingle();
+
   if (!data) throw new GallerySessionError("LINK_EXPIRED");
-  
   if (data.status !== "active") throw new GallerySessionError("LINK_EXPIRED");
   if (data.expires_at && new Date(data.expires_at) < new Date()) {
     throw new GallerySessionError("LINK_EXPIRED");
   }
-
-  return session;
 }
 
 /** Roles allowed to change the primary selection. */

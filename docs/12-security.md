@@ -121,3 +121,38 @@ Dùng Upstash Redis; nếu chưa cấu hình thì fallback in-memory (chấp nh�
 | Rà soát share link còn hiệu lực, thu hồi link cũ | Hằng quý |
 | Diễn tập khôi phục dữ liệu | 6 tháng |
 | Rà soát toàn bộ mô hình đe doạ | 6 tháng, hoặc khi thêm module lớn |
+
+## 9. Hàm database: `revoke` phải nằm cạnh `create`
+
+Hàm `security definer` chạy bằng quyền chủ sở hữu nên **RLS không áp dụng** cho
+những gì nó đụng tới. Postgres mặc định cấp quyền `EXECUTE` cho `PUBLIC` trên
+mọi hàm mới. Ghép hai điều đó lại: một hàm `security definer` vừa tạo là một
+cánh cửa mở cho bất kỳ ai cầm khoá publishable — mà khoá đó nằm sẵn trong mã
+trình duyệt của mọi khách, theo đúng thiết kế.
+
+Ngày 10/09/2026 chuyện này xảy ra thật. Chỉ với khoá công khai, không cookie,
+không PIN, không token chia sẻ:
+
+```
+POST /rest/v1/rpc/get_gallery_photos   { p_gallery_id: <UUID album bất kỳ> }
+→ HTTP 200, trả về danh sách ảnh của album đó
+```
+
+Ba hàng rào — token, PIN, cookie phiên — và cả RLS bị đi vòng qua trong một lời
+gọi, vì hàm nhận danh tính người gọi làm **tham số** và tin tuyệt đối.
+
+Vá xong vẫn tái phát ngay trong ngày: BB-035 thêm tham số `p_allow_extra` vào
+`patch_selection_batch`. `create or replace function` mà đổi danh sách tham số
+thì **không** thay thế hàm cũ — nó tạo thêm một hàm nạp chồng, và hàm mới sinh
+ra với quyền mặc định `PUBLIC`. Câu `revoke` viết trước đó chỉ trúng chữ ký cũ.
+
+**Luật:**
+
+1. Mọi migration tạo hoặc sửa hàm trong schema `public` phải có câu `revoke
+   execute ... from public, anon, authenticated` **ngay bên dưới câu `create`,
+   trong cùng một file**. Tách ra file khác là sớm muộn lệch nhau.
+2. Đổi danh sách tham số thì phải `drop function` chữ ký cũ trong cùng migration.
+3. Hàm phải nhận danh tính từ phía máy chủ, không bao giờ tin tham số do người
+   gọi truyền vào — trừ khi đã chắc chắn chỉ `service_role` gọi được.
+4. `npm run verify:db` có sẵn phép kiểm *"Khoá công khai không gọi được hàm
+   SECURITY DEFINER"*. Dòng đó đỏ là dừng, không được đánh dấu task xong.

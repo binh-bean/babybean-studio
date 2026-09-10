@@ -23,3 +23,18 @@ grant execute on function public.patch_selection_batch(uuid, uuid, uuid, text, j
 grant execute on function public.patch_selection_batch(uuid, uuid, uuid, text, jsonb, integer, boolean, integer, numeric, text, inet, text) to service_role;
 grant execute on function public.create_gallery_bundle to service_role;
 grant execute on function public.rls_auto_enable to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Dọn hàm cũ còn sót
+-- ---------------------------------------------------------------------------
+-- BB-035 thêm tham số p_allow_extra vào patch_selection_batch. Trong Postgres,
+-- `create or replace function` mà đổi danh sách tham số KHÔNG thay thế hàm cũ —
+-- nó tạo thêm một hàm nạp chồng. Kết quả: bản 11 tham số (còn lỗi hạn mức) vẫn
+-- nằm đó gọi được, còn bản 12 tham số sinh ra với quyền mặc định PUBLIC, tức là
+-- mở lại đúng lỗ hổng mà file này vừa bịt.
+--
+-- Vì vậy mọi migration tạo hoặc sửa hàm phải kèm câu revoke ngay bên dưới, và
+-- đổi chữ ký thì phải drop chữ ký cũ. Xem docs/12-security.md §9.
+drop function if exists public.patch_selection_batch(
+  uuid, uuid, uuid, text, jsonb, integer, integer, numeric, text, inet, text
+);
