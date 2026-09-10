@@ -19,7 +19,7 @@ const PAGE_SIZE = "1000";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 /** Drive traversal is capped at 2 levels: the album folder and its concepts. */
-const MAX_DEPTH = 2;
+export const MAX_DEPTH = 2;
 
 export interface ListFilesOptions {
   /** Called after each page so the UI can show sync progress. */
@@ -94,7 +94,7 @@ async function walk(
   } while (pageToken);
 }
 
-interface RawDriveFile {
+export interface RawDriveFile {
   id: string;
   name: string;
   mimeType: string;
@@ -103,7 +103,7 @@ interface RawDriveFile {
   imageMediaMetadata?: { width?: number; height?: number; time?: string };
 }
 
-function toDriveFile(file: RawDriveFile, subfolder: string | null): DriveFile {
+export function toDriveFile(file: RawDriveFile, subfolder: string | null): DriveFile {
   return {
     id: file.id,
     name: file.name,

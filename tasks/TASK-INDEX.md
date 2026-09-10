@@ -40,9 +40,9 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
-| BB-010 | Test cho `parse-link.ts` (4 dạng link + ID thuần + link file + rác) | DEV-INT | BB-001 | low | TODO |
-| BB-011 | Hoàn thiện `driveFetch()`: retry, backoff+jitter, timeout, log không lộ key | DEV-INT | BB-001 | med | TODO |
-| BB-012 | `list-files.ts`: phân trang, đệ quy 2 cấp, lọc ảnh, natural sort + test với fixture 1.000 file | DEV-INT | BB-011 | med | TODO |
+| BB-010 | Test cho `parse-link.ts` (4 dạng link + ID thuần + link file + rác) | DEV-INT | BB-001 | low | ✅ **DONE** — 12 tests vitest phủ đủ 4 dạng link, bare id, file link, chuỗi rác |
+| BB-011 | Hoàn thiện `driveFetch()`: retry, backoff+jitter, timeout, log không lộ key | DEV-INT | BB-001 | med | ✅ **DONE** — timeout 10s, retry 429/5xx (tối đa 5 lần, backoff + jitter 30%), 403/404 không retry, log an toàn không lộ key, 9 tests vitest |
+| BB-012 | `list-files.ts`: phân trang, đệ quy 2 cấp, lọc ảnh, natural sort + test với fixture 1.000 file | DEV-INT | BB-011 | med | ✅ **DONE** — đệ quy 2 cấp, lọc mimeType image/*, phân trang nextPageToken, natural sort (subfolder, name), 6 fixture files, 9 tests vitest |
 | BB-013 | `POST /api/admin/galleries/preview` — trả tên thư mục, số file, 6 ảnh mẫu, lỗi 403 kèm hướng dẫn 3 bước | DEV-INT | BB-012 | med | TODO |
 | BB-014 | Job đồng bộ: upsert `photos`, đánh dấu `missing`, cập nhật `photo_count`, `status` | DEV-INT | BB-012 | high | TODO |
 | BB-015 | Proxy `/api/img/[photoId]`: kiểm quyền, fallback nguồn, cache header | DEV-INT | BB-014, BB-030 | high | TODO |

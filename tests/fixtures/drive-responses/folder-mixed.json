@@ -1,0 +1,68 @@
+{
+  "files": [
+    {
+      "id": "file_mixed_ds_store",
+      "name": ".DS_Store",
+      "mimeType": "application/octet-stream",
+      "size": "6148",
+      "modifiedTime": "2026-09-01T08:00:00.000Z"
+    },
+    {
+      "id": "file_mixed_lrcat",
+      "name": "Shoot_2026.lrcat",
+      "mimeType": "application/x-sqlite3",
+      "size": "15728640",
+      "modifiedTime": "2026-09-01T08:00:00.000Z"
+    },
+    {
+      "id": "file_mixed_notes",
+      "name": "ghi_chu.txt",
+      "mimeType": "text/plain",
+      "size": "150",
+      "modifiedTime": "2026-09-01T08:00:00.000Z"
+    },
+    {
+      "id": "file_mixed_video",
+      "name": "clip_behind_the_scenes.mp4",
+      "mimeType": "video/mp4",
+      "size": "104857600",
+      "modifiedTime": "2026-09-01T08:00:00.000Z"
+    },
+    {
+      "id": "file_mixed_img_001",
+      "name": "BB_001.jpg",
+      "mimeType": "image/jpeg",
+      "size": "2048000",
+      "modifiedTime": "2026-09-01T08:00:00.000Z",
+      "imageMediaMetadata": {
+        "width": 2048,
+        "height": 1365,
+        "time": "2026:09:01 08:00:00"
+      }
+    },
+    {
+      "id": "file_mixed_img_002",
+      "name": "BB_002.png",
+      "mimeType": "image/png",
+      "size": "3145728",
+      "modifiedTime": "2026-09-01T08:01:00.000Z",
+      "imageMediaMetadata": {
+        "width": 2048,
+        "height": 1365,
+        "time": "2026:09:01 08:01:00"
+      }
+    },
+    {
+      "id": "file_mixed_img_003",
+      "name": "BB_003.webp",
+      "mimeType": "image/webp",
+      "size": "1048576",
+      "modifiedTime": "2026-09-01T08:02:00.000Z",
+      "imageMediaMetadata": {
+        "width": 2048,
+        "height": 1365,
+        "time": "2026:09:01 08:02:00"
+      }
+    }
+  ]
+}

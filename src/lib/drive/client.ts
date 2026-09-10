@@ -14,9 +14,9 @@
 import "server-only";
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
-const TIMEOUT_MS = 10_000;
-const MAX_ATTEMPTS = 5;
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+export const TIMEOUT_MS = 10_000;
+export const MAX_ATTEMPTS = 5;
+export const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
 export class DriveAccessDeniedError extends Error {
   readonly code = "DRIVE_ACCESS_DENIED" as const;
@@ -41,7 +41,7 @@ function apiKey(): string {
 }
 
 /** Exponential backoff with ±30% jitter so parallel syncs do not resonate. */
-function backoffMs(attempt: number): number {
+export function backoffMs(attempt: number): number {
   const base = 250 * 2 ** attempt;
   const jitter = base * 0.3 * (Math.random() * 2 - 1);
   return Math.round(base + jitter);
@@ -66,7 +66,9 @@ export async function driveFetch(
   ctx: DriveRequestContext,
 ): Promise<Response> {
   const url = new URL(`${DRIVE_API}${path}`);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined) url.searchParams.set(k, v);
+  }
   url.searchParams.set("key", apiKey());
 
   let lastStatus = 0;
@@ -80,7 +82,7 @@ export async function driveFetch(
       const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
       lastStatus = res.status;
 
-      logDriveCall(ctx, path, res.status, Date.now() - started, attempt);
+      logDriveCall(ctx, path, res.status, Date.now() - started, attempt, params.pageToken);
 
       if (res.ok) return res;
 
@@ -97,7 +99,7 @@ export async function driveFetch(
       if (err instanceof DriveAccessDeniedError) throw err;
       if (err instanceof DriveUnavailableError) throw err;
       // AbortError and network failures fall through to the retry below.
-      logDriveCall(ctx, path, 0, Date.now() - started, attempt);
+      logDriveCall(ctx, path, 0, Date.now() - started, attempt, params.pageToken);
     } finally {
       clearTimeout(timer);
     }
@@ -117,6 +119,7 @@ function logDriveCall(
   status: number,
   durationMs: number,
   attempt: number,
+  pageToken?: string,
 ): void {
   console.info(
     JSON.stringify({
@@ -127,6 +130,7 @@ function logDriveCall(
       status,
       durationMs,
       attempt,
+      ...(pageToken ? { pageToken } : {}),
     }),
   );
 }
