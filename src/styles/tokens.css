@@ -1,25 +1,31 @@
 /* Design tokens — OWNER: DEV-UI. Task BB-002.
    Source of truth: docs/07-ui-ux.md §2. Keep the two in sync. */
 
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap");
+
 :root {
-  --bb-primary: #e8a598;
+  /* Thương hiệu — pastel ấm, hợp studio ảnh em bé */
+  --bb-primary: #e8a598; /* hồng đất */
   --bb-primary-fg: #ffffff;
-  --bb-accent: #7fa99b;
+  --bb-accent: #7fa99b; /* xanh sage */
   --bb-cream: #fbf7f2;
 
+  /* Nền */
   --bb-bg: #fbf7f2;
   --bb-surface: #ffffff;
   --bb-surface-2: #f3ede6;
   --bb-border: #e5dcd2;
 
+  /* Chữ */
   --bb-fg: #2e2a27;
   --bb-fg-muted: #7a716a;
 
+  /* Trạng thái */
   --bb-success: #4e9a6b;
   --bb-warning: #d9932b;
   --bb-danger: #c4553f;
 
-  /* The lightbox is always dark so the photo carries the screen. */
+  /* Chế độ xem ảnh — luôn nền tối để mắt tập trung vào ảnh */
   --bb-viewer-bg: #16130f;
 
   --bb-radius: 12px;
@@ -28,15 +34,131 @@
 
   --bb-font-sans: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
   --bb-font-display: "Playfair Display", Georgia, serif;
+
+  /* shadcn/ui semantic tokens mapped to BabyBean palette */
+  --background: var(--bb-bg);
+  --foreground: var(--bb-fg);
+  --card: var(--bb-surface);
+  --card-foreground: var(--bb-fg);
+  --popover: var(--bb-surface);
+  --popover-foreground: var(--bb-fg);
+  --primary: var(--bb-primary);
+  --primary-foreground: var(--bb-primary-fg);
+  --secondary: var(--bb-surface-2);
+  --secondary-foreground: var(--bb-fg);
+  --muted: var(--bb-surface-2);
+  --muted-foreground: var(--bb-fg-muted);
+  --accent: var(--bb-accent);
+  --accent-foreground: var(--bb-primary-fg);
+  --destructive: var(--bb-danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--bb-border);
+  --input: var(--bb-border);
+  --ring: var(--bb-primary);
+  --radius: var(--bb-radius);
+}
+
+.dark,
+[data-theme="dark"] {
+  --bb-bg: #16130f;
+  --bb-surface: #211d19;
+  --bb-surface-2: #2b2621;
+  --bb-border: #3a332c;
+  --bb-fg: #f2ede7;
+  --bb-fg-muted: #a69b91;
+
+  --background: var(--bb-bg);
+  --foreground: var(--bb-fg);
+  --card: var(--bb-surface);
+  --card-foreground: var(--bb-fg);
+  --popover: var(--bb-surface);
+  --popover-foreground: var(--bb-fg);
+  --primary: var(--bb-primary);
+  --primary-foreground: var(--bb-primary-fg);
+  --secondary: var(--bb-surface-2);
+  --secondary-foreground: var(--bb-fg);
+  --muted: var(--bb-surface-2);
+  --muted-foreground: var(--bb-fg-muted);
+  --accent: var(--bb-accent);
+  --accent-foreground: var(--bb-primary-fg);
+  --destructive: var(--bb-danger);
+  --destructive-foreground: #ffffff;
+  --border: var(--bb-border);
+  --input: var(--bb-border);
+  --ring: var(--bb-primary);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bb-bg: #16130f;
     --bb-surface: #211d19;
     --bb-surface-2: #2b2621;
     --bb-border: #3a332c;
     --bb-fg: #f2ede7;
     --bb-fg-muted: #a69b91;
+
+    --background: var(--bb-bg);
+    --foreground: var(--bb-fg);
+    --card: var(--bb-surface);
+    --card-foreground: var(--bb-fg);
+    --popover: var(--bb-surface);
+    --popover-foreground: var(--bb-fg);
+    --primary: var(--bb-primary);
+    --primary-foreground: var(--bb-primary-fg);
+    --secondary: var(--bb-surface-2);
+    --secondary-foreground: var(--bb-fg);
+    --muted: var(--bb-surface-2);
+    --muted-foreground: var(--bb-fg-muted);
+    --accent: var(--bb-accent);
+    --accent-foreground: var(--bb-primary-fg);
+    --destructive: var(--bb-danger);
+    --destructive-foreground: #ffffff;
+    --border: var(--bb-border);
+    --input: var(--bb-border);
+    --ring: var(--bb-primary);
   }
+}
+
+@theme {
+  --color-bb-primary: var(--bb-primary);
+  --color-bb-primary-fg: var(--bb-primary-fg);
+  --color-bb-accent: var(--bb-accent);
+  --color-bb-cream: var(--bb-cream);
+  --color-bb-bg: var(--bb-bg);
+  --color-bb-surface: var(--bb-surface);
+  --color-bb-surface-2: var(--bb-surface-2);
+  --color-bb-border: var(--bb-border);
+  --color-bb-fg: var(--bb-fg);
+  --color-bb-fg-muted: var(--bb-fg-muted);
+  --color-bb-success: var(--bb-success);
+  --color-bb-warning: var(--bb-warning);
+  --color-bb-danger: var(--bb-danger);
+  --color-bb-viewer-bg: var(--bb-viewer-bg);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --font-sans: var(--bb-font-sans);
+  --font-display: var(--bb-font-display);
+
+  --radius-lg: var(--bb-radius);
+  --radius-md: var(--bb-radius-sm);
+  --radius-sm: calc(var(--bb-radius-sm) - 2px);
 }
