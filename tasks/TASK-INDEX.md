@@ -121,6 +121,8 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-076 | Seed hỏng: `dev_token_with_pin_123` có `requires_pin=true` mà `pin_hash` NULL; link 2 không có `selections`; thiếu link revoked/expired/locked để test | DEV-BE | BB-008 | med | TODO |
 | BB-077 | Tài liệu mâu thuẫn code: `02-architecture.md` §2.2 thiếu `selection_id` trong cookie; `05-rbac.md` §5 hứa "đổi PIN thu hồi phiên" mà schema không làm được | ARCH | BB-030 | med | TODO |
 | BB-078 | Một cookie `bb_gs` cho mọi album: khách quay lại lần 2 mở album mới sẽ bị đăng xuất khỏi album cũ | SEC-ARCH + DEV-BE | BB-030 | med | HOÃN — quyết định sau Phase 1 |
+| BB-079 | Bỏ tên miền bịa `https://chon-anh.babybean.vn` làm giá trị dự phòng trong `api/admin/galleries/route.ts:139` — thiếu `NEXT_PUBLIC_APP_URL` phải báo lỗi, không được đoán | DEV-BE | BB-023 | high | TODO |
+| BB-080b | Gắn tên miền `babybeanstudio.vn`: đổi `NEXT_PUBLIC_APP_URL`, cập nhật `verify-prod.mjs`, kiểm HTTPS và link chia sẻ | DEV-OPS | BB-079 | med | ĐANG CHỜ DNS |
 
 ---
 
