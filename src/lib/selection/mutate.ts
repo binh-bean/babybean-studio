@@ -10,18 +10,29 @@ export async function patchSelection(
 ): Promise<{ data?: SelectionPatchResponse; error?: { code: ErrorCode; message?: string } }> {
   const supabase = createAdminClient();
 
-  // Load gallery for rules
-  const { data: gallery, error: galleryError } = await supabase
-    .from("galleries")
-    .select("status, included_quota, extra_photo_price, max_selection, allow_extra")
-    .eq("id", session.galleryId)
-    .single();
+  // Load gallery and share_link
+  const [galleryResult, linkResult] = await Promise.all([
+    supabase
+      .from("galleries")
+      .select("status, included_quota, extra_photo_price, max_selection, allow_extra")
+      .eq("id", session.galleryId)
+      .single(),
+    supabase
+      .from("share_links")
+      .select("label")
+      .eq("id", session.shareLinkId)
+      .single()
+  ]);
+
+  const galleryError = galleryResult.error;
+  const gallery = galleryResult.data;
+  const actorLabel = linkResult.data?.label || "Customer";
 
   if (galleryError || !gallery) {
     return { error: { code: "NOT_FOUND", message: "Gallery not found" } };
   }
 
-  if (gallery.status === "submitted" || gallery.status === "delivered" || gallery.status === "archived") {
+  if (gallery.status === "submitted" || gallery.status === "delivered" || gallery.status === "archived" || gallery.status === "in_retouch") {
     return { error: { code: "GALLERY_LOCKED", message: "Gallery is locked" } };
   }
 
@@ -51,7 +62,13 @@ export async function patchSelection(
     const currentMark = currentMarkMap.get(op.photoId);
 
     const wasSelected = currentMark === "selected";
-    const willBeSelected = intendedMark === "selected";
+    
+    let willBeSelected = false;
+    if (op.mark !== undefined) {
+      willBeSelected = intendedMark === "selected";
+    } else {
+      willBeSelected = wasSelected;
+    }
 
     if (!wasSelected && willBeSelected) netChange++;
     if (wasSelected && !willBeSelected) netChange--;
@@ -77,9 +94,10 @@ export async function patchSelection(
     p_role: session.role,
     p_ops: request.ops,
     p_max_selection: gallery.max_selection,
+    p_allow_extra: gallery.allow_extra,
     p_included_quota: gallery.included_quota,
     p_extra_price: gallery.extra_photo_price,
-    p_actor_label: "Customer", // TODO: could be share_link label
+    p_actor_label: actorLabel,
     p_ip: ip,
     p_user_agent: userAgent,
   });

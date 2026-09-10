@@ -68,12 +68,12 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
-| BB-030 | Phiên khách: `POST /api/auth/gallery`, ký cookie, **kiểm `share_links.status` mỗi request** | SEC-ARCH | BB-023 | high | TODO |
-| BB-031 | Màn nhập PIN: 4 ô, tự nhảy, khoá sau 5 lần sai, đếm ngược | DEV-FE + SEC-ARCH | BB-030 | med | TODO |
-| BB-032 | `GET /api/g/gallery` + `GET /api/g/photos` (cursor, filter, subfolder) | DEV-BE | BB-030, BB-014 | med | TODO |
-| BB-033 | `PhotoGrid`: virtualize >200 ảnh, lazy load, srcset, đổi mật độ, skeleton | DEV-FE | BB-032, BB-015 | high | TODO |
-| BB-034 | `Lightbox`: vuốt, pinch zoom, phím tắt, preload 3 ảnh | DEV-FE | BB-033 | high | TODO |
-| BB-035 | `PATCH /api/g/selection`: idempotent theo `clientOpId`, all-or-nothing khi vượt hạn | DEV-BE | BB-032 | high | TODO |
+| BB-030 | Phiên khách: `POST /api/auth/gallery`, ký cookie, **kiểm `share_links.status` mỗi request** | SEC-ARCH | BB-023 | high | ✅ DONE |
+| BB-031 | Màn nhập PIN: 4 ô, tự nhảy, khoá sau 5 lần sai, đếm ngược | DEV-FE + SEC-ARCH | BB-030 | med | ✅ DONE |
+| BB-032 | `GET /api/g/gallery` + `GET /api/g/photos` (cursor, filter, subfolder) | DEV-BE | BB-030, BB-014 | med | ✅ DONE |
+| BB-033 | `PhotoGrid`: virtualize >200 ảnh, lazy load, srcset, đổi mật độ, skeleton | DEV-FE | BB-032, BB-015 | high | ✅ DONE |
+| BB-034 | `Lightbox`: vuốt, pinch zoom, phím tắt, preload 3 ảnh | DEV-FE | BB-033 | high | ✅ DONE |
+| BB-035 | `PATCH /api/g/selection`: idempotent theo `clientOpId`, all-or-nothing khi vượt hạn | DEV-BE | BB-032 | high | ✅ DONE |
 | BB-036 | Store chọn ảnh (Zustand): optimistic, debounce 400ms, hàng đợi offline + localStorage | DEV-FE | BB-035 | high | TODO |
 | BB-037 | `SelectionBar` + `QuotaMeter` + hộp thoại cảnh báo vượt quota | DEV-FE | BB-036 | med | TODO |
 | BB-038 | Ghi chú chỉnh sửa: sheet từng ảnh + chip gợi ý + ghi chú chung | DEV-FE + DEV-BE | BB-035 | med | TODO |
