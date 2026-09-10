@@ -165,7 +165,7 @@ export function StaffManager() {
         <EmptyState title={t.emptyTitle} description={t.emptyBody} />
       ) : (
         <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
+          <table className="w-full min-w-[1100px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bb-border)] text-left text-[var(--bb-fg-muted)]">
                 <th className="px-4 py-3 font-medium">{t.colName}</th>
@@ -185,12 +185,13 @@ export function StaffManager() {
                     row.isActive ? "" : "opacity-60"
                   }`}
                 >
-                  <td className="px-4 py-3 font-medium text-[var(--bb-fg)]">{row.fullName}</td>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium text-[var(--bb-fg)]">{row.fullName}</td>
                   <td className="px-4 py-3">
                     <code className="text-[var(--bb-fg)]">{row.identifier}</code>
                   </td>
                   <td className="px-4 py-3">
                     <Select
+                      className="min-w-[180px]"
                       aria-label={t.colRole}
                       value={row.role}
                       disabled={busyId === row.id || !assignableRoles.includes(row.role)}
@@ -231,7 +232,7 @@ export function StaffManager() {
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex flex-nowrap justify-end gap-2">
                       <Button
                         variant="outline"
                         size="sm"
