@@ -173,5 +173,5 @@ begin
 end;
 $$;
 
-revoke all on function patch_selection_batch from public;
-grant execute on function patch_selection_batch to service_role;
+revoke all on function patch_selection_batch(uuid, uuid, uuid, text, jsonb, integer, boolean, integer, numeric, text, inet, text) from public;
+grant execute on function patch_selection_batch(uuid, uuid, uuid, text, jsonb, integer, boolean, integer, numeric, text, inet, text) to service_role;

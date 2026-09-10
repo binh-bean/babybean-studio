@@ -69,3 +69,6 @@ begin
   limit p_limit;
 end;
 $$;
+
+revoke all on function get_gallery_photos(uuid, uuid, integer, integer, text, text) from public;
+grant execute on function get_gallery_photos(uuid, uuid, integer, integer, text, text) to service_role;
