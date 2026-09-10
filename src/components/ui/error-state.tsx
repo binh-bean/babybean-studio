@@ -2,6 +2,7 @@ import * as React from "react";
 import { AlertCircle, RotateCcw } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "./utils";
+import { vi } from "../../i18n";
 
 export interface ErrorStateProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode;
@@ -14,10 +15,10 @@ export interface ErrorStateProps extends React.HTMLAttributes<HTMLDivElement> {
 
 function ErrorState({
   icon,
-  title = "Đã xảy ra lỗi",
-  description = "Không thể tải dữ liệu, vui lòng thử lại.",
+  title = vi.ui.errorState.defaultTitle,
+  description = vi.ui.errorState.defaultDescription,
   onRetry,
-  retryLabel = "Thử lại",
+  retryLabel = vi.ui.errorState.defaultRetryLabel,
   action,
   className,
   ...props

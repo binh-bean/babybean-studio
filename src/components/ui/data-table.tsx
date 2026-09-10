@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cn } from "./utils";
+import { vi } from "../../i18n";
 
 const Table = React.forwardRef<
   HTMLTableElement,
@@ -134,7 +135,7 @@ export interface DataTableProps<T> {
 function DataTable<T>({
   columns,
   data,
-  emptyMessage = "Không có dữ liệu",
+  emptyMessage = vi.ui.dataTable.emptyMessage,
   className,
 }: DataTableProps<T>) {
   return (

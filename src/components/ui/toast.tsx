@@ -3,6 +3,7 @@
 import * as React from "react";
 import { X, CheckCircle2, AlertTriangle, AlertCircle, Info } from "lucide-react";
 import { cn } from "./utils";
+import { vi } from "../../i18n";
 
 export type ToastType = "default" | "success" | "warning" | "danger" | "info";
 
@@ -105,7 +106,7 @@ export function Toaster() {
   return (
     <div
       aria-live="polite"
-      aria-label="Thông báo"
+      aria-label={vi.ui.toast.notificationAria}
       className="fixed bottom-4 right-4 z-50 flex max-h-screen w-full max-w-sm flex-col-reverse gap-2 pointer-events-none p-4 sm:p-0"
     >
       {toasts.map((item) => (
@@ -162,7 +163,7 @@ function ToastSingle({
         type="button"
         onClick={onDismiss}
         className="rounded-sm p-1 text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--bb-primary)]"
-        aria-label="Đóng thông báo"
+        aria-label={vi.ui.toast.closeNotification}
       >
         <X className="h-4 w-4" />
       </button>

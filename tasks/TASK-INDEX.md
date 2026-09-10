@@ -111,7 +111,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-066 | Watermark ở tầng proxy ảnh | DEV-INT | BB-015 | high | TODO |
 | BB-067 | Tải ảnh preview + ZIP ảnh đã chọn + log lượt tải | DEV-BE | BB-015 | med | TODO |
 | BB-068 | Cron: `expire-galleries`, `send-reminders`, `flush-notifications` | DEV-BE | BB-039 | med | TODO |
-| BB-069 | i18n VI/EN đầy đủ, rà soát không còn chuỗi hard-code | DEV-UI | BB-040 | low | TODO |
+| BB-069 | i18n VI/EN đầy đủ, rà soát không còn chuỗi hard-code | DEV-UI | BB-040 | low | ✅ DONE |
 | BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-FE | BB-040 | med | TODO |
 | BB-071 | Tối ưu album 1.500 ảnh: bundle ≤180KB, bộ nhớ ≤300MB | DEV-FE | BB-033 | high | TODO |
 | BB-072 | Sentry + trang lỗi 404/500 tiếng Việt | DEV-OPS | BB-005 | low | TODO |
