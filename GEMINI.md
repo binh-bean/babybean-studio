@@ -143,6 +143,8 @@ Một lần hỏi thay vì ba.
 npm run verify:own -- <AGENT>  # kiểm thay đổi có trong vùng sở hữu của mình
 npm run verify:db      # kiểm database: cấu trúc, RLS, quyền, rò rỉ khoá công khai
 npm run verify:db:seed # như trên, kèm yêu cầu phải có dữ liệu mẫu
+npm run verify:build   # mở file đã build ra đọc: bí mật lọt vào bundle? font khai mà không nạp?
+npm run verify:prod    # hỏi thẳng site đang chạy thật: định tuyến, vùng máy chủ, header an ninh
 npm run dev          # chạy dev
 npm run typecheck    # bắt buộc trước khi báo xong
 npm run lint
@@ -151,6 +153,18 @@ npm run test:e2e     # playwright
 npm run db:push      # apply schema lên Supabase
 npm run drive:sync   # đồng bộ thủ công 1 album
 ```
+
+## Build xanh không có nghĩa là đúng
+
+`npm run build` thoát 0 chỉ nói rằng trình biên dịch hài lòng, không nói rằng kết quả đúng.
+Ngày 10/09/2026: build xanh, 39 test xanh, mà production phục vụ `font-family: "Be Vietnam Pro"`
+trong khi không tải một file font nào — trình tối ưu CSS đã âm thầm vứt dòng `@import` đi.
+Không ai thấy lỗi vì không có gì báo lỗi.
+
+Vì vậy: **đừng lấy "lệnh chạy xong không báo lỗi" làm bằng chứng.** Mở kết quả ra xem.
+`verify:build` và `verify:prod` làm đúng việc đó, hãy chạy chúng thay vì tin vào build.
+
+---
 
 ## Trước khi báo "xong"
 
@@ -162,4 +176,5 @@ npm run drive:sync   # đồng bộ thủ công 1 album
 - [ ] Không có secret trong diff
 - [ ] `npm run verify:own -- <TÊN AGENT>` xanh — không sửa file của agent khác
 - [ ] `npm run verify:db` xanh (bắt buộc nếu task đụng database) — dán kết quả vào báo cáo
+- [ ] `npm run verify:build` xanh (bắt buộc nếu task đụng giao diện, style hoặc biến môi trường)
 - [ ] Trạng thái task trong `tasks/TASK-INDEX.md` đã đổi
