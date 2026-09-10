@@ -98,6 +98,29 @@ feat/BB-xxx  ──PR──►  develop  ──PR──►  main
 7. Gắn tag `v0.x.y`, ghi changelog.
 
 **Quy tắc**: không deploy vào chiều thứ Sáu và không deploy trong giờ studio đang gửi link cho khách (14:00–20:00), trừ hotfix.
+ 
+### 3.1. Thiết lập GitHub Branch Protection (chặn merge khi đỏ)
+ 
+Áp dụng cho cả nhánh `main` và `develop` trên GitHub repo:
+1. Vào **Settings** → **Branches** → **Add branch protection rule** (hoặc Rulesets).
+2. Nhập Branch name pattern: `main` (làm tương tự cho `develop`).
+3. Tích chọn **Require a pull request before merging**.
+4. Tích chọn **Require status checks to pass before merging**:
+   - Chọn status check: `verify` (tên job trong `.github/workflows/ci.yml`).
+   - Tích chọn **Require branches to be up to date before merging**.
+5. Tích chọn **Do not allow bypassing the above settings** để đảm bảo quy trình.
+ 
+### 3.2. Hướng dẫn kết nối Vercel & thiết lập môi trường (cho BB-005)
+ 
+1. Đăng nhập Vercel bằng tài khoản studio.
+2. **Add New Project** → Import repository `babybean-studio`.
+3. Framework Preset: chọn **Next.js**, Root Directory: `./`.
+4. Project Settings → **Functions** → **Function Region**: chọn **Singapore (sin1)** (khớp với `vercel.json` và Supabase).
+5. Cấu hình biến môi trường (Environment Variables) theo bảng ở §2:
+   - Điền các biến `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_DRIVE_API_KEY`, `APP_SECRET`, `NEXT_PUBLIC_APP_URL`.
+   - Chọn đúng scope (Production, Preview, Development).
+6. Deploy bản đầu tiên để kích hoạt pipeline.
+
 
 ## 4. Migration cơ sở dữ liệu
 
