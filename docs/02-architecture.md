@@ -66,7 +66,7 @@ GET /g/<token>
   → nếu requires_pin và chưa có cookie hợp lệ → màn hình nhập PIN
   → POST /api/auth/gallery  { token, pin }
   → so khớp pin_hash (bcrypt), rate-limit theo IP + token
-  → set cookie bb_gs = JWT{ gallery_id, share_link_id, role, exp } (HttpOnly, Secure, SameSite=Lax)
+  → set cookie bb_gs = JWT{ gallery_id, share_link_id, selection_id, role, exp } (HttpOnly, Secure, SameSite=Lax)
 ```
 
 Mọi API của khách đều đọc cookie này, không tin `gallery_id` do client gửi.

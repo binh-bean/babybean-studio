@@ -100,7 +100,7 @@ UI ẩn nút theo quyền chỉ để đỡ rối mắt — **không tính là b
 | Chống dò token | 20 request 404 / 5 phút / IP → chặn 1 giờ |
 | Hết hạn | `expires_at` tuỳ chọn; mặc định 90 ngày sau `due_at` |
 | Thu hồi | `status = 'revoked'` → mọi phiên hiện có bị vô hiệu ngay |
-| Phiên | JWT 7 ngày, HttpOnly, Secure, SameSite=Lax; đổi PIN → thu hồi toàn bộ phiên |
+| Phiên | JWT 7 ngày, HttpOnly, Secure, SameSite=Lax; đổi PIN → thu hồi toàn bộ phiên (Phase 2) |
 | Không lộ tồn tại | Token sai và token hết hạn trả cùng dạng lỗi khi chưa xác thực |
 
 ## 6. Ma trận nghiệm thu cho SEC-ARCH
