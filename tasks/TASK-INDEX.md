@@ -105,7 +105,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-060 | Dashboard: thẻ số liệu, danh sách khẩn, biểu đồ 14 ngày | DEV-FE | BB-024 | med | TODO |
 | BB-061 | Quản lý khách hàng + bé + lịch sử + chống trùng SĐT | DEV-FE + DEV-BE | BB-024 | med | TODO |
 | BB-062 | Quản lý gói chụp | DEV-FE + DEV-BE | BB-024 | low | TODO |
-| BB-063 | Quản lý chi nhánh + nhân sự: chủ studio tạo tài khoản/mật khẩu, gán vai trò và chi nhánh, bật/tắt hoạt động. Đăng nhập bằng tên tài khoản. Xem docs/13 §8 | DEV-FE + DEV-BE | BB-020 | **high** | TODO |
+| BB-063 | Quản lý chi nhánh + nhân sự: chủ studio tạo tài khoản/mật khẩu, gán vai trò và chi nhánh, bật/tắt hoạt động. Đăng nhập bằng tên tài khoản. Xem docs/13 §8 | DEV-FE + DEV-BE | BB-020 | **high** | ✅ **DONE** — tạo/sửa/tắt tài khoản, gán vai trò + chi nhánh, đặt lại mật khẩu, đăng nhập bằng tên tài khoản. Chi nhánh riêng vẫn TODO |
 | BB-064 | Màn nhật ký hoạt động + bộ lọc | DEV-FE | BB-052 | low | TODO |
 | BB-065 | Mời người thân: link phụ, vai trò, hiển thị đề xuất | DEV-FE + DEV-BE | BB-039 | high | TODO |
 | BB-066 | Watermark ở tầng proxy ảnh | DEV-INT | BB-015 | high | TODO |
