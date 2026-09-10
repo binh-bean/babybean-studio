@@ -65,11 +65,14 @@ export async function driveFetch(
   params: Record<string, string>,
   ctx: DriveRequestContext,
 ): Promise<Response> {
-  const url = new URL(`${DRIVE_API}${path}`);
+  const isAbsolute = path.startsWith("http");
+  const url = new URL(isAbsolute ? path : `${DRIVE_API}${path}`);
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined) url.searchParams.set(k, v);
   }
-  url.searchParams.set("key", apiKey());
+  if (!isAbsolute) {
+    url.searchParams.set("key", apiKey());
+  }
 
   let lastStatus = 0;
 
