@@ -9,10 +9,16 @@
  * Chủ studio tự đặt tên tài khoản và mật khẩu. Không có màn hình đăng ký công
  * khai: hệ thống này chứa ảnh trẻ em, tài khoản phải do người biết mặt nhân
  * viên cấp ra.
+ *
+ * Bảy cột không nhét vừa màn hình hẹp. Bản đầu tiên ép bảng rộng 1100px rồi để
+ * nó tự co, kết quả là tên chi nhánh xuống dòng mỗi chữ một hàng và ô trạng
+ * thái méo thành hình tròn. Từ `lg` trở lên là bảng; hẹp hơn thì mỗi người một
+ * thẻ, vì trên điện thoại người ta đọc theo chiều dọc chứ không kéo ngang.
  */
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Button, Input, Select, Badge, Card, Spinner, EmptyState } from "@/components/ui";
+import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
 
 const t = vi.admin.staff;
@@ -36,8 +42,7 @@ interface Branch {
   name: string;
 }
 
-const roleLabel = (role: string) =>
-  (t.roles as Record<string, string>)[role] ?? role;
+const roleLabel = (role: string) => (t.roles as Record<string, string>)[role] ?? role;
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -46,6 +51,14 @@ function formatDate(iso: string | null): string {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+/** Owner và admin thấy mọi chi nhánh nên không cần liệt kê tên. */
+function branchSummary(row: StaffRow, branches: Branch[]): string {
+  if (row.role === "owner" || row.role === "admin") return t.allBranches;
+  if (row.branchIds.length === 0) return t.noBranch;
+  if (row.branchIds.length === branches.length) return t.allBranches;
+  return row.branchIds.map((id) => branches.find((b) => b.id === id)?.name ?? "?").join(", ");
 }
 
 export function StaffManager() {
@@ -106,12 +119,72 @@ export function StaffManager() {
   }
 
   function resetPassword(row: StaffRow) {
-    // prompt() keeps the new password out of the page's own state and out of
-    // any re-render; it goes straight to the request and is never stored.
+    // prompt() giữ mật khẩu mới nằm ngoài state của trang: nó đi thẳng vào
+    // request và không bao giờ được lưu lại hay render lần nào.
     const next = window.prompt(`${t.newPassword} — ${row.fullName}`);
     if (!next) return;
     void patch(row.id, { password: next }, t.passwordChanged);
   }
+
+  const roleSelect = (row: StaffRow, className: string) => (
+    <Select
+      className={className}
+      aria-label={t.colRole}
+      value={row.role}
+      disabled={busyId === row.id || !assignableRoles.includes(row.role)}
+      onChange={(e) => void patch(row.id, { role: e.target.value }, t.updated)}
+    >
+      {!assignableRoles.includes(row.role) && (
+        <option value={row.role}>{roleLabel(row.role)}</option>
+      )}
+      {assignableRoles.map((r) => (
+        <option key={r} value={r}>
+          {roleLabel(r)}
+        </option>
+      ))}
+    </Select>
+  );
+
+  const rowActions = (row: StaffRow) => (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busyId === row.id}
+        onClick={() => setEditingId(editingId === row.id ? null : row.id)}
+      >
+        {editingId === row.id ? t.cancel : t.edit}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busyId === row.id}
+        onClick={() => resetPassword(row)}
+      >
+        {t.resetPassword}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busyId === row.id}
+        onClick={() => toggleActive(row)}
+      >
+        {row.isActive ? t.deactivate : t.reactivate}
+      </Button>
+    </>
+  );
+
+  const lastLogin = (row: StaffRow) =>
+    row.neverLoggedIn ? (
+      <Badge variant="outline" className="whitespace-nowrap">
+        {t.neverLoggedIn}
+      </Badge>
+    ) : (
+      <span className="whitespace-nowrap" title={row.stale ? t.staleWarning : undefined}>
+        {formatDate(row.lastLoginAt)}
+        {row.stale && " ⚠"}
+      </span>
+    );
 
   if (loading) {
     return (
@@ -164,123 +237,127 @@ export function StaffManager() {
       {rows.length === 0 ? (
         <EmptyState title={t.emptyTitle} description={t.emptyBody} />
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[1100px] border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-[var(--bb-border)] text-left text-[var(--bb-fg-muted)]">
-                <th className="px-4 py-3 font-medium">{t.colName}</th>
-                <th className="px-4 py-3 font-medium">{t.colAccount}</th>
-                <th className="px-4 py-3 font-medium">{t.colRole}</th>
-                <th className="px-4 py-3 font-medium">{t.colBranches}</th>
-                <th className="px-4 py-3 font-medium">{t.colLastLogin}</th>
-                <th className="px-4 py-3 font-medium">{t.colStatus}</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <Fragment key={row.id}>
-                <tr
-                  className={`border-b border-[var(--bb-border)] last:border-0 ${
-                    row.isActive ? "" : "opacity-60"
-                  }`}
-                >
-                  <td className="whitespace-nowrap px-4 py-3 font-medium text-[var(--bb-fg)]">{row.fullName}</td>
-                  <td className="px-4 py-3">
-                    <code className="text-[var(--bb-fg)]">{row.identifier}</code>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Select
-                      className="min-w-[180px]"
-                      aria-label={t.colRole}
-                      value={row.role}
-                      disabled={busyId === row.id || !assignableRoles.includes(row.role)}
-                      onChange={(e) => void patch(row.id, { role: e.target.value }, t.updated)}
-                    >
-                      {!assignableRoles.includes(row.role) && (
-                        <option value={row.role}>{roleLabel(row.role)}</option>
-                      )}
-                      {assignableRoles.map((r) => (
-                        <option key={r} value={r}>
-                          {roleLabel(r)}
-                        </option>
-                      ))}
-                    </Select>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--bb-fg-muted)]">
-                    {row.role === "owner" || row.role === "admin"
-                      ? t.allBranches
-                      : row.branchIds.length === 0
-                        ? t.noBranch
-                        : row.branchIds
-                            .map((id) => branches.find((b) => b.id === id)?.name ?? "?")
-                            .join(", ")}
-                  </td>
-                  <td className="px-4 py-3 text-[var(--bb-fg-muted)]">
-                    {row.neverLoggedIn ? (
-                      <Badge variant="outline">{t.neverLoggedIn}</Badge>
-                    ) : (
-                      <span title={row.stale ? t.staleWarning : undefined}>
-                        {formatDate(row.lastLoginAt)}
-                        {row.stale && " ⚠"}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={row.isActive ? "default" : "secondary"}>
-                      {row.isActive ? t.active : t.inactive}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-nowrap justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={busyId === row.id}
-                        onClick={() => setEditingId(editingId === row.id ? null : row.id)}
-                      >
-                        {editingId === row.id ? t.cancel : t.edit}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={busyId === row.id}
-                        onClick={() => resetPassword(row)}
-                      >
-                        {t.resetPassword}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={busyId === row.id}
-                        onClick={() => toggleActive(row)}
-                      >
-                        {row.isActive ? t.deactivate : t.reactivate}
-                      </Button>
-                    </div>
-                  </td>
+        <>
+          {/* Màn rộng: bảng */}
+          <Card className="hidden overflow-x-auto p-0 lg:block">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-[var(--bb-border)] text-left text-[var(--bb-fg-muted)]">
+                  <th className="px-4 py-3 font-medium">{t.colName}</th>
+                  <th className="px-4 py-3 font-medium">{t.colAccount}</th>
+                  <th className="w-[190px] px-4 py-3 font-medium">{t.colRole}</th>
+                  <th className="px-4 py-3 font-medium">{t.colBranches}</th>
+                  <th className="px-4 py-3 font-medium">{t.colLastLogin}</th>
+                  <th className="px-4 py-3 font-medium">{t.colStatus}</th>
+                  <th className="px-4 py-3" />
                 </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <Fragment key={row.id}>
+                    <tr
+                      className={`border-b border-[var(--bb-border)] last:border-0 ${
+                        row.isActive ? "" : "opacity-60"
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-medium text-[var(--bb-fg)]">{row.fullName}</td>
+                      <td className="px-4 py-3">
+                        <code className="break-all text-[var(--bb-fg)]">{row.identifier}</code>
+                      </td>
+                      <td className="px-4 py-3">{roleSelect(row, "w-full")}</td>
+                      <td className="max-w-[220px] px-4 py-3 text-[var(--bb-fg-muted)]">
+                        {branchSummary(row, branches)}
+                      </td>
+                      <td className="px-4 py-3 text-[var(--bb-fg-muted)]">{lastLogin(row)}</td>
+                      <td className="px-4 py-3">
+                        <Badge
+                          variant={row.isActive ? "default" : "secondary"}
+                          className="whitespace-nowrap"
+                        >
+                          {row.isActive ? t.active : t.inactive}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap justify-end gap-2">{rowActions(row)}</div>
+                      </td>
+                    </tr>
+
+                    {editingId === row.id && (
+                      <tr className="border-b border-[var(--bb-border)] bg-[var(--bb-surface-2)]">
+                        <td colSpan={7} className="px-4 py-4">
+                          <EditStaffRow
+                            row={row}
+                            branches={branches}
+                            saving={busyId === row.id}
+                            onSave={async (payload) => {
+                              await patch(row.id, payload, t.updated);
+                              setEditingId(null);
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          {/* Màn hẹp: mỗi người một thẻ */}
+          <div className="space-y-3 lg:hidden">
+            {rows.map((row) => (
+              <Card key={row.id} className={`p-4 ${row.isActive ? "" : "opacity-60"}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-[var(--bb-fg)]">{row.fullName}</p>
+                    <code className="block break-all text-xs text-[var(--bb-fg-muted)]">
+                      {row.identifier}
+                    </code>
+                  </div>
+                  <Badge
+                    variant={row.isActive ? "default" : "secondary"}
+                    className="shrink-0 whitespace-nowrap"
+                  >
+                    {row.isActive ? t.active : t.inactive}
+                  </Badge>
+                </div>
+
+                <dl className="mt-3 space-y-2 text-sm">
+                  <div>
+                    <dt className="mb-1 text-xs text-[var(--bb-fg-muted)]">{t.colRole}</dt>
+                    <dd>{roleSelect(row, "w-full")}</dd>
+                  </div>
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <dt className="text-xs text-[var(--bb-fg-muted)]">{t.colBranches}</dt>
+                    <dd className="text-right text-[var(--bb-fg)]">
+                      {branchSummary(row, branches)}
+                    </dd>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <dt className="text-xs text-[var(--bb-fg-muted)]">{t.colLastLogin}</dt>
+                    <dd className="text-[var(--bb-fg-muted)]">{lastLogin(row)}</dd>
+                  </div>
+                </dl>
+
+                <div className="mt-4 flex flex-wrap gap-2">{rowActions(row)}</div>
 
                 {editingId === row.id && (
-                  <tr className="border-b border-[var(--bb-border)] bg-[var(--bb-surface-2)]">
-                    <td colSpan={7} className="px-4 py-4">
-                      <EditStaffRow
-                        row={row}
-                        branches={branches}
-                        saving={busyId === row.id}
-                        onSave={async (payload) => {
-                          await patch(row.id, payload, t.updated);
-                          setEditingId(null);
-                        }}
-                      />
-                    </td>
-                  </tr>
+                  <div className="mt-4 border-t border-[var(--bb-border)] pt-4">
+                    <EditStaffRow
+                      row={row}
+                      branches={branches}
+                      saving={busyId === row.id}
+                      onSave={async (payload) => {
+                        await patch(row.id, payload, t.updated);
+                        setEditingId(null);
+                      }}
+                    />
+                  </div>
                 )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -312,7 +389,7 @@ function EditStaffRow({
 
   return (
     <form
-      className="grid gap-4 sm:grid-cols-3"
+      className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       onSubmit={(e) => {
         e.preventDefault();
         void onSave({
@@ -322,8 +399,13 @@ function EditStaffRow({
         });
       }}
     >
-      <Field label={t.fullName}>
-        <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required minLength={2} />
+      <Field label={t.fullName} required>
+        <Input
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          required
+          minLength={2}
+        />
       </Field>
 
       <Field label={t.phone}>
@@ -353,8 +435,11 @@ function EditStaffRow({
         )}
       </Field>
 
-      <div className="sm:col-span-3 flex items-center justify-between gap-4">
-        <p className="text-xs text-[var(--bb-fg-muted)]">{t.usernameLocked}</p>
+      <div className="flex flex-wrap items-center justify-between gap-4 sm:col-span-2 lg:col-span-3">
+        <div className="space-y-1">
+          <RequiredLegend />
+          <p className="text-xs text-[var(--bb-fg-muted)]">{t.usernameLocked}</p>
+        </div>
         <Button type="submit" disabled={saving}>
           {saving ? t.saving : t.save}
         </Button>
@@ -409,11 +494,11 @@ function CreateStaffForm({
   return (
     <Card className="p-5">
       <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
-        <Field label={t.fullName}>
+        <Field label={t.fullName} required>
           <Input name="fullName" required minLength={2} autoComplete="off" />
         </Field>
 
-        <Field label={t.username} hint={t.usernameHint}>
+        <Field label={t.username} hint={t.usernameHint} required>
           <Input
             name="username"
             required
@@ -423,15 +508,21 @@ function CreateStaffForm({
           />
         </Field>
 
-        <Field label={t.password} hint={t.passwordHint}>
-          <Input name="password" type="password" required minLength={10} autoComplete="new-password" />
+        <Field label={t.password} hint={t.passwordHint} required>
+          <Input
+            name="password"
+            type="password"
+            required
+            minLength={10}
+            autoComplete="new-password"
+          />
         </Field>
 
         <Field label={t.phone}>
           <Input name="phone" inputMode="tel" autoComplete="off" />
         </Field>
 
-        <Field label={t.role}>
+        <Field label={t.role} required>
           <Select name="role" defaultValue="cs">
             {assignableRoles.map((r) => (
               <option key={r} value={r}>
@@ -460,31 +551,16 @@ function CreateStaffForm({
           </div>
         </Field>
 
-        <div className="sm:col-span-2 flex items-center justify-between gap-4 pt-2">
-          <p className="text-xs text-[var(--bb-fg-muted)]">{t.loginNote}</p>
+        <div className="flex flex-wrap items-center justify-between gap-4 sm:col-span-2">
+          <div className="space-y-1">
+            <RequiredLegend />
+            <p className="text-xs text-[var(--bb-fg-muted)]">{t.loginNote}</p>
+          </div>
           <Button type="submit" disabled={saving}>
             {saving ? t.saving : t.save}
           </Button>
         </div>
       </form>
     </Card>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium text-[var(--bb-fg)]">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-[var(--bb-fg-muted)]">{hint}</span>}
-    </label>
   );
 }

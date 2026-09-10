@@ -11,6 +11,7 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Button, Input, Badge, Card, Spinner, EmptyState } from "@/components/ui";
+import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
 
 const t = vi.admin.branches;
@@ -141,8 +142,9 @@ export function BranchManager() {
       {rows.length === 0 ? (
         <EmptyState title={t.emptyTitle} description={t.emptyBody} />
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
+        <>
+          <Card className="hidden overflow-x-auto p-0 lg:block">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bb-border)] text-left text-[var(--bb-fg-muted)]">
                 <th className="px-4 py-3 font-medium">{t.colCode}</th>
@@ -226,7 +228,83 @@ export function BranchManager() {
               ))}
             </tbody>
           </table>
-        </Card>
+          </Card>
+
+          {/* Màn hẹp: mỗi chi nhánh một thẻ, đọc theo chiều dọc */}
+          <div className="space-y-3 lg:hidden">
+            {rows.map((row) => (
+              <Card key={row.id} className={`p-4 ${row.isActive ? "" : "opacity-60"}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-[var(--bb-fg)]">{row.name}</p>
+                    <code className="text-xs text-[var(--bb-fg-muted)]">{row.code}</code>
+                  </div>
+                  <Badge
+                    variant={row.isActive ? "default" : "secondary"}
+                    className="shrink-0 whitespace-nowrap"
+                  >
+                    {row.isActive ? t.open : t.closed}
+                  </Badge>
+                </div>
+
+                <dl className="mt-3 space-y-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-[var(--bb-fg-muted)]">{t.colAddress}</dt>
+                    <dd className="text-[var(--bb-fg)]">
+                      {row.address ?? <span className="italic">{t.noAddress}</span>}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-xs text-[var(--bb-fg-muted)]">{t.colHotline}</dt>
+                    <dd className="text-[var(--bb-fg)]">{row.hotline ?? "—"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-xs text-[var(--bb-fg-muted)]">{t.colUsage}</dt>
+                    <dd className="text-[var(--bb-fg-muted)]">
+                      {t.usage
+                        .replace("{staff}", String(row.staffCount))
+                        .replace("{galleries}", String(row.galleryCount))}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={busyId === row.id}
+                      onClick={() => setEditingId(editingId === row.id ? null : row.id)}
+                    >
+                      {editingId === row.id ? t.cancel : t.edit}
+                    </Button>
+                  )}
+                  {canCreate && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={busyId === row.id}
+                      onClick={() => toggleActive(row)}
+                    >
+                      {row.isActive ? t.close : t.reopen}
+                    </Button>
+                  )}
+                </div>
+
+                {editingId === row.id && (
+                  <div className="mt-4 border-t border-[var(--bb-border)] pt-4">
+                    <BranchForm
+                      initial={row}
+                      submitLabel={t.save}
+                      onSubmit={(payload) => patch(row.id, payload)}
+                      onError={setError}
+                    />
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -270,7 +348,7 @@ function BranchForm({
   return (
     <Card className={initial ? "border-0 bg-transparent p-0 shadow-none" : "p-5"}>
       <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
-        <Field label={t.colCode} hint={t.codeHint}>
+        <Field label={t.colCode} hint={t.codeHint} required>
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -280,7 +358,7 @@ function BranchForm({
           />
         </Field>
 
-        <Field label={t.colName}>
+        <Field label={t.colName} required>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -308,30 +386,15 @@ function BranchForm({
         </Field>
 
         <div className="sm:col-span-2 flex items-center justify-between gap-4 pt-1">
-          <p className="text-xs text-[var(--bb-fg-muted)]">{t.privacyNote}</p>
+          <div className="space-y-1">
+            <RequiredLegend />
+            <p className="text-xs text-[var(--bb-fg-muted)]">{t.privacyNote}</p>
+          </div>
           <Button type="submit" disabled={saving}>
             {saving ? t.saving : submitLabel}
           </Button>
         </div>
       </form>
     </Card>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium text-[var(--bb-fg)]">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-[var(--bb-fg-muted)]">{hint}</span>}
-    </label>
   );
 }
