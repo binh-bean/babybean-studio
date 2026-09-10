@@ -159,3 +159,47 @@ Hệ thống đọc tối đa **2 cấp** và hiển thị thành tab cho khách
 1. **Không xoá thư mục Drive của album chưa giao xong.** Ảnh không nằm trong hệ thống, chúng nằm trên Drive của studio (`docs/adr/ADR-0002`). Xoá thư mục là ảnh biến mất khỏi album của khách.
 2. **Không gửi link Google Drive cho khách.** Chỉ gửi link `babybeanstudio.vn/g/...`. Link Drive gốc không có PIN, không thu hồi được, không đếm được ai đã xem.
 3. **Đồng bộ lại trước khi xuất danh sách cho retoucher.** Nếu ai đó đổi tên file trên Drive sau khi album được tạo, danh sách xuất ra sẽ mang tên cũ cho tới khi đồng bộ lại.
+
+---
+
+## 8. Cấp tài khoản nhân viên — chốt ngày 10/09/2026
+
+**Chủ studio tự tạo tài khoản và mật khẩu, rồi gán vai trò.** Không có màn hình
+đăng ký công khai, và không dùng cơ chế mời qua email.
+
+Lý do không có nút "Đăng ký": hệ thống này chứa ảnh trẻ em. Một trang đăng ký mở
+nghĩa là bất kỳ ai trên internet cũng tự tạo được tài khoản, vì trang đó không có
+cách nào biết ai là nhân viên BabyBean.
+
+### Đăng nhập bằng tên tài khoản, không bắt buộc email
+
+Nhiều nhân viên studio không dùng email thường xuyên. Nhưng Supabase Auth bắt
+buộc phải có email cho mỗi tài khoản.
+
+Cách giải: chủ studio nhập **tên tài khoản** (ví dụ `linh.q1`), hệ thống tự sinh
+email nội bộ `linh.q1@staff.babybeanstudio.vn` để lưu trong Supabase. Nhân viên
+gõ `linh.q1` ở màn đăng nhập, không cần biết cái email kia tồn tại. Ai có email
+thật thì nhập email thật, màn đăng nhập nhận cả hai dạng.
+
+Email nội bộ này **không nhận được thư** — nó chỉ là định danh. Vì vậy chức năng
+"quên mật khẩu" gửi email sẽ không dùng được cho những tài khoản đó; chủ studio
+đặt lại mật khẩu hộ.
+
+### Nghỉ việc: tắt, không xoá
+
+Đặt `staff_profiles.is_active = false`. Tài khoản không đăng nhập được nữa, nhưng
+nhật ký hoạt động vẫn giữ tên người đó — cần cho việc đối soát về sau: ai tạo
+album này, ai đổi gói, ai mở lại album đã chốt.
+
+Xoá hẳn sẽ làm mọi album cũ mất dấu vết người thực hiện.
+
+### Tắt thủ công là chính, tự động chỉ để nhắc
+
+Chủ studio bấm tắt. Ngoài ra màn quản lý nhân sự hiện một danh sách **tài khoản
+quá 60 ngày không đăng nhập** để chủ studio tự quyết định — không tự động khoá,
+vì khoá nhầm giữa ca chụp thì nhân viên không vào được máy.
+
+### Ai được làm việc này
+
+Theo `docs/05-rbac.md` §2: chỉ `owner` và `admin` có quyền CRUD nhân sự và gán
+vai trò. `branch_manager` chỉ được xem.
