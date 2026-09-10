@@ -7,22 +7,31 @@
 
 import "server-only";
 import { cookies } from "next/headers";
-import { createServerClient as createSSRClient } from "@supabase/ssr";
+import { createServerClient as createSSRClient, type CookieOptions } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Shape @supabase/ssr passes to setAll. */
 interface CookieToSet {
   name: string;
   value: string;
-  options?: Record<string, unknown>;
+  options?: CookieOptions;
 }
 
 export async function createServerClient(): Promise<SupabaseClient> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !anonKey) {
+    throw new Error(
+      "Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set",
+    );
+  }
+
   const store = await cookies();
 
   return createSSRClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    anonKey,
     {
       cookies: {
         getAll: () => store.getAll(),
