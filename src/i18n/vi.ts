@@ -187,6 +187,8 @@ export const vi = {
       save: "Lưu",
       saving: "Đang lưu…",
       cancel: "Huỷ",
+      edit: "Sửa",
+      usernameLocked: "Tên tài khoản không đổi được. Cần đổi thì tắt tài khoản cũ và cấp cái mới — lịch sử vẫn giữ nguyên.",
       resetPassword: "Đặt lại mật khẩu",
       newPassword: "Mật khẩu mới",
       deactivate: "Cho nghỉ việc",

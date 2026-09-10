@@ -23,7 +23,8 @@
     "verify:db:seed": "node --env-file-if-exists=.env.local scripts/verify-db.mjs --seed",
     "verify:own": "node scripts/verify-ownership.mjs",
     "verify:build": "node --env-file-if-exists=.env.local scripts/verify-build.mjs",
-    "verify:prod": "node --env-file-if-exists=.env.local scripts/verify-prod.mjs"
+    "verify:prod": "node --env-file-if-exists=.env.local scripts/verify-prod.mjs",
+    "staff:link": "node --env-file-if-exists=.env.local scripts/link-staff.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

@@ -11,7 +11,7 @@
  * viên cấp ra.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Button, Input, Select, Badge, Card, Spinner, EmptyState } from "@/components/ui";
 import { vi } from "@/i18n/vi";
 
@@ -57,6 +57,7 @@ export function StaffManager() {
   const [notice, setNotice] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -178,8 +179,8 @@ export function StaffManager() {
             </thead>
             <tbody>
               {rows.map((row) => (
+                <Fragment key={row.id}>
                 <tr
-                  key={row.id}
                   className={`border-b border-[var(--bb-border)] last:border-0 ${
                     row.isActive ? "" : "opacity-60"
                   }`}
@@ -235,6 +236,14 @@ export function StaffManager() {
                         variant="outline"
                         size="sm"
                         disabled={busyId === row.id}
+                        onClick={() => setEditingId(editingId === row.id ? null : row.id)}
+                      >
+                        {editingId === row.id ? t.cancel : t.edit}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busyId === row.id}
                         onClick={() => resetPassword(row)}
                       >
                         {t.resetPassword}
@@ -250,12 +259,106 @@ export function StaffManager() {
                     </div>
                   </td>
                 </tr>
+
+                {editingId === row.id && (
+                  <tr className="border-b border-[var(--bb-border)] bg-[var(--bb-surface-2)]">
+                    <td colSpan={7} className="px-4 py-4">
+                      <EditStaffRow
+                        row={row}
+                        branches={branches}
+                        saving={busyId === row.id}
+                        onSave={async (payload) => {
+                          await patch(row.id, payload, t.updated);
+                          setEditingId(null);
+                        }}
+                      />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Sửa thông tin một nhân viên tại chỗ.
+ *
+ * Tên và số điện thoại đổi được, tên tài khoản thì không: đổi tên đăng nhập
+ * nghĩa là đổi cả định danh trong Supabase Auth, và người đang có phiên mở sẽ
+ * rơi vào trạng thái nửa vời. Cần đổi thật thì tắt tài khoản cũ, cấp cái mới —
+ * lịch sử vẫn còn nguyên vì tắt không phải xoá.
+ */
+function EditStaffRow({
+  row,
+  branches,
+  saving,
+  onSave,
+}: {
+  row: StaffRow;
+  branches: Branch[];
+  saving: boolean;
+  onSave: (payload: Record<string, unknown>) => void | Promise<void>;
+}) {
+  const [fullName, setFullName] = useState(row.fullName);
+  const [phone, setPhone] = useState(row.phone ?? "");
+  const [branchIds, setBranchIds] = useState<string[]>(row.branchIds);
+  const seesAllBranches = row.role === "owner" || row.role === "admin";
+
+  return (
+    <form
+      className="grid gap-4 sm:grid-cols-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void onSave({
+          fullName,
+          phone: phone.trim() === "" ? null : phone.trim(),
+          ...(seesAllBranches ? {} : { branchIds }),
+        });
+      }}
+    >
+      <Field label={t.fullName}>
+        <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required minLength={2} />
+      </Field>
+
+      <Field label={t.phone}>
+        <Input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" />
+      </Field>
+
+      <Field label={t.branches}>
+        {seesAllBranches ? (
+          <p className="pt-2 text-sm text-[var(--bb-fg-muted)]">{t.allBranches}</p>
+        ) : (
+          <div className="flex flex-wrap gap-3 pt-2">
+            {branches.map((b) => (
+              <label key={b.id} className="flex items-center gap-2 text-sm text-[var(--bb-fg)]">
+                <input
+                  type="checkbox"
+                  checked={branchIds.includes(b.id)}
+                  onChange={(e) =>
+                    setBranchIds((prev) =>
+                      e.target.checked ? [...prev, b.id] : prev.filter((x) => x !== b.id),
+                    )
+                  }
+                />
+                {b.name}
+              </label>
+            ))}
+          </div>
+        )}
+      </Field>
+
+      <div className="sm:col-span-3 flex items-center justify-between gap-4">
+        <p className="text-xs text-[var(--bb-fg-muted)]">{t.usernameLocked}</p>
+        <Button type="submit" disabled={saving}>
+          {saving ? t.saving : t.save}
+        </Button>
+      </div>
+    </form>
   );
 }
 

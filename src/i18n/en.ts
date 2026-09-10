@@ -187,6 +187,8 @@ export const en: Messages = {
       save: "Save",
       saving: "Saving…",
       cancel: "Cancel",
+      edit: "Edit",
+      usernameLocked: "The username cannot change. Deactivate and issue a new account instead; history is kept.",
       resetPassword: "Reset password",
       newPassword: "New password",
       deactivate: "Deactivate",
