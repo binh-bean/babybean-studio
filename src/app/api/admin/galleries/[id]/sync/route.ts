@@ -58,8 +58,8 @@ export async function POST(
           
         const existingMap = new Map((existing || []).map(p => [p.drive_file_id, p]));
         
-        const toInsert: any[] = [];
-        const toUpdate: any[] = [];
+        const toInsert: Record<string, unknown>[] = [];
+        const toUpdate: Record<string, unknown>[] = [];
         const activeDriveIds = new Set<string>();
 
         let i = 0;

@@ -37,7 +37,7 @@ export async function GET(
       const staff = await requireStaff();
       const branchId = Array.isArray(photo.galleries)
         ? photo.galleries[0]?.branch_id
-        : (photo.galleries as any)?.branch_id;
+        : (photo.galleries as unknown as { branch_id: string })?.branch_id;
       requireBranch(staff, branchId);
     } catch (err) {
       // TODO(BB-030): Implement customer auth using bb_gs cookie matching photo.gallery_id
@@ -67,7 +67,7 @@ export async function GET(
           }
         });
       }
-    } catch (e) {
+    } catch {
       // fallback
     }
 
@@ -84,7 +84,7 @@ export async function GET(
           }
         });
       }
-    } catch (e) {
+    } catch {
       // failure
     }
 
