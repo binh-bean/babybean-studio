@@ -12,7 +12,7 @@ Tài liệu này chốt 7 câu hỏi treo ở `HANDOFF.md`. Agent lấy giá tr�
 | 2 | Hạn chốt mặc định | **7 ngày**, nhắc ngày 3 và ngày 6 | Chốt |
 | 3 | PIN mặc định | **Bật cho mọi album**, PIN = 4 số cuối SĐT | Chốt |
 | 4 | Cho khách tải ảnh | **Tắt** ở Phase 1 | Chốt |
-| 5 | Tên miền | `chon-anh.babybean.vn` | Giả định |
+| 5 | Tên miền | `babybeanstudio.vn` | Giả định |
 | 6 | Nhóm Lark | Riêng từng chi nhánh **+ 1 nhóm quản lý chung** (4 webhook) | Giả định |
 | 7 | Ảnh preview | Cạnh dài **2048px**, JPEG q75, sRGB, xoá GPS | Chốt |
 
@@ -82,17 +82,17 @@ Ba lý do:
 
 **Cấu hình**: `settings` key `gallery.allow_download_default = false`.
 
-## 5. Tên miền — `chon-anh.babybean.vn`
+## 5. Tên miền — `babybeanstudio.vn`
 
 Chọn **subdomain của tên miền chính**, không phải tên miền riêng.
 
-- Khách dán link vào Zalo thấy `babybean.vn` → biết ngay là studio, không nghi lừa đảo. Một tên miền lạ như `chonanh-bb.com` trông y hệt link phishing.
+- Khách dán link vào Zalo thấy `babybeanstudio.vn` → biết ngay là studio, không nghi lừa đảo. Một tên miền lạ như `chonanh-bb.com` trông y hệt link phishing.
 - `chon-anh` đọc là hiểu, không cần giải thích trong tin nhắn.
-- Link đầy đủ: `chon-anh.babybean.vn/g/aB3xK9pQ7mN2vC5tR8wZ1y` — 46 ký tự, gọn cho Zalo.
+- Link đầy đủ: `babybeanstudio.vn/g/aB3xK9pQ7mN2vC5tR8wZ1y` — 46 ký tự, gọn cho Zalo.
 
-**Điều kiện**: studio phải sở hữu `babybean.vn` và thêm được bản ghi CNAME trỏ về Vercel.
+**Điều kiện**: studio phải sở hữu `babybeanstudio.vn` và thêm được bản ghi CNAME trỏ về Vercel.
 
-**Nếu chưa có `babybean.vn`**: mua trước khi làm BB-005. Đừng dùng domain `.vercel.app` cho khách thật — trông thiếu chuyên nghiệp và khách sẽ ngại bấm.
+**Nếu chưa có `babybeanstudio.vn`**: mua trước khi làm BB-005. Đừng dùng domain `.vercel.app` cho khách thật — trông thiếu chuyên nghiệp và khách sẽ ngại bấm.
 
 **Sửa ở đâu**: biến `NEXT_PUBLIC_APP_URL`, và mục tên miền trong `docs/11-deployment.md §8`.
 
@@ -157,5 +157,5 @@ Hệ thống đọc tối đa **2 cấp** và hiển thị thành tab cho khách
 ## Ba quy tắc vận hành phải dặn thợ ảnh và CSKH
 
 1. **Không xoá thư mục Drive của album chưa giao xong.** Ảnh không nằm trong hệ thống, chúng nằm trên Drive của studio (`docs/adr/ADR-0002`). Xoá thư mục là ảnh biến mất khỏi album của khách.
-2. **Không gửi link Google Drive cho khách.** Chỉ gửi link `chon-anh.babybean.vn/g/...`. Link Drive gốc không có PIN, không thu hồi được, không đếm được ai đã xem.
+2. **Không gửi link Google Drive cho khách.** Chỉ gửi link `babybeanstudio.vn/g/...`. Link Drive gốc không có PIN, không thu hồi được, không đếm được ai đã xem.
 3. **Đồng bộ lại trước khi xuất danh sách cho retoucher.** Nếu ai đó đổi tên file trên Drive sau khi album được tạo, danh sách xuất ra sẽ mang tên cũ cho tới khi đồng bộ lại.

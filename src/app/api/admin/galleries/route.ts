@@ -136,7 +136,17 @@ export async function POST(request: Request): Promise<Response> {
       return failUnexpected(rpcError, requestId);
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://chon-anh.babybean.vn";
+    // No fallback on purpose. This used to guess "https://chon-anh.babybean.vn",
+    // a domain the studio does not own and nobody has registered — so a missing
+    // variable would mint share links pointing into thin air, and whoever
+    // registered that domain later would start receiving gallery tokens from
+    // parents clicking them. A base URL we cannot know is a configuration
+    // error, and it should stop the request loudly rather than be invented.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (!appUrl) {
+      console.error(JSON.stringify({ evt: "missing_app_url", requestId }));
+      return fail("INTERNAL", "Thiếu cấu hình địa chỉ trang web, chưa tạo được link chia sẻ");
+    }
     const shareUrl = `${appUrl.replace(/\/$/, "")}/g/${token}`;
 
     const pinHint = requirePin

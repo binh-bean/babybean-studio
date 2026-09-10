@@ -86,13 +86,16 @@ describe('Selection Mutation (patch_selection_batch)', () => {
     expect(data.selectedCount).toBe(0);
   });
 
-  it('2. op chỉ có ghi chú, ảnh đang favorite -> vẫn favorite', async () => {
-    // Mark photo2 as favorite first
+  // Viết lại theo mô hình sau BB-081: yêu thích nằm ở cột is_favorite,
+  // không còn là một giá trị của mark.
+  it('2. op chỉ có ghi chú, ảnh đang có tim -> vẫn còn tim', async () => {
+    // Thả tim cho photo2 trước
     await supabase.from('selection_items').insert({
       selection_id: selectionId,
       photo_id: photo2,
       gallery_id: galleryId,
-      mark: 'favorite'
+      mark: null,
+      is_favorite: true
     });
 
     const { data, error } = await supabase.rpc('patch_selection_batch', {
@@ -115,8 +118,9 @@ describe('Selection Mutation (patch_selection_batch)', () => {
     expect(data.selectedCount).toBe(0);
     expect(data.favoriteCount).toBe(1);
 
-    const { data: item } = await supabase.from('selection_items').select('mark, retouch_note').eq('photo_id', photo2).single();
-    expect(item!.mark).toBe('favorite');
+    const { data: item } = await supabase.from('selection_items').select('mark, is_favorite, retouch_note').eq('photo_id', photo2).single();
+    expect(item!.mark).toBeNull();
+    expect(item!.is_favorite).toBe(true);
     expect(item!.retouch_note).toBe('Xóa mụn');
   });
 
@@ -278,6 +282,80 @@ describe('Selection Mutation (patch_selection_batch)', () => {
     expect(data.selectedCount).toBe(1);
     expect(data.rejected.length).toBe(1);
     expect(data.rejected[0].photoId).toBe(photoMissing);
+  });
+
+
+  // BB-081 — cái lỗi tốn kém nhất tìm được trong dự án này. Trước khi tách
+  // is_favorite ra khỏi mark, thả tim vào ảnh đã chọn sẽ ÂM THẦM bỏ chọn ảnh
+  // đó. Mẹ bé tưởng đã chọn 20 ảnh, thực tế 15, và chỉ 15 ảnh được giao.
+  // Hoàn nguyên migration 0009 thì ca này phải đỏ.
+  it('8. thả tim vào ảnh ĐÃ CHỌN thì ảnh vẫn còn được chọn', async () => {
+    await supabase.from('selection_items').delete().eq('selection_id', selectionId);
+
+    const patch = (ops: unknown[]) => supabase.rpc('patch_selection_batch', {
+      p_client_op_id: randomUUID(),
+      p_selection_id: selectionId,
+      p_gallery_id: galleryId,
+      p_role: 'owner',
+      p_ops: ops,
+      p_max_selection: null,
+      p_allow_extra: true,
+      p_included_quota: 2,
+      p_extra_price: 50000,
+      p_actor_label: 'Test',
+      p_ip: null,
+      p_user_agent: null
+    });
+
+    const chosen = await patch([{ photoId: photo1, mark: 'selected' }]);
+    expect(chosen.error).toBeNull();
+    expect(chosen.data.selectedCount).toBe(1);
+
+    const hearted = await patch([{ photoId: photo1, isFavorite: true }]);
+    expect(hearted.error).toBeNull();
+    expect(hearted.data.selectedCount).toBe(1);   // <- đây là dòng bắt lỗi
+    expect(hearted.data.favoriteCount).toBe(1);
+
+    const { data: row } = await supabase
+      .from('selection_items')
+      .select('mark, is_favorite')
+      .eq('selection_id', selectionId)
+      .eq('photo_id', photo1)
+      .single();
+    expect(row!.mark).toBe('selected');
+    expect(row!.is_favorite).toBe(true);
+  });
+
+  it('9. bỏ chọn ảnh đang có tim thì giữ lại cái tim', async () => {
+    const patch = (ops: unknown[]) => supabase.rpc('patch_selection_batch', {
+      p_client_op_id: randomUUID(),
+      p_selection_id: selectionId,
+      p_gallery_id: galleryId,
+      p_role: 'owner',
+      p_ops: ops,
+      p_max_selection: null,
+      p_allow_extra: true,
+      p_included_quota: 2,
+      p_extra_price: 50000,
+      p_actor_label: 'Test',
+      p_ip: null,
+      p_user_agent: null
+    });
+
+    const unchosen = await patch([{ photoId: photo1, mark: null }]);
+    expect(unchosen.error).toBeNull();
+    expect(unchosen.data.selectedCount).toBe(0);
+    expect(unchosen.data.favoriteCount).toBe(1);
+
+    // Bỏ nốt tim thì không còn liên hệ gì với ảnh, dòng phải được dọn đi.
+    const cleared = await patch([{ photoId: photo1, isFavorite: false }]);
+    expect(cleared.data.favoriteCount).toBe(0);
+    const { data: gone } = await supabase
+      .from('selection_items')
+      .select('photo_id')
+      .eq('selection_id', selectionId)
+      .eq('photo_id', photo1);
+    expect(gone?.length).toBe(0);
   });
 
   // Bài test dựng album thật trong bb-dev. Không dọn thì verify:db đỏ vì

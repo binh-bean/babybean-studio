@@ -19,7 +19,9 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://babybean.vn"),
+  // babybean.vn chưa ai đăng ký. Dự phòng bằng tên miền thật của studio
+  // chứ không bằng một tên miền tưởng tượng — thẻ OG trỏ sai thì ảnh không hiện.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://babybeanstudio.vn"),
   title: {
     default: "BabyBean Studio",
     template: "%s | BabyBean Studio",
