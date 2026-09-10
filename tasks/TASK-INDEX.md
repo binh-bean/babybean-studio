@@ -24,7 +24,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
 | BB-001 | Khởi tạo Next.js 15 + TS strict + Tailwind v4, chạy được `npm run dev` | DEV-OPS | — | low | TODO |
-| BB-002 | Cài shadcn/ui, `tokens.css` theo `docs/07-ui-ux.md §2`, font Be Vietnam Pro | DEV-UI | BB-001 | low | TODO |
+| BB-002 | Cài shadcn/ui, `tokens.css` theo `docs/07-ui-ux.md §2`, font Be Vietnam Pro | DEV-UI | BB-001 | low | ✅ DONE |
 | BB-003 | Áp `schema.sql` + `policies.sql` lên `bb-dev`, hoàn thiện `scripts/db-push.mjs`, xác nhận RLS bật trên 17 bảng và 6 test phủ định ở `db/policies.sql` chạy đúng. **Thêm**: sau khi áp xong, gọi `/rest/v1/galleries` bằng khoá publishable — phải trả 401/403, nếu trả dữ liệu là bảng đang bị lộ ra API công khai | ARCH | P-1..P-3 (xong) | med | DONE |
 | BB-004 | GitHub Actions: lint, typecheck, test, build; chặn merge khi đỏ | DEV-OPS | BB-001 | low | TODO |
 | BB-005 | Nối Vercel, cấu hình env cho 3 môi trường, deploy trang trắng | DEV-OPS | BB-001 | low | TODO |
