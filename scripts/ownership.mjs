@@ -23,6 +23,12 @@
 export const COMMON = [
   "tasks/TASK-INDEX.md",
   "tasks/BLOCKERS.md",
+  // Every agent needs to add a dependency sooner or later, and only DEV-OPS
+  // owned the file that lists them. The part worth guarding is the scripts
+  // block — the gates live there — and verify-ownership.mjs guards that
+  // separately, for everyone but DEV-OPS and PM.
+  "package.json",
+  "package-lock.json",
   "tests/unit/**",
   "tests/fixtures/**",
 ];
@@ -78,8 +84,13 @@ export const OWNERSHIP = {
   // to ship it to production. Splitting those two created a handoff, and the
   // handoff dropped the accountant-photo fix. verify:own now refuses a change
   // to policies.sql that arrives without a migration beside it.
+  // src/app/api/auth/** belongs here, not with the rest of the API. Without it
+  // SEC-ARCH had to hide the customer auth route inside the (auth) page group
+  // to stay in its lane, which works only because route groups do not appear
+  // in the URL. Two homes for API routes is how one of them gets forgotten.
   "SEC-ARCH": [
     "db/policies.sql",
+    "src/app/api/auth/**",
     "db/migrations/**",
     "docs/12-security.md",
     "src/lib/auth/**",
@@ -91,7 +102,6 @@ export const OWNERSHIP = {
   "DEV-OPS": [
     ".github/**",
     "vercel.json",
-    "package.json",
     "eslint.config.mjs",
     "next.config.ts",
     "postcss.config.mjs",

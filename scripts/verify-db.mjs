@@ -118,9 +118,9 @@ async function main() {
   const drift = await client.query(
     `select g.title,
             g.photo_count as declared,
-            (select count(*)::int from photos p where p.gallery_id = g.id) as actual
+            (select count(*)::int from photos p where p.gallery_id = g.id and p.status = 'active') as actual
        from galleries g
-      where g.photo_count <> (select count(*)::int from photos p where p.gallery_id = g.id)`,
+      where g.photo_count <> (select count(*)::int from photos p where p.gallery_id = g.id and p.status = 'active')`,
   );
   check("photo_count khớp số ảnh thật", drift.rowCount === 0,
     drift.rowCount
