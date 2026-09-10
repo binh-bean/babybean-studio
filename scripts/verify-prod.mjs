@@ -18,7 +18,7 @@
  *   npm run verify:prod -- https://babybean-studio.vercel.app
  */
 
-const DEFAULT_URL = "https://babybean-studio.vercel.app";
+const DEFAULT_URL = "https://babybeanstudio.vn";
 
 /**
  * Deliberately NOT NEXT_PUBLIC_APP_URL: on a dev machine that points at
