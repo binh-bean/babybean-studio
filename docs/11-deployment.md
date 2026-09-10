@@ -13,6 +13,23 @@ Chủ sở hữu: **DEV-OPS**.
 
 **Quy tắc**: Preview và Staging **không bao giờ** trỏ vào `bb-prod`. Dữ liệu khách thật không được lọt sang môi trường thử.
 
+## 1a. Vercel — thông tin thật
+
+| Mục | Giá trị |
+|---|---|
+| Vercel team | `Binh-Bean` (gói Hobby) |
+| Project | `babybean-studio` |
+| URL production | `https://babybean-studio.vercel.app` — **đang chạy** |
+| Nguồn | GitHub `binh-bean/babybean-studio`, nhánh `main` |
+| Function Region | **Singapore `sin1`** — phải khớp region Supabase, xem §1b |
+
+**Deploy tự động khi push lên `main`.** Trước đây tưởng webhook hỏng, thực ra nó vẫn chạy: mỗi lần nó kích hoạt, Vercel bắt đầu build rồi từ chối ngay ở bước kiểm cấu hình vì dòng cron sai, nên không có deployment nào xuất hiện để nhìn thấy. Sửa cron xong là webhook hoạt động bình thường. `npx vercel --prod` vẫn dùng được khi cần deploy tay.
+
+Bài học đắt nhất của lần dựng này: **Vercel không hiện lỗi cấu hình lên dashboard.** Một dòng cron sai làm mọi deployment bị từ chối, mà giao diện chỉ ghi "No Production Deployment" — không có mục nào báo lỗi. Chỉ `vercel --prod` qua CLI mới in ra lý do. Lần sau deploy hỏng mà dashboard im lặng, chạy CLI trước tiên.
+
+Biến môi trường đã đặt trên Vercel (5 biến, không có `SUPABASE_DB_URL` — biến đó chỉ dùng cho script chạy ở máy dev):
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_SECRET`, `NEXT_PUBLIC_APP_URL`, `CUSTOMER_SESSION_TTL`.
+
 ## 1b. Cài đặt khi tạo project Supabase
 
 Bốn lựa chọn ở màn hình "Create a new project" quyết định mô hình bảo mật. Đặt giống nhau cho cả `bb-dev`, `bb-staging`, `bb-prod`.
@@ -141,6 +158,10 @@ feat/BB-xxx  ──PR──►  develop  ──PR──►  main
   ]
 }
 ```
+**Gói Hobby chỉ cho cron chạy một lần mỗi ngày.** Bất kỳ biểu thức nào chạy dày hơn — kể cả `*/5 * * * *` — làm **toàn bộ deployment bị từ chối**, và Vercel không hiện lỗi đó trên dashboard: bản deploy đơn giản không bao giờ xuất hiện. Chỉ `vercel --prod` qua CLI mới in ra nguyên nhân.
+
+Vì vậy `flush-notifications` (mỗi 5 phút, đẩy hàng đợi Lark/Zalo) đã **bị gỡ khỏi `vercel.json`**. Nó chỉ cần từ Phase 3. Khi tới đó, chọn một trong hai: nâng lên gói Pro, hoặc chuyển việc đẩy hàng đợi sang một dịch vụ cron ngoài gọi vào `/api/cron/flush-notifications`.
+
 Giờ trong `vercel.json` là **UTC**. `0 18 * * *` UTC = 01:00 giờ Việt Nam. `0 2 * * *` UTC = 09:00 giờ Việt Nam.
 Mọi handler cron kiểm `Authorization: Bearer <CRON_SECRET>` trước khi làm gì.
 
