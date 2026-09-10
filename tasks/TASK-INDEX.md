@@ -112,11 +112,11 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-067 | Tải ảnh preview + ZIP ảnh đã chọn + log lượt tải | DEV-BE | BB-015 | med | TODO |
 | BB-068 | Cron: `expire-galleries`, `send-reminders`, `flush-notifications` | DEV-BE | BB-039 | med | TODO |
 | BB-069 | i18n VI/EN đầy đủ, rà soát không còn chuỗi hard-code | DEV-UI | BB-040 | low | ✅ **DONE** — i18n VI/EN đầy đủ, hết chuỗi hard-code |
-| BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-UI | BB-040 | med | TODO |
+| BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-UI | BB-040 | med | ✅ **DONE** — manifest.ts + OG metadata đã nối vào RootLayout, dark mode 26 component, PWA prompt |
 | BB-071 | Tối ưu album 1.500 ảnh: bundle ≤180KB, bộ nhớ ≤300MB | DEV-FE | BB-033 | high | TODO |
 | BB-072 | Sentry + trang lỗi 404/500 tiếng Việt | DEV-OPS | BB-005 | low | TODO |
 | BB-073 | Migration `0003`: accountant không xem được ảnh — đồng bộ `policies.sql` sang `db/migrations/` | ARCH | BB-020 | low | TODO |
-| BB-074 | Font thương hiệu không nạp trên production: `@import` trong `tokens.css` bị CSS optimizer loại bỏ | DEV-UI | BB-040 | high | TODO |
+| BB-074 | Font thương hiệu không nạp trên production | DEV-UI | BB-040 | high | ✅ **DONE** — tự host Be Vietnam Pro bằng next/font, không còn gửi IP khách sang Google |
 | BB-075 | `middleware.ts` `return` redirect trước khi gắn header an ninh — `/admin` ra ngoài không CSP, không `Referrer-Policy` | SEC-ARCH | BB-020 | med | TODO |
 | BB-076 | Seed hỏng: `dev_token_with_pin_123` có `requires_pin=true` mà `pin_hash` NULL; link 2 không có `selections`; thiếu link revoked/expired/locked để test | DEV-BE | BB-008 | med | TODO |
 | BB-077 | Tài liệu mâu thuẫn code: `02-architecture.md` §2.2 thiếu `selection_id` trong cookie; `05-rbac.md` §5 hứa "đổi PIN thu hồi phiên" mà schema không làm được | ARCH | BB-030 | med | DONE |
@@ -133,8 +133,8 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | Mã | Việc | Agent | Phức tạp | TT |
 |---|---|---|---|---|
 | BB-080 | Bot Lark: 7 sự kiện, message card, webhook theo chi nhánh | DEV-INT | med | TODO |
-| BB-081 | Đồng bộ một chiều sang Lark Base (bitable batch upsert) | DEV-INT | high | TODO |
-| BB-082 | Hàng đợi retouch: gán người, deadline, trạng thái | DEV-FE + DEV-BE | med | DONE |
+| BB-089 | Đồng bộ một chiều sang Lark Base (bitable batch upsert) | DEV-INT | high | TODO |
+| BB-090 | Hàng đợi retouch: gán người, deadline, trạng thái | DEV-FE + DEV-BE | med | TODO |
 | BB-083 | Duyệt nội bộ trước khi giao | DEV-FE + DEV-BE | med | TODO |
 | BB-084 | Theo dõi giao hàng: album in, USB, link final | DEV-FE + DEV-BE | med | TODO |
 | BB-085 | Module booking: lịch, phòng, thợ, cọc | DEV-FE + DEV-BE | high | TODO |
