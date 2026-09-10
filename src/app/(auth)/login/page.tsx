@@ -60,6 +60,11 @@ function LoginForm() {
 
       router.push(target);
       router.refresh();
+    } catch {
+      // Mất mạng, Supabase không trả lời, cấu hình thiếu biến môi trường — nếu
+      // không bắt ở đây thì người dùng bấm Đăng nhập và KHÔNG THẤY GÌ XẢY RA,
+      // rồi tưởng mình gõ sai mật khẩu.
+      setError("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
     } finally {
       setBusy(false);
     }
