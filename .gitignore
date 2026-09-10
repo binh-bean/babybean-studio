@@ -17,3 +17,7 @@ test-results/
 db/seed.local.sql
 db/*.local.sql
 .antigravity/cache/
+
+.vercel
+.env*
+!.env.example

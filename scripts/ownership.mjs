@@ -37,6 +37,8 @@ export const PROTECTED = [
   "scripts/ownership.mjs",
   "scripts/verify-ownership.mjs",
   "scripts/verify-db.mjs",
+  "scripts/verify-build.mjs",
+  "scripts/verify-prod.mjs",
 ];
 
 export const OWNERSHIP = {
@@ -72,8 +74,13 @@ export const OWNERSHIP = {
     "src/app/api/img/**",
     "scripts/sync-drive.ts",
   ],
+  // db/migrations/** on purpose: the agent that fixes a policy has to be able
+  // to ship it to production. Splitting those two created a handoff, and the
+  // handoff dropped the accountant-photo fix. verify:own now refuses a change
+  // to policies.sql that arrives without a migration beside it.
   "SEC-ARCH": [
     "db/policies.sql",
+    "db/migrations/**",
     "docs/12-security.md",
     "src/lib/auth/**",
     "src/middleware.ts",
