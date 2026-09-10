@@ -8,7 +8,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// Enums — must mirror the Postgres enums exactly
+// Enums — must mirror the Postgres enums and check constraints exactly
 // ---------------------------------------------------------------------------
 
 export const STAFF_ROLES = [
@@ -37,20 +37,39 @@ export const GALLERY_STATUSES = [
 ] as const;
 export type GalleryStatus = (typeof GALLERY_STATUSES)[number];
 
-export type PhotoStatus = "active" | "missing" | "hidden";
+export const PHOTO_STATUSES = ["active", "missing", "hidden"] as const;
+export type PhotoStatus = (typeof PHOTO_STATUSES)[number];
 
 export const SHARE_ROLES = ["owner", "co_editor", "suggester", "viewer"] as const;
 export type ShareRole = (typeof SHARE_ROLES)[number];
 
-export type ShareLinkStatus = "active" | "revoked" | "expired";
+export const SHARE_LINK_STATUSES = ["active", "revoked", "expired"] as const;
+export type ShareLinkStatus = (typeof SHARE_LINK_STATUSES)[number];
 
 /** `selected` counts against quota. `suggested` never does. */
-export type SelectionMark = "selected" | "suggested" | "favorite" | "rejected";
+export const SELECTION_MARKS = ["selected", "suggested", "favorite", "rejected"] as const;
+export type SelectionMark = (typeof SELECTION_MARKS)[number];
 
-export type DeliveryStatus = "pending" | "in_progress" | "ready" | "delivered";
+export const DELIVERY_STATUSES = ["pending", "in_progress", "ready", "delivered"] as const;
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+
+export const ACTOR_TYPES = ["staff", "customer", "system"] as const;
+export type ActorType = (typeof ACTOR_TYPES)[number];
+
+export const NOTIFICATION_CHANNELS = ["lark", "zalo", "email", "inapp"] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+
+export const NOTIFICATION_STATUSES = ["pending", "sent", "failed", "skipped"] as const;
+export type NotificationStatus = (typeof NOTIFICATION_STATUSES)[number];
+
+export const CUSTOMER_SOURCES = ["facebook", "zalo", "referral", "walk_in"] as const;
+export type CustomerSource = (typeof CUSTOMER_SOURCES)[number];
+
+export const BABY_GENDERS = ["male", "female", "other"] as const;
+export type BabyGender = (typeof BABY_GENDERS)[number];
 
 // ---------------------------------------------------------------------------
-// Entities
+// Entities — mirror Postgres tables
 // ---------------------------------------------------------------------------
 
 export interface Branch {
@@ -63,6 +82,9 @@ export interface Branch {
   logoUrl: string | null;
   timezone: string;
   isActive: boolean;
+  settings?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface StaffProfile {
@@ -74,6 +96,16 @@ export interface StaffProfile {
   avatarUrl: string | null;
   isActive: boolean;
   branchIds: string[];
+  lastLoginAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface StaffBranch {
+  staffId: string;
+  branchId: string;
+  isPrimary: boolean;
+  createdAt?: string;
 }
 
 export interface Customer {
@@ -81,11 +113,17 @@ export interface Customer {
   branchId: string;
   fullName: string;
   phone: string;
+  phoneNormalized?: string;
   email: string | null;
   zalo: string | null;
+  facebook?: string | null;
   address: string | null;
   note: string | null;
+  source?: CustomerSource | string | null;
   tags: string[];
+  createdBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Baby {
@@ -93,8 +131,11 @@ export interface Baby {
   customerId: string;
   fullName: string;
   nickname: string | null;
-  birthDate: string | null; // ISO date
-  gender: "male" | "female" | "other" | null;
+  birthDate: string | null; // ISO date YYYY-MM-DD
+  gender: BabyGender | null;
+  note?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Package {
@@ -102,11 +143,29 @@ export interface Package {
   branchId: string | null;
   code: string;
   name: string;
+  description?: string | null;
   price: number;
   includedQuota: number;
   extraPhotoPrice: number;
   printedPhotoCount: number;
   isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Shoot {
+  id: string;
+  branchId: string;
+  customerId: string;
+  babyId: string | null;
+  packageId: string | null;
+  photographerId: string | null;
+  shootDate: string; // YYYY-MM-DD
+  concept: string | null;
+  note: string | null;
+  createdBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Gallery {
@@ -147,6 +206,10 @@ export interface Gallery {
   photoCount: number;
   lastSyncedAt: string | null;
   syncError: string | null;
+
+  createdBy?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Photo {
@@ -163,6 +226,9 @@ export interface Photo {
   subfolder: string | null;
   sortIndex: number;
   status: PhotoStatus;
+  driveModifiedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 /** Photo shape safe to send to the browser. Note: no driveFileId. */
@@ -192,6 +258,18 @@ export interface ShareLink {
   expiresAt: string | null;
   viewCount: number;
   lastViewedAt: string | null;
+
+  /** Database-only fields for administrative and security auditing */
+  tokenHash?: string;
+  pinHash?: string | null;
+  failedAttempts?: number;
+  lockedUntil?: string | null;
+  maxViews?: number | null;
+  lastViewedIp?: string | null;
+  createdBy?: string | null;
+  createdAt?: string;
+  revokedAt?: string | null;
+  revokedBy?: string | null;
 }
 
 export interface Selection {
@@ -206,6 +284,8 @@ export interface Selection {
   snapshotSelectedCount: number | null;
   snapshotExtraCount: number | null;
   snapshotExtraAmount: number | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SelectionItem {
@@ -217,6 +297,79 @@ export interface SelectionItem {
   orderIndex: number | null;
   retouchNote: string | null;
   noteTags: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Record in the selection_ops table for idempotency tracking */
+export interface SelectionOpRecord {
+  clientOpId: string;
+  selectionId: string;
+  appliedAt: string;
+}
+export type SelectionOpRow = SelectionOpRecord;
+
+export interface DeliveryPhysicalItem {
+  type: string;
+  name: string;
+  quantity: number;
+  note?: string;
+  [key: string]: unknown;
+}
+
+export interface Delivery {
+  id: string;
+  galleryId: string;
+  branchId: string;
+  status: DeliveryStatus;
+  retoucherId: string | null;
+  dueAt: string | null;
+  finalDriveUrl: string | null;
+  physicalItems: DeliveryPhysicalItem[];
+  deliveredAt: string | null;
+  receivedBy: string | null;
+  note: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ActivityLog {
+  id: number; // bigserial
+  branchId: string | null;
+  actorType: ActorType;
+  actorId: string | null;
+  actorLabel: string | null;
+  action: string;
+  entityType: string | null;
+  entityId: string | null;
+  metadata: Record<string, unknown>;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt?: string;
+}
+
+export interface Notification {
+  id: string;
+  branchId: string | null;
+  channel: NotificationChannel;
+  template: string;
+  payload: Record<string, unknown>;
+  target: string | null;
+  status: NotificationStatus;
+  attempts: number;
+  lastError: string | null;
+  scheduledAt: string;
+  sentAt: string | null;
+  createdAt?: string;
+}
+
+export interface Setting {
+  id: string;
+  key: string;
+  branchId: string | null; // null = system-wide
+  value: Record<string, unknown>;
+  updatedBy: string | null;
+  updatedAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +504,9 @@ export interface GalleryProgress {
   selectedCount: number;
   extraCount: number;
   dueAt: string | null;
+  sentAt?: string | null;
   submittedAt: string | null;
+  primarySelectionId?: string | null;
   urgency: Urgency;
+  daysToSubmit?: number | null;
 }
