@@ -12,12 +12,12 @@ export const maxDuration = 60;
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const galleryId = params.id;
+    const { id: galleryId } = await context.params;
     const staff = await requireStaff();
     requireRole(staff, ["owner", "admin", "branch_manager", "cs"]);
 
