@@ -12,6 +12,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import type { GallerySession, ShareRole } from "@/types/domain";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const SESSION_COOKIE = "bb_gs";
 
@@ -128,10 +129,6 @@ export class GallerySessionError extends Error {
 
 /**
  * Session for the current request, or throw.
- *
- * TODO(BB-030): before returning, re-read share_links.status for
- * session.shareLinkId and throw LINK_EXPIRED when it is no longer 'active'.
- * A valid signature is not enough — revoking a link must kill live sessions.
  */
 export async function requireGallerySession(
   allowedRoles?: readonly ShareRole[],
@@ -141,6 +138,21 @@ export async function requireGallerySession(
   if (allowedRoles && !allowedRoles.includes(session.role)) {
     throw new GallerySessionError("FORBIDDEN");
   }
+  
+  const admin = await createAdminClient();
+  const { data } = await admin
+    .from("share_links")
+    .select("status, expires_at")
+    .eq("id", session.shareLinkId)
+    .single();
+    
+  if (!data) throw new GallerySessionError("LINK_EXPIRED");
+  
+  if (data.status !== "active") throw new GallerySessionError("LINK_EXPIRED");
+  if (data.expires_at && new Date(data.expires_at) < new Date()) {
+    throw new GallerySessionError("LINK_EXPIRED");
+  }
+
   return session;
 }
 

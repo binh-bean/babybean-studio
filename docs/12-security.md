@@ -42,9 +42,9 @@ Chủ sở hữu: **SEC-ARCH**.
 - Không có tài khoản. `token` (22 ký tự base62) + `PIN` (4 số).
 - Token: chỉ lưu SHA-256 trong DB.
 - PIN: bcrypt cost 10. Mặc định 4 số cuối SĐT — **có thể đoán được nếu biết SĐT**, nên PIN chỉ là lớp phòng vệ thứ hai sau token, không phải lớp duy nhất. Cho phép nhân viên đặt PIN tuỳ ý cho khách VIP.
-- Sai 5 lần / 15 phút → khoá link 15 phút.
+- Sai 5 lần liên tiếp → khoá link 15 phút (không có cửa sổ thời gian do hạn chế của schema).
 - Phiên: JWT ký `HS256` bằng `APP_SECRET`, hạn 7 ngày, cookie `HttpOnly; Secure; SameSite=Lax; Path=/`.
-- Thu hồi link → mọi phiên đang mở mất hiệu lực (kiểm `share_links.status` mỗi request, không chỉ tin JWT).
+- Thu hồi link → mọi phiên đang mở mất hiệu lực (kiểm `share_links.status` mỗi request, không chỉ tin JWT). Lưu ý: đổi PIN KHÔNG thu hồi được phiên đang mở.
 
 ## 4. Phân quyền
 

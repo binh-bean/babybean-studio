@@ -1,7 +1,7 @@
 /**
  * Edge middleware: route gating, session refresh, security headers.
  *
- * OWNER: SEC-ARCH. Task BB-020.
+ * OWNER: SEC-ARCH. Task BB-020, BB-075.
  * Spec: docs/05-rbac.md §3, docs/12-security.md §6
  *
  * This is layer 1 of 3. It stops the obvious cases cheaply; it is NOT the
@@ -50,7 +50,9 @@ export async function middleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
+      const redirectResponse = NextResponse.redirect(url);
+      applySecurityHeaders(redirectResponse, pathname);
+      return redirectResponse;
     }
   }
 
