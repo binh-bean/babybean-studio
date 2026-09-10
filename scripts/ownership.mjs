@@ -10,10 +10,21 @@
  * A path with no `*` must match exactly.
  */
 
-/** Every agent may update its own row here, and record its own blockers. */
+/**
+ * Shared ground.
+ *
+ * Task status and blockers: every agent updates its own row.
+ *
+ * Unit tests and their fixtures: whoever writes the code writes its tests.
+ * QA-BOT owns end-to-end tests, not the unit layer — the matrix used to give
+ * it all of tests/**, which flagged DEV-INT for adding tests to the Drive
+ * client it had just written.
+ */
 export const COMMON = [
   "tasks/TASK-INDEX.md",
   "tasks/BLOCKERS.md",
+  "tests/unit/**",
+  "tests/fixtures/**",
 ];
 
 /**

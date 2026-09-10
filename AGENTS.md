@@ -151,7 +151,9 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 | `src/components/features/**` | R | - | W | R | - | - | - | R |
 | `src/lib/drive/**` | R | R | - | - | W | R | - | R |
 | `src/lib/auth/**`, `middleware.ts` | R | R | - | - | - | W | R | R |
-| `tests/**` | R | R | R | - | R | R | R | W |
+| `tests/unit/**`, `tests/fixtures/**` | W | W | W | W | W | W | W | W |
+| `tests/security/**` | R | R | - | - | R | W | - | R |
+| `tests/e2e/**`, `playwright.config.ts` | R | R | R | - | R | R | R | W |
 | `.github/**`, `vercel.json` | R | - | - | - | - | R | W | - |
 | `docs/**` | W | R | R | R | R | R | R | R |
 | `public/brand/**` | R | - | R | R | - | - | - | R |
