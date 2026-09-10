@@ -112,9 +112,10 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-067 | Tải ảnh preview + ZIP ảnh đã chọn + log lượt tải | DEV-BE | BB-015 | med | TODO |
 | BB-068 | Cron: `expire-galleries`, `send-reminders`, `flush-notifications` | DEV-BE | BB-039 | med | TODO |
 | BB-069 | i18n VI/EN đầy đủ, rà soát không còn chuỗi hard-code | DEV-UI | BB-040 | low | ✅ **DONE** — i18n VI/EN đầy đủ, hết chuỗi hard-code |
-| BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-UI | BB-002, BB-069 | med | ✅ **DONE** — Tối ưu dark mode 26 components, PWA manifest/icons, OG image an toàn |
+| BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-UI | BB-002, BB-069 | med | ✅ **DONE** — Nối manifest.ts & OG metadata vào RootLayout, Dark mode 26 components, PWA prompt |
 | BB-071 | Tối ưu album 1.500 ảnh: bundle ≤180KB, bộ nhớ ≤300MB | DEV-FE | BB-033 | high | TODO |
 | BB-072 | Sentry + trang lỗi 404/500 tiếng Việt | DEV-OPS | BB-005 | low | TODO |
+| BB-074 | Nạp font Be Vietnam Pro bằng next/font/google thay vì @import | DEV-UI | BB-002 | low | ✅ **DONE** — Tự host font qua next/font/google, hỗ trợ offline & bảo mật CSP |
 
 ---
 
