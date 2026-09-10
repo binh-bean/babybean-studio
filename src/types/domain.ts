@@ -240,6 +240,7 @@ export interface PhotoPublic {
   subfolder: string | null;
   sortIndex: number;
   status: PhotoStatus;
+  isFavorite: boolean;
   mark: SelectionMark | null;
   orderIndex: number | null;
   retouchNote: string | null;
@@ -293,6 +294,7 @@ export interface SelectionItem {
   selectionId: string;
   photoId: string;
   galleryId: string;
+  isFavorite: boolean;
   mark: SelectionMark;
   orderIndex: number | null;
   retouchNote: string | null;
