@@ -23,6 +23,7 @@
  * --base, or pass --only with the files that agent actually touched.
  */
 
+import fs from "node:fs";
 import { execSync } from "node:child_process";
 import { AGENT_NAMES, ownersOf, isCommon, isProtected } from "./ownership.mjs";
 
@@ -134,19 +135,81 @@ if (orphans.length) {
   console.warn("");
 }
 
-if (violations.length) {
-  if (!only && !base) {
-    console.error(
-      "Lưu ý: đang xét TOÀN BỘ cây làm việc. Nếu có agent khác cùng chạy trong\n" +
-      "thư mục này thì file của họ cũng bị tính vào đây. Dùng --only hoặc --base\n" +
-      "để chỉ xét đúng phần của bạn.\n",
-    );
+// --- semantic collisions the path matrix cannot see ------------------------
+
+/**
+ * Three agents now write db/migrations/. Two of them working in separate
+ * worktrees will happily both pick 0003 and neither git nor the path matrix
+ * will notice, because no file is edited twice — two different files simply
+ * claim the same position in the order.
+ */
+function duplicateMigrationNumbers() {
+  let entries;
+  try {
+    entries = fs.readdirSync("db/migrations").filter((f) => f.endsWith(".sql"));
+  } catch {
+    return [];
   }
+  const byNumber = new Map();
+  for (const f of entries) {
+    const n = f.match(/^(\d{4})-/)?.[1];
+    if (!n) continue;
+    byNumber.set(n, [...(byNumber.get(n) ?? []), f]);
+  }
+  return [...byNumber.entries()]
+    .filter(([, list]) => list.length > 1)
+    .map(([n, list]) => `số ${n} bị dùng ${list.length} lần: ${list.join(", ")}`);
+}
+
+/**
+ * db/policies.sql is a snapshot; production only ever replays db/migrations/.
+ * A policy fixed in the snapshot alone reaches bb-dev and stops there. That is
+ * how the "accountant can see photos" fix nearly shipped without shipping —
+ * it lived in policies.sql and on bb-dev, and in no migration at all.
+ */
+function policyChangeWithoutMigration() {
+  const touchedPolicies = files.includes("db/policies.sql");
+  if (!touchedPolicies) return null;
+  const addedMigration = files.some((f) => /^db\/migrations\/\d{4}-.+\.sql$/.test(f));
+  if (addedMigration) return null;
+  return (
+    "db/policies.sql đổi nhưng không có file db/migrations/NNNN-*.sql nào kèm theo.\n" +
+    "      policies.sql chỉ là ảnh chụp để dựng môi trường mới; production chỉ chạy\n" +
+    "      lại migrations. Không có migration thì bản vá này dừng ở bb-dev."
+  );
+}
+
+const semantic = [];
+for (const d of duplicateMigrationNumbers()) {
+  semantic.push({ what: "Trùng số migration", detail: d });
+}
+const orphanPolicy = policyChangeWithoutMigration();
+if (orphanPolicy) semantic.push({ what: "Sửa policy mà thiếu migration", detail: orphanPolicy });
+
+if (semantic.length) {
+  console.error("  SAI QUY TRÌNH:");
+  for (const s of semantic) {
+    console.error(`    ${s.what}`);
+    console.error(`      -> ${s.detail}`);
+  }
+  console.error("");
+}
+
+if (violations.length && !only && !base) {
+  console.error(
+    "Lưu ý: đang xét TOÀN BỘ cây làm việc. Nếu có agent khác cùng chạy trong\n" +
+    "thư mục này thì file của họ cũng bị tính vào đây. Dùng --only hoặc --base\n" +
+    "để chỉ xét đúng phần của bạn.\n",
+  );
+}
+
+if (violations.length) {
   console.error(
     "Hoàn nguyên các file ngoài vùng, hoặc mở ADR xin đổi ma trận sở hữu.\n" +
     "Sửa file của agent khác trong lúc họ đang làm sẽ ghi đè lên nhau.\n",
   );
-  process.exit(1);
 }
+
+if (violations.length || semantic.length) process.exit(1);
 
 console.info("Sạch — mọi thay đổi đều trong vùng sở hữu.\n");
