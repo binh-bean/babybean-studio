@@ -26,7 +26,7 @@ export async function POST(
     // Fetch gallery to check if it exists and get drive_folder_id
     const { data: gallery, error: galErr } = await supabase
       .from("galleries")
-      .select("drive_folder_id, cover_photo_id")
+      .select("drive_folder_id, cover_photo_id, status")
       .eq("id", galleryId)
       .single();
 
@@ -34,10 +34,17 @@ export async function POST(
       return fail("NOT_FOUND", "Không tìm thấy album");
     }
 
-    // Mark gallery as syncing
+    const isEarlyStatus = ["draft", "syncing", "sync_error"].includes(gallery.status);
+
+    // Mark gallery as syncing if it's in early status
+    const initialUpdate: Record<string, unknown> = { sync_error: null };
+    if (isEarlyStatus) {
+      initialUpdate.status = "syncing";
+    }
+
     const { error: updErr } = await supabase
       .from("galleries")
-      .update({ status: "syncing", sync_error: null })
+      .update(initialUpdate)
       .eq("id", galleryId);
 
     if (updErr) {
@@ -123,12 +130,16 @@ export async function POST(
           if (missErr) throw missErr;
         }
 
-        // Update gallery status to ready
-        await supabase.from("galleries").update({
-          status: "ready",
+        // Update gallery status and photo_count
+        const finalUpdate: Record<string, unknown> = {
           photo_count: activeDriveIds.size,
           last_synced_at: new Date().toISOString()
-        }).eq("id", galleryId);
+        };
+        if (isEarlyStatus) {
+          finalUpdate.status = "ready";
+        }
+
+        await supabase.from("galleries").update(finalUpdate).eq("id", galleryId);
 
         // Update cover photo if not set
         const firstImage = images[0];
@@ -151,10 +162,12 @@ export async function POST(
         else if (err instanceof DriveUnavailableError) errMsg = "Drive không khả dụng";
         else if (err instanceof Error) errMsg = err.message;
 
-        await supabase.from("galleries").update({
-          status: "sync_error",
-          sync_error: errMsg
-        }).eq("id", galleryId);
+        const errorUpdate: Record<string, unknown> = { sync_error: errMsg };
+        if (isEarlyStatus) {
+          errorUpdate.status = "sync_error";
+        }
+
+        await supabase.from("galleries").update(errorUpdate).eq("id", galleryId);
       }
     });
 
