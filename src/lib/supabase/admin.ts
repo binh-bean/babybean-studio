@@ -32,7 +32,9 @@ export function createAdminClient(): SupabaseClient {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !serviceKey) {
-    throw new Error("Supabase admin client is not configured");
+    throw new Error(
+      "Supabase admin client is not configured: NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set",
+    );
   }
 
   cached = createClient(url, serviceKey, {
@@ -41,3 +43,9 @@ export function createAdminClient(): SupabaseClient {
 
   return cached;
 }
+
+/** Reset cached client — intended for test environments only. */
+export function _resetAdminClientForTesting(): void {
+  cached = null;
+}
+
