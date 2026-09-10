@@ -19,11 +19,13 @@ Chủ sở hữu: **DEV-OPS**.
 |---|---|
 | Vercel team | `Binh-Bean` (gói Hobby) |
 | Project | `babybean-studio` |
-| URL production | `https://babybean-studio.vercel.app` |
+| URL production | `https://babybean-studio.vercel.app` — **đang chạy** |
 | Nguồn | GitHub `binh-bean/babybean-studio`, nhánh `main` |
 | Function Region | **Singapore `sin1`** — phải khớp region Supabase, xem §1b |
 
-Deploy được kích hoạt bằng cách **push lên `main`**. Vercel không tự chạy lần đầu sau khi nối repo; phải có một commit mới.
+**Cách deploy đang dùng: `npx vercel --prod` từ máy.** Webhook GitHub → Vercel không kích hoạt build (đã thử hai lần import và một deploy hook, không lần nào tạo được deployment). Chưa truy ra nguyên nhân; CLI chạy ổn nên chưa chặn gì.
+
+Bài học đắt nhất của lần dựng này: **Vercel không hiện lỗi cấu hình lên dashboard.** Một dòng cron sai làm mọi deployment bị từ chối, mà giao diện chỉ ghi "No Production Deployment" — không có mục nào báo lỗi. Chỉ `vercel --prod` qua CLI mới in ra lý do. Lần sau deploy hỏng mà dashboard im lặng, chạy CLI trước tiên.
 
 Biến môi trường đã đặt trên Vercel (5 biến, không có `SUPABASE_DB_URL` — biến đó chỉ dùng cho script chạy ở máy dev):
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_SECRET`, `NEXT_PUBLIC_APP_URL`, `CUSTOMER_SESSION_TTL`.
