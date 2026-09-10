@@ -40,9 +40,9 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
-| BB-010 | Test cho `parse-link.ts` (4 dạng link + ID thuần + link file + rác) | DEV-INT | BB-001 | low | ✅ **DONE** — 12 tests vitest phủ đủ 4 dạng link, bare id, file link, chuỗi rác |
-| BB-011 | Hoàn thiện `driveFetch()`: retry, backoff+jitter, timeout, log không lộ key | DEV-INT | BB-001 | med | ✅ **DONE** — timeout 10s, retry 429/5xx (tối đa 5 lần, backoff + jitter 30%), 403/404 không retry, log an toàn không lộ key, 9 tests vitest |
-| BB-012 | `list-files.ts`: phân trang, đệ quy 2 cấp, lọc ảnh, natural sort + test với fixture 1.000 file | DEV-INT | BB-011 | med | ✅ **DONE** — đệ quy 2 cấp, lọc mimeType image/*, phân trang nextPageToken, natural sort (subfolder, name), 6 fixture files, 9 tests vitest |
+| BB-010 | Test cho `parse-link.ts` (4 dạng link + ID thuần + link file + rác) | DEV-INT | BB-001 | low | ✅ **DONE** — test parse-link đủ 4 dạng link + ca xấu |
+| BB-011 | Hoàn thiện `driveFetch()`: retry, backoff+jitter, timeout, log không lộ key | DEV-INT | BB-001 | med | ✅ **DONE** — driveFetch retry/backoff/timeout, 403-404 không retry |
+| BB-012 | `list-files.ts`: phân trang, đệ quy 2 cấp, lọc ảnh, natural sort + test với fixture 1.000 file | DEV-INT | BB-011 | med | ✅ **DONE** — phân trang, đệ quy 2 cấp, natural sort, có fixture |
 | BB-013 | `POST /api/admin/galleries/preview` — trả tên thư mục, số file, 6 ảnh mẫu, lỗi 403 kèm hướng dẫn 3 bước | DEV-INT | BB-012 | med | TODO |
 | BB-014 | Job đồng bộ: upsert `photos`, đánh dấu `missing`, cập nhật `photo_count`, `status` | DEV-INT | BB-012 | high | TODO |
 | BB-015 | Proxy `/api/img/[photoId]`: kiểm quyền, fallback nguồn, cache header | DEV-INT | BB-014, BB-030 | high | TODO |
@@ -56,9 +56,9 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
 | BB-020 | Đăng nhập nhân viên + `middleware.ts` + `src/lib/auth/staff.ts` (`requireStaff`/`requireRole`/`requireBranch`). Vai trò phải khớp `docs/05-rbac.md §2` — chú ý `photographer` **không** được sửa khách hàng (xem migration 0001) | SEC-ARCH | BB-003 ✅ | high | ✅ **DONE** — 7 test RLS chạy trên db thật, mutation-test xác nhận có tác dụng |
-| BB-021 | Layout admin: sidebar, bộ chọn chi nhánh, breadcrumb | DEV-FE | BB-002, BB-020 | low | TODO |
+| BB-021 | Layout admin: sidebar, bộ chọn chi nhánh, breadcrumb | DEV-FE | BB-002, BB-020 | low | ✅ **DONE** — layout admin, sidebar thu gọn, bộ chọn chi nhánh |
 | BB-022 | Wizard tạo album 3 bước (nguồn ảnh → thông tin → luật chọn) | DEV-FE | BB-013, BB-021 | med | TODO |
-| BB-023 | `POST /api/admin/galleries`: tạo gallery + share_link, sinh token 22 ký tự, hash PIN | DEV-BE | BB-007, BB-020 ✅ | high | ✅ **DONE** — `POST /api/admin/galleries` hoàn thiện + transaction tạo gallery, share_link (token base62, sha256 hash, bcrypt PIN), activity_logs |
+| BB-023 | `POST /api/admin/galleries`: tạo gallery + share_link, sinh token 22 ký tự, hash PIN | DEV-BE | BB-007, BB-020 ✅ | high | ✅ **DONE** — POST /api/admin/galleries, token 22 ký tự, hash sha256 |
 | BB-024 | Danh sách album: bảng, bộ lọc, tìm kiếm, phân trang cursor | DEV-FE | BB-021, BB-023 | med | TODO |
 | BB-025 | Chi tiết album: tab tổng quan, nút đồng bộ, thanh tiến trình | DEV-FE | BB-014, BB-024 | med | TODO |
 
@@ -111,7 +111,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-066 | Watermark ở tầng proxy ảnh | DEV-INT | BB-015 | high | TODO |
 | BB-067 | Tải ảnh preview + ZIP ảnh đã chọn + log lượt tải | DEV-BE | BB-015 | med | TODO |
 | BB-068 | Cron: `expire-galleries`, `send-reminders`, `flush-notifications` | DEV-BE | BB-039 | med | TODO |
-| BB-069 | i18n VI/EN đầy đủ, rà soát không còn chuỗi hard-code | DEV-UI | BB-040 | low | ✅ DONE |
+| BB-069 | i18n VI/EN đầy đủ, rà soát không còn chuỗi hard-code | DEV-UI | BB-040 | low | ✅ **DONE** — i18n VI/EN đầy đủ, hết chuỗi hard-code |
 | BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-FE | BB-040 | med | TODO |
 | BB-071 | Tối ưu album 1.500 ảnh: bundle ≤180KB, bộ nhớ ≤300MB | DEV-FE | BB-033 | high | TODO |
 | BB-072 | Sentry + trang lỗi 404/500 tiếng Việt | DEV-OPS | BB-005 | low | TODO |
