@@ -13,6 +13,16 @@ export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
+    // Kiểm đăng nhập TRƯỚC khi đụng tới dữ liệu gửi lên.
+    //
+    // Trước đây thứ tự ngược lại, nên một người chưa đăng nhập gửi request rỗng
+    // nhận về 400 kèm mô tả schema thay vì 401. Không rò dữ liệu khách hàng,
+    // nhưng nó nói cho người lạ biết endpoint này có thật và cần những trường
+    // gì — và máy chủ làm việc không công cho họ. Người lạ thì trả lời "anh là
+    // ai" trước, mọi thứ khác sau.
+    const staff = await requireStaff();
+    requireRole(staff, ["owner", "admin", "branch_manager", "cs"]);
+
     let body: unknown;
     try {
       body = await request.json();
@@ -35,9 +45,6 @@ export async function POST(request: Request): Promise<Response> {
       }
       return fail("INVALID_INPUT", "Link Google Drive không hợp lệ");
     }
-
-    const staff = await requireStaff();
-    requireRole(staff, ["owner", "admin", "branch_manager", "cs"]);
 
     const ctx = { requestId, folderId };
 
