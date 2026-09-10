@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
 
@@ -278,5 +278,11 @@ describe('Selection Mutation (patch_selection_batch)', () => {
     expect(data.selectedCount).toBe(1);
     expect(data.rejected.length).toBe(1);
     expect(data.rejected[0].photoId).toBe(photoMissing);
+  });
+
+  // Bài test dựng album thật trong bb-dev. Không dọn thì verify:db đỏ vì
+  // photo_count lệch, và người ta sẽ quen với việc bỏ qua dòng đỏ đó.
+  afterAll(async () => {
+    if (galleryId) await supabase.from('galleries').delete().eq('id', galleryId);
   });
 });
