@@ -67,6 +67,8 @@ export async function POST(
           activeDriveIds.add(img.id);
           const exist = existingMap.get(img.id);
           
+          const nextStatus = exist && exist.status === "hidden" ? "hidden" : "active";
+
           const record = {
             gallery_id: galleryId,
             drive_file_id: img.id,
@@ -78,7 +80,7 @@ export async function POST(
             taken_at: img.takenAt,
             subfolder: img.subfolder,
             sort_index: i + 1,
-            status: "active",
+            status: nextStatus,
             drive_modified_at: img.modifiedAt
           };
 

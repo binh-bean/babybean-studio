@@ -3,6 +3,7 @@ import { fail, failUnexpected } from "@/lib/api-response";
 import { THUMBNAIL_WIDTHS, type ThumbnailWidth } from "@/types/domain";
 import { createServerClient } from "@/lib/supabase/server";
 import { requireStaff, requireBranch, AuthError } from "@/lib/auth/staff";
+import { driveFetch } from "@/lib/drive/client";
 
 export const runtime = "nodejs";
 
@@ -29,7 +30,7 @@ export async function GET(
       .eq("id", photoId)
       .single();
 
-    if (photoErr || !photo || photo.status === "missing") {
+    if (photoErr || !photo || photo.status === "missing" || photo.status === "hidden") {
       return fail("NOT_FOUND", "Không tìm thấy ảnh");
     }
 
@@ -54,10 +55,12 @@ export async function GET(
       "X-Content-Type-Options": "nosniff",
     };
 
+    const ctx = { requestId };
+    
     // Try lh3 first
     const lh3Url = `https://lh3.googleusercontent.com/d/${driveFileId}=w${width}`;
     try {
-      const lh3Res = await fetch(lh3Url, { cache: "no-store" });
+      const lh3Res = await driveFetch(lh3Url, {}, ctx);
       if (lh3Res.ok) {
         return new Response(lh3Res.body, {
           status: 200,
@@ -74,7 +77,7 @@ export async function GET(
     // Try drive.google.com/thumbnail
     const driveUrl = `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w${width}`;
     try {
-      const driveRes = await fetch(driveUrl, { cache: "no-store" });
+      const driveRes = await driveFetch(driveUrl, {}, ctx);
       if (driveRes.ok) {
         return new Response(driveRes.body, {
           status: 200,
