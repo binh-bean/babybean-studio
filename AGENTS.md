@@ -202,6 +202,7 @@ Một thư mục chỉ checkout được một nhánh. Hai agent cùng làm tron
 | `babybean-sec-arch/` | `agent/sec-arch` | SEC-ARCH |
 | `babybean-dev-ops/` | `agent/dev-ops` | DEV-OPS |
 | `babybean-dev-ui/` | `agent/dev-ui` | DEV-UI |
+| `babybean-arch/` | `agent/arch` | ARCH |
 
 Tất cả nằm cạnh nhau trong `Downloads/claude code/`. Trong Antigravity, mỗi agent mở **đúng thư mục của mình**.
 
