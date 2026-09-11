@@ -183,6 +183,7 @@ export interface Gallery {
   driveFolderId: string;
   driveFolderUrl: string;
   driveFolderName: string | null;
+  larkContractCode: string | null;
 
   includedQuota: number;
   extraPhotoPrice: number;
@@ -250,7 +251,8 @@ export interface PhotoPublic {
 
 export interface ShareLink {
   id: string;
-  galleryId: string;
+  galleryId: string | null;
+  customerId: string | null;
   tokenPrefix: string;
   role: ShareRole;
   label: string | null;

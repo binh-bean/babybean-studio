@@ -196,6 +196,8 @@ create table galleries (
   drive_folder_id     text not null,
   drive_folder_url    text not null,
   drive_folder_name   text,
+  
+  lark_contract_code  text,                           -- HD_YYYYMMDD#NN
 
   -- Quy tắc chọn ảnh
   included_quota      integer not null default 20,
@@ -235,6 +237,7 @@ create index idx_galleries_branch_status on galleries(branch_id, status);
 create index idx_galleries_customer on galleries(customer_id);
 create index idx_galleries_due on galleries(due_at) where status in ('ready','in_review');
 create unique index uq_galleries_drive_folder on galleries(drive_folder_id) where status <> 'archived';
+create index idx_galleries_lark_contract on galleries(lark_contract_code);
 
 -- ============================================================================
 -- 7. ẢNH (metadata cache từ Drive)
@@ -275,14 +278,15 @@ alter table galleries
 
 create table share_links (
   id             uuid primary key default gen_random_uuid(),
-  gallery_id     uuid not null references galleries(id) on delete cascade,
+  gallery_id     uuid references galleries(id) on delete cascade,
+  customer_id    uuid references customers(id) on delete cascade,
 
   token_hash     text not null unique,       -- sha256(token); token gốc không lưu
   token_prefix   text not null,              -- 6 ký tự đầu, chỉ để hiển thị/log
   role           share_role not null default 'owner',
   label          text,                       -- 'Mẹ bé', 'Bà ngoại'
 
-  requires_pin   boolean not null default true,
+  requires_pin   boolean not null default false,
   pin_hash       text,                       -- bcrypt
   failed_attempts integer not null default 0,
   locked_until   timestamptz,
@@ -297,10 +301,16 @@ create table share_links (
   created_by     uuid references staff_profiles(id),
   created_at     timestamptz not null default now(),
   revoked_at     timestamptz,
-  revoked_by     uuid references staff_profiles(id)
+  revoked_by     uuid references staff_profiles(id),
+  
+  constraint chk_share_link_target check ((gallery_id is null) <> (customer_id is null))
 );
 
+comment on column share_links.expires_at is 'Token kiểu mới (theo khách) không có hạn dùng mặc định. Cột được giữ lại cho token cũ hoặc logic thu hồi riêng.';
+comment on column galleries.lark_contract_code is 'Mã Hợp Đồng từ Lark (HD_YYYYMMDD#NN). CẢNH BÁO: Phải dùng encodeURIComponent khi đưa vào URL vì chứa ký tự #, nếu không sẽ bị trình duyệt cắt mất.';
+
 create index idx_share_links_gallery on share_links(gallery_id);
+create index idx_share_links_customer on share_links(customer_id);
 create index idx_share_links_status on share_links(status) where status = 'active';
 
 -- ============================================================================
