@@ -29,6 +29,22 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
 
   await admin.from("activity_logs").delete().eq("action", AUTH_ACTION);
 
+  const tokensToClean = [
+    "token-no-pin",
+    "token-with-pin",
+    "token-revoked",
+    "token-expired",
+    "token-no-selections",
+    "token-to-revoke",
+  ];
+  const hashes = await Promise.all(
+    tokensToClean.map(async (t) => {
+      const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
+      return Buffer.from(b).toString("hex");
+    })
+  );
+  await admin.from("share_links").delete().in("token_hash", hashes);
+
   const { data: shoot } = await admin
     .from("shoots")
     .select("id, branch_id, customer_id, baby_id")
