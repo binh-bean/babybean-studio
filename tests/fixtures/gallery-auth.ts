@@ -96,7 +96,7 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
   await createLink("token-no-pin", { role: "owner" });
   const pinLinkId = await createLink("token-with-pin", {
     requires_pin: true,
-    pin_hash: await bcrypt.hash(TEST_PIN, 10),
+    pin_hash: await bcrypt.hash(TEST_PIN, 4),
   });
   await createLink("token-revoked", { status: "revoked" });
   await createLink("token-expired", {
