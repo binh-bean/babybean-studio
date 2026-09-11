@@ -20,7 +20,8 @@ create type staff_role as enum (
   'photographer',
   'retoucher',
   'accountant',
-  'viewer'            -- chỉ xem báo cáo
+  'viewer',           -- chỉ xem báo cáo
+  'photoshop_ctv'
 );
 
 create type gallery_status as enum (
@@ -226,6 +227,9 @@ create table galleries (
   sync_error          text,
 
   created_by          uuid references staff_profiles(id),
+  photographer_id     uuid references staff_profiles(id),
+  cskh_id             uuid references staff_profiles(id),
+  editor_id           uuid references staff_profiles(id),
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
 
@@ -238,6 +242,9 @@ create index idx_galleries_customer on galleries(customer_id);
 create index idx_galleries_due on galleries(due_at) where status in ('ready','in_review');
 create unique index uq_galleries_drive_folder on galleries(drive_folder_id) where status <> 'archived';
 create index idx_galleries_lark_contract on galleries(lark_contract_code);
+create index idx_galleries_photographer on galleries(photographer_id);
+create index idx_galleries_cskh on galleries(cskh_id);
+create index idx_galleries_editor on galleries(editor_id);
 
 -- ============================================================================
 -- 7. ẢNH (metadata cache từ Drive)

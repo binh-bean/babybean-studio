@@ -20,6 +20,7 @@ export const STAFF_ROLES = [
   "retoucher",
   "accountant",
   "viewer",
+  "photoshop_ctv",
 ] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
@@ -209,6 +210,9 @@ export interface Gallery {
   syncError: string | null;
 
   createdBy?: string | null;
+  photographerId?: string | null;
+  cskhId?: string | null;
+  editorId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
