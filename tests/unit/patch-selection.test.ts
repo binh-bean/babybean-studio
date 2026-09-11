@@ -31,6 +31,7 @@ describe('Selection Mutation (patch_selection_batch)', () => {
       drive_folder_url: 'http://test',
       title: 'Test Gallery',
       status: 'ready',
+      photo_count: 3,
       included_quota: 2,
       max_selection: null,
       allow_extra: false
@@ -61,6 +62,12 @@ describe('Selection Mutation (patch_selection_batch)', () => {
       { id: photoMissing, gallery_id: galleryId, drive_file_id: randomUUID(), file_name: 'miss.jpg', mime_type: 'image/jpeg', status: 'missing', width: 100, height: 100 }
     ]);
     if (photoRes.error) throw photoRes.error;
+  });
+
+  afterAll(async () => {
+    if (galleryId) {
+      await supabase.from('galleries').delete().eq('id', galleryId);
+    }
   });
 
   it('1. op chỉ có ghi chú, ảnh chưa chọn -> KHÔNG tự chọn ảnh', async () => {
