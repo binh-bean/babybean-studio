@@ -59,7 +59,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-021 | Layout admin: sidebar, bộ chọn chi nhánh, breadcrumb | DEV-FE | BB-002, BB-020 | low | ✅ **DONE** — layout admin, sidebar thu gọn, bộ chọn chi nhánh |
 | BB-022 | Wizard tạo album 3 bước (nguồn ảnh → thông tin → luật chọn) | DEV-FE | BB-013, BB-021 | med | ✅ **DONE** — nối API thật: xem trước Drive và tạo album. Bản trước là giao diện giả, bấm tạo không ghi gì vào database |
 | BB-023 | `POST /api/admin/galleries`: tạo gallery + share_link, sinh token 22 ký tự, hash PIN | DEV-BE | BB-007, BB-020 ✅ | high | ✅ **DONE** — POST /api/admin/galleries, token 22 ký tự, hash sha256 |
-| BB-024 | Danh sách album: bảng, bộ lọc, tìm kiếm, phân trang cursor | DEV-FE | BB-021, BB-023 | med | ❌ **LÀM LẠI** — hiện là mockData cứng, bộ lọc là vỏ tĩnh. Cần bảng thật + kanban + lọc thật |
+| BB-024 | Danh sách album: bảng, bộ lọc, tìm kiếm, phân trang cursor | DEV-FE | BB-021, BB-023 | med | ✅ **DONE** — bảng 10 cột cho desktop, thẻ cho mobile, kanban theo trạng thái, lọc thật 6 trường, nối GET /api/admin/galleries |
 | BB-025 | Chi tiết album: tab tổng quan, nút đồng bộ, thanh tiến trình | DEV-FE | BB-014, BB-024 | med | TODO |
 
 ---
@@ -125,7 +125,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-080b | Gắn tên miền `babybeanstudio.vn`: đổi `NEXT_PUBLIC_APP_URL`, cập nhật `verify-prod.mjs`, kiểm HTTPS và link chia sẻ | DEV-OPS | BB-079 | med | ĐANG CHỜ DNS |
 | BB-081 | **CHẶN BB-035/BB-033.** `selection_items.mark` là một cột loại trừ nên "Yêu thích" xoá mất "Đã chọn", trong khi `07-ui-ux.md:127` là hai nút riêng. Thêm `is_favorite boolean` + migration | ARCH | BB-006 | high | TODO |
 | BB-082 | **NGHIÊM TRỌNG.** 4 hàm `security definer` trong schema `public` cho `anon` gọi: chỉ cần khoá công khai + UUID album là đọc/ghi được mọi album, bỏ qua token, PIN, cookie và RLS. Đã chứng minh HTTP 200 | SEC-ARCH | BB-023 | high | DONE |
-| BB-096 | `branch-selector.tsx` dùng `mockBranches` cứng — bộ chọn chi nhánh trên thanh tiêu đề không nối vào đâu | DEV-FE | BB-063 | med | TODO |
+| BB-096 | `branch-selector.tsx` dùng `mockBranches` cứng — bộ chọn chi nhánh trên thanh tiêu đề không nối vào đâu | DEV-FE | BB-063 | med | ✅ **DONE** — nối GET /api/admin/branches thật, lưu chọn chi nhánh, chỉ hiện khi phụ trách >1 chi nhánh |
 | BB-097 | Bóc tên mẹ và tên bé từ tên thư mục Drive: ngoài ngoặc là mẹ, trong ngoặc là bé, không ngoặc thì tất cả là tên mẹ. Gợi ý cho CSKH sửa, không tự lưu | DEV-INT + DEV-FE | BB-013 | med | TODO |
 | BB-098 | PIN thành tuỳ chọn từng link, mặc định TẮT, mã sinh ngẫu nhiên 4 số — không lấy từ SĐT vì khách nước ngoài không có | SEC-ARCH | BB-030 | med | TODO |
 | BB-099 | Gán người theo từng album: photographer, CSKH, người photoshop. Thêm vai `photoshop_ctv` quyền hẹp hơn | ARCH + DEV-BE | BB-063 | high | TODO |
