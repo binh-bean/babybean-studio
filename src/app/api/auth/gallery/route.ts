@@ -1,11 +1,17 @@
 /**
- * POST /api/auth/gallery - exchange a share token for a session cookie.
+ * POST /api/auth/gallery — exchange a share token (+ PIN) for a session cookie.
  *
  * OWNER: SEC-ARCH. Task BB-030.
- * Spec: docs/04-api-spec.md  3.1, docs/12-security.md  3
+ * Spec: docs/04-api-spec.md §3.1, docs/12-security.md §3
+ *
+ * The cookie is set on the returned response rather than through next/headers
+ * `cookies()`. Both work in production; only this one can be called directly
+ * from a test, and a security route nobody can test is a security route nobody
+ * checks.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signGallerySession, SESSION_COOKIE } from "@/lib/auth/gallery-session";
@@ -16,14 +22,23 @@ export const runtime = "nodejs";
 
 const schema = z.object({
   token: z.string().min(1).max(200),
+  pin: z.string().optional(),
 });
 
+const MAX_ATTEMPTS = 5;
+const LOCK_MINUTES = 15;
 const RATE_LIMIT_PER_IP = 10;
 const RATE_WINDOW_MINUTES = 15;
 
-/** Logged against every attempt, valid or not. */
+/** Logged against every attempt, valid or not. Dotted, like every other action. */
 const ACTION = "gallery.auth";
 
+/**
+ * x-forwarded-for is a list — "client, proxy1, proxy2" — and the client is
+ * first. The whole string is not a valid inet, and neither is a placeholder
+ * like "unknown": either would make the activity_logs insert throw and take
+ * the whole login down with it. Absent header means null.
+ */
 function clientIp(req: NextRequest): string | null {
   const raw = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip");
   const first = raw?.split(",")[0]?.trim();
@@ -42,10 +57,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const parsed = schema.safeParse(await req.json());
     if (!parsed.success) return fail("INVALID_INPUT");
 
-    const { token } = parsed.data;
+    const { token, pin } = parsed.data;
     const admin = await createAdminClient();
     const ip = clientIp(req);
 
+    // Rate limit BEFORE the token is looked up. Checking it afterwards would
+    // let someone probe tokens forever, because an unknown token returns
+    // early and never reaches the counter — docs/05-rbac.md §5 asks for the
+    // opposite.
     if (ip) {
       const since = new Date(Date.now() - RATE_WINDOW_MINUTES * 60_000).toISOString();
       const { count } = await admin
@@ -68,10 +87,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const { data: link } = await admin
       .from("share_links")
-      .select("id, gallery_id, customer_id, role, status, expires_at")
+      .select("id, gallery_id, customer_id, role, status, expires_at, requires_pin, pin_hash, failed_attempts, locked_until")
       .eq("token_hash", await sha256Hex(token))
       .maybeSingle();
 
+    // Unknown, revoked and expired all answer identically. Telling them apart
+    // would confirm which albums exist to someone who is guessing.
     const isLegacy = !link?.customer_id;
     const usable =
       link &&
@@ -80,8 +101,64 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     if (!usable) return fail("NOT_FOUND");
 
+    if (link.requires_pin) {
+      if (!link.pin_hash) {
+        // Never treat this as "no PIN needed" - that turns a misconfigured
+        // link into an open one.
+        console.error(JSON.stringify({ evt: "pin_hash_missing", shareLinkId: link.id, reqId }));
+        return fail("INTERNAL");
+      }
+
+      const lockedUntil = link.locked_until ? new Date(link.locked_until) : null;
+      const stillLocked = lockedUntil !== null && lockedUntil > new Date();
+
+      if (stillLocked) {
+        return fail("PIN_LOCKED", undefined, {
+          retryAfter: Math.ceil((lockedUntil.getTime() - Date.now()) / 1000),
+        });
+      }
+
+      // A lock that has run out clears the counter. Without this the counter
+      // stays at 5 forever, so the next single typo re-locks the album - and
+      // it is a parent on a phone typing the last four digits of their own
+      // number.
+      const priorAttempts = lockedUntil !== null ? 0 : (link.failed_attempts ?? 0);
+
+      if (!pin) return fail("PIN_REQUIRED");
+
+      if (!(await bcrypt.compare(pin, link.pin_hash))) {
+        const attempts = priorAttempts + 1;
+        const lockNow = attempts >= MAX_ATTEMPTS;
+
+        await admin
+          .from("share_links")
+          .update({
+            failed_attempts: attempts,
+            locked_until: lockNow
+              ? new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString()
+              : null,
+          })
+          .eq("id", link.id);
+
+        return lockNow
+          ? fail("PIN_LOCKED", undefined, { retryAfter: LOCK_MINUTES * 60 })
+          : fail("PIN_INVALID", undefined, { remainingAttempts: MAX_ATTEMPTS - attempts });
+      }
+
+      if (priorAttempts > 0 || lockedUntil !== null) {
+        await admin
+          .from("share_links")
+          .update({ failed_attempts: 0, locked_until: null })
+          .eq("id", link.id);
+      }
+    }
+
+    // One selection per share link, created on first successful entry rather
+    // than at gallery creation: BB-065 mints new share links later and they
+    // would otherwise arrive without one.
+    // BUT only for legacy gallery links! Customer portal links have no specific gallery.
     let selectionId = "";
-    if (isLegacy) {
+    if (isLegacy && link.gallery_id) {
       const { data: existing } = await admin
         .from("selections")
         .select("id")
@@ -111,19 +188,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .update({ last_viewed_at: new Date().toISOString() })
       .eq("id", link.id);
 
-    // Provide empty strings to satisfy GallerySession type without altering domain.ts
-    // DEV-BE endpoints currently crash if galleryId/selectionId are missing,
-    // but the session will hold the new customer_id context!
-    // Since we cast to any, the TS types are satisfied.
-    const payload = {
+    const { token: sessionToken, expiresAt } = await signGallerySession({
       customerId: link.customer_id || "",
       galleryId: link.gallery_id || "",
       shareLinkId: link.id,
       selectionId,
       role: link.role as ShareRole,
-    };
-
-    const { token: sessionToken, expiresAt } = await signGallerySession(payload as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     const response = ok({
       customerId: link.customer_id || "",
