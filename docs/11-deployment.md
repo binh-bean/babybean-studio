@@ -8,8 +8,8 @@ Chủ sở hữu: **DEV-OPS**.
 |---|---|---|---|---|
 | Local | — | `localhost:3000` | project `bb-dev` hoặc Supabase CLI | Phát triển |
 | Preview | mọi PR | `*.vercel.app` | project `bb-staging` | Review PR, QA-BOT chạy E2E |
-| Staging | `develop` | `staging.chon-anh.babybean.vn` | `bb-staging` | Nghiệm thu trước khi lên thật |
-| Production | `main` | `chon-anh.babybean.vn` | `bb-prod` | Thật |
+| Staging | `develop` | `staging.babybeanstudio.vn` | `bb-staging` | Nghiệm thu trước khi lên thật |
+| Production | `main` | `babybeanstudio.vn` | `bb-prod` | Thật |
 
 **Quy tắc**: Preview và Staging **không bao giờ** trỏ vào `bb-prod`. Dữ liệu khách thật không được lọt sang môi trường thử.
 
@@ -186,8 +186,8 @@ Mọi handler cron kiểm `Authorization: Bearer <CRON_SECRET>` trước khi là
 
 ## 8. Tên miền
 
-- Production: `chon-anh.babybean.vn` (CNAME → Vercel).
-- Link gửi khách ngắn gọn: `chon-anh.babybean.vn/g/aB3xK9pQ`.
+- Production: `babybeanstudio.vn` (CNAME → Vercel).
+- Link gửi khách ngắn gọn: `babybeanstudio.vn/g/aB3xK9pQ`.
 - Bắt buộc HTTPS, HSTS bật sau khi chạy ổn định 1 tháng.
 
 ## 9. Quy trình xử lý sự cố

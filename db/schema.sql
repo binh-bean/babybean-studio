@@ -341,6 +341,7 @@ create table selection_items (
   photo_id      uuid not null references photos(id) on delete cascade,
   gallery_id    uuid not null references galleries(id) on delete cascade,  -- phi chuẩn hoá cho RLS + truy vấn nhanh
 
+  is_favorite   boolean not null default false,
   mark          selection_mark not null default 'selected',
   order_index   integer,                     -- thứ tự khách chọn
   retouch_note  text,

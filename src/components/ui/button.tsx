@@ -10,7 +10,7 @@ const buttonVariants = cva(
         default:
           "bg-[var(--bb-primary)] text-[var(--bb-primary-fg)] shadow hover:opacity-90 active:opacity-100",
         accent:
-          "bg-[var(--bb-accent)] text-white shadow hover:opacity-90 active:opacity-100",
+          "bg-[var(--bb-accent)] text-[var(--bb-accent-fg)] shadow hover:opacity-90 active:opacity-100",
         secondary:
           "bg-[var(--bb-surface-2)] text-[var(--bb-fg)] hover:bg-[var(--bb-border)]/60",
         outline:
@@ -18,7 +18,7 @@ const buttonVariants = cva(
         ghost:
           "text-[var(--bb-fg)] hover:bg-[var(--bb-surface-2)] hover:text-[var(--bb-fg)]",
         danger:
-          "bg-[var(--bb-danger)] text-white shadow hover:opacity-90",
+          "bg-[var(--bb-danger)] text-[var(--bb-danger-fg)] shadow hover:opacity-90",
         link:
           "text-[var(--bb-primary)] underline-offset-4 hover:underline",
       },

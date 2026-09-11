@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
       ? Buffer.from(JSON.stringify({ s: photosToReturn[photosToReturn.length - 1].sort_index })).toString('base64url')
       : null;
 
-    type RpcPhoto = { id: string; file_name: string; width: number | null; height: number | null; subfolder: string | null; sort_index: number; status: "active" | "missing" | "hidden"; mark: "selected" | "suggested" | "favorite" | "rejected" | null; order_index: number | null; retouch_note: string | null; note_tags: string[]; suggested_by: string[] };
+    type RpcPhoto = { id: string; file_name: string; width: number | null; height: number | null; subfolder: string | null; sort_index: number; status: "active" | "missing" | "hidden"; mark: "selected" | "suggested" | "favorite" | "rejected" | null; is_favorite: boolean; order_index: number | null; retouch_note: string | null; note_tags: string[]; suggested_by: string[] };
 
     const photos: PhotoPublic[] = (photosToReturn as RpcPhoto[]).map(p => ({
       id: p.id,
@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
       sortIndex: p.sort_index,
       status: p.status,
       mark: p.mark,
+      isFavorite: p.is_favorite ?? false,
       orderIndex: p.order_index,
       retouchNote: p.retouch_note,
       noteTags: p.note_tags || [],

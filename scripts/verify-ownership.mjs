@@ -186,6 +186,39 @@ for (const d of duplicateMigrationNumbers()) {
 const orphanPolicy = policyChangeWithoutMigration();
 if (orphanPolicy) semantic.push({ what: "Sửa policy mà thiếu migration", detail: orphanPolicy });
 
+/**
+ * package.json is shared ground so any agent can add a dependency. The part
+ * that must not move is the scripts block: `verify`, `verify:db`, `verify:own`
+ * and `verify:build` are the gates, and an agent that can edit its own gate is
+ * not being gated. DEV-OPS owns the build tooling and may change them; so may
+ * the PM.
+ */
+function scriptsBlockChanged() {
+  if (agent === "PM" || agent === "DEV-OPS") return null;
+  if (!files.includes("package.json")) return null;
+
+  const readScripts = (spec) => {
+    try {
+      return JSON.stringify(JSON.parse(execSync(spec, { encoding: "utf8" })).scripts ?? {});
+    } catch {
+      return null;
+    }
+  };
+
+  const now = readScripts("git show HEAD:package.json");
+  const then = readScripts(`git show ${base ?? "HEAD"}:package.json`);
+  if (now === null || then === null || now === then) return null;
+
+  return (
+    "khối `scripts` trong package.json đã đổi. Thêm thư viện thì được, nhưng\n" +
+    "      các lệnh verify là cổng chấm bài — sửa chúng thì không còn ai chấm.\n" +
+    "      Cần đổi thật thì nhờ DEV-OPS hoặc PM."
+  );
+}
+
+const scriptsProblem = scriptsBlockChanged();
+if (scriptsProblem) semantic.push({ what: "Sửa cổng trong package.json", detail: scriptsProblem });
+
 if (semantic.length) {
   console.error("  SAI QUY TRÌNH:");
   for (const s of semantic) {

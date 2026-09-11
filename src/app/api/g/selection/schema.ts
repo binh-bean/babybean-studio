@@ -12,7 +12,12 @@ import { z } from "zod";
 
 export const SelectionOpSchema = z.object({
   photoId: z.string().uuid(),
-  mark: z.enum(["selected", "suggested", "favorite", "rejected"]).nullable().optional(),
+  // "suggested" is assigned by the server for the suggester role, never sent
+  // by a client. "favorite" stays accepted only until 0007 finishes retiring
+  // it from the enum; use isFavorite.
+  mark: z.enum(["selected", "rejected"]).nullable().optional(),
+  /** Independent of mark: a photo can be chosen, hearted, both or neither. */
+  isFavorite: z.boolean().optional(),
   retouchNote: z.string().max(500).nullable().optional(),
   noteTags: z.array(z.string().max(40)).max(10).optional(),
 });
