@@ -1,5 +1,5 @@
 -- ============================================================================
--- Migration: 0010-admin-galleries-rpc
+-- Migration: 0013-admin-galleries-rpc (đổi số: 0010 đã thuộc về portal-token-theo-khach)
 --
 -- Task BB-024: RPC get_admin_galleries phục vụ danh sách album khu quản trị.
 -- Hỗ trợ lọc theo chi nhánh, trạng thái, thợ ảnh, retoucher, CSKH, ngày chụp,
