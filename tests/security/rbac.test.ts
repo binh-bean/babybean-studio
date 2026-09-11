@@ -285,4 +285,67 @@ describe("Database RLS Policies & Security (BB-020)", () => {
   });
 
   it.todo("Ca 14: Token đã revoked -> 410 LINK_EXPIRED (Chờ BB-030)");
+
+  it("photoshop_ctv không xem được customers, packages, selections, và chỉ thấy gallery của mình", async () => {
+    await client.query("BEGIN");
+
+    const { photoId: ctvId } = await makePhotographerAndCustomer();
+    await client.query("UPDATE staff_profiles SET role = 'photoshop_ctv' WHERE id = $1", [ctvId]);
+
+    // Gán 1 album cho ctv
+    const { rows: galleries } = await client.query("SELECT id FROM galleries LIMIT 2");
+    expect(galleries.length).toBeGreaterThanOrEqual(2);
+    const assignedGalleryId = galleries[0].id;
+    await client.query("UPDATE galleries SET editor_id = $1 WHERE id = $2", [ctvId, assignedGalleryId]);
+
+    // Set role
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${ctvId}", "role": "authenticated"}'`);
+
+    // Kiểm tra không thấy customers
+    const custRes = await client.query("SELECT * FROM customers");
+    expect(custRes.rows.length).toBe(0);
+
+    // Kiểm tra không thấy packages
+    const pkgRes = await client.query("SELECT * FROM packages");
+    expect(pkgRes.rows.length).toBe(0);
+
+    // Kiểm tra không thấy selections
+    const selRes = await client.query("SELECT * FROM selections");
+    expect(selRes.rows.length).toBe(0);
+
+    // Kiểm tra chỉ thấy gallery được gán
+    const galRes = await client.query("SELECT * FROM galleries");
+    expect(galRes.rows.length).toBe(1);
+    expect(galRes.rows[0].id).toBe(assignedGalleryId);
+
+    // Kiểm tra thấy photos của gallery được gán
+    const photoRes = await client.query("SELECT * FROM photos");
+    for (const p of photoRes.rows) {
+      expect(p.gallery_id).toBe(assignedGalleryId);
+    }
+
+    await client.query("ROLLBACK");
+  });
+
+  it("Đối chứng dương: retoucher thấy mọi customers, packages, selections và galleries trong nhánh", async () => {
+    await client.query("BEGIN");
+
+    const { photoId: retoucherId } = await makePhotographerAndCustomer();
+    await client.query("UPDATE staff_profiles SET role = 'retoucher' WHERE id = $1", [retoucherId]);
+
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${retoucherId}", "role": "authenticated"}'`);
+
+    const custRes = await client.query("SELECT * FROM customers");
+    expect(custRes.rows.length).toBeGreaterThan(0);
+
+    const pkgRes = await client.query("SELECT * FROM packages");
+    expect(pkgRes.rows.length).toBeGreaterThan(0);
+
+    const galRes = await client.query("SELECT * FROM galleries");
+    expect(galRes.rows.length).toBeGreaterThan(0);
+
+    await client.query("ROLLBACK");
+  });
 });

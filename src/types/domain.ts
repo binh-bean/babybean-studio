@@ -20,6 +20,7 @@ export const STAFF_ROLES = [
   "retoucher",
   "accountant",
   "viewer",
+  "photoshop_ctv",
 ] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
@@ -183,6 +184,7 @@ export interface Gallery {
   driveFolderId: string;
   driveFolderUrl: string;
   driveFolderName: string | null;
+  larkContractCode: string | null;
 
   includedQuota: number;
   extraPhotoPrice: number;
@@ -208,6 +210,9 @@ export interface Gallery {
   syncError: string | null;
 
   createdBy?: string | null;
+  photographerId?: string | null;
+  cskhId?: string | null;
+  editorId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -250,7 +255,8 @@ export interface PhotoPublic {
 
 export interface ShareLink {
   id: string;
-  galleryId: string;
+  galleryId: string | null;
+  customerId: string | null;
   tokenPrefix: string;
   role: ShareRole;
   label: string | null;

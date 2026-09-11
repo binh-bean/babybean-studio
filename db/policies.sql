@@ -137,7 +137,7 @@ create policy staff_branches_admin on staff_branches for all to authenticated
 -- ---------------------------------------------------------------------------
 
 create policy customers_select on customers for select to authenticated
-  using (app.can_see_branch(branch_id));
+  using (app.can_see_branch(branch_id) and app.my_role() != 'photoshop_ctv');
 
 create policy customers_write on customers for all to authenticated
   using (app.can_see_branch(branch_id) and app.can_manage_customers())
@@ -163,7 +163,7 @@ create policy babies_write on babies for all to authenticated
 -- ---------------------------------------------------------------------------
 
 create policy packages_select on packages for select to authenticated
-  using (branch_id is null or app.can_see_branch(branch_id));
+  using ((branch_id is null or app.can_see_branch(branch_id)) and app.my_role() != 'photoshop_ctv');
 
 -- branch_id IS NULL means a system-wide package; only superusers touch those.
 create policy packages_write on packages for all to authenticated
@@ -184,7 +184,7 @@ create policy shoots_write on shoots for all to authenticated
   with check (app.can_see_branch(branch_id) and app.can_write());
 
 create policy galleries_select on galleries for select to authenticated
-  using (app.can_see_branch(branch_id));
+  using (app.can_see_branch(branch_id) and (app.my_role() != 'photoshop_ctv' or editor_id = auth.uid()));
 
 create policy galleries_write on galleries for all to authenticated
   using (app.can_see_branch(branch_id) and app.can_write())
@@ -196,6 +196,7 @@ create policy photos_select on photos for select to authenticated
     exists (
       select 1 from galleries g
       where g.id = photos.gallery_id and app.can_see_branch(g.branch_id)
+      and (app.my_role() != 'photoshop_ctv' or g.editor_id = auth.uid())
     )
   );
 
@@ -217,7 +218,8 @@ create policy photos_write on photos for all to authenticated
 create policy share_links_select on share_links for select to authenticated
   using (exists (
     select 1 from galleries g
-    where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id)));
+    where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id)
+    and (app.my_role() != 'photoshop_ctv' or g.editor_id = auth.uid())));
 
 create policy share_links_write on share_links for all to authenticated
   using (exists (
@@ -240,7 +242,7 @@ from share_links;
 -- ---------------------------------------------------------------------------
 
 create policy selections_select on selections for select to authenticated
-  using (exists (
+  using (app.my_role() != 'photoshop_ctv' and exists (
     select 1 from galleries g
     where g.id = selections.gallery_id and app.can_see_branch(g.branch_id)));
 
@@ -257,7 +259,8 @@ create policy selections_write on selections for all to authenticated
 create policy selection_items_select on selection_items for select to authenticated
   using (exists (
     select 1 from galleries g
-    where g.id = selection_items.gallery_id and app.can_see_branch(g.branch_id)));
+    where g.id = selection_items.gallery_id and app.can_see_branch(g.branch_id)
+    and (app.my_role() != 'photoshop_ctv' or g.editor_id = auth.uid())));
 
 -- Nhân viên KHÔNG được sửa lựa chọn của khách (tránh tranh cãi).
 -- Muốn đổi thì phải reopen album, hành động này có ghi log.
