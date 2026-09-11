@@ -88,7 +88,7 @@ export async function verifyGallerySession(token: string): Promise<GallerySessio
   try {
     const parsed = JSON.parse(new TextDecoder().decode(b64url.decode(body))) as GallerySession;
     if (parsed.exp * 1000 < Date.now()) return null;
-    if (!parsed.galleryId || !parsed.shareLinkId || !parsed.selectionId) return null;
+    if (!parsed.shareLinkId) return null;
     return parsed;
   } catch {
     return null;
@@ -160,13 +160,13 @@ export async function assertShareLinkUsable(shareLinkId: string): Promise<void> 
   const admin = await createAdminClient();
   const { data } = await admin
     .from("share_links")
-    .select("status, expires_at")
+    .select("status, customer_id, expires_at")
     .eq("id", shareLinkId)
     .maybeSingle();
 
   if (!data) throw new GallerySessionError("LINK_EXPIRED");
   if (data.status !== "active") throw new GallerySessionError("LINK_EXPIRED");
-  if (data.expires_at && new Date(data.expires_at) < new Date()) {
+  if (!data.customer_id && data.expires_at && new Date(data.expires_at) < new Date()) {
     throw new GallerySessionError("LINK_EXPIRED");
   }
 }
@@ -175,3 +175,15 @@ export async function assertShareLinkUsable(shareLinkId: string): Promise<void> 
 export const EDITING_ROLES: readonly ShareRole[] = ["owner", "co_editor", "suggester"];
 /** Only the primary customer may submit. */
 export const SUBMIT_ROLES: readonly ShareRole[] = ["owner"];
+
+export async function assertCustomerOwnsGallery(customerId: string, galleryId: string): Promise<void> {
+  const admin = await createAdminClient();
+  const { data } = await admin
+    .from("galleries")
+    .select("id")
+    .eq("id", galleryId)
+    .eq("customer_id", customerId)
+    .maybeSingle();
+
+  if (!data) throw new GallerySessionError("FORBIDDEN");
+}

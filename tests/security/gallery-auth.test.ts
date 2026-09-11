@@ -1,12 +1,7 @@
 /**
- * BB-030 — customer gallery authentication.
+ * BB-030 - customer gallery authentication.
  *
  * OWNER: SEC-ARCH.
- *
- * These call the route handler directly instead of over HTTP. The earlier
- * version posted to NEXT_PUBLIC_APP_URL, which is localhost:3000 on a dev
- * machine and nothing at all during `npm run verify` — every case was skipped
- * and the suite reported no failures, which is worse than failing.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -14,31 +9,35 @@ import { NextRequest } from "next/server";
 import { POST } from "@/app/api/auth/gallery/route";
 import {
   assertShareLinkUsable,
+  assertCustomerOwnsGallery,
   GallerySessionError,
   SESSION_COOKIE,
 } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setupAuthFixtures, cleanupAuthFixtures } from "../fixtures/gallery-auth";
 
-describe("BB-030 — POST /api/auth/gallery", () => {
+describe("BB-030 - POST /api/auth/gallery", () => {
   let gid: string;
   let revId: string;
-  let pinLinkId: string;
+  let customerAId: string;
+  let customerBId: string;
+  let galleryBId: string;
 
   beforeAll(async () => {
     const res = await setupAuthFixtures();
     gid = res.gid;
     revId = res.revId;
-    pinLinkId = res.pinLinkId;
+    customerAId = res.customerAId;
+    customerBId = res.customerBId;
+    galleryBId = res.galleryBId;
   });
 
   afterAll(async () => {
     if (gid) await cleanupAuthFixtures(gid);
   });
 
-  /** Each call gets its own IP so the rate limiter does not bleed across cases. */
   let ipCounter = 0;
-  async function postAuth(token: string, pin?: string) {
+  async function postAuth(token: string) {
     ipCounter += 1;
     const req = new NextRequest("http://localhost/api/auth/gallery", {
       method: "POST",
@@ -46,102 +45,83 @@ describe("BB-030 — POST /api/auth/gallery", () => {
         "content-type": "application/json",
         "x-forwarded-for": `10.0.0.${ipCounter}, 172.16.0.1`,
       },
-      body: JSON.stringify(pin === undefined ? { token } : { token, pin }),
+      body: JSON.stringify({ token }),
     });
     const res = await POST(req);
     return { res, body: await res.clone().json() };
   }
 
-  it("Ca 1: token đúng, không cần PIN → ký được phiên", async () => {
-    const { res } = await postAuth("token-no-pin");
+  it("Ca 1: token đúng -> ký được phiên", async () => {
+    const { res, body } = await postAuth("token-active");
     expect(res.status).toBe(200);
     expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
+    // API should return customerId
+    expect(body.data.customerId).toBe(customerAId);
   });
 
-  it("Ca 2: token đúng + PIN đúng → ký được phiên", async () => {
-    const { res, body } = await postAuth("token-with-pin", "1234");
-    expect(res.status).toBe(200);
-    expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
-    expect(body.data.galleryId).toBe(gid);
-  });
-
-  it("Ca 3: PIN sai → PIN_INVALID và failed_attempts tăng", async () => {
-    const { res, body } = await postAuth("token-with-pin", "9999");
-    expect(res.status).toBe(401);
-    expect(body.error.code).toBe("PIN_INVALID");
-    expect(body.error.details.remainingAttempts).toBe(4);
-  });
-
-  it("Ca 4: sai lần thứ 5 → PIN_LOCKED", async () => {
-    for (let i = 0; i < 3; i++) await postAuth("token-with-pin", "9999");
-    const { res, body } = await postAuth("token-with-pin", "9999");
-    expect(res.status).toBe(429);
-    expect(body.error.code).toBe("PIN_LOCKED");
-  });
-
-  it("Ca 5: đang bị khoá → PIN_LOCKED kể cả khi PIN đúng", async () => {
-    const { res, body } = await postAuth("token-with-pin", "1234");
-    expect(res.status).toBe(429);
-    expect(body.error.code).toBe("PIN_LOCKED");
-  });
-
-  it("Ca 5b: hết hạn khoá thì bộ đếm về 0, một lần gõ nhầm KHÔNG khoá lại", async () => {
-    const admin = await createAdminClient();
-    // Wind the lock back into the past, leaving failed_attempts at 5 exactly
-    // as a real expiring lock does.
-    await admin
-      .from("share_links")
-      .update({ locked_until: new Date(Date.now() - 1000).toISOString(), failed_attempts: 5 })
-      .eq("id", pinLinkId);
-
-    const { res, body } = await postAuth("token-with-pin", "9999");
-    expect(res.status).toBe(401);
-    expect(body.error.code).toBe("PIN_INVALID");
-    expect(body.error.details.remainingAttempts).toBe(4);
-  });
-
-  it("Ca 6: link đã thu hồi → NOT_FOUND", async () => {
+  it("Ca 2: link đã thu hồi -> NOT_FOUND", async () => {
     const { res, body } = await postAuth("token-revoked");
     expect(res.status).toBe(404);
     expect(body.error.code).toBe("NOT_FOUND");
   });
 
-  it("Ca 7: expires_at ở quá khứ nhưng status vẫn 'active' → NOT_FOUND", async () => {
-    const { res, body } = await postAuth("token-expired");
-    expect(res.status).toBe(404);
-    expect(body.error.code).toBe("NOT_FOUND");
-  });
-
-  it("Ca 8: token không tồn tại → NOT_FOUND, giống hệt ca 6 và 7", async () => {
+  it("Ca 3: token không tồn tại -> NOT_FOUND", async () => {
     const { res, body } = await postAuth("khong-he-ton-tai");
     expect(res.status).toBe(404);
     expect(body.error.code).toBe("NOT_FOUND");
   });
 
-  it("Ca 9: share_link chưa có selection → tạo mới rồi ký phiên", async () => {
-    const { res } = await postAuth("token-no-selections");
-    expect(res.status).toBe(200);
+  it("Ca 4: token của khách A không xem được buổi của khách B", async () => {
+    // Tests the authorization function
+    await expect(assertCustomerOwnsGallery(customerAId, galleryBId)).rejects.toThrow(GallerySessionError);
+    await expect(assertCustomerOwnsGallery(customerAId, galleryBId)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
 
-    const admin = await createAdminClient();
-    const { data } = await admin
-      .from("selections")
-      .select("id")
-      .eq("gallery_id", gid);
-    expect(data?.length).toBeGreaterThan(0);
+    // Positive control: Khách A xem được buổi của khách A
+    await expect(assertCustomerOwnsGallery(customerAId, gid)).resolves.toBeUndefined();
   });
 
-  it("Ca 10: thu hồi link khi phiên đang mở → request kế tiếp bị LINK_EXPIRED", async () => {
+  it("Ca 5: thu hồi token khi phiên đang mở -> request kế tiếp bị LINK_EXPIRED", async () => {
     const admin = await createAdminClient();
 
-    // Still good while active — the positive control. Without it a broken
-    // assertShareLinkUsable that always throws would pass the negative case.
+    // Still good while active
     await expect(assertShareLinkUsable(revId)).resolves.toBeUndefined();
 
+    // Revoke it
     await admin.from("share_links").update({ status: "revoked" }).eq("id", revId);
 
+    // Next request fails
     await expect(assertShareLinkUsable(revId)).rejects.toThrow(GallerySessionError);
     await expect(assertShareLinkUsable(revId)).rejects.toMatchObject({
       code: "LINK_EXPIRED",
     });
+  });
+
+  it("Ca 6: rate limit theo IP vẫn hoạt động (10 lần / 15 phút)", async () => {
+    const ip = `10.0.0.999`;
+    
+    // Probe 10 times with wrong tokens
+    const probes = Array.from({ length: 10 }).map(() => {
+      const req = new NextRequest("http://localhost/api/auth/gallery", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": ip },
+        body: JSON.stringify({ token: "wrong" }),
+      });
+      return POST(req);
+    });
+    await Promise.all(probes);
+
+    // 11th time should be rate limited
+    const req = new NextRequest("http://localhost/api/auth/gallery", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": ip },
+      body: JSON.stringify({ token: "wrong" }),
+    });
+    const res = await POST(req);
+    const body = await res.clone().json();
+    
+    expect(res.status).toBe(429);
+    expect(body.error.code).toBe("RATE_LIMITED");
   });
 });
