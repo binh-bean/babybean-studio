@@ -59,7 +59,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-021 | Layout admin: sidebar, bộ chọn chi nhánh, breadcrumb | DEV-FE | BB-002, BB-020 | low | ✅ **DONE** — layout admin, sidebar thu gọn, bộ chọn chi nhánh |
 | BB-022 | Wizard tạo album 3 bước (nguồn ảnh → thông tin → luật chọn) | DEV-FE | BB-013, BB-021 | med | ✅ **DONE** — nối API thật: xem trước Drive và tạo album. Bản trước là giao diện giả, bấm tạo không ghi gì vào database |
 | BB-023 | `POST /api/admin/galleries`: tạo gallery + share_link, sinh token 22 ký tự, hash PIN | DEV-BE | BB-007, BB-020 ✅ | high | ✅ **DONE** — POST /api/admin/galleries, token 22 ký tự, hash sha256 |
-| BB-024 | Danh sách album: bảng, bộ lọc, tìm kiếm, phân trang cursor | DEV-FE | BB-021, BB-023 | med | TODO |
+| BB-024 | Danh sách album: bảng, bộ lọc, tìm kiếm, phân trang cursor | DEV-FE | BB-021, BB-023 | med | ❌ **LÀM LẠI** — hiện là mockData cứng, bộ lọc là vỏ tĩnh. Cần bảng thật + kanban + lọc thật |
 | BB-025 | Chi tiết album: tab tổng quan, nút đồng bộ, thanh tiến trình | DEV-FE | BB-014, BB-024 | med | TODO |
 
 ---
@@ -69,7 +69,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
 | BB-030 | Phiên khách: `POST /api/auth/gallery`, ký cookie, **kiểm `share_links.status` mỗi request** | SEC-ARCH | BB-023 | high | DONE |
-| BB-031 | Màn nhập PIN: 4 ô, tự nhảy, khoá sau 5 lần sai, đếm ngược | DEV-FE + SEC-ARCH | BB-030 | med | DONE |
+| BB-031 | Màn nhập PIN: 4 ô, tự nhảy, khoá sau 5 lần sai, đếm ngược | DEV-FE + SEC-ARCH | BB-030 | med | 🚫 **HUỶ** — chủ studio chốt bỏ PIN, thay bằng BB-098 |
 | BB-032 | `GET /api/g/gallery` + `GET /api/g/photos` (cursor, filter, subfolder) | DEV-BE | BB-030, BB-014 | med | ✅ DONE |
 | BB-033 | `PhotoGrid`: virtualize >200 ảnh, lazy load, srcset, đổi mật độ, skeleton | DEV-FE | BB-032, BB-015 | high | TODO |
 | BB-034 | `Lightbox`: vuốt, pinch zoom, phím tắt, preload 3 ảnh | DEV-FE | BB-033 | high | TODO |
@@ -108,12 +108,12 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-063 | Quản lý chi nhánh + nhân sự: chủ studio tạo tài khoản/mật khẩu, gán vai trò và chi nhánh, bật/tắt hoạt động. Đăng nhập bằng tên tài khoản. Xem docs/13 §8 | DEV-FE + DEV-BE | BB-020 | **high** | ✅ **DONE** — nhân sự: tạo/sửa/tắt, gán vai trò + chi nhánh, đặt lại mật khẩu, đăng nhập bằng tên tài khoản. Chi nhánh: thêm/sửa/đóng, địa chỉ và hotline nhập trong app |
 | BB-064 | Màn nhật ký hoạt động + bộ lọc | DEV-FE | BB-052 | low | TODO |
 | BB-065 | Mời người thân: link phụ, vai trò, hiển thị đề xuất | DEV-FE + DEV-BE | BB-039 | high | TODO |
-| BB-066 | Watermark ở tầng proxy ảnh | DEV-INT | BB-015 | high | TODO |
+| BB-066 | Watermark ở tầng proxy ảnh | DEV-INT | BB-015 | high | 🚫 **HUỶ** — chủ studio chốt không đóng dấu mờ, khách nhận ảnh chất lượng cao |
 | BB-067 | Tải ảnh preview + ZIP ảnh đã chọn + log lượt tải | DEV-BE | BB-015 | med | TODO |
 | BB-068 | Cron: `expire-galleries`, `send-reminders`, `flush-notifications` | DEV-BE | BB-039 | med | TODO |
 | BB-069 | i18n VI/EN đầy đủ, rà soát không còn chuỗi hard-code | DEV-UI | BB-040 | low | ✅ **DONE** — i18n VI/EN đầy đủ, hết chuỗi hard-code |
 | BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-UI | BB-040 | med | ✅ **DONE** — manifest.ts + OG metadata đã nối vào RootLayout, dark mode 26 component, PWA prompt |
-| BB-071 | Tối ưu album 1.500 ảnh: bundle ≤180KB, bộ nhớ ≤300MB | DEV-FE | BB-033 | high | TODO |
+| BB-071 | Tối ưu album **400 ảnh** (đo thật, không phải 1.500): bundle ≤180KB | DEV-FE | BB-033 | high | TODO |
 | BB-072 | Sentry + trang lỗi 404/500 tiếng Việt | DEV-OPS | BB-005 | low | TODO |
 | BB-073 | Migration `0003`: accountant không xem được ảnh — đồng bộ `policies.sql` sang `db/migrations/` | ARCH | BB-020 | low | TODO |
 | BB-074 | Font thương hiệu không nạp trên production | DEV-UI | BB-040 | high | ✅ **DONE** — tự host Be Vietnam Pro bằng next/font, không còn gửi IP khách sang Google |
@@ -125,6 +125,10 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-080b | Gắn tên miền `babybeanstudio.vn`: đổi `NEXT_PUBLIC_APP_URL`, cập nhật `verify-prod.mjs`, kiểm HTTPS và link chia sẻ | DEV-OPS | BB-079 | med | ĐANG CHỜ DNS |
 | BB-081 | **CHẶN BB-035/BB-033.** `selection_items.mark` là một cột loại trừ nên "Yêu thích" xoá mất "Đã chọn", trong khi `07-ui-ux.md:127` là hai nút riêng. Thêm `is_favorite boolean` + migration | ARCH | BB-006 | high | TODO |
 | BB-082 | **NGHIÊM TRỌNG.** 4 hàm `security definer` trong schema `public` cho `anon` gọi: chỉ cần khoá công khai + UUID album là đọc/ghi được mọi album, bỏ qua token, PIN, cookie và RLS. Đã chứng minh HTTP 200 | SEC-ARCH | BB-023 | high | DONE |
+| BB-096 | `branch-selector.tsx` dùng `mockBranches` cứng — bộ chọn chi nhánh trên thanh tiêu đề không nối vào đâu | DEV-FE | BB-063 | med | TODO |
+| BB-097 | Bóc tên mẹ và tên bé từ tên thư mục Drive: ngoài ngoặc là mẹ, trong ngoặc là bé, không ngoặc thì tất cả là tên mẹ. Gợi ý cho CSKH sửa, không tự lưu | DEV-INT + DEV-FE | BB-013 | med | TODO |
+| BB-098 | PIN thành tuỳ chọn từng link, mặc định TẮT, mã sinh ngẫu nhiên 4 số — không lấy từ SĐT vì khách nước ngoài không có | SEC-ARCH | BB-030 | med | TODO |
+| BB-099 | Gán người theo từng album: photographer, CSKH, người photoshop. Thêm vai `photoshop_ctv` quyền hẹp hơn | ARCH + DEV-BE | BB-063 | high | TODO |
 
 ---
 

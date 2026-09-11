@@ -10,12 +10,16 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 1. **Không agent nào được tự ý đổi hợp đồng chung.** Hợp đồng chung = `db/schema.sql`, `docs/04-api-spec.md`, `src/types/domain.ts`. Muốn đổi thì mở ADR trong `docs/adr/` và chờ Tech Lead duyệt.
 2. **Mỗi agent chỉ làm việc trong "vùng sở hữu" của mình.** File ngoài vùng: được đề xuất, không được tự sửa.
 3. **Mọi task bắt đầu từ một mã `BB-xxx`** trong `tasks/TASK-INDEX.md`. Không có mã thì không code.
-4. **Definition of Done** (bắt buộc đủ 9): code chạy · type-check sạch · test đơn vị cho logic mới · **`npm run verify:own -- <TÊN AGENT>` xanh** · **`npm run verify:db` xanh nếu task đụng database** · **`npm run verify:build` xanh nếu task đụng giao diện, style hoặc biến môi trường** · verify bằng browser agent kèm ảnh chụp · cập nhật tài liệu liên quan · walkthrough artifact mô tả thay đổi.
+4. **Definition of Done** (bắt buộc đủ 10): code chạy · type-check sạch · test đơn vị cho logic mới · **`npm run verify:own -- <TÊN AGENT>` xanh** · **`npm run verify:db` xanh nếu task đụng database** · **`npm run verify:build` xanh nếu task đụng giao diện, style hoặc biến môi trường** · **`npm run verify:wired` xanh nếu task đụng màn hình** · verify bằng browser agent kèm ảnh chụp · cập nhật tài liệu liên quan · walkthrough artifact mô tả thay đổi.
 5. **Cổng kiểm tra đọc kết quả, không đọc lời hứa.** `npm run build` thoát 0 chỉ có nghĩa là trình biên dịch hài lòng. Ngày 10/09/2026 build xanh, 39 test xanh, mà production phục vụ `font-family: "Be Vietnam Pro"` trong khi không hề tải một file font nào — trình tối ưu CSS đã lặng lẽ vứt bỏ dòng `@import`. Vì vậy có `npm run verify:build`: nó mở file đã build ra đọc, tìm bí mật lọt vào bundle trình duyệt và tìm font được khai mà không được nạp.
+6. **Màn hình phải nối vào đâu đó.** `npm run verify:wired` tìm những thứ trông như chạy mà không chạy: biến tên `mockData`, hàm `handleSubmit` dùng `setTimeout` giả vờ gọi mạng, địa chỉ `placehold.co`, và ô nhập không có `onChange` lẫn `name` — tức bấm vào không có gì xảy ra.
 
-   > **Đang biết trước một dòng HỎNG:** *"Font được khai báo đều thật sự được nạp"* đỏ vì lỗi BB-074, DEV-UI đang sửa. Nếu bạn không phải DEV-UI thì dòng đó không phải do bạn — mọi dòng còn lại vẫn phải xanh. Xoá ghi chú này khi BB-074 xong và nối `verify:build` vào `npm run verify`.
-6. **Không báo xong khi chưa tự kiểm.** Chạy một lệnh rồi đi tiếp không phải là bằng chứng nó chạy đúng. Task đụng database thì phải chạy `npm run verify:db` (thêm `:seed` nếu có ghi dữ liệu) và **dán kết quả vào báo cáo**. Quy tắc này sinh ra sau khi một agent báo đã seed xong trong lúc mọi bảng còn 0 dòng.
-7. **Ngân sách suy luận**: chỉ nâng thinking level khi task đánh dấu `complexity: high`. Task CRUD dùng model rẻ.
+   Ba màn hình đã được đánh dấu DONE mà không nối vào đâu: wizard tạo album, danh sách album, bộ lọc album. Cả ba đều qua typecheck, qua lint, qua build. Trình biên dịch không phân biệt được dữ liệu thật với dữ liệu bịa, và không biết một cái nút có gắn với việc gì không.
+
+   **Báo cáo của màn hình gọi API phải dán kèm phản hồi thật của API đó.** Không dán được nghĩa là chưa nối.
+
+7. **Không báo xong khi chưa tự kiểm.** Chạy một lệnh rồi đi tiếp không phải là bằng chứng nó chạy đúng. Task đụng database thì phải chạy `npm run verify:db` (thêm `:seed` nếu có ghi dữ liệu) và **dán kết quả vào báo cáo**. Quy tắc này sinh ra sau khi một agent báo đã seed xong trong lúc mọi bảng còn 0 dòng.
+8. **Ngân sách suy luận**: chỉ nâng thinking level khi task đánh dấu `complexity: high`. Task CRUD dùng model rẻ.
 
 ---
 

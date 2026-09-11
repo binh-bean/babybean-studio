@@ -45,6 +45,7 @@ export const PROTECTED = [
   "scripts/verify-db.mjs",
   "scripts/verify-build.mjs",
   "scripts/verify-prod.mjs",
+  "scripts/verify-wired.mjs",
 ];
 
 export const OWNERSHIP = {

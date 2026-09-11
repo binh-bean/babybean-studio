@@ -17,13 +17,14 @@
     "db:push": "node --env-file-if-exists=.env.local scripts/db-push.mjs",
     "db:seed": "node --env-file-if-exists=.env.local scripts/db-seed.mjs",
     "drive:sync": "node --env-file-if-exists=.env.local --import tsx scripts/sync-drive.ts",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run build && npm run verify:build",
     "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
     "verify:db": "node --env-file-if-exists=.env.local scripts/verify-db.mjs",
     "verify:db:seed": "node --env-file-if-exists=.env.local scripts/verify-db.mjs --seed",
     "verify:own": "node scripts/verify-ownership.mjs",
     "verify:build": "node --env-file-if-exists=.env.local scripts/verify-build.mjs",
     "verify:prod": "node --env-file-if-exists=.env.local scripts/verify-prod.mjs",
+    "verify:wired": "node scripts/verify-wired.mjs",
     "staff:link": "node --env-file-if-exists=.env.local scripts/link-staff.mjs"
   },
   "dependencies": {
