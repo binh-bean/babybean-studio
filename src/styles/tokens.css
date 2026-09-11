@@ -1,13 +1,12 @@
 /* Design tokens — OWNER: DEV-UI. Task BB-002.
    Source of truth: docs/07-ui-ux.md §2. Keep the two in sync. */
 
-@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap");
-
 :root {
   /* Thương hiệu — pastel ấm, hợp studio ảnh em bé */
   --bb-primary: #e8a598; /* hồng đất */
-  --bb-primary-fg: #ffffff;
+  --bb-primary-fg: #2e2a27; /* Đảm bảo tương phản ≥ 4.5:1 trên nền pastel */
   --bb-accent: #7fa99b; /* xanh sage */
+  --bb-accent-fg: #142e25; /* Đảm bảo tương phản ≥ 4.5:1 trên nền sage */
   --bb-cream: #fbf7f2;
 
   /* Nền */
@@ -22,8 +21,11 @@
 
   /* Trạng thái */
   --bb-success: #4e9a6b;
+  --bb-success-fg: #ffffff;
   --bb-warning: #d9932b;
+  --bb-warning-fg: #2e2211;
   --bb-danger: #c4553f;
+  --bb-danger-fg: #ffffff;
 
   /* Chế độ xem ảnh — luôn nền tối để mắt tập trung vào ảnh */
   --bb-viewer-bg: #16130f;
@@ -32,8 +34,8 @@
   --bb-radius-sm: 8px;
   --bb-shadow: 0 1px 3px rgb(46 42 39 / 8%), 0 8px 24px rgb(46 42 39 / 6%);
 
-  --bb-font-sans: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
-  --bb-font-display: "Playfair Display", Georgia, serif;
+  --bb-font-sans: var(--font-be-vietnam-pro), "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
+  --bb-font-display: var(--font-playfair-display), "Playfair Display", Georgia, serif;
 
   /* shadcn/ui semantic tokens mapped to BabyBean palette */
   --background: var(--bb-bg);
@@ -49,9 +51,9 @@
   --muted: var(--bb-surface-2);
   --muted-foreground: var(--bb-fg-muted);
   --accent: var(--bb-accent);
-  --accent-foreground: var(--bb-primary-fg);
+  --accent-foreground: var(--bb-accent-fg);
   --destructive: var(--bb-danger);
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: var(--bb-danger-fg);
   --border: var(--bb-border);
   --input: var(--bb-border);
   --ring: var(--bb-primary);
@@ -66,6 +68,16 @@
   --bb-border: #3a332c;
   --bb-fg: #f2ede7;
   --bb-fg-muted: #a69b91;
+  --bb-primary: #e8a598;
+  --bb-primary-fg: #16130f;
+  --bb-accent: #7fa99b;
+  --bb-accent-fg: #0e1f19;
+  --bb-success: #4e9a6b;
+  --bb-success-fg: #ffffff;
+  --bb-warning: #d9932b;
+  --bb-warning-fg: #1a1309;
+  --bb-danger: #c4553f;
+  --bb-danger-fg: #ffffff;
 
   --background: var(--bb-bg);
   --foreground: var(--bb-fg);
@@ -80,9 +92,9 @@
   --muted: var(--bb-surface-2);
   --muted-foreground: var(--bb-fg-muted);
   --accent: var(--bb-accent);
-  --accent-foreground: var(--bb-primary-fg);
+  --accent-foreground: var(--bb-accent-fg);
   --destructive: var(--bb-danger);
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: var(--bb-danger-fg);
   --border: var(--bb-border);
   --input: var(--bb-border);
   --ring: var(--bb-primary);
@@ -96,6 +108,16 @@
     --bb-border: #3a332c;
     --bb-fg: #f2ede7;
     --bb-fg-muted: #a69b91;
+    --bb-primary: #e8a598;
+    --bb-primary-fg: #16130f;
+    --bb-accent: #7fa99b;
+    --bb-accent-fg: #0e1f19;
+    --bb-success: #4e9a6b;
+    --bb-success-fg: #ffffff;
+    --bb-warning: #d9932b;
+    --bb-warning-fg: #1a1309;
+    --bb-danger: #c4553f;
+    --bb-danger-fg: #ffffff;
 
     --background: var(--bb-bg);
     --foreground: var(--bb-fg);
@@ -110,9 +132,9 @@
     --muted: var(--bb-surface-2);
     --muted-foreground: var(--bb-fg-muted);
     --accent: var(--bb-accent);
-    --accent-foreground: var(--bb-primary-fg);
+    --accent-foreground: var(--bb-accent-fg);
     --destructive: var(--bb-danger);
-    --destructive-foreground: #ffffff;
+    --destructive-foreground: var(--bb-danger-fg);
     --border: var(--bb-border);
     --input: var(--bb-border);
     --ring: var(--bb-primary);
@@ -123,6 +145,7 @@
   --color-bb-primary: var(--bb-primary);
   --color-bb-primary-fg: var(--bb-primary-fg);
   --color-bb-accent: var(--bb-accent);
+  --color-bb-accent-fg: var(--bb-accent-fg);
   --color-bb-cream: var(--bb-cream);
   --color-bb-bg: var(--bb-bg);
   --color-bb-surface: var(--bb-surface);
@@ -131,8 +154,11 @@
   --color-bb-fg: var(--bb-fg);
   --color-bb-fg-muted: var(--bb-fg-muted);
   --color-bb-success: var(--bb-success);
+  --color-bb-success-fg: var(--bb-success-fg);
   --color-bb-warning: var(--bb-warning);
+  --color-bb-warning-fg: var(--bb-warning-fg);
   --color-bb-danger: var(--bb-danger);
+  --color-bb-danger-fg: var(--bb-danger-fg);
   --color-bb-viewer-bg: var(--bb-viewer-bg);
 
   --color-background: var(--background);

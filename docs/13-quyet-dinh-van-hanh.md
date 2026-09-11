@@ -12,7 +12,7 @@ Tài liệu này chốt 7 câu hỏi treo ở `HANDOFF.md`. Agent lấy giá tr�
 | 2 | Hạn chốt mặc định | **7 ngày**, nhắc ngày 3 và ngày 6 | Chốt |
 | 3 | PIN mặc định | **Bật cho mọi album**, PIN = 4 số cuối SĐT | Chốt |
 | 4 | Cho khách tải ảnh | **Tắt** ở Phase 1 | Chốt |
-| 5 | Tên miền | `chon-anh.babybean.vn` | Giả định |
+| 5 | Tên miền | `babybeanstudio.vn` | Giả định |
 | 6 | Nhóm Lark | Riêng từng chi nhánh **+ 1 nhóm quản lý chung** (4 webhook) | Giả định |
 | 7 | Ảnh preview | Cạnh dài **2048px**, JPEG q75, sRGB, xoá GPS | Chốt |
 
@@ -82,17 +82,17 @@ Ba lý do:
 
 **Cấu hình**: `settings` key `gallery.allow_download_default = false`.
 
-## 5. Tên miền — `chon-anh.babybean.vn`
+## 5. Tên miền — `babybeanstudio.vn`
 
 Chọn **subdomain của tên miền chính**, không phải tên miền riêng.
 
-- Khách dán link vào Zalo thấy `babybean.vn` → biết ngay là studio, không nghi lừa đảo. Một tên miền lạ như `chonanh-bb.com` trông y hệt link phishing.
+- Khách dán link vào Zalo thấy `babybeanstudio.vn` → biết ngay là studio, không nghi lừa đảo. Một tên miền lạ như `chonanh-bb.com` trông y hệt link phishing.
 - `chon-anh` đọc là hiểu, không cần giải thích trong tin nhắn.
-- Link đầy đủ: `chon-anh.babybean.vn/g/aB3xK9pQ7mN2vC5tR8wZ1y` — 46 ký tự, gọn cho Zalo.
+- Link đầy đủ: `babybeanstudio.vn/g/aB3xK9pQ7mN2vC5tR8wZ1y` — 46 ký tự, gọn cho Zalo.
 
-**Điều kiện**: studio phải sở hữu `babybean.vn` và thêm được bản ghi CNAME trỏ về Vercel.
+**Điều kiện**: studio phải sở hữu `babybeanstudio.vn` và thêm được bản ghi CNAME trỏ về Vercel.
 
-**Nếu chưa có `babybean.vn`**: mua trước khi làm BB-005. Đừng dùng domain `.vercel.app` cho khách thật — trông thiếu chuyên nghiệp và khách sẽ ngại bấm.
+**Nếu chưa có `babybeanstudio.vn`**: mua trước khi làm BB-005. Đừng dùng domain `.vercel.app` cho khách thật — trông thiếu chuyên nghiệp và khách sẽ ngại bấm.
 
 **Sửa ở đâu**: biến `NEXT_PUBLIC_APP_URL`, và mục tên miền trong `docs/11-deployment.md §8`.
 
@@ -157,5 +157,49 @@ Hệ thống đọc tối đa **2 cấp** và hiển thị thành tab cho khách
 ## Ba quy tắc vận hành phải dặn thợ ảnh và CSKH
 
 1. **Không xoá thư mục Drive của album chưa giao xong.** Ảnh không nằm trong hệ thống, chúng nằm trên Drive của studio (`docs/adr/ADR-0002`). Xoá thư mục là ảnh biến mất khỏi album của khách.
-2. **Không gửi link Google Drive cho khách.** Chỉ gửi link `chon-anh.babybean.vn/g/...`. Link Drive gốc không có PIN, không thu hồi được, không đếm được ai đã xem.
+2. **Không gửi link Google Drive cho khách.** Chỉ gửi link `babybeanstudio.vn/g/...`. Link Drive gốc không có PIN, không thu hồi được, không đếm được ai đã xem.
 3. **Đồng bộ lại trước khi xuất danh sách cho retoucher.** Nếu ai đó đổi tên file trên Drive sau khi album được tạo, danh sách xuất ra sẽ mang tên cũ cho tới khi đồng bộ lại.
+
+---
+
+## 8. Cấp tài khoản nhân viên — chốt ngày 10/09/2026
+
+**Chủ studio tự tạo tài khoản và mật khẩu, rồi gán vai trò.** Không có màn hình
+đăng ký công khai, và không dùng cơ chế mời qua email.
+
+Lý do không có nút "Đăng ký": hệ thống này chứa ảnh trẻ em. Một trang đăng ký mở
+nghĩa là bất kỳ ai trên internet cũng tự tạo được tài khoản, vì trang đó không có
+cách nào biết ai là nhân viên BabyBean.
+
+### Đăng nhập bằng tên tài khoản, không bắt buộc email
+
+Nhiều nhân viên studio không dùng email thường xuyên. Nhưng Supabase Auth bắt
+buộc phải có email cho mỗi tài khoản.
+
+Cách giải: chủ studio nhập **tên tài khoản** (ví dụ `linh.q1`), hệ thống tự sinh
+email nội bộ `linh.q1@staff.babybeanstudio.vn` để lưu trong Supabase. Nhân viên
+gõ `linh.q1` ở màn đăng nhập, không cần biết cái email kia tồn tại. Ai có email
+thật thì nhập email thật, màn đăng nhập nhận cả hai dạng.
+
+Email nội bộ này **không nhận được thư** — nó chỉ là định danh. Vì vậy chức năng
+"quên mật khẩu" gửi email sẽ không dùng được cho những tài khoản đó; chủ studio
+đặt lại mật khẩu hộ.
+
+### Nghỉ việc: tắt, không xoá
+
+Đặt `staff_profiles.is_active = false`. Tài khoản không đăng nhập được nữa, nhưng
+nhật ký hoạt động vẫn giữ tên người đó — cần cho việc đối soát về sau: ai tạo
+album này, ai đổi gói, ai mở lại album đã chốt.
+
+Xoá hẳn sẽ làm mọi album cũ mất dấu vết người thực hiện.
+
+### Tắt thủ công là chính, tự động chỉ để nhắc
+
+Chủ studio bấm tắt. Ngoài ra màn quản lý nhân sự hiện một danh sách **tài khoản
+quá 60 ngày không đăng nhập** để chủ studio tự quyết định — không tự động khoá,
+vì khoá nhầm giữa ca chụp thì nhân viên không vào được máy.
+
+### Ai được làm việc này
+
+Theo `docs/05-rbac.md` §2: chỉ `owner` và `admin` có quyền CRUD nhân sự và gán
+vai trò. `branch_manager` chỉ được xem.

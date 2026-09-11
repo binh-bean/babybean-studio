@@ -9,7 +9,7 @@
 
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected } from "@/lib/api-response";
 import {
   requireStaff,
   requireRole,
@@ -17,8 +17,9 @@ import {
   AuthError,
 } from "@/lib/auth/staff";
 import { createServerClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
-import { CreateGallerySchema } from "./schema";
+import { CreateGallerySchema, GetGalleriesQuerySchema } from "./schema";
 
 export const runtime = "nodejs";
 
@@ -136,7 +137,17 @@ export async function POST(request: Request): Promise<Response> {
       return failUnexpected(rpcError, requestId);
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://chon-anh.babybean.vn";
+    // No fallback on purpose. This used to guess "https://chon-anh.babybean.vn",
+    // a domain the studio does not own and nobody has registered — so a missing
+    // variable would mint share links pointing into thin air, and whoever
+    // registered that domain later would start receiving gallery tokens from
+    // parents clicking them. A base URL we cannot know is a configuration
+    // error, and it should stop the request loudly rather than be invented.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (!appUrl) {
+      console.error(JSON.stringify({ evt: "missing_app_url", requestId }));
+      return fail("INTERNAL", "Thiếu cấu hình địa chỉ trang web, chưa tạo được link chia sẻ");
+    }
     const shareUrl = `${appUrl.replace(/\/$/, "")}/g/${token}`;
 
     const pinHint = requirePin
@@ -162,6 +173,117 @@ export async function POST(request: Request): Promise<Response> {
   } catch (err) {
     if (err instanceof AuthError) {
       return fail(err.code, err.message);
+    }
+    return failUnexpected(err, requestId);
+  }
+}
+
+export async function GET(request: Request): Promise<Response> {
+  const requestId = randomUUID();
+
+  try {
+    // 1. Authenticate staff ------------------------------------------------
+    const staff = await requireStaff();
+
+    // 2. Parse & validate query parameters ---------------------------------
+    const url = new URL(request.url);
+    const rawParams: Record<string, unknown> = {};
+    for (const [key, value] of url.searchParams.entries()) {
+      if (key === "status") {
+        const existing = url.searchParams.getAll("status");
+        rawParams[key] = existing.length > 1 ? existing : value;
+      } else {
+        rawParams[key] = value;
+      }
+    }
+
+    const parsed = GetGalleriesQuerySchema.safeParse(rawParams);
+    if (!parsed.success) {
+      return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
+    }
+    const query = parsed.data;
+
+    // 3. Authorize branch access -------------------------------------------
+    let targetBranchIds: string[] | null = null;
+    if (query.branchId) {
+      requireBranch(staff, query.branchId);
+      targetBranchIds = [query.branchId];
+    } else {
+      if (staff.role === "owner" || staff.role === "admin") {
+        targetBranchIds = null; // Toàn quyền xem mọi chi nhánh
+      } else {
+        targetBranchIds = staff.branchIds;
+      }
+    }
+
+    // 4. Decode cursor -----------------------------------------------------
+    let offset = 0;
+    if (query.cursor) {
+      try {
+        const decoded = JSON.parse(Buffer.from(query.cursor, "base64url").toString("utf8"));
+        if (typeof decoded.o === "number" && decoded.o >= 0) {
+          offset = decoded.o;
+        }
+      } catch {
+        return fail("INVALID_INPUT", "Cursor không hợp lệ");
+      }
+    }
+
+    // 5. Query via stored procedure (chặn trần 200) ------------------------
+    const limit = Math.min(query.limit, 200);
+    const admin = createAdminClient();
+
+    const { data: result, error: rpcError } = await admin.rpc("get_admin_galleries", {
+      p_branch_ids: targetBranchIds,
+      p_status: query.status && query.status.length > 0 ? query.status : null,
+      p_photographer_id: query.photographerId || null,
+      p_editor_id: query.editorId || null,
+      p_cskh_id: query.cskhId || null,
+      p_shoot_date_from: query.dateFrom || query.fromShootDate || null,
+      p_shoot_date_to: query.dateTo || query.toShootDate || null,
+      p_expiring_soon: query.expiringSoon ?? false,
+      p_search: query.q || query.search || null,
+      p_sort_by: query.sortBy,
+      p_sort_order: query.sortOrder,
+      p_offset: offset,
+      p_limit: limit,
+    });
+
+    if (rpcError) {
+      return failUnexpected(rpcError, requestId);
+    }
+
+    type AdminGalleriesRpcResult = {
+      items: unknown[];
+      counts: Record<string, number>;
+      hasMore: boolean;
+      limit: number;
+      offset: number;
+    };
+
+    const rpcData = (result ?? {}) as AdminGalleriesRpcResult;
+    const items = rpcData.items || [];
+    const hasMore = Boolean(rpcData.hasMore);
+
+    const nextCursor = hasMore
+      ? Buffer.from(JSON.stringify({ o: offset + items.length })).toString("base64url")
+      : null;
+
+    return ok(
+      {
+        items,
+        counts: rpcData.counts,
+        nextCursor,
+        hasMore,
+      },
+      {
+        cursor: nextCursor ?? undefined,
+        hasMore,
+      },
+    );
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);
     }
     return failUnexpected(err, requestId);
   }

@@ -23,6 +23,12 @@
 export const COMMON = [
   "tasks/TASK-INDEX.md",
   "tasks/BLOCKERS.md",
+  // Every agent needs to add a dependency sooner or later, and only DEV-OPS
+  // owned the file that lists them. The part worth guarding is the scripts
+  // block — the gates live there — and verify-ownership.mjs guards that
+  // separately, for everyone but DEV-OPS and PM.
+  "package.json",
+  "package-lock.json",
   "tests/unit/**",
   "tests/fixtures/**",
 ];
@@ -39,6 +45,7 @@ export const PROTECTED = [
   "scripts/verify-db.mjs",
   "scripts/verify-build.mjs",
   "scripts/verify-prod.mjs",
+  "scripts/verify-wired.mjs",
 ];
 
 export const OWNERSHIP = {
@@ -96,7 +103,6 @@ export const OWNERSHIP = {
   "DEV-OPS": [
     ".github/**",
     "vercel.json",
-    "package.json",
     "eslint.config.mjs",
     "next.config.ts",
     "postcss.config.mjs",

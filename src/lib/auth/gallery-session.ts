@@ -12,6 +12,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import type { GallerySession, ShareRole } from "@/types/domain";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const SESSION_COOKIE = "bb_gs";
 
@@ -128,10 +129,6 @@ export class GallerySessionError extends Error {
 
 /**
  * Session for the current request, or throw.
- *
- * TODO(BB-030): before returning, re-read share_links.status for
- * session.shareLinkId and throw LINK_EXPIRED when it is no longer 'active'.
- * A valid signature is not enough — revoking a link must kill live sessions.
  */
 export async function requireGallerySession(
   allowedRoles?: readonly ShareRole[],
@@ -141,7 +138,37 @@ export async function requireGallerySession(
   if (allowedRoles && !allowedRoles.includes(session.role)) {
     throw new GallerySessionError("FORBIDDEN");
   }
+  
+  await assertShareLinkUsable(session.shareLinkId);
+
   return session;
+}
+
+/**
+ * Is this share link still good, right now?
+ *
+ * Split out of requireGallerySession() so it can be tested: that function
+ * needs a live request context for cookies(), this one needs nothing but the
+ * database. Revoking a link has to end sessions that are already open, and a
+ * rule that is never exercised is a rule that quietly stops working.
+ *
+ * Both halves matter. Checking only `status` would let an expired link work
+ * forever, because the cron that would flip status to 'expired' (BB-068) does
+ * not exist yet.
+ */
+export async function assertShareLinkUsable(shareLinkId: string): Promise<void> {
+  const admin = await createAdminClient();
+  const { data } = await admin
+    .from("share_links")
+    .select("status, expires_at")
+    .eq("id", shareLinkId)
+    .maybeSingle();
+
+  if (!data) throw new GallerySessionError("LINK_EXPIRED");
+  if (data.status !== "active") throw new GallerySessionError("LINK_EXPIRED");
+  if (data.expires_at && new Date(data.expires_at) < new Date()) {
+    throw new GallerySessionError("LINK_EXPIRED");
+  }
 }
 
 /** Roles allowed to change the primary selection. */

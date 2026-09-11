@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&amp;family=Playfair+Display:ital,wght@0,600;0,700;1,400&amp;display=swap');
+      .brand-title {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-weight: 700;
+        font-size: 68px;
+        fill: #2E2A27;
+      }
+      .brand-sub {
+        font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+        font-weight: 600;
+        font-size: 26px;
+        fill: #7A716A;
+      }
+      .badge-text {
+        font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+        font-weight: 600;
+        font-size: 16px;
+        letter-spacing: 0.08em;
+        fill: #5E2C22;
+        text-transform: uppercase;
+      }
+      .tag-text {
+        font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+        font-weight: 500;
+        font-size: 18px;
+        fill: #2E2A27;
+      }
+      .footer-text {
+        font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+        font-weight: 500;
+        font-size: 16px;
+        fill: #A69B91;
+      }
+    </style>
+
+    <linearGradient id="ogBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCFAF6"/>
+      <stop offset="50%" stop-color="#F8F2EA"/>
+      <stop offset="100%" stop-color="#F1E7DC"/>
+    </linearGradient>
+
+    <linearGradient id="beanOgGrad" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#F5BCB1"/>
+      <stop offset="100%" stop-color="#DE9385"/>
+    </linearGradient>
+
+    <linearGradient id="leafOgGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6F998B"/>
+      <stop offset="100%" stop-color="#93BEB0"/>
+    </linearGradient>
+
+    <filter id="ogShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#2E2A27" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="1200" height="630" fill="url(#ogBg)"/>
+
+  <!-- Decorative Border Frame -->
+  <rect x="28" y="28" width="1144" height="574" rx="28" fill="none" stroke="#E5DCD2" stroke-width="2.5"/>
+
+  <!-- Subtle background watermark / pattern -->
+  <g opacity="0.04" fill="#2E2A27">
+    <circle cx="1050" cy="120" r="220"/>
+    <circle cx="150" cy="520" r="160"/>
+  </g>
+
+  <!-- LEFT EMBLEM CARD -->
+  <g transform="translate(100, 115)">
+    <!-- White Card Base -->
+    <rect width="360" height="400" rx="40" fill="#FFFFFF" filter="url(#ogShadow)" stroke="#E5DCD2" stroke-width="1.5"/>
+
+    <!-- Inner decorative circle -->
+    <circle cx="180" cy="200" r="140" fill="#FAF5EF"/>
+
+    <!-- Emblem Bean Illustration -->
+    <g transform="translate(10, 0)">
+      <!-- Sprout Leaves -->
+      <path d="M 170 145 C 170 95 198 70 230 75 C 235 110 205 138 170 145 Z" fill="url(#leafOgGrad)"/>
+      <path d="M 170 145 C 170 105 140 88 115 95 C 115 125 140 140 170 145 Z" fill="#7FA99B" opacity="0.85"/>
+
+      <!-- Bean Body -->
+      <path d="M 135 135 
+               C 185 125, 240 160, 240 220 
+               C 240 280, 190 315, 135 315 
+               C 80 315, 65 245, 90 195 
+               C 105 165, 115 138, 135 135 Z" 
+            fill="url(#beanOgGrad)"/>
+
+      <!-- Sleeping Eyes -->
+      <path d="M 145 195 Q 157 205 170 195" fill="none" stroke="#683B32" stroke-width="5" stroke-linecap="round"/>
+      <path d="M 185 200 Q 197 210 210 200" fill="none" stroke="#683B32" stroke-width="5" stroke-linecap="round"/>
+
+      <!-- Smile -->
+      <path d="M 170 220 Q 180 230 190 220" fill="none" stroke="#683B32" stroke-width="4" stroke-linecap="round"/>
+    </g>
+
+    <!-- Warm Tag below emblem -->
+    <rect x="80" y="325" width="200" height="34" rx="17" fill="#F3EDE6"/>
+    <text x="180" y="347" text-anchor="middle" font-family="'Be Vietnam Pro', sans-serif" font-size="13" font-weight="600" fill="#7A716A" letter-spacing="0.05em">BABYBEAN STUDIO</text>
+  </g>
+
+  <!-- RIGHT CONTENT BLOCK -->
+  <g transform="translate(520, 140)">
+    <!-- Small Category Pill -->
+    <rect x="0" y="0" width="370" height="38" rx="19" fill="#E8A598" opacity="0.4"/>
+    <text x="185" y="24" text-anchor="middle" class="badge-text">✦ STUDIO CHỤP ẢNH CHO BÉ &amp; GIA ĐÌNH</text>
+
+    <!-- Main Title -->
+    <text x="0" y="105" class="brand-title">BabyBean Studio</text>
+
+    <!-- Subtitle -->
+    <text x="0" y="160" class="brand-sub">Cổng xem &amp; chọn ảnh dành cho ba mẹ</text>
+
+    <!-- Horizontal Divider -->
+    <line x1="0" y1="195" x2="560" y2="195" stroke="#E5DCD2" stroke-width="1.5"/>
+
+    <!--
+      Không ghi tên chi nhánh ở đây.
+
+      Ảnh này là file PNG cố định, còn chi nhánh thì đổi: mở thêm, dời chỗ, đóng
+      cửa. Ngày 10/09/2026 một trong ba cái tên ở đây là do agent tự bịa, và không
+      ai phát hiện cho tới khi chủ studio đọc qua. Đây lại đúng là ảnh phụ huynh
+      nhìn thấy khi link được dán vào Zalo.
+
+      Địa chỉ thật nằm ở bảng `branches`, nhập qua /admin/branches, và trang web
+      hiển thị từ đó nên luôn đúng. Ảnh này chỉ nói về studio.
+    -->
+    <g transform="translate(0, 225)">
+      <g>
+        <rect x="0" y="0" width="196" height="42" rx="21" fill="#FFFFFF" stroke="#E5DCD2"/>
+        <text x="98" y="27" text-anchor="middle" class="tag-text">📍 TP. Hồ Chí Minh</text>
+      </g>
+      <g transform="translate(211, 0)">
+        <rect x="0" y="0" width="238" height="42" rx="21" fill="#FFFFFF" stroke="#E5DCD2"/>
+        <text x="119" y="27" text-anchor="middle" class="tag-text">Xem ảnh qua link riêng</text>
+      </g>
+    </g>
+
+    <!-- Security & Privacy Banner -->
+    <g transform="translate(0, 310)">
+      <circle cx="10" cy="9" r="4" fill="#7FA99B"/>
+      <text x="26" y="14" class="footer-text">Ảnh riêng tư của gia đình • Không hiển thị công khai trên mạng xã hội</text>
+    </g>
+  </g>
+</svg>

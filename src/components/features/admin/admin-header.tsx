@@ -9,7 +9,7 @@ import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/s
 import { Button } from "@/components/ui/button";
 import { NavLinks } from "./admin-sidebar";
 
-export function AdminHeader() {
+export function AdminHeader({ role }: { role?: string }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -29,7 +29,7 @@ export function AdminHeader() {
                 <span className="font-display text-lg font-bold">BabyBean Studio</span>
               </div>
               <div className="overflow-y-auto">
-                <NavLinks isCollapsed={false} onClick={() => setMobileOpen(false)} />
+                <NavLinks onClick={() => setMobileOpen(false)} role={role} />
               </div>
             </SheetContent>
           </Sheet>

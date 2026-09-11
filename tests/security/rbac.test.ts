@@ -23,6 +23,49 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     await client.end();
   });
 
+  /**
+   * Dựng một thợ ảnh và một khách trong cùng chi nhánh, ngay trong transaction
+   * của bài test.
+   *
+   * Trước đây bài test đi tìm `role = 'photographer'` trong dữ liệu mẫu. Ngày
+   * 10/09/2026 chủ studio đổi vai trò của người thợ ảnh duy nhất sang retoucher
+   * — một thao tác quản trị hoàn toàn bình thường — và bài kiểm tra bảo mật này
+   * đỏ vì không còn ai để thử. Bài test bảo mật không được phụ thuộc vào thứ
+   * người dùng sửa được qua giao diện.
+   */
+  async function makePhotographerAndCustomer(): Promise<{ photoId: string; custId: string }> {
+    const { rows: branch } = await client.query("SELECT id FROM branches LIMIT 1");
+    if (branch.length === 0) throw new Error("Cần ít nhất một chi nhánh, chạy npm run db:seed");
+    const branchId = branch[0].id;
+
+    const { rows: user } = await client.query(
+      `INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
+       VALUES (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+               'fixture.photographer.' || gen_random_uuid() || '@staff.babybeanstudio.vn', '', now(), now(), now())
+       RETURNING id`,
+    );
+    const photoId = user[0].id;
+
+    await client.query(
+      `INSERT INTO staff_profiles (id, full_name, email, role, is_active)
+       SELECT $1, 'Fixture Thợ Ảnh', email, 'photographer', true FROM auth.users WHERE id = $1`,
+      [photoId],
+    );
+    await client.query(
+      "INSERT INTO staff_branches (staff_id, branch_id) VALUES ($1, $2)",
+      [photoId, branchId],
+    );
+
+    const { rows: cust } = await client.query(
+      `INSERT INTO customers (branch_id, full_name, phone)
+       VALUES ($1, 'Fixture Khách Hàng', '0900000' || floor(random() * 900 + 100)::text)
+       RETURNING id`,
+      [branchId],
+    );
+
+    return { photoId, custId: cust[0].id };
+  }
+
   it("Ca 1: cs chi nhánh thấy album chi nhánh mình và KHÔNG thấy album chi nhánh khác", async () => {
     await client.query("BEGIN");
     
@@ -57,17 +100,8 @@ describe("Database RLS Policies & Security (BB-020)", () => {
   it("Ca 2 (Lỗ hổng 0001): photographer KHÔNG được phép sửa hồ sơ khách hàng", async () => {
     await client.query("BEGIN");
 
-    // Lấy 1 photographer và 1 customer của chính photographer đó (cùng branch)
-    const photoRes = await client.query("SELECT id FROM staff_profiles WHERE role = 'photographer' LIMIT 1");
-    expect(photoRes.rows.length).toBe(1);
-    const photoId = photoRes.rows[0].id;
-
-    const sbRes = await client.query("SELECT branch_id FROM staff_branches WHERE staff_id = $1 LIMIT 1", [photoId]);
-    const photoBranchId = sbRes.rows[0].branch_id;
-
-    const custRes = await client.query("SELECT id FROM customers WHERE branch_id = $1 LIMIT 1", [photoBranchId]);
-    expect(custRes.rows.length).toBe(1);
-    const custId = custRes.rows[0].id;
+    // Tự dựng thợ ảnh và khách, không đi tìm trong dữ liệu mẫu.
+    const { photoId, custId } = await makePhotographerAndCustomer();
 
     await client.query("SET LOCAL ROLE authenticated");
     await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${photoId}", "role": "authenticated"}'`);
@@ -251,4 +285,67 @@ describe("Database RLS Policies & Security (BB-020)", () => {
   });
 
   it.todo("Ca 14: Token đã revoked -> 410 LINK_EXPIRED (Chờ BB-030)");
+
+  it("photoshop_ctv không xem được customers, packages, selections, và chỉ thấy gallery của mình", async () => {
+    await client.query("BEGIN");
+
+    const { photoId: ctvId } = await makePhotographerAndCustomer();
+    await client.query("UPDATE staff_profiles SET role = 'photoshop_ctv' WHERE id = $1", [ctvId]);
+
+    // Gán 1 album cho ctv
+    const { rows: galleries } = await client.query("SELECT id FROM galleries LIMIT 2");
+    expect(galleries.length).toBeGreaterThanOrEqual(2);
+    const assignedGalleryId = galleries[0].id;
+    await client.query("UPDATE galleries SET editor_id = $1 WHERE id = $2", [ctvId, assignedGalleryId]);
+
+    // Set role
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${ctvId}", "role": "authenticated"}'`);
+
+    // Kiểm tra không thấy customers
+    const custRes = await client.query("SELECT * FROM customers");
+    expect(custRes.rows.length).toBe(0);
+
+    // Kiểm tra không thấy packages
+    const pkgRes = await client.query("SELECT * FROM packages");
+    expect(pkgRes.rows.length).toBe(0);
+
+    // Kiểm tra không thấy selections
+    const selRes = await client.query("SELECT * FROM selections");
+    expect(selRes.rows.length).toBe(0);
+
+    // Kiểm tra chỉ thấy gallery được gán
+    const galRes = await client.query("SELECT * FROM galleries");
+    expect(galRes.rows.length).toBe(1);
+    expect(galRes.rows[0].id).toBe(assignedGalleryId);
+
+    // Kiểm tra thấy photos của gallery được gán
+    const photoRes = await client.query("SELECT * FROM photos");
+    for (const p of photoRes.rows) {
+      expect(p.gallery_id).toBe(assignedGalleryId);
+    }
+
+    await client.query("ROLLBACK");
+  });
+
+  it("Đối chứng dương: retoucher thấy mọi customers, packages, selections và galleries trong nhánh", async () => {
+    await client.query("BEGIN");
+
+    const { photoId: retoucherId } = await makePhotographerAndCustomer();
+    await client.query("UPDATE staff_profiles SET role = 'retoucher' WHERE id = $1", [retoucherId]);
+
+    await client.query("SET LOCAL ROLE authenticated");
+    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${retoucherId}", "role": "authenticated"}'`);
+
+    const custRes = await client.query("SELECT * FROM customers");
+    expect(custRes.rows.length).toBeGreaterThan(0);
+
+    const pkgRes = await client.query("SELECT * FROM packages");
+    expect(pkgRes.rows.length).toBeGreaterThan(0);
+
+    const galRes = await client.query("SELECT * FROM galleries");
+    expect(galRes.rows.length).toBeGreaterThan(0);
+
+    await client.query("ROLLBACK");
+  });
 });

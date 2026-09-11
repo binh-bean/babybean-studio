@@ -10,7 +10,7 @@ Ký hiệu ưu tiên: **P0** = bắt buộc cho bản chạy thật · **P1** = 
 
 ## A1. Mở album (P0)
 
-**US-A1.1** — Là phụ huynh, tôi mở link `https://chon-anh.babybean.vn/g/aB3xK9pQ` trên điện thoại và thấy ngay album của bé mình.
+**US-A1.1** — Là phụ huynh, tôi mở link `https://babybeanstudio.vn/g/aB3xK9pQ` trên điện thoại và thấy ngay album của bé mình.
 
 Tiêu chí nghiệm thu:
 - Trang hiển thị: ảnh bìa, tên bé, ngày chụp, chi nhánh, logo BabyBean.

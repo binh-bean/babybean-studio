@@ -45,7 +45,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-012 | `list-files.ts`: phân trang, đệ quy 2 cấp, lọc ảnh, natural sort + test với fixture 1.000 file | DEV-INT | BB-011 | med | ✅ **DONE** — phân trang, đệ quy 2 cấp, natural sort, có fixture |
 | BB-013 | `POST /api/admin/galleries/preview` — trả tên thư mục, số file, 6 ảnh mẫu, lỗi 403 kèm hướng dẫn 3 bước | DEV-INT | BB-012 | med | TODO |
 | BB-014 | Job đồng bộ: upsert `photos`, đánh dấu `missing`, cập nhật `photo_count`, `status` | DEV-INT | BB-012 | high | TODO |
-| BB-015 | Proxy `/api/img/[photoId]`: kiểm quyền, fallback nguồn, cache header | DEV-INT | BB-014, BB-030 | high | TODO |
+| BB-015 | Proxy `/api/img/[photoId]`: kiểm quyền, fallback nguồn, cache header | DEV-INT | BB-014, BB-030 | high | DONE |
 
 **Nghiệm thu 1A**: album Drive thật 500+ ảnh đồng bộ < 30s; thư mục chưa mở công khai → thông báo có hướng dẫn, không phải 500.
 
@@ -57,9 +57,9 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 |---|---|---|---|---|---|
 | BB-020 | Đăng nhập nhân viên + `middleware.ts` + `src/lib/auth/staff.ts` (`requireStaff`/`requireRole`/`requireBranch`). Vai trò phải khớp `docs/05-rbac.md §2` — chú ý `photographer` **không** được sửa khách hàng (xem migration 0001) | SEC-ARCH | BB-003 ✅ | high | ✅ **DONE** — 7 test RLS chạy trên db thật, mutation-test xác nhận có tác dụng |
 | BB-021 | Layout admin: sidebar, bộ chọn chi nhánh, breadcrumb | DEV-FE | BB-002, BB-020 | low | ✅ **DONE** — layout admin, sidebar thu gọn, bộ chọn chi nhánh |
-| BB-022 | Wizard tạo album 3 bước (nguồn ảnh → thông tin → luật chọn) | DEV-FE | BB-013, BB-021 | med | TODO |
+| BB-022 | Wizard tạo album 3 bước (nguồn ảnh → thông tin → luật chọn) | DEV-FE | BB-013, BB-021 | med | ✅ **DONE** — nối API thật: xem trước Drive và tạo album. Bản trước là giao diện giả, bấm tạo không ghi gì vào database |
 | BB-023 | `POST /api/admin/galleries`: tạo gallery + share_link, sinh token 22 ký tự, hash PIN | DEV-BE | BB-007, BB-020 ✅ | high | ✅ **DONE** — POST /api/admin/galleries, token 22 ký tự, hash sha256 |
-| BB-024 | Danh sách album: bảng, bộ lọc, tìm kiếm, phân trang cursor | DEV-FE | BB-021, BB-023 | med | TODO |
+| BB-024 | Danh sách album: bảng, bộ lọc, tìm kiếm, phân trang cursor | DEV-FE | BB-021, BB-023 | med | ❌ **LÀM LẠI** — hiện là mockData cứng, bộ lọc là vỏ tĩnh. Cần bảng thật + kanban + lọc thật |
 | BB-025 | Chi tiết album: tab tổng quan, nút đồng bộ, thanh tiến trình | DEV-FE | BB-014, BB-024 | med | TODO |
 
 ---
@@ -68,12 +68,12 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
-| BB-030 | Phiên khách: `POST /api/auth/gallery`, ký cookie, **kiểm `share_links.status` mỗi request** | SEC-ARCH | BB-023 | high | TODO |
-| BB-031 | Màn nhập PIN: 4 ô, tự nhảy, khoá sau 5 lần sai, đếm ngược | DEV-FE | BB-030 | med | ✅ **DONE** — 4 ô tự nhảy, paste 4 số, rung khi sai, đếm ngược khóa, bảo mật enum token |
-| BB-032 | `GET /api/g/gallery` + `GET /api/g/photos` (cursor, filter, subfolder) | DEV-BE | BB-030, BB-014 | med | TODO |
+| BB-030 | Phiên khách: `POST /api/auth/gallery`, ký cookie, **kiểm `share_links.status` mỗi request** | SEC-ARCH | BB-023 | high | DONE |
+| BB-031 | Màn nhập PIN: 4 ô, tự nhảy, khoá sau 5 lần sai, đếm ngược | DEV-FE + SEC-ARCH | BB-030 | med | 🚫 **HUỶ** — chủ studio chốt bỏ PIN, thay bằng BB-098 |
+| BB-032 | `GET /api/g/gallery` + `GET /api/g/photos` (cursor, filter, subfolder) | DEV-BE | BB-030, BB-014 | med | ✅ DONE |
 | BB-033 | `PhotoGrid`: virtualize >200 ảnh, lazy load, srcset, đổi mật độ, skeleton | DEV-FE | BB-032, BB-015 | high | TODO |
 | BB-034 | `Lightbox`: vuốt, pinch zoom, phím tắt, preload 3 ảnh | DEV-FE | BB-033 | high | TODO |
-| BB-035 | `PATCH /api/g/selection`: idempotent theo `clientOpId`, all-or-nothing khi vượt hạn | DEV-BE | BB-032 | high | TODO |
+| BB-035 | `PATCH /api/g/selection`: idempotent theo `clientOpId`, all-or-nothing khi vượt hạn | DEV-BE | BB-032 | high | ⚠️ DONE — chờ BB-081 (is_favorite) rồi phải sửa lại phần đếm favorite |
 | BB-036 | Store chọn ảnh (Zustand): optimistic, debounce 400ms, hàng đợi offline + localStorage | DEV-FE | BB-035 | high | TODO |
 | BB-037 | `SelectionBar` + `QuotaMeter` + hộp thoại cảnh báo vượt quota | DEV-FE | BB-036 | med | TODO |
 | BB-038 | Ghi chú chỉnh sửa: sheet từng ảnh + chip gợi ý + ghi chú chung | DEV-FE + DEV-BE | BB-035 | med | TODO |
@@ -105,26 +105,30 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-060 | Dashboard: thẻ số liệu, danh sách khẩn, biểu đồ 14 ngày | DEV-FE | BB-024 | med | TODO |
 | BB-061 | Quản lý khách hàng + bé + lịch sử + chống trùng SĐT | DEV-FE + DEV-BE | BB-024 | med | TODO |
 | BB-062 | Quản lý gói chụp | DEV-FE + DEV-BE | BB-024 | low | TODO |
-| BB-063 | Quản lý chi nhánh, nhân sự, mời qua email, gán vai trò | DEV-FE + DEV-BE | BB-020 | med | TODO |
+| BB-063 | Quản lý chi nhánh + nhân sự: chủ studio tạo tài khoản/mật khẩu, gán vai trò và chi nhánh, bật/tắt hoạt động. Đăng nhập bằng tên tài khoản. Xem docs/13 §8 | DEV-FE + DEV-BE | BB-020 | **high** | ✅ **DONE** — nhân sự: tạo/sửa/tắt, gán vai trò + chi nhánh, đặt lại mật khẩu, đăng nhập bằng tên tài khoản. Chi nhánh: thêm/sửa/đóng, địa chỉ và hotline nhập trong app |
 | BB-064 | Màn nhật ký hoạt động + bộ lọc | DEV-FE | BB-052 | low | TODO |
 | BB-065 | Mời người thân: link phụ, vai trò, hiển thị đề xuất | DEV-FE + DEV-BE | BB-039 | high | TODO |
-| BB-066 | Watermark ở tầng proxy ảnh | DEV-INT | BB-015 | high | TODO |
+| BB-066 | Watermark ở tầng proxy ảnh | DEV-INT | BB-015 | high | 🚫 **HUỶ** — chủ studio chốt không đóng dấu mờ, khách nhận ảnh chất lượng cao |
 | BB-067 | Tải ảnh preview + ZIP ảnh đã chọn + log lượt tải | DEV-BE | BB-015 | med | TODO |
 | BB-068 | Cron: `expire-galleries`, `send-reminders`, `flush-notifications` | DEV-BE | BB-039 | med | TODO |
 | BB-069 | i18n VI/EN đầy đủ, rà soát không còn chuỗi hard-code | DEV-UI | BB-040 | low | ✅ **DONE** — i18n VI/EN đầy đủ, hết chuỗi hard-code |
-| BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-UI | BB-040 | med | TODO |
-| BB-071 | Tối ưu album 1.500 ảnh: bundle ≤180KB, bộ nhớ ≤300MB | DEV-FE | BB-033 | high | TODO |
+| BB-070 | Chế độ tối + PWA nhẹ + OG image trang chia sẻ | DEV-UI | BB-040 | med | ✅ **DONE** — manifest.ts + OG metadata đã nối vào RootLayout, dark mode 26 component, PWA prompt |
+| BB-071 | Tối ưu album **400 ảnh** (đo thật, không phải 1.500): bundle ≤180KB | DEV-FE | BB-033 | high | TODO |
 | BB-072 | Sentry + trang lỗi 404/500 tiếng Việt | DEV-OPS | BB-005 | low | TODO |
 | BB-073 | Migration `0003`: accountant không xem được ảnh — đồng bộ `policies.sql` sang `db/migrations/` | ARCH | BB-020 | low | TODO |
-| BB-074 | Font thương hiệu không nạp trên production: `@import` trong `tokens.css` bị CSS optimizer loại bỏ | DEV-UI | BB-040 | high | TODO |
+| BB-074 | Font thương hiệu không nạp trên production | DEV-UI | BB-040 | high | ✅ **DONE** — tự host Be Vietnam Pro bằng next/font, không còn gửi IP khách sang Google |
 | BB-075 | `middleware.ts` `return` redirect trước khi gắn header an ninh — `/admin` ra ngoài không CSP, không `Referrer-Policy` | SEC-ARCH | BB-020 | med | TODO |
 | BB-076 | Seed hỏng: `dev_token_with_pin_123` có `requires_pin=true` mà `pin_hash` NULL; link 2 không có `selections`; thiếu link revoked/expired/locked để test | DEV-BE | BB-008 | med | TODO |
-| BB-077 | Tài liệu mâu thuẫn code: `02-architecture.md` §2.2 thiếu `selection_id` trong cookie; `05-rbac.md` §5 hứa "đổi PIN thu hồi phiên" mà schema không làm được | ARCH | BB-030 | med | TODO |
+| BB-077 | Tài liệu mâu thuẫn code: `02-architecture.md` §2.2 thiếu `selection_id` trong cookie; `05-rbac.md` §5 hứa "đổi PIN thu hồi phiên" mà schema không làm được | ARCH | BB-030 | med | DONE |
 | BB-078 | Một cookie `bb_gs` cho mọi album: khách quay lại lần 2 mở album mới sẽ bị đăng xuất khỏi album cũ | SEC-ARCH + DEV-BE | BB-030 | med | HOÃN — quyết định sau Phase 1 |
 | BB-079 | Bỏ tên miền bịa `https://chon-anh.babybean.vn` làm giá trị dự phòng trong `api/admin/galleries/route.ts:139` — thiếu `NEXT_PUBLIC_APP_URL` phải báo lỗi, không được đoán | DEV-BE | BB-023 | high | TODO |
 | BB-080b | Gắn tên miền `babybeanstudio.vn`: đổi `NEXT_PUBLIC_APP_URL`, cập nhật `verify-prod.mjs`, kiểm HTTPS và link chia sẻ | DEV-OPS | BB-079 | med | ĐANG CHỜ DNS |
 | BB-081 | **CHẶN BB-035/BB-033.** `selection_items.mark` là một cột loại trừ nên "Yêu thích" xoá mất "Đã chọn", trong khi `07-ui-ux.md:127` là hai nút riêng. Thêm `is_favorite boolean` + migration | ARCH | BB-006 | high | TODO |
-| BB-082 | **NGHIÊM TRỌNG.** 4 hàm `security definer` trong schema `public` cho `anon` gọi: chỉ cần khoá công khai + UUID album là đọc/ghi được mọi album, bỏ qua token, PIN, cookie và RLS. Đã chứng minh HTTP 200 | SEC-ARCH | BB-023 | high | TODO |
+| BB-082 | **NGHIÊM TRỌNG.** 4 hàm `security definer` trong schema `public` cho `anon` gọi: chỉ cần khoá công khai + UUID album là đọc/ghi được mọi album, bỏ qua token, PIN, cookie và RLS. Đã chứng minh HTTP 200 | SEC-ARCH | BB-023 | high | DONE |
+| BB-096 | `branch-selector.tsx` dùng `mockBranches` cứng — bộ chọn chi nhánh trên thanh tiêu đề không nối vào đâu | DEV-FE | BB-063 | med | TODO |
+| BB-097 | Bóc tên mẹ và tên bé từ tên thư mục Drive: ngoài ngoặc là mẹ, trong ngoặc là bé, không ngoặc thì tất cả là tên mẹ. Gợi ý cho CSKH sửa, không tự lưu | DEV-INT + DEV-FE | BB-013 | med | TODO |
+| BB-098 | PIN thành tuỳ chọn từng link, mặc định TẮT, mã sinh ngẫu nhiên 4 số — không lấy từ SĐT vì khách nước ngoài không có | SEC-ARCH | BB-030 | med | TODO |
+| BB-099 | Gán người theo từng album: photographer, CSKH, người photoshop. Thêm vai `photoshop_ctv` quyền hẹp hơn | ARCH + DEV-BE | BB-063 | high | TODO |
 
 ---
 
@@ -133,8 +137,8 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | Mã | Việc | Agent | Phức tạp | TT |
 |---|---|---|---|---|
 | BB-080 | Bot Lark: 7 sự kiện, message card, webhook theo chi nhánh | DEV-INT | med | TODO |
-| BB-081 | Đồng bộ một chiều sang Lark Base (bitable batch upsert) | DEV-INT | high | TODO |
-| BB-082 | Hàng đợi retouch: gán người, deadline, trạng thái | DEV-FE + DEV-BE | med | TODO |
+| BB-091 | Đồng bộ một chiều sang Lark Base (bitable batch upsert) | DEV-INT | high | TODO |
+| BB-092 | Hàng đợi retouch: gán người, deadline, trạng thái | DEV-FE + DEV-BE | med | TODO |
 | BB-083 | Duyệt nội bộ trước khi giao | DEV-FE + DEV-BE | med | TODO |
 | BB-084 | Theo dõi giao hàng: album in, USB, link final | DEV-FE + DEV-BE | med | TODO |
 | BB-085 | Module booking: lịch, phòng, thợ, cọc | DEV-FE + DEV-BE | high | TODO |

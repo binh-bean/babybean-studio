@@ -74,3 +74,68 @@ export const CreateGallerySchema = z
   );
 
 export type CreateGalleryInput = z.infer<typeof CreateGallerySchema>;
+
+export const GALLERY_STATUS_VALUES = [
+  "draft",
+  "syncing",
+  "ready",
+  "in_review",
+  "submitted",
+  "in_retouch",
+  "delivered",
+  "expired",
+  "archived",
+] as const;
+
+export const GetGalleriesQuerySchema = z.object({
+  branchId: z.string().uuid("branchId phải là UUID hợp lệ").optional(),
+  status: z
+    .union([
+      z.enum(GALLERY_STATUS_VALUES),
+      z.array(z.enum(GALLERY_STATUS_VALUES)),
+      z.string().transform((val) =>
+        val
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean) as (typeof GALLERY_STATUS_VALUES)[number][],
+      ),
+    ])
+    .optional()
+    .transform((val) => {
+      if (!val) return undefined;
+      if (Array.isArray(val)) return val;
+      return [val];
+    }),
+  photographerId: z.string().uuid("photographerId phải là UUID hợp lệ").optional(),
+  editorId: z.string().uuid("editorId phải là UUID hợp lệ").optional(),
+  cskhId: z.string().uuid("cskhId phải là UUID hợp lệ").optional(),
+  dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dateFrom phải theo định dạng YYYY-MM-DD").optional(),
+  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dateTo phải theo định dạng YYYY-MM-DD").optional(),
+  fromShootDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "fromShootDate phải theo định dạng YYYY-MM-DD").optional(),
+  toShootDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "toShootDate phải theo định dạng YYYY-MM-DD").optional(),
+  expiringSoon: z
+    .union([
+      z.boolean(),
+      z.enum(["true", "false", "1", "0"]).transform((v) => v === "true" || v === "1"),
+    ])
+    .optional(),
+  q: z.string().trim().optional(),
+  search: z.string().trim().optional(),
+  sortBy: z
+    .enum([
+      "createdAt",
+      "shootDate",
+      "dueAt",
+      "title",
+      "status",
+      "photoCount",
+      "selectedCount",
+      "lastSelectedAt",
+    ])
+    .default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+  cursor: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+export type GetGalleriesQueryInput = z.infer<typeof GetGalleriesQuerySchema>;

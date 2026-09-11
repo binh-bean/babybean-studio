@@ -154,6 +154,20 @@ npm run db:push      # apply schema lên Supabase
 npm run drive:sync   # đồng bộ thủ công 1 album
 ```
 
+## Đừng chạy `npm run build` khi máy chủ dev đang chạy
+
+`next dev` và `next build` dùng chung thư mục `.next`. Chạy build trong lúc dev
+đang chạy là bản sản xuất ghi đè cache của dev, và mọi trang thành TRẮNG TINH với
+lỗi kiểu `Cannot find module './331.js'` hoặc `__webpack_modules__[moduleId] is
+not a function`. Nhìn y như code hỏng, mà code không hỏng.
+
+Ngày 10/09/2026 chuyện này xảy ra hai lần trong một buổi, lần thứ hai làm chủ
+studio tưởng mình gõ sai mật khẩu.
+
+Cần chạy build thì tắt máy chủ dev trước, hoặc `rm -rf .next` rồi khởi động lại.
+
+---
+
 ## Build xanh không có nghĩa là đúng
 
 `npm run build` thoát 0 chỉ nói rằng trình biên dịch hài lòng, không nói rằng kết quả đúng.
