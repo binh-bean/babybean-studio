@@ -138,6 +138,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-106 | Báo cáo thất thoát: view album đã giao vượt hạn mức mà chưa lập hóa đơn | ARCH | BB-102 | high | ✅ **DONE** — `0020`, PM sửa đếm trùng ảnh và một chỗ fail-open |
 | BB-107 | Component chọn mua thêm và khối thành phần hợp đồng hai tầng | DEV-UI | BB-102 | med | TODO |
 | BB-108 | **Gỡ công tắc watermark khỏi giao diện.** Nó chạy đủ một vòng nhưng không component nào vẽ watermark — CSKH bật, hệ thống báo đã bật, ảnh vẫn ra sạch. Hứa suông về một thứ bảo vệ không tồn tại | DEV-FE + DEV-BE | — | med | TODO |
+| BB-109 | Đồng bộ nội dung hợp đồng Lark xuống `gallery_items`: hai tầng, tiền thật, khớp sản phẩm theo mã bản ghi | PM | BB-100 | high | ✅ **DONE** — `sync:contracts`, `0023` thêm `line_total` |
 
 ---
 

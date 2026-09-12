@@ -260,6 +260,31 @@ describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_
     expect(rows.length).toBe(0);
   });
 
+  /**
+   * Chạy một truy vấn dưới danh nghĩa một nhân viên, rồi LUÔN LUÔN rollback.
+   *
+   * try/finally ở đây không phải cho gọn. Bản đầu đặt ROLLBACK ngay sau
+   * expect(), nên khi một assertion ném lỗi thì giao dịch ở lại MỞ với
+   * `SET LOCAL ROLE authenticated`. afterAll sau đó chạy DELETE dưới vai đó,
+   * bị RLS chặn, xoá 0 dòng và KHÔNG báo lỗi. Fixture nằm lại trong bb-dev,
+   * và verify:db của mọi người đỏ từ đó trở đi.
+   *
+   * Chuyện này đã xảy ra thật ngày 12.09.2026: một phép thử hỏng để lại sáu
+   * album mồ côi trong cơ sở dữ liệu dùng chung.
+   */
+  async function asStaff<T>(staffId: string, run: () => Promise<T>): Promise<T> {
+    await client.query("BEGIN");
+    try {
+      await client.query("SET LOCAL ROLE authenticated");
+      await client.query(
+        `SET LOCAL request.jwt.claims = '{"sub": "${staffId}", "role": "authenticated"}'`,
+      );
+      return await run();
+    } finally {
+      await client.query("ROLLBACK");
+    }
+  }
+
   it("6. BỐN LUẬT - Luật 3: RLS theo chi nhánh - Quản lý chi nhánh chỉ thấy chi nhánh mình, CTV không thấy gì", async () => {
     // Tạo 1 album ở Branch B
     const gBranchB = await createGalleryWithSelection({
@@ -271,37 +296,33 @@ describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_
       editorId: staffCtvId, // Gán CTV làm editor của album này
     });
 
-    // A. Quản lý chi nhánh A (staffManagerAId)
-    await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE authenticated");
-    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${staffManagerAId}", "role": "authenticated"}'`);
+    // A. Quản lý chi nhánh A không thấy album của Branch B
+    await asStaff(staffManagerAId, async () => {
+      const { rows } = await client.query(
+        "SELECT * FROM v_over_quota_unbilled WHERE gallery_id = $1",
+        [gBranchB],
+      );
+      expect(rows.length).toBe(0);
+    });
 
-    const { rows: mgrRows } = await client.query("SELECT * FROM v_over_quota_unbilled WHERE gallery_id = $1", [gBranchB]);
-    expect(mgrRows.length).toBe(0); // Không thấy album của Branch B
+    // B. CTV thời vụ không thấy gì, kể cả khi được gán làm editor của album
+    await asStaff(staffCtvId, async () => {
+      const { rows: unbilled } = await client.query("SELECT * FROM v_over_quota_unbilled");
+      expect(unbilled.length).toBe(0);
 
-    await client.query("ROLLBACK");
+      // Bảng tổng phải trả KHÔNG dòng nào, không phải một dòng toàn số 0:
+      // một dòng số 0 vừa là thông tin CTV không được thấy, vừa sai sự thật.
+      const { rows: summary } = await client.query("SELECT * FROM v_over_quota_summary");
+      expect(summary.length).toBe(0);
+    });
 
-    // B. CTV thời vụ (staffCtvId) - kể cả khi được gán làm editor của album
-    await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE authenticated");
-    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${staffCtvId}", "role": "authenticated"}'`);
-
-    const { rows: ctvUnbilled } = await client.query("SELECT * FROM v_over_quota_unbilled");
-    expect(ctvUnbilled.length).toBe(0); // CTV thời vụ không thấy dòng nào
-
-    const { rows: ctvSummary } = await client.query("SELECT * FROM v_over_quota_summary");
-    expect(ctvSummary.length).toBe(0); // CTV thời vụ không thấy summary
-
-    await client.query("ROLLBACK");
-
-    // C. Owner thấy cả Branch B
-    await client.query("BEGIN");
-    await client.query("SET LOCAL ROLE authenticated");
-    await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${staffOwnerId}", "role": "authenticated"}'`);
-
-    const { rows: ownerRows } = await client.query("SELECT * FROM v_over_quota_unbilled WHERE gallery_id = $1", [gBranchB]);
-    expect(ownerRows.length).toBe(1);
-
-    await client.query("ROLLBACK");
+    // C. Chủ studio thấy cả Branch B
+    await asStaff(staffOwnerId, async () => {
+      const { rows } = await client.query(
+        "SELECT * FROM v_over_quota_unbilled WHERE gallery_id = $1",
+        [gBranchB],
+      );
+      expect(rows.length).toBe(1);
+    });
   });
 });
