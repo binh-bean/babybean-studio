@@ -579,3 +579,42 @@ export interface GalleryProgress {
   urgency: Urgency;
   daysToSubmit?: number | null;
 }
+
+// ---------------------------------------------------------------------------
+// Báo cáo thất thoát (BB-106)
+// ---------------------------------------------------------------------------
+
+export interface OverQuotaUnbilledRow {
+  galleryId: string;
+  galleryTitle: string;
+  id?: string;
+  title?: string;
+  albumId?: string;
+  albumTitle?: string;
+  branchId: string;
+  branchName: string;
+  larkContractCode: string | null;
+  shootDate: string | null;
+  quota: number;
+  includedQuota?: number;
+  selectedCount: number;
+  overCount: number;
+  addonCount: number;
+  addonPhotoCount?: number;
+  unbilledCount: number;
+  unbilledPhotoCount?: number;
+  extraPhotoPrice: number;
+  unbilledAmount: number;
+}
+
+export interface OverQuotaSummary {
+  overQuotaAlbumCount: number;
+  albumCount?: number;
+  unbilledPhotoCount: number;
+  photoCount?: number;
+  totalUnbilledAmount: number;
+  totalAmount?: number;
+  missingQuotaAlbumCount: number;
+  missingDataAlbumCount?: number;
+}
+

@@ -135,7 +135,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-103 | Màn quản trị: CSKH xem và sửa dòng hàng của album (thêm/bớt sản phẩm, đổi số lượng) | DEV-FE | BB-100 | med | TODO |
 | BB-104 | Dải tiến trình 6 bước cho khách, ưu tiên điện thoại | DEV-UI | BB-100 | med | ✅ **DONE** — PM sửa chỗ coi hạn mức 0 là chưa biết |
 | BB-105 | API mua thêm: POST /api/g/addons, chốt giá từ `products.list_price` theo ngưỡng tin cậy | DEV-BE | BB-101 | med | TODO |
-| BB-106 | Báo cáo thất thoát: view album đã giao vượt hạn mức mà chưa lập hóa đơn | ARCH | BB-102 | high | TODO |
+| BB-106 | Báo cáo thất thoát: view album đã giao vượt hạn mức mà chưa lập hóa đơn | ARCH | BB-102 | high | ✅ **DONE** — migration 0020 (v_over_quota_unbilled & v_over_quota_summary), 4 luật chuẩn, 6/6 test |
 | BB-107 | Component chọn mua thêm và khối thành phần hợp đồng hai tầng | DEV-UI | BB-102 | med | TODO |
 
 ---
