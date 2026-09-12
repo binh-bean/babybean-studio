@@ -374,6 +374,30 @@ create unique index uq_selection_items on selection_items(selection_id, photo_id
 create index idx_selection_items_gallery on selection_items(gallery_id);
 create index idx_selection_items_photo on selection_items(photo_id);
 
+create table selection_addons (
+  id            uuid primary key default gen_random_uuid(),
+  selection_id  uuid not null references selections(id) on delete cascade,
+  product_id    uuid not null references products(id),
+  quantity      integer not null check (quantity > 0),
+  unit_price    numeric(12,0) not null,
+  created_at    timestamptz not null default now()
+);
+
+create index idx_selection_addons_selection on selection_addons(selection_id);
+
+comment on table selection_addons is 'Sản phẩm mua thêm lúc khách chốt đơn.';
+
+create table selection_placements (
+  selection_item_id uuid not null references selection_items(id) on delete cascade,
+  gallery_item_id   uuid not null references gallery_items(id) on delete cascade,
+  primary key (selection_item_id, gallery_item_id)
+);
+
+create index idx_selection_placements_gallery_item on selection_placements(gallery_item_id);
+
+comment on table selection_placements is 'Ảnh nào được in vào sản phẩm nào (album, ảnh phóng...). Việc in không tiêu hao hạn mức ảnh chỉnh sửa.';
+
+
 -- Idempotency cho ghi theo lô: client gửi client_op_id, server bỏ qua nếu trùng.
 create table selection_ops (
   client_op_id  uuid primary key,

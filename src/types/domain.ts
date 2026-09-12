@@ -41,6 +41,16 @@ export type GalleryStatus = (typeof GALLERY_STATUSES)[number];
 export const PHOTO_STATUSES = ["active", "missing", "hidden"] as const;
 export type PhotoStatus = (typeof PHOTO_STATUSES)[number];
 
+export const PRODUCT_KINDS = [
+  "shoot_package",
+  "edited_photo",
+  "print",
+  "addon",
+  "service",
+] as const;
+export type ProductKind = (typeof PRODUCT_KINDS)[number];
+
+
 export const SHARE_ROLES = ["owner", "co_editor", "suggester", "viewer"] as const;
 export type ShareRole = (typeof SHARE_ROLES)[number];
 
@@ -152,6 +162,40 @@ export interface Package {
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface Product {
+  id: string;
+  branchId: string | null;
+  name: string;
+  kind: ProductKind;
+  material: string | null;
+  size: string | null;
+  listPrice: number | null;
+  /**
+   * Chỉ báo giá cho khách khi: priceConfidence >= 0.8 VÀ priceSamples >= 5.
+   * Nếu không đủ điều kiện, phải hiện "CSKH sẽ báo giá", tuyệt đối KHÔNG hiện số 0
+   * và không hiện giá đoán.
+   */
+  priceConfidence: number | null;
+  priceSamples: number;
+  larkCategory: string | null;
+  larkRecordId: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface GalleryItem {
+  id: string;
+  galleryId: string;
+  productId: string;
+  parentItemId: string | null;
+  quantity: number;
+  unitPrice: number | null;
+  larkContractCode: string | null;
+  larkRecordId: string | null;
+  createdAt?: string;
 }
 
 export interface Shoot {
@@ -307,6 +351,20 @@ export interface SelectionItem {
   noteTags: string[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface SelectionAddon {
+  id: string;
+  selectionId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  createdAt?: string;
+}
+
+export interface SelectionPlacement {
+  selectionItemId: string;
+  galleryItemId: string;
 }
 
 /** Record in the selection_ops table for idempotency tracking */
