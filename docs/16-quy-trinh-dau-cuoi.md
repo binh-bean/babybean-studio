@@ -174,6 +174,61 @@ Lark đã có sẵn cột `Chat với khách` chứa link hộp thư Facebook.
 
 ---
 
+## 4b. Sau khi chỉnh ảnh: vòng duyệt
+
+Chủ studio mô tả ngày 12.09.2026:
+
+> thu tiền → xác nhận → chuyển cho nhân viên photoshop chỉnh sửa theo quy trình
+> đã có sẵn → CSKH chuyển file chỉnh sửa cho khách → khách duyệt, sửa hoặc in →
+> quy trình tiếp tục
+
+Đây là **vòng lặp**, không phải đường thẳng:
+
+```
+in_retouch            người photoshop đang chỉnh
+   ↓ CSKH chuyển file đã chỉnh cho khách
+awaiting_approval     chờ khách duyệt
+   ├─ khách đồng ý       → approved → đi in → delivered
+   └─ khách yêu cầu sửa  → QUAY LẠI in_retouch, vòng sau
+```
+
+Vòng lặp được nhiều lần. `revision_requests` ghi **mỗi vòng một dòng**, không
+ghi đè: câu hỏi *"khách đã đòi sửa mấy lần rồi"* chỉ trả lời được bằng lịch sử,
+và câu đó luôn xuất hiện đúng lúc hai bên bắt đầu căng thẳng.
+
+| Ai làm | Đường |
+|---|---|
+| CSKH chuyển file đã chỉnh | `POST /api/admin/galleries/[id]/retouch-done` |
+| Khách duyệt hoặc đòi sửa | `POST /api/g/review` |
+
+### Bốn điều đã chốt
+
+**Bắt buộc có link file đã chỉnh** mới chuyển sang chờ duyệt. Chuyển mà không
+có gì cho khách xem thì khách mở link thấy trang trống rồi gọi điện — thà chặn
+ở đây còn hơn phát hiện qua một cuộc gọi.
+
+**Yêu cầu sửa bắt buộc viết gì đó.** "Sửa đi" mà không nói sửa gì thì người
+photoshop phải gọi lại hỏi, tức là khách trả lời hai lần cho một việc.
+
+**Giữ link bản khách đang xem lúc chê.** Vòng sau file khác rồi; không lưu thì
+không ai biết khách chê bản nào.
+
+**Chỉ khách chính được quyết.** Bà hay dì được mời vào xem và gợi ý, nhưng
+quyết định cuối là của người đứng tên hợp đồng — cùng luật với lúc chốt chọn ảnh.
+
+### Khoá chọn ảnh: một danh sách duy nhất
+
+Hai trạng thái mới nằm **sau** lúc khách chốt, nên khách không được sửa lựa
+chọn nữa — nếu không, khách đang duyệt ảnh đã chỉnh vẫn bỏ chọn được ảnh gốc mà
+người photoshop đã chỉnh xong.
+
+Danh sách trạng thái khoá trước đây **viết cứng trong thân hàm**
+`patch_selection_batch`. Thêm trạng thái mà quên sửa chỗ đó thì lỗ hổng im
+lặng. `0033` gom vào `app.gallery_is_locked()`, `0034` cho hàm gọi nó — thêm
+trạng thái lần sau chỉ phải sửa một nơi.
+
+---
+
 ## 5. Sáu bước khách nhìn thấy
 
 Quy trình vận hành có chín bước (`docs/15` mục 1). Khách chỉ cần thấy sáu:
@@ -184,8 +239,8 @@ Quy trình vận hành có chín bước (`docs/15` mục 1). Khách chỉ cần
 | 2 | Ảnh đã sẵn sàng, mời bạn chọn | `ready` |
 | 3 | Bạn đang chọn ảnh | `in_review` |
 | 4 | Đã chốt, chờ studio xác nhận | `submitted` |
-| 5 | Đang chỉnh ảnh | `in_retouch` |
-| 6 | Đang in và giao | `delivered` |
+| 5 | Đang chỉnh ảnh · *Mời ba mẹ duyệt ảnh* | `in_retouch` · `awaiting_approval` |
+| 6 | Đang in và giao | `approved` · `delivered` |
 
 `expired` **không phải** một bước — đó là link hết hạn, phải báo riêng chứ
 không được vẽ vào dải tiến trình.

@@ -31,6 +31,8 @@ const EXPECTED_TABLES = [
   "selection_addons", "selection_placements",
   // BB-115 — ghi nhận thanh toán phát sinh.
   "gallery_payments",
+  // BB-121 — vòng duyệt ảnh đã chỉnh.
+  "revision_requests",
 ];
 
 const EXPECTED_VIEWS = ["v_gallery_progress", "v_share_links"];

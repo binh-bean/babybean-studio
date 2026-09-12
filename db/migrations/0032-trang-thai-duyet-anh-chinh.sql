@@ -1,0 +1,50 @@
+-- ============================================================================
+-- Migration: 0032 — hai trạng thái cho vòng duyệt ảnh đã chỉnh
+--
+-- BB-121. Chủ studio mô tả ngày 12.09.2026:
+--
+--   thu tiền → CSKH xác nhận → chuyển cho người photoshop chỉnh sửa
+--   → CSKH chuyển file đã chỉnh cho khách
+--   → khách duyệt: đồng ý thì đi in, không thì yêu cầu sửa
+--   → quay lại người photoshop, vòng lặp tiếp tục
+--
+-- Enum hiện có nhảy thẳng từ 'in_retouch' sang 'delivered', nên hai bước giữa
+-- không có chỗ đứng: "đã chỉnh xong, chờ khách duyệt" và "khách đã duyệt, chờ
+-- in". Thiếu chúng thì CSKH phải nhớ trong đầu bộ nào đang chờ khách trả lời.
+--
+-- ---------------------------------------------------------------------------
+-- CHỈ thêm giá trị enum. Không dùng, không tạo bảng, không sửa hàm.
+-- ---------------------------------------------------------------------------
+-- Postgres KHÔNG cho dùng một giá trị enum vừa thêm trong cùng giao dịch với
+-- lệnh thêm nó. Viết chung một file thì lệnh sau báo "unsafe use of new value
+-- of enum type" — và thông báo đó không nói rõ nguyên nhân, nên người đọc
+-- tưởng mình gõ sai tên.
+--
+-- Vì vậy file này KHÔNG có begin/commit: mỗi ALTER TYPE tự chạy trong giao
+-- dịch riêng. Phần dùng tới hai giá trị này nằm ở 0033.
+--
+-- Đây chính là cái bẫy docs/12-security.md đã ghi, lần này gặp ở enum thay vì
+-- ở hàm.
+--
+-- ---------------------------------------------------------------------------
+-- BẪY THỨ HAI, PM vấp ngay khi chạy file này
+-- ---------------------------------------------------------------------------
+-- Lệnh thứ hai tham chiếu giá trị mà lệnh thứ nhất vừa thêm (`after
+-- awaiting_approval`). Chạy cả hai trên CÙNG MỘT PHIÊN KẾT NỐI thì lệnh hai
+-- báo:
+--
+--     "awaiting_approval" is not an existing enum label
+--
+-- dù lệnh một đã chạy xong và đã commit. Postgres nhớ danh sách nhãn enum theo
+-- phiên, nên phiên đang mở vẫn thấy enum cũ.
+--
+-- Thông báo lỗi đó đọc như gõ sai tên, nên rất dễ đi sửa nhầm chỗ. PM đã mất
+-- một vòng vì nó.
+--
+-- CÁCH CHẠY: mỗi lệnh một phiên kết nối riêng. Hoặc chạy lệnh một, ngắt kết
+-- nối, rồi chạy lệnh hai.
+-- ============================================================================
+
+alter type gallery_status add value if not exists 'awaiting_approval' after 'in_retouch';
+
+alter type gallery_status add value if not exists 'approved' after 'awaiting_approval';
