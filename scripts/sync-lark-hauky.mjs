@@ -238,7 +238,19 @@ async function main() {
     const { rows: branchRows } = await client.query("select id, name from branches");
     const branchIdByName = new Map(branchRows.map((b) => [b.name, b.id]));
 
-    const plan = [];
+    // Gom theo THƯ MỤC DRIVE, không gom theo bản ghi hậu kỳ.
+    //
+    // Khách nhìn thấy một thư mục ảnh, nên một thư mục là một album và một lần
+    // chọn ảnh. Chủ studio xác nhận ngày 12.09.2026: HD_...#3556 và #3557 là
+    // MỘT nhà, MỘT buổi chụp, hai gói chụp khác nhau nên lập hai hóa đơn.
+    //
+    // Tách chúng thành hai album là chia đôi hạn mức của chính khách đó: họ
+    // mua 15 + 15 ảnh nhưng mỗi màn hình chỉ cho chọn 15, và ảnh thì trùng
+    // nhau vì cùng một thư mục.
+    //
+    // Bộ nào không bóc được mã thư mục thì lấy mã bản ghi hậu kỳ làm khoá —
+    // mỗi bộ một album, không gom nhầm với ai.
+    const byFolder = new Map();
     const unmappedBranches = new Map();
     const noContract = [];
 
@@ -248,40 +260,81 @@ async function main() {
       const larkBranch = branchByContract.get(contractCode) ?? "";
       const appBranch = BRANCH_MAP[larkBranch];
       const branchId = appBranch ? branchIdByName.get(appBranch) : undefined;
+      const haukyId = cellText(f["record ID"]).trim() || rec.record_id;
 
       if (!contractCode) {
-        noContract.push(cellText(f["record ID"]).trim() || rec.record_id);
+        noContract.push(haukyId);
         continue;
       }
       if (!branchId) {
-        unmappedBranches.set(larkBranch || "(trống)", (unmappedBranches.get(larkBranch || "(trống)") ?? 0) + 1);
+        const key = larkBranch || "(trống)";
+        unmappedBranches.set(key, (unmappedBranches.get(key) ?? 0) + 1);
         continue;
       }
 
       const photoUrl = cellLink(f["Link ảnh gửi khách"]);
-      plan.push({
-        haukyId: cellText(f["record ID"]).trim() || rec.record_id,
-        contractCode,
+      const folderId = driveFolderId(photoUrl);
+      const key = folderId || `hauky:${haukyId}`;
+
+      const existing = byFolder.get(key);
+      if (existing) {
+        // Cùng thư mục: thêm hợp đồng vào album đã có, đừng tạo album thứ hai.
+        if (!existing.contractCodes.includes(contractCode)) {
+          existing.contractCodes.push(contractCode);
+        }
+        existing.haukyIds.push(haukyId);
+        continue;
+      }
+
+      byFolder.set(key, {
+        haukyId,
+        haukyIds: [haukyId],
+        contractCodes: [contractCode],
         branchId,
         // Che: KHÔNG lấy "Tên KH", KHÔNG lấy nhãn text của ô link (là tên thư
         // mục kiểu "LIA - ZAC"). Mã hợp đồng vừa duy nhất vừa tra được bên Lark.
-        customerName: `KH · ${contractCode}`,
         chatUrl: cellLink(f["Chat với khách"]) || null,
         driveUrl: photoUrl,
-        driveFolderId: driveFolderId(photoUrl),
+        driveFolderId: folderId,
+        folderKey: key,
         larkStatus: cellText(f["Trạng Thái"]).trim(),
       });
     }
 
-    console.log(`\nDựng được ${plan.length} album.`);
+    const plan = [...byFolder.values()].map((g) => ({
+      ...g,
+      contractCode: g.contractCodes[0],
+      customerName: `KH · ${g.contractCodes[0]}`,
+    }));
+
+    console.log(`\nDựng được ${plan.length} album từ ${candidates.length} bản ghi hậu kỳ.`);
     if (noContract.length) console.log(`  ${noContract.length} bộ không có mã hợp đồng — bỏ qua.`);
     if (unmappedBranches.size) {
       console.log(`  BỎ QUA vì chi nhánh chưa có trong BRANCH_MAP:`);
       for (const [name, n] of unmappedBranches) console.log(`     "${name}" — ${n} bộ`);
-      console.log(`  Bổ sung vào BRANCH_MAP trong ${"scripts/sync-lark-hauky.mjs"} rồi chạy lại.`);
+      console.log(`  Bổ sung vào BRANCH_MAP trong scripts/sync-lark-hauky.mjs rồi chạy lại.`);
     }
+
+    // Album gom nhiều hợp đồng: in ra hết để nhân viên soát.
+    //
+    // Hai kiểu lẫn vào nhau và MÁY KHÔNG PHÂN BIỆT ĐƯỢC. Mã liên tiếp
+    // (#3556 + #3557) thường là một nhà mua hai gói — gom là đúng. Mã cách xa
+    // nhau thường là nhân viên dán nhầm link, và chủ studio đã xác nhận
+    // #4487 với #4515 đúng là dán nhầm. Gom nhầm hai nhà là khách này nhìn
+    // thấy ảnh con nhà kia, nên phải có người nhìn danh sách này.
+    const merged = plan.filter((p) => p.contractCodes.length > 1);
+    if (merged.length) {
+      console.log(`\n  ${merged.length} album gom nhiều hợp đồng — NHỜ NHÂN VIÊN SOÁT:`);
+      for (const m of merged) {
+        const nums = m.contractCodes.map((c) => Number(c.split("#")[1]) || 0);
+        const consecutive =
+          nums.length === 2 && Math.abs(nums[0] - nums[1]) === 1 ? "liên tiếp, có vẻ cùng nhà" : "CÁCH XA NHAU, kiểm kỹ";
+        console.log(`     ${m.contractCodes.join(" + ")}   (${consecutive})`);
+      }
+    }
+
     const noFolder = plan.filter((p) => !p.driveFolderId).length;
-    if (noFolder) console.log(`  ${noFolder} bộ có link nhưng không bóc được mã thư mục Drive.`);
+    if (noFolder) console.log(`\n  ${noFolder} bộ không bóc được mã thư mục Drive — mỗi bộ một album riêng.`);
 
     const byStatus = plan.reduce((acc, p) => ({ ...acc, [p.larkStatus]: (acc[p.larkStatus] ?? 0) + 1 }), {});
     console.log("  Theo trạng thái:", byStatus);
@@ -317,27 +370,29 @@ async function main() {
           customerId = rows[0]?.id;
         }
 
-        // Album: neo vào bản ghi hậu kỳ, KHÔNG neo vào mã hợp đồng.
+        // Album neo vào THƯ MỤC DRIVE — đó là thứ khách nhìn thấy, và là khoá
+        // định danh sau 0028. Bộ nào không bóc được mã thư mục thì lấy mã bản
+        // ghi hậu kỳ làm khoá, mỗi bộ một album riêng.
         const { rows: gal } = await client.query(
           `insert into galleries
              (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url,
-              lark_contract_code, lark_hauky_record_id)
-           values ($1,$2,$3,'draft',$4,$5,$6,$7)
-           on conflict (lark_hauky_record_id) where lark_hauky_record_id is not null
+              lark_contract_code, lark_contract_codes, lark_hauky_record_id)
+           values ($1,$2,$3,'draft',$4,$5,$6,$7,$8)
+           -- uq_galleries_drive_folder là chỉ số duy nhất CÓ ĐIỀU KIỆN
+           -- (where status <> archived). ON CONFLICT phải khai lại đúng điều
+           -- kiện đó, nếu không Postgres báo "no unique or exclusion constraint
+           -- matching" và không ai đoán ra vì tên chỉ số vẫn tồn tại.
+           on conflict (drive_folder_id) where status <> 'archived'
            do update set
-             -- PHẢI cập nhật cả drive_folder_id. Lần chạy đầu bộ bóc mã chỉ
-             -- nhận một dạng link nên 25 album lấy mã bản ghi hậu kỳ làm mã
-             -- thư mục. Không cập nhật cột này thì bản vá bộ bóc mã chẳng sửa
-             -- được gì cho những album đã tạo — chúng trỏ vào một thư mục
-             -- không tồn tại, vĩnh viễn.
-             drive_folder_id    = excluded.drive_folder_id,
-             drive_folder_url   = excluded.drive_folder_url,
-             lark_contract_code = excluded.lark_contract_code,
+             drive_folder_url     = excluded.drive_folder_url,
+             lark_contract_code   = excluded.lark_contract_code,
+             lark_contract_codes  = excluded.lark_contract_codes,
+             lark_hauky_record_id = excluded.lark_hauky_record_id,
              updated_at = now()
            returning (xmax = 0) as inserted`,
           [
             p.branchId, customerId, p.customerName, p.driveFolderId || p.haukyId,
-            p.driveUrl, p.contractCode, p.haukyId,
+            p.driveUrl, p.contractCode, p.contractCodes, p.haukyId,
           ],
         );
         if (gal[0]?.inserted) created += 1;

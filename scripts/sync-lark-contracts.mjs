@@ -279,7 +279,7 @@ async function main() {
     console.log(`Danh mục: ${productByLarkId.size} sản phẩm có mã Lark.`);
 
     const { rows: galleries } = await client.query(
-      `select id, title, lark_contract_code from galleries
+      `select id, title, lark_contract_code, lark_contract_codes from galleries
         where lark_contract_code is not null and lark_contract_code <> ''
           ${onlyContract ? "and lark_contract_code = $1" : ""}
         order by created_at`,
@@ -328,40 +328,62 @@ async function main() {
 
     let totalWritten = 0;
     for (const g of galleries) {
-      const { parents, unknownProducts } = buildContractTree(
-        g.lark_contract_code,
-        invoiceLines,
-        components,
-        productByLarkId,
-      );
+      // Một album có thể gom NHIỀU hợp đồng: một nhà chụp một buổi nhưng mua
+      // hai gói thì lập hai hóa đơn, chung một thư mục ảnh. Chủ studio xác
+      // nhận ngày 12.09.2026. Hạn mức của khách đó là TỔNG hai hợp đồng, nên
+      // phải kéo dòng hàng của cả hai vào cùng một album.
+      //
+      // lark_contract_codes rỗng nghĩa là album do CSKH tạo tay trước khi có
+      // 0028 — rơi về mã đơn.
+      const codes =
+        g.lark_contract_codes?.length > 0 ? g.lark_contract_codes : [g.lark_contract_code];
 
-      const childCount = parents.reduce((n, p) => n + p.children.length, 0);
-      const money = parents.reduce((n, p) => n + Number(p.lineTotal ?? 0), 0);
-      console.log(`${g.lark_contract_code}  ->  ${g.title}`);
+      const label = codes.join(" + ");
+      console.log(`${label}  ->  ${g.title}`);
+
+      let lines = 0;
+      let comps = 0;
+      let money = 0;
+      const missing = [];
+
+      for (const code of codes) {
+        const { parents, unknownProducts } = buildContractTree(
+          code,
+          invoiceLines,
+          components,
+          productByLarkId,
+        );
+
+        lines += parents.length;
+        comps += parents.reduce((n, p) => n + p.children.length, 0);
+        money += parents.reduce((n, p) => n + Number(p.lineTotal ?? 0), 0);
+        missing.push(...unknownProducts);
+
+        if (parents.length === 0) {
+          console.log(`   ${code}: KHÔNG tìm thấy dòng nào bên Lark — kiểm tra lại mã.`);
+        }
+
+        if (write) {
+          await client.query("begin");
+          try {
+            totalWritten += await writeGallery(client, g.id, code, parents);
+            await client.query("commit");
+          } catch (err) {
+            await client.query("rollback");
+            console.log(`   LỖI ở ${code}, đã hoàn tác hợp đồng này: ${err.message}`);
+          }
+        }
+      }
+
       console.log(
-        `   ${parents.length} dòng hợp đồng, ${childCount} thành phần, ` +
+        `   ${lines} dòng hợp đồng, ${comps} thành phần, ` +
           `tổng ${money.toLocaleString("vi-VN")}đ`,
       );
-
-      if (parents.length === 0) {
-        console.log("   KHÔNG tìm thấy dòng nào bên Lark — kiểm tra lại mã hợp đồng.");
-      }
-      if (unknownProducts.length) {
+      if (missing.length) {
         console.log(
-          `   BỎ QUA ${unknownProducts.length} sản phẩm chưa có trong danh mục: ` +
-            `${unknownProducts.join(", ")} — chạy npm run sync:catalog trước.`,
+          `   BỎ QUA ${missing.length} sản phẩm chưa có trong danh mục: ` +
+            `${[...new Set(missing)].join(", ")} — chạy npm run sync:catalog trước.`,
         );
-      }
-
-      if (write) {
-        await client.query("begin");
-        try {
-          totalWritten += await writeGallery(client, g.id, g.lark_contract_code, parents);
-          await client.query("commit");
-        } catch (err) {
-          await client.query("rollback");
-          console.log(`   LỖI, đã hoàn tác album này: ${err.message}`);
-        }
       }
     }
 

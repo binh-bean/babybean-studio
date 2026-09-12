@@ -319,3 +319,42 @@ có báo ra. Không ảnh hưởng tiền hay hạn mức.
 
 *(Lần quét đầu PM đọc ra "88 dòng thiếu sản phẩm" — con số đó đếm gộp cả dòng
 thành phần và đếm theo lượt xuất hiện. Đếm đúng ở tầng hóa đơn là 8.)*
+
+### 7.6. Một album = một thư mục ảnh, có thể gom nhiều hợp đồng
+
+Chủ studio giải thích ba trường hợp thư mục Drive dùng chung, ngày 12.09.2026:
+
+| Cặp | Thực chất |
+|---|---|
+| `HD_...#3556` + `#3557` | **một nhà, một buổi chụp, hai gói chụp** nên lập hai hóa đơn |
+| `HD_...#4260` hai lần | đã xử lý xong bên Lark |
+| `HD_...#4487` + `#4515` | **nhân viên điền sai**, để nhân viên sửa sau |
+
+Trường hợp đầu quyết định mô hình. Khách đó **chỉ nhìn thấy một thư mục ảnh**,
+và hạn mức của họ là **tổng hai hợp đồng**. Tách thành hai album là chia đôi
+hạn mức của chính khách: họ mua 35 + 35 ảnh nhưng mỗi màn hình chỉ cho chọn 35,
+và ảnh thì trùng nhau vì cùng một thư mục.
+
+**Đơn vị định danh album là `drive_folder_id`** — thứ khách nhìn thấy — chứ
+không phải bản ghi hậu kỳ (0027) cũng không phải mã hợp đồng.
+
+```
+drive_folder_id        KHOÁ ĐỊNH DANH
+lark_contract_codes    mọi hợp đồng đổ vào album này
+lark_contract_code     phần tử đầu, giữ cho chỗ hiển thị
+lark_hauky_record_id   bản ghi hậu kỳ đầu tiên, để tra ngược — THÔI unique
+```
+
+Ràng buộc `chk_contract_code_first` giữ hai cột mã hợp đồng khỏi nói khác nhau.
+
+Kết quả trên dữ liệu thật: **432 album từ 446 bản ghi**, 4 album gom hai hợp
+đồng. Cặp `#3556 + #3557` giờ là một album **hạn mức 70 ảnh**.
+
+> **Máy không phân biệt được hai kiểu gom.** Mã liên tiếp thường là một nhà mua
+> hai gói; mã cách xa nhau thường là dán nhầm link. Script in ra **toàn bộ**
+> danh sách album gom kèm nhãn *"liên tiếp, có vẻ cùng nhà"* hoặc *"CÁCH XA
+> NHAU, kiểm kỹ"*. Gom nhầm hai nhà là khách này nhìn thấy ảnh con nhà kia, nên
+> danh sách đó phải có người đọc — không được bỏ qua.
+
+Ba cặp đang mang nhãn *kiểm kỹ*: `#4796 + #4898`, `#4842 + #4967`,
+`#4635 + #4638`.
