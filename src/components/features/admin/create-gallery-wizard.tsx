@@ -70,6 +70,7 @@ export function CreateGalleryWizard() {
   const [shootDate, setShootDate] = useState("");
   const [photographerId, setPhotographerId] = useState("");
   const [packageId, setPackageId] = useState("");
+  const [larkContractCode, setLarkContractCode] = useState("");
 
   const [quota, setQuota] = useState(20);
   const [extraPrice, setExtraPrice] = useState(50000);
@@ -152,6 +153,7 @@ export function CreateGalleryWizard() {
           shootDate: shootDate || null,
           title: babyName ? `${babyName} — ${preview?.folderName ?? ""}`.trim() : preview?.folderName,
           driveUrl,
+          larkContractCode: larkContractCode.trim() || undefined,
           includedQuota: quota,
           extraPhotoPrice: extraPrice,
           dueAt: dueAt.toISOString(),
@@ -378,6 +380,15 @@ export function CreateGalleryWizard() {
                   </option>
                 ))}
               </Select>
+            </Field>
+
+            {/* @ts-expect-error: DEV-UI cần thêm larkContractCode vào vi.ts (BB-110) */}
+            <Field label={w.larkContractCode || "Mã hợp đồng Lark"} hint="Dạng HD_YYYYMMDD#NN">
+              <Input
+                value={larkContractCode}
+                onChange={(e) => setLarkContractCode(e.target.value)}
+                placeholder="HD_20260901#01"
+              />
             </Field>
 
             <div className="sm:col-span-2">
