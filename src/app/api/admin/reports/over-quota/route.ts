@@ -117,7 +117,7 @@ export async function GET(request: Request): Promise<Response> {
     if (unknownErr) throw unknownErr;
 
     const summary = {
-      albumCount: items.length,
+      galleryCount: items.length,
       unbilledPhotoCount: items.reduce((n, i) => n + (i.unbilledCount ?? 0), 0),
       totalUnbilledAmount: items.reduce((n, i) => n + i.unbilledAmount, 0),
       missingQuotaCount: Number((unknownRows as { n: number } | null)?.n ?? 0),
@@ -130,5 +130,5 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 function emptySummary() {
-  return { albumCount: 0, unbilledPhotoCount: 0, totalUnbilledAmount: 0, missingQuotaCount: 0 };
+  return { galleryCount: 0, unbilledPhotoCount: 0, totalUnbilledAmount: 0, missingQuotaCount: 0 };
 }

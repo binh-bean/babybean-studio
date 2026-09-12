@@ -62,7 +62,7 @@ export function BranchSelector() {
       localStorage.removeItem("bb_admin_selected_branch");
     }
 
-    // Phát custom event để các component khác (như danh sách album) có thể lắng nghe
+    // Phát custom event để các component khác (như danh sách bộ ảnh) có thể lắng nghe
     window.dispatchEvent(new CustomEvent("branchChange", { detail: val }));
 
     // Cập nhật query param trên URL

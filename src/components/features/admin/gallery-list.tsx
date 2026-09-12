@@ -172,7 +172,7 @@ export function GalleryList() {
     return () => window.removeEventListener("branchChange", handleBranchChange);
   }, []);
 
-  // Tải danh sách album từ API
+  // Tải danh sách bộ ảnh từ API
   const fetchGalleries = useCallback(
     async (isLoadMore = false, cursorToUse?: string | null) => {
       if (isLoadMore) {
@@ -201,7 +201,7 @@ export function GalleryList() {
         });
 
         if (!res.ok) {
-          throw new Error("Không thể tải danh sách album");
+          throw new Error("Không thể tải danh sách bộ ảnh");
         }
 
         const body = await res.json();
@@ -271,12 +271,12 @@ export function GalleryList() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20">
           <Spinner size="lg" />
-          <p className="mt-3 text-sm text-[var(--bb-fg-muted)]">Đang tải danh sách album…</p>
+          <p className="mt-3 text-sm text-[var(--bb-fg-muted)]">Đang tải danh sách bộ ảnh…</p>
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          title="Không tìm thấy album nào"
-          description="Hãy thử thay đổi điều kiện lọc hoặc tạo album mới."
+          title="Không tìm thấy bộ ảnh nào"
+          description="Hãy thử thay đổi điều kiện lọc hoặc tạo bộ ảnh mới."
         />
       ) : filters.viewMode === "table" ? (
         /* ================= CHẾ ĐỘ XEM BẢNG ================= */
@@ -511,7 +511,7 @@ export function GalleryList() {
                   <div className="flex items-center gap-2 pt-2 border-t border-[var(--bb-border)]/60">
                     <Link href={`/admin/galleries/${item.id}`} className="flex-1">
                       <Button variant="outline" size="sm" className="w-full text-xs h-8">
-                        <Eye className="h-3.5 w-3.5 mr-1" /> Xem album
+                        <Eye className="h-3.5 w-3.5 mr-1" /> Xem bộ ảnh
                       </Button>
                     </Link>
                     <Button
@@ -559,7 +559,7 @@ export function GalleryList() {
                   <div className="p-2.5 space-y-2.5 overflow-y-auto flex-1">
                     {colItems.length === 0 ? (
                       <div className="py-8 text-center text-xs text-[var(--bb-fg-muted)]">
-                        Không có album
+                        Không có bộ ảnh
                       </div>
                     ) : (
                       colItems.map((item) => {
@@ -632,7 +632,7 @@ export function GalleryList() {
             ) : (
               <>
                 <ChevronDown className="h-4 w-4 mr-1.5" />
-                Tải thêm album
+                Tải thêm bộ ảnh
               </>
             )}
           </Button>

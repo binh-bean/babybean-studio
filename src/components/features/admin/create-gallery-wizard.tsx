@@ -1,18 +1,18 @@
 "use client";
 
 /**
- * Wizard tạo album — BB-022.
+ * Wizard tạo bộ ảnh — BB-022.
  *
  * OWNER: DEV-FE.
  * Spec: docs/07-ui-ux.md §4.3, docs/04-api-spec.md §3.9 và §4.1
  *
  * Bản đầu tiên của màn hình này là hàng giả: handleCheckDrive và handleSubmit
  * đều là setTimeout trả về dữ liệu cứng, nên dán link Drive nào cũng ra "862
- * ảnh, Bé Bơ 3 tháng", và bấm tạo album thì không có gì được ghi vào database —
+ * ảnh, Bé Bơ 3 tháng", và bấm tạo bộ ảnh thì không có gì được ghi vào database —
  * chỉ hiện một link mock123 không mở được. Giờ nó gọi API thật:
  *
  *   POST /api/admin/galleries/preview   đọc thư mục Drive
- *   POST /api/admin/galleries           tạo album, sinh token chia sẻ
+ *   POST /api/admin/galleries           tạo bộ ảnh, sinh token chia sẻ
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -99,7 +99,7 @@ export function CreateGalleryWizard() {
   }, [loadOptions]);
 
   // Chọn gói thì lấy luôn hạn mức và giá ảnh thêm của gói đó làm mặc định,
-  // người tạo album vẫn sửa đè được cho từng trường hợp.
+  // người tạo bộ ảnh vẫn sửa đè được cho từng trường hợp.
   useEffect(() => {
     const pkg = options?.packages.find((p) => p.id === packageId);
     if (pkg) {
@@ -162,7 +162,7 @@ export function CreateGalleryWizard() {
       });
       const body = await res.json();
       if (!res.ok) {
-        setError({ message: body?.error?.message ?? "Không tạo được album" });
+        setError({ message: body?.error?.message ?? "Không tạo được bộ ảnh" });
         return;
       }
       setResult(body.data);

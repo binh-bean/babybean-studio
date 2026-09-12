@@ -12,7 +12,7 @@ export function AdminBreadcrumb() {
   
   const getBreadcrumbName = (path: string) => {
     if (path === "admin") return "Bảng điều khiển";
-    if (path === "galleries") return "Quản lý Album";
+    if (path === "galleries") return "Quản lý Bộ ảnh";
     if (path === "customers") return "Khách hàng";
     if (path === "settings") return "Cài đặt";
     return path; 

@@ -43,7 +43,7 @@ interface ReportItem {
 }
 
 interface ReportSummary {
-  albumCount: number;
+  galleryCount: number;
   unbilledPhotoCount: number;
   totalUnbilledAmount: number;
   missingQuotaCount: number;
@@ -93,7 +93,7 @@ export function OverQuotaReport() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Bộ ảnh" value={String(summary.albumCount)} />
+        <Stat label="Bộ ảnh" value={String(summary.galleryCount)} />
         <Stat label="Ảnh chưa thu" value={String(summary.unbilledPhotoCount)} />
         <Stat
           label="Tiền chưa thu"

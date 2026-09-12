@@ -132,7 +132,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-100 | Danh mục sản phẩm + dòng hàng hợp đồng theo cấu trúc Lark thật (3 tầng). Hạn mức ảnh là dòng `Edit file`, không phải cột | PM | BB-063 | high | ✅ **DONE** — `0014`, 130/132 sản phẩm đã đồng bộ, `app.gallery_quota()` |
 | BB-101 | Khách mua thêm ngay trên app: `selection_addons` + bảng nối `selection_placements` | ARCH | BB-100 | high | ✅ **DONE** — `0015`, ADR-0003 |
 | BB-102 | API trả thành phần hợp đồng hai tầng cho một album, hạn mức lấy từ `app.gallery_quota()` chứ không từ cột | DEV-BE | BB-100 | med | ✅ **DONE** — `app.gallery_quota` ưu tiên `gallery_items`; cây 2 tầng tại `GET /api/g/gallery` và `GET /api/admin/galleries/[id]/items`; chặn chọn khi quota chưa biết; 5/5 unit test |
-| BB-103 | CSKH sửa dòng hàng của bộ ảnh (API thêm/đổi/bỏ, báo hạn mức trước-sau) | PM | BB-100 | med | ✅ **DONE** — phần API; màn hình còn lại |
+| BB-103 | CSKH sửa dòng hàng, xác nhận chốt đơn, bật/tắt PIN — API và màn hình | PM | BB-100 | med | ✅ **DONE** |
 | BB-104 | Dải tiến trình 6 bước cho khách, ưu tiên điện thoại | DEV-UI | BB-100 | med | ✅ **DONE** — PM sửa chỗ coi hạn mức 0 là chưa biết |
 | BB-105 | API mua thêm: POST /api/g/addons, chốt giá từ `products.list_price` theo ngưỡng tin cậy | DEV-BE | BB-101 | med | ✅ **DONE** |
 | BB-106 | Báo cáo thất thoát: view album đã giao vượt hạn mức mà chưa lập hóa đơn | ARCH | BB-102 | high | ✅ **DONE** — `0020`, PM sửa đếm trùng ảnh và một chỗ fail-open |

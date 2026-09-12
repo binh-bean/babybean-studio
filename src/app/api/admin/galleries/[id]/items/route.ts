@@ -36,7 +36,7 @@ export async function GET(
     // 3. Check gallery existence and branch authorization
     const { data: gallery, error: galleryError } = await admin
       .from("galleries")
-      .select("id, branch_id")
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price")
       .eq("id", galleryId)
       .single();
 
@@ -50,11 +50,38 @@ export async function GET(
     const summary = await getGalleryContractSummary(gallery.id, admin);
 
     // 5. Respond
+    // Số ảnh khách đã chọn, đếm MỖI ẢNH MỘT LẦN.
+    //
+    // Một bộ ảnh có thể có nhiều lựa chọn (mẹ một link, bà một link). count(*)
+    // sẽ đếm trùng tấm ảnh mà cả hai cùng chọn — đúng lỗi đã phải sửa ở 0022.
+    const { data: selRows } = await admin
+      .from("selection_items")
+      .select("photo_id")
+      .eq("gallery_id", gallery.id)
+      .eq("mark", "selected");
+    const selectedCount = new Set((selRows ?? []).map((r) => r.photo_id)).size;
+
+    // Link chia sẻ chính, để màn hình bật/tắt PIN được (BB-098).
+    const { data: link } = await admin
+      .from("share_links")
+      .select("id, requires_pin, status")
+      .eq("gallery_id", gallery.id)
+      .eq("status", "active")
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+
     return ok({
       galleryId: gallery.id,
+      title: gallery.title,
+      status: gallery.status,
+      contractCodes: gallery.lark_contract_codes ?? [],
+      extraPhotoPrice: Number(gallery.extra_photo_price ?? 0),
       quotaKnown: summary.quotaKnown,
       includedQuota: summary.includedQuota,
       totalValue: summary.totalValue,
+      selectedCount,
+      shareLink: link ? { id: link.id, requiresPin: link.requires_pin } : null,
       items: summary.items,
     });
   } catch (err) {
