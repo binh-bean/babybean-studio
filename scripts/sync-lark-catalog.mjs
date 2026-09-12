@@ -193,6 +193,44 @@ function observedPrices(invoiceRows) {
   return out;
 }
 
+
+/**
+ * Hạn mức ảnh hay đi kèm mỗi gói, suy từ lịch sử.
+ *
+ * Bảng Chi Tiết Gói Chụp đã mang sẵn tên gói ở cột "Tên Dịch Vụ" trên từng
+ * dòng thành phần, nên không cần nối bảng: lọc dòng Edit file rồi nhóm theo
+ * tên gói là ra.
+ *
+ * Chỉ trả về khi đủ chắc. Minisession có 6 hợp đồng rải ra 4 mức khác nhau,
+ * mức hay gặp nhất chỉ chiếm 33% — điền sẵn con số đó cho CSKH là gợi ý sai
+ * và tệ hơn là để trống, vì người ta tin vào số đã điền sẵn.
+ */
+function packageQuotas(componentRows) {
+  const tally = new Map();
+
+  for (const row of componentRows) {
+    const f = row.fields ?? {};
+    if (!/^edit file$/i.test(cellText(f["Sản Phẩm"]).trim())) continue;
+
+    const pkg = cellText(f["Tên Dịch Vụ"]).trim();
+    const qty = cellNumber(f["Số Lượng"]);
+    if (!pkg || !qty) continue;
+
+    if (!tally.has(pkg)) tally.set(pkg, new Map());
+    const levels = tally.get(pkg);
+    levels.set(qty, (levels.get(qty) ?? 0) + 1);
+  }
+
+  const out = new Map();
+  for (const [pkg, levels] of tally) {
+    const sorted = [...levels.entries()].sort((a, b) => b[1] - a[1]);
+    const total = sorted.reduce((sum, [, count]) => sum + count, 0);
+    const [quota, hits] = sorted[0];
+    if (total >= 5 && hits / total >= 0.7) out.set(pkg, quota);
+  }
+  return out;
+}
+
 // --- chạy -------------------------------------------------------------------
 
 async function main() {
@@ -211,7 +249,11 @@ async function main() {
   const invoices = await readTable(auth, baseToken, /h[oó]a đơn chi ti[eế]t/i);
   console.log(`Đọc ${catalog.rows.length} sản phẩm, ${invoices.rows.length} dòng hóa đơn.`);
 
+  const components = await readTable(auth, baseToken, /chi ti[eế]t g[oó]i ch[uụ]p/i);
+  console.log(`Đọc thêm ${components.rows.length} dòng thành phần gói.`);
+
   const prices = observedPrices(invoices.rows);
+  const quotas = packageQuotas(components.rows);
 
   const items = [];
   const skipped = [];
@@ -244,6 +286,7 @@ async function main() {
       list_price: p?.price ?? null,
       price_confidence: p?.confidence ?? null,
       price_samples: p?.samples ?? 0,
+      default_quota: kind === "shoot_package" ? (quotas.get(name) ?? null) : null,
       lark_category: category || null,
       lark_record_id: recordId,
       is_active: cellText(f["Trạng Thái Sử Dụng"]).trim() !== "Ngừng Kinh Doanh",
@@ -254,6 +297,11 @@ async function main() {
   console.log("\nPhân loại:", byKind);
   console.log(`Đang kinh doanh: ${items.filter((i) => i.is_active).length}/${items.length}`);
   console.log(`Có giá quan sát được: ${items.filter((i) => i.list_price).length}/${items.length}`);
+  const withQuota = items.filter((i) => i.default_quota);
+  console.log(`Gói chụp suy được hạn mức: ${withQuota.length}`);
+  for (const i of withQuota.sort((x, y) => x.name.localeCompare(y.name))) {
+    console.log(`    ${i.name.padEnd(26)} ${i.default_quota} ảnh`);
+  }
 
   if (skipped.length) {
     console.log("\nBỏ qua:");
@@ -275,8 +323,8 @@ async function main() {
       await client.query(
         `insert into products
            (name, kind, material, size, list_price, price_confidence,
-            price_samples, lark_category, lark_record_id, is_active)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+            price_samples, lark_category, lark_record_id, is_active, default_quota)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          on conflict (lark_record_id) do update set
            name = excluded.name,
            kind = excluded.kind,
@@ -287,11 +335,12 @@ async function main() {
            price_samples = excluded.price_samples,
            lark_category = excluded.lark_category,
            is_active = excluded.is_active,
+           default_quota = excluded.default_quota,
            updated_at = now()`,
         [
           i.name, i.kind, i.material, i.size, i.list_price,
           i.price_confidence, i.price_samples, i.lark_category,
-          i.lark_record_id, i.is_active,
+          i.lark_record_id, i.is_active, i.default_quota,
         ],
       );
     }

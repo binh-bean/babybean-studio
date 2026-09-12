@@ -222,6 +222,46 @@ phụ thuộc vào trí nhớ của CSKH. App làm việc đó ở mỗi lần k
 > ghi trong đầu file `db/migrations/0014-danh-muc-san-pham.sql`. Con số 20 là
 > bịa, nhưng nó **chặn**, còn null thì **mở**.
 
+### 6.4. Mặc định 20 ảnh sai với gần như mọi gói
+
+`galleries.included_quota` và `packages.included_quota` đều là `default 20`.
+Con số đó không đến từ hợp đồng nào. Nhóm toàn bộ dòng `Edit file` theo tên gói:
+
+| Gói | Hạn mức thật | Số hợp đồng | Độ chắc | Giá gói |
+|---|---|---|---|---|
+| Baby 01 | 5 | 286 | 82% | 1.200.000 ₫ |
+| Baby 02 | **15** | **1.326** | 87% | 2.000.000 ₫ |
+| Baby 03 | 20 | 112 | 82% | 3.000.000 ₫ |
+| Baby 04 | 30 | 223 | 83% | 4.000.000 ₫ |
+| Baby 05 | 35 | 21 | 81% | 6.500.000 ₫ |
+| Fam 01 | 5 | 87 | 87% | 2.000.000 ₫ |
+| Fam 02 | **15** | **1.059** | 81% | 3.000.000 ₫ |
+| Fam 03 | 20 | 828 | 78% | 4.500.000 ₫ |
+| Fam 04 | 30 | 141 | 77% | 6.000.000 ₫ |
+| Fam 05 | 35 | 20 | 80% | 10.000.000 ₫ |
+| Newborn 01 · Portrait | 5 | | | |
+| Bầu 01 | 10 | | | |
+| Bầu 02 | 15 | | | |
+| Newborn 02 · EXTENDED FAMILY 02 | 20 | | | |
+
+Một cái thang rõ ràng — **5 · 15 · 20 · 30 · 35** — và không bậc nào là 20 cho
+hai gói phổ thông nhất.
+
+**Baby 02 bán 1.326 hợp đồng, hạn mức thật 15.** Mặc định 20 cho không 5 ảnh
+mỗi hợp đồng. Ở 50.000 ₫/ảnh, riêng gói đó đã là 331 triệu nếu chạy hết lượng
+lịch sử. App sinh ra để chặn đúng loại thất thoát này, nên để nguyên con số 20
+là app tự tạo lại cái lỗi nó đi sửa.
+
+Phần 13–23% còn lại của mỗi gói **không phải nhiễu**: đó là khách mua thêm ảnh
+ngay lúc ký, tạo ra các số 16, 21, 31. Vì thế `products.default_quota` là
+**giá trị gợi ý điền sẵn**, không phải luật. Hạn mức thật của một album vẫn là
+`app.gallery_quota()`, suy từ dòng hàng của chính hợp đồng đó.
+
+Ba gói bị **cố ý bỏ trống** vì dữ liệu chưa đủ chắc: Minisession (6 hợp đồng,
+4 mức, mức hay gặp nhất chỉ 33%), Dã Ngoại 02 (50%), EXTENDED FAMILY 01 (53%).
+Điền sẵn một con số sai còn tệ hơn để trống — người ta tin vào số đã điền sẵn.
+Ngưỡng đang dùng: từ 5 hợp đồng trở lên và từ 70% trở lên.
+
 ---
 
 ## 7. Thiết bị — khách dùng điện thoại
