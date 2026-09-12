@@ -11,6 +11,7 @@ import {
   Users,
   Settings,
   Store,
+  AlertTriangle,
   UserCog,
   ChevronLeft,
   ChevronRight
@@ -33,7 +34,13 @@ const navItems: {
   ownerOnly?: boolean;
 }[] = [
   { name: "Bảng điều khiển", href: "/admin", icon: LayoutDashboard, ready: false },
-  { name: "Quản lý album", href: "/admin/galleries", icon: Images, ready: true },
+  { name: "Quản lý bộ ảnh", href: "/admin/galleries", icon: Images, ready: true },
+  {
+    name: "Ảnh vượt hạn mức",
+    href: "/admin/reports/over-quota",
+    icon: AlertTriangle,
+    ready: true,
+  },
   { name: "Chi nhánh", href: "/admin/branches", icon: Store, ready: true },
   { name: "Nhân sự", href: "/admin/staff", icon: UserCog, ready: true, ownerOnly: true },
   { name: "Khách hàng", href: "/admin/customers", icon: Users, ready: false },

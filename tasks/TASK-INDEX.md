@@ -148,6 +148,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-116 | Đẩy 447 bộ hậu kỳ chưa qua khâu in lên để test | PM | BB-111 | med | ✅ **DONE** — 431/447 vào, 16 bộ trùng thư mục Drive |
 | BB-117 | Bỏ NOT NULL và DEFAULT của included_quota, get_admin_galleries hỗ trợ hạn mức null ('N/?', extraCount null) | ARCH | BB-102 | med | ✅ **DONE** — migration `0030`, schema.sql, domain.ts, get_admin_galleries |
 | BB-118 | Component đặt ảnh vào sản phẩm in, kèm nối vào màn khách | PM (thay DEV-UI hết token) | BB-113 | med | ✅ **DONE** |
+| BB-120 | Màn quản trị mở báo cáo thất thoát: API lọc chi nhánh, trang, mục menu | PM | BB-106 | high | ✅ **DONE** — `0031`, 5 test kèm đối chứng cách ly chi nhánh |
 | BB-119 | ~~Hợp nhất hai bản BB-111~~ — chủ studio chốt giữ bản PM, INT làm riêng BB-097 | — | — | — | 🚫 **HUỶ** |
 
 ---
