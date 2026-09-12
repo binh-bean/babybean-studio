@@ -5,6 +5,44 @@
 
 ---
 
+## 0. Thuật ngữ — gọi đúng tên, nhất là chữ "album"
+
+> Chủ studio chỉnh ngày 12.09.2026. **"Album" là một SẢN PHẨM**, không phải tập
+> ảnh khách chọn. Danh mục có 11 sản phẩm tên thật bắt đầu bằng "Album (Ultra
+> HD)". Gọi tập ảnh là "album" thì hai thứ khác hẳn nhau dùng chung một chữ, và
+> câu *"album này có album không"* là câu hỏi hợp lệ — dấu hiệu rõ nhất của một
+> cái tên sai.
+
+| Gọi là | Nghĩa | Trong mã nguồn |
+|---|---|---|
+| **Khách hàng** | một nhà. Một khách có **nhiều buổi chụp** | `customers` |
+| **Buổi chụp** | một lần chụp. Thường **một buổi = một hóa đơn** | `shoots` |
+| **Hóa đơn** | hợp đồng của buổi chụp đó. Chứa **1 hoặc nhiều gói chụp**, cộng dịch vụ và sản phẩm mua thêm | `gallery_items` có `parent_item_id` null |
+| **Gói chụp** | sản phẩm, ví dụ `Baby 02`, `Fam 03` | `products.kind = 'shoot_package'` |
+| **Bộ ảnh** | **tập ảnh khách mở ra chọn**. Một thư mục Drive = một bộ ảnh | `galleries` |
+| **Album** | **SẢN PHẨM** — quyển ảnh in. Nằm trong gói chụp, hoặc khách quay lại mua lẻ sau khi đã xong gói | `products.kind = 'print'`, tên chứa "Album" |
+| **Ảnh phóng · ảnh để bàn** | sản phẩm in khác | `products.kind = 'print'` |
+| **Hạn mức** | số ảnh chỉnh sửa đã trả tiền — dòng `Edit file` | `app.gallery_quota()` |
+
+**Bảng trong cơ sở dữ liệu vẫn tên `galleries`.** Đổi tên bảng là sửa hàng trăm
+chỗ mà chẳng sửa được hiểu lầm nào. Cái phải đúng là **chữ người đọc nhìn
+thấy**: mọi văn bản tiếng Việt hiện cho khách và cho nhân viên đều nói **"bộ
+ảnh"**. Tiếng Anh dùng **"gallery"**.
+
+### Mô hình bốn tầng, chủ studio chốt
+
+```
+Khách hàng
+  └─ nhiều BUỔI CHỤP
+       └─ thường một HÓA ĐƠN cho một buổi
+            ├─ 1 hoặc nhiều GÓI CHỤP
+            │    └─ thành phần của gói: ảnh chỉnh sửa, makeup, hàng in
+            └─ dịch vụ và sản phẩm MUA THÊM
+       └─ một BỘ ẢNH — thư mục Drive khách mở ra chọn
+```
+
+---
+
 ## 1. Dữ liệu đi từ Lark xuống, một chiều
 
 Lark có **ba tầng**, và tiền chỉ nằm ở tầng giữa:
@@ -28,7 +66,7 @@ Lark.
 
 ---
 
-## 2. Album xuất hiện trong app như thế nào
+## 2. Bộ ảnh xuất hiện trong app như thế nào
 
 Điều kiện kích hoạt, cả hai phải đúng:
 
@@ -48,7 +86,7 @@ Luồng:
 
 ```
 nhân viên tích "Lấy link app"
-   -> app tự điền tạm thông tin khách vào album (CÒN SỬA ĐƯỢC, để nhân viên soát)
+   -> app tự điền tạm thông tin khách vào bộ ảnh (CÒN SỬA ĐƯỢC, để nhân viên soát)
    -> nhân viên bấm tạo link app
    -> nhân viên COPY link, DÁN vào cột "Link app" bên Lark
    -> khách nhận link, mở xem ảnh
@@ -100,12 +138,12 @@ báo *"studio sẽ báo lại số ảnh trong gói"*. Không hiện số 0. Xem
 ### 3.3. Ghi chú và chọn ảnh cho sản phẩm in
 
 - Ghi chú chỉnh sửa **từng ảnh một** (`selection_items.retouch_note`).
-- Chọn ảnh nào để **phóng**, để **bàn**, làm **bìa album**.
+- Chọn ảnh nào để **phóng**, để **bàn**, làm **bìa bộ ảnh**.
 
 **Chỉ hiện ô chọn cho sản phẩm mà hợp đồng THẬT SỰ có.** Hợp đồng không mua
-album thì không được hiện chỗ chọn ảnh bìa album. Nguồn sự thật là
+bộ ảnh thì không được hiện chỗ chọn ảnh bìa bộ ảnh. Nguồn sự thật là
 `gallery_items`; chỗ lưu là `selection_placements` (bảng nối, vì một ảnh có thể
-vừa vào album vừa được phóng).
+vừa vào bộ ảnh vừa được phóng).
 
 Đặt ảnh vào sản phẩm in **không tiêu thêm hạn mức**. Hạn mức đếm ảnh được
 CHỈNH; ảnh in lấy từ tập đã chỉnh đó.
@@ -116,12 +154,12 @@ CHỈNH; ảnh in lấy từ tập đã chỉnh đó.
 
 ```
 khách bấm CHỐT
-   -> album chuyển 'in_review' -> 'submitted', khoá không cho sửa nữa
+   -> bộ ảnh chuyển 'in_review' -> 'submitted', khoá không cho sửa nữa
    -> báo cho studio qua Zalo hoặc link chat page
    -> CSKH xem lại
    -> có phát sinh  -> khách thanh toán  -> CSKH xác nhận
       không phát sinh -> CSKH xác nhận luôn
-   -> album chuyển sang giai đoạn sau ('in_retouch')
+   -> bộ ảnh chuyển sang giai đoạn sau ('in_retouch')
 ```
 
 Hai điểm phải đúng:
@@ -158,10 +196,10 @@ không được vẽ vào dải tiến trình.
 
 | | Việc | Chặn cái gì |
 |---|---|---|
-| 1 | Nhập mã hợp đồng lúc tạo album | không có mã thì không đồng bộ được hợp đồng |
-| 2 | Đồng bộ bảng Hậu Kỳ xuống app | album không tự xuất hiện |
+| 1 | Nhập mã hợp đồng lúc tạo bộ ảnh | không có mã thì không đồng bộ được hợp đồng |
+| 2 | Đồng bộ bảng Hậu Kỳ xuống app | bộ ảnh không tự xuất hiện |
 | 3 | Nút chọn ảnh hình trái tim + bốn con số | khách không chọn được |
-| 4 | Chọn ảnh cho sản phẩm in | khách không đặt được ảnh vào album |
+| 4 | Chọn ảnh cho sản phẩm in | khách không đặt được ảnh vào bộ ảnh |
 | 5 | Chốt, báo studio, CSKH xác nhận | vòng đời không khép |
 | 6 | Thanh toán phát sinh | tiền vẫn thu ngoài app |
 
@@ -194,10 +232,10 @@ Lark ghi "Đã chốt chưa in" và "Đã gửi In". **Chủ studio đã xác nh
 3.177  tổng bản ghi hậu kỳ
 2.680  bị loại (năm trạng thái trên)
   497  còn lại
-  443  trong đó CÓ "Link ảnh gửi khách"   <== số album sẽ lên app
+  443  trong đó CÓ "Link ảnh gửi khách"   <== số bộ ảnh sẽ lên app
 ```
 
-| Trạng thái | Số album | Ghi chú |
+| Trạng thái | Số bộ ảnh | Ghi chú |
 |---|---|---|
 | `Đã gửi file gốc` | 270 | **đúng điểm app thay thế** — khách chưa chọn |
 | `Đã Chọn Hình` | 84 | khách **đã chọn rồi** bằng cách cũ |
@@ -279,7 +317,7 @@ ngày 12.09.2026. Không ghi gì vào Lark, không ghi gì vào `bb-dev`.
 | **Suy được hạn mức** | **440** |
 | **KHÔNG suy được hạn mức** | **7** |
 | Có sản phẩm in | 438 |
-| Có album | 146 |
+| Có bộ ảnh | 146 |
 | Dòng hợp đồng / dòng thành phần | 1.070 / 1.109 |
 
 Phân bố hạn mức khớp với lịch sử: 15 ảnh (191 bộ), 20 (92), 30 (52), 5 (36).
@@ -288,20 +326,20 @@ Phân bố hạn mức khớp với lịch sử: 15 ảnh (191 bộ), 20 (92), 3
 
 Một mã hợp đồng xuất hiện ở **hai** bản ghi Hậu Kỳ khác nhau, 11 lần.
 
-Nếu album được tạo **theo mã hợp đồng**, 11 mã đó thành 22 album, và mỗi album
+Nếu bộ ảnh được tạo **theo mã hợp đồng**, 11 mã đó thành 22 bộ ảnh, và mỗi bộ ảnh
 nhận đủ dòng hàng của hợp đồng — **hạn mức bị đếm hai lần, studio cho không
 gấp đôi số ảnh.**
 
-> **Album phải được tạo theo BẢN GHI HẬU KỲ, không phải theo mã hợp đồng.**
+> **Bộ ảnh phải được tạo theo BẢN GHI HẬU KỲ, không phải theo mã hợp đồng.**
 > Một hợp đồng có thể có nhiều bản ghi hậu kỳ (nhiều buổi chụp, nhiều bé).
 > `galleries.lark_contract_code` là thứ để TRA CỨU hợp đồng, không phải khoá
-> định danh album.
+> định danh bộ ảnh.
 
-`scripts/sync-lark-contracts.mjs` giờ **cảnh báo** khi thấy nhiều album chung
+`scripts/sync-lark-contracts.mjs` giờ **cảnh báo** khi thấy nhiều bộ ảnh chung
 một mã, liệt kê ra từng cái. Cảnh báo chứ không chặn — có thể là hai buổi chụp
 thật, và chỉ người chạy mới phân biệt được. Nhưng phải nhìn thấy nó.
 
-Đã đối chứng: dựng hai album cùng mã thì cảnh báo nổ đúng.
+Đã đối chứng: dựng hai bộ ảnh cùng mã thì cảnh báo nổ đúng.
 
 #### Vấn đề 2 — 7 bộ không suy được hạn mức
 
@@ -320,7 +358,7 @@ có báo ra. Không ảnh hưởng tiền hay hạn mức.
 *(Lần quét đầu PM đọc ra "88 dòng thiếu sản phẩm" — con số đó đếm gộp cả dòng
 thành phần và đếm theo lượt xuất hiện. Đếm đúng ở tầng hóa đơn là 8.)*
 
-### 7.6. Một album = một thư mục ảnh, có thể gom nhiều hợp đồng
+### 7.6. Một bộ ảnh = một thư mục ảnh, có thể gom nhiều hợp đồng
 
 Chủ studio giải thích ba trường hợp thư mục Drive dùng chung, ngày 12.09.2026:
 
@@ -331,28 +369,28 @@ Chủ studio giải thích ba trường hợp thư mục Drive dùng chung, ngà
 | `HD_...#4487` + `#4515` | **nhân viên điền sai**, để nhân viên sửa sau |
 
 Trường hợp đầu quyết định mô hình. Khách đó **chỉ nhìn thấy một thư mục ảnh**,
-và hạn mức của họ là **tổng hai hợp đồng**. Tách thành hai album là chia đôi
+và hạn mức của họ là **tổng hai hợp đồng**. Tách thành hai bộ ảnh là chia đôi
 hạn mức của chính khách: họ mua 35 + 35 ảnh nhưng mỗi màn hình chỉ cho chọn 35,
 và ảnh thì trùng nhau vì cùng một thư mục.
 
-**Đơn vị định danh album là `drive_folder_id`** — thứ khách nhìn thấy — chứ
+**Đơn vị định danh bộ ảnh là `drive_folder_id`** — thứ khách nhìn thấy — chứ
 không phải bản ghi hậu kỳ (0027) cũng không phải mã hợp đồng.
 
 ```
 drive_folder_id        KHOÁ ĐỊNH DANH
-lark_contract_codes    mọi hợp đồng đổ vào album này
+lark_contract_codes    mọi hợp đồng đổ vào bộ ảnh này
 lark_contract_code     phần tử đầu, giữ cho chỗ hiển thị
 lark_hauky_record_id   bản ghi hậu kỳ đầu tiên, để tra ngược — THÔI unique
 ```
 
 Ràng buộc `chk_contract_code_first` giữ hai cột mã hợp đồng khỏi nói khác nhau.
 
-Kết quả trên dữ liệu thật: **432 album từ 446 bản ghi**, 4 album gom hai hợp
-đồng. Cặp `#3556 + #3557` giờ là một album **hạn mức 70 ảnh**.
+Kết quả trên dữ liệu thật: **432 bộ ảnh từ 446 bản ghi**, 4 bộ ảnh gom hai hợp
+đồng. Cặp `#3556 + #3557` giờ là một bộ ảnh **hạn mức 70 ảnh**.
 
 > **Máy không phân biệt được hai kiểu gom.** Mã liên tiếp thường là một nhà mua
 > hai gói; mã cách xa nhau thường là dán nhầm link. Script in ra **toàn bộ**
-> danh sách album gom kèm nhãn *"liên tiếp, có vẻ cùng nhà"* hoặc *"CÁCH XA
+> danh sách bộ ảnh gom kèm nhãn *"liên tiếp, có vẻ cùng nhà"* hoặc *"CÁCH XA
 > NHAU, kiểm kỹ"*. Gom nhầm hai nhà là khách này nhìn thấy ảnh con nhà kia, nên
 > danh sách đó phải có người đọc — không được bỏ qua.
 
@@ -382,10 +420,10 @@ một khách.
 tên lẫn số điện thoại, nên lưu **băm sha256, 12 ký tự đầu**: cùng khách thì cùng
 khoá ở mọi lần chạy, mà không đọc ngược ra tên hay số điện thoại. Xem `0029`.
 
-Tên album đổi sang **mã hợp đồng** để nhân viên dán vào Lark tra ra ngay; tên
+Tên bộ ảnh đổi sang **mã hợp đồng** để nhân viên dán vào Lark tra ra ngay; tên
 khách là bí danh bám theo khoá băm.
 
-Sau khi sửa: **405 khách · 432 album · 1.988 dòng hàng**, 23 khách có nhiều hơn
+Sau khi sửa: **405 khách · 432 bộ ảnh · 1.988 dòng hàng**, 23 khách có nhiều hơn
 một buổi chụp — bốn người trong đó có ba buổi trải nhiều tháng.
 
 #### Hai lỗi lộ ra nhờ việc này
@@ -397,7 +435,7 @@ chèn thêm 446 khách mới. Năm lần chạy để lại **2.154 khách rác*
 qua nếu trùng", nó là **"luôn luôn chèn"**.
 
 **Hai.** Test `admin-galleries` tìm `q=0912` rồi kiểm khớp trên
-`phone`/`babyName`/`customerName`, nhưng RPC `0013` còn tìm cả `g.title`. Album
+`phone`/`babyName`/`customerName`, nhưng RPC `0013` còn tìm cả `g.title`. Bộ ảnh
 mang tiêu đề `HD_20260912#...` khớp qua tiêu đề — **API đúng, test báo sai**.
 Kèm theo `customerPhone` có thể null vì đã che, và gọi `.includes` trên null ném
 `TypeError` che mất phép thử thật.

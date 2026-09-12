@@ -1,5 +1,10 @@
 # AGENTS.md — Điều lệ đội phát triển (Antigravity)
 
+> **THUẬT NGỮ — đọc `docs/16` mục 0 trước khi đặt tên bất cứ thứ gì.**
+> "Album" là một SẢN PHẨM (quyển ảnh in), không phải tập ảnh khách chọn. Tập
+> ảnh gọi là **bộ ảnh** trong mọi văn bản tiếng Việt, **gallery** trong tiếng
+> Anh. Bảng trong cơ sở dữ liệu vẫn tên `galleries`.
+
 Tài liệu này **phân quyền và phân vai** cho các model của Google trong Antigravity, vận hành như một phòng dev thật.
 Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc lập / QA gate**. Các agent bên dưới là **nhân sự thực thi**.
 

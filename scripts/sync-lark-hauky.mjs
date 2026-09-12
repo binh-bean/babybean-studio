@@ -156,6 +156,20 @@ function cellLink(value) {
 }
 
 /**
+ * Ngày từ ô kiểu ngày của Lark: mảng một phần tử, epoch mili-giây.
+ *
+ * Trả null khi trống — KHÔNG rơi về hôm nay. Một buổi chụp ghi nhầm ngày hôm
+ * nay trông y hệt buổi chụp thật, và sẽ nằm sai chỗ trong mọi báo cáo theo
+ * tháng mà không ai nhận ra.
+ */
+function cellDate(value) {
+  const ms = Array.isArray(value) ? value[0] : value;
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return new Date(n).toISOString().slice(0, 10);
+}
+
+/**
  * Khoá khách hàng, băm từ "Mã KH" của Lark.
  *
  * Mã gốc có dạng "B_SG-<tên khách>_<số điện thoại>" — gộp cả tên lẫn số điện
@@ -289,6 +303,7 @@ async function main() {
       }
 
       const larkCustomer = cellText(f["Mã KH"]).trim();
+      const shootDate = cellDate(f["Ngày Chụp"]);
       const photoUrl = cellLink(f["Link ảnh gửi khách"]);
       const folderId = driveFolderId(photoUrl);
       const key = folderId || `hauky:${haukyId}`;
@@ -315,6 +330,7 @@ async function main() {
         driveUrl: photoUrl,
         driveFolderId: folderId,
         folderKey: key,
+        shootDate,
         larkStatus: cellText(f["Trạng Thái"]).trim(),
       });
     }
@@ -399,21 +415,55 @@ async function main() {
         const customerId = cust[0]?.id;
         if (!customerId) throw new Error(`Không lấy được customer cho ${p.customerKey}`);
 
+        // BUỔI CHỤP — tầng chủ studio chốt ngày 12.09.2026:
+        //   khách hàng → nhiều buổi chụp → thường một hóa đơn mỗi buổi
+        //
+        // Bộ ảnh là tập ảnh của MỘT buổi chụp, nên mỗi bộ ảnh gắn một buổi.
+        // Không có tầng này thì ngày chụp bỏ trắng, và báo cáo thất thoát
+        // (v_over_quota_unbilled) mất hẳn cột ngày — không ai biết khoản nợ đó
+        // từ tháng nào.
+        //
+        // ĐỌC TRƯỚC RỒI MỚI GHI. Nếu bộ ảnh đã có buổi chụp thì cập nhật buổi
+        // đó, đừng tạo buổi mới: tạo mới mỗi lần chạy là đúng cái lỗi đã để
+        // lại 2.154 khách rác trước đây.
+        const { rows: existing } = await client.query(
+          `select shoot_id from galleries where drive_folder_id = $1`,
+          [p.driveFolderId || p.haukyId],
+        );
+        let shootId = existing[0]?.shoot_id ?? null;
+
+        if (p.shootDate) {
+          if (shootId) {
+            await client.query(`update shoots set shoot_date = $1 where id = $2`, [
+              p.shootDate,
+              shootId,
+            ]);
+          } else {
+            const { rows: sh } = await client.query(
+              `insert into shoots (branch_id, customer_id, shoot_date)
+               values ($1, $2, $3) returning id`,
+              [p.branchId, customerId, p.shootDate],
+            );
+            shootId = sh[0].id;
+          }
+        }
+
 
         // Album neo vào THƯ MỤC DRIVE — đó là thứ khách nhìn thấy, và là khoá
         // định danh sau 0028. Bộ nào không bóc được mã thư mục thì lấy mã bản
         // ghi hậu kỳ làm khoá, mỗi bộ một album riêng.
         const { rows: gal } = await client.query(
           `insert into galleries
-             (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url,
-              lark_contract_code, lark_contract_codes, lark_hauky_record_id)
-           values ($1,$2,$3,'draft',$4,$5,$6,$7,$8)
+             (branch_id, customer_id, shoot_id, title, status, drive_folder_id,
+              drive_folder_url, lark_contract_code, lark_contract_codes, lark_hauky_record_id)
+           values ($1,$2,$3,$4,'draft',$5,$6,$7,$8,$9)
            -- uq_galleries_drive_folder là chỉ số duy nhất CÓ ĐIỀU KIỆN
            -- (where status <> archived). ON CONFLICT phải khai lại đúng điều
            -- kiện đó, nếu không Postgres báo "no unique or exclusion constraint
            -- matching" và không ai đoán ra vì tên chỉ số vẫn tồn tại.
            on conflict (drive_folder_id) where status <> 'archived'
            do update set
+             shoot_id             = coalesce(galleries.shoot_id, excluded.shoot_id),
              drive_folder_url     = excluded.drive_folder_url,
              lark_contract_code   = excluded.lark_contract_code,
              lark_contract_codes  = excluded.lark_contract_codes,
@@ -421,8 +471,9 @@ async function main() {
              updated_at = now()
            returning (xmax = 0) as inserted`,
           [
-            p.branchId, customerId, p.galleryTitle, p.driveFolderId || p.haukyId,
-            p.driveUrl, p.contractCode, p.contractCodes, p.haukyId,
+            p.branchId, customerId, shootId, p.galleryTitle,
+            p.driveFolderId || p.haukyId, p.driveUrl, p.contractCode,
+            p.contractCodes, p.haukyId,
           ],
         );
         if (gal[0]?.inserted) created += 1;
