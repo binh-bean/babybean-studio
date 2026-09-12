@@ -29,6 +29,8 @@ const EXPECTED_TABLES = [
   "gallery_items", "products",
   // BB-101 — khách mua thêm và ảnh đặt vào sản phẩm in.
   "selection_addons", "selection_placements",
+  // BB-115 — ghi nhận thanh toán phát sinh.
+  "gallery_payments",
 ];
 
 const EXPECTED_VIEWS = ["v_gallery_progress", "v_share_links"];
@@ -222,6 +224,42 @@ async function main() {
           ? "có cổng QUOTA_UNKNOWN"
           : `${quotaGuard.rows.length - guarded.length}/${quotaGuard.rows.length} bản THIẾU cổng — trần chọn ảnh đang mở`,
     );
+
+    // authenticated không được có TRUNCATE, TRIGGER hay REFERENCES.
+    //
+    // TRUNCATE KHÔNG đi qua RLS: có quyền đó là xoá sạch bảng được, bất kể
+    // policy viết gì. Ngày 12.09.2026 cả 26/26 bảng đều đang cấp nó, trong đó
+    // có gallery_payments — bảng vừa được dựng theo kiểu chỉ-ghi-thêm với
+    // policy chặn update và delete. Policy đúng, quyền bảng phá nó.
+    //
+    // Nguồn là mặc định của Supabase (cấp ALL cho anon/authenticated/
+    // service_role), không phải mã của dự án. policies.sql đã thu hồi của anon
+    // nhưng bỏ sót authenticated. 0025 thu hồi, kèm alter default privileges
+    // để bảng mới không nhận lại.
+    //
+    // Cổng này canh chỗ đó, vì một migration sau chỉ cần một dòng grant là mở
+    // lại mà không ai để ý.
+    const looseGrants = await client.query(`
+      select table_name,
+             string_agg(privilege_type, ',' order by privilege_type) as privs
+      from information_schema.role_table_grants
+      where grantee = 'authenticated'
+        and table_schema = 'public'
+        and privilege_type in ('TRUNCATE', 'TRIGGER', 'REFERENCES')
+      group by table_name
+      order by table_name
+    `);
+    check(
+      "authenticated không có TRUNCATE/TRIGGER/REFERENCES",
+      looseGrants.rowCount === 0,
+      looseGrants.rowCount
+        ? `${looseGrants.rowCount} bảng còn: ` +
+            looseGrants.rows.slice(0, 4).map((r) => `${r.table_name}(${r.privs})`).join(" · ") +
+            (looseGrants.rowCount > 4 ? ` …` : "") +
+            " — TRUNCATE không đi qua RLS"
+        : "đã thu hồi hết",
+    );
+
 
   if (REQUIRE_SEED) {
     const counts = {};
