@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requireRole, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 
@@ -61,6 +61,217 @@ export async function GET(
     if (err instanceof AuthError) {
       return fail(err.code, err.message);
     }
+    return failUnexpected(err, requestId);
+  }
+}
+
+/**
+ * POST   thêm một dòng hàng vào bộ ảnh
+ * PATCH  đổi số lượng một dòng
+ * DELETE bỏ một dòng
+ *
+ * OWNER: DEV-BE. Task BB-103.
+ *
+ * ---------------------------------------------------------------------------
+ * Sửa dòng Edit file là SỬA HẠN MỨC CỦA KHÁCH
+ * ---------------------------------------------------------------------------
+ * Hạn mức không phải một cột người ta gõ vào; nó là tổng số lượng các dòng
+ * `Edit file`. Nên đổi số lượng một dòng như thế là đổi số ảnh khách được chọn
+ * miễn phí — và khách đang nhìn con số đó trên màn hình của họ.
+ *
+ * Route trả về hạn mức TRƯỚC và SAU mỗi lần sửa, để giao diện hỏi lại người
+ * dùng bằng con số cụ thể thay vì một câu cảnh báo chung chung.
+ *
+ * ---------------------------------------------------------------------------
+ * Chốt xong là khoá
+ * ---------------------------------------------------------------------------
+ * Bộ ảnh đã ở trạng thái submitted trở đi thì không sửa dòng hàng nữa. Lúc
+ * khách bấm chốt, BB-114 đã chụp lại con số họ nhìn thấy; sửa dòng hàng sau đó
+ * làm hai bên nhớ hai con số khác nhau, và bên thiệt luôn là khách.
+ *
+ * Cùng luật với patch_selection_batch — xem docs/16 mục 4.
+ */
+
+const EDIT_ROLES = ["owner", "admin", "branch_manager", "cs"] as const;
+const LOCKED_STATUSES = ["submitted", "in_retouch", "delivered", "archived"];
+
+/** Lấy bộ ảnh, kiểm quyền và kiểm khoá. Trả về null kèm lý do nếu không được. */
+type EditableGallery =
+  | { error: Response; admin?: undefined; gallery?: undefined }
+  | { error?: undefined; admin: ReturnType<typeof createAdminClient>; gallery: { id: string; branch_id: string; status: string } };
+
+async function loadEditableGallery(galleryId: string): Promise<EditableGallery> {
+  const staff = await requireStaff();
+  requireRole(staff, EDIT_ROLES as unknown as Parameters<typeof requireRole>[1]);
+
+  const admin = createAdminClient();
+  const { data: gallery } = await admin
+    .from("galleries")
+    .select("id, branch_id, status")
+    .eq("id", galleryId)
+    .maybeSingle();
+
+  if (!gallery) return { error: fail("NOT_FOUND", "Không tìm thấy bộ ảnh") } as const;
+  requireBranch(staff, gallery.branch_id);
+
+  if (LOCKED_STATUSES.includes(gallery.status)) {
+    return {
+      error: fail(
+        "GALLERY_LOCKED",
+        "Khách đã chốt bộ ảnh này. Không sửa được dòng hàng nữa.",
+      ),
+    } as const;
+  }
+
+  return { admin, gallery } as const;
+}
+
+async function quotaOf(
+  admin: ReturnType<typeof createAdminClient>,
+  galleryId: string,
+): Promise<number | null> {
+  const { data } = await admin.rpc("gallery_quota", { p_gallery_id: galleryId });
+  return data === null || data === undefined ? null : Number(data);
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const requestId = randomUUID();
+  try {
+    const { id: galleryId } = await context.params;
+    if (!UUID_REGEX.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
+
+    const loaded = await loadEditableGallery(galleryId);
+    if (loaded.error) return loaded.error;
+    const { admin } = loaded;
+
+    const body = (await request.json().catch(() => null)) as {
+      productId?: string;
+      quantity?: number;
+      unitPrice?: number | null;
+    } | null;
+
+    if (!body?.productId || !UUID_REGEX.test(body.productId)) {
+      return fail("INVALID_INPUT", "Thiếu sản phẩm");
+    }
+    const quantity = Number(body.quantity ?? 1);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return fail("INVALID_INPUT", "Số lượng phải là số nguyên từ 1 trở lên");
+    }
+
+    const quotaBefore = await quotaOf(admin, galleryId);
+
+    const { data: inserted, error } = await admin
+      .from("gallery_items")
+      .insert({
+        gallery_id: galleryId,
+        product_id: body.productId,
+        quantity,
+        // Dòng CSKH thêm tay là dòng hợp đồng (không có cha), nên được mang
+        // tiền. Thành phần của gói thì không — ràng buộc chk_component_no_price
+        // ở 0023 chặn việc đó.
+        unit_price: body.unitPrice ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw error;
+
+    return ok({
+      id: inserted.id,
+      quotaBefore,
+      quotaAfter: await quotaOf(admin, galleryId),
+    });
+  } catch (err) {
+    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
+    return failUnexpected(err, requestId);
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const requestId = randomUUID();
+  try {
+    const { id: galleryId } = await context.params;
+    if (!UUID_REGEX.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
+
+    const loaded = await loadEditableGallery(galleryId);
+    if (loaded.error) return loaded.error;
+    const { admin } = loaded;
+
+    const body = (await request.json().catch(() => null)) as {
+      itemId?: string;
+      quantity?: number;
+    } | null;
+
+    if (!body?.itemId || !UUID_REGEX.test(body.itemId)) {
+      return fail("INVALID_INPUT", "Thiếu dòng hàng cần sửa");
+    }
+    const quantity = Number(body.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return fail("INVALID_INPUT", "Số lượng phải là số nguyên từ 1 trở lên");
+    }
+
+    const quotaBefore = await quotaOf(admin, galleryId);
+
+    // Ràng buộc gallery_id trong câu update, không chỉ ràng id: thiếu nó thì
+    // một mã dòng hàng của bộ ảnh KHÁC vẫn sửa được, và kiểm quyền chi nhánh ở
+    // trên chẳng bảo vệ được gì.
+    const { error } = await admin
+      .from("gallery_items")
+      .update({ quantity })
+      .eq("id", body.itemId)
+      .eq("gallery_id", galleryId);
+
+    if (error) throw error;
+
+    return ok({ quotaBefore, quotaAfter: await quotaOf(admin, galleryId) });
+  } catch (err) {
+    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
+    return failUnexpected(err, requestId);
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const requestId = randomUUID();
+  try {
+    const { id: galleryId } = await context.params;
+    if (!UUID_REGEX.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
+
+    const loaded = await loadEditableGallery(galleryId);
+    if (loaded.error) return loaded.error;
+    const { admin } = loaded;
+
+    const url = new URL(request.url);
+    const itemId =
+      ((await request.json().catch(() => null)) as { itemId?: string } | null)?.itemId ??
+      url.searchParams.get("itemId") ??
+      "";
+
+    if (!UUID_REGEX.test(itemId)) return fail("INVALID_INPUT", "Thiếu dòng hàng cần bỏ");
+
+    const quotaBefore = await quotaOf(admin, galleryId);
+
+    // Xoá dòng cha kéo theo thành phần của nó (0014 khai on delete cascade),
+    // nên bỏ một gói chụp là bỏ luôn hạn mức nằm trong gói đó.
+    const { error } = await admin
+      .from("gallery_items")
+      .delete()
+      .eq("id", itemId)
+      .eq("gallery_id", galleryId);
+
+    if (error) throw error;
+
+    return ok({ quotaBefore, quotaAfter: await quotaOf(admin, galleryId) });
+  } catch (err) {
+    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
     return failUnexpected(err, requestId);
   }
 }
