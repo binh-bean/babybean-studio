@@ -127,7 +127,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-082 | **NGHIÊM TRỌNG.** 4 hàm `security definer` trong schema `public` cho `anon` gọi: chỉ cần khoá công khai + UUID album là đọc/ghi được mọi album, bỏ qua token, PIN, cookie và RLS. Đã chứng minh HTTP 200 | SEC-ARCH | BB-023 | high | DONE |
 | BB-096 | `branch-selector.tsx` dùng `mockBranches` cứng — bộ chọn chi nhánh trên thanh tiêu đề không nối vào đâu | DEV-FE | BB-063 | med | ✅ **DONE** — nối GET /api/admin/branches thật, lưu chọn chi nhánh, chỉ hiện khi phụ trách >1 chi nhánh |
 | BB-097 | Bóc tên mẹ và tên bé từ tên thư mục Drive: ngoài ngoặc là mẹ, trong ngoặc là bé, không ngoặc thì tất cả là tên mẹ. Gợi ý cho CSKH sửa, không tự lưu | DEV-INT + DEV-FE | BB-013 | med | ✅ **DONE** (DEV-INT) — `parseFolderName` tại `src/lib/drive/parse-folder-name.ts`, lệnh `npm run suggest:names`, 8 unit tests |
-| BB-098 | PIN thành tuỳ chọn từng link, mặc định TẮT, mã sinh ngẫu nhiên 4 số — không lấy từ SĐT vì khách nước ngoài không có | SEC-ARCH | BB-030 | med | TODO |
+| BB-098 | PIN tuỳ chọn từng link, mặc định TẮT, mã ngẫu nhiên 4 số | PM (thay SEC-ARCH hết token) | BB-030 | med | ✅ **DONE** — trả mã đúng một lần, bật lại xoá bộ đếm cũ |
 | BB-099 | Gán người theo từng album: photographer, CSKH, người photoshop. Thêm vai `photoshop_ctv` quyền hẹp hơn | ARCH + DEV-BE | BB-063 | high | TODO |
 | BB-100 | Danh mục sản phẩm + dòng hàng hợp đồng theo cấu trúc Lark thật (3 tầng). Hạn mức ảnh là dòng `Edit file`, không phải cột | PM | BB-063 | high | ✅ **DONE** — `0014`, 130/132 sản phẩm đã đồng bộ, `app.gallery_quota()` |
 | BB-101 | Khách mua thêm ngay trên app: `selection_addons` + bảng nối `selection_placements` | ARCH | BB-100 | high | ✅ **DONE** — `0015`, ADR-0003 |
