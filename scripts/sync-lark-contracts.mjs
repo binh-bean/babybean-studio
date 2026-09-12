@@ -129,6 +129,12 @@ function cellNumber(value) {
   return Number(String(cellText(value)).replace(/[^\d]/g, "")) || 0;
 }
 
+// Ô kiểu URL của Lark là { link, text } và `text` là nhãn do nhân viên gõ —
+// với "Link ảnh gửi khách" và "Chat với khách" thì nhãn đó CHÍNH LÀ TÊN KHÁCH.
+// cellText đọc `text` trước `link`, nên lấy địa chỉ bằng cellText sẽ ra tên
+// khách. Script này không đọc ô URL nào; cần thì dùng cellLink() trong
+// scripts/sync-lark-hauky.mjs.
+
 /** Mã bản ghi mà một ô liên kết trỏ tới. Ô liên kết mới có, ô chữ thì không. */
 function linkedRecordIds(value) {
   if (!Array.isArray(value)) return [];

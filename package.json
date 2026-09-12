@@ -27,7 +27,8 @@
     "verify:wired": "node scripts/verify-wired.mjs",
     "staff:link": "node --env-file-if-exists=.env.local scripts/link-staff.mjs",
     "sync:catalog": "node --env-file-if-exists=.env.local scripts/sync-lark-catalog.mjs",
-    "sync:contracts": "node --env-file-if-exists=.env.local scripts/sync-lark-contracts.mjs"
+    "sync:contracts": "node --env-file-if-exists=.env.local scripts/sync-lark-contracts.mjs",
+    "sync:hauky": "node --env-file-if-exists=.env.local scripts/sync-lark-hauky.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

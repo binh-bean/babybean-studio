@@ -1,0 +1,330 @@
+#!/usr/bin/env node
+/**
+ * Đồng bộ bảng Hậu Kỳ từ Lark xuống galleries + customers.
+ * OWNER: DEV-INT. Task BB-111.
+ *
+ * MỘT CHIỀU. Không bao giờ ghi ngược lên Lark. Nhân viên dán tay link app vào
+ * cột "Link app" bên Lark — xem docs/16 mục 2, dán tay là cố ý.
+ *
+ * Chạy:  npm run sync:hauky            xem trước, không ghi gì
+ *        npm run sync:hauky -- --write ghi thật
+ *        npm run sync:hauky -- --limit 20   chỉ lấy 20 bộ đầu, để thử
+ *
+ * ---------------------------------------------------------------------------
+ * Album neo vào BẢN GHI HẬU KỲ, không neo vào mã hợp đồng
+ * ---------------------------------------------------------------------------
+ * Đếm trên nhóm sắp đẩy: 11 mã hợp đồng xuất hiện ở HAI bản ghi Hậu Kỳ khác
+ * nhau. Một hợp đồng có thể có nhiều buổi chụp, nhiều bé, nhiều lần hậu kỳ.
+ *
+ * Neo theo mã hợp đồng thì 11 mã đó thành 22 album, và vì sync-lark-contracts
+ * kéo dòng hàng theo lark_contract_code, MỖI album nhận ĐỦ dòng hàng của hợp
+ * đồng — hạn mức đếm hai lần, studio cho không gấp đôi số ảnh, không gì báo lỗi.
+ *
+ * Nên khoá định danh là galleries.lark_hauky_record_id (0027).
+ *
+ * ---------------------------------------------------------------------------
+ * Che dữ liệu cá nhân — docs/16 mục 7.3
+ * ---------------------------------------------------------------------------
+ * bb-dev dùng chung với mọi agent, test xoá dòng trong đó, và repo CÔNG KHAI.
+ * Đợt này che tên và số điện thoại; mở lại khi có bb-prod.
+ *
+ * BA Ô MANG TÊN KHÁCH, cả ba đều dễ vô tình kéo vào:
+ *   "Tên KH"              tên thẳng
+ *   "Mã KH"               gộp cả tên lẫn số điện thoại vào một chuỗi
+ *   "Link ảnh gửi khách"  ô URL, nhãn text là tên thư mục kiểu "LIA - ZAC"
+ *   "Chat với khách"      ô URL, nhãn text là tên khách
+ *
+ * Hai ô cuối phải đọc bằng cellLink() chứ KHÔNG phải cellText(): cellText đọc
+ * `text` trước `link` nên sẽ trả về đúng cái tên vừa mất công che.
+ */
+
+import pg from "pg";
+
+const HOST = "https://open.larksuite.com/open-apis";
+
+/**
+ * Trạng thái đã qua khâu in — không đẩy lên.
+ * Chủ studio chốt ngày 12.09.2026, xem docs/16 mục 7.1.
+ */
+const SKIP_STATUSES = [
+  "Đã chốt chưa in",
+  "Đã gửi In",
+  "Hình đã về",
+  "Đã Giao",
+  "Đã CSKH",
+];
+
+/**
+ * Tên chi nhánh bên Lark sang tên trong app.
+ *
+ * KHÔNG đoán. Xếp khách nhầm chi nhánh là quản lý chi nhánh kia nhìn thấy dữ
+ * liệu không phải của mình, và RLS theo chi nhánh trở thành vô nghĩa. Gặp giá
+ * trị lạ thì script dừng và in ra để người chạy bổ sung.
+ */
+const BRANCH_MAP = {
+  Pasteur: "Baby Bean Pasteur",
+  "Thảo Điền": "Baby Bean Thảo Điền",
+
+  // NTB SUY RA BẰNG LOẠI TRỪ, chưa ai xác nhận.
+  //
+  // Đếm trên toàn bộ 11.693 dòng hợp đồng: Lark chỉ có đúng ba giá trị —
+  // NTB (5.993), Pasteur (3.206), Thảo Điền (2.428). App cũng có đúng ba chi
+  // nhánh, hai cái khớp tên, nên cái còn lại phải là Tân Bình.
+  //
+  // Suy luận này chắc nhưng KHÔNG phải bằng chứng. Nếu sai thì 5.993 dòng bị
+  // xếp nhầm chi nhánh, và RLS theo chi nhánh sẽ cho quản lý chi nhánh kia
+  // nhìn thấy dữ liệu không phải của mình. Chủ studio xác nhận rồi xoá ghi chú
+  // này đi.
+  NTB: "Baby Bean Tân Bình",
+};
+
+const need = (name) => {
+  const v = process.env[name];
+  if (!v) {
+    console.error(`Thiếu biến môi trường ${name}. Kiểm tra .env.local.`);
+    process.exit(1);
+  }
+  return v;
+};
+
+// --- đọc Lark ---------------------------------------------------------------
+
+async function larkAuth() {
+  const res = await fetch(`${HOST}/auth/v3/tenant_access_token/internal`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      app_id: need("LARK_APP_ID"),
+      app_secret: need("LARK_APP_SECRET"),
+    }),
+  });
+  const json = await res.json();
+  if (!json.tenant_access_token) throw new Error(`Lark từ chối cấp token: ${json.msg}`);
+  return { authorization: `Bearer ${json.tenant_access_token}` };
+}
+
+/** Đọc hết một bảng, tìm theo tên. Lark trả 500 dòng một lần, phải lặp. */
+async function readTable(auth, baseToken, namePattern) {
+  const list = await (
+    await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables?page_size=100`, { headers: auth })
+  ).json();
+  if (list.code !== 0) throw new Error(`Không liệt kê được bảng: ${list.msg}`);
+
+  const table = list.data.items.find((t) => namePattern.test(t.name));
+  if (!table) {
+    throw new Error(
+      `Không tìm thấy bảng khớp ${namePattern}. Các bảng hiện có: ` +
+        list.data.items.map((t) => t.name).join(" | "),
+    );
+  }
+
+  const rows = [];
+  let pageToken = "";
+  do {
+    const url =
+      `${HOST}/bitable/v1/apps/${baseToken}/tables/${table.table_id}/records?page_size=500` +
+      (pageToken ? `&page_token=${pageToken}` : "");
+    const page = await (await fetch(url, { headers: auth })).json();
+    if (page.code !== 0) throw new Error(`Lỗi đọc ${table.name}: ${page.msg}`);
+    rows.push(...(page.data.items ?? []));
+    pageToken = page.data.has_more ? page.data.page_token : "";
+  } while (pageToken);
+
+  return rows;
+}
+
+/** Ô của Lark có tám hình dạng tuỳ kiểu cột, kể cả ô điện thoại {fullPhoneNum}. */
+function cellText(value) {
+  if (value == null) return "";
+  if (Array.isArray(value)) {
+    return value
+      .map((v) =>
+        v == null ? "" : typeof v === "object" ? (v.text ?? v.name ?? v.fullPhoneNum ?? "") : String(v),
+      )
+      .join("");
+  }
+  if (typeof value === "object") return value.text ?? value.name ?? value.fullPhoneNum ?? "";
+  return String(value);
+}
+
+/**
+ * Địa chỉ của ô kiểu URL. DÙNG HÀM NÀY, ĐỪNG DÙNG cellText cho ô URL.
+ *
+ * Ô URL của Lark là { link, text } và `text` là nhãn do nhân viên gõ — với hai
+ * ô ta dùng thì nhãn đó chính là TÊN KHÁCH. cellText đọc `text` trước `link`.
+ */
+function cellLink(value) {
+  if (value == null) return "";
+  const first = Array.isArray(value) ? value[0] : value;
+  if (!first || typeof first !== "object") return "";
+  return first.link ?? "";
+}
+
+/** "https://drive.google.com/drive/folders/1VP4IW...?usp=sharing" -> "1VP4IW..." */
+function driveFolderId(url) {
+  const m = String(url).match(/\/folders\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : "";
+}
+
+// --- chạy -------------------------------------------------------------------
+
+async function main() {
+  const write = process.argv.includes("--write");
+  const limitIdx = process.argv.indexOf("--limit");
+  const limit = limitIdx >= 0 ? Number(process.argv[limitIdx + 1]) : 0;
+
+  const baseToken = need("LARK_BASE_APP_TOKEN");
+  const dbUrl = need("SUPABASE_DB_URL");
+
+  if (/prod/i.test(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "")) {
+    console.error("Đang trỏ vào production. Đợt này chỉ chạy trên bb-dev.");
+    process.exit(1);
+  }
+
+  const auth = await larkAuth();
+  const hauky = await readTable(auth, baseToken, /h[aậ]u k[yỳ]/i);
+  const invoiceLines = await readTable(auth, baseToken, /h[oó]a đơn chi ti[eế]t/i);
+  console.log(`Lark: ${hauky.length} bản ghi hậu kỳ, ${invoiceLines.length} dòng hợp đồng.`);
+
+  // Chi nhánh lấy từ dòng hợp đồng: cột Chi Nhánh bên Hậu Kỳ là ô tra cứu, trả
+  // về mã lựa chọn chứ không trả tên đọc được.
+  const branchByContract = new Map();
+  for (const line of invoiceLines) {
+    const code = cellText(line.fields["Hóa Đơn"]).trim();
+    const branch = cellText(line.fields["Chi Nhánh"]).trim();
+    if (code && branch && !branchByContract.has(code)) branchByContract.set(code, branch);
+  }
+
+  let candidates = hauky.filter(
+    (r) =>
+      !SKIP_STATUSES.includes(cellText(r.fields["Trạng Thái"]).trim()) &&
+      cellLink(r.fields["Link ảnh gửi khách"]),
+  );
+  console.log(`Sau khi loại ${SKIP_STATUSES.length} trạng thái đã qua in: ${candidates.length} bộ.`);
+  if (limit > 0) {
+    candidates = candidates.slice(0, limit);
+    console.log(`--limit ${limit}: chỉ xử lý ${candidates.length} bộ đầu.`);
+  }
+
+  const client = new pg.Client({ connectionString: dbUrl });
+  await client.connect();
+
+  try {
+    const { rows: branchRows } = await client.query("select id, name from branches");
+    const branchIdByName = new Map(branchRows.map((b) => [b.name, b.id]));
+
+    const plan = [];
+    const unmappedBranches = new Map();
+    const noContract = [];
+
+    for (const rec of candidates) {
+      const f = rec.fields;
+      const contractCode = cellText(f["HĐ Tổng"]).trim();
+      const larkBranch = branchByContract.get(contractCode) ?? "";
+      const appBranch = BRANCH_MAP[larkBranch];
+      const branchId = appBranch ? branchIdByName.get(appBranch) : undefined;
+
+      if (!contractCode) {
+        noContract.push(cellText(f["record ID"]).trim() || rec.record_id);
+        continue;
+      }
+      if (!branchId) {
+        unmappedBranches.set(larkBranch || "(trống)", (unmappedBranches.get(larkBranch || "(trống)") ?? 0) + 1);
+        continue;
+      }
+
+      const photoUrl = cellLink(f["Link ảnh gửi khách"]);
+      plan.push({
+        haukyId: cellText(f["record ID"]).trim() || rec.record_id,
+        contractCode,
+        branchId,
+        // Che: KHÔNG lấy "Tên KH", KHÔNG lấy nhãn text của ô link (là tên thư
+        // mục kiểu "LIA - ZAC"). Mã hợp đồng vừa duy nhất vừa tra được bên Lark.
+        customerName: `KH · ${contractCode}`,
+        chatUrl: cellLink(f["Chat với khách"]) || null,
+        driveUrl: photoUrl,
+        driveFolderId: driveFolderId(photoUrl),
+        larkStatus: cellText(f["Trạng Thái"]).trim(),
+      });
+    }
+
+    console.log(`\nDựng được ${plan.length} album.`);
+    if (noContract.length) console.log(`  ${noContract.length} bộ không có mã hợp đồng — bỏ qua.`);
+    if (unmappedBranches.size) {
+      console.log(`  BỎ QUA vì chi nhánh chưa có trong BRANCH_MAP:`);
+      for (const [name, n] of unmappedBranches) console.log(`     "${name}" — ${n} bộ`);
+      console.log(`  Bổ sung vào BRANCH_MAP trong ${"scripts/sync-lark-hauky.mjs"} rồi chạy lại.`);
+    }
+    const noFolder = plan.filter((p) => !p.driveFolderId).length;
+    if (noFolder) console.log(`  ${noFolder} bộ có link nhưng không bóc được mã thư mục Drive.`);
+
+    const byStatus = plan.reduce((acc, p) => ({ ...acc, [p.larkStatus]: (acc[p.larkStatus] ?? 0) + 1 }), {});
+    console.log("  Theo trạng thái:", byStatus);
+
+    if (!write) {
+      console.log("\nXem trước, chưa ghi gì. Thêm -- --write để ghi thật.");
+      console.log("Ví dụ ba album đầu:");
+      for (const p of plan.slice(0, 3)) {
+        console.log(`   ${p.customerName}  |  thư mục ${p.driveFolderId || "(không bóc được)"}`);
+      }
+      return;
+    }
+
+    let created = 0;
+    let updated = 0;
+    for (const p of plan) {
+      await client.query("begin");
+      try {
+        // Khách: một khách cho mỗi hợp đồng, tên đã che.
+        const { rows: cust } = await client.query(
+          `insert into customers (branch_id, full_name, facebook)
+           values ($1, $2, $3)
+           on conflict do nothing
+           returning id`,
+          [p.branchId, p.customerName, p.chatUrl],
+        );
+        let customerId = cust[0]?.id;
+        if (!customerId) {
+          const { rows } = await client.query(
+            `select id from customers where full_name = $1 limit 1`,
+            [p.customerName],
+          );
+          customerId = rows[0]?.id;
+        }
+
+        // Album: neo vào bản ghi hậu kỳ, KHÔNG neo vào mã hợp đồng.
+        const { rows: gal } = await client.query(
+          `insert into galleries
+             (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url,
+              lark_contract_code, lark_hauky_record_id)
+           values ($1,$2,$3,'draft',$4,$5,$6,$7)
+           on conflict (lark_hauky_record_id) where lark_hauky_record_id is not null
+           do update set
+             drive_folder_url  = excluded.drive_folder_url,
+             lark_contract_code = excluded.lark_contract_code,
+             updated_at = now()
+           returning (xmax = 0) as inserted`,
+          [
+            p.branchId, customerId, p.customerName, p.driveFolderId || p.haukyId,
+            p.driveUrl, p.contractCode, p.haukyId,
+          ],
+        );
+        if (gal[0]?.inserted) created += 1;
+        else updated += 1;
+        await client.query("commit");
+      } catch (err) {
+        await client.query("rollback");
+        console.log(`   LỖI ở ${p.customerName}, đã hoàn tác bộ này: ${err.message}`);
+      }
+    }
+    console.log(`\nĐã ghi: ${created} album mới, ${updated} album cập nhật.`);
+    console.log("Bước tiếp theo: npm run sync:contracts -- --write để kéo dòng hàng.");
+  } finally {
+    await client.end();
+  }
+}
+
+main().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});

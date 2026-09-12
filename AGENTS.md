@@ -97,7 +97,7 @@ Quản trị dự án (PM) là con người; Claude đóng vai **reviewer độc
 |---|---|
 | **Model** | Gemini 3 Pro — thinking **Medium** |
 | **Nhiệm vụ** | Client Drive API, parse link chia sẻ, phân trang, cache metadata, image proxy + CDN, xử lý rate-limit/backoff. Webhook Lark. ZNS Zalo (Phase 4). |
-| **Sở hữu** | `src/lib/drive/**`, `src/lib/lark/**`, `src/app/api/img/**`, `scripts/sync-drive.ts`, `scripts/sync-lark-catalog.mjs`, `scripts/sync-lark-contracts.mjs` |
+| **Sở hữu** | `src/lib/drive/**`, `src/lib/lark/**`, `src/app/api/img/**`, `scripts/sync-drive.ts`, `scripts/sync-lark-catalog.mjs`, `scripts/sync-lark-*.mjs` |
 | **Cấm** | Lộ `GOOGLE_DRIVE_API_KEY` ra client bundle. Fetch Drive trong render path của trang khách. |
 | **Ràng buộc** | Mọi lời gọi Drive đi qua `driveFetch()`: retry 429/5xx với exponential backoff + jitter, timeout 10s, ghi log quota đã dùng. |
 | **Prompt pack** | `prompts/dev-int.md` |

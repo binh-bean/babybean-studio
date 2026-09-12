@@ -140,12 +140,12 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-108 | **Gỡ công tắc watermark khỏi giao diện.** Nó chạy đủ một vòng nhưng không component nào vẽ watermark — CSKH bật, hệ thống báo đã bật, ảnh vẫn ra sạch. Hứa suông về một thứ bảo vệ không tồn tại | DEV-FE + DEV-BE | — | med | TODO |
 | BB-109 | Đồng bộ nội dung hợp đồng Lark xuống `gallery_items`: hai tầng, tiền thật, khớp sản phẩm theo mã bản ghi | PM | BB-100 | high | ✅ **DONE** — `sync:contracts`, `0023` thêm `line_total` |
 | BB-110 | Ô nhập **mã hợp đồng Lark** khi tạo và khi sửa album — mắt xích cuối để `sync:contracts` chạy được | DEV-FE | BB-109 | med | TODO |
-| BB-111 | Đồng bộ bảng **Hậu Kỳ**: bản ghi mới + có `Link ảnh gửi khách` thì hiện trong app; ô tích `Lấy link app` tạo album nháp sửa được | DEV-INT | BB-109 | high | TODO |
+| BB-111 | Đồng bộ bảng **Hậu Kỳ** xuống app, che tên và số điện thoại | PM (thay DEV-INT hết token) | BB-109 | high | ✅ **DONE** — `sync:hauky`, `0027` neo theo bản ghi hậu kỳ, 431 album thật |
 | BB-112 | **Thả tim = chọn ảnh** (`mark=selected`, KHÔNG phải `is_favorite`) + bốn con số hạn mức hiện ngay | DEV-FE | BB-102 | high | TODO |
 | BB-113 | Khách đặt ảnh vào sản phẩm in: chỉ hiện ô chọn cho sản phẩm hợp đồng THẬT SỰ có | DEV-FE + DEV-BE | BB-101 | high | TODO |
 | BB-114 | Chốt đơn, báo studio qua Zalo hoặc link chat, CSKH xác nhận rồi chuyển giai đoạn | DEV-BE + DEV-INT | BB-112 | high | ✅ **DONE** — `POST /api/g/submit`, `POST /api/admin/galleries/[id]/confirm`, snapshot con số, thông báo studio |
 | BB-115 | Ghi nhận thanh toán phát sinh và gắn vào lần xác nhận của CSKH | ARCH + DEV-BE | BB-114 | med | ✅ **DONE** — `0024` `gallery_payments`, chỉ ghi thêm không sửa đè |
-| BB-116 | Đẩy 443 bộ hậu kỳ chưa qua khâu in lên để test, che tên và số điện thoại | DEV-INT | BB-111 | med | TODO |
+| BB-116 | Đẩy 447 bộ hậu kỳ chưa qua khâu in lên để test | PM | BB-111 | med | ✅ **DONE** — 431/447 vào, 16 bộ trùng thư mục Drive |
 
 ---
 
