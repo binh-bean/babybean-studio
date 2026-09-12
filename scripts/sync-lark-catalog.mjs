@@ -98,7 +98,8 @@ async function readTable(auth, baseToken, namePattern) {
 
 /**
  * Ô của Lark có bảy hình dạng khác nhau tùy kiểu cột: chuỗi, số, mảng chuỗi,
- * mảng {text}, mảng {name}, object {name}, object {text}. Một hàm cho tất cả,
+ * mảng {text}, mảng {name}, object {name}, object {text}, và ô điện thoại
+ * {fullPhoneNum}. Một hàm cho tất cả,
  * vì đoán sai kiểu thì ra chuỗi "[object Object]" và không ai nhận ra.
  */
 function cellText(value) {
@@ -114,7 +115,7 @@ function cellText(value) {
       )
       .join("");
   }
-  if (typeof value === "object") return value.text ?? value.name ?? "";
+  if (typeof value === "object") return value.text ?? value.name ?? value.fullPhoneNum ?? "";
   return String(value);
 }
 

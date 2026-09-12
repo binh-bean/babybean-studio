@@ -104,17 +104,24 @@ async function readTable(auth, baseToken, namePattern) {
   return rows;
 }
 
-/** Ô của Lark có bảy hình dạng tuỳ kiểu cột. Một hàm cho tất cả. */
+/**
+ * Ô của Lark có tám hình dạng tuỳ kiểu cột, kể cả ô điện thoại trả
+ * {fullPhoneNum}. Một hàm cho tất cả.
+ *
+ * Thiếu một nhánh thì ô CÓ dữ liệu lại đọc ra chuỗi rỗng, và không có lỗi nào
+ * báo. PM đã kết luận nhầm "bảng hậu kỳ không có số điện thoại nào" đúng một
+ * lần vì thiếu đúng nhánh fullPhoneNum này.
+ */
 function cellText(value) {
   if (value == null) return "";
   if (Array.isArray(value)) {
     return value
       .map((v) =>
-        v == null ? "" : typeof v === "object" ? (v.text ?? v.name ?? "") : String(v),
+        v == null ? "" : typeof v === "object" ? (v.text ?? v.name ?? v.fullPhoneNum ?? "") : String(v),
       )
       .join("");
   }
-  if (typeof value === "object") return value.text ?? value.name ?? "";
+  if (typeof value === "object") return value.text ?? value.name ?? value.fullPhoneNum ?? "";
   return String(value);
 }
 

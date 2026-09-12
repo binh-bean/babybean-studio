@@ -145,6 +145,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-113 | Khách đặt ảnh vào sản phẩm in: chỉ hiện ô chọn cho sản phẩm hợp đồng THẬT SỰ có | DEV-FE + DEV-BE | BB-101 | high | TODO |
 | BB-114 | Chốt đơn, báo studio qua Zalo hoặc link chat, CSKH xác nhận rồi chuyển giai đoạn | DEV-BE + DEV-INT | BB-112 | high | TODO |
 | BB-115 | Ghi nhận thanh toán phát sinh và gắn vào lần xác nhận của CSKH | ARCH + DEV-BE | BB-114 | med | TODO |
+| BB-116 | Đẩy 443 bộ hậu kỳ chưa qua khâu in lên để test, che tên và số điện thoại | DEV-INT | BB-111 | med | TODO |
 
 ---
 
