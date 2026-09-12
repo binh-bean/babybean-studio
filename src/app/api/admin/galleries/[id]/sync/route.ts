@@ -31,7 +31,7 @@ export async function POST(
       .single();
 
     if (galErr || !gallery) {
-      return fail("NOT_FOUND", "Không tìm thấy album");
+      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
     const isEarlyStatus = ["draft", "syncing", "sync_error"].includes(gallery.status);

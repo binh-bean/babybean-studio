@@ -48,7 +48,7 @@ export async function POST(
       .single();
 
     if (galleryError || !gallery) {
-      return fail("NOT_FOUND", "Không tìm thấy album");
+      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
     requireBranch(staff, gallery.branch_id);
@@ -57,7 +57,7 @@ export async function POST(
     if (gallery.status !== "submitted") {
       return fail(
         "INVALID_INPUT",
-        `Không thể xác nhận album ở trạng thái '${gallery.status}'. Chỉ album 'submitted' mới được chuyển sang 'in_retouch'.`
+        `Không thể xác nhận bộ ảnh ở trạng thái '${gallery.status}'. Chỉ bộ ảnh 'submitted' mới được chuyển sang 'in_retouch'.`
       );
     }
 
@@ -94,7 +94,7 @@ export async function POST(
     return ok({
       galleryId,
       status: "in_retouch",
-      message: "Đã xác nhận và chuyển album sang giai đoạn chỉnh sửa (in_retouch)",
+      message: "Đã xác nhận và chuyển bộ ảnh sang giai đoạn chỉnh sửa (in_retouch)",
     });
   } catch (err) {
     if (err instanceof AuthError) {

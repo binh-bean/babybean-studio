@@ -41,7 +41,7 @@ export async function GET(
       .single();
 
     if (galleryError || !gallery) {
-      return fail("NOT_FOUND", "Không tìm thấy album");
+      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
     requireBranch(staff, gallery.branch_id);

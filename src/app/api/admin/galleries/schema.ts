@@ -36,7 +36,7 @@ export const CreateGallerySchema = z
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày chụp phải theo định dạng YYYY-MM-DD")
       .optional()
       .nullable(),
-    title: z.string().min(1, "Tên album không được để trống"),
+    title: z.string().min(1, "Tên bộ ảnh không được để trống"),
     driveUrl: z.string().min(1, "Link Google Drive không được để trống"),
     includedQuota: z.number().int().nonnegative().optional(),
     extraPhotoPrice: z.number().nonnegative().optional(),
@@ -51,7 +51,6 @@ export const CreateGallerySchema = z
           .regex(/^\d{4}$/, "Mã PIN phải gồm đúng 4 chữ số")
           .optional()
           .nullable(),
-        watermark: z.boolean().default(true),
         download: z.boolean().default(false),
         notes: z.boolean().default(true),
         invite: z.boolean().default(true),

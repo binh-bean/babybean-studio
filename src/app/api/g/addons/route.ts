@@ -53,7 +53,7 @@ export async function POST(request: Request): Promise<Response> {
       .single();
 
     if (galleryError || !gallery) {
-      return fail("NOT_FOUND", "Không tìm thấy album");
+      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
     if (
@@ -63,7 +63,7 @@ export async function POST(request: Request): Promise<Response> {
       gallery.status === "archived" ||
       gallery.status === "expired"
     ) {
-      return fail("GALLERY_LOCKED", "Album đã chốt hoặc đã khoá, không thể mua thêm");
+      return fail("GALLERY_LOCKED", "Bộ ảnh đã chốt hoặc đã khoá, không thể mua thêm");
     }
 
     // 4. Verify product & price rules
