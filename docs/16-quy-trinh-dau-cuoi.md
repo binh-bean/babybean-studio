@@ -358,3 +358,46 @@ Kết quả trên dữ liệu thật: **432 album từ 446 bản ghi**, 4 album 
 
 Ba cặp đang mang nhãn *kiểm kỹ*: `#4796 + #4898`, `#4842 + #4967`,
 `#4635 + #4638`.
+
+### 7.7. Một khách hàng là một khách hàng, dù có bao nhiêu hóa đơn
+
+Chủ studio chỉ ra ngày 12.09.2026: *"một khách hàng nhiều hóa đơn buổi chụp"*.
+Đợt nhập đầu của PM đặt tên khách theo **mã hợp đồng**, nên mỗi hợp đồng thành
+một khách.
+
+| | |
+|---|---|
+| Khách thật | **405** |
+| App tạo ra | 446 |
+| Khách có nhiều hợp đồng | 25 — 21 người có 2, 4 người có 3 |
+
+41 khách bị xé nhỏ. Hậu quả không chỉ là đếm sai:
+
+- **Cổng khách (`0010`) cấp MỘT link cho MỘT khách** để xem mọi buổi chụp của
+  họ. Khách bị xé nhỏ thì mỗi buổi một link — đúng thứ `0010` sinh ra để bỏ.
+- Mô hình chủ studio chốt từ đầu là *một khách → nhiều buổi chụp → nhiều gói*.
+  Xé khách ra là phá tầng trên cùng.
+
+**Khoá đúng là `Mã KH` bên Lark**, có đủ ở 446/446 bản ghi. Nhưng mã đó gộp cả
+tên lẫn số điện thoại, nên lưu **băm sha256, 12 ký tự đầu**: cùng khách thì cùng
+khoá ở mọi lần chạy, mà không đọc ngược ra tên hay số điện thoại. Xem `0029`.
+
+Tên album đổi sang **mã hợp đồng** để nhân viên dán vào Lark tra ra ngay; tên
+khách là bí danh bám theo khoá băm.
+
+Sau khi sửa: **405 khách · 432 album · 1.988 dòng hàng**, 23 khách có nhiều hơn
+một buổi chụp — bốn người trong đó có ba buổi trải nhiều tháng.
+
+#### Hai lỗi lộ ra nhờ việc này
+
+**Một.** Câu `insert ... on conflict do nothing` cũ **không có ràng buộc duy
+nhất nào để đụng vào**, nên nó không bao giờ xung đột — mỗi lần chạy lại là
+chèn thêm 446 khách mới. Năm lần chạy để lại **2.154 khách rác** trong
+`bb-dev`. `on conflict do nothing` mà thiếu chỉ số duy nhất thì không phải "bỏ
+qua nếu trùng", nó là **"luôn luôn chèn"**.
+
+**Hai.** Test `admin-galleries` tìm `q=0912` rồi kiểm khớp trên
+`phone`/`babyName`/`customerName`, nhưng RPC `0013` còn tìm cả `g.title`. Album
+mang tiêu đề `HD_20260912#...` khớp qua tiêu đề — **API đúng, test báo sai**.
+Kèm theo `customerPhone` có thể null vì đã che, và gọi `.includes` trên null ném
+`TypeError` che mất phép thử thật.
