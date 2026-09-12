@@ -181,20 +181,46 @@ async function main() {
     // as a parameter returned that gallery's photos with HTTP 200.
     // These functions are meant to be called by the server with the service
     // key. Nothing else should be able to call them at all.
+    // Quét CẢ HAI schema. Bản đầu của cổng này chỉ nhìn `public`, nên 6 hàm
+    // trợ giúp SECURITY DEFINER trong schema `app` — my_role, is_superuser,
+    // my_branches, can_see_branch, can_write, can_manage_customers — chưa bao
+    // giờ được canh. Cả sáu đang mang PUBLIC EXECUTE cho tới 0026.
+    //
+    // "Gọi được" phải tính CẢ HAI tầng: quyền trên hàm, VÀ quyền USAGE trên
+    // schema chứa nó. Chỉ nhìn một tầng thì hoặc báo động giả, hoặc bỏ sót.
+    // Hôm nay anon bị chặn ở tầng schema, nhưng một dòng
+    // `grant usage on schema app to anon` là mở ra hết.
     const definerFns = await client.query(`
-      select p.proname,
-             has_function_privilege('anon', p.oid, 'EXECUTE') as anon_can
+      select n.nspname || '.' || p.proname as fn,
+             has_function_privilege('anon', p.oid, 'EXECUTE')
+               and has_schema_privilege('anon', n.nspname, 'USAGE') as anon_can
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
-      where n.nspname = 'public' and p.prosecdef
+      where n.nspname in ('public', 'app') and p.prosecdef
     `);
-    const reachable = definerFns.rows.filter((r) => r.anon_can).map((r) => r.proname);
+    const reachable = definerFns.rows.filter((r) => r.anon_can).map((r) => r.fn);
     check(
       "Khoá công khai không gọi được hàm SECURITY DEFINER",
       reachable.length === 0,
       reachable.length
         ? `GỌI ĐƯỢC: ${reachable.join(", ")} — đi vòng qua token, PIN, cookie và RLS`
-        : `${definerFns.rows.length} hàm, đã chặn hết`,
+        : `${definerFns.rows.length} hàm ở public và app, đã chặn hết`,
+    );
+
+    // Lớp thứ hai, kiểm riêng: anon không được có USAGE trên schema app.
+    //
+    // Tách khỏi phép kiểm trên là cố ý. Nếu gộp, thì ngày nào đó ai đó cấp
+    // usage cho anon mà đúng lúc mọi hàm đều đã revoke PUBLIC, cổng vẫn xanh —
+    // và hàng rào đã mất một lớp mà không ai biết. Hai lớp thì kiểm hai lần.
+    const appUsage = await client.query(
+      `select has_schema_privilege('anon', 'app', 'USAGE') as can`,
+    );
+    check(
+      "anon không có USAGE trên schema app",
+      appUsage.rows[0].can === false,
+      appUsage.rows[0].can
+        ? "CÓ USAGE — mọi hàm trợ giúp RLS đều nằm trong schema này"
+        : "đã chặn",
     );
 
     // Hạn mức chưa biết phải CHẶN chọn ảnh, không được mở trần.
