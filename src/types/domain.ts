@@ -24,19 +24,12 @@ export const STAFF_ROLES = [
 ] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
-export const GALLERY_STATUSES = [
-  "draft",
-  "syncing",
-  "sync_error",
-  "ready",
-  "in_review",
-  "submitted",
-  "in_retouch",
-  "delivered",
-  "expired",
-  "archived",
-] as const;
-export type GalleryStatus = (typeof GALLERY_STATUSES)[number];
+// Danh sách nằm ở @/lib/gallery-status — một nguồn duy nhất, có phép thử so
+// với enum thật trong cơ sở dữ liệu. Bản chép tay ở đây từng thiếu
+// 'awaiting_approval' và 'approved'.
+import { GALLERY_STATUSES, type GalleryStatusValue } from "@/lib/gallery-status";
+export { GALLERY_STATUSES };
+export type GalleryStatus = GalleryStatusValue;
 
 export const PHOTO_STATUSES = ["active", "missing", "hidden"] as const;
 export type PhotoStatus = (typeof PHOTO_STATUSES)[number];

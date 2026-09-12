@@ -74,17 +74,10 @@ export const CreateGallerySchema = z
 
 export type CreateGalleryInput = z.infer<typeof CreateGallerySchema>;
 
-export const GALLERY_STATUS_VALUES = [
-  "draft",
-  "syncing",
-  "ready",
-  "in_review",
-  "submitted",
-  "in_retouch",
-  "delivered",
-  "expired",
-  "archived",
-] as const;
+// Bản chép tay ở đây từng thiếu 'sync_error', 'awaiting_approval' và
+// 'approved' — CSKH lọc theo các trạng thái đó thì Zod từ chối thẳng.
+import { GALLERY_STATUSES } from "@/lib/gallery-status";
+export const GALLERY_STATUS_VALUES = GALLERY_STATUSES;
 
 export const GetGalleriesQuerySchema = z.object({
   branchId: z.string().uuid("branchId phải là UUID hợp lệ").optional(),

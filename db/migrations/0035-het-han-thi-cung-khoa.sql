@@ -19,11 +19,20 @@
 -- trạng thái 'expired' không tự chặn được gì.
 --
 -- ---------------------------------------------------------------------------
--- Vì sao khoá là đúng, không phải mở
+-- ĐÍNH CHÍNH (viết ngay sau khi chạy migration này)
 -- ---------------------------------------------------------------------------
--- Mở lại cho khách chọn là việc studio làm bằng cách đổi trạng thái sang
--- 'reopened' — trạng thái đó không khoá. Nên khoá 'expired' không chặn mất
--- đường nào của nghiệp vụ.
+-- Bản đầu của ghi chú này viết: "mở lại cho khách chọn là việc studio làm
+-- bằng cách đổi trạng thái sang 'reopened'". SAI hai lần. Kiểu enum
+-- gallery_status KHÔNG có giá trị 'reopened' — dải tiến trình phía khách có
+-- nhánh xử lý nó, nhưng nhánh đó chưa bao giờ chạy. Và không có đường mở lại
+-- nào cả: hai cột reopened_at, reopen_reason có trong schema từ đầu mà không
+-- ai ghi.
+--
+-- Nghĩa là trước migration này, chính lỗ hổng trên LÀ đường thoát duy nhất
+-- cho bộ ảnh quá hạn. Khoá lại mà không mở đường chính thức thì bộ ảnh quá
+-- hạn thành ngõ cụt. Đường chính thức là
+-- POST /api/admin/galleries/[id]/reopen (BB-122): CSKH mở lại, bắt buộc ghi
+-- lý do, trạng thái về 'in_review'.
 --
 -- Giữ NGUYÊN chữ ký hàm: đổi tham số là Postgres tạo bản CHỒNG chứ không thay
 -- thế, và bản mới mặc định cho PUBLIC gọi.

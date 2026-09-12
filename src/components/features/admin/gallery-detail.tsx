@@ -182,6 +182,28 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     }
   }
 
+  /** Mở lại cho khách chọn tiếp. Bắt buộc có lý do — route API cũng bắt. */
+  async function reopen(reason: string) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/reopen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const json = await res.json().catch(() => null);
+      setNotice(
+        res.ok
+          ? "Đã mở lại. Khách chọn ảnh tiếp được — nhớ báo cho khách."
+          : (json?.error?.message ?? "Không mở lại được"),
+      );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const overCount = detail.quotaKnown && detail.includedQuota !== null
     ? Math.max(0, detail.selectedCount - detail.includedQuota)
     : null;
@@ -346,6 +368,18 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         </section>
       )}
 
+      {(detail.status === "expired" || detail.status === "submitted") && (
+        <section className="rounded-lg border border-[var(--bb-border)] p-4">
+          <h2 className="text-base font-medium">Mở lại cho khách chọn tiếp</h2>
+          <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
+            {detail.status === "expired"
+              ? "Bộ ảnh đã quá hạn nên khách không thao tác được nữa."
+              : "Khách đã chốt nhưng chưa xác nhận. Mở lại nếu khách muốn đổi ý."}
+          </p>
+          <ReopenForm disabled={busy} onSubmit={(r) => void reopen(r)} />
+        </section>
+      )}
+
       <section className="flex flex-wrap gap-3">
         {detail.shareLink && (
           <button
@@ -453,6 +487,48 @@ function RetouchSender({
         className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
       >
         Gửi file đã chỉnh cho khách
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Ô ghi lý do mở lại.
+ *
+ * Không có nút "mở lại" trần. Mở lại là đảo ngược một quyết định của khách, và
+ * sáu tháng sau câu hỏi "sao bộ này mở lại" chỉ trả lời được nếu lúc đó có
+ * người viết vào.
+ */
+function ReopenForm({
+  disabled,
+  onSubmit,
+}: {
+  disabled?: boolean;
+  onSubmit: (reason: string) => void;
+}) {
+  const [reason, setReason] = React.useState("");
+  const trimmed = reason.trim();
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <input
+        type="text"
+        name="reason"
+        maxLength={500}
+        value={reason}
+        disabled={disabled}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder="Lý do mở lại (khách xin thêm thời gian…)"
+        aria-label="Lý do mở lại"
+        className="min-w-64 flex-1 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+      />
+      <button
+        type="button"
+        disabled={disabled || trimmed.length === 0}
+        onClick={() => onSubmit(trimmed)}
+        className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+      >
+        Mở lại cho khách chọn
       </button>
     </div>
   );

@@ -19,6 +19,35 @@
  */
 
 /**
+ * TẤT CẢ trạng thái của bộ ảnh, đúng bằng kiểu enum `gallery_status` trong cơ
+ * sở dữ liệu.
+ *
+ * Trước BB-121 danh sách này nằm ở SÁU chỗ, và mỗi bản thiếu một kiểu khác
+ * nhau: `GALLERY_STATUSES` trong types/domain thiếu hai trạng thái mới,
+ * `GALLERY_STATUS_VALUES` trong schema lọc danh sách thiếu cả `sync_error` —
+ * nên CSKH không lọc được bộ ảnh "chờ khách duyệt", Zod từ chối thẳng giá trị
+ * đó. Không bản nào sai to đến mức gây lỗi đỏ; tất cả đều sai âm thầm.
+ *
+ * Có phép thử so danh sách này với enum thật trong cơ sở dữ liệu.
+ */
+export const GALLERY_STATUSES = [
+  "draft",
+  "syncing",
+  "sync_error",
+  "ready",
+  "in_review",
+  "submitted",
+  "in_retouch",
+  "awaiting_approval",
+  "approved",
+  "delivered",
+  "expired",
+  "archived",
+] as const;
+
+export type GalleryStatusValue = (typeof GALLERY_STATUSES)[number];
+
+/**
  * Khách không sửa lựa chọn được nữa.
  *
  * Phải khớp `app.gallery_is_locked()` CHÍNH XÁC — có phép thử so từng giá trị

@@ -11,6 +11,7 @@
  * 4. Hạn mức chưa biết (app.gallery_quota trả null) thì KHÔNG cho chốt (trả QUOTA_UNKNOWN).
  */
 
+import { isGalleryLocked } from "@/lib/gallery-status";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
@@ -58,13 +59,11 @@ export async function POST(request: Request): Promise<Response> {
       return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
-    if (
-      gallery.status === "submitted" ||
-      gallery.status === "in_retouch" ||
-      gallery.status === "delivered" ||
-      gallery.status === "archived" ||
-      gallery.status === "expired"
-    ) {
+    // Danh sách chép tay ở đây từng thiếu 'awaiting_approval' và 'approved':
+    // khách đang chờ duyệt ảnh đã chỉnh vẫn gọi được route này, đẩy bộ ảnh
+    // ngược về 'submitted' và xoá mất giai đoạn chỉnh ảnh. Dùng chung
+    // @/lib/gallery-status, khớp app.gallery_is_locked() bên SQL.
+    if (isGalleryLocked(gallery.status)) {
       return fail("GALLERY_LOCKED", "Bộ ảnh đã được chốt, không thể thay đổi");
     }
 

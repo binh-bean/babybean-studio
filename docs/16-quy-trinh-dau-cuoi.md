@@ -244,8 +244,49 @@ Hai bên lệch nhau đúng một giá trị. Bộ ảnh hết hạn đã bị c
 chọn ảnh** — phiên đăng nhập chỉ kiểm link chia sẻ, không kiểm trạng thái bộ
 ảnh. Khách mở lại link cũ còn hạn thì thêm bớt ảnh thoải mái, chỉ là không chốt
 được; danh sách đổi sau lưng studio trong khi người chỉnh ảnh có thể đã làm
-theo danh sách cũ. `0035` khoá lại. Mở lại cho khách chọn vẫn làm được bằng
-cách đổi trạng thái sang `reopened`, nên không mất đường nào của nghiệp vụ.
+theo danh sách cũ. `0035` khoá lại.
+
+**Đính chính.** Bản đầu của mục này viết rằng mở lại cho khách chọn làm được
+bằng cách đổi trạng thái sang `reopened`. Sai: enum không có giá trị đó — dải
+tiến trình phía khách có nhánh xử lý `reopened`, nhưng nhánh ấy chưa bao giờ
+chạy. Và **không có đường mở lại nào cả**; hai cột `reopened_at`,
+`reopen_reason` nằm trong schema từ đầu mà không ai ghi.
+
+Tức là trước `0035`, chính lỗ hổng đó là đường thoát duy nhất cho bộ ảnh quá
+hạn. Khoá mà không mở đường chính thức thì bộ ảnh quá hạn thành ngõ cụt, CSKH
+phải nhờ người sửa thẳng cơ sở dữ liệu. Đường chính thức:
+
+| Ai | Đường | Từ trạng thái |
+|---|---|---|
+| CSKH mở lại cho khách chọn tiếp | `POST /api/admin/galleries/[id]/reopen` | `expired`, `submitted` |
+
+Bắt buộc ghi lý do — mở lại là đảo ngược một quyết định của khách, và sáu
+tháng sau câu hỏi *"sao bộ này mở lại"* chỉ trả lời được nếu lúc đó có người
+viết vào. **Không** mở từ `in_retouch` trở đi: người chỉnh ảnh đã làm theo
+danh sách cũ, mở ra thì công đã bỏ vào những ảnh khách vừa bỏ chọn. Muốn đổi ở
+giai đoạn đó thì đi đường yêu cầu sửa.
+
+### Danh sách trạng thái: sáu bản chép tay, mỗi bản thiếu một kiểu
+
+Gom lại mới thấy hết. Ngoài bốn chỗ trên còn hai chỗ nữa, và hai chỗ này là lỗ
+hổng thật chứ không phải phiền phức giao diện:
+
+- `/api/g/submit` và `/api/g/addons` giữ danh sách riêng, thiếu
+  `awaiting_approval` và `approved`. Khách đang **chờ duyệt ảnh đã chỉnh** vẫn
+  gọi được hai route đó: bộ ảnh bị đẩy ngược về `submitted`, xoá mất giai đoạn
+  chỉnh ảnh trong khi người photoshop đã làm xong.
+- `GALLERY_STATUS_VALUES` trong lược đồ lọc danh sách thiếu cả `sync_error` —
+  CSKH lọc theo trạng thái đó thì Zod từ chối thẳng.
+
+Cả sáu giờ lấy từ `GALLERY_STATUSES` trong `src/lib/gallery-status.ts`, và có
+phép thử so danh sách ấy với enum thật — **bằng nhau**, không thiếu cũng không
+thừa. Thừa cũng là lỗi: nhánh `reopened` tồn tại được lâu như vậy chính vì
+không ai so hai chiều.
+
+Riêng dải tiến trình thì không dùng phép thử mà dùng cổng **lúc biên dịch**:
+`getCustomerProgressStep` bỏ `default`, kết thúc bằng phép kiểm `never`. Thêm
+trạng thái mà quên file đó thì không biên dịch được — chắc hơn phép thử, vì
+không ai quên chạy trình biên dịch.
 
 ### Hai màn hình
 

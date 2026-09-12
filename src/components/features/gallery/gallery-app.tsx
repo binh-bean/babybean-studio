@@ -1,6 +1,8 @@
 "use client";
 
 import { isGalleryLocked } from "@/lib/gallery-status";
+import { getCustomerProgressStep } from "@/lib/gallery/progress";
+import type { GalleryStatus } from "@/types/domain";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
@@ -87,31 +89,6 @@ interface GalleryApiResponse {
       size: string | null;
     }>;
   };
-}
-
-function getProgressStep(status: string): number {
-  switch (status) {
-    case "draft":
-    case "syncing":
-    case "sync_error":
-      return 1;
-    case "ready":
-      return 2;
-    case "in_review":
-    case "reopened":
-      return 3;
-    case "submitted":
-      return 4;
-    case "in_retouch":
-    case "awaiting_approval":
-      return 5;
-    case "approved":
-    case "delivered":
-    case "archived":
-      return 6;
-    default:
-      return 3;
-  }
 }
 
 export function GalleryApp({ token }: GalleryAppProps) {
@@ -520,7 +497,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
     );
   }
 
-  const stepNumber = getProgressStep(gallery.status);
+  const stepNumber = getCustomerProgressStep(gallery.status as GalleryStatus);
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground pb-32">

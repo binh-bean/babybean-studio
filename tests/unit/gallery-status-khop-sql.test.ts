@@ -15,7 +15,11 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
-import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import {
+  isGalleryLocked,
+  GALLERY_STATUSES,
+  GALLERY_STATUS_LABEL,
+} from "@/lib/gallery-status";
 
 describe("Trạng thái bộ ảnh: TypeScript khớp SQL", () => {
   let client: Client;
@@ -55,7 +59,15 @@ describe("Trạng thái bộ ảnh: TypeScript khớp SQL", () => {
     expect(lech).toEqual([]);
   });
 
-  it("3. Mỗi trạng thái có nhãn tiếng Việt", () => {
+  it("3. Danh sách bên TypeScript đúng bằng enum trong cơ sở dữ liệu", () => {
+    // Không chỉ "không thiếu" mà còn "không thừa". Một giá trị thừa nghĩa là
+    // có chỗ trong mã nguồn đang chờ một trạng thái không tồn tại — đúng
+    // chuyện đã xảy ra với 'reopened': dải tiến trình có nhánh xử lý nó, mà
+    // enum thì chưa bao giờ có giá trị đó.
+    expect([...GALLERY_STATUSES].sort()).toEqual([...statuses].sort());
+  });
+
+  it("4. Mỗi trạng thái có nhãn tiếng Việt", () => {
     // Thiếu nhãn thì màn hình in tên trong máy ra cho nhân viên đọc.
     const thieu = statuses.filter((s) => !GALLERY_STATUS_LABEL[s]);
     expect(thieu).toEqual([]);
