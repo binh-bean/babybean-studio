@@ -29,3 +29,5 @@ export * from "./data-table";
 export * from "./pagination";
 export * from "./stat-card";
 export * from "./pwa-install-prompt";
+export * from './customer-progress';
+export * from './quota-display';
