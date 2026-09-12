@@ -132,6 +132,96 @@ Hiện `0` thì khách hoặc tưởng miễn phí, hoặc tưởng vượt ngay
 Ca biên bắt buộc kiểm thử: 0 ảnh · đúng hạn mức · vượt 1 · vượt 100 · bỏ chọn
 sau khi đã vượt.
 
+### 6.1. Lark có ba tầng, không phải hai
+
+Đọc toàn bộ dữ liệu thật ngày 11.09.2026:
+
+```
+Hóa Đơn                4.744    một hợp đồng
+  Hóa Đơn Chi Tiết    11.689    dòng hợp đồng: sản phẩm, số lượng, ĐƠN GIÁ
+    Chi Tiết Gói Chụp  9.637    dòng đó gồm những gì — KHÔNG có tiền
+```
+
+Tầng giữa mang tiền, tầng dưới mang thành phần. Bảng danh mục `Sản Phẩm Dịch Vụ`
+(132 dòng) chỉ có tên và phân loại — **không có cột giá**. Giá chỉ tồn tại trên
+từng dòng hóa đơn đã bán.
+
+**`Giá niêm yết` là ĐƠN GIÁ, không phải tiền cả dòng.** Kiểm trên 11.163 dòng có
+đủ hai cột: `Thành Tiền niêm yết` = `Giá niêm yết` × `Số Lượng`, đúng
+11.163/11.163 dòng, không sai dòng nào. Ai chia `Giá niêm yết` cho `Số Lượng` sẽ
+thấy một bảng giá loạn xạ và kết luận nhầm là studio bán phá giá — PM đã mắc
+đúng lỗi này một lần trong quá trình khảo sát.
+
+### 6.2. Hạn mức nằm ở đâu — bộ bàn giao kết luận sai
+
+`ban-giao-studio-os/01-doc-truoc/TONG-HOP-BAN-GIAO.md` §A5 viết: *"Hạn mức ảnh
+— KHÔNG có trường nào trong Lark"*, rồi dựng bảng ước lượng theo trung vị kèm
+cảnh báo *"đây là suy luận, chưa ai xác nhận"*.
+
+Đúng về **trường**, sai về **dữ liệu**. Hạn mức là một **dòng hàng** ở tầng dưới
+cùng: sản phẩm `Edit file`, cột `Số Lượng`. Đếm trên toàn bộ 9.637 dòng:
+
+| | |
+|---|---|
+| Hợp đồng riêng biệt | 4.403 |
+| Có dòng `Edit file` | **4.212 — 95,7%** |
+| Không có | 191 — **chưa biết**, không phải bằng 0 |
+
+| Số ảnh | 5 | 6 | 10 | 15 | 16 | 17 | 20 | 21 | 25 | 30 | 31 | 35 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Số hợp đồng | 355 | 34 | 48 | **2.043** | 179 | 37 | **804** | 89 | 30 | **325** | 27 | 54 |
+
+Đuôi dài tới **141 ảnh**. Số lẻ (16, 17, 21, 31…) là gói gốc **cộng ảnh mua thêm
+ngay lúc ký** — hạn mức thật, tuyệt đối không làm tròn về 15 hay 20.
+
+Ảnh mua thêm **sau** khi ký nằm ở tầng giữa, cũng là sản phẩm `Edit file`. Nên
+hạn mức thực = tổng `Số Lượng` mọi dòng `Edit file` ở **cả hai tầng**.
+
+### 6.3. Thất thoát: ảnh đã giao mà chưa lập hóa đơn
+
+Studio **có** thu tiền ảnh vượt, và thu đúng giá:
+
+| | |
+|---|---|
+| Đơn giá `Edit file` | 50.000 ₫/ảnh, độ tin cậy 1,000 trên 405 lần bán |
+| Đã bán thêm | 405 dòng hóa đơn, 4.027 ảnh |
+| Đã thu (giá chốt cuối) | 197.075.000 ₫ |
+
+Thất thoát không nằm ở hóa đơn. Nó nằm ở ảnh **đã giao mà chưa ai lập hóa đơn**.
+So `Tổng file edit` (bảng Hậu Kỳ) với hạn mức + ảnh đã mua thêm, theo từng hợp
+đồng:
+
+| | |
+|---|---|
+| Hợp đồng so sánh được | 2.218 |
+| Giao **vượt** số đã trả tiền | **584 hợp đồng, 4.246 ảnh** |
+| Quy ra tiền theo 50.000 ₫/ảnh | **212.300.000 ₫** |
+| Giao ít hơn hạn mức | 157 hợp đồng (khách chưa chọn xong) |
+
+Riêng năm 2026 tính đến tháng 9: 486 hợp đồng, 3.315 ảnh, **165.750.000 ₫**.
+Quy ra cả năm ≈ 221 triệu — khớp với con số 223 triệu/năm của bộ bàn giao, nhưng
+lần này là **đếm**, không phải suy luận.
+
+**Ba giới hạn của con số này, phải nói kèm mỗi lần trích dẫn:**
+
+1. 875/3.177 bản ghi hậu kỳ chưa điền `Tổng file edit` → **không được tính**.
+   Con số thật lớn hơn 212 triệu, không nhỏ hơn.
+2. Chỉ 2.218 trong 4.403 hợp đồng có đủ cả hạn mức lẫn số đã giao.
+3. Năm 2024 gần như trắng vì `Tổng file edit` mới được dùng gần đây. Phân bố
+   theo năm phản ánh **độ phủ dữ liệu**, không phải xu hướng tăng.
+
+Đây chính là lý do app này tồn tại: hôm nay không chỗ nào tự động đối chiếu
+"khách đã chọn bao nhiêu" với "khách đã trả tiền cho bao nhiêu". Việc đó đang
+phụ thuộc vào trí nhớ của CSKH. App làm việc đó ở mỗi lần khách bấm chọn.
+
+> **Chưa làm, có chủ đích.** `galleries.included_quota` hôm nay là `not null
+> default 20`. Bỏ `not null` để null mang nghĩa "chưa biết" sẽ **mở trần chọn
+> ảnh**: `0009` dòng 190 kiểm tra `v_hard_limit is not null and ...`, hạn mức
+> null làm mệnh đề thành null và Postgres coi như false. Khách chọn bao nhiêu
+> cũng được, không tính tiền vượt. Phải sửa cùng lúc bốn chỗ đọc nó — chi tiết
+> ghi trong đầu file `db/migrations/0014-danh-muc-san-pham.sql`. Con số 20 là
+> bịa, nhưng nó **chặn**, còn null thì **mở**.
+
 ---
 
 ## 7. Thiết bị — khách dùng điện thoại

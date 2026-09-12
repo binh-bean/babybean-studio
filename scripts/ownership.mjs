@@ -80,6 +80,7 @@ export const OWNERSHIP = {
     "src/lib/lark/**",
     "src/app/api/img/**",
     "scripts/sync-drive.ts",
+    "scripts/sync-lark-catalog.mjs",
   ],
   // db/migrations/** on purpose: the agent that fixes a policy has to be able
   // to ship it to production. Splitting those two created a handoff, and the

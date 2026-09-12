@@ -25,6 +25,8 @@ const EXPECTED_TABLES = [
   "notifications", "packages", "photos", "selection_items", "selection_ops",
   "selections", "settings", "share_links", "shoots", "staff_branches",
   "staff_profiles",
+  // BB-100 — danh mục sản phẩm và dòng hàng hợp đồng.
+  "gallery_items", "products",
 ];
 
 const EXPECTED_VIEWS = ["v_gallery_progress", "v_share_links"];
@@ -67,13 +69,13 @@ async function main() {
   );
   const names = tables.rows.map((r) => r.tablename);
   const missing = EXPECTED_TABLES.filter((t) => !names.includes(t));
-  check("17 bảng tồn tại", missing.length === 0,
+  check(`${EXPECTED_TABLES.length} bảng tồn tại`, missing.length === 0,
     missing.length ? `thiếu: ${missing.join(", ")}` : `${names.length} bảng`);
 
   // RLS is the whole security model; a single table without it is a hole.
   const noRls = tables.rows.filter((r) => !r.rowsecurity).map((r) => r.tablename);
   check("RLS bật trên mọi bảng", noRls.length === 0,
-    noRls.length ? `chưa bật: ${noRls.join(", ")}` : "17/17");
+    noRls.length ? `chưa bật: ${noRls.join(", ")}` : `${EXPECTED_TABLES.length}/${EXPECTED_TABLES.length}`);
 
   const views = await client.query(
     `select viewname from pg_views where schemaname = 'public'`,

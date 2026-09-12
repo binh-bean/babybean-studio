@@ -25,7 +25,8 @@
     "verify:build": "node --env-file-if-exists=.env.local scripts/verify-build.mjs",
     "verify:prod": "node --env-file-if-exists=.env.local scripts/verify-prod.mjs",
     "verify:wired": "node scripts/verify-wired.mjs",
-    "staff:link": "node --env-file-if-exists=.env.local scripts/link-staff.mjs"
+    "staff:link": "node --env-file-if-exists=.env.local scripts/link-staff.mjs",
+    "sync:catalog": "node --env-file-if-exists=.env.local scripts/sync-lark-catalog.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
