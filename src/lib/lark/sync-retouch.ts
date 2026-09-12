@@ -1,7 +1,7 @@
 /**
  * Đồng bộ bảng Hậu Kỳ từ Lark Base xuống app (galleries).
  * OWNER: DEV-INT. Task BB-111.
- * Spec: docs/16-quy-trinh-dau-cuoi.md §2, docs/15-doi-chieu-lark.md §9
+ * Spec: docs/16-quy-trinh-dau-cuoi.md §2 & §7, docs/15-doi-chieu-lark.md §9
  *
  * MỘT CHIỀU. Tuyệt đối không bao giờ ghi ngược lên Lark ở giai đoạn này.
  * Thông tin app tự điền là BẢN NHÁP (status = 'draft') để nhân viên soát và sửa
@@ -13,20 +13,52 @@ import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-lin
 
 export const HOST = "https://open.larksuite.com/open-apis";
 
+// --- 5 trạng thái đã qua khâu in bị loại (docs/16 §7.1) ---------------------
+
+export const EXCLUDED_RETOUCH_STATUSES = [
+  "Đã chốt chưa in",
+  "Đã gửi In",
+  "Hình đã về",
+  "Đã Giao",
+  "Đã CSKH",
+];
+
+export function isRetouchStatusExcluded(status: string): boolean {
+  if (!status) return false;
+  const s = status.trim().toLowerCase();
+  return EXCLUDED_RETOUCH_STATUSES.some((ex) => ex.toLowerCase() === s);
+}
+
 // --- Hàm bóc tách dữ liệu ô Lark -------------------------------------------
 
-/** Ô của Lark có bảy hình dạng tuỳ kiểu cột. Một hàm cho tất cả. */
+/**
+ * Ô của Lark có tám hình dạng tuỳ kiểu cột, kể cả ô điện thoại trả
+ * {fullPhoneNum}. Một hàm cho tất cả.
+ * (Chép đúng từ scripts/sync-lark-contracts.mjs để tránh lỗi bẫy điện thoại).
+ */
 export function cellText(value: unknown): string {
   if (value == null) return "";
   if (Array.isArray(value)) {
     return value
       .map((v) =>
-        v == null ? "" : typeof v === "object" ? ((v as { text?: string; name?: string }).text ?? (v as { text?: string; name?: string }).name ?? "") : String(v),
+        v == null
+          ? ""
+          : typeof v === "object"
+            ? ((v as { text?: string; name?: string; fullPhoneNum?: string }).text ??
+               (v as { text?: string; name?: string; fullPhoneNum?: string }).name ??
+               (v as { text?: string; name?: string; fullPhoneNum?: string }).fullPhoneNum ??
+               "")
+            : String(v),
       )
       .join("");
   }
   if (typeof value === "object") {
-    return (value as { text?: string; name?: string }).text ?? (value as { text?: string; name?: string }).name ?? "";
+    return (
+      (value as { text?: string; name?: string; fullPhoneNum?: string }).text ??
+      (value as { text?: string; name?: string; fullPhoneNum?: string }).name ??
+      (value as { text?: string; name?: string; fullPhoneNum?: string }).fullPhoneNum ??
+      ""
+    );
   }
   return String(value);
 }
@@ -47,7 +79,33 @@ export function cellBoolean(value: unknown): boolean {
 /** Mã bản ghi mà một ô liên kết trỏ tới. */
 export function linkedRecordIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((v) => (v && typeof v === "object" ? ((v as { record_ids?: string[] }).record_ids ?? []) : []));
+  return value.flatMap((v) =>
+    v && typeof v === "object" ? ((v as { record_ids?: string[] }).record_ids ?? []) : [],
+  );
+}
+
+/**
+ * Bẫy 1 (docs/16 §7.3): Ô "Chat với khách" có dạng [{ link, text }] và text CHÍNH LÀ TÊN KHÁCH.
+ * Chỉ lấy link URL, tuyệt đối bỏ text để không kéo tên khách vào.
+ */
+export function extractChatLink(value: unknown): string | null {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    for (const v of value) {
+      if (v && typeof v === "object" && typeof (v as { link?: string }).link === "string") {
+        const link = (v as { link: string }).link.trim();
+        if (link) return link;
+      }
+    }
+  }
+  if (typeof value === "object" && value !== null && typeof (value as { link?: string }).link === "string") {
+    const link = (value as { link: string }).link.trim();
+    if (link) return link;
+  }
+  if (typeof value === "string" && value.startsWith("http")) {
+    return value.trim();
+  }
+  return null;
 }
 
 /**
@@ -61,52 +119,6 @@ export function getField(fields: Record<string, unknown>, pattern: RegExp): unkn
   return undefined;
 }
 
-// --- BB-097: Bóc tên mẹ và tên bé từ tên thư mục hoặc ô văn bản -------------
-
-export interface ParsedNames {
-  customerName: string;
-  babyName: string;
-  isGuessed: boolean;
-}
-
-/**
- * Quy tắc bóc tên khách (BB-097):
- *   - Bỏ tiền tố "fb" / "FB" nếu có
- *   - ngoài ngoặc  -> tên mẹ
- *   - trong ngoặc  -> tên bé
- *   - không ngoặc  -> tất cả là tên mẹ
- */
-export function parseCustomerAndBabyName(raw: string): ParsedNames {
-  if (!raw || typeof raw !== "string") {
-    return { customerName: "Khách hàng", babyName: "", isGuessed: false };
-  }
-
-  // Chuẩn hoá khoảng trắng và bỏ tiền tố FB/fb
-  const trimmed = raw.replace(/\s+/g, " ").trim();
-  const cleaned = trimmed.replace(/^[fF][bB]\s*[-:_]?\s*/, "").trim();
-
-  // Tìm cặp ngoặc tròn đầu tiên
-  const match = cleaned.match(/^(.*?)\((.*?)\)(.*)$/);
-  if (match && match[1] !== undefined && match[2] !== undefined && match[3] !== undefined) {
-    const partBefore = match[1].trim();
-    const inside = match[2].trim();
-    const partAfter = match[3].trim();
-    const combinedMother = [partBefore, partAfter].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
-
-    return {
-      customerName: combinedMother || "Khách hàng",
-      babyName: inside,
-      isGuessed: true,
-    };
-  }
-
-  return {
-    customerName: cleaned || "Khách hàng",
-    babyName: "",
-    isGuessed: false,
-  };
-}
-
 // --- Trích xuất Google Drive URL --------------------------------------------
 
 export function extractDriveUrl(text: string): string | null {
@@ -115,10 +127,12 @@ export function extractDriveUrl(text: string): string | null {
   return match ? match[0] : null;
 }
 
-// --- Kiểm tra điều kiện kích hoạt BB-111 -----------------------------------
+// --- Kiểm tra điều kiện kích hoạt BB-111 & Bộ lọc docs/16 §7.1 -------------
 
 export interface RetouchTriggerCheck {
   triggered: boolean;
+  status: string;
+  isStatusExcluded: boolean;
   driveUrl: string | null;
   driveFolderId: string | null;
   hasLayLinkApp: boolean;
@@ -127,28 +141,50 @@ export interface RetouchTriggerCheck {
 }
 
 /**
- * Điều kiện kích hoạt BB-111:
- *   1. Có bản ghi trong bảng Hậu Kỳ
- *   2. Cột "Link ảnh gửi khách" có nội dung (chứa link Google Drive hợp lệ)
- *
- * Ngoài ra đọc thêm:
- *   - "Lấy link app" (ô tích): nhân viên đánh dấu muốn app dựng link
- *   - "Link app" (chữ): nhân viên dán tay link app vào
+ * Kiểm tra bản ghi Hậu Kỳ:
+ *   1. Trạng thái không thuộc 5 trạng thái đã qua in (docs/16 §7.1)
+ *   2. Cột "Link ảnh gửi khách" CÓ NỘI DUNG (chứa link Google Drive hợp lệ)
  */
 export function checkRetouchTrigger(fields: Record<string, unknown>): RetouchTriggerCheck {
+  const statusField = getField(fields, /trạng\s*thái|status/i);
+  const status = cellText(statusField).trim();
+  const statusExcluded = isRetouchStatusExcluded(status);
+
   const rawLinkField =
     getField(fields, /link\s*(ảnh|anh)\s*(gửi\s*khách|gui\s*khach)?/i) ??
     getField(fields, /link\s*(ảnh|anh)/i) ??
     getField(fields, /link.*drive/i);
 
   const rawLinkText = cellText(rawLinkField).trim();
+
+  const layLinkAppField = getField(fields, /lấy\s*link\s*app|lay\s*link\s*app/i);
+  const hasLayLinkApp = cellBoolean(layLinkAppField);
+
+  const linkAppField = getField(fields, /^link\s*app$/i);
+  const linkApp = cellText(linkAppField).trim();
+
+  if (statusExcluded) {
+    return {
+      triggered: false,
+      status,
+      isStatusExcluded: true,
+      driveUrl: null,
+      driveFolderId: null,
+      hasLayLinkApp,
+      linkApp,
+      reason: `Trạng thái đã qua khâu in (${status})`,
+    };
+  }
+
   if (!rawLinkText) {
     return {
       triggered: false,
+      status,
+      isStatusExcluded: false,
       driveUrl: null,
       driveFolderId: null,
-      hasLayLinkApp: false,
-      linkApp: "",
+      hasLayLinkApp,
+      linkApp,
       reason: "Cột 'Link ảnh gửi khách' không có nội dung",
     };
   }
@@ -160,22 +196,20 @@ export function checkRetouchTrigger(fields: Record<string, unknown>): RetouchTri
   } catch (err) {
     return {
       triggered: false,
+      status,
+      isStatusExcluded: false,
       driveUrl,
       driveFolderId: null,
-      hasLayLinkApp: false,
-      linkApp: "",
+      hasLayLinkApp,
+      linkApp,
       reason: err instanceof InvalidDriveLinkError ? err.message : "Link Drive không hợp lệ",
     };
   }
 
-  const layLinkAppField = getField(fields, /lấy\s*link\s*app|lay\s*link\s*app/i);
-  const hasLayLinkApp = cellBoolean(layLinkAppField);
-
-  const linkAppField = getField(fields, /^link\s*app$/i);
-  const linkApp = cellText(linkAppField).trim();
-
   return {
     triggered: true,
+    status,
+    isStatusExcluded: false,
     driveUrl,
     driveFolderId,
     hasLayLinkApp,
@@ -213,7 +247,7 @@ export function matchBranch(branchText: string, branches: BranchLookup[]): strin
   return defaultBranch.id;
 }
 
-// --- Đọc bảng từ Lark Base (có hỗ trợ phân trang 500) ------------------------
+// --- Đọc bảng từ Lark Base (phân trang tối đa 500 bản ghi) -------------------
 
 export interface LarkAuthHeader {
   authorization: string;
@@ -292,14 +326,13 @@ export async function readLarkTable(
   return { tableId: table.table_id, tableName: table.name, records };
 }
 
-// --- Xử lý đồng bộ 1 bản ghi Hậu Kỳ xuống DB --------------------------------
+// --- Xử lý đồng bộ 1 bản ghi Hậu Kỳ xuống DB theo docs/16 §7.3 -------------
 
 export interface SyncRetouchOptions {
   client: pg.Client;
   record: LarkRecord;
   branches: BranchLookup[];
   staffList: Array<{ id: string; fullName: string; role: string }>;
-  isProduction: boolean;
   write: boolean;
   index: number;
 }
@@ -308,22 +341,27 @@ export interface SyncResult {
   action: "created" | "skipped" | "already_exists" | "error";
   galleryId?: string;
   title?: string;
+  contractCode?: string;
   driveFolderId?: string;
   reason?: string;
 }
 
 /**
- * Xử lý 1 dòng bản ghi bảng Hậu Kỳ:
- *   - Kiểm tra điều kiện kích hoạt
- *   - Bóc tên khách + tên bé (BB-097)
- *   - Tạo customer nháp + baby nháp (nếu chưa có)
- *   - Tạo album nháp trong `galleries` với status='draft'
+ * Xử lý 1 dòng bản ghi bảng Hậu Kỳ theo đúng bảng ánh xạ docs/16 §7.3:
+ *   customers.full_name        "KH · HD_..." (chính mã hợp đồng)
+ *   customers.phone            null
+ *   customers.phone_normalized null (tự sinh)
+ *   customers.facebook         CHỈ phần URL của ô "Chat với khách" (bỏ text)
+ *   customers.zalo             null
+ *   customers.note             null
+ *   galleries.lark_contract_code GIỮ NGUYÊN THẬT
+ *   galleries.status           'draft' (Bản nháp)
  */
 export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise<SyncResult> {
-  const { client, record, branches, staffList, isProduction, write, index } = opts;
+  const { client, record, branches, staffList, write } = opts;
   const fields = record.fields;
 
-  // 1. Kiểm tra điều kiện kích hoạt
+  // 1. Kiểm tra điều kiện kích hoạt & bộ lọc 5 trạng thái đã qua khâu in
   const trigger = checkRetouchTrigger(fields);
   if (!trigger.triggered || !trigger.driveFolderId || !trigger.driveUrl) {
     return { action: "skipped", reason: trigger.reason };
@@ -348,48 +386,38 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
   const rawBranch = cellText(getField(fields, /chi\s*nhánh|cơ\s*sở|branch/i));
   const branchId = matchBranch(rawBranch, branches);
 
-  // 4. Bóc tên mẹ, tên bé từ folder name hoặc ô tên khách (BB-097)
-  const rawFolderTitle =
-    cellText(getField(fields, /tên\s*thư\s*mục|thư\s*mục|folder|tên\s*album|bộ\s*ảnh/i)) ||
-    cellText(getField(fields, /khách\s*hàng|tên\s*khách/i));
-
-  const parsedNames = parseCustomerAndBabyName(rawFolderTitle);
-
-  // An toàn dữ liệu mẫu: nếu không phải production thì dùng số điện thoại giả (AGENTS.md §6)
-  const rawPhone = cellText(getField(fields, /số\s*điện\s*thoại|sđt|phone/i)).replace(/\D/g, "");
-  let phone = rawPhone;
-  if (!isProduction || !phone) {
-    // Dãy số giả rõ ràng, không trùng, hợp lệ định dạng VN
-    phone = `0901${String(index + 1).padStart(6, "0")}`;
-  }
-
-  // Tên khách hàng & tên bé
-  let customerName = parsedNames.customerName || "Khách hàng";
-  const babyName = parsedNames.babyName;
-  if (!isProduction && /^(nguyễn|trần|lê|phạm|hoàng|huỳnh|phan|vũ|võ|đặng|bùi|đỗ|hồ|ngô|dương|lý)/i.test(customerName)) {
-    // Nếu dữ liệu trông giống tên người thật ngoài đời, thêm nhãn mẫu để tránh commit thông tin cá nhân
-    customerName = `${customerName} [Dự thảo]`;
-  }
-
-  // Mã hợp đồng
+  // 4. Mã hợp đồng (lark_contract_code)
   const rawContract = cellText(getField(fields, /hợp\s*đồng|mã\s*hợp\s*đồng|hóa\s*đơn|contract/i)).trim();
   const contractCode = rawContract || null;
 
-  // Tiêu đề album
-  const albumTitle = rawFolderTitle
-    ? rawFolderTitle.replace(/\s+/g, " ").trim()
-    : babyName
-      ? `Album Bé ${babyName} - ${customerName}`
-      : `Album ${customerName}`;
+  // 5. Ánh xạ dữ liệu cá nhân đúng docs/16 §7.3:
+  //    customers.full_name: "KH · " + mã hợp đồng (hoặc record_id nếu thiếu)
+  //    customers.phone: null
+  //    customers.facebook: CHỈ lấy URL từ "Chat với khách", bỏ text
+  const customerFullName = contractCode ? `KH · ${contractCode}` : `KH · ${record.record_id}`;
+  const chatField = getField(fields, /chat\s*với\s*khách|link\s*chat|chat/i);
+  const facebookChatUrl = extractChatLink(chatField);
 
-  // Thợ ảnh, CSKH, retoucher
+  // Tiêu đề album: Album · Mã HĐ
+  const albumTitle = contractCode ? `Album · ${contractCode}` : `Album · ${record.record_id}`;
+
+  // Thợ ảnh, CSKH, retoucher (khớp theo nhân sự trong hệ thống nếu có)
   const rawPhotographer = cellText(getField(fields, /thợ\s*chụp|photographer/i)).toLowerCase();
   const rawEditor = cellText(getField(fields, /người\s*photoshop|photoshop\s*ctv|retoucher/i)).toLowerCase();
   const rawCskh = cellText(getField(fields, /cskh/i)).toLowerCase();
 
-  const photographer = staffList.find((s) => s.role === "photographer" && rawPhotographer.includes(s.fullName.toLowerCase()));
-  const editor = staffList.find((s) => (s.role === "retoucher" || s.role === "photoshop_ctv") && rawEditor.includes(s.fullName.toLowerCase()));
-  const cskh = staffList.find((s) => s.role === "cs" && rawCskh.includes(s.fullName.toLowerCase()));
+  const photographer = staffList.find(
+    (s) => s.role === "photographer" && rawPhotographer && rawPhotographer.includes(s.fullName.toLowerCase()),
+  );
+  const editor = staffList.find(
+    (s) =>
+      (s.role === "retoucher" || s.role === "photoshop_ctv") &&
+      rawEditor &&
+      rawEditor.includes(s.fullName.toLowerCase()),
+  );
+  const cskh = staffList.find(
+    (s) => s.role === "cs" && rawCskh && rawCskh.includes(s.fullName.toLowerCase()),
+  );
 
   // Ngày chụp
   const rawShootDate = cellText(getField(fields, /ngày\s*chụp|shoot\s*date/i)).trim();
@@ -404,93 +432,74 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
     return {
       action: "created",
       title: albumTitle,
+      contractCode: contractCode ?? undefined,
       driveFolderId: trigger.driveFolderId,
-      reason: `Sẽ tạo album nháp: "${albumTitle}" (Mẹ: ${customerName}, Bé: ${babyName || "—"}, HĐ: ${contractCode || "—"})`,
+      reason: `Sẽ tạo album nháp: "${albumTitle}" (Chat: ${facebookChatUrl || "—"})`,
     };
   }
 
-  // --- Ghi vào DB trong transaction ---
+  // --- Ghi vào DB trong transaction (xoá-rồi-ghi-lại hoặc kiểm tra tồn tại) ---
   await client.query("begin");
   try {
-    // A. Tìm hoặc tạo Customer
+    // A. Tìm hoặc tạo Customer (khớp theo full_name = 'KH · HD_...' và branch_id)
     const { rows: custRows } = await client.query(
-      `select id from customers where branch_id = $1 and phone_normalized = regexp_replace($2, '\\D', '', 'g') limit 1`,
-      [branchId, phone],
+      `select id from customers where branch_id = $1 and full_name = $2 limit 1`,
+      [branchId, customerFullName],
     );
 
     let customerId: string;
     if (custRows.length > 0) {
       customerId = custRows[0].id;
+      // Cập nhật facebook link nếu chưa có
+      if (facebookChatUrl) {
+        await client.query(`update customers set facebook = coalesce(facebook, $1) where id = $2`, [
+          facebookChatUrl,
+          customerId,
+        ]);
+      }
     } else {
       const { rows: newCust } = await client.query(
-        `insert into customers (branch_id, full_name, phone, note, source, tags)
-         values ($1, $2, $3, $4, 'lark_retouch', array['lark_draft', 'bb111'])
+        `insert into customers (branch_id, full_name, phone, facebook, zalo, note, source, tags)
+         values ($1, $2, null, $3, null, null, 'lark_retouch', array['lark_draft', 'bb111'])
          returning id`,
-        [
-          branchId,
-          customerName,
-          phone,
-          `[Đồng bộ Lark Hậu Kỳ] ${parsedNames.isGuessed ? "Máy đoán từ tên thư mục: " + customerName : "Bản nháp tự điền"}`,
-        ],
+        [branchId, customerFullName, facebookChatUrl],
       );
       customerId = newCust[0].id;
     }
 
-    // B. Tạo Baby nếu có tên bé
-    let babyId: string | null = null;
-    if (babyName) {
-      const { rows: babyRows } = await client.query(
-        `select id from babies where customer_id = $1 and lower(full_name) = lower($2) limit 1`,
-        [customerId, babyName],
-      );
-      if (babyRows.length > 0) {
-        babyId = babyRows[0].id;
-      } else {
-        const { rows: newBaby } = await client.query(
-          `insert into babies (customer_id, full_name, nickname, note)
-           values ($1, $2, $3, $4)
-           returning id`,
-          [customerId, babyName, babyName, "[Tự động điền từ Lark Hậu Kỳ]"],
-        );
-        babyId = newBaby[0].id;
-      }
-    }
-
-    // C. Tạo Shoot
+    // B. Tạo Shoot (buổi chụp)
     const { rows: newShoot } = await client.query(
-      `insert into shoots (branch_id, customer_id, baby_id, photographer_id, shoot_date, note)
-       values ($1, $2, $3, $4, $5, '[Đồng bộ Lark Hậu Kỳ]')
+      `insert into shoots (branch_id, customer_id, photographer_id, shoot_date, note)
+       values ($1, $2, $3, $4, '[Đồng bộ Lark Hậu Kỳ]')
        returning id`,
-      [branchId, customerId, babyId, photographer?.id ?? null, shootDate],
+      [branchId, customerId, photographer?.id ?? null, shootDate],
     );
     const shootId = newShoot[0].id;
 
-    // D. Tạo Gallery (Album) với status = 'draft'
-    const noteMsg = `Chào mừng ba mẹ và bé đến với album ảnh của BabyBean Studio!`;
+    // C. Tạo Gallery (Album) với status = 'draft'
+    const noteMsg = `Chào mừng bạn đến với album ảnh của BabyBean Studio!`;
     const { rows: newGal } = await client.query(
       `insert into galleries (
-         branch_id, customer_id, baby_id, shoot_id,
+         branch_id, customer_id, shoot_id,
          title, welcome_message, status,
-         drive_folder_id, drive_folder_url, drive_folder_name,
+         drive_folder_id, drive_folder_url,
          lark_contract_code, included_quota, extra_photo_price,
          photographer_id, cskh_id, editor_id
        ) values (
-         $1, $2, $3, $4,
-         $5, $6, 'draft',
-         $7, $8, $9,
-         $10, 20, 50000,
-         $11, $12, $13
+         $1, $2, $3,
+         $4, $5, 'draft',
+         $6, $7,
+         $8, 20, 50000,
+         $9, $10, $11
        ) returning id`,
       [
         branchId,
         customerId,
-        babyId,
         shootId,
         albumTitle,
         noteMsg,
         trigger.driveFolderId,
         trigger.driveUrl,
-        rawFolderTitle || null,
         contractCode,
         photographer?.id ?? null,
         cskh?.id ?? null,
@@ -504,6 +513,7 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
       action: "created",
       galleryId: newGal[0].id,
       title: albumTitle,
+      contractCode: contractCode ?? undefined,
       driveFolderId: trigger.driveFolderId,
       reason: `Đã tạo album nháp thành công (id=${newGal[0].id})`,
     };
