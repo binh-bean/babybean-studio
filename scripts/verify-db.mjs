@@ -288,6 +288,40 @@ async function main() {
         : "đã thu hồi hết",
     );
 
+    // -----------------------------------------------------------------------
+    // Không bảng nào có HAI chính sách SELECT
+    // -----------------------------------------------------------------------
+    // Chính sách PERMISSIVE thì OR với nhau. Thêm một chính sách chặt bên cạnh
+    // một chính sách lỏng KHÔNG chặn được gì — cái lỏng vẫn cho qua.
+    //
+    // Ngày 12.09.2026 activity_logs có hai: 'activity_select' (lỏng, ai trong
+    // chi nhánh cũng đọc) và 'activity_logs_select' (chặt, CTV chỉ thấy việc
+    // mình). Migration 0037 viết 'drop policy if exists activity_logs_select'
+    // — đúng cú pháp, chạy thành công, và KHÔNG XOÁ GÌ vì tên thật khác. Lỗ
+    // hổng nguyên vẹn, migration báo xanh. Chỉ có đo lại bằng một phiên đăng
+    // nhập CTV thật mới lộ ra.
+    //
+    // Cổng này bắt đúng hình dạng đó: hai chính sách đọc trên một bảng gần như
+    // luôn là dấu vết của một lần sửa hụt.
+    const trungSelect = await client.query(`
+      select tablename, string_agg(policyname, ' + ' order by policyname) as ten
+      from pg_policies
+      where schemaname = 'public' and permissive = 'PERMISSIVE' and cmd = 'SELECT'
+      group by tablename
+      having count(*) > 1
+      order by tablename
+    `);
+    check(
+      "Không bảng nào có hai chính sách SELECT",
+      trungSelect.rowCount === 0,
+      trungSelect.rowCount
+        ? trungSelect.rows.map((r) => `${r.tablename}: ${r.ten}`).join(" · ") +
+            " — policy PERMISSIVE thì OR, cái lỏng thắng"
+        : `${(await client.query(
+            "select count(*)::int n from pg_policies where schemaname='public' and cmd='SELECT'"
+          )).rows[0].n} bảng, mỗi bảng một chính sách`,
+    );
+
 
   if (REQUIRE_SEED) {
     const counts = {};

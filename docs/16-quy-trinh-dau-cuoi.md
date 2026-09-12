@@ -387,6 +387,50 @@ lại với danh sách thứ hai.
 
 ---
 
+## 6c. CTV thời vụ chỉ thấy việc của mình
+
+Tìm ra khi soát bảng `deliveries` sau BB-121. Trước đó bảng ấy **không ai ghi
+vào**, nên chính sách đọc lỏng của nó không lộ ra. BB-121 bắt đầu ghi
+`final_drive_url` — link thư mục ảnh **hoàn thiện** của từng khách — và lúc đó
+một CTV làm một bộ đọc được link ảnh thành phẩm của mọi khách trong chi nhánh.
+
+Cách soát: đếm bảng nào có chính sách đọc **không nhắc tới** `photoshop_ctv`.
+Ra tám bảng. Đo thật bằng một phiên đăng nhập CTV trên bb-dev:
+
+| Bảng | CTV đọc được | Chứa gì |
+|---|---|---|
+| `deliveries` | tất cả | link thư mục ảnh hoàn thiện |
+| `shoots` | 120 / 471 | buổi chụp của mọi khách trong chi nhánh |
+| `activity_logs` | 1.586 / 1.589 | ai đụng vào bộ nào, lúc nào |
+| `notifications` | 0 / 0 — **bảng rỗng** | số điện thoại, link chat, nội dung nhắn |
+| `babies` | 0 / 4 — an toàn nhờ may | tên, biệt danh, **ngày sinh** của bé |
+
+Con số 0 của `notifications` **không chứng minh gì**: bảng đang rỗng. Chính
+sách vẫn cho CTV đọc hết, và đã kiểm lại bằng cách chèn một dòng.
+
+`babies` đang an toàn vì chính sách của nó lồng truy vấn vào `customers`, mà
+bảng ấy chặn CTV — tức là **bảng nhạy cảm nhất trong cơ sở dữ liệu đang được
+bảo vệ bởi hiệu ứng phụ ở bảng khác**. Nới `customers` một ngày nào đó là
+`babies` mở theo, im lặng. `0037` viết rõ điều kiện vào chính `babies`.
+
+Siết không làm hỏng màn hình nào: cả bốn bảng chỉ được đọc qua service_role,
+vốn đi vòng qua RLS.
+
+### Cái bẫy đắt nhất: hai chính sách đọc trên một bảng
+
+Chính sách PERMISSIVE thì **OR** với nhau. Thêm một chính sách chặt bên cạnh
+một chính sách lỏng **không chặn được gì**.
+
+`activity_logs` có hai: `activity_select` (lỏng) và cái tôi vừa thêm. Lệnh
+`drop policy if exists activity_logs_select` — đúng cú pháp, chạy thành công,
+và **không xoá gì** vì tên thật là `activity_select`. Migration báo xanh, lỗ
+hổng nguyên vẹn. Chỉ có đo lại bằng phiên đăng nhập CTV thật mới lộ ra.
+
+`verify:db` giờ có cổng thứ 15 canh đúng hình dạng đó: **không bảng nào được
+có hai chính sách SELECT**. Hiện 22 bảng, mỗi bảng một chính sách.
+
+---
+
 ## 7. Đợt đẩy dữ liệu thật đầu tiên
 
 Chủ studio chốt: chỉ đẩy các bộ **chưa qua khâu in**. Đo trên bảng Hậu Kỳ ngày
