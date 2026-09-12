@@ -462,6 +462,61 @@ không ai đọc nhầm con số đó nữa.
 
 ---
 
+## 6d. Hạn mức bịa: 434 bộ mang số 20 mà không ai chọn
+
+Tìm ra khi đo xem dữ liệu thật đã dùng được chưa. Câu hỏi đơn giản — *bao nhiêu
+bộ ảnh còn thiếu hạn mức* — trả lời ra **không bộ nào**. Con số đó quá đẹp.
+
+Phân bố hạn mức: **434 / 436 bộ có hạn mức đúng bằng 20**. Hai bộ còn lại là 35
+và 15.
+
+Cột `galleries.included_quota` từng có `default 20`. Toàn bộ 432 bộ nhập từ
+Lark được chèn **trước** khi `0030` bỏ mặc định đó, và script nhập không hề ghi
+cột này. Nên con số 20 không từ đâu ra cả.
+
+`0016` dựng cổng QUOTA_UNKNOWN với đúng một mục đích: **hạn mức chưa biết thì
+chặn, không đoán**. `0030` bỏ mặc định để "chưa biết" biểu diễn được. Nhưng dữ
+liệu chèn trước đó vẫn mang số đoán, nên cổng không bao giờ nổ.
+
+### Vì sao chỉ sửa ba dòng chứ không phải 434
+
+`app.gallery_quota()` chỉ đọc cột này khi bộ ảnh **không có dòng hợp đồng nào**;
+có dòng thì nó cộng các dòng `Edit file` và bỏ qua cột. Nên 430 bộ có hợp đồng
+vẫn ra số đúng dù cột sai.
+
+Đối chiếu cho thấy mức lệch: **337 bộ có cột mâu thuẫn với chính hợp đồng của
+nó** — 187 bộ ghi 20 trong khi hợp đồng là 15, 52 bộ ghi 20 trong khi hợp đồng
+là 30. Số trong cột vô hại vì không được dùng, nhưng ai đọc thẳng cơ sở dữ liệu
+sẽ tin nhầm.
+
+Thật sự nguy hiểm là các bộ **không có dòng hợp đồng nào** — lúc đó số 20 được
+dùng thật. Có sáu bộ như vậy:
+
+| Bộ | Hạn mức | Nguồn | Xử lý |
+|---|---|---|---|
+| Bé Bơ, Bé Sóc, Bé Bin | 20 / 15 / 35 | dữ liệu mẫu | giữ — người đặt |
+| ba bộ mã `HD_…` | 20 | Lark | **xoá về "chưa biết"** |
+
+Ba bộ Lark đó giờ chặn khách chọn ảnh, và CSKH phải điền số thật. Chặn một bộ
+còn hơn mời khách chọn 20 ảnh trong khi họ trả tiền cho một số khác — lúc đó
+studio hoặc chịu lỗ phần chênh, hoặc phải gọi điện nói với khách là mình ghi
+nhầm.
+
+Sau `0039`: **427 bộ có hạn mức đúng, 9 bộ chờ CSKH điền** (ba bộ trên cộng sáu
+bộ có hợp đồng nhưng thiếu dòng `Edit file`).
+
+`verify:db` có cổng thứ 16 canh: không bộ ảnh Lark nào được mang hạn mức khi
+chưa có dòng hợp đồng nào.
+
+### Bài học chung của hai mục 6c và 6d
+
+Cả hai lỗi đều **không gây lỗi đỏ ở đâu cả**. Một cái là chính sách viết cho
+bảng đang rỗng; một cái là giá trị mặc định đã bị bỏ, nhưng dữ liệu chèn trước
+đó vẫn mang nó. Không phép thử nào đỏ, không màn hình nào hỏng. Chỉ có **đo
+thẳng vào dữ liệu và hỏi "con số này từ đâu ra"** mới thấy.
+
+---
+
 ## 7. Đợt đẩy dữ liệu thật đầu tiên
 
 Chủ studio chốt: chỉ đẩy các bộ **chưa qua khâu in**. Đo trên bảng Hậu Kỳ ngày

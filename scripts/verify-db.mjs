@@ -322,6 +322,37 @@ async function main() {
           )).rows[0].n} bảng, mỗi bảng một chính sách`,
     );
 
+    // -----------------------------------------------------------------------
+    // Không bộ ảnh nào mang hạn mức BỊA
+    // -----------------------------------------------------------------------
+    // Cột included_quota từng có 'default 20'. Toàn bộ 432 bộ nhập từ Lark
+    // được chèn TRƯỚC khi 0030 bỏ mặc định đó, và script nhập không ghi cột
+    // này — nên 434 dòng mang số 20 mà không ai chọn.
+    //
+    // app.gallery_quota() chỉ đọc cột này khi bộ ảnh không có dòng hợp đồng
+    // nào. Đúng lúc đó số bịa được dùng thật: khách được mời chọn 20 ảnh
+    // trong khi họ trả tiền cho một số khác, và studio hoặc chịu lỗ phần
+    // chênh hoặc phải gọi điện nói mình ghi nhầm.
+    //
+    // 0016 dựng cổng QUOTA_UNKNOWN để "chưa biết thì CHẶN, không đoán". Dữ
+    // liệu chèn trước đó làm cổng không bao giờ nổ. 0039 xoá. Cổng này canh.
+    const quotaBia = await client.query(`
+      select count(*)::int as n
+      from galleries g
+      where g.included_quota is not null
+        and g.lark_contract_codes is not null
+        and array_length(g.lark_contract_codes, 1) > 0
+        and not exists (select 1 from gallery_items gi where gi.gallery_id = g.id)
+    `);
+    check(
+      "Không bộ ảnh Lark nào mang hạn mức bịa",
+      quotaBia.rows[0].n === 0,
+      quotaBia.rows[0].n
+        ? `${quotaBia.rows[0].n} bộ có hạn mức nhưng KHÔNG có dòng hợp đồng nào — ` +
+            "số đó không từ đâu ra cả"
+        : "không bộ nào",
+    );
+
 
   if (REQUIRE_SEED) {
     const counts = {};
