@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
@@ -16,13 +15,13 @@ export async function GET() {
         id, title, welcome_message, status, baby_id, shoot_date:shoots(shoot_date),
         branch:branches(name, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
-        cover_photo_id, watermark_enabled, download_enabled, notes_enabled, invite_enabled
+        cover_photo_id, download_enabled, notes_enabled, invite_enabled
       `)
       .eq("id", session.galleryId)
       .single();
 
     if (galleryError || !gallery) {
-      return NextResponse.json({ error: { code: "NOT_FOUND", message: "Gallery not found" } }, { status: 404 });
+      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
     const { data: baby } = gallery.baby_id ? await supabase
@@ -112,6 +111,29 @@ export async function GET() {
 
     const totalAddonsAmount = addonsList.reduce((sum, a) => sum + a.totalPrice, 0);
 
+    // Lấy danh sách ảnh đã đặt vào sản phẩm in (selection_placements)
+    const { data: userSelectionItems } = await supabase
+      .from("selection_items")
+      .select("id, photo_id")
+      .eq("selection_id", session.selectionId);
+
+    const selectionItemIds = (userSelectionItems || []).map((si) => si.id);
+    const photoMap = new Map((userSelectionItems || []).map((si) => [si.id, si.photo_id]));
+
+    let placementsList: { selectionItemId: string; photoId: string; galleryItemId: string }[] = [];
+    if (selectionItemIds.length > 0) {
+      const { data: rawPlacements } = await supabase
+        .from("selection_placements")
+        .select("selection_item_id, gallery_item_id")
+        .in("selection_item_id", selectionItemIds);
+
+      placementsList = (rawPlacements || []).map((p) => ({
+        selectionItemId: p.selection_item_id,
+        photoId: photoMap.get(p.selection_item_id) || "",
+        galleryItemId: p.gallery_item_id,
+      }));
+    }
+
     const isSubmittedOrLater = ["submitted", "in_retouch", "delivered", "archived"].includes(gallery.status);
     const hasSnapshot = isSubmittedOrLater && selection?.snapshot_selected_count !== null && selection?.snapshot_selected_count !== undefined;
 
@@ -141,7 +163,6 @@ export async function GET() {
       allowExtra: gallery.allow_extra,
       dueAt: gallery.due_at,
       options: {
-        watermark: gallery.watermark_enabled,
         download: gallery.download_enabled,
         notes: gallery.notes_enabled,
         invite: gallery.invite_enabled
@@ -167,6 +188,7 @@ export async function GET() {
         totalAmount: totalAddonsAmount,
         items: addonsList,
       },
+      placements: placementsList,
     };
 
     return ok(responseData);

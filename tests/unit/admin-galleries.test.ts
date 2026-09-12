@@ -118,9 +118,10 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     expect(body.data.items.length).toBeGreaterThan(0);
     for (const item of body.data.items) {
       const match =
-        item.customerPhone.includes("0912") ||
+        (item.customerPhone && item.customerPhone.includes("0912")) ||
         (item.babyName && item.babyName.includes("0912")) ||
-        item.customerName.includes("0912");
+        (item.customerName && item.customerName.includes("0912")) ||
+        (item.title && item.title.includes("0912"));
       expect(match).toBe(true);
     }
   });

@@ -103,7 +103,7 @@ export async function POST(request: Request): Promise<Response> {
       p_max_selection: input.maxSelection ?? null,
       p_due_at: input.dueAt ?? null,
       p_welcome_message: input.welcomeMessage || null,
-      p_watermark_enabled: input.options.watermark,
+      p_watermark_enabled: false,
       p_download_enabled: input.options.download,
       p_notes_enabled: input.options.notes,
       p_invite_enabled: input.options.invite,
@@ -122,7 +122,7 @@ export async function POST(request: Request): Promise<Response> {
       if (rpcError.code === "23505") {
         return fail(
           "CONFLICT",
-          "Thư mục Google Drive này đã được gắn với một album khác đang hoạt động",
+          "Thư mục Google Drive này đã được gắn với một bộ ảnh khác đang hoạt động",
         );
       }
       if (rpcError.message.includes("CUSTOMER_NOT_FOUND")) {

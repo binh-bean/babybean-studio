@@ -28,7 +28,7 @@ export async function POST(request: Request): Promise<Response> {
 
     // Chỉ khách chính (owner) mới có quyền chốt
     if (session.role !== "owner") {
-      return fail("FORBIDDEN", "Chỉ người nhận link chính mới có quyền chốt album");
+      return fail("FORBIDDEN", "Chỉ người nhận link chính mới có quyền chốt bộ ảnh");
     }
 
     // 2. Parse & validate input
@@ -55,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
       .single();
 
     if (galleryError || !gallery) {
-      return fail("NOT_FOUND", "Không tìm thấy album");
+      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
     if (
@@ -65,7 +65,7 @@ export async function POST(request: Request): Promise<Response> {
       gallery.status === "archived" ||
       gallery.status === "expired"
     ) {
-      return fail("GALLERY_LOCKED", "Album đã được chốt, không thể thay đổi");
+      return fail("GALLERY_LOCKED", "Bộ ảnh đã được chốt, không thể thay đổi");
     }
 
     // 4. Kiểm tra hạn mức từ app.gallery_quota — Luật 4: Hạn mức chưa biết thì KHÔNG cho chốt
@@ -80,7 +80,7 @@ export async function POST(request: Request): Promise<Response> {
     if (quotaVal === null || quotaVal === undefined) {
       return fail(
         "QUOTA_UNKNOWN",
-        "Studio chưa xác định số ảnh trong gói cho album này, vui lòng liên hệ CSKH"
+        "Studio chưa xác định số ảnh trong gói cho bộ ảnh này, vui lòng liên hệ CSKH"
       );
     }
 

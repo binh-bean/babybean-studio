@@ -137,12 +137,12 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-105 | API mua thêm: POST /api/g/addons, chốt giá từ `products.list_price` theo ngưỡng tin cậy | DEV-BE | BB-101 | med | ✅ **DONE** |
 | BB-106 | Báo cáo thất thoát: view album đã giao vượt hạn mức mà chưa lập hóa đơn | ARCH | BB-102 | high | ✅ **DONE** — `0020`, PM sửa đếm trùng ảnh và một chỗ fail-open |
 | BB-107 | Component chọn mua thêm và khối thành phần hợp đồng hai tầng | DEV-UI | BB-102 | med | TODO |
-| BB-108 | **Gỡ công tắc watermark khỏi giao diện.** Nó chạy đủ một vòng nhưng không component nào vẽ watermark — CSKH bật, hệ thống báo đã bật, ảnh vẫn ra sạch. Hứa suông về một thứ bảo vệ không tồn tại | DEV-FE + DEV-BE | — | med | TODO |
+| BB-108 | **Gỡ công tắc watermark khỏi giao diện.** Nó chạy đủ một vòng nhưng không component nào vẽ watermark — CSKH bật, hệ thống báo đã bật, ảnh vẫn ra sạch. Hứa suông về một thứ bảo vệ không tồn tại | DEV-FE + DEV-BE | — | med | ⏳ **TIẾN ĐỘ** — DEV-BE đã gỡ khỏi schema nhập liệu & phản hồi API; chờ DEV-FE gỡ component |
 | BB-109 | Đồng bộ nội dung hợp đồng Lark xuống `gallery_items`: hai tầng, tiền thật, khớp sản phẩm theo mã bản ghi | PM | BB-100 | high | ✅ **DONE** — `sync:contracts`, `0023` thêm `line_total` |
 | BB-110 | Ô nhập **mã hợp đồng Lark** khi tạo và khi sửa album — mắt xích cuối để `sync:contracts` chạy được | DEV-FE | BB-109 | med | TODO |
 | BB-111 | Đồng bộ bảng **Hậu Kỳ**: bản ghi mới + có `Link ảnh gửi khách` thì hiện trong app; ô tích `Lấy link app` tạo album nháp sửa được | DEV-INT | BB-109 | high | TODO |
 | BB-112 | **Thả tim = chọn ảnh** (`mark=selected`, KHÔNG phải `is_favorite`) + bốn con số hạn mức hiện ngay | DEV-FE | BB-102 | high | TODO |
-| BB-113 | Khách đặt ảnh vào sản phẩm in: chỉ hiện ô chọn cho sản phẩm hợp đồng THẬT SỰ có | DEV-FE + DEV-BE | BB-101 | high | TODO |
+| BB-113 | Khách đặt ảnh vào sản phẩm in: chỉ hiện ô chọn cho sản phẩm hợp đồng THẬT SỰ có | DEV-FE + DEV-BE | BB-101 | high | ⏳ **TIẾN ĐỘ** — DEV-BE đã xong API `POST/DELETE /api/g/placements`, mở rộng `GET /api/g/gallery` trả placements |
 | BB-114 | Chốt đơn, báo studio qua Zalo hoặc link chat, CSKH xác nhận rồi chuyển giai đoạn | DEV-BE + DEV-INT | BB-112 | high | ✅ **DONE** — `POST /api/g/submit`, `POST /api/admin/galleries/[id]/confirm`, snapshot con số, thông báo studio |
 | BB-115 | Ghi nhận thanh toán phát sinh và gắn vào lần xác nhận của CSKH | ARCH + DEV-BE | BB-114 | med | TODO |
 
