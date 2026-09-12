@@ -65,16 +65,10 @@ const BRANCH_MAP = {
   Pasteur: "Baby Bean Pasteur",
   "Thảo Điền": "Baby Bean Thảo Điền",
 
-  // NTB SUY RA BẰNG LOẠI TRỪ, chưa ai xác nhận.
+  // Lark viết tắt NTB; chủ studio xác nhận ngày 12.09.2026 đó là Tân Bình.
   //
-  // Đếm trên toàn bộ 11.693 dòng hợp đồng: Lark chỉ có đúng ba giá trị —
-  // NTB (5.993), Pasteur (3.206), Thảo Điền (2.428). App cũng có đúng ba chi
-  // nhánh, hai cái khớp tên, nên cái còn lại phải là Tân Bình.
-  //
-  // Suy luận này chắc nhưng KHÔNG phải bằng chứng. Nếu sai thì 5.993 dòng bị
-  // xếp nhầm chi nhánh, và RLS theo chi nhánh sẽ cho quản lý chi nhánh kia
-  // nhìn thấy dữ liệu không phải của mình. Chủ studio xác nhận rồi xoá ghi chú
-  // này đi.
+  // Giữ tên đầy đủ ở phía app, không đổi thành "NTB": khách nhìn thấy tên chi
+  // nhánh trên trang chọn ảnh, và "NTB" là chữ viết tắt nội bộ.
   NTB: "Baby Bean Tân Bình",
 };
 
@@ -160,10 +154,41 @@ function cellLink(value) {
   return first.link ?? "";
 }
 
-/** "https://drive.google.com/drive/folders/1VP4IW...?usp=sharing" -> "1VP4IW..." */
+/**
+ * Mã thư mục Drive, từ BA dạng link mà nhân viên đã dán vào Lark.
+ *
+ * Bản đầu chỉ nhận dạng /folders/<id> và bỏ sót 25/447 bộ. Ba dạng thật:
+ *
+ *   drive.google.com/drive/folders/<id>?usp=sharing   dạng hiện nay
+ *   drive.google.com/open?id=<id>                     dạng chia sẻ cũ
+ *   l.facebook.com/l.php?u=<link Drive đã mã hoá>     Facebook bọc lại khi
+ *                                                     nhân viên copy từ chat
+ *
+ * Dạng thứ ba phải giải mã URL rồi bóc tiếp, nếu không sẽ mất hẳn.
+ *
+ * Trả chuỗi rỗng khi không phải link Drive — có bộ dán nhầm link hộp thư
+ * Facebook vào ô ảnh. Trả rỗng để chỗ gọi BÁO RA, đừng đoán bừa một mã.
+ */
 function driveFolderId(url) {
-  const m = String(url).match(/\/folders\/([A-Za-z0-9_-]+)/);
-  return m ? m[1] : "";
+  let u = String(url ?? "");
+
+  // Facebook bọc link thật trong tham số u= và mã hoá nó.
+  const wrapped = u.match(/[?&]u=([^&]+)/);
+  if (wrapped) {
+    try {
+      u = decodeURIComponent(wrapped[1]);
+    } catch {
+      // Chuỗi mã hoá hỏng thì dùng nguyên bản, vẫn hơn là ném lỗi.
+    }
+  }
+
+  const folders = u.match(/\/folders\/([A-Za-z0-9_-]+)/);
+  if (folders) return folders[1];
+
+  const openId = u.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  if (openId) return openId[1];
+
+  return "";
 }
 
 // --- chạy -------------------------------------------------------------------
@@ -300,7 +325,13 @@ async function main() {
            values ($1,$2,$3,'draft',$4,$5,$6,$7)
            on conflict (lark_hauky_record_id) where lark_hauky_record_id is not null
            do update set
-             drive_folder_url  = excluded.drive_folder_url,
+             -- PHẢI cập nhật cả drive_folder_id. Lần chạy đầu bộ bóc mã chỉ
+             -- nhận một dạng link nên 25 album lấy mã bản ghi hậu kỳ làm mã
+             -- thư mục. Không cập nhật cột này thì bản vá bộ bóc mã chẳng sửa
+             -- được gì cho những album đã tạo — chúng trỏ vào một thư mục
+             -- không tồn tại, vĩnh viễn.
+             drive_folder_id    = excluded.drive_folder_id,
+             drive_folder_url   = excluded.drive_folder_url,
              lark_contract_code = excluded.lark_contract_code,
              updated_at = now()
            returning (xmax = 0) as inserted`,

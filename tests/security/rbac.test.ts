@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { requireRole, PERMISSIONS } from "../../src/lib/auth/staff";
@@ -17,6 +17,19 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     if (parseInt(rows[0].count, 10) === 0) {
       throw new Error("Dữ liệu trống, cần chạy npm run db:seed trước khi chạy test");
     }
+  });
+
+  // Luôn đóng giao dịch sau mỗi phép thử, KỂ CẢ khi phép thử ném lỗi.
+  //
+  // 10 phép thử trong file này đều mở BEGIN rồi SET LOCAL ROLE authenticated,
+  // và đặt ROLLBACK ở cuối — sau các assertion. Một assertion hỏng là ROLLBACK
+  // không chạy, kết nối ở lại trong giao dịch với vai authenticated, và phép
+  // thử KẾ TIẾP chết với "permission denied for table users" ở chỗ chẳng liên
+  // quan gì. Một lỗi thật hoá thành hai lỗi, và lỗi thứ hai chỉ vào nhầm chỗ.
+  //
+  // Xảy ra thật ngày 12.09.2026. Cùng khuôn với test BB-106 đã sửa cùng ngày.
+  afterEach(async () => {
+    await client.query("ROLLBACK").catch(() => {});
   });
 
   afterAll(async () => {
@@ -293,7 +306,21 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     await client.query("UPDATE staff_profiles SET role = 'photoshop_ctv' WHERE id = $1", [ctvId]);
 
     // Gán 1 album cho ctv
-    const { rows: galleries } = await client.query("SELECT id FROM galleries LIMIT 2");
+    // PHẢI lọc theo chi nhánh của chính nhân viên này.
+    //
+    // Bản cũ lấy "SELECT id FROM galleries LIMIT 2" — album bất kỳ, không thứ
+    // tự, không lọc. Nó chỉ đúng khi cơ sở dữ liệu vừa vặn có album ở đúng chi
+    // nhánh mà makePhotographerAndCustomer bốc trúng. Khi bb-dev có thêm 431
+    // album thật từ Lark, LIMIT 2 rơi vào chi nhánh khác, CTV không thấy gì,
+    // và phép thử báo hỏng ở chỗ chẳng sai gì cả.
+    const { rows: staffBranch } = await client.query(
+      "SELECT branch_id FROM staff_branches WHERE staff_id = $1 LIMIT 1",
+      [ctvId],
+    );
+    const { rows: galleries } = await client.query(
+      "SELECT id FROM galleries WHERE branch_id = $1 ORDER BY created_at LIMIT 2",
+      [staffBranch[0].branch_id],
+    );
     expect(galleries.length).toBeGreaterThanOrEqual(2);
     const assignedGalleryId = galleries[0].id;
     await client.query("UPDATE galleries SET editor_id = $1 WHERE id = $2", [ctvId, assignedGalleryId]);
