@@ -429,6 +429,37 @@ hổng nguyên vẹn. Chỉ có đo lại bằng phiên đăng nhập CTV thật
 `verify:db` giờ có cổng thứ 15 canh đúng hình dạng đó: **không bảng nào được
 có hai chính sách SELECT**. Hiện 22 bảng, mỗi bảng một chính sách.
 
+### Đo, chứ không đọc: `npm run soat:quyen`
+
+Vì chính sách cộng dồn, đọc một chính sách rồi kết luận là sai. Script
+`scripts/soat-quyen-doc.mjs` dựng một nhân viên giả cho **từng vai trò** rồi
+đếm số dòng vai đó đọc được ở cả 23 bảng, in ra một bảng vai-trò × bảng. Mỗi
+vai nằm trong một giao dịch bị huỷ, không để lại dòng nào.
+
+Nó tìm ra thứ mà đọc chính sách không thấy: **`settings` là bảng duy nhất cả
+chín vai trò đọc được hết**, kể cả CTV thời vụ — dòng toàn cục
+(`branch_id null`) không có điều kiện nào. Trong bảng có khoá
+`lark.webhook_url`.
+
+Hôm nay giá trị rỗng nên chưa rò gì. Nhưng webhook là thứ ai cầm cũng nhắn
+được vào Lark của studio — nó là một loại chìa khoá, và chỗ để chìa mà ai cũng
+mở được thì chỉ chờ tới ngày có người bỏ chìa vào. Đúng hình dạng lỗ hổng
+`deliveries`: chính sách viết cho bảng chưa có dữ liệu thì không ai soát kỹ.
+
+`0038` bắt theo **hình dạng tên** chứ không theo danh sách liệt kê — khoá nào
+có `url`, `token`, `secret`, `key`, `password` hay `webhook` thì chỉ chủ và
+quản trị đọc được. Liệt kê từng khoá thì khoá thêm sau này không ai nhớ bổ
+sung; bắt theo tên thì `zalo.api_token` hay `smtp.password` tự động bị chặn.
+
+Một bẫy nữa của script: bản đầu in "cấm" cho **tám bảng liền nhau**, toàn số
+giả. Nguyên nhân là một truy vấn lỗi làm hỏng cả giao dịch, mọi truy vấn sau
+đó lỗi theo. Suýt thành một phát hiện tưởng tượng. Giờ mỗi bảng có savepoint
+riêng.
+
+Và con số 0 không phải lúc nào cũng là tin tốt: `notifications` cho 0 vì
+**bảng đang rỗng**, không phải vì bị chặn. Script in kèm chữ *(bảng rỗng)* để
+không ai đọc nhầm con số đó nữa.
+
 ---
 
 ## 7. Đợt đẩy dữ liệu thật đầu tiên
