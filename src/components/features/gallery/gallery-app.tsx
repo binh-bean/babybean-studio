@@ -9,6 +9,7 @@ import { cn } from "@/components/ui/utils";
 import { QuotaDisplay } from "@/components/ui/quota-display";
 import { CustomerProgress } from "@/components/ui/customer-progress";
 import { ContractBreakdown, type ContractItem, formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import { PhotoPlacementPicker } from "@/components/ui/photo-placement-picker";
 import { AddonSelector, type AddonProduct } from "@/components/ui/addon-selector";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -54,16 +55,22 @@ interface GalleryApiResponse {
       id: string;
       productId: string;
       name: string;
+      // kind phân biệt gói chụp, hàng in, ảnh chỉnh sửa. API vẫn luôn trả
+      // trường này; bản khai đầu của giao diện bỏ sót nên không lọc được sản
+      // phẩm in ra khỏi gói chụp.
+      kind: string;
       quantity: number;
       unitPrice: number | null;
       totalPrice: number | null;
       components: Array<{
         id: string;
         name: string;
+        kind: string;
         quantity: number;
       }>;
     }>;
   };
+  placements?: Array<{ photoId: string; galleryItemId: string }>;
   addons?: {
     totalAmount: number;
     items: Array<{
@@ -123,6 +130,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [customerNote, setCustomerNote] = useState("");
+  const [placements, setPlacements] = useState<{ photoId: string; galleryItemId: string }[]>([]);
+  const [placing, setPlacing] = useState(false);
 
   const isLocked = useMemo(() => {
     if (!gallery) return false;
@@ -183,6 +192,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
       const gData = json.data as GalleryApiResponse;
       setGallery(gData);
+      setPlacements(gData.placements ?? []);
       setSelectionCounts({
         selectedCount: gData.selection?.selectedCount ?? 0,
         extraCount: gData.selection?.extraCount ?? 0,
@@ -344,6 +354,75 @@ export function GalleryApp({ token }: GalleryAppProps) {
   }, [photos, filter, selectedSubfolder]);
 
   // Chuyển đổi thành phần hợp đồng cho component ContractBreakdown
+  /**
+   * Sản phẩm in mà hợp đồng THẬT SỰ có.
+   *
+   * Lấy từ cả hai tầng: dòng hợp đồng (khách mua lẻ một tấm ảnh phóng) và
+   * thành phần của gói (ảnh phóng nằm sẵn trong gói chụp). Cả hai đều là dòng
+   * trong gallery_items nên đều có id để đặt ảnh vào.
+   *
+   * Hợp đồng không mua hàng in thì mảng này rỗng, và component tự ẩn. Đây là
+   * luật "chỉ hiện ô chọn cho sản phẩm hợp đồng thật sự có" ở docs/16 mục 3.3 —
+   * và nó được thực thi ở ĐÂY chứ không phải bằng cách giấu nút, vì API cũng
+   * từ chối dòng hàng không thuộc bộ ảnh.
+   */
+  const printProducts = useMemo(() => {
+    const items = gallery?.contract?.items ?? [];
+    const out: { galleryItemId: string; name: string; quantity: number }[] = [];
+    for (const item of items) {
+      if (item.kind === "print") {
+        out.push({ galleryItemId: item.id, name: item.name, quantity: item.quantity });
+      }
+      for (const comp of item.components ?? []) {
+        if (comp.kind === "print") {
+          out.push({ galleryItemId: comp.id, name: comp.name, quantity: comp.quantity });
+        }
+      }
+    }
+    return out;
+  }, [gallery]);
+
+  /** Chỉ ảnh ĐÃ CHỌN mới đặt được vào sản phẩm in — ảnh in lấy từ tập đã chỉnh. */
+  const placeablePhotos = useMemo(
+    () =>
+      photos
+        .filter((p) => p.mark === "selected")
+        .map((p) => ({ id: p.id, thumbnailUrl: `/api/img/${p.id}?w=200` })),
+    [photos],
+  );
+
+  const changePlacement = useCallback(
+    async (photoId: string, galleryItemId: string, add: boolean) => {
+      // Cập nhật giao diện trước, trả lại nếu máy chủ từ chối — cùng cách với
+      // nút thả tim, để khách không phải chờ một vòng mạng mới thấy phản hồi.
+      const before = placements;
+      setPlacements((prev) =>
+        add
+          ? [...prev, { photoId, galleryItemId }]
+          : prev.filter((x) => !(x.photoId === photoId && x.galleryItemId === galleryItemId)),
+      );
+      setPlacing(true);
+      try {
+        const res = await fetch("/api/g/placements", {
+          method: add ? "POST" : "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photoId, galleryItemId }),
+        });
+        if (!res.ok) {
+          setPlacements(before);
+          const json = await res.json().catch(() => null);
+          setStatusMessage(json?.error?.message ?? "Không lưu được, ba mẹ thử lại giúp.");
+        }
+      } catch {
+        setPlacements(before);
+        setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
+      } finally {
+        setPlacing(false);
+      }
+    },
+    [placements],
+  );
+
   const contractBreakdownItems = useMemo<ContractItem[]>(() => {
     if (!gallery?.contract?.items) return [];
     return gallery.contract.items.map((item) => ({
@@ -717,6 +796,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
           <section aria-labelledby="contract-breakdown-heading" className="pt-4">
             <ContractBreakdown items={contractBreakdownItems} />
           </section>
+        )}
+
+        {/* ĐẶT ẢNH VÀO SẢN PHẨM IN
+            Component tự ẩn khi hợp đồng không có hàng in. Khoá lại sau khi
+            khách đã chốt — cùng luật với nút thả tim. */}
+        {!isLocked && (
+          <PhotoPlacementPicker
+            className="mt-4"
+            products={printProducts}
+            selectedPhotos={placeablePhotos}
+            placements={placements}
+            busy={placing}
+            onPlace={(photoId, itemId) => changePlacement(photoId, itemId, true)}
+            onRemove={(photoId, itemId) => changePlacement(photoId, itemId, false)}
+          />
         )}
 
         {/* SẢN PHẨM MUA THÊM (ADDON) */}
