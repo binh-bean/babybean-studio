@@ -131,7 +131,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-099 | Gán người theo từng album: photographer, CSKH, người photoshop. Thêm vai `photoshop_ctv` quyền hẹp hơn | ARCH + DEV-BE | BB-063 | high | TODO |
 | BB-100 | Danh mục sản phẩm + dòng hàng hợp đồng theo cấu trúc Lark thật (3 tầng). Hạn mức ảnh là dòng `Edit file`, không phải cột | PM | BB-063 | high | ✅ **DONE** — `0014`, 130/132 sản phẩm đã đồng bộ, `app.gallery_quota()` |
 | BB-101 | Khách mua thêm ngay trên app: bảng `selection_addons`, và `selection_items.gallery_item_id` để biết ảnh này in vào sản phẩm nào | ARCH | BB-100 | high | TODO |
-| BB-102 | API trả thành phần hợp đồng hai tầng cho một album, hạn mức lấy từ `app.gallery_quota()` chứ không từ cột | DEV-BE | BB-100 | med | TODO |
+| BB-102 | API trả thành phần hợp đồng hai tầng cho một album, hạn mức lấy từ `app.gallery_quota()` chứ không từ cột | DEV-BE | BB-100 | med | ✅ **DONE** — `app.gallery_quota` ưu tiên `gallery_items`; cây 2 tầng tại `GET /api/g/gallery` và `GET /api/admin/galleries/[id]/items`; chặn chọn khi quota chưa biết; 5/5 unit test |
 | BB-103 | Màn quản trị: CSKH xem và sửa dòng hàng của album (thêm/bớt sản phẩm, đổi số lượng) | DEV-FE | BB-100 | med | TODO |
 | BB-104 | Dải tiến trình 6 bước cho khách, ưu tiên điện thoại. Hạn mức chưa biết thì báo chữ, không hiện số 0 | DEV-UI | BB-100 | med | TODO |
 

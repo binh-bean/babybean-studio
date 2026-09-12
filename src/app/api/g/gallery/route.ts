@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
+import { getGalleryContractSummary } from "@/lib/selection/contract";
 
 
 export async function GET() {
@@ -61,9 +62,15 @@ export async function GET() {
       .eq("selection_id", session.selectionId)
       .eq("mark", "favorite");
 
+    // Lấy thành phần hợp đồng và hạn mức từ app.gallery_quota
+    const contractSummary = await getGalleryContractSummary(session.galleryId, supabase);
+    const { quotaKnown, includedQuota } = contractSummary;
+
     const selected = selectedCount || 0;
     const favorite = favoriteCount || 0;
-    const extraCount = Math.max(0, selected - gallery.included_quota);
+    const extraCount = quotaKnown && includedQuota !== null
+      ? Math.max(0, selected - includedQuota)
+      : 0;
     const extraAmount = extraCount * gallery.extra_photo_price;
 
     const responseData = {
@@ -79,7 +86,8 @@ export async function GET() {
         zaloOa: (gallery.branch as unknown as { zalo_oa: string }[])?.[0]?.zalo_oa || (gallery.branch as unknown as { zalo_oa: string })?.zalo_oa
       },
       photoCount: gallery.photo_count,
-      includedQuota: gallery.included_quota,
+      quotaKnown,
+      includedQuota,
       extraPhotoPrice: gallery.extra_photo_price,
       maxSelection: gallery.max_selection,
       allowExtra: gallery.allow_extra,
@@ -101,7 +109,11 @@ export async function GET() {
         extraAmount: gallery.status === 'submitted' ? selection?.snapshot_extra_amount : extraAmount,
         generalNote: selection?.general_note || null,
         submittedAt: selection?.submitted_at || null
-      }
+      },
+      contract: {
+        totalValue: contractSummary.totalValue,
+        items: contractSummary.items,
+      },
     };
 
     return ok(responseData);
