@@ -407,6 +407,30 @@ create table selection_ops (
 
 create index idx_selection_ops_selection on selection_ops(selection_id);
 
+-- BB-115: Ghi nhận thanh toán phát sinh
+create table gallery_payments (
+  id                    uuid primary key default gen_random_uuid(),
+  gallery_id            uuid not null references galleries(id) on delete cascade,
+  selection_id          uuid references selections(id) on delete set null,
+
+  amount                numeric(12,0) not null check (amount <> 0),
+  snapshot_extra_amount numeric(12,0),
+  payment_method        text not null check (length(trim(payment_method)) > 0),
+
+  confirmed_by          uuid not null references staff_profiles(id),
+  confirmed_at          timestamptz not null default now(),
+
+  note                  text,
+  created_at            timestamptz not null default now()
+);
+
+create index idx_gallery_payments_gallery on gallery_payments(gallery_id);
+create index idx_gallery_payments_selection on gallery_payments(selection_id);
+create index idx_gallery_payments_confirmed_by on gallery_payments(confirmed_by);
+
+comment on table gallery_payments is
+  'Bảng ghi nhận tiền phát sinh của album thu ngoài app (chuyển khoản, tiền mặt...). Append-only: không sửa/xoá dòng cũ.';
+
 -- ============================================================================
 -- 10. GIAO HÀNG (Phase 2)
 -- ============================================================================
@@ -546,6 +570,15 @@ returns integer language sql as $$
     returning 1
   )
   select count(*)::integer from updated;
+$$;
+
+-- Tính tổng tiền phát sinh đã thanh toán của một album.
+create or replace function app.gallery_paid_amount(p_gallery_id uuid)
+returns numeric
+language sql stable security definer set search_path = public as $$
+  select coalesce(sum(amount), 0)::numeric
+  from gallery_payments
+  where gallery_id = p_gallery_id;
 $$;
 
 -- ============================================================================
