@@ -38,6 +38,7 @@
  * `text` trước `link` nên sẽ trả về đúng cái tên vừa mất công che.
  */
 
+import { createHash } from "node:crypto";
 import pg from "pg";
 
 const HOST = "https://open.larksuite.com/open-apis";
@@ -152,6 +153,21 @@ function cellLink(value) {
   const first = Array.isArray(value) ? value[0] : value;
   if (!first || typeof first !== "object") return "";
   return first.link ?? "";
+}
+
+/**
+ * Khoá khách hàng, băm từ "Mã KH" của Lark.
+ *
+ * Mã gốc có dạng "B_SG-<tên khách>_<số điện thoại>" — gộp cả tên lẫn số điện
+ * thoại. Lưu thẳng là mang nguyên dữ liệu cá nhân vào bb-dev, đúng thứ
+ * docs/16 mục 7.3 đang che.
+ *
+ * sha256 rồi lấy 12 ký tự: cùng khách thì cùng khoá ở mọi lần chạy, mà không
+ * đọc ngược ra tên hay số điện thoại được. 12 ký tự hex là 48 bit — với vài
+ * nghìn khách thì khả năng trùng là không đáng kể.
+ */
+function customerKey(larkCustomerCode) {
+  return createHash("sha256").update(String(larkCustomerCode)).digest("hex").slice(0, 12);
 }
 
 /**
@@ -272,6 +288,7 @@ async function main() {
         continue;
       }
 
+      const larkCustomer = cellText(f["Mã KH"]).trim();
       const photoUrl = cellLink(f["Link ảnh gửi khách"]);
       const folderId = driveFolderId(photoUrl);
       const key = folderId || `hauky:${haukyId}`;
@@ -288,6 +305,7 @@ async function main() {
 
       byFolder.set(key, {
         haukyId,
+        customerKey: larkCustomer ? customerKey(larkCustomer) : null,
         haukyIds: [haukyId],
         contractCodes: [contractCode],
         branchId,
@@ -304,7 +322,11 @@ async function main() {
     const plan = [...byFolder.values()].map((g) => ({
       ...g,
       contractCode: g.contractCodes[0],
-      customerName: `KH · ${g.contractCodes[0]}`,
+      // Tên khách bám theo KHÁCH, không bám theo hợp đồng — nếu không thì một
+      // khách hai hợp đồng sẽ thành hai khách.
+      customerName: `KH · ${g.customerKey ?? g.contractCodes[0]}`,
+      // Tiêu đề album bám theo HỢP ĐỒNG, để nhân viên dán vào Lark tra ra ngay.
+      galleryTitle: g.contractCodes.join(" + "),
     }));
 
     console.log(`\nDựng được ${plan.length} album từ ${candidates.length} bản ghi hậu kỳ.`);
@@ -353,22 +375,30 @@ async function main() {
     for (const p of plan) {
       await client.query("begin");
       try {
-        // Khách: một khách cho mỗi hợp đồng, tên đã che.
+        // Khách: MỘT khách là MỘT khách, dù có bao nhiêu hợp đồng.
+        //
+        // Bản đầu đặt tên khách theo mã hợp đồng nên mỗi hợp đồng thành một
+        // khách: 446 khách giả thay vì 405 khách thật. Chủ studio chỉ ra ngày
+        // 12.09.2026. Cổng khách (0010) cấp MỘT link cho MỘT khách để xem mọi
+        // buổi chụp của họ — xé khách ra là mỗi buổi một link, đúng thứ 0010
+        // sinh ra để bỏ.
+        //
+        // Khoá là "Mã KH" bên Lark, ĐÃ BĂM vì mã gốc gộp cả tên lẫn số điện
+        // thoại vào chuỗi.
         const { rows: cust } = await client.query(
-          `insert into customers (branch_id, full_name, facebook)
-           values ($1, $2, $3)
-           on conflict do nothing
+          `insert into customers (branch_id, full_name, facebook, lark_customer_key)
+           values ($1, $2, $3, $4)
+           on conflict (lark_customer_key) where lark_customer_key is not null
+           do update set
+             -- Link chat có thể đổi; tên bí danh thì không, nó dẫn xuất từ khoá.
+             facebook = coalesce(excluded.facebook, customers.facebook),
+             updated_at = now()
            returning id`,
-          [p.branchId, p.customerName, p.chatUrl],
+          [p.branchId, p.customerName, p.chatUrl, p.customerKey],
         );
-        let customerId = cust[0]?.id;
-        if (!customerId) {
-          const { rows } = await client.query(
-            `select id from customers where full_name = $1 limit 1`,
-            [p.customerName],
-          );
-          customerId = rows[0]?.id;
-        }
+        const customerId = cust[0]?.id;
+        if (!customerId) throw new Error(`Không lấy được customer cho ${p.customerKey}`);
+
 
         // Album neo vào THƯ MỤC DRIVE — đó là thứ khách nhìn thấy, và là khoá
         // định danh sau 0028. Bộ nào không bóc được mã thư mục thì lấy mã bản
@@ -391,7 +421,7 @@ async function main() {
              updated_at = now()
            returning (xmax = 0) as inserted`,
           [
-            p.branchId, customerId, p.customerName, p.driveFolderId || p.haukyId,
+            p.branchId, customerId, p.galleryTitle, p.driveFolderId || p.haukyId,
             p.driveUrl, p.contractCode, p.contractCodes, p.haukyId,
           ],
         );

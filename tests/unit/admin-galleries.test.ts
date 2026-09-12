@@ -116,11 +116,23 @@ describe("GET /api/admin/galleries (BB-024)", () => {
 
     expect(res.status).toBe(200);
     expect(body.data.items.length).toBeGreaterThan(0);
+    // Phải kiểm ĐỦ những cột mà RPC thật sự tìm, và phải phòng null.
+    //
+    // 0013 tìm trên: c.phone, c.phone_normalized, c.full_name, bb.full_name,
+    // bb.nickname, VÀ g.title. Bản cũ bỏ sót g.title, nên khi bb-dev có album
+    // mang tiêu đề là mã hợp đồng (HD_20260912#...) thì "0912" khớp qua tiêu
+    // đề — API đúng, test báo sai.
+    //
+    // Và customerPhone CÓ THỂ null: khách nhập từ Lark được che số điện thoại
+    // theo docs/16 mục 7.3. Gọi .includes trên null là ném TypeError, che mất
+    // phép thử thật bằng một lỗi chẳng liên quan.
+    const has = (value: string | null | undefined) => Boolean(value?.includes("0912"));
     for (const item of body.data.items) {
       const match =
-        item.customerPhone.includes("0912") ||
-        (item.babyName && item.babyName.includes("0912")) ||
-        item.customerName.includes("0912");
+        has(item.customerPhone) ||
+        has(item.babyName) ||
+        has(item.customerName) ||
+        has(item.title);
       expect(match).toBe(true);
     }
   });
