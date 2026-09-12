@@ -372,7 +372,18 @@ X"* ngay cạnh nút chuyển sang chỉnh ảnh, nhưng **không khoá nút**. 
 đây thì gặp trường hợp thật — khách trả trước một nửa, khách trả dư rồi bù vào
 buổi sau — CSKH sẽ đi ghi tay ra ngoài, và sổ trong app thành sổ rỗng.
 
-*Điểm này chờ chủ studio chốt: có nên khoá hẳn nút khi còn thiếu tiền không.*
+**Chủ studio chốt ngày 12.09.2026: báo, vẫn cho bấm.** Không khoá nút.
+
+### Hai hình thức thu, không phải năm
+
+**Chủ studio chốt ngày 12.09.2026: ba chi nhánh chỉ thu tiền mặt và chuyển
+khoản.** Bản đầu PM tự thêm quẹt thẻ, ví điện tử và "khác" — đã bỏ. Mục không
+bao giờ dùng để trong danh sách chỉ tổ nhân viên chọn nhầm, và một dòng sổ sai
+hình thức thì báo cáo đối chiếu ngân hàng lệch theo.
+
+Danh sách nằm ở `src/lib/payment-methods.ts`, **một chỗ duy nhất** — route và
+màn hình cùng lấy từ đó. Bài học sáu bản chép tay ở mục 4b còn mới; không lặp
+lại với danh sách thứ hai.
 
 ---
 

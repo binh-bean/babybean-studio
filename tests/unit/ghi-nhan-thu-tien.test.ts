@@ -144,6 +144,11 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
       { amount: 0, method: "tien_mat" },
       { amount: 1000.5, method: "tien_mat" },
       { amount: 100000, method: "bitcoin" },
+      // Ba hình thức PM tự thêm, chủ studio đã bỏ: ba chi nhánh chỉ thu tiền
+      // mặt và chuyển khoản.
+      { amount: 100000, method: "pos" },
+      { amount: 100000, method: "vi_dien_tu" },
+      { amount: 100000, method: "khac" },
       { amount: 100000, method: "" },
     ]) {
       const res = await pay(body(b), params());

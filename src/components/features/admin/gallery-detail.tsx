@@ -26,6 +26,7 @@
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { PAYMENT_METHODS } from "@/lib/payment-methods";
 
 interface Component {
   id: string;
@@ -607,15 +608,6 @@ function ReopenForm({
   );
 }
 
-/** Hình thức thu, khớp danh sách đóng bên route. */
-const PAYMENT_METHODS: Array<{ value: string; label: string }> = [
-  { value: "chuyen_khoan", label: "Chuyển khoản" },
-  { value: "tien_mat", label: "Tiền mặt" },
-  { value: "pos", label: "Quẹt thẻ" },
-  { value: "vi_dien_tu", label: "Ví điện tử" },
-  { value: "khac", label: "Khác" },
-];
-
 /**
  * Ô ghi nhận đã thu tiền.
  *
@@ -633,7 +625,7 @@ function PaymentForm({
   onSubmit: (amount: number, method: string, note: string) => void;
 }) {
   const [amount, setAmount] = React.useState(suggested > 0 ? String(suggested) : "");
-  const [method, setMethod] = React.useState("chuyen_khoan");
+  const [method, setMethod] = React.useState("tien_mat");
   const [note, setNote] = React.useState("");
 
   React.useEffect(() => {
