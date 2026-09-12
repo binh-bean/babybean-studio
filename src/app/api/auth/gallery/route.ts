@@ -77,8 +77,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if ((count ?? 0) >= RATE_LIMIT_PER_IP) return fail("RATE_LIMITED");
     }
 
-    // Logged before we know whether the token is real, so probing counts too.
-    // Only the 6-character prefix is ever written down.
     await admin.from("activity_logs").insert({
       actor_type: "customer",
       action: ACTION,
@@ -89,22 +87,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const { data: link } = await admin
       .from("share_links")
-      .select("id, gallery_id, role, status, expires_at, requires_pin, pin_hash, failed_attempts, locked_until")
+      .select("id, gallery_id, customer_id, role, status, expires_at, requires_pin, pin_hash, failed_attempts, locked_until")
       .eq("token_hash", await sha256Hex(token))
       .maybeSingle();
 
     // Unknown, revoked and expired all answer identically. Telling them apart
     // would confirm which albums exist to someone who is guessing.
+    const isLegacy = !link?.customer_id;
     const usable =
       link &&
       link.status === "active" &&
-      (!link.expires_at || new Date(link.expires_at) > new Date());
+      (!isLegacy || !link.expires_at || new Date(link.expires_at) > new Date());
 
     if (!usable) return fail("NOT_FOUND");
 
     if (link.requires_pin) {
       if (!link.pin_hash) {
-        // Never treat this as "no PIN needed" — that turns a misconfigured
+        // Never treat this as "no PIN needed" - that turns a misconfigured
         // link into an open one.
         console.error(JSON.stringify({ evt: "pin_hash_missing", shareLinkId: link.id, reqId }));
         return fail("INTERNAL");
@@ -120,7 +119,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
 
       // A lock that has run out clears the counter. Without this the counter
-      // stays at 5 forever, so the next single typo re-locks the album — and
+      // stays at 5 forever, so the next single typo re-locks the album - and
       // it is a parent on a phone typing the last four digits of their own
       // number.
       const priorAttempts = lockedUntil !== null ? 0 : (link.failed_attempts ?? 0);
@@ -157,28 +156,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // One selection per share link, created on first successful entry rather
     // than at gallery creation: BB-065 mints new share links later and they
     // would otherwise arrive without one.
-    let selectionId: string;
-    const { data: existing } = await admin
-      .from("selections")
-      .select("id")
-      .eq("share_link_id", link.id)
-      .maybeSingle();
-
-    if (existing) {
-      selectionId = existing.id;
-    } else {
-      const { data: created, error: insErr } = await admin
+    // BUT only for legacy gallery links! Customer portal links have no specific gallery.
+    let selectionId = "";
+    if (isLegacy && link.gallery_id) {
+      const { data: existing } = await admin
         .from("selections")
-        .insert({
-          gallery_id: link.gallery_id,
-          share_link_id: link.id,
-          is_primary: link.role === "owner",
-        })
         .select("id")
-        .single();
+        .eq("share_link_id", link.id)
+        .maybeSingle();
 
-      if (insErr || !created) throw insErr ?? new Error("selection insert returned nothing");
-      selectionId = created.id;
+      if (existing) {
+        selectionId = existing.id;
+      } else {
+        const { data: created, error: insErr } = await admin
+          .from("selections")
+          .insert({
+            gallery_id: link.gallery_id,
+            share_link_id: link.id,
+            is_primary: link.role === "owner",
+          })
+          .select("id")
+          .single();
+
+        if (insErr || !created) throw insErr ?? new Error("selection insert returned nothing");
+        selectionId = created.id;
+      }
     }
 
     await admin
@@ -187,14 +189,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .eq("id", link.id);
 
     const { token: sessionToken, expiresAt } = await signGallerySession({
-      galleryId: link.gallery_id,
+      customerId: link.customer_id || "",
+      galleryId: link.gallery_id || "",
       shareLinkId: link.id,
       selectionId,
       role: link.role as ShareRole,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     const response = ok({
-      galleryId: link.gallery_id,
+      customerId: link.customer_id || "",
+      galleryId: link.gallery_id || "",
       role: link.role,
       expiresAt: expiresAt.toISOString(),
     });

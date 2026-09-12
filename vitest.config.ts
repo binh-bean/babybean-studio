@@ -27,6 +27,23 @@ export default defineConfig({
      * Cái giá là bộ test chậm hơn. Đáng.
      */
     fileParallelism: false,
+
+    /**
+     * 20 giây cho mỗi phép thử, thay vì 5 giây mặc định.
+     *
+     * Phần lớn test ở đây gọi Supabase qua HTTP, mỗi lượt 1-2 giây. Một phép
+     * thử làm ba lượt liên tiếp là đã chạm 5 giây, và sau khi bb-dev có dữ liệu
+     * thật (432 bộ ảnh, 2.000 dòng hàng) thì chạm thật.
+     *
+     * Ngày 12.09.2026: test "thả tim vào ảnh ĐÃ CHỌN" hết giờ ở 5014ms — quá
+     * đúng 14 mili-giây. Phép thử kế tiếp hỏng theo vì phép thử trước dừng
+     * giữa chừng, để lại dữ liệu dở dang. Một lỗi thời gian chờ hoá thành hai
+     * lỗi, và lỗi thứ hai chỉ vào nhầm chỗ.
+     *
+     * Nới thời gian chờ KHÔNG che được lỗi thật: phép thử sai vẫn sai, chỉ là
+     * nó có đủ thời gian để sai cho đúng chỗ.
+     */
+    testTimeout: 20_000,
   },
   resolve: {
     alias: {

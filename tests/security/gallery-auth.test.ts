@@ -14,26 +14,33 @@ import { NextRequest } from "next/server";
 import { POST } from "@/app/api/auth/gallery/route";
 import {
   assertShareLinkUsable,
+  assertCustomerOwnsGallery,
   GallerySessionError,
   SESSION_COOKIE,
 } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { setupAuthFixtures, cleanupAuthFixtures } from "../fixtures/gallery-auth";
 
-describe("BB-030 — POST /api/auth/gallery", () => {
+describe("BB-030 - POST /api/auth/gallery", () => {
   let gid: string;
   let revId: string;
   let pinLinkId: string;
+  let customerAId: string;
+  let galleryBId: string;
+  let customerToken: string;
 
   beforeAll(async () => {
     const res = await setupAuthFixtures();
     gid = res.gid;
     revId = res.revId;
     pinLinkId = res.pinLinkId;
+    customerAId = res.customerAId;
+    galleryBId = res.galleryBId;
+    customerToken = res.customerToken;
   });
 
   afterAll(async () => {
-    if (gid) await cleanupAuthFixtures(gid);
+    if (gid) await cleanupAuthFixtures();
   });
 
   /** Each call gets its own IP so the rate limiter does not bleed across cases. */
@@ -52,34 +59,34 @@ describe("BB-030 — POST /api/auth/gallery", () => {
     return { res, body: await res.clone().json() };
   }
 
-  it("Ca 1: token đúng, không cần PIN → ký được phiên", async () => {
+  it("Ca 1: token đúng, không cần PIN -> ký được phiên", async () => {
     const { res } = await postAuth("token-no-pin");
     expect(res.status).toBe(200);
     expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
   });
 
-  it("Ca 2: token đúng + PIN đúng → ký được phiên", async () => {
+  it("Ca 2: token đúng + PIN đúng -> ký được phiên", async () => {
     const { res, body } = await postAuth("token-with-pin", "1234");
     expect(res.status).toBe(200);
     expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
     expect(body.data.galleryId).toBe(gid);
   });
 
-  it("Ca 3: PIN sai → PIN_INVALID và failed_attempts tăng", async () => {
+  it("Ca 3: PIN sai -> PIN_INVALID và failed_attempts tăng", async () => {
     const { res, body } = await postAuth("token-with-pin", "9999");
     expect(res.status).toBe(401);
     expect(body.error.code).toBe("PIN_INVALID");
     expect(body.error.details.remainingAttempts).toBe(4);
   });
 
-  it("Ca 4: sai lần thứ 5 → PIN_LOCKED", async () => {
+  it("Ca 4: sai lần thứ 5 -> PIN_LOCKED", async () => {
     for (let i = 0; i < 3; i++) await postAuth("token-with-pin", "9999");
     const { res, body } = await postAuth("token-with-pin", "9999");
     expect(res.status).toBe(429);
     expect(body.error.code).toBe("PIN_LOCKED");
   });
 
-  it("Ca 5: đang bị khoá → PIN_LOCKED kể cả khi PIN đúng", async () => {
+  it("Ca 5: đang bị khoá -> PIN_LOCKED kể cả khi PIN đúng", async () => {
     const { res, body } = await postAuth("token-with-pin", "1234");
     expect(res.status).toBe(429);
     expect(body.error.code).toBe("PIN_LOCKED");
@@ -100,25 +107,25 @@ describe("BB-030 — POST /api/auth/gallery", () => {
     expect(body.error.details.remainingAttempts).toBe(4);
   });
 
-  it("Ca 6: link đã thu hồi → NOT_FOUND", async () => {
+  it("Ca 6: link đã thu hồi -> NOT_FOUND", async () => {
     const { res, body } = await postAuth("token-revoked");
     expect(res.status).toBe(404);
     expect(body.error.code).toBe("NOT_FOUND");
   });
 
-  it("Ca 7: expires_at ở quá khứ nhưng status vẫn 'active' → NOT_FOUND", async () => {
+  it("Ca 7: expires_at ở quá khứ nhưng status vẫn 'active' -> NOT_FOUND", async () => {
     const { res, body } = await postAuth("token-expired");
     expect(res.status).toBe(404);
     expect(body.error.code).toBe("NOT_FOUND");
   });
 
-  it("Ca 8: token không tồn tại → NOT_FOUND, giống hệt ca 6 và 7", async () => {
+  it("Ca 8: token không tồn tại -> NOT_FOUND", async () => {
     const { res, body } = await postAuth("khong-he-ton-tai");
     expect(res.status).toBe(404);
     expect(body.error.code).toBe("NOT_FOUND");
   });
 
-  it("Ca 9: share_link chưa có selection → tạo mới rồi ký phiên", async () => {
+  it("Ca 9: share_link chưa có selection -> tạo mới rồi ký phiên", async () => {
     const { res } = await postAuth("token-no-selections");
     expect(res.status).toBe(200);
 
@@ -130,11 +137,10 @@ describe("BB-030 — POST /api/auth/gallery", () => {
     expect(data?.length).toBeGreaterThan(0);
   });
 
-  it("Ca 10: thu hồi link khi phiên đang mở → request kế tiếp bị LINK_EXPIRED", async () => {
+  it("Ca 10: thu hồi link khi phiên đang mở -> request kế tiếp bị LINK_EXPIRED", async () => {
     const admin = await createAdminClient();
 
-    // Still good while active — the positive control. Without it a broken
-    // assertShareLinkUsable that always throws would pass the negative case.
+    // Still good while active - the positive control
     await expect(assertShareLinkUsable(revId)).resolves.toBeUndefined();
 
     await admin.from("share_links").update({ status: "revoked" }).eq("id", revId);
@@ -144,4 +150,46 @@ describe("BB-030 — POST /api/auth/gallery", () => {
       code: "LINK_EXPIRED",
     });
   });
+
+  it("Ca 11: token của khách portal -> ký được phiên và trả về customerId", async () => {
+    const { res, body } = await postAuth(customerToken);
+    expect(res.status).toBe(200);
+    expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
+    expect(body.data.customerId).toBe(customerAId);
+  });
+
+  it("Ca 12: token của khách A không xem được buổi của khách B", async () => {
+    await expect(assertCustomerOwnsGallery(customerAId, galleryBId)).rejects.toThrow(GallerySessionError);
+    await expect(assertCustomerOwnsGallery(customerAId, galleryBId)).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+
+    await expect(assertCustomerOwnsGallery(customerAId, gid)).resolves.toBeUndefined();
+  });
+
+  it("Ca 13: rate limit theo IP vẫn hoạt động (10 lần / 15 phút)", async () => {
+    const ip = `10.0.0.254`;
+    
+    for (let i = 0; i < 10; i++) {
+      const req = new NextRequest("http://localhost/api/auth/gallery", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": ip },
+        body: JSON.stringify({ token: "wrong" }),
+      });
+      await POST(req);
+    }
+
+    // Removed query
+
+    const req = new NextRequest("http://localhost/api/auth/gallery", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": ip },
+      body: JSON.stringify({ token: "wrong" }),
+    });
+    const res = await POST(req);
+    const body = await res.clone().json();
+    
+    expect(res.status).toBe(429);
+    expect(body.error.code).toBe("RATE_LIMITED");
+  }, 15000);
 });

@@ -16,12 +16,13 @@ export const AUTH_ACTION = "gallery.auth";
 export const TEST_PIN = "1234";
 
 export interface AuthFixtures {
-  /** The throwaway gallery every fixture link points at. */
   gid: string;
-  /** The PIN-protected link, addressed by id so tests never match by prefix. */
   pinLinkId: string;
-  /** Active at setup; Ca 10 revokes it. */
   revId: string;
+  customerAId: string;
+  customerBId: string;
+  galleryBId: string;
+  customerToken: string;
 }
 
 export async function setupAuthFixtures(): Promise<AuthFixtures> {
@@ -45,20 +46,41 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
   );
   await admin.from("share_links").delete().in("token_hash", hashes);
 
-  const { data: shoot } = await admin
+  // Cần HAI khách khác nhau, mỗi khách có buổi chụp riêng, để kiểm ca 12:
+  // token của khách A không xem được bộ ảnh của khách B.
+  //
+  // Lấy khách qua bảng SHOOTS chứ không lấy "customers limit 2".
+  // bb-dev có 405 khách nhập từ Lark; chọn khách bất kỳ rồi mới đi tìm buổi
+  // chụp của họ là gặp khách chưa có buổi nào, và `.single()` ném lỗi ở chỗ
+  // chẳng liên quan gì tới thứ đang kiểm. Đi từ shoots thì mỗi khách lấy ra
+  // chắc chắn đã có buổi.
+  const { data: shootRows } = await admin
     .from("shoots")
     .select("id, branch_id, customer_id, baby_id")
-    .limit(1)
-    .single();
-  if (!shoot) throw new Error("Cần ít nhất một shoot trong bb-dev, chạy npm run db:seed trước");
+    .order("created_at")
+    .limit(200);
+
+  type ShootRow = NonNullable<typeof shootRows>[number];
+  const byCustomer = new Map<string, ShootRow>();
+  for (const s of shootRows ?? []) {
+    if (s.customer_id && !byCustomer.has(s.customer_id)) byCustomer.set(s.customer_id, s);
+  }
+  const [shootA, shootB] = [...byCustomer.values()];
+
+  if (!shootA || !shootB) {
+    throw new Error("Cần hai khách khác nhau, mỗi khách một buổi chụp — chạy npm run db:seed trước");
+  }
+
+  const customerA = shootA.customer_id!;
+  const customerB = shootB.customer_id!;
 
   const { data: gallery, error: galErr } = await admin
     .from("galleries")
     .insert({
-      shoot_id: shoot.id,
-      branch_id: shoot.branch_id,
-      customer_id: shoot.customer_id,
-      baby_id: shoot.baby_id,
+      shoot_id: shootA.id,
+      branch_id: shootA.branch_id,
+      customer_id: shootA.customer_id,
+      baby_id: shootA.baby_id,
       title: "Fixture BB-030",
       status: "ready",
       drive_folder_id: `fixture-bb030-${Date.now()}`,
@@ -67,9 +89,45 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
     .select("id")
     .single();
 
-  if (galErr || !gallery) throw galErr ?? new Error("Không tạo được gallery fixture");
+  const { data: galleryB, error: galErrB } = await admin
+    .from("galleries")
+    .insert({
+      shoot_id: shootB.id,
+      branch_id: shootB.branch_id,
+      customer_id: shootB.customer_id,
+      baby_id: shootB.baby_id,
+      title: "Fixture BB-030 B",
+      status: "ready",
+      drive_folder_id: `fixture-b-${Date.now()}`,
+      drive_folder_url: "https://drive.google.com/drive/folders/fixture",
+    })
+    .select("id")
+    .single();
 
-  async function createLink(token: string, options: Record<string, unknown>): Promise<string> {
+  if (galErr || galErrB || !gallery || !galleryB) throw new Error("Không tạo được gallery fixture");
+
+  async function createLink(tokenBase: string, options: Record<string, unknown>): Promise<string> {
+    const token = `${tokenBase}-${Date.now()}`;
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+    const { data, error } = await admin
+      .from("share_links")
+      .insert({
+        gallery_id: options.customer_id ? null : gallery!.id,
+        token_hash: Buffer.from(buf).toString("hex"),
+        token_prefix: token.slice(0, 6),
+        role: "co_editor",
+        status: "active",
+        requires_pin: false,
+        ...options,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data) throw error ?? new Error(`Không tạo được share_link ${token}`);
+    return token;
+  }
+
+  async function createLegacyLink(token: string, options: Record<string, unknown>): Promise<string> {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
     const { data, error } = await admin
       .from("share_links")
@@ -77,10 +135,6 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
         gallery_id: gallery!.id,
         token_hash: Buffer.from(buf).toString("hex"),
         token_prefix: token.slice(0, 6),
-        // co_editor by default. uq_selections_primary allows one is_primary
-        // selection per gallery, and the route sets is_primary from role ===
-        // 'owner', so a second owner link on the same gallery would collide.
-        // That mirrors production: one owner link, the rest are guests.
         role: "co_editor",
         status: "active",
         requires_pin: false,
@@ -93,24 +147,34 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
     return data.id;
   }
 
-  await createLink("token-no-pin", { role: "owner" });
-  const pinLinkId = await createLink("token-with-pin", {
+  await createLegacyLink("token-no-pin", { role: "owner" });
+  const pinLinkId = await createLegacyLink("token-with-pin", {
     requires_pin: true,
     pin_hash: await bcrypt.hash(TEST_PIN, 4),
   });
-  await createLink("token-revoked", { status: "revoked" });
-  await createLink("token-expired", {
+  await createLegacyLink("token-revoked", { status: "revoked" });
+  await createLegacyLink("token-expired", {
     expires_at: new Date(Date.now() - 60_000).toISOString(),
   });
-  await createLink("token-no-selections", {});
-  const revId = await createLink("token-to-revoke", {});
+  await createLegacyLink("token-no-selections", {});
+  const revId = await createLegacyLink("token-to-revoke", {});
 
-  return { gid: gallery.id, pinLinkId, revId };
+  const customerToken = await createLink("customer-token", { customer_id: customerA, role: "owner" });
+
+  return { 
+    gid: gallery.id, 
+    pinLinkId, 
+    revId,
+    customerAId: customerA,
+    customerBId: customerB,
+    galleryBId: galleryB.id,
+    customerToken
+  };
 }
 
 /** Galleries cascade to share_links and selections, so one delete is enough. */
-export async function cleanupAuthFixtures(gid: string): Promise<void> {
+export async function cleanupAuthFixtures(): Promise<void> {
   const admin = await createAdminClient();
   await admin.from("activity_logs").delete().eq("action", AUTH_ACTION);
-  await admin.from("galleries").delete().eq("id", gid);
+  await admin.from("galleries").delete().like("title", "Fixture BB-030%");
 }
