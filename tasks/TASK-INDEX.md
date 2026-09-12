@@ -137,6 +137,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-105 | API mua thêm: POST /api/g/addons, chốt giá từ `products.list_price` theo ngưỡng tin cậy | DEV-BE | BB-101 | med | TODO |
 | BB-106 | Báo cáo thất thoát: view album đã giao vượt hạn mức mà chưa lập hóa đơn | ARCH | BB-102 | high | TODO |
 | BB-107 | Component chọn mua thêm và khối thành phần hợp đồng hai tầng | DEV-UI | BB-102 | med | TODO |
+| BB-108 | **Gỡ công tắc watermark khỏi giao diện.** Nó chạy đủ một vòng nhưng không component nào vẽ watermark — CSKH bật, hệ thống báo đã bật, ảnh vẫn ra sạch. Hứa suông về một thứ bảo vệ không tồn tại | DEV-FE + DEV-BE | — | med | TODO |
 
 ---
 

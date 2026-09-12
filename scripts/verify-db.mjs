@@ -27,6 +27,8 @@ const EXPECTED_TABLES = [
   "staff_profiles",
   // BB-100 — danh mục sản phẩm và dòng hàng hợp đồng.
   "gallery_items", "products",
+  // BB-101 — khách mua thêm và ảnh đặt vào sản phẩm in.
+  "selection_addons", "selection_placements",
 ];
 
 const EXPECTED_VIEWS = ["v_gallery_progress", "v_share_links"];
@@ -117,17 +119,36 @@ async function main() {
 
   // --- consistency, whatever the row counts are ---------------------------
 
+  // photo_count phải khớp số ảnh đang hoạt động.
+  //
+  // BỎ QUA album vừa tạo trong 10 phút gần đây. bb-dev dùng chung cho PM và
+  // mọi agent; khi ai đó đang chạy npm test, fixture của họ tồn tại vài giây
+  // với photo_count chưa kịp cập nhật, và cổng này báo hỏng oan. Ngày
+  // 12.09.2026 nó báo hỏng hai lần liên tiếp rồi tự xanh lại, chỉ vì ARCH đang
+  // chạy test BB-106 — mất thời gian truy một lỗi không tồn tại.
+  //
+  // Lệch photo_count thật là trạng thái ĐỌNG LẠI, không phải cửa sổ 30 giây:
+  // nó do đồng bộ Drive hỏng giữa chừng và nằm đó cho tới khi có người sửa.
+  // Nên cắt cửa sổ 10 phút không làm yếu phép kiểm, mà làm nó thôi kêu nhầm.
+  // Một cổng kêu nhầm là một cổng người ta học cách phớt lờ.
   const drift = await client.query(
     `select g.title,
             g.photo_count as declared,
             (select count(*)::int from photos p where p.gallery_id = g.id and p.status = 'active') as actual
        from galleries g
-      where g.photo_count <> (select count(*)::int from photos p where p.gallery_id = g.id and p.status = 'active')`,
+      where g.created_at < now() - interval '10 minutes'
+        and g.photo_count <> (select count(*)::int from photos p where p.gallery_id = g.id and p.status = 'active')`,
   );
+  const fresh = await client.query(
+    `select count(*)::int n from galleries where created_at >= now() - interval '10 minutes'`,
+  );
+  const freshNote = fresh.rows[0].n
+    ? ` (bỏ qua ${fresh.rows[0].n} album vừa tạo — có thể là test đang chạy)`
+    : "";
   check("photo_count khớp số ảnh thật", drift.rowCount === 0,
     drift.rowCount
       ? drift.rows.map((r) => `${r.title}: khai ${r.declared} / thật ${r.actual}`).join(" · ")
-      : "khớp");
+      : `khớp${freshNote}`);
 
   // One primary selection per gallery, enforced by a unique index — verified
   // here too so a bad seed shows up as a failed check, not a confusing 500.
