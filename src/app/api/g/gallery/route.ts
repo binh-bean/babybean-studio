@@ -73,6 +73,45 @@ export async function GET() {
       : 0;
     const extraAmount = extraCount * gallery.extra_photo_price;
 
+    // Lấy danh sách sản phẩm mua thêm (addons) của phiên chọn ảnh
+    const { data: rawAddons } = await supabase
+      .from("selection_addons")
+      .select(`
+        id,
+        selection_id,
+        product_id,
+        quantity,
+        unit_price,
+        created_at,
+        product:products (
+          name,
+          kind,
+          material,
+          size
+        )
+      `)
+      .eq("selection_id", session.selectionId)
+      .order("created_at", { ascending: true });
+
+    const addonsList = (rawAddons || []).map((row) => {
+      const prod = Array.isArray(row.product) ? row.product[0] : row.product;
+      const unitPrice = Number(row.unit_price);
+      return {
+        id: row.id,
+        productId: row.product_id,
+        name: prod?.name || "Sản phẩm mua thêm",
+        kind: prod?.kind || "addon",
+        material: prod?.material || null,
+        size: prod?.size || null,
+        quantity: row.quantity,
+        unitPrice,
+        totalPrice: unitPrice * row.quantity,
+        createdAt: row.created_at,
+      };
+    });
+
+    const totalAddonsAmount = addonsList.reduce((sum, a) => sum + a.totalPrice, 0);
+
     const responseData = {
       id: gallery.id,
       title: gallery.title,
@@ -107,12 +146,17 @@ export async function GET() {
         favoriteCount: favorite,
         extraCount: gallery.status === 'submitted' ? selection?.snapshot_extra_count : extraCount,
         extraAmount: gallery.status === 'submitted' ? selection?.snapshot_extra_amount : extraAmount,
+        addonsAmount: totalAddonsAmount,
         generalNote: selection?.general_note || null,
         submittedAt: selection?.submitted_at || null
       },
       contract: {
         totalValue: contractSummary.totalValue,
         items: contractSummary.items,
+      },
+      addons: {
+        totalAmount: totalAddonsAmount,
+        items: addonsList,
       },
     };
 

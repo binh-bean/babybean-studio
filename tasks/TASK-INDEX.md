@@ -134,7 +134,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-102 | API trả thành phần hợp đồng hai tầng cho một album, hạn mức lấy từ `app.gallery_quota()` chứ không từ cột | DEV-BE | BB-100 | med | ✅ **DONE** — `app.gallery_quota` ưu tiên `gallery_items`; cây 2 tầng tại `GET /api/g/gallery` và `GET /api/admin/galleries/[id]/items`; chặn chọn khi quota chưa biết; 5/5 unit test |
 | BB-103 | Màn quản trị: CSKH xem và sửa dòng hàng của album (thêm/bớt sản phẩm, đổi số lượng) | DEV-FE | BB-100 | med | TODO |
 | BB-104 | Dải tiến trình 6 bước cho khách, ưu tiên điện thoại | DEV-UI | BB-100 | med | ✅ **DONE** — PM sửa chỗ coi hạn mức 0 là chưa biết |
-| BB-105 | API mua thêm: POST /api/g/addons, chốt giá từ `products.list_price` theo ngưỡng tin cậy | DEV-BE | BB-101 | med | TODO |
+| BB-105 | API mua thêm: POST /api/g/addons, chốt giá từ `products.list_price` theo ngưỡng tin cậy | DEV-BE | BB-101 | med | ✅ **DONE** — POST /api/g/addons theo 3 luật về tiền, mở rộng GET /api/g/gallery trả addons, 7/7 test pass |
 | BB-106 | Báo cáo thất thoát: view album đã giao vượt hạn mức mà chưa lập hóa đơn | ARCH | BB-102 | high | TODO |
 | BB-107 | Component chọn mua thêm và khối thành phần hợp đồng hai tầng | DEV-UI | BB-102 | med | TODO |
 
