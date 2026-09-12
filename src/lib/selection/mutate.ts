@@ -10,8 +10,8 @@ export async function patchSelection(
 ): Promise<{ data?: SelectionPatchResponse; error?: { code: ErrorCode; message?: string } }> {
   const supabase = createAdminClient();
 
-  // Load gallery and share_link
-  const [galleryResult, linkResult] = await Promise.all([
+  // Load gallery, share_link and quota
+  const [galleryResult, linkResult, quotaResult] = await Promise.all([
     supabase
       .from("galleries")
       .select("status, included_quota, extra_photo_price, max_selection, allow_extra")
@@ -21,7 +21,8 @@ export async function patchSelection(
       .from("share_links")
       .select("label")
       .eq("id", session.shareLinkId)
-      .single()
+      .single(),
+    supabase.rpc("gallery_quota", { p_gallery_id: session.galleryId }),
   ]);
 
   const galleryError = galleryResult.error;
@@ -35,6 +36,9 @@ export async function patchSelection(
   if (gallery.status === "submitted" || gallery.status === "delivered" || gallery.status === "archived" || gallery.status === "in_retouch") {
     return { error: { code: "GALLERY_LOCKED", message: "Gallery is locked" } };
   }
+
+  const quotaKnown = quotaResult.data !== null && quotaResult.data !== undefined;
+  const actualIncludedQuota = quotaKnown ? Number(quotaResult.data) : null;
 
   // To use canSelectMore properly, we need to know the current selected count and the net change
   // We can fetch current selected count
@@ -74,8 +78,26 @@ export async function patchSelection(
     if (wasSelected && !willBeSelected) netChange--;
   }
 
+  // Quota chưa biết -> CHẶN chọn ảnh, trả mã QUOTA_UNKNOWN
+  if (!quotaKnown || actualIncludedQuota === null) {
+    const isSelecting = request.ops.some((op) => {
+      const mark = session.role === "suggester" && op.mark === "selected" ? "suggested" : op.mark;
+      return mark === "selected";
+    });
+    if (isSelecting || netChange > 0) {
+      return {
+        error: {
+          code: "QUOTA_UNKNOWN" as unknown as ErrorCode,
+          message: "Studio sẽ báo lại số ảnh trong gói",
+        },
+      };
+    }
+  }
+
+  const effectiveQuota = actualIncludedQuota ?? gallery.included_quota;
+
   const quotaRules: QuotaRules = {
-    includedQuota: gallery.included_quota,
+    includedQuota: effectiveQuota,
     extraPhotoPrice: gallery.extra_photo_price,
     maxSelection: gallery.max_selection,
     allowExtra: gallery.allow_extra,
@@ -95,7 +117,7 @@ export async function patchSelection(
     p_ops: request.ops,
     p_max_selection: gallery.max_selection,
     p_allow_extra: gallery.allow_extra,
-    p_included_quota: gallery.included_quota,
+    p_included_quota: effectiveQuota,
     p_extra_price: gallery.extra_photo_price,
     p_actor_label: actorLabel,
     p_ip: ip,
