@@ -83,6 +83,20 @@ export const en: Messages = {
       installLater: "Maybe later",
       iosInstructions: "To add to home screen: tap the Share button in Safari, then select 'Add to Home Screen'.",
     },
+    contractBreakdown: {
+      title: "Contract breakdown",
+      totalLabel: "Total",
+      emptyMessage: "No package or item details available.",
+    },
+    addonSelector: {
+      title: "Select add-ons",
+      description: "Choose extra printed photos, frames, or retouching files.",
+      priceQuotePending: "CSKH will quote price",
+      priceQuotePendingHint: "CSKH will contact to provide pricing for this item",
+      subtotalLabel: "Subtotal",
+      itemsSelected: "{count} item(s) selected",
+      emptyMessage: "No add-on products currently available.",
+    },
   },
   gallery: {
     pinTitle: "Enter the last 4 digits of your registered phone number",
