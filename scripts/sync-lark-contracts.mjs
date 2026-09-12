@@ -288,6 +288,31 @@ async function main() {
       );
       return;
     }
+    // Hai album mang CÙNG một mã hợp đồng sẽ nhận CÙNG một tập dòng hàng, nên
+    // hạn mức của hợp đồng đó bị đếm hai lần — studio cho không gấp đôi số ảnh.
+    //
+    // Không phải giả định: bảng Hậu Kỳ có 11 mã hợp đồng xuất hiện ở hai bản
+    // ghi khác nhau (PM đo ngày 12.09.2026, trên nhóm 447 bộ sắp đẩy lên). Nếu
+    // album được tạo theo mã hợp đồng thay vì theo bản ghi hậu kỳ, 11 mã đó
+    // thành 22 album cùng chung một hạn mức.
+    //
+    // Cảnh báo chứ không chặn: có thể là hai buổi chụp thật trong một hợp đồng,
+    // và chỉ người chạy mới phân biệt được. Nhưng phải NHÌN THẤY nó.
+    const byCode = new Map();
+    for (const g of galleries) {
+      if (!byCode.has(g.lark_contract_code)) byCode.set(g.lark_contract_code, []);
+      byCode.get(g.lark_contract_code).push(g.title);
+    }
+    const shared = [...byCode.entries()].filter(([, titles]) => titles.length > 1);
+    if (shared.length) {
+      console.log(`CẢNH BÁO: ${shared.length} mã hợp đồng dùng cho nhiều album.`);
+      console.log("Mỗi album nhận đủ dòng hàng của hợp đồng, nên hạn mức bị đếm lặp:");
+      for (const [code, titles] of shared.slice(0, 10)) {
+        console.log(`   ${code}  ->  ${titles.join(" | ")}`);
+      }
+      console.log("");
+    }
+
     console.log(`Album cần đồng bộ: ${galleries.length}\n`);
 
     const auth = await larkAuth();

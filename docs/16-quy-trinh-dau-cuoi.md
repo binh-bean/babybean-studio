@@ -265,3 +265,57 @@ rỗng, hết.
 
 Đã vá trong cả hai script đồng bộ. Ai viết bộ đọc Lark mới thì chép `cellText`
 từ `scripts/sync-lark-contracts.mjs`, đừng viết lại.
+
+### 7.5. Chạy thử toàn bộ trước khi đẩy — ba vấn đề tìm được
+
+PM chạy đường ống hợp đồng ở chế độ **chỉ đọc** trên toàn bộ nhóm sắp đẩy,
+ngày 12.09.2026. Không ghi gì vào Lark, không ghi gì vào `bb-dev`.
+
+| | |
+|---|---|
+| Bộ sẽ đẩy lên | **447** (số đo lần trước là 443 — dữ liệu Lark thay đổi từng ngày) |
+| Không có mã hợp đồng | 0 |
+| Có mã nhưng Lark không có dòng nào | 0 |
+| **Suy được hạn mức** | **440** |
+| **KHÔNG suy được hạn mức** | **7** |
+| Có sản phẩm in | 438 |
+| Có album | 146 |
+| Dòng hợp đồng / dòng thành phần | 1.070 / 1.109 |
+
+Phân bố hạn mức khớp với lịch sử: 15 ảnh (191 bộ), 20 (92), 30 (52), 5 (36).
+
+#### Vấn đề 1 — 11 mã hợp đồng dùng cho hai bản ghi hậu kỳ
+
+Một mã hợp đồng xuất hiện ở **hai** bản ghi Hậu Kỳ khác nhau, 11 lần.
+
+Nếu album được tạo **theo mã hợp đồng**, 11 mã đó thành 22 album, và mỗi album
+nhận đủ dòng hàng của hợp đồng — **hạn mức bị đếm hai lần, studio cho không
+gấp đôi số ảnh.**
+
+> **Album phải được tạo theo BẢN GHI HẬU KỲ, không phải theo mã hợp đồng.**
+> Một hợp đồng có thể có nhiều bản ghi hậu kỳ (nhiều buổi chụp, nhiều bé).
+> `galleries.lark_contract_code` là thứ để TRA CỨU hợp đồng, không phải khoá
+> định danh album.
+
+`scripts/sync-lark-contracts.mjs` giờ **cảnh báo** khi thấy nhiều album chung
+một mã, liệt kê ra từng cái. Cảnh báo chứ không chặn — có thể là hai buổi chụp
+thật, và chỉ người chạy mới phân biệt được. Nhưng phải nhìn thấy nó.
+
+Đã đối chứng: dựng hai album cùng mã thì cảnh báo nổ đúng.
+
+#### Vấn đề 2 — 7 bộ không suy được hạn mức
+
+Bảy hợp đồng không có dòng `Edit file` nào. Theo luật ở mục 3.2, khách của bảy
+bộ này sẽ **bị chặn chọn ảnh** và thấy *"studio sẽ báo lại số ảnh trong gói"*.
+
+Đó là hành vi đúng — chặn còn hơn mở trần. Nhưng bảy hợp đồng này cần được bổ
+sung bên Lark trước khi gửi link cho khách, nếu không CSKH sẽ nhận bảy cuộc
+gọi.
+
+#### Vấn đề 3 — 8 dòng hóa đơn trống
+
+Tám dòng không liên kết tới sản phẩm nào và trị giá 0đ. Script bỏ qua chúng và
+có báo ra. Không ảnh hưởng tiền hay hạn mức.
+
+*(Lần quét đầu PM đọc ra "88 dòng thiếu sản phẩm" — con số đó đếm gộp cả dòng
+thành phần và đếm theo lượt xuất hiện. Đếm đúng ở tầng hóa đơn là 8.)*
