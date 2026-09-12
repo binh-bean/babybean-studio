@@ -618,3 +618,21 @@ export interface OverQuotaSummary {
   missingDataAlbumCount?: number;
 }
 
+// ---------------------------------------------------------------------------
+// Thanh toán phát sinh (BB-115)
+// ---------------------------------------------------------------------------
+
+export interface GalleryPayment {
+  id: string;
+  galleryId: string;
+  selectionId: string | null;
+  amount: number;
+  snapshotExtraAmount: number | null;
+  paymentMethod: string;
+  confirmedBy: string;
+  confirmedAt: string;
+  note: string | null;
+  createdAt: string;
+}
+
+
