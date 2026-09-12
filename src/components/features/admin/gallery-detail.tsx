@@ -65,6 +65,9 @@ interface Detail {
   items: Item[];
   revisions: Revision[];
   finalDriveUrl: string | null;
+  dueAmount: number;
+  paidAmount: number;
+  outstanding: number;
 }
 
 export function GalleryDetail({ galleryId }: { galleryId: string }) {
@@ -204,6 +207,35 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     }
   }
 
+  /** Ghi nhận đã thu tiền. Ghi thêm dòng, không sửa đè — bảng là sổ. */
+  async function recordPayment(amount: number, method: string, note: string) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, method, note }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNotice(json?.error?.message ?? "Không ghi nhận được");
+        return;
+      }
+      const left = json.data.outstanding as number;
+      setNotice(
+        left > 0
+          ? `Đã ghi. Còn thiếu ${formatCurrencyVND(left)}.`
+          : left < 0
+            ? `Đã ghi. Khách trả DƯ ${formatCurrencyVND(-left)} — kiểm tra lại giúp.`
+            : "Đã ghi. Khách đã trả đủ.",
+      );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const overCount = detail.quotaKnown && detail.includedQuota !== null
     ? Math.max(0, detail.selectedCount - detail.includedQuota)
     : null;
@@ -248,6 +280,36 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           được</strong>. Thêm dòng <em>Edit file</em> bên dưới với số ảnh trong gói, hoặc
           bổ sung bên Lark rồi đồng bộ lại.
         </p>
+      )}
+
+      {(detail.dueAmount !== 0 || detail.paidAmount !== 0) && (
+        <section className="rounded-lg border border-[var(--bb-border)] p-4">
+          <h2 className="text-base font-medium">Tiền phát sinh</h2>
+          <p className="mt-1 text-sm">
+            Phải thu <strong>{formatCurrencyVND(detail.dueAmount)}</strong> · đã thu{" "}
+            <strong>{formatCurrencyVND(detail.paidAmount)}</strong> ·{" "}
+            {detail.outstanding > 0 ? (
+              <span className="text-[var(--bb-danger)]">
+                còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>
+              </span>
+            ) : detail.outstanding < 0 ? (
+              <span className="text-[var(--bb-danger)]">
+                khách trả DƯ <strong>{formatCurrencyVND(-detail.outstanding)}</strong>
+              </span>
+            ) : (
+              <span>đã trả đủ</span>
+            )}
+          </p>
+          <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
+            Tiền thu ngoài app. Đây chỉ là chỗ đánh dấu đã thu. Ghi sai thì ghi thêm
+            một dòng trừ kèm lý do — dòng cũ không sửa được.
+          </p>
+          <PaymentForm
+            disabled={busy}
+            suggested={detail.outstanding > 0 ? detail.outstanding : 0}
+            onSubmit={(a, m, n) => void recordPayment(a, m, n)}
+          />
+        </section>
       )}
 
       <section>
@@ -393,14 +455,25 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         )}
 
         {detail.status === "submitted" && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void confirmSubmission()}
-            className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white"
-          >
-            Xác nhận và chuyển sang chỉnh ảnh
-          </button>
+          <div className="flex flex-col gap-2">
+            {/* Báo, KHÔNG chặn. Máy không quyết thay người ở bước này — nhưng
+                để CSKH bấm qua mà không thấy con số thì đúng bằng không có. */}
+            {detail.outstanding > 0 && (
+              <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
+                Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>.
+                Thu xong thì ghi nhận ở mục <em>Tiền phát sinh</em> phía trên rồi hãy
+                chuyển giai đoạn.
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void confirmSubmission()}
+              className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white"
+            >
+              Xác nhận và chuyển sang chỉnh ảnh
+            </button>
+          </div>
         )}
       </section>
     </div>
@@ -529,6 +602,98 @@ function ReopenForm({
         className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
       >
         Mở lại cho khách chọn
+      </button>
+    </div>
+  );
+}
+
+/** Hình thức thu, khớp danh sách đóng bên route. */
+const PAYMENT_METHODS: Array<{ value: string; label: string }> = [
+  { value: "chuyen_khoan", label: "Chuyển khoản" },
+  { value: "tien_mat", label: "Tiền mặt" },
+  { value: "pos", label: "Quẹt thẻ" },
+  { value: "vi_dien_tu", label: "Ví điện tử" },
+  { value: "khac", label: "Khác" },
+];
+
+/**
+ * Ô ghi nhận đã thu tiền.
+ *
+ * Số tiền điền sẵn bằng số còn thiếu — trường hợp thường gặp nhất là khách trả
+ * đúng số còn thiếu, và bắt CSKH gõ lại con số đang hiện ngay phía trên là cách
+ * chắc chắn để thỉnh thoảng gõ nhầm.
+ */
+function PaymentForm({
+  disabled,
+  suggested,
+  onSubmit,
+}: {
+  disabled?: boolean;
+  suggested: number;
+  onSubmit: (amount: number, method: string, note: string) => void;
+}) {
+  const [amount, setAmount] = React.useState(suggested > 0 ? String(suggested) : "");
+  const [method, setMethod] = React.useState("chuyen_khoan");
+  const [note, setNote] = React.useState("");
+
+  React.useEffect(() => {
+    setAmount(suggested > 0 ? String(suggested) : "");
+  }, [suggested]);
+
+  const parsed = Number(amount);
+  const amountOk = Number.isInteger(parsed) && parsed !== 0;
+  // Dòng trừ tiền bắt buộc có lý do — route cũng chặn.
+  const valid = amountOk && (parsed > 0 || note.trim().length > 0);
+
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-2">
+      <label className="flex flex-col gap-1 text-xs">
+        Số tiền
+        <input
+          type="number"
+          name="amount"
+          value={amount}
+          disabled={disabled}
+          onChange={(e) => setAmount(e.target.value)}
+          className="w-36 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs">
+        Hình thức
+        <select
+          name="method"
+          value={method}
+          disabled={disabled}
+          onChange={(e) => setMethod(e.target.value)}
+          className="rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+        >
+          {PAYMENT_METHODS.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs">
+        Ghi chú
+        <input
+          type="text"
+          name="note"
+          maxLength={500}
+          value={note}
+          disabled={disabled}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={parsed < 0 ? "Bắt buộc: lý do trừ tiền" : "Mã giao dịch, ghi chú…"}
+          className="rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+        />
+      </label>
+      <button
+        type="button"
+        disabled={disabled || !valid}
+        onClick={() => onSubmit(parsed, method, note.trim())}
+        className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+      >
+        Ghi nhận đã thu
       </button>
     </div>
   );

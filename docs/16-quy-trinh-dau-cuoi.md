@@ -336,7 +336,43 @@ không được vẽ vào dải tiến trình.
 | 3 | Nút chọn ảnh hình trái tim + bốn con số | khách không chọn được |
 | 4 | Chọn ảnh cho sản phẩm in | khách không đặt được ảnh vào bộ ảnh |
 | 5 | Chốt, báo studio, CSKH xác nhận | vòng đời không khép |
-| 6 | Thanh toán phát sinh | tiền vẫn thu ngoài app |
+| 6 | ~~Thanh toán phát sinh~~ | **xong** — xem mục 6b |
+
+---
+
+## 6b. Ghi nhận thu tiền phát sinh
+
+Bảng `gallery_payments` có từ `0024`, nhưng **chưa route nào ghi vào** — CSKH
+thu tiền xong không có chỗ đánh dấu, nên câu hỏi *"bộ này khách trả chưa"* chỉ
+trả lời được bằng cách hỏi nhau. `POST /api/admin/galleries/[id]/payments` lấp
+chỗ đó, và màn CSKH hiện ba con số: **phải thu · đã thu · còn thiếu**.
+
+### App chỉ ghi nhận
+
+Tiền thu ngoài app — chuyển khoản, tiền mặt, quẹt thẻ. App không nối cổng
+thanh toán và không tự chuyển giai đoạn theo tiền.
+
+### Sổ thì không sửa đè
+
+Bảng là append-only, nên route **chỉ có POST**: không PATCH, không DELETE, kể
+cả khi con số vừa ghi sai rõ ràng. Ghi nhầm thì ghi một dòng **âm** kèm lý do —
+dòng trừ không có lý do bị từ chối, vì sáu tháng sau không ai biết vì sao sổ bị
+trừ. Sổ tiền mà sửa được thì không còn là sổ.
+
+### Số phải trả là con số khách đã NHÌN THẤY
+
+`snapshot_extra_amount` chép lại lúc khách bấm chốt, không tính lại theo trạng
+thái hiện tại. CSKH đổi hạn mức sau đó thì phát sinh tính lại sẽ ra số khác,
+nhưng khách đã trả theo số cũ — và biên nhận phải khớp cái khách nhìn thấy.
+
+### Báo, chứ không chặn
+
+Thu thiếu và thu thừa đều ghi được. Màn CSKH hiện cảnh báo *"khách còn thiếu
+X"* ngay cạnh nút chuyển sang chỉnh ảnh, nhưng **không khoá nút**. Chặn cứng ở
+đây thì gặp trường hợp thật — khách trả trước một nửa, khách trả dư rồi bù vào
+buổi sau — CSKH sẽ đi ghi tay ra ngoài, và sổ trong app thành sổ rỗng.
+
+*Điểm này chờ chủ studio chốt: có nên khoá hẳn nút khi còn thiếu tiền không.*
 
 ---
 

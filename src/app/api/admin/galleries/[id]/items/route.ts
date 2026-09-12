@@ -86,8 +86,27 @@ export async function GET(
       .eq("gallery_id", gallery.id)
       .maybeSingle();
 
+    // Tiền phát sinh: phải trả bao nhiêu, đã thu bao nhiêu, còn thiếu bao
+    // nhiêu. Số PHẢI TRẢ lấy từ con số chụp lại lúc khách chốt, không tính
+    // lại — khách trả theo số họ đã nhìn thấy.
+    const [{ data: primarySel }, { data: payRows }] = await Promise.all([
+      admin
+        .from("selections")
+        .select("snapshot_extra_amount")
+        .eq("gallery_id", gallery.id)
+        .eq("is_primary", true)
+        .maybeSingle(),
+      admin.from("gallery_payments").select("amount").eq("gallery_id", gallery.id),
+    ]);
+
+    const dueAmount = Number(primarySel?.snapshot_extra_amount ?? 0);
+    const paidAmount = (payRows ?? []).reduce((t, r) => t + Number(r.amount), 0);
+
     return ok({
       galleryId: gallery.id,
+      dueAmount,
+      paidAmount,
+      outstanding: dueAmount - paidAmount,
       revisions: revisions ?? [],
       finalDriveUrl: delivery?.final_drive_url ?? null,
       title: gallery.title,
