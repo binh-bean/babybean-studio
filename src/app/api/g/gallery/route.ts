@@ -1,3 +1,4 @@
+import { isSubmittedOrLater } from "@/lib/gallery-status";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
@@ -134,8 +135,41 @@ export async function GET() {
       }));
     }
 
-    const isSubmittedOrLater = ["submitted", "in_retouch", "delivered", "archived"].includes(gallery.status);
-    const hasSnapshot = isSubmittedOrLater && selection?.snapshot_selected_count !== null && selection?.snapshot_selected_count !== undefined;
+    // Vòng duyệt ảnh đã chỉnh (BB-121). Khách cần THẤY link bản đã chỉnh, nếu
+    // không thì nút "duyệt" bắt họ đồng ý với thứ chưa xem. Chỉ đọc khi bộ ảnh
+    // đã qua bước chỉnh — trước đó chưa có gì để xem.
+    let review: {
+      finalDriveUrl: string | null;
+      rounds: Array<{ round: number; note: string; createdAt: string; resolved: boolean }>;
+    } | null = null;
+
+    if (["in_retouch", "awaiting_approval", "approved", "delivered"].includes(gallery.status)) {
+      const [{ data: delivery }, { data: rounds }] = await Promise.all([
+        supabase
+          .from("deliveries")
+          .select("final_drive_url")
+          .eq("gallery_id", gallery.id)
+          .maybeSingle(),
+        supabase
+          .from("revision_requests")
+          .select("round, note, created_at, resolved_at")
+          .eq("gallery_id", gallery.id)
+          .order("round", { ascending: true }),
+      ]);
+
+      review = {
+        finalDriveUrl: delivery?.final_drive_url ?? null,
+        rounds: (rounds ?? []).map((r) => ({
+          round: r.round as number,
+          note: r.note as string,
+          createdAt: r.created_at as string,
+          resolved: r.resolved_at !== null,
+        })),
+      };
+    }
+
+    const submittedOrLater = isSubmittedOrLater(gallery.status);
+    const hasSnapshot = submittedOrLater && selection?.snapshot_selected_count !== null && selection?.snapshot_selected_count !== undefined;
 
     const finalIncludedQuota = hasSnapshot ? gallery.included_quota : includedQuota;
     const finalQuotaKnown = hasSnapshot ? true : quotaKnown;
@@ -189,6 +223,7 @@ export async function GET() {
         items: addonsList,
       },
       placements: placementsList,
+      review,
     };
 
     return ok(responseData);

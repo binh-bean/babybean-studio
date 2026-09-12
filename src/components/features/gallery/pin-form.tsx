@@ -290,7 +290,7 @@ export function PinForm({ token, hotline = "0901 000 001" }: PinFormProps) {
           </div>
         )}
 
-        {/* Nút Xem album */}
+        {/* Nút Xem bộ ảnh */}
         <Button
           type="button"
           onClick={() => submitPin(pin.join(""))}

@@ -1,5 +1,7 @@
 "use client";
 
+import { isGalleryLocked } from "@/lib/gallery-status";
+import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
 import { useRouter } from "next/navigation";
@@ -71,6 +73,8 @@ interface GalleryApiResponse {
     }>;
   };
   placements?: Array<{ photoId: string; galleryItemId: string }>;
+  // Vòng duyệt ảnh đã chỉnh. null khi bộ ảnh chưa tới bước đó.
+  review?: ReviewData | null;
   addons?: {
     totalAmount: number;
     items: Array<{
@@ -99,7 +103,9 @@ function getProgressStep(status: string): number {
     case "submitted":
       return 4;
     case "in_retouch":
+    case "awaiting_approval":
       return 5;
+    case "approved":
     case "delivered":
     case "archived":
       return 6;
@@ -135,7 +141,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
   const isLocked = useMemo(() => {
     if (!gallery) return false;
-    return ["submitted", "in_retouch", "delivered", "archived", "expired"].includes(gallery.status);
+    return isGalleryLocked(gallery.status);
   }, [gallery]);
 
   const loadGallery = useCallback(async () => {
@@ -218,6 +224,32 @@ export function GalleryApp({ token }: GalleryAppProps) {
     }
   }, [token, router]);
 
+  /**
+   * Khách duyệt hoặc yêu cầu sửa. Tải lại cả bộ ảnh sau đó — quyết định này
+   * đổi trạng thái, mà trạng thái chi phối gần như mọi thứ trên màn hình.
+   */
+  const decideReview = useCallback(
+    async (decision: "approve" | "revise", note?: string) => {
+      const res = await fetch("/api/g/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, note }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setStatusMessage(json?.error?.message ?? "Không gửi được, ba mẹ thử lại giúp");
+        return;
+      }
+      setStatusMessage(
+        decision === "approve"
+          ? "Cảm ơn ba mẹ. Studio chuyển bộ ảnh sang in."
+          : "Đã gửi yêu cầu sửa cho studio.",
+      );
+      await loadGallery();
+    },
+    [loadGallery],
+  );
+
   useEffect(() => {
     void loadGallery();
   }, [loadGallery]);
@@ -232,7 +264,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
    */
   const handleToggleHeart = async (photo: PhotoPublic) => {
     if (isLocked) {
-      setStatusMessage("Album đã được chốt, không thể thay đổi danh sách chọn.");
+      setStatusMessage("Bộ ảnh đã được chốt, không thể thay đổi danh sách chọn.");
       return;
     }
 
@@ -277,10 +309,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
           setStatusMessage(
             gallery?.maxSelection
               ? vi.gallery.quotaHardLimit.replace("{max}", String(gallery.maxSelection))
-              : "Đã vượt quá số lượng ảnh cho phép của album."
+              : "Đã vượt quá số lượng ảnh cho phép của gói chụp."
           );
         } else if (code === "GALLERY_LOCKED") {
-          setStatusMessage("Album đã được chốt, không thể chọn thêm.");
+          setStatusMessage("Bộ ảnh đã được chốt, không thể chọn thêm.");
         } else {
           setStatusMessage(msg || "Không thể lưu lựa chọn, vui lòng thử lại.");
         }
@@ -335,7 +367,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       // Tải lại để cập nhật trạng thái đã chốt
       await loadGallery();
     } catch {
-      setStatusMessage("Không thể gửi yêu cầu chốt album. Vui lòng kiểm tra lại mạng.");
+      setStatusMessage("Không thể gửi yêu cầu chốt bộ ảnh. Vui lòng kiểm tra lại mạng.");
     } finally {
       setSubmitting(false);
     }
@@ -539,12 +571,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
           <CustomerProgress currentStep={stepNumber} />
         </div>
 
-        {/* Cảnh báo album đã chốt */}
+        {gallery.review && (
+          <ReviewPanel
+            status={gallery.status}
+            review={gallery.review}
+            hotline={gallery.branch.hotline}
+            onDecide={decideReview}
+          />
+        )}
+
+        {/* Cảnh báo bộ ảnh đã chốt */}
         {isLocked && (
           <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex items-start gap-3">
             <Lock className="w-5 h-5 shrink-0 mt-0.5" />
             <div className="text-sm">
-              <p className="font-semibold">Album đang ở chế độ xem lại</p>
+              <p className="font-semibold">Bộ ảnh đang ở chế độ xem lại</p>
               <p className="text-xs mt-0.5 opacity-90">
                 {vi.gallery.lockedBanner.replace(
                   "{date}",
@@ -564,7 +605,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             <div className="text-sm">
               <p className="font-bold">Studio sẽ báo lại số ảnh trong gói</p>
               <p className="text-xs mt-1 leading-relaxed">
-                Hạn mức ảnh chỉnh sửa của album đang được CSKH cập nhật. Quý khách vui lòng liên hệ hotline{" "}
+                Hạn mức ảnh chỉnh sửa của gói chụp đang được CSKH cập nhật. Quý khách vui lòng liên hệ hotline{" "}
                 <span className="font-semibold">{gallery.branch.hotline}</span> để mở chọn ảnh.
               </p>
             </div>
@@ -864,7 +905,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         </div>
       </div>
 
-      {/* HỘP THOẠI XÁC NHẬN CHỐT ALBUM */}
+      {/* HỘP THOẠI XÁC NHẬN CHỐT BỘ ẢNH */}
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-md bg-surface border rounded-2xl p-6 shadow-2xl space-y-4">

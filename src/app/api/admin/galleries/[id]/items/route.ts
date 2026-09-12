@@ -71,8 +71,25 @@ export async function GET(
       .limit(1)
       .maybeSingle();
 
+    // Lịch sử khách yêu cầu sửa. CSKH phải thấy khách đã đòi gì ở các vòng
+    // trước, nếu không người photoshop sẽ sửa lại đúng thứ đã sửa rồi.
+    const { data: revisions } = await admin
+      .from("revision_requests")
+      .select("round, note, reviewed_url, created_at, resolved_at")
+      .eq("gallery_id", gallery.id)
+      .order("round", { ascending: false });
+
+    // Link thư mục ảnh đã chỉnh gần nhất, để màn hình điền sẵn khi gửi lại.
+    const { data: delivery } = await admin
+      .from("deliveries")
+      .select("final_drive_url")
+      .eq("gallery_id", gallery.id)
+      .maybeSingle();
+
     return ok({
       galleryId: gallery.id,
+      revisions: revisions ?? [],
+      finalDriveUrl: delivery?.final_drive_url ?? null,
       title: gallery.title,
       status: gallery.status,
       contractCodes: gallery.lark_contract_codes ?? [],

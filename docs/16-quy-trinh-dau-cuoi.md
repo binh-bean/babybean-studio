@@ -227,6 +227,45 @@ Danh sách trạng thái khoá trước đây **viết cứng trong thân hàm**
 lặng. `0033` gom vào `app.gallery_is_locked()`, `0034` cho hàm gọi nó — thêm
 trạng thái lần sau chỉ phải sửa một nơi.
 
+Bên TypeScript thì danh sách nằm ở **ba** chỗ, và cả ba đều không được sửa
+theo: màn khách, màn CSKH, route ảnh của khách. Hậu quả không phải lỗi đỏ mà
+là màn hình hiện nút sửa, khách bấm vào, API trả `GALLERY_LOCKED` — nhân viên
+tưởng hệ thống hỏng. Cả ba giờ dùng chung `src/lib/gallery-status.ts`.
+
+Một phép thử so **từng giá trị** của kiểu enum giữa hai bên
+(`tests/unit/gallery-status-khop-sql.test.ts`) giữ cho hai bản không trôi khỏi
+nhau. Nó không đọc danh sách chép tay mà hỏi thẳng cơ sở dữ liệu, nên trạng
+thái mới thêm vào là lộ ngay, kể cả khi chưa có dòng dữ liệu nào.
+
+### Lỗ hổng phép thử đó tìm ra: `expired`
+
+Hai bên lệch nhau đúng một giá trị. Bộ ảnh hết hạn đã bị chặn mua thêm
+(`/api/g/addons`) và chặn chốt (`/api/g/submit`), nhưng **vẫn đổi được lựa
+chọn ảnh** — phiên đăng nhập chỉ kiểm link chia sẻ, không kiểm trạng thái bộ
+ảnh. Khách mở lại link cũ còn hạn thì thêm bớt ảnh thoải mái, chỉ là không chốt
+được; danh sách đổi sau lưng studio trong khi người chỉnh ảnh có thể đã làm
+theo danh sách cũ. `0035` khoá lại. Mở lại cho khách chọn vẫn làm được bằng
+cách đổi trạng thái sang `reopened`, nên không mất đường nào của nghiệp vụ.
+
+### Hai màn hình
+
+| Ai | Thấy gì |
+|---|---|
+| CSKH, khi đang chỉnh ảnh | Ô dán link thư mục ảnh đã chỉnh + nút gửi khách. Yêu cầu sửa đang mở hiện **trên cùng**, không nằm dưới lịch sử — người chỉnh ảnh mở màn này để biết phải làm gì. |
+| Khách, khi chờ duyệt | Link mở thư mục ảnh đã chỉnh, nút *Duyệt, cho in* và *Yêu cầu sửa*. |
+
+Nút duyệt **chỉ hiện khi có link**. Studio quên dán link mà khách vẫn duyệt
+được thì bộ ảnh đi thẳng vào xưởng in, và cái sai chỉ lộ ra lúc khách cầm ảnh
+trên tay.
+
+Nút *Yêu cầu sửa* **mở ra ô viết trước**, không gửi ngay. Bấm một nút là gửi
+thì khách gửi yêu cầu rỗng, người chỉnh ảnh phải gọi lại hỏi — khách trả lời
+hai lần cho một việc.
+
+Lịch sử các vòng để **mở sẵn** ở cả hai màn. Đến vòng thứ ba, câu hỏi của cả
+hai bên đều là *"lần trước đã nói gì rồi"*; giấu đi thì khách viết lại yêu cầu
+cũ và người chỉnh ảnh sửa lại thứ đã sửa.
+
 ---
 
 ## 5. Sáu bước khách nhìn thấy

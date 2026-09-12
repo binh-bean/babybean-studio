@@ -25,6 +25,7 @@
 
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 
 interface Component {
   id: string;
@@ -42,6 +43,14 @@ interface Item {
   components: Component[];
 }
 
+interface Revision {
+  round: number;
+  note: string;
+  reviewed_url: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
 interface Detail {
   galleryId: string;
   title: string;
@@ -54,9 +63,9 @@ interface Detail {
   selectedCount: number;
   shareLink: { id: string; requiresPin: boolean } | null;
   items: Item[];
+  revisions: Revision[];
+  finalDriveUrl: string | null;
 }
-
-const LOCKED = ["submitted", "in_retouch", "delivered", "archived"];
 
 export function GalleryDetail({ galleryId }: { galleryId: string }) {
   const [detail, setDetail] = React.useState<Detail | null>(null);
@@ -81,7 +90,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   if (error) return <p className="text-sm text-[var(--bb-danger)]">{error}</p>;
   if (!detail) return <p className="text-sm text-[var(--bb-fg-muted)]">Đang tải…</p>;
 
-  const locked = LOCKED.includes(detail.status);
+  const locked = isGalleryLocked(detail.status);
 
   /** Gửi một thay đổi dòng hàng, hỏi lại nếu hạn mức đổi. */
   async function changeItem(method: "PATCH" | "DELETE", body: Record<string, unknown>) {
@@ -151,6 +160,28 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     }
   }
 
+  /** CSKH chuyển thư mục ảnh đã chỉnh cho khách: in_retouch → chờ khách duyệt. */
+  async function sendRetouched(url: string) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/retouch-done`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ finalDriveUrl: url }),
+      });
+      const json = await res.json().catch(() => null);
+      setNotice(
+        res.ok
+          ? "Đã gửi. Bộ ảnh chuyển sang chờ khách duyệt — nhắn cho khách vào link xem."
+          : (json?.error?.message ?? "Không gửi được"),
+      );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const overCount = detail.quotaKnown && detail.includedQuota !== null
     ? Math.max(0, detail.selectedCount - detail.includedQuota)
     : null;
@@ -171,7 +202,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       )}
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Trạng thái" value={detail.status} />
+        <Stat label="Trạng thái" value={GALLERY_STATUS_LABEL[detail.status] ?? detail.status} />
         <Stat
           label="Hạn mức"
           value={detail.quotaKnown ? String(detail.includedQuota) : "chưa biết"}
@@ -259,6 +290,62 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         )}
       </section>
 
+      {(detail.status === "in_retouch" ||
+        detail.status === "awaiting_approval" ||
+        detail.revisions.length > 0) && (
+        <section className="rounded-lg border border-[var(--bb-border)] p-4">
+          <h2 className="text-base font-medium">Vòng duyệt ảnh đã chỉnh</h2>
+
+          {/* Vòng đang mở nằm TRÊN CÙNG, không nằm dưới lịch sử. Người chỉnh ảnh
+              mở màn này để biết phải làm gì, không phải để đọc lại lịch sử. */}
+          {detail.revisions
+            .filter((r) => r.resolved_at === null)
+            .map((r) => (
+              <p
+                key={r.round}
+                className="mt-3 rounded-md border border-[var(--bb-warning)] p-3 text-sm"
+              >
+                <strong>Khách yêu cầu sửa (vòng {r.round}):</strong> {r.note}
+              </p>
+            ))}
+
+          {detail.status === "in_retouch" && (
+            <RetouchSender
+              defaultUrl={detail.finalDriveUrl ?? ""}
+              disabled={busy}
+              onSubmit={(u) => void sendRetouched(u)}
+            />
+          )}
+
+          {detail.status === "awaiting_approval" && (
+            <p className="mt-3 text-sm text-[var(--bb-fg-muted)]">
+              Đã gửi khách, đang chờ khách duyệt. Khách bấm duyệt thì bộ ảnh chuyển sang
+              in; khách yêu cầu sửa thì quay lại đây kèm lời nhắn.
+            </p>
+          )}
+
+          {detail.revisions.length > 0 && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-sm text-[var(--bb-fg-muted)]">
+                Lịch sử yêu cầu sửa ({detail.revisions.length} vòng)
+              </summary>
+              <ul className="mt-2 flex flex-col gap-2">
+                {detail.revisions.map((r) => (
+                  <li key={r.round} className="text-sm">
+                    <span className="text-[var(--bb-fg-muted)]">
+                      Vòng {r.round} · {new Date(r.created_at).toLocaleDateString("vi-VN")}
+                      {r.resolved_at ? " · đã xử lý" : " · đang chờ"}
+                    </span>
+                    <br />
+                    {r.note}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      )}
+
       <section className="flex flex-wrap gap-3">
         {detail.shareLink && (
           <button
@@ -323,6 +410,51 @@ function QuantityEditor({
         lưu
       </button>
     </span>
+  );
+}
+
+/**
+ * Ô nhập link thư mục ảnh đã chỉnh.
+ *
+ * Nút gửi TẮT khi ô trống. Route API cũng chặn, nhưng để bấm được rồi mới báo
+ * lỗi thì nhân viên đã kịp nghĩ là mình gửi xong.
+ */
+function RetouchSender({
+  defaultUrl,
+  disabled,
+  onSubmit,
+}: {
+  defaultUrl: string;
+  disabled?: boolean;
+  onSubmit: (url: string) => void;
+}) {
+  const [url, setUrl] = React.useState(defaultUrl);
+  // Chỉ là để bật/tắt nút. Route API mới kiểm thật — màn hình không phải
+  // ranh giới an ninh.
+  const trimmed = url.trim();
+  const valid = trimmed.startsWith("http") && trimmed.length > 12 && !trimmed.includes(" ");
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <input
+        type="url"
+        name="finalDriveUrl"
+        value={url}
+        disabled={disabled}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="Link thư mục ảnh đã chỉnh"
+        aria-label="Link thư mục ảnh đã chỉnh"
+        className="min-w-64 flex-1 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+      />
+      <button
+        type="button"
+        disabled={disabled || !valid}
+        onClick={() => onSubmit(trimmed)}
+        className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+      >
+        Gửi file đã chỉnh cho khách
+      </button>
+    </div>
   );
 }
 

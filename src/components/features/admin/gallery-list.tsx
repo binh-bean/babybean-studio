@@ -420,7 +420,7 @@ export function GalleryList() {
             </table>
           </div>
 
-          {/* Màn hình nhỏ (< lg): MỖI ALBUM MỘT THẺ CHO CSKH */}
+          {/* Màn hình nhỏ (< lg): MỖI BỘ ẢNH MỘT THẺ CHO CSKH */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 lg:hidden">
             {items.map((item) => {
               const statusConfig = getStatusBadgeConfig(item.status);
