@@ -184,9 +184,9 @@ Tên chủ studio gọi, và giá trị thật bên Lark:
 | đã giao | `Đã Giao` | 1.954 |
 | đã cskh | `Đã CSKH` | 362 |
 
-Hai dòng đầu là **PM suy ra**, không phải khớp chữ: chủ studio nói "đã chốt in"
-và "đã in", Lark ghi "Đã chốt chưa in" và "Đã gửi In". Cần chủ studio xác nhận
-trước khi chạy thật.
+Hai dòng đầu ban đầu là PM suy ra — chủ studio nói "đã chốt in" và "đã in",
+Lark ghi "Đã chốt chưa in" và "Đã gửi In". **Chủ studio đã xác nhận ngày
+12.09.2026: đúng hai giá trị đó.**
 
 ### 7.2. Còn lại bao nhiêu
 
@@ -206,35 +206,55 @@ trước khi chạy thật.
 | `Leader check hình` | 6 | |
 | `sửa` | 1 | |
 
-**84 bộ `Đã Chọn Hình` là câu hỏi mở.** Chúng lọt qua luật của chủ studio vì
-chưa in, nhưng khách đã chọn ảnh bằng cách cũ rồi. Đẩy lên app là mời họ chọn
-lại. Cần chủ studio quyết: loại luôn, hay đưa lên ở chế độ chỉ xem.
+**84 bộ `Đã Chọn Hình`: chủ studio chốt ĐƯA LÊN**, để có dữ liệu thật mà kiểm.
+Khách những bộ này đã chọn ảnh bằng cách cũ, nên đừng gửi link cho họ trong
+đợt thử — chúng ở đó để kiểm phần tính toán, không phải để khách dùng.
 
-### 7.3. Dữ liệu cá nhân — phải xử lý trước khi đẩy
+### 7.3. Dữ liệu cá nhân — quy tắc che, chủ studio đã chốt
 
 Cả 443 bản ghi đều mang dữ liệu cá nhân thật:
 
-| Cột | Có giá trị | Nội dung |
+| Cột Lark | Có giá trị | Nội dung |
 |---|---|---|
 | `Tên KH` | 443/443 | tên thật |
 | `SDT KH` | 443/443 | số điện thoại thật |
 | `Mã KH` | 443/443 | **gộp cả tên lẫn số điện thoại vào một chuỗi** |
 
-`bb-dev` **không phải chỗ cho dữ liệu này**:
+`bb-dev` dùng chung cho PM và toàn bộ agent, test xoá dòng trong đó, và repo
+**công khai** — ảnh chụp màn hình lên PR là dữ liệu đi theo.
 
-- dùng chung cho PM và toàn bộ agent
-- test xoá dòng trong đó — đã xảy ra thật, xem mục 9
-- repo **CÔNG KHAI**, và ảnh chụp màn hình lên PR thì dữ liệu đi theo
+**Chốt: che tên và số điện thoại, giữ nguyên phần còn lại.** Mở lại khi dựng
+`bb-prod`; lúc đó agent không được cấp khoá vào đó.
 
-Hai đường đi, chọn một:
+#### Bảng ánh xạ, DEV-INT làm đúng từng dòng
 
-| | Cách | Được gì |
+| Cột trong app | Đợt này ghi gì | Vì sao |
 |---|---|---|
-| A | Đẩy vào `bb-dev` nhưng **che tên và số điện thoại** | Kiểm được toàn bộ phần tính toán: mã hợp đồng, hạn mức, dòng hàng, tiền — không thứ nào phụ thuộc vào tên khách |
-| B | Dựng `bb-prod` rồi đẩy nguyên | Kiểm được cả phần hiển thị tên, nhưng phải có `bb-prod` trước và **agent không được cấp khoá** |
+| `customers.full_name` | `KH · HD_20250722#572` (chính mã hợp đồng) | **Đây là cách phân biệt khách.** Duy nhất, dán thẳng vào ô tìm kiếm bên Lark là ra đúng người. Không mang tên ai. |
+| `customers.phone` | `null` | |
+| `customers.phone_normalized` | `null` | |
+| `customers.facebook` | **chỉ phần URL** của ô `Chat với khách` | chủ studio yêu cầu đưa link chat lên để còn liên lạc được |
+| `customers.zalo` | `null` | |
+| `customers.note` | `null` | ô `Ghi Chú` bên Lark là nhận xét về từng khách, ví dụ *"đã nhắc mẹ rất nhiều lần"* |
+| `galleries.lark_contract_code` | **giữ nguyên thật** | khoá để kéo hợp đồng, không phải dữ liệu cá nhân |
+| dòng hàng, hạn mức, tiền | **giữ nguyên thật** | đây mới là phần cần kiểm |
 
-PM đề xuất **A trước, B sau**: phần dễ sai là logic tiền và hạn mức, mà phần đó
-không cần biết khách tên gì.
+#### Hai chỗ dễ làm hỏng
+
+**Một.** Ô `Chat với khách` bên Lark có dạng
+`[{ "link": "https://...", "text": "<tên khách>" }]`.
+**Chỉ lấy `link`, bỏ `text`.** Lấy cả ô bằng `cellText()` sẽ kéo luôn tên
+khách vào — đúng thứ vừa mất công che.
+
+**Hai.** Bản thân URL chat vẫn chứa một mã định danh Facebook của khách. Che
+tên và số điện thoại **làm giảm** mức lộ, không xoá hẳn. Ảnh chụp màn hình có
+link chat vẫn không được đưa lên PR.
+
+#### Không phụ thuộc vào tên
+
+Toàn bộ phần dễ sai — mã hợp đồng, dòng hàng hai tầng, hạn mức, tiền vượt, báo
+cáo thất thoát — **không dùng tới tên khách một lần nào**. Che tên không làm
+yếu phép thử.
 
 ### 7.4. Bẫy đọc dữ liệu đã vấp
 
