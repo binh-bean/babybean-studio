@@ -28,6 +28,16 @@ export interface AuthFixtures {
 export async function setupAuthFixtures(): Promise<AuthFixtures> {
   const admin = await createAdminClient();
 
+  // Dọn rác của lần chạy TRƯỚC, ngay từ đầu — không chỉ dọn ở afterAll.
+  //
+  // afterAll không chạy khi một lần chạy chết giữa chừng, và lần sau kế thừa
+  // nguyên đống rác đó: bộ ảnh cũ còn đấy, link cũ còn đấy, và các phép thử
+  // sau đọc nhầm sang dữ liệu của lần trước. Triệu chứng đúng như đã thấy ngày
+  // 12.09.2026: chạy riêng thì 14/14 đạt, chạy lại ngay sau đó thì 6 ca đỏ, và
+  // TẬP CA ĐỎ KHÁC NHAU giữa hai lần.
+  //
+  // Dọn hai đầu thì một lần chạy hỏng không kéo theo lần sau.
+  await admin.from("galleries").delete().like("title", "Fixture BB-030%");
   await admin.from("activity_logs").delete().eq("action", AUTH_ACTION);
 
   const tokensToClean = [
@@ -46,31 +56,49 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
   );
   await admin.from("share_links").delete().in("token_hash", hashes);
 
-  // Cần HAI khách khác nhau, mỗi khách có buổi chụp riêng, để kiểm ca 12:
-  // token của khách A không xem được bộ ảnh của khách B.
+  // TỰ TẠO khách và buổi chụp của mình, không mượn của cơ sở dữ liệu.
   //
-  // Lấy khách qua bảng SHOOTS chứ không lấy "customers limit 2".
-  // bb-dev có 405 khách nhập từ Lark; chọn khách bất kỳ rồi mới đi tìm buổi
-  // chụp của họ là gặp khách chưa có buổi nào, và `.single()` ném lỗi ở chỗ
-  // chẳng liên quan gì tới thứ đang kiểm. Đi từ shoots thì mỗi khách lấy ra
-  // chắc chắn đã có buổi.
-  const { data: shootRows } = await admin
-    .from("shoots")
-    .select("id, branch_id, customer_id, baby_id")
-    .order("created_at")
-    .limit(200);
+  // Hai bản trước đều mượn: bản đầu lấy "customers limit 2", bản sau lấy
+  // "shoots order by created_at limit 200". Cả hai đều chập chờn, và bản sau
+  // chập chờn vì một lý do rất dễ bỏ qua: đợt nhập dữ liệu thật tạo 435 buổi
+  // chụp trong vài giây, nên created_at TRÙNG NHAU hàng loạt. `order by` trên
+  // cột có hàng trăm giá trị bằng nhau thì Postgres trả thứ tự TUỲ Ý — mỗi lần
+  // chạy bốc trúng một cặp khách khác nhau, và các phép thử đỏ khác nhau.
+  //
+  // Ngày 12.09.2026: chạy riêng 14/14 đạt, chạy lại ngay sau đó 6 ca đỏ, tập
+  // ca đỏ đổi giữa hai lần. Đã thử vá bằng dọn rác đầu vào và IP ngẫu nhiên —
+  // không hết, vì cả hai đều không chạm gốc.
+  //
+  // Fixture tự dựng dữ liệu của mình thì không có gì để bốc trúng sai.
+  const { data: branch } = await admin.from("branches").select("id").order("name").limit(1).single();
+  if (!branch) throw new Error("Cần ít nhất một chi nhánh, chạy npm run db:seed trước");
 
-  type ShootRow = NonNullable<typeof shootRows>[number];
-  const byCustomer = new Map<string, ShootRow>();
-  for (const s of shootRows ?? []) {
-    if (s.customer_id && !byCustomer.has(s.customer_id)) byCustomer.set(s.customer_id, s);
-  }
-  const [shootA, shootB] = [...byCustomer.values()];
+  const made = await Promise.all(
+    ["A", "B"].map(async (suffix) => {
+      const { data: cust, error: custErr } = await admin
+        .from("customers")
+        .insert({ branch_id: branch.id, full_name: `Fixture BB-030 Khách ${suffix}` })
+        .select("id")
+        .single();
+      if (custErr || !cust) throw custErr ?? new Error("Không tạo được khách fixture");
 
-  if (!shootA || !shootB) {
-    throw new Error("Cần hai khách khác nhau, mỗi khách một buổi chụp — chạy npm run db:seed trước");
-  }
+      const { data: shoot, error: shootErr } = await admin
+        .from("shoots")
+        .insert({
+          branch_id: branch.id,
+          customer_id: cust.id,
+          shoot_date: "2026-01-01",
+        })
+        .select("id, branch_id, customer_id, baby_id")
+        .single();
+      if (shootErr || !shoot) throw shootErr ?? new Error("Không tạo được buổi chụp fixture");
 
+      return shoot;
+    }),
+  );
+
+  const [shootA, shootB] = made;
+  if (!shootA || !shootB) throw new Error("Không dựng đủ hai buổi chụp fixture");
   const customerA = shootA.customer_id!;
   const customerB = shootB.customer_id!;
 
@@ -177,4 +205,6 @@ export async function cleanupAuthFixtures(): Promise<void> {
   const admin = await createAdminClient();
   await admin.from("activity_logs").delete().eq("action", AUTH_ACTION);
   await admin.from("galleries").delete().like("title", "Fixture BB-030%");
+  // Khách và buổi chụp fixture cũng phải dọn — buổi chụp cascade theo khách.
+  await admin.from("customers").delete().like("full_name", "Fixture BB-030 Khách%");
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { buildHeartPayload } from "@/lib/selection/heart-payload";
 import { useRouter } from "next/navigation";
 import { Heart, AlertTriangle, AlertCircle, Info, ChevronRight, Lock } from "lucide-react";
 import { vi } from "@/i18n";
@@ -244,15 +245,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
       const res = await fetch("/api/g/selection", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientOpId: crypto.randomUUID(),
-          ops: [
-            {
-              photoId: photo.id,
-              mark: nextMark,
-            },
-          ],
-        }),
+        body: JSON.stringify(
+          buildHeartPayload(photo.id, isCurrentlySelected, crypto.randomUUID()),
+        ),
       });
 
       const json = await res.json().catch(() => null);

@@ -1,78 +1,50 @@
-import { describe, it, expect, vi } from "vitest";
+/**
+ * BB-112 — khách thả tim để chọn ảnh.
+ *
+ * Bản đầu của phép thử này TỰ VIẾT LẠI hàm dựng nội dung gửi đi rồi kiểm chính
+ * bản sao đó. Nó trông như một đảm bảo mà không đảm bảo gì: component gửi sai
+ * thì phép thử vẫn xanh. Giờ import ĐÚNG hàm mà gallery-app.tsx đang gọi.
+ */
 
-describe("BB-112: Khách chọn ảnh và 4 con số hạn mức", () => {
-  it("1. BẤY: Thao tác thả tim gửi mark = 'selected', TUYỆT ĐỐI KHÔNG gửi isFavorite", () => {
-    // Mô phỏng payload gửi đi từ hàm handleToggleHeart
-    const toggleSelection = (photoId: string, isCurrentlySelected: boolean) => {
-      const nextMark: "selected" | null = isCurrentlySelected ? null : "selected";
-      return {
-        clientOpId: "mock-client-op-id",
-        ops: [
-          {
-            photoId,
-            mark: nextMark,
-          },
-        ],
-      };
-    };
+import { describe, it, expect } from "vitest";
+import { buildHeartPayload } from "@/lib/selection/heart-payload";
 
-    // Khi bấm chọn ảnh
-    const selectPayload = toggleSelection("photo-123", false);
-    expect(selectPayload.ops[0].mark).toBe("selected");
-    expect((selectPayload.ops[0] as Record<string, unknown>).isFavorite).toBeUndefined();
+describe("BB-112: Khách thả tim để chọn ảnh", () => {
+  it("Thả tim gửi mark='selected', TUYỆT ĐỐI KHÔNG gửi isFavorite", () => {
+    const body = buildHeartPayload("photo-123", false, "op-1");
 
-    // Khi bấm bỏ chọn ảnh
-    const deselectPayload = toggleSelection("photo-123", true);
-    expect(deselectPayload.ops[0].mark).toBeNull();
-    expect((deselectPayload.ops[0] as Record<string, unknown>).isFavorite).toBeUndefined();
+    expect(body.ops).toHaveLength(1);
+    expect(body.ops[0]?.mark).toBe("selected");
+    expect(body.ops[0]?.photoId).toBe("photo-123");
+
+    // Đây là dòng quan trọng nhất của cả phép thử.
+    //
+    // API nhận CẢ HAI trường. Gửi isFavorite sẽ thành công, HTTP 200, không
+    // lỗi gì — nhưng hạn mức chỉ đếm mark='selected', nên khách thả tim 30 ảnh
+    // mà hệ thống báo 0, không ai trả tiền vượt, báo cáo thất thoát mù.
+    expect(Object.keys(body.ops[0] ?? {})).toEqual(["photoId", "mark"]);
+    expect("isFavorite" in (body.ops[0] ?? {})).toBe(false);
   });
 
-  it("2. quotaKnown = false thì CHẶN chọn ảnh, không thực hiện gọi API", () => {
-    let apiCalled = false;
-    const galleryState = {
-      quotaKnown: false,
-      includedQuota: null,
-    };
+  it("Bỏ tim gửi mark=null, không phải xoá dòng", () => {
+    const body = buildHeartPayload("photo-123", true, "op-2");
 
-    const handleHeartClick = () => {
-      if (!galleryState.quotaKnown) {
-        return {
-          allowed: false,
-          message: "Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH",
-        };
-      }
-      apiCalled = true;
-      return { allowed: true };
-    };
-
-    const result = handleHeartClick();
-    expect(result.allowed).toBe(false);
-    expect(result.message).toBe("Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH");
-    expect(apiCalled).toBe(false);
+    // null nghĩa là "khách chưa quyết định gì về ảnh này" — 0009 cố ý cho cột
+    // mark nhận null. Ảnh còn tim hoặc còn ghi chú thì dòng vẫn ở lại.
+    expect(body.ops[0]?.mark).toBeNull();
+    expect("isFavorite" in (body.ops[0] ?? {})).toBe(false);
   });
 
-  it("3. Bốn con số hạn mức được lấy trực tiếp từ phản hồi API backend, không tự tính ở client", () => {
-    // API backend trả về
-    const backendResponse = {
-      data: {
-        selectedCount: 25,
-        favoriteCount: 10,
-        extraCount: 5,
-        extraAmount: 250000,
-        applied: 1,
-        rejected: [],
-      },
-    };
+  it("clientOpId đi vào nguyên vẹn, để gửi lại không áp dụng hai lần", () => {
+    // patch_selection_batch nhận ra mã trùng và trả kết quả cũ thay vì ghi
+    // thêm. Hàm này phải chuyển mã qua nguyên vẹn, không tự sinh mã mới.
+    expect(buildHeartPayload("p", false, "op-abc").clientOpId).toBe("op-abc");
+  });
 
-    // Client gán trực tiếp từ response
-    const stats = {
-      selectedCount: backendResponse.data.selectedCount,
-      extraCount: backendResponse.data.extraCount,
-      extraAmount: backendResponse.data.extraAmount,
-    };
-
-    expect(stats.selectedCount).toBe(25);
-    expect(stats.extraCount).toBe(5);
-    expect(stats.extraAmount).toBe(250000);
+  it("Hai lần bấm liên tiếp cho ra hai trạng thái ngược nhau", () => {
+    const on = buildHeartPayload("p", false, "op-3");
+    const off = buildHeartPayload("p", true, "op-4");
+    expect(on.ops[0]?.mark).toBe("selected");
+    expect(off.ops[0]?.mark).toBeNull();
   });
 });

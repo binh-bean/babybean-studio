@@ -43,7 +43,22 @@ describe("BB-030 - POST /api/auth/gallery", () => {
     if (gid) await cleanupAuthFixtures();
   });
 
-  /** Each call gets its own IP so the rate limiter does not bleed across cases. */
+  /**
+   * Mỗi phép thử một IP riêng, VÀ mỗi LẦN CHẠY một dải IP riêng.
+   *
+   * Bộ giới hạn tần suất đếm activity_logs theo IP trong 15 PHÚT. Bản cũ dùng
+   * 10.0.0.1, 10.0.0.2... cố định, nên chạy lại bộ test trong vòng 15 phút là
+   * những IP đó đã mang sẵn lịch sử của lần trước: phép thử chờ 401 thì nhận
+   * 429, chờ 429 thì nhận 401, tuỳ lần.
+   *
+   * Xảy ra thật ngày 12.09.2026: chạy riêng tệp này thì 14/14 đạt, chạy trong
+   * cả bộ thì hai ca đỏ. Bộ test chập chờn tệ hơn bộ test đỏ — người ta học
+   * thói quen chạy lại cho tới khi xanh, và một lỗi thật sẽ trôi qua giữa
+   * những lần chạy lại đó.
+   *
+   * Dải ngẫu nhiên mỗi lần chạy thì không lần nào giẫm lên lần nào.
+   */
+  const ipRun = `10.${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 254) + 1}`;
   let ipCounter = 0;
   async function postAuth(token: string, pin?: string) {
     ipCounter += 1;
@@ -51,7 +66,7 @@ describe("BB-030 - POST /api/auth/gallery", () => {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-forwarded-for": `10.0.0.${ipCounter}, 172.16.0.1`,
+        "x-forwarded-for": `${ipRun}.${ipCounter}, 172.16.0.1`,
       },
       body: JSON.stringify(pin === undefined ? { token } : { token, pin }),
     });
@@ -168,7 +183,7 @@ describe("BB-030 - POST /api/auth/gallery", () => {
   });
 
   it("Ca 13: rate limit theo IP vẫn hoạt động (10 lần / 15 phút)", async () => {
-    const ip = `10.0.0.254`;
+    const ip = `${ipRun}.254`;
     
     for (let i = 0; i < 10; i++) {
       const req = new NextRequest("http://localhost/api/auth/gallery", {
