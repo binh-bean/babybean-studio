@@ -83,6 +83,20 @@ export const vi = {
       installLater: "Để sau",
       iosInstructions: "Để thêm vào màn hình chính: chạm vào biểu tượng Chia sẻ ở thanh dưới rồi chọn 'Thêm vào MH chính'.",
     },
+    contractBreakdown: {
+      title: "Thành phần hợp đồng",
+      totalLabel: "Tổng cộng",
+      emptyMessage: "Chưa có thông tin gói chụp hoặc sản phẩm.",
+    },
+    addonSelector: {
+      title: "Chọn sản phẩm mua thêm",
+      description: "Chọn thêm sản phẩm in ấn, khung ảnh hoặc file chỉnh sửa theo nhu cầu.",
+      priceQuotePending: "CSKH sẽ báo giá",
+      priceQuotePendingHint: "Sản phẩm này cần CSKH tư vấn và báo giá cụ thể",
+      subtotalLabel: "Tổng tạm tính",
+      itemsSelected: "{count} sản phẩm đã chọn",
+      emptyMessage: "Hiện chưa có sản phẩm mua thêm nào khả dụng.",
+    },
   },
   gallery: {
     pinTitle: "Nhập 4 số cuối số điện thoại đã đăng ký",

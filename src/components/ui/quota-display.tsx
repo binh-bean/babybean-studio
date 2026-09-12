@@ -9,8 +9,8 @@ interface QuotaDisplayProps {
 }
 
 export function QuotaDisplay({ includedQuota, extraPrice, selectedCount, className }: QuotaDisplayProps) {
-  // Chưa biết hạn mức -> "studio sẽ báo lại số ảnh trong gói" TUYỆT ĐỐI không hiện số 0
-  if (includedQuota == null || includedQuota === 0) {
+  // Chưa biết hạn mức (chỉ null hoặc undefined, số 0 là hạn mức thật của đơn chỉ mua ảnh in)
+  if (includedQuota == null) {
     return (
       <div className={cn("text-sm", className)}>
         <span>Đã chọn: {selectedCount} ảnh</span>
