@@ -508,6 +508,21 @@ bộ có hợp đồng nhưng thiếu dòng `Edit file`).
 `verify:db` có cổng thứ 16 canh: không bộ ảnh Lark nào được mang hạn mức khi
 chưa có dòng hợp đồng nào.
 
+### Cái nút không tồn tại
+
+Vá xong mới thấy vấn đề thật: chín bộ ảnh giờ bị chặn đúng như thiết kế, và
+màn hình bảo CSKH *"thêm dòng Edit file bên dưới"* — nhưng **không có nút nào
+để làm**. Đường `POST` thêm dòng hàng có sẵn từ lâu; giao diện thiếu. Có hai
+chỗ trên màn hình bảo người ta "thêm tay" mà không đưa chỗ để thêm.
+
+Bảo người ta làm một việc rồi không đưa chỗ để làm là cách chắc chắn để họ đi
+sửa thẳng cơ sở dữ liệu — và lúc đó mọi cổng đã dựng đều vô nghĩa.
+
+Màn CSKH giờ có ô chọn sản phẩm (nhóm theo loại) kèm số lượng. Bộ nào chưa rõ
+hạn mức thì ô chọn **mở sẵn ở dòng ảnh chỉnh sửa**, vì đó gần như luôn là thứ
+cần thêm. Thêm xong, nếu hạn mức đổi thì màn hình báo bằng **con số trước và
+sau** — *"chưa biết → 15 ảnh"* — chứ không phải một câu chung chung.
+
 ### Bài học chung của hai mục 6c và 6d
 
 Cả hai lỗi đều **không gây lỗi đỏ ở đâu cả**. Một cái là chính sách viết cho

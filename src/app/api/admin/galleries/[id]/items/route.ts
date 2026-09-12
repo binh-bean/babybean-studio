@@ -86,6 +86,20 @@ export async function GET(
       .eq("gallery_id", gallery.id)
       .maybeSingle();
 
+    // Danh mục sản phẩm để CSKH thêm dòng hàng tay.
+    //
+    // Màn hình từ trước vẫn bảo "thêm dòng Edit file bên dưới" và "thêm tay",
+    // nhưng KHÔNG có nút nào để làm — đường POST có sẵn mà giao diện thiếu.
+    // Chín bộ ảnh đang bị chặn vì chưa rõ hạn mức, và CSKH không có cách nào
+    // gỡ. Bảo người ta làm một việc rồi không đưa chỗ để làm là cách chắc chắn
+    // để họ đi sửa thẳng cơ sở dữ liệu.
+    const { data: catalog } = await admin
+      .from("products")
+      .select("id, name, kind")
+      .eq("is_active", true)
+      .order("kind")
+      .order("name");
+
     // Tiền phát sinh: phải trả bao nhiêu, đã thu bao nhiêu, còn thiếu bao
     // nhiêu. Số PHẢI TRẢ lấy từ con số chụp lại lúc khách chốt, không tính
     // lại — khách trả theo số họ đã nhìn thấy.
@@ -108,6 +122,7 @@ export async function GET(
       paidAmount,
       outstanding: dueAmount - paidAmount,
       revisions: revisions ?? [],
+      catalog: catalog ?? [],
       finalDriveUrl: delivery?.final_drive_url ?? null,
       title: gallery.title,
       status: gallery.status,

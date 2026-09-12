@@ -52,6 +52,12 @@ interface Revision {
   resolved_at: string | null;
 }
 
+interface CatalogProduct {
+  id: string;
+  name: string;
+  kind: string;
+}
+
 interface Detail {
   galleryId: string;
   title: string;
@@ -65,6 +71,7 @@ interface Detail {
   shareLink: { id: string; requiresPin: boolean } | null;
   items: Item[];
   revisions: Revision[];
+  catalog: CatalogProduct[];
   finalDriveUrl: string | null;
   dueAmount: number;
   paidAmount: number;
@@ -202,6 +209,34 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           ? "Đã mở lại. Khách chọn ảnh tiếp được — nhớ báo cho khách."
           : (json?.error?.message ?? "Không mở lại được"),
       );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Thêm một dòng hàng tay. Hỏi lại bằng con số nếu hạn mức đổi. */
+  async function addItem(productId: string, quantity: number) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/items`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId, quantity }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNotice(json?.error?.message ?? "Không thêm được");
+        return;
+      }
+      const { quotaBefore, quotaAfter } = json.data;
+      if (quotaBefore !== quotaAfter) {
+        setNotice(
+          `Hạn mức đã đổi: ${quotaBefore ?? "chưa biết"} → ${quotaAfter ?? "chưa biết"} ảnh. ` +
+            "Nhớ báo lại cho khách.",
+        );
+      }
       await load();
     } finally {
       setBusy(false);
@@ -372,6 +407,17 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               </li>
             ))}
           </ul>
+        )}
+
+        {!locked && detail.catalog.length > 0 && (
+          <AddItemForm
+            catalog={detail.catalog}
+            disabled={busy}
+            // Bộ ảnh chưa rõ hạn mức thì thứ CSKH cần thêm gần như luôn là
+            // dòng ảnh chỉnh sửa — chọn sẵn giúp.
+            preferKind={detail.quotaKnown ? undefined : "edited_photo"}
+            onSubmit={(id, q) => void addItem(id, q)}
+          />
         )}
       </section>
 
@@ -686,6 +732,103 @@ function PaymentForm({
         className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
       >
         Ghi nhận đã thu
+      </button>
+    </div>
+  );
+}
+
+/** Tên tiếng Việt của loại sản phẩm. */
+const KIND_LABEL: Record<string, string> = {
+  shoot_package: "Gói chụp",
+  edited_photo: "Ảnh chỉnh sửa",
+  print: "Hàng in",
+  addon: "Mua thêm",
+  service: "Dịch vụ",
+};
+
+/**
+ * Thêm một dòng hàng tay.
+ *
+ * Màn hình từ trước vẫn bảo CSKH "thêm dòng Edit file bên dưới" và "thêm tay"
+ * mà KHÔNG có nút nào để làm — đường POST có sẵn, giao diện thiếu. Chín bộ ảnh
+ * đang bị chặn vì chưa rõ hạn mức và CSKH không có cách gỡ. Bảo người ta làm
+ * một việc rồi không đưa chỗ để làm là cách chắc chắn để họ đi sửa thẳng cơ sở
+ * dữ liệu.
+ */
+function AddItemForm({
+  catalog,
+  disabled,
+  preferKind,
+  onSubmit,
+}: {
+  catalog: CatalogProduct[];
+  disabled?: boolean;
+  preferKind?: string;
+  onSubmit: (productId: string, quantity: number) => void;
+}) {
+  const macDinh = React.useMemo(
+    () => catalog.find((p) => p.kind === preferKind)?.id ?? catalog[0]?.id ?? "",
+    [catalog, preferKind],
+  );
+  const [productId, setProductId] = React.useState(macDinh);
+  const [qty, setQty] = React.useState("1");
+
+  React.useEffect(() => setProductId(macDinh), [macDinh]);
+
+  const parsed = Number(qty);
+  const valid = productId !== "" && Number.isInteger(parsed) && parsed >= 1;
+
+  const theoLoai = React.useMemo(() => {
+    const nhom = new Map<string, CatalogProduct[]>();
+    for (const p of catalog) {
+      const list = nhom.get(p.kind) ?? [];
+      list.push(p);
+      nhom.set(p.kind, list);
+    }
+    return [...nhom.entries()];
+  }, [catalog]);
+
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-[var(--bb-border)] pt-3">
+      <label className="flex min-w-56 flex-1 flex-col gap-1 text-xs">
+        Thêm dòng hàng
+        <select
+          name="productId"
+          value={productId}
+          disabled={disabled}
+          onChange={(e) => setProductId(e.target.value)}
+          className="rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+        >
+          {theoLoai.map(([kind, items]) => (
+            <optgroup key={kind} label={KIND_LABEL[kind] ?? kind}>
+              {items.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-xs">
+        Số lượng
+        <input
+          type="number"
+          min={1}
+          name="quantity"
+          value={qty}
+          disabled={disabled}
+          onChange={(e) => setQty(e.target.value)}
+          className="w-20 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+        />
+      </label>
+      <button
+        type="button"
+        disabled={disabled || !valid}
+        onClick={() => onSubmit(productId, parsed)}
+        className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+      >
+        Thêm
       </button>
     </div>
   );
