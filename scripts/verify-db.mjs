@@ -174,6 +174,34 @@ async function main() {
         : `${definerFns.rows.length} hàm, đã chặn hết`,
     );
 
+    // Hạn mức chưa biết phải CHẶN chọn ảnh, không được mở trần.
+    //
+    // 0009 kiểm `if v_hard_limit is not null and v_selected_count > v_hard_limit`.
+    // Mệnh đề đó đúng cho trường hợp "cho mua thêm không giới hạn", nhưng nó
+    // nuốt luôn trường hợp hạn mức null: null làm cả mệnh đề thành null,
+    // Postgres coi như false, trần biến mất. Khách chọn bao nhiêu cũng được và
+    // tiền phụ trội trả về null. Không có màn hình đỏ nào cả.
+    //
+    // 0016 đặt một cổng chặn ngay đầu hàm. Cổng này canh cái cổng đó: ai viết
+    // lại patch_selection_batch mà quên chép cổng sang thì hỏng ở đây, chứ
+    // không hỏng ở hoá đơn ba tháng sau.
+    const quotaGuard = await client.query(`
+      select pg_get_functiondef(p.oid) as src
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'patch_selection_batch'
+    `);
+    const guarded = quotaGuard.rows.filter((r) => r.src.includes("QUOTA_UNKNOWN"));
+    check(
+      "Hạn mức chưa biết thì chặn chọn ảnh",
+      quotaGuard.rows.length > 0 && guarded.length === quotaGuard.rows.length,
+      quotaGuard.rows.length === 0
+        ? "KHÔNG THẤY patch_selection_batch"
+        : guarded.length === quotaGuard.rows.length
+          ? "có cổng QUOTA_UNKNOWN"
+          : `${quotaGuard.rows.length - guarded.length}/${quotaGuard.rows.length} bản THIẾU cổng — trần chọn ảnh đang mở`,
+    );
+
   if (REQUIRE_SEED) {
     const counts = {};
     for (const t of ["branches", "packages", "customers", "galleries", "photos",
