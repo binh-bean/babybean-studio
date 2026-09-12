@@ -112,6 +112,15 @@ export async function GET() {
 
     const totalAddonsAmount = addonsList.reduce((sum, a) => sum + a.totalPrice, 0);
 
+    const isSubmittedOrLater = ["submitted", "in_retouch", "delivered", "archived"].includes(gallery.status);
+    const hasSnapshot = isSubmittedOrLater && selection?.snapshot_selected_count !== null && selection?.snapshot_selected_count !== undefined;
+
+    const finalIncludedQuota = hasSnapshot ? gallery.included_quota : includedQuota;
+    const finalQuotaKnown = hasSnapshot ? true : quotaKnown;
+    const finalSelectedCount = hasSnapshot ? (selection?.snapshot_selected_count ?? 0) : selected;
+    const finalExtraCount = hasSnapshot ? (selection?.snapshot_extra_count ?? 0) : extraCount;
+    const finalExtraAmount = hasSnapshot ? (selection?.snapshot_extra_amount ?? 0) : extraAmount;
+
     const responseData = {
       id: gallery.id,
       title: gallery.title,
@@ -125,8 +134,8 @@ export async function GET() {
         zaloOa: (gallery.branch as unknown as { zalo_oa: string }[])?.[0]?.zalo_oa || (gallery.branch as unknown as { zalo_oa: string })?.zalo_oa
       },
       photoCount: gallery.photo_count,
-      quotaKnown,
-      includedQuota,
+      quotaKnown: finalQuotaKnown,
+      includedQuota: finalIncludedQuota,
       extraPhotoPrice: gallery.extra_photo_price,
       maxSelection: gallery.max_selection,
       allowExtra: gallery.allow_extra,
@@ -142,10 +151,10 @@ export async function GET() {
       myRole: session.role,
       selection: {
         id: session.selectionId,
-        selectedCount: gallery.status === 'submitted' ? selection?.snapshot_selected_count : selected,
+        selectedCount: finalSelectedCount,
         favoriteCount: favorite,
-        extraCount: gallery.status === 'submitted' ? selection?.snapshot_extra_count : extraCount,
-        extraAmount: gallery.status === 'submitted' ? selection?.snapshot_extra_amount : extraAmount,
+        extraCount: finalExtraCount,
+        extraAmount: finalExtraAmount,
         addonsAmount: totalAddonsAmount,
         generalNote: selection?.general_note || null,
         submittedAt: selection?.submitted_at || null

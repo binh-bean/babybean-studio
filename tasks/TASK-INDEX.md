@@ -143,7 +143,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-111 | Đồng bộ bảng **Hậu Kỳ**: bản ghi mới + có `Link ảnh gửi khách` thì hiện trong app; ô tích `Lấy link app` tạo album nháp sửa được | DEV-INT | BB-109 | high | TODO |
 | BB-112 | **Thả tim = chọn ảnh** (`mark=selected`, KHÔNG phải `is_favorite`) + bốn con số hạn mức hiện ngay | DEV-FE | BB-102 | high | TODO |
 | BB-113 | Khách đặt ảnh vào sản phẩm in: chỉ hiện ô chọn cho sản phẩm hợp đồng THẬT SỰ có | DEV-FE + DEV-BE | BB-101 | high | TODO |
-| BB-114 | Chốt đơn, báo studio qua Zalo hoặc link chat, CSKH xác nhận rồi chuyển giai đoạn | DEV-BE + DEV-INT | BB-112 | high | TODO |
+| BB-114 | Chốt đơn, báo studio qua Zalo hoặc link chat, CSKH xác nhận rồi chuyển giai đoạn | DEV-BE + DEV-INT | BB-112 | high | ✅ **DONE** — `POST /api/g/submit`, `POST /api/admin/galleries/[id]/confirm`, snapshot con số, thông báo studio |
 | BB-115 | Ghi nhận thanh toán phát sinh và gắn vào lần xác nhận của CSKH | ARCH + DEV-BE | BB-114 | med | TODO |
 
 ---
