@@ -126,7 +126,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-081 | **CHẶN BB-035/BB-033.** `selection_items.mark` là một cột loại trừ nên "Yêu thích" xoá mất "Đã chọn", trong khi `07-ui-ux.md:127` là hai nút riêng. Thêm `is_favorite boolean` + migration | ARCH | BB-006 | high | TODO |
 | BB-082 | **NGHIÊM TRỌNG.** 4 hàm `security definer` trong schema `public` cho `anon` gọi: chỉ cần khoá công khai + UUID album là đọc/ghi được mọi album, bỏ qua token, PIN, cookie và RLS. Đã chứng minh HTTP 200 | SEC-ARCH | BB-023 | high | DONE |
 | BB-096 | `branch-selector.tsx` dùng `mockBranches` cứng — bộ chọn chi nhánh trên thanh tiêu đề không nối vào đâu | DEV-FE | BB-063 | med | ✅ **DONE** — nối GET /api/admin/branches thật, lưu chọn chi nhánh, chỉ hiện khi phụ trách >1 chi nhánh |
-| BB-097 | Bóc tên mẹ và tên bé từ tên thư mục Drive: ngoài ngoặc là mẹ, trong ngoặc là bé, không ngoặc thì tất cả là tên mẹ. Gợi ý cho CSKH sửa, không tự lưu | DEV-INT + DEV-FE | BB-013 | med | TODO |
+| BB-097 | Bóc tên mẹ và tên bé từ tên thư mục Drive: ngoài ngoặc là mẹ, trong ngoặc là bé, không ngoặc thì tất cả là mẹ. Chỉ GỢI Ý, không tự ghi | DEV-INT | BB-111 | med | TODO |
 | BB-098 | PIN thành tuỳ chọn từng link, mặc định TẮT, mã sinh ngẫu nhiên 4 số — không lấy từ SĐT vì khách nước ngoài không có | SEC-ARCH | BB-030 | med | TODO |
 | BB-099 | Gán người theo từng album: photographer, CSKH, người photoshop. Thêm vai `photoshop_ctv` quyền hẹp hơn | ARCH + DEV-BE | BB-063 | high | TODO |
 | BB-100 | Danh mục sản phẩm + dòng hàng hợp đồng theo cấu trúc Lark thật (3 tầng). Hạn mức ảnh là dòng `Edit file`, không phải cột | PM | BB-063 | high | ✅ **DONE** — `0014`, 130/132 sản phẩm đã đồng bộ, `app.gallery_quota()` |
@@ -146,6 +146,9 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-114 | Chốt đơn, báo studio qua Zalo hoặc link chat, CSKH xác nhận rồi chuyển giai đoạn | DEV-BE + DEV-INT | BB-112 | high | ✅ **DONE** — `POST /api/g/submit`, `POST /api/admin/galleries/[id]/confirm`, snapshot con số, thông báo studio |
 | BB-115 | Ghi nhận thanh toán phát sinh và gắn vào lần xác nhận của CSKH | ARCH + DEV-BE | BB-114 | med | ✅ **DONE** — `0024` `gallery_payments`, chỉ ghi thêm không sửa đè |
 | BB-116 | Đẩy 447 bộ hậu kỳ chưa qua khâu in lên để test | PM | BB-111 | med | ✅ **DONE** — 431/447 vào, 16 bộ trùng thư mục Drive |
+| BB-117 | Bỏ NOT NULL của `included_quota` — việc hoãn từ `0016`, giờ đã đủ điều kiện | ARCH | BB-102 | high | TODO |
+| BB-118 | Component đặt ảnh vào sản phẩm in | DEV-UI | BB-113 | med | TODO |
+| BB-119 | ~~Hợp nhất hai bản BB-111~~ — chủ studio chốt giữ bản PM, INT làm riêng BB-097 | — | — | — | 🚫 **HUỶ** |
 
 ---
 

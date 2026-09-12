@@ -31,7 +31,8 @@
  * BA Ô MANG TÊN KHÁCH, cả ba đều dễ vô tình kéo vào:
  *   "Tên KH"              tên thẳng
  *   "Mã KH"               gộp cả tên lẫn số điện thoại vào một chuỗi
- *   "Link ảnh gửi khách"  ô URL, nhãn text là tên thư mục kiểu "LIA - ZAC"
+ *   "Link ảnh gửi khách"  ô URL, nhãn text là tên thư mục,
+ *                         mang tên mẹ và tên bé
  *   "Chat với khách"      ô URL, nhãn text là tên khách
  *
  * Hai ô cuối phải đọc bằng cellLink() chứ KHÔNG phải cellText(): cellText đọc
@@ -325,7 +326,7 @@ async function main() {
         contractCodes: [contractCode],
         branchId,
         // Che: KHÔNG lấy "Tên KH", KHÔNG lấy nhãn text của ô link (là tên thư
-        // mục kiểu "LIA - ZAC"). Mã hợp đồng vừa duy nhất vừa tra được bên Lark.
+        // mục, mang tên mẹ và tên bé). Mã hợp đồng vừa duy nhất vừa tra được bên Lark.
         chatUrl: cellLink(f["Chat với khách"]) || null,
         driveUrl: photoUrl,
         driveFolderId: folderId,
