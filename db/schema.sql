@@ -145,7 +145,7 @@ create table packages (
   name                text not null,
   description         text,
   price               numeric(12,0) not null default 0,
-  included_quota      integer not null default 20,    -- số ảnh chỉnh miễn phí
+  included_quota      integer,                        -- số ảnh chỉnh miễn phí (null = không cố định)
   extra_photo_price   numeric(12,0) not null default 0,
   printed_photo_count integer not null default 0,
   is_active           boolean not null default true,
@@ -201,7 +201,7 @@ create table galleries (
   lark_contract_code  text,                           -- HD_YYYYMMDD#NN
 
   -- Quy tắc chọn ảnh
-  included_quota      integer not null default 20,
+  included_quota      integer,                        -- null = chưa biết hạn mức (dự phòng khi chưa có dòng hàng)
   extra_photo_price   numeric(12,0) not null default 0,
   max_selection       integer,                        -- null = không giới hạn cứng
   allow_extra         boolean not null default true,
@@ -595,13 +595,16 @@ select
   c.full_name                         as customer_name,
   c.phone                             as customer_phone,
   g.photo_count,
-  g.included_quota,
+  app.gallery_quota(g.id)             as included_quota,
   g.due_at,
   g.sent_at,
   g.submitted_at,
   s.id                                as primary_selection_id,
   coalesce(count_selected(s.id), 0)   as selected_count,
-  greatest(coalesce(count_selected(s.id), 0) - g.included_quota, 0) as extra_count,
+  case
+    when app.gallery_quota(g.id) is null then null
+    else greatest(coalesce(count_selected(s.id), 0) - app.gallery_quota(g.id), 0)
+  end                                 as extra_count,
   case
     when g.status = 'submitted' then 'done'
     when g.due_at is null then 'no_due'

@@ -156,7 +156,7 @@ export interface Package {
   name: string;
   description?: string | null;
   price: number;
-  includedQuota: number;
+  includedQuota: number | null;
   extraPhotoPrice: number;
   printedPhotoCount: number;
   isActive: boolean;
@@ -230,7 +230,7 @@ export interface Gallery {
   driveFolderName: string | null;
   larkContractCode: string | null;
 
-  includedQuota: number;
+  includedQuota: number | null;
   extraPhotoPrice: number;
   /** null = no hard cap; customer may keep adding paid photos. */
   maxSelection: number | null;
@@ -569,9 +569,9 @@ export interface GalleryProgress {
   customerName: string;
   customerPhone: string;
   photoCount: number;
-  includedQuota: number;
+  includedQuota: number | null;
   selectedCount: number;
-  extraCount: number;
+  extraCount: number | null;
   dueAt: string | null;
   sentAt?: string | null;
   submittedAt: string | null;
@@ -595,8 +595,8 @@ export interface OverQuotaUnbilledRow {
   branchName: string;
   larkContractCode: string | null;
   shootDate: string | null;
-  quota: number;
-  includedQuota?: number;
+  quota: number | null;
+  includedQuota?: number | null;
   selectedCount: number;
   overCount: number;
   addonCount: number;

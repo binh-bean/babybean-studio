@@ -168,4 +168,52 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     const body = await res.json();
     expect(body.error.code).toBe("FORBIDDEN");
   });
+
+  it("8. BB-117: Album có hạn mức chưa biết (null) trả về includedQuota: null, extraCount: null, progress: 'N/?'", async () => {
+    vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
+      staffId: "00000000-0000-0000-0000-000000000001",
+      role: "owner",
+      branchIds: [sampleBranchId],
+    });
+
+    const admin = createAdminClient();
+    const { data: customer } = await admin.from("customers").select("id").limit(1).single();
+    if (!customer) throw new Error("Cần ít nhất một khách hàng");
+
+    const testFolderId = "TEST_FOLDER_BB117_" + Date.now();
+    const { data: gallery, error } = await admin
+      .from("galleries")
+      .insert({
+        branch_id: sampleBranchId,
+        customer_id: customer.id,
+        title: "Test BB-117 Null Quota",
+        drive_folder_id: testFolderId,
+        drive_folder_url: "https://drive.google.com/drive/folders/" + testFolderId,
+        included_quota: null,
+      })
+      .select("id")
+      .single();
+
+    if (error || !gallery) {
+      throw new Error("Không tạo được album test: " + (error?.message || ""));
+    }
+
+    try {
+      const req = new Request(
+        `http://localhost:3000/api/admin/galleries?q=${encodeURIComponent("Test BB-117 Null Quota")}`
+      );
+      const res = await GET(req);
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.data.items.length).toBeGreaterThan(0);
+      const item = body.data.items.find((i: { id: string }) => i.id === gallery.id);
+      expect(item).toBeDefined();
+      expect(item.includedQuota).toBeNull();
+      expect(item.extraCount).toBeNull();
+      expect(item.progress).toBe("0/?");
+    } finally {
+      await admin.from("galleries").delete().eq("id", gallery.id);
+    }
+  });
 });

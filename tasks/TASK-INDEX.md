@@ -146,7 +146,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-114 | Chốt đơn, báo studio qua Zalo hoặc link chat, CSKH xác nhận rồi chuyển giai đoạn | DEV-BE + DEV-INT | BB-112 | high | ✅ **DONE** — `POST /api/g/submit`, `POST /api/admin/galleries/[id]/confirm`, snapshot con số, thông báo studio |
 | BB-115 | Ghi nhận thanh toán phát sinh và gắn vào lần xác nhận của CSKH | ARCH + DEV-BE | BB-114 | med | ✅ **DONE** — `0024` `gallery_payments`, chỉ ghi thêm không sửa đè |
 | BB-116 | Đẩy 447 bộ hậu kỳ chưa qua khâu in lên để test | PM | BB-111 | med | ✅ **DONE** — 431/447 vào, 16 bộ trùng thư mục Drive |
-| BB-117 | Bỏ NOT NULL của `included_quota` — việc hoãn từ `0016`, giờ đã đủ điều kiện | ARCH | BB-102 | high | TODO |
+| BB-117 | Bỏ NOT NULL và DEFAULT của included_quota, get_admin_galleries hỗ trợ hạn mức null ('N/?', extraCount null) | ARCH | BB-102 | med | ✅ **DONE** — migration `0030`, schema.sql, domain.ts, get_admin_galleries |
 | BB-118 | Component đặt ảnh vào sản phẩm in | DEV-UI | BB-113 | med | TODO |
 | BB-119 | ~~Hợp nhất hai bản BB-111~~ — chủ studio chốt giữ bản PM, INT làm riêng BB-097 | — | — | — | 🚫 **HUỶ** |
 
