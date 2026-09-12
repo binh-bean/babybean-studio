@@ -178,9 +178,12 @@ language sql stable set search_path = public as $$
   );
 $$;
 
+-- CHÚ Ý: 0019 đã ĐỔI NGHĨA hàm này. Bản ở đây đọc included_quota trước rồi
+-- mới suy từ dòng hàng; bản 0019 làm ngược lại — dòng hàng là chính,
+-- included_quota chỉ dùng khi album chưa có dòng hàng nào. Bản 0019 mới là bản
+-- đang chạy. Giữ nguyên đoạn này để đọc lại lịch sử, đừng chép lại nó.
 comment on function app.gallery_quota is
-  'Hạn mức ảnh của album. galleries.included_quota nếu có, ngược lại suy từ '
-  'gallery_items. null = chưa biết.';
+  'Hạn mức ảnh của album. Xem 0019 để biết bản đang chạy.';
 
 -- ---------------------------------------------------------------------------
 -- KHÔNG đổi galleries.included_quota trong migration này. Đọc kỹ trước khi làm.

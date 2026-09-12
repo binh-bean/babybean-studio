@@ -9,8 +9,14 @@ interface QuotaDisplayProps {
 }
 
 export function QuotaDisplay({ includedQuota, extraPrice, selectedCount, className }: QuotaDisplayProps) {
-  // Chưa biết hạn mức -> "studio sẽ báo lại số ảnh trong gói" TUYỆT ĐỐI không hiện số 0
-  if (includedQuota == null || includedQuota === 0) {
+  // Chưa biết hạn mức -> "studio sẽ báo lại số ảnh trong gói", tuyệt đối không
+  // hiện số 0.
+  //
+  // Chỉ null và undefined mới là "chưa biết". Số 0 là một hạn mức THẬT: đơn
+  // chỉ mua ảnh in, không kèm ảnh chỉnh sửa nào. Gộp hai thứ đó lại là làm
+  // hỏng đúng cái ranh giới mà 0016 dựng lên ở tầng database — khách đơn in
+  // sẽ thấy "studio sẽ báo lại" mãi mãi trong khi studio chẳng có gì để báo.
+  if (includedQuota == null) {
     return (
       <div className={cn("text-sm", className)}>
         <span>Đã chọn: {selectedCount} ảnh</span>

@@ -1,5 +1,14 @@
 -- ============================================================================
--- Migration: 0015 — Hạn mức gallery ưu tiên gallery_items
+-- Migration: 0019 — hạn mức ưu tiên dòng hàng
+--
+-- ĐÃ ĐỔI SỐ khi gộp: DEV-BE đặt 0015, ARCH cũng đặt 0015 cho BB-101. Hai
+-- migration khác nhau cùng số là hai máy chạy ra hai database khác nhau.
+-- BB-101 giữ 0015 vì tới trước, việc này lùi xuống 0019.
+--
+-- Migration này ĐỔI NGHĨA của galleries.included_quota so với 0014: từ "giá
+-- trị ghi đè" thành "dự phòng khi album chưa có dòng hàng". Cách này đúng hơn
+-- — sửa hạn mức tức là sửa dòng hàng, một chỗ duy nhất, thay vì hai chỗ có thể
+-- nói khác nhau. Chú thích trong 0014 đã được sửa lại cho khớp.
 --
 -- BB-102: app.gallery_quota() trả về NULL khi chưa biết hạn mức. NULL KHÔNG PHẢI 0.
 -- - Nếu album CÓ dòng hàng (gallery_items):

@@ -472,6 +472,9 @@ export const ERROR_CODES = [
   "LINK_EXPIRED",
   "GALLERY_LOCKED",
   "QUOTA_EXCEEDED",
+  // Khác QUOTA_EXCEEDED: khách chọn quá là một chuyện, studio chưa nhập hạn
+  // mức là chuyện khác. CSKH xử lý hai việc khác nhau.
+  "QUOTA_UNKNOWN",
   "CONFLICT",
   "RATE_LIMITED",
   "DRIVE_ACCESS_DENIED",

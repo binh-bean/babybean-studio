@@ -78,23 +78,33 @@ export async function patchSelection(
     if (wasSelected && !willBeSelected) netChange--;
   }
 
-  // Quota chưa biết -> CHẶN chọn ảnh, trả mã QUOTA_UNKNOWN
+  // Hạn mức chưa biết thì KHÔNG GHI GÌ HẾT.
+  //
+  // Bản gốc của BB-102 chỉ chặn khi khách đang chọn thêm, rồi để lọt xuống
+  //
+  //     const effectiveQuota = actualIncludedQuota ?? gallery.included_quota;
+  //
+  // Dòng đó lấy lại đúng con số mặc định 20 mà cả 0016, 0017, 0018 đang gỡ bỏ,
+  // và gửi nó xuống RPC. Hậu quả: p_included_quota không bao giờ là null, nên
+  // cổng chặn QUOTA_UNKNOWN ở tầng database KHÔNG BAO GIỜ nổ được. Hai tầng
+  // bảo vệ trở thành không tầng nào.
+  //
+  // Nới cho khách bỏ chọn nghe có vẻ tử tế, nhưng nó vẫn tính lại số ảnh vượt
+  // và tiền phụ trội dựa trên con số 20 bịa, rồi trả về cho khách xem. Sai số
+  // im lặng còn tệ hơn một dòng báo lỗi.
+  //
+  // Một luật duy nhất: chưa biết hạn mức thì album chưa dùng được, CSKH điền
+  // xong mới mở. API và database nói cùng một câu.
   if (!quotaKnown || actualIncludedQuota === null) {
-    const isSelecting = request.ops.some((op) => {
-      const mark = session.role === "suggester" && op.mark === "selected" ? "suggested" : op.mark;
-      return mark === "selected";
-    });
-    if (isSelecting || netChange > 0) {
-      return {
-        error: {
-          code: "QUOTA_UNKNOWN" as unknown as ErrorCode,
-          message: "Studio sẽ báo lại số ảnh trong gói",
-        },
-      };
-    }
+    return {
+      error: {
+        code: "QUOTA_UNKNOWN",
+        message: "Studio sẽ báo lại số ảnh trong gói",
+      },
+    };
   }
 
-  const effectiveQuota = actualIncludedQuota ?? gallery.included_quota;
+  const effectiveQuota = actualIncludedQuota;
 
   const quotaRules: QuotaRules = {
     includedQuota: effectiveQuota,
