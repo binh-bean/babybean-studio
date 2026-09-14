@@ -64,9 +64,24 @@ export const OWNERSHIP = {
     "scripts/db-seed.mjs",
     "scripts/db-push.mjs",
   ],
+  // src/app/api/admin/reports/** nằm ở DEV-FE chứ không ở DEV-BE, cùng lý lẽ
+  // với db/migrations/** ghi bên dưới: tách ra là tạo một lần bàn giao.
+  //
+  // Một đường báo cáo chỉ đọc, sinh ra để nuôi đúng một màn hình, mà chủ màn
+  // hình không được viết thì phải chờ người khác — và chỗ nguy hiểm nhất của
+  // đường đó (lọc theo chi nhánh, vì service_role đi vòng qua RLS) nằm đúng
+  // ngay chỗ bàn giao.
+  //
+  // Cái giữ an toàn ở đây KHÔNG phải ai sở hữu tệp, mà là phép thử: mỗi đường
+  // báo cáo phải có một ca chứng minh nhân viên chi nhánh A không thấy dữ liệu
+  // chi nhánh B, và ca đó phải đỏ khi gỡ bộ lọc ra. Xem
+  // tests/unit/loi-dong-bo-report-api.test.ts và over-quota.
+  //
+  // PM chốt ngày 14.09.2026 sau khi BB-129 vấp phải ranh giới này.
   "DEV-FE": [
     "src/app/(customer)/**",
     "src/app/(admin)/**",
+    "src/app/api/admin/reports/**",
     "src/components/features/**",
     "src/lib/utils/**",
   ],

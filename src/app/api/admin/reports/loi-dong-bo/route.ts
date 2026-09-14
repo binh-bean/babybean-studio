@@ -1,9 +1,10 @@
 /**
  * GET /api/admin/reports/loi-dong-bo — bộ ảnh kéo từ Drive về không thành công.
  *
- * OWNER: DEV-BE theo ma trận sở hữu. Tệp này do DEV-FE viết mới ở BB-129 vì
- * brief giao cả đường dữ liệu kèm màn hình; PM cần chốt lại chủ sở hữu trước
- * khi có người sửa tiếp. Tệp mới nên không đè lên việc của ai.
+ * OWNER: DEV-FE. PM chốt ngày 14.09.2026: đường báo cáo chỉ đọc thuộc về chủ
+ * màn hình mà nó nuôi, không thuộc DEV-BE — tách ra là tạo một lần bàn giao,
+ * và chỗ nguy hiểm nhất của đường này nằm đúng ngay chỗ bàn giao. Xem ghi chú
+ * ở scripts/ownership.mjs.
  * Spec: docs/briefs/BB-129-man-hinh-loi-dong-bo.md
  *
  * ---------------------------------------------------------------------------
