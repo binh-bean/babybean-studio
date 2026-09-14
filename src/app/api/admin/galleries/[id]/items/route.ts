@@ -36,7 +36,7 @@ export async function GET(
     // 3. Check gallery existence and branch authorization
     const { data: gallery, error: galleryError } = await admin
       .from("galleries")
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price")
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count")
       .eq("id", galleryId)
       .single();
 
@@ -118,6 +118,7 @@ export async function GET(
 
     return ok({
       galleryId: gallery.id,
+      photoCount: gallery.photo_count,
       dueAmount,
       paidAmount,
       outstanding: dueAmount - paidAmount,

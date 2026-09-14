@@ -38,6 +38,8 @@ export async function listImageFiles(
   ctx: DriveRequestContext,
   options: ListFilesOptions = {},
 ): Promise<DriveFile[]> {
+  await assertFolderReadable(folderId, ctx);
+
   const collected: DriveFile[] = [];
   await walk(folderId, null, 1, ctx, options, collected);
 
@@ -47,6 +49,34 @@ export async function listImageFiles(
   });
 
   return collected;
+}
+
+/**
+ * Hỏi thẳng Drive xem thư mục này có đọc được không.
+ *
+ * BẮT BUỘC gọi trước khi liệt kê. Lệnh liệt kê dùng `q='<id>' in parents`, và
+ * với một thư mục KHÔNG đọc được Drive trả về **200 kèm danh sách rỗng** chứ
+ * không trả 403 hay 404. Nghĩa là `driveFetch` không bao giờ có cơ hội ném
+ * `DriveAccessDeniedError`, đồng bộ báo thành công, và bộ ảnh được đánh dấu
+ * "sẵn sàng gửi khách" với KHÔNG TẤM ẢNH NÀO.
+ *
+ * Đo thật ngày 14.09.2026: ba bộ đầu tiên chạy thử đều rơi vào đúng chỗ này —
+ * liệt kê trả 200 / 0 ảnh, trong khi hỏi metadata thư mục trả 404.
+ *
+ * Khách mở link ra thấy trang trắng rồi gọi điện hỏi studio làm mất ảnh của
+ * con mình. Lỗi im lặng ở đây đắt hơn nhiều so với một mẻ đồng bộ dừng lại.
+ *
+ * `/files/{id}` thì ngược lại: không đọc được là trả 404, và `driveFetch`
+ * dịch thành `DriveAccessDeniedError`.
+ */
+export async function assertFolderReadable(
+  folderId: string,
+  ctx: DriveRequestContext,
+): Promise<void> {
+  await driveFetch(`/files/${encodeURIComponent(folderId)}`, {
+    fields: "id,mimeType,trashed",
+    supportsAllDrives: "true",
+  }, { ...ctx, folderId });
 }
 
 async function walk(

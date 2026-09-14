@@ -532,6 +532,96 @@ thẳng vào dữ liệu và hỏi "con số này từ đâu ra"** mới thấy.
 
 ---
 
+## 6e. Kéo ảnh từ Drive, và cái bẫy 200-mà-rỗng
+
+Chủ studio chốt ngày 14.09.2026: *"đồng bộ ảnh từ Drive, bộ nào trùng lỗi thì
+bỏ qua, đồng bộ những bộ đúng trước"*.
+
+### Kết quả đợt đầu
+
+| | |
+|---|---|
+| Đồng bộ được | **350 bộ**, 152.472 ảnh, hết 4 phút |
+| Lỗi, đã bỏ qua | **77 bộ** — tất cả cùng một lý do: thư mục chưa chia sẻ công khai |
+
+Lỗi ghi lên từng bộ (`galleries.sync_error`) để CSKH nhìn thấy trên màn hình,
+không nằm im trong nhật ký. Sửa quyền chia sẻ bên Drive xong thì chạy lại với
+`--lam-lai`.
+
+### Cái bẫy: Drive trả 200 kèm danh sách RỖNG
+
+Ba bộ chạy thử đầu tiên đều báo **thành công với 0 ảnh**, và bị đánh dấu *sẵn
+sàng gửi khách*. Hỏi thẳng Drive về chính ba thư mục đó thì trả **404**.
+
+Nguyên nhân: lệnh liệt kê dùng `q='<id>' in parents`. Với một thư mục **không
+đọc được**, Drive không trả 403 hay 404 — nó trả **200 kèm danh sách rỗng**.
+Nên `driveFetch` không bao giờ có cơ hội ném `DriveAccessDeniedError`, đồng bộ
+báo thành công, và khách mở link ra thấy **trang trắng** rồi gọi điện hỏi
+studio làm mất ảnh của con mình.
+
+Vá hai lớp:
+
+1. `assertFolderReadable()` hỏi `/files/{id}` **trước** khi liệt kê — đường đó
+   trả 404 thật khi không đọc được.
+2. Không bao giờ đánh dấu *sẵn sàng gửi khách* khi không có tấm ảnh nào. Lớp
+   một bịt nguyên nhân đã biết; lớp hai bịt **hình dạng của hậu quả**, dù
+   nguyên nhân là gì.
+
+### Thứ tự chạy: mới nhất trước
+
+Bản đầu chạy từ bộ cũ nhất. Mười bộ đầu (tháng 7.2025) hỏng thư mục cả mười,
+trong khi lấy ngẫu nhiên cả kho thì 30/40 đọc được — thư mục cũ hay bị gỡ chia
+sẻ. Chạy từ cũ nhất là mấy phút đầu chỉ toàn lỗi, người ngồi xem tưởng cả mẻ
+hỏng. Mới nhất trước cũng đúng thứ tự cần: bộ vừa chụp là bộ sắp phải gửi khách.
+
+### Tên file không lộ thông tin khách
+
+Kiểm bằng cách che (chữ → X, số → 9) rồi mới đọc hình dạng: tên file toàn kiểu
+máy ảnh (`X99_9999.jpg`), 26/26 tên thư mục con đều là từ kỹ thuật (ảnh gốc,
+đã chỉnh, đã chọn…). Không có tên người nào vào bb-dev.
+
+---
+
+## 6f. Tạo link gửi khách
+
+Chủ studio mô tả từ đầu: *"nhân viên tạo link app của khách và gán lại vào cột
+link app trong hậu kỳ Lark"*. Cho tới hôm nay **không có đường nào tạo link** —
+chỉ có đường đổi PIN, và link duy nhất trong cơ sở dữ liệu là của dữ liệu mẫu.
+
+`POST /api/admin/galleries/[id]/share-link` + nút bên màn CSKH.
+
+**Link hiện đúng một lần.** Cơ sở dữ liệu chỉ giữ bản băm SHA-256, không giữ
+mã. Mất thì tạo lại chứ không đọc lại được — cùng luật với PIN. Nhật ký chỉ ghi
+sáu ký tự đầu.
+
+**Tạo link mới thì thu hồi link cũ.** Hai link cùng sống nghĩa là mã cũ vẫn mở
+được, kể cả khi CSKH tạo mới đúng vì nghi mã cũ lọt ra ngoài.
+
+**Chưa có ảnh thì không tạo được link.** Gửi link cho khách khi bộ ảnh trống là
+để khách mở ra thấy trang trắng rồi gọi điện.
+
+### Gắn theo bộ ảnh, không gắn theo khách — và vì sao
+
+Ràng buộc `chk_share_link_target` bắt chọn đúng một trong hai. `0010` đã đổi mô
+hình sang **một link cho một khách** làm địa chỉ vĩnh viễn, vì link hết hạn
+khiến phụ huynh không xem lại được ảnh con mình.
+
+Nhưng nửa còn lại của mô hình đó **chưa làm xong**: link theo khách mint ra
+phiên có `galleryId` rỗng và không tạo lượt chọn, vì một khách có nhiều buổi
+chụp và chưa có trang cho khách chọn xem buổi nào. Dùng nó hôm nay là gửi khách
+một link mở ra lỗi.
+
+Nên link gắn theo bộ ảnh — cũng đúng với cột *link app* bên Hậu Kỳ, vốn **một
+dòng một buổi chụp**. Ý định của `0010` vẫn giữ: **không đặt hạn dùng**, link
+không hết hạn. Cái `0010` muốn bỏ là hạn dùng, không phải việc gắn theo bộ ảnh.
+
+Ràng buộc cơ sở dữ liệu chính là thứ bắt được lỗi này: bản đầu của route gắn
+vào `customer_id` và bị từ chối thẳng. Không có ràng buộc đó thì link vẫn tạo
+ra, vẫn trông đúng, và hỏng lúc khách mở. Vì thế có thêm một phép thử đi hết
+đường — tạo link → đăng nhập bằng chính mã đó → kiểm phiên trỏ đúng bộ ảnh.
+
+---
+
 ## 7. Đợt đẩy dữ liệu thật đầu tiên
 
 Chủ studio chốt: chỉ đẩy các bộ **chưa qua khâu in**. Đo trên bảng Hậu Kỳ ngày

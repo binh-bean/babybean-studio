@@ -73,6 +73,7 @@ interface Detail {
   revisions: Revision[];
   catalog: CatalogProduct[];
   finalDriveUrl: string | null;
+  photoCount: number;
   dueAmount: number;
   paidAmount: number;
   outstanding: number;
@@ -83,6 +84,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [linkMoi, setLinkMoi] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     const res = await fetch(`/api/admin/galleries/${galleryId}/items`);
@@ -209,6 +211,35 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           ? "Đã mở lại. Khách chọn ảnh tiếp được — nhớ báo cho khách."
           : (json?.error?.message ?? "Không mở lại được"),
       );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Tạo link gửi khách. Link hiện ĐÚNG MỘT LẦN — cơ sở dữ liệu chỉ giữ bản băm.
+   *
+   * Giữ trong state riêng chứ không nhét vào `notice`: nhắn thông báo nào khác
+   * cũng ghi đè `notice`, mà mất link thì phải tạo lại từ đầu.
+   */
+  async function taoLink() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/share-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNotice(json?.error?.message ?? "Không tạo được link");
+        return;
+      }
+      // Ghép tên miền ở phía trình duyệt: máy chủ không biết chắc khách vào
+      // bằng tên miền nào, đoán sai thì CSKH gửi đi một link chết.
+      setLinkMoi(`${window.location.origin}${json.data.duongDan}`);
       await load();
     } finally {
       setBusy(false);
@@ -488,6 +519,44 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           <ReopenForm disabled={busy} onSubmit={(r) => void reopen(r)} />
         </section>
       )}
+
+      <section className="rounded-lg border border-[var(--bb-border)] p-4">
+        <h2 className="text-base font-medium">Link gửi khách</h2>
+
+        {linkMoi ? (
+          <div className="mt-3">
+            <p className="text-sm">
+              Sao link này dán vào cột <em>link app</em> bên Lark. Đóng màn hình là
+              <strong> không xem lại được</strong> — hệ thống không lưu link, chỉ lưu bản băm.
+            </p>
+            <textarea
+              readOnly
+              rows={2}
+              value={linkMoi}
+              onFocus={(e) => e.currentTarget.select()}
+              aria-label="Link gửi khách"
+              className="mt-2 w-full select-all rounded border border-[var(--bb-border)] p-2 font-mono text-xs"
+            />
+          </div>
+        ) : (
+          <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
+            {detail.shareLink
+              ? "Bộ ảnh đã có link đang dùng. Tạo link mới sẽ thu hồi link cũ — dùng khi nghi link cũ lọt ra ngoài."
+              : detail.photoCount === 0
+                ? "Chưa có ảnh nào. Đồng bộ ảnh từ Drive xong rồi hãy tạo link."
+                : "Chưa có link nào cho bộ ảnh này."}
+          </p>
+        )}
+
+        <button
+          type="button"
+          disabled={busy || detail.photoCount === 0}
+          onClick={() => void taoLink()}
+          className="mt-3 rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+        >
+          {detail.shareLink ? "Tạo link mới (thu hồi link cũ)" : "Tạo link gửi khách"}
+        </button>
+      </section>
 
       <section className="flex flex-wrap gap-3">
         {detail.shareLink && (

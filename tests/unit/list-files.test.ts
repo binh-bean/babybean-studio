@@ -82,9 +82,23 @@ describe("BB-012: listImageFiles & toDriveFile", () => {
       vi.restoreAllMocks();
     });
 
+    /**
+     * listImageFiles() gọi assertFolderReadable() TRƯỚC khi liệt kê, nên mỗi
+     * lượt có thêm một lần gọi `/files/<id>`.
+     *
+     * Kiểm tra đó thêm vào ngày 14.09.2026 sau khi đo thật: một thư mục không
+     * đọc được thì lệnh liệt kê của Drive trả **200 kèm danh sách rỗng**, chứ
+     * không trả 403/404. Đồng bộ báo thành công và bộ ảnh bị đánh dấu "sẵn
+     * sàng gửi khách" với KHÔNG TẤM ẢNH NÀO.
+     */
+    const laGoiKiemTraThuMuc = (path: string) => path.startsWith("/files/");
+    const dapAnKiemTra = () => new Response(JSON.stringify({ id: "x", mimeType: "application/vnd.google-apps.folder" }), { status: 200 });
+
     it("loads small single-page album (folder-50.json)", async () => {
       const fixture = loadFixture("folder-50.json");
-      vi.spyOn(clientModule, "driveFetch").mockResolvedValueOnce(
+      vi.spyOn(clientModule, "driveFetch")
+        .mockResolvedValueOnce(dapAnKiemTra())
+        .mockResolvedValueOnce(
         new Response(JSON.stringify(fixture), { status: 200 }),
       );
 
@@ -100,6 +114,7 @@ describe("BB-012: listImageFiles & toDriveFile", () => {
 
       const driveFetchSpy = vi.spyOn(clientModule, "driveFetch").mockImplementation(
         async (_path, params) => {
+          if (laGoiKiemTraThuMuc(_path)) return dapAnKiemTra();
           if (!params.pageToken) {
             return new Response(JSON.stringify(fixture.page1), { status: 200 });
           }
@@ -116,7 +131,8 @@ describe("BB-012: listImageFiles & toDriveFile", () => {
       });
 
       expect(files).toHaveLength(1000);
-      expect(driveFetchSpy).toHaveBeenCalledTimes(2);
+      // +1 cho lần kiểm tra thư mục đọc được.
+      expect(driveFetchSpy).toHaveBeenCalledTimes(3);
       expect(progressCalls).toEqual([500, 1000]);
       expect(files[0]?.name).toBe("BB_0001.jpg");
       expect(files[999]?.name).toBe("BB_1000.jpg");
@@ -124,7 +140,9 @@ describe("BB-012: listImageFiles & toDriveFile", () => {
 
     it("filters out non-image files like .DS_Store and Lightroom catalogs (folder-mixed.json)", async () => {
       const fixture = loadFixture("folder-mixed.json");
-      vi.spyOn(clientModule, "driveFetch").mockResolvedValueOnce(
+      vi.spyOn(clientModule, "driveFetch")
+        .mockResolvedValueOnce(dapAnKiemTra())
+        .mockResolvedValueOnce(
         new Response(JSON.stringify(fixture), { status: 200 }),
       );
 
@@ -139,6 +157,7 @@ describe("BB-012: listImageFiles & toDriveFile", () => {
 
       const driveFetchSpy = vi.spyOn(clientModule, "driveFetch").mockImplementation(
         async (_path, params) => {
+          if (laGoiKiemTraThuMuc(_path)) return dapAnKiemTra();
           const folderQuery = params.q?.match(/'([^']+)' in parents/)?.[1];
           if (folderQuery === "root-id") {
             return new Response(JSON.stringify(fixture.root), { status: 200 });
@@ -164,7 +183,8 @@ describe("BB-012: listImageFiles & toDriveFile", () => {
       // subfolder_c2 has 1 image: BB_020.jpg (subfolder = Concept 2 - Ngoai canh)
       // subfolder_c3 should NOT be traversed
       expect(files).toHaveLength(5);
-      expect(driveFetchSpy).toHaveBeenCalledTimes(3);
+      // 3 lần liệt kê (thư mục gốc + hai thư mục con) + 1 lần kiểm tra thư mục.
+      expect(driveFetchSpy).toHaveBeenCalledTimes(4);
 
       const subfolders = [...new Set(files.map((f) => f.subfolder))];
       expect(subfolders).toContain(null);
@@ -183,7 +203,9 @@ describe("BB-012: listImageFiles & toDriveFile", () => {
         ],
       };
 
-      vi.spyOn(clientModule, "driveFetch").mockResolvedValueOnce(
+      vi.spyOn(clientModule, "driveFetch")
+        .mockResolvedValueOnce(dapAnKiemTra())
+        .mockResolvedValueOnce(
         new Response(JSON.stringify(mockResponse), { status: 200 }),
       );
 
