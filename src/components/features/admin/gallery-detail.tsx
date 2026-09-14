@@ -85,6 +85,14 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   const [notice, setNotice] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [linkMoi, setLinkMoi] = React.useState<string | null>(null);
+  /**
+   * BB-132: link vừa tạo đã được ghi thẳng sang cột "Link app" bên Lark chưa.
+   *
+   * null = chưa tạo link nào lần này. Phân biệt với false ("đã thử, hỏng") là
+   * cần thiết: hai trạng thái đó dẫn tới hai việc khác nhau của CSKH.
+   */
+  const [daGhiLark, setDaGhiLark] = React.useState<boolean | null>(null);
+  const [lyDoKhongGhiLark, setLyDoKhongGhiLark] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     const res = await fetch(`/api/admin/galleries/${galleryId}/items`);
@@ -226,6 +234,10 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   async function taoLink() {
     setBusy(true);
     setNotice(null);
+    // Xoá kết quả ghi Lark của lần trước: để nguyên là CSKH nhìn thấy dấu
+    // "đã ghi sang Lark" của link cũ trong lúc link mới còn đang tạo.
+    setDaGhiLark(null);
+    setLyDoKhongGhiLark(null);
     try {
       const res = await fetch(`/api/admin/galleries/${galleryId}/share-link`, {
         method: "POST",
@@ -237,9 +249,15 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         setNotice(json?.error?.message ?? "Không tạo được link");
         return;
       }
-      // Ghép tên miền ở phía trình duyệt: máy chủ không biết chắc khách vào
-      // bằng tên miền nào, đoán sai thì CSKH gửi đi một link chết.
-      setLinkMoi(`${window.location.origin}${json.data.duongDan}`);
+      // Ưu tiên ĐÚNG chuỗi đã ghi sang Lark: đó chính là link khách sẽ nhận.
+      // Ghi hỏng thì rơi về ghép tên miền ở phía trình duyệt — máy chủ không
+      // biết chắc khách vào bằng tên miền nào, đoán sai thì CSKH gửi đi một
+      // link chết.
+      setLinkMoi(
+        json.data.diaChiDaGhiLark ?? `${window.location.origin}${json.data.duongDan}`,
+      );
+      setDaGhiLark(json.data.daGhiLark === true);
+      setLyDoKhongGhiLark(json.data.lyDoKhongGhiLark ?? null);
       await load();
     } finally {
       setBusy(false);
@@ -525,9 +543,32 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
 
         {linkMoi ? (
           <div className="mt-3">
-            <p className="text-sm">
-              Sao link này dán vào cột <em>link app</em> bên Lark. Đóng màn hình là
-              <strong> không xem lại được</strong> — hệ thống không lưu link, chỉ lưu bản băm.
+            {/* BB-132: nói rõ CSKH còn phải làm gì. Trước đây câu chữ luôn là
+                "sao link này dán vào cột link app bên Lark" — nay máy đã dán
+                hộ, nên để nguyên câu đó là bắt người làm lại một việc đã xong,
+                và tệ hơn: dán tay đè lên thì lại mở ra đúng nguy cơ dán nhầm
+                dòng mà BB-132 sinh ra để bỏ. */}
+            {daGhiLark ? (
+              <p className="rounded-md border border-[var(--bb-success)] p-3 text-sm">
+                <strong>Đã ghi sang Lark.</strong> Link nằm sẵn ở cột <em>Link app</em> đúng
+                dòng Hậu Kỳ của khách này — <strong>không cần dán tay</strong>. Dưới đây là
+                đúng chuỗi đã ghi, để đối chiếu hoặc gửi thẳng cho khách.
+              </p>
+            ) : (
+              <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
+                <strong>Chưa ghi được sang Lark — dán tay giúp.</strong> Sao link dưới đây
+                dán vào cột <em>Link app</em> đúng dòng Hậu Kỳ của khách này.
+                {lyDoKhongGhiLark ? (
+                  <>
+                    <br />
+                    <span className="text-[var(--bb-fg-muted)]">Lý do: {lyDoKhongGhiLark}</span>
+                  </>
+                ) : null}
+              </p>
+            )}
+            <p className="mt-2 text-sm">
+              Đóng màn hình là <strong>không xem lại được</strong> — hệ thống không lưu link,
+              chỉ lưu bản băm.
             </p>
             <textarea
               readOnly
