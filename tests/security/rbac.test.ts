@@ -260,11 +260,34 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     
     await client.query("UPDATE staff_profiles SET role = 'accountant' WHERE id = $1", [accId]);
 
+    // Neo vào MỘT bộ ảnh cụ thể, thuộc ĐÚNG chi nhánh của nhân viên này, và
+    // chắc chắn có ảnh. Lấy trước khi đổi vai nên còn thấy hết.
+    //
+    // Không hỏi "toàn bảng có dòng nào không": khi câu trả lời là 0 dòng thì
+    // LIMIT 1 không có gì để dừng sớm, Postgres xét luật quyền trên đủ 152k
+    // ảnh — 11 giây lúc máy rảnh, quá 20 giây khi chạy song song. Hỏi theo
+    // gallery_id thì có chỉ mục: 336 ms.
+    //
+    // Phải ĐÚNG chi nhánh, nếu không phép thử đạt rỗng: bộ ảnh của chi nhánh
+    // khác thì cs cũng không thấy, và ca này sẽ xanh kể cả khi luật quyền hỏng.
+    // Đã đo: cùng câu này vai cs thấy 1 dòng, vai accountant thấy 0 dòng.
+    const { rows: boCoAnh } = await client.query(
+      `SELECT p.gallery_id FROM photos p
+         JOIN galleries g ON g.id = p.gallery_id
+         JOIN staff_branches sb ON sb.branch_id = g.branch_id
+        WHERE sb.staff_id = $1 LIMIT 1`,
+      [accId],
+    );
+    expect(boCoAnh.length).toBe(1); // thiếu dữ liệu thì phải ĐỎ, không được đạt rỗng
+
     await client.query("SET LOCAL ROLE authenticated");
     await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${accId}", "role": "authenticated"}'`);
 
-    // SELECT photos phải trả về 0 dòng vì chính sách photos_select chặn accountant
-    const photosRes = await client.query("SELECT 1 FROM photos LIMIT 1");
+    // Không thấy một tấm nào của bộ đó, vì photos_select chặn accountant
+    const photosRes = await client.query(
+      "SELECT 1 FROM photos WHERE gallery_id = $1 LIMIT 1",
+      [boCoAnh[0].gallery_id],
+    );
     expect(photosRes.rows.length).toBe(0);
 
     await client.query("ROLLBACK");
@@ -325,6 +348,18 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     const assignedGalleryId = galleries[0].id;
     await client.query("UPDATE galleries SET editor_id = $1 WHERE id = $2", [ctvId, assignedGalleryId]);
 
+    // Bộ ảnh KHÔNG thuộc ctv này nhưng CÙNG chi nhánh, và chắc chắn có ảnh.
+    // Cùng chi nhánh mới là phép thử đúng: nếu luật quyền rò theo chi nhánh
+    // thay vì theo album được gán, chính bộ này sẽ lộ ra.
+    const { rows: boKhac } = await client.query(
+      `SELECT p.gallery_id FROM photos p
+         JOIN galleries g ON g.id = p.gallery_id
+        WHERE g.branch_id = $1 AND p.gallery_id <> $2 LIMIT 1`,
+      [staffBranch[0].branch_id, assignedGalleryId],
+    );
+    expect(boKhac.length).toBe(1); // thiếu dữ liệu thì phải ĐỎ, không được đạt rỗng
+    const boAnhCuaNhaKhac: string = boKhac[0].gallery_id;
+
     // Set role
     await client.query("SET LOCAL ROLE authenticated");
     await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${ctvId}", "role": "authenticated"}'`);
@@ -347,10 +382,15 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     expect(galRes.rows[0].id).toBe(assignedGalleryId);
 
     // Kiểm tra thấy photos của gallery được gán
-    const photoRes = await client.query("SELECT gallery_id FROM photos LIMIT 1");
-    for (const p of photoRes.rows) {
-      expect(p.gallery_id).toBe(assignedGalleryId);
-    }
+    // Neo vào một bộ ảnh CỤ THỂ không thuộc về ctv này và chắc chắn có ảnh.
+    // Bản cũ kéo cả bảng về rồi soát từng dòng: đúng ý nhưng mất 8,6 giây trên
+    // 152k ảnh. Bản "WHERE gallery_id <> $1" cũng không cứu được, vì câu trả
+    // lời là 0 dòng nên không có gì để dừng sớm — vẫn phải xét đủ 152k dòng.
+    const photoRes = await client.query(
+      "SELECT 1 FROM photos WHERE gallery_id = $1 LIMIT 1",
+      [boAnhCuaNhaKhac],
+    );
+    expect(photoRes.rows.length).toBe(0);
 
     await client.query("ROLLBACK");
   });
