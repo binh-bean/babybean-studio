@@ -42,6 +42,18 @@
  * Nên ở đây gắn theo bộ ảnh. Cũng đúng với quy trình chủ studio mô tả: cột
  * *link app* bên bảng Hậu Kỳ là **một dòng một buổi chụp**.
  *
+ * ---------------------------------------------------------------------------
+ * BB-132 — ghi thẳng sang cột *Link app* bên Lark
+ * ---------------------------------------------------------------------------
+ * Phần "gán lại vào cột link app" trước nay là CHÉP TAY: CSKH sao link trên
+ * màn hình rồi dán sang Lark. Mỗi lần chép tay là một lần có thể dán nhầm
+ * dòng, và dán nhầm nghĩa là khách A nhận link xem ảnh của khách B.
+ *
+ * Ghi sang Lark làm SAU khi link đã nằm trong cơ sở dữ liệu, và KHÔNG BAO GIỜ
+ * chặn phản hồi: `ghiLinkAppVeLark` không ném lỗi, mọi sự cố quy về một câu
+ * tiếng Việt trong `lark.lyDo`. Lark chết mà chặn luôn việc tạo link là làm cả
+ * studio đứng — CSKH vẫn phải cầm được link để dán tay.
+ *
  * Ý định của `0010` vẫn giữ được: KHÔNG đặt `expires_at`, nên link không hết
  * hạn. Cái `0010` muốn bỏ là hạn dùng, không phải là việc gắn theo bộ ảnh.
  *
@@ -58,6 +70,7 @@ import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requireRole, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiLinkAppVeLark, diaChiDayDu } from "@/lib/lark/ghi-link-app";
 
 export const runtime = "nodejs";
 
@@ -106,7 +119,10 @@ export async function POST(
     const admin = createAdminClient();
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, branch_id, customer_id, status, photo_count")
+      // lark_hauky_record_id: mã DÒNG Hậu Kỳ bên Lark, sẽ ghi link vào đúng
+      // dòng đó. Tên cột là `lark_hauky_record_id` chứ không phải
+      // `lark_record_id` — xem db/migrations/0027 và 0028.
+      .select("id, branch_id, customer_id, status, photo_count, lark_hauky_record_id")
       .eq("id", galleryId)
       .maybeSingle();
 
@@ -168,12 +184,65 @@ export async function POST(
       metadata: { shareLinkId: link.id, tokenPrefix: ma.slice(0, 6) },
     });
 
+    const duongDan = `/g/${ma}`;
+
+    // --- BB-132: gán link vào cột "Link app" của đúng dòng Hậu Kỳ ----------
+    //
+    // Sau khi link đã nằm trong cơ sở dữ liệu, không phải trước: ghi sang Lark
+    // một link chưa chắc tồn tại là tự tạo ra dòng Lark trỏ vào hư không.
+    const diaChi = diaChiDayDu(duongDan);
+    const lark: { ghiDuoc: boolean; lyDo?: string } = diaChi
+      ? // `ghiLinkAppVeLark` cam kết không ném lỗi, nhưng vẫn bọc `.catch` ở
+        // đây: link ĐÃ nằm trong cơ sở dữ liệu rồi, và một lỗi bất ngờ ở đoạn
+        // này sẽ biến thành 500, khiến CSKH không bao giờ nhìn thấy cái link
+        // vừa tạo — mà cũng không tạo lại được vì mã chỉ hiện đúng một lần.
+        await ghiLinkAppVeLark({
+          recordId: gallery.lark_hauky_record_id ?? "",
+          diaChi,
+          // Đường này ghi THẬT. Công tắc chạy thử `--that` nằm ở
+          // scripts/ghi-link-app-len-lark.ts, dành cho lúc soát trước khi mở.
+          ghiThat: true,
+        }).catch((err: unknown) => ({
+          ghiDuoc: false,
+          lyDo: `Không ghi được sang Lark: ${err instanceof Error ? err.message : String(err)}`,
+        }))
+      : {
+          ghiDuoc: false,
+          lyDo: "Thiếu NEXT_PUBLIC_APP_URL nên không dựng được địa chỉ đầy đủ để ghi sang Lark.",
+        };
+
+    // Nhật ký: SÁU ký tự đầu, không bao giờ cả mã — cùng luật với bản ghi
+    // share_link.created ở trên. Nhật ký đọc được rộng hơn bảng link nhiều.
+    console.info(
+      JSON.stringify({
+        evt: "share_link.lark_write",
+        requestId,
+        galleryId,
+        tokenPrefix: ma.slice(0, 6),
+        ghiDuoc: lark.ghiDuoc,
+        lyDo: lark.lyDo ?? null,
+      }),
+    );
+
     return ok({
       shareLinkId: link.id,
       // Trả về ĐƯỜNG DẪN, không phải địa chỉ đầy đủ: máy chủ không biết chắc
       // tên miền nào khách sẽ dùng, và đoán sai thì CSKH gửi đi một link chết.
-      duongDan: `/g/${ma}`,
+      duongDan,
       tokenPrefix: ma.slice(0, 6),
+      // Màn CSKH đọc hai trường này để nói "đã ghi sang Lark" hay "chưa ghi
+      // được, dán tay giúp" — hai câu dẫn tới hai việc khác hẳn nhau, nên
+      // không gộp thành một dòng chung chung được.
+      daGhiLark: lark.ghiDuoc,
+      lyDoKhongGhiLark: lark.ghiDuoc ? null : (lark.lyDo ?? null),
+      // Địa chỉ ĐÃ ghi sang Lark, chỉ có khi ghi được.
+      //
+      // Trả về để màn CSKH hiện ĐÚNG chuỗi khách sẽ nhận. Máy chủ ghép theo
+      // NEXT_PUBLIC_APP_URL còn trình duyệt ghép theo tên miền đang mở; hai
+      // cái lệch nhau (nhân viên vào bằng địa chỉ nội bộ chẳng hạn) thì CSKH
+      // đọc một link còn khách nhận một link khác, và khi khách báo lỗi thì
+      // không ai đối chiếu ra.
+      diaChiDaGhiLark: lark.ghiDuoc ? diaChi : null,
     });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền tạo link");
