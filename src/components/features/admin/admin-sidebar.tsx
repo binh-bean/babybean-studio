@@ -12,6 +12,7 @@ import {
   Settings,
   Store,
   AlertTriangle,
+  CloudOff,
   UserCog,
   ChevronLeft,
   ChevronRight
@@ -25,6 +26,10 @@ import {
  * mà bấm vào là trang trắng.
  *
  * `ownerOnly` theo docs/05-rbac.md §2: chỉ owner và admin đụng được nhân sự.
+ *
+ * `hiddenForRoles` là chiều ngược lại: mục ai cũng vào được TRỪ vài vai. Viết
+ * riêng thay vì liệt kê vai được phép, để thêm một vai mới sau này không âm
+ * thầm khoá mất mục của họ.
  */
 const navItems: {
   name: string;
@@ -32,6 +37,7 @@ const navItems: {
   icon: typeof LayoutDashboard;
   ready: boolean;
   ownerOnly?: boolean;
+  hiddenForRoles?: string[];
 }[] = [
   { name: "Bảng điều khiển", href: "/admin", icon: LayoutDashboard, ready: false },
   { name: "Quản lý bộ ảnh", href: "/admin/galleries", icon: Images, ready: true },
@@ -40,6 +46,13 @@ const navItems: {
     href: "/admin/reports/over-quota",
     icon: AlertTriangle,
     ready: true,
+  },
+  {
+    name: "Bộ ảnh lỗi tải",
+    href: "/admin/reports/loi-dong-bo",
+    icon: CloudOff,
+    ready: true,
+    hiddenForRoles: ["photoshop_ctv"],
   },
   { name: "Chi nhánh", href: "/admin/branches", icon: Store, ready: true },
   { name: "Nhân sự", href: "/admin/staff", icon: UserCog, ready: true, ownerOnly: true },
@@ -69,6 +82,7 @@ export function NavLinks({
     <nav className="space-y-1 p-2">
       {navItems.map((item) => {
         if (item.ownerOnly && !canSeeStaff) return null;
+        if (role && item.hiddenForRoles?.includes(role)) return null;
 
         const isActive =
           item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
