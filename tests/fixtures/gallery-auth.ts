@@ -16,6 +16,7 @@ export const AUTH_ACTION = "gallery.auth";
 export const TEST_PIN = "1234";
 
 export interface AuthFixtures {
+  runId: string;
   gid: string;
   pinLinkId: string;
   revId: string;
@@ -23,53 +24,66 @@ export interface AuthFixtures {
   customerBId: string;
   galleryBId: string;
   customerToken: string;
+  tokenNoPin: string;
+  tokenWithPin: string;
+  tokenRevoked: string;
+  tokenExpired: string;
+  tokenNoSelections: string;
+  tokenToRevoke: string;
 }
+
+let lastCreatedFixtures: AuthFixtures | null = null;
 
 export async function setupAuthFixtures(): Promise<AuthFixtures> {
   const admin = await createAdminClient();
 
-  // Dọn rác của lần chạy TRƯỚC, ngay từ đầu — không chỉ dọn ở afterAll.
-  //
-  // afterAll không chạy khi một lần chạy chết giữa chừng, và lần sau kế thừa
-  // nguyên đống rác đó: bộ ảnh cũ còn đấy, link cũ còn đấy, và các phép thử
-  // sau đọc nhầm sang dữ liệu của lần trước. Triệu chứng đúng như đã thấy ngày
-  // 12.09.2026: chạy riêng thì 14/14 đạt, chạy lại ngay sau đó thì 6 ca đỏ, và
-  // TẬP CA ĐỎ KHÁC NHAU giữa hai lần.
-  //
-  // Dọn hai đầu thì một lần chạy hỏng không kéo theo lần sau.
-  await admin.from("galleries").delete().like("title", "Fixture BB-030%");
-  await admin.from("activity_logs").delete().eq("action", AUTH_ACTION);
+  // Dọn rác của lần chạy TRƯỚC, nhưng CHỈ DỌN RÁC CŨ HƠN MỘT GIỜ.
+  // Không bao giờ dọn theo tiền tố chung của các tiến trình đang chạy song song.
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 
-  const tokensToClean = [
-    "token-no-pin",
-    "token-with-pin",
-    "token-revoked",
-    "token-expired",
-    "token-no-selections",
-    "token-to-revoke",
-  ];
-  const hashes = await Promise.all(
-    tokensToClean.map(async (t) => {
-      const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
-      return Buffer.from(b).toString("hex");
-    })
-  );
-  await admin.from("share_links").delete().in("token_hash", hashes);
+  const { data: oldGalleries, error: oldGalErr } = await admin
+    .from("galleries")
+    .select("id")
+    .like("title", "Fixture BB-030%")
+    .lt("created_at", oneHourAgo);
+  if (oldGalErr) throw oldGalErr;
+  if (oldGalleries && oldGalleries.length > 0) {
+    const { error: delGalErr } = await admin
+      .from("galleries")
+      .delete()
+      .in("id", oldGalleries.map((g) => g.id));
+    if (delGalErr) throw delGalErr;
+  }
 
-  // TỰ TẠO khách và buổi chụp của mình, không mượn của cơ sở dữ liệu.
-  //
-  // Hai bản trước đều mượn: bản đầu lấy "customers limit 2", bản sau lấy
-  // "shoots order by created_at limit 200". Cả hai đều chập chờn, và bản sau
-  // chập chờn vì một lý do rất dễ bỏ qua: đợt nhập dữ liệu thật tạo 435 buổi
-  // chụp trong vài giây, nên created_at TRÙNG NHAU hàng loạt. `order by` trên
-  // cột có hàng trăm giá trị bằng nhau thì Postgres trả thứ tự TUỲ Ý — mỗi lần
-  // chạy bốc trúng một cặp khách khác nhau, và các phép thử đỏ khác nhau.
-  //
-  // Ngày 12.09.2026: chạy riêng 14/14 đạt, chạy lại ngay sau đó 6 ca đỏ, tập
-  // ca đỏ đổi giữa hai lần. Đã thử vá bằng dọn rác đầu vào và IP ngẫu nhiên —
-  // không hết, vì cả hai đều không chạm gốc.
-  //
-  // Fixture tự dựng dữ liệu của mình thì không có gì để bốc trúng sai.
+  const { data: oldCusts, error: oldCustErr } = await admin
+    .from("customers")
+    .select("id")
+    .like("full_name", "Fixture BB-030%")
+    .lt("created_at", oneHourAgo);
+  if (oldCustErr) throw oldCustErr;
+  if (oldCusts && oldCusts.length > 0) {
+    const cids = oldCusts.map((c) => c.id);
+    const { error: delLinksErr } = await admin.from("share_links").delete().in("customer_id", cids);
+    if (delLinksErr) throw delLinksErr;
+
+    const { error: delShootsErr } = await admin.from("shoots").delete().in("customer_id", cids);
+    if (delShootsErr) throw delShootsErr;
+
+    const { error: delCustsErr } = await admin.from("customers").delete().in("id", cids);
+    if (delCustsErr) throw delCustsErr;
+  }
+
+  const { error: delLogsErr } = await admin
+    .from("activity_logs")
+    .delete()
+    .eq("action", AUTH_ACTION)
+    .lt("created_at", oneHourAgo);
+  if (delLogsErr) throw delLogsErr;
+
+  // Mỗi LẦN CHẠY mang một nhãn riêng biệt (8 ký tự ngẫu nhiên).
+  const runId = Math.random().toString(36).slice(2, 10);
+
+  // TỰ TẠO khách và buổi chụp mang nhãn runId.
   const { data: branch } = await admin.from("branches").select("id").order("name").limit(1).single();
   if (!branch) throw new Error("Cần ít nhất một chi nhánh, chạy npm run db:seed trước");
 
@@ -77,7 +91,7 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
     ["A", "B"].map(async (suffix) => {
       const { data: cust, error: custErr } = await admin
         .from("customers")
-        .insert({ branch_id: branch.id, full_name: `Fixture BB-030 Khách ${suffix}` })
+        .insert({ branch_id: branch.id, full_name: `Fixture BB-030 ${runId} Khách ${suffix}` })
         .select("id")
         .single();
       if (custErr || !cust) throw custErr ?? new Error("Không tạo được khách fixture");
@@ -109,9 +123,9 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
       branch_id: shootA.branch_id,
       customer_id: shootA.customer_id,
       baby_id: shootA.baby_id,
-      title: "Fixture BB-030",
+      title: `Fixture BB-030 ${runId} A`,
       status: "ready",
-      drive_folder_id: `fixture-bb030-${Date.now()}`,
+      drive_folder_id: `fixture-bb030-${runId}-a`,
       drive_folder_url: "https://drive.google.com/drive/folders/fixture",
     })
     .select("id")
@@ -124,18 +138,19 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
       branch_id: shootB.branch_id,
       customer_id: shootB.customer_id,
       baby_id: shootB.baby_id,
-      title: "Fixture BB-030 B",
+      title: `Fixture BB-030 ${runId} B`,
       status: "ready",
-      drive_folder_id: `fixture-b-${Date.now()}`,
+      drive_folder_id: `fixture-bb030-${runId}-b`,
       drive_folder_url: "https://drive.google.com/drive/folders/fixture",
     })
     .select("id")
     .single();
 
-  if (galErr || galErrB || !gallery || !galleryB) throw new Error("Không tạo được gallery fixture");
+  if (galErr || galErrB || !gallery || !galleryB) {
+    throw galErr ?? galErrB ?? new Error("Không tạo được gallery fixture");
+  }
 
-  async function createLink(tokenBase: string, options: Record<string, unknown>): Promise<string> {
-    const token = `${tokenBase}-${Date.now()}`;
+  async function createLink(token: string, options: Record<string, unknown>): Promise<string> {
     const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
     const { data, error } = await admin
       .from("share_links")
@@ -152,87 +167,91 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
       .single();
 
     if (error || !data) throw error ?? new Error(`Không tạo được share_link ${token}`);
-    return token;
-  }
-
-  async function createLegacyLink(token: string, options: Record<string, unknown>): Promise<string> {
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
-    const { data, error } = await admin
-      .from("share_links")
-      .insert({
-        gallery_id: gallery!.id,
-        token_hash: Buffer.from(buf).toString("hex"),
-        token_prefix: token.slice(0, 6),
-        role: "co_editor",
-        status: "active",
-        requires_pin: false,
-        ...options,
-      })
-      .select("id")
-      .single();
-
-    if (error || !data) throw error ?? new Error(`Không tạo được share_link ${token}`);
     return data.id;
   }
 
-  await createLegacyLink("token-no-pin", { role: "owner" });
-  const pinLinkId = await createLegacyLink("token-with-pin", {
+  const tokenNoPin = `token-no-pin-${runId}`;
+  await createLink(tokenNoPin, { role: "owner" });
+
+  const tokenWithPin = `token-with-pin-${runId}`;
+  const pinLinkId = await createLink(tokenWithPin, {
     requires_pin: true,
     pin_hash: await bcrypt.hash(TEST_PIN, 4),
   });
-  await createLegacyLink("token-revoked", { status: "revoked" });
-  await createLegacyLink("token-expired", {
+
+  const tokenRevoked = `token-revoked-${runId}`;
+  await createLink(tokenRevoked, { status: "revoked" });
+
+  const tokenExpired = `token-expired-${runId}`;
+  await createLink(tokenExpired, {
     expires_at: new Date(Date.now() - 60_000).toISOString(),
   });
-  await createLegacyLink("token-no-selections", {});
-  const revId = await createLegacyLink("token-to-revoke", {});
 
-  const customerToken = await createLink("customer-token", { customer_id: customerA, role: "owner" });
+  const tokenNoSelections = `token-no-selections-${runId}`;
+  await createLink(tokenNoSelections, {});
 
-  return { 
-    gid: gallery.id, 
-    pinLinkId, 
+  const tokenToRevoke = `token-to-revoke-${runId}`;
+  const revId = await createLink(tokenToRevoke, {});
+
+  const customerToken = `customer-token-${runId}`;
+  await createLink(customerToken, { customer_id: customerA, role: "owner" });
+
+  const fixtures: AuthFixtures = {
+    runId,
+    gid: gallery.id,
+    pinLinkId,
     revId,
     customerAId: customerA,
     customerBId: customerB,
     galleryBId: galleryB.id,
-    customerToken
+    customerToken,
+    tokenNoPin,
+    tokenWithPin,
+    tokenRevoked,
+    tokenExpired,
+    tokenNoSelections,
+    tokenToRevoke,
   };
+
+  lastCreatedFixtures = fixtures;
+  return fixtures;
 }
 
 /**
- * Dọn sạch fixture. Galleries cascade sang share_links và selections.
+ * Dọn sạch fixture của lần chạy này.
+ * Chỉ xoá dữ liệu mang nhãn / ID của chính mình, không đụng tới tiền tố chung.
  *
- * ---------------------------------------------------------------------------
- * Buổi chụp KHÔNG cascade theo khách — ghi chú cũ ở đây nói sai
- * ---------------------------------------------------------------------------
- * `shoots_customer_id_fkey` là `on delete NO ACTION`, nên chừng nào buổi chụp
- * còn thì Postgres CHẶN việc xoá khách. Supabase `.delete()` không ném lỗi và
- * bản cũ cũng không đọc `error`, nên lần dọn nào cũng "thành công" trong khi
- * không xoá được dòng nào.
- *
- * Đo ngày 14.09.2026: bb-dev tồn **138 khách** và **138 buổi chụp**
- * `Fixture BB-030` — mỗi lần chạy bộ test bồi thêm hai, suốt nhiều tuần.
- *
- * Xoá buổi chụp TRƯỚC, rồi mới tới khách. Và đọc `error` ở cả hai bước: một
- * lần dọn hỏng phải kêu lên, vì đúng chỗ im lặng này đã nuôi 138 dòng rác.
+ * Xoá buổi chụp TRƯỚC khi xoá khách, và đọc error ở mỗi bước:
+ * shoots.customer_id là on delete NO ACTION nên xoá khách bị chặn, mà
+ * Supabase .delete() không ném lỗi.
  */
-export async function cleanupAuthFixtures(): Promise<void> {
+export async function cleanupAuthFixtures(fixtures?: AuthFixtures): Promise<void> {
+  const target = fixtures ?? lastCreatedFixtures;
+  if (!target) return;
+
   const admin = await createAdminClient();
-  await admin.from("activity_logs").delete().eq("action", AUTH_ACTION);
-  await admin.from("galleries").delete().like("title", "Fixture BB-030%");
 
-  const { data: khach } = await admin
-    .from("customers")
-    .select("id")
-    .like("full_name", "Fixture BB-030 Khách%");
+  const custIds = [target.customerAId, target.customerBId].filter(Boolean);
+  if (custIds.length > 0) {
+    const { error: linkErr } = await admin.from("share_links").delete().in("customer_id", custIds);
+    if (linkErr) throw linkErr;
+  }
 
-  const ids = (khach ?? []).map((k) => k.id);
-  if (ids.length === 0) return;
+  const gids = [target.gid, target.galleryBId].filter(Boolean);
+  if (gids.length > 0) {
+    const { error: galErr } = await admin.from("galleries").delete().in("id", gids);
+    if (galErr) throw galErr;
+  }
 
-  const { error: loiShoot } = await admin.from("shoots").delete().in("customer_id", ids);
-  if (loiShoot) throw loiShoot;
+  if (custIds.length > 0) {
+    const { error: shootErr } = await admin.from("shoots").delete().in("customer_id", custIds);
+    if (shootErr) throw shootErr;
 
-  const { error: loiKhach } = await admin.from("customers").delete().in("id", ids);
-  if (loiKhach) throw loiKhach;
+    const { error: custErr } = await admin.from("customers").delete().in("id", custIds);
+    if (custErr) throw custErr;
+  }
+
+  if (target === lastCreatedFixtures) {
+    lastCreatedFixtures = null;
+  }
 }
