@@ -95,7 +95,7 @@ export async function GET(): Promise<Response> {
     const { data: rows, error } = await admin
       .from("galleries")
       .select(
-        "id, title, status, lark_contract_code, branch_id, drive_folder_url, " +
+        "id, title, status, lark_contract_codes, branch_id, drive_folder_url, " +
           "last_synced_at, sync_error, branch:branches(name)",
       )
       .not("sync_error", "is", null)
@@ -109,7 +109,11 @@ export async function GET(): Promise<Response> {
       id: string;
       title: string;
       status: string;
-      lark_contract_code: string | null;
+      // MẢNG, không phải một chuỗi: 0028 cho một thư mục ảnh gom nhiều hợp
+      // đồng (cùng nhà, chụp cùng buổi, hai gói khác nhau). Hôm nay chưa bộ
+      // gộp nào nằm trong nhóm lỗi, nên dùng cột số ít vẫn "chạy" — nhưng
+      // ngày nó lỗi thì CSKH chỉ thấy một trong hai mã và dán nhầm sang Lark.
+      lark_contract_codes: string[] | null;
       branch_id: string;
       drive_folder_url: string;
       last_synced_at: string | null;
@@ -131,7 +135,7 @@ export async function GET(): Promise<Response> {
       const item: LoiItem = {
         galleryId: r.id,
         galleryTitle: r.title,
-        contractCode: r.lark_contract_code,
+        contractCode: r.lark_contract_codes?.length ? r.lark_contract_codes.join(" + ") : null,
         branchId: r.branch_id,
         branchName: branch?.name ?? "—",
         driveFolderUrl: r.drive_folder_url,
