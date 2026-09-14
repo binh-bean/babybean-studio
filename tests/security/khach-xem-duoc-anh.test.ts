@@ -27,16 +27,16 @@ import { Client } from "pg";
 
 vi.mock("server-only", () => ({}));
 
-// Route lấy máy khách qua createServerClient(), vốn đọc cookie — và ngoài một
-// yêu cầu Next thật thì cookies() ném lỗi. Không giả lập chỗ này thì phép thử
-// dừng TRƯỚC bước xét quyền, mọi ca đều trả INTERNAL, và ca "không bị chặn"
-// xanh một cách vô nghĩa. Đã vấp đúng như vậy ở lượt chạy đầu.
+// KHÔNG giả lập máy khách cơ sở dữ liệu nữa.
 //
-// Thứ đang đo là LUẬT XÉT QUYỀN, không phải cách lấy cookie.
-vi.mock("@/lib/supabase/server", async () => {
-  const { createAdminClient } = await import("@/lib/supabase/admin");
-  return { createServerClient: async () => createAdminClient() };
-});
+// Bản đầu của phép thử này giả lập createServerClient() thành máy khách quản
+// trị "để đo luật xét quyền, không đo cách lấy cookie". Nó XANH — và che mất
+// đúng lỗi làm hỏng mọi thứ: route thật dùng máy khách theo phiên Supabase,
+// mà khách hàng không có phiên Supabase, nên RLS chặn sạch và mọi tấm ảnh trả
+// 404. Giả lập đã thay chính cái đang hỏng bằng một cái chạy được.
+//
+// Lỗi chỉ lộ ra khi mở thật một bộ ảnh bằng link khách. Giờ route dùng máy
+// khách quản trị thẳng, và phép thử chạy đúng đường thật.
 
 import * as staffAuth from "@/lib/auth/staff";
 import * as gallerySession from "@/lib/auth/gallery-session";

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { fail, failUnexpected } from "@/lib/api-response";
 import { THUMBNAIL_WIDTHS, type ThumbnailWidth } from "@/types/domain";
-import { createServerClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireStaff, requireBranch, AuthError } from "@/lib/auth/staff";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { driveFetch } from "@/lib/drive/client";
@@ -24,7 +24,19 @@ export async function GET(
     const width = parseWidth(new URL(request.url).searchParams.get("w"));
     if (!width) return fail("INVALID_INPUT", "Kích thước ảnh không hợp lệ");
 
-    const supabase = await createServerClient();
+    // Máy khách QUẢN TRỊ, không phải máy khách theo phiên Supabase.
+    //
+    // Khách hàng không có phiên Supabase — họ chỉ có cookie `bb_gs` do app
+    // tự ký. Dùng createServerClient() thì câu truy vấn chạy dưới quyền ẩn
+    // danh, RLS chặn sạch, và route trả "không tìm thấy ảnh" cho MỌI tấm.
+    //
+    // Đo thật ngày 14.09.2026: mở một bộ 1.235 ảnh đúng như khách thì cả
+    // 1.235 yêu cầu ảnh đều trả 404. Nhân viên không thấy lỗi này vì họ CÓ
+    // phiên Supabase — nên nó chỉ hỏng ở đúng phía khách.
+    //
+    // Đổi sang quyền quản trị thì RLS không còn che chắn, nên quyền xem phải
+    // do CHÍNH ĐOẠN MÃ dưới đây quyết — xem khối xét quyền ngay sau.
+    const supabase = createAdminClient();
     const { data: photo, error: photoErr } = await supabase
       .from("photos")
       // Phải gọi ĐÍCH DANH khoá ngoại photos_gallery_id_fkey.
