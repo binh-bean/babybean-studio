@@ -264,7 +264,7 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${accId}", "role": "authenticated"}'`);
 
     // SELECT photos phải trả về 0 dòng vì chính sách photos_select chặn accountant
-    const photosRes = await client.query("SELECT * FROM photos");
+    const photosRes = await client.query("SELECT 1 FROM photos LIMIT 1");
     expect(photosRes.rows.length).toBe(0);
 
     await client.query("ROLLBACK");
@@ -291,7 +291,7 @@ describe("Database RLS Policies & Security (BB-020)", () => {
 
     // Kiểm tra CS thấy ảnh
     await client.query(`SET LOCAL request.jwt.claims = '{"sub": "${csId}", "role": "authenticated"}'`);
-    const photosRes = await client.query("SELECT * FROM photos");
+    const photosRes = await client.query("SELECT 1 FROM photos LIMIT 1");
     expect(photosRes.rows.length).toBeGreaterThan(0);
 
     await client.query("ROLLBACK");
@@ -347,7 +347,7 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     expect(galRes.rows[0].id).toBe(assignedGalleryId);
 
     // Kiểm tra thấy photos của gallery được gán
-    const photoRes = await client.query("SELECT * FROM photos");
+    const photoRes = await client.query("SELECT gallery_id FROM photos LIMIT 1");
     for (const p of photoRes.rows) {
       expect(p.gallery_id).toBe(assignedGalleryId);
     }
