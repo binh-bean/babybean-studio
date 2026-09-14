@@ -86,8 +86,42 @@ for (const file of files) {
   // 5. Component hiển thị danh sách nhưng không lấy dữ liệu từ đâu và cũng
   //    không nhận qua props.
   const showsList = /\.map\s*\(\s*\(?\s*\w+/.test(code) && /<(table|tbody|ul|DataTable)\b/i.test(code);
-  const getsData = /fetch\s*\(|use[A-Z]\w*Query|props\.|\}\s*:\s*\{[^}]*\[\]/.test(code)
+  // Nhận mảng qua props, khai báo THẲNG trong chữ ký hàm.
+  const mangTrongChuKy = /\}\s*:\s*\{[^}]*\[\]/.test(code)
     || /\(\s*\{[^}]*\}\s*:\s*\{[\s\S]{0,400}\[\]/.test(code);
+
+  // Nhận mảng qua props, nhưng kiểu được ĐẶT TÊN RIÊNG.
+  //
+  // Cách viết này rất thường gặp, và bản đầu của luật 5 báo nhầm nó:
+  //
+  //     interface ReviewData { rounds: ReviewRound[] }
+  //     function ReviewPanel({ review }: { review: ReviewData }) { ... }
+  //
+  // Chữ ký hàm không có cặp ngoặc vuông nào nên biểu thức trên trượt, và bộ
+  // kiểm kết luận component "không có nguồn dữ liệu" — trong khi nó nhận dữ
+  // liệu qua props đàng hoàng.
+  //
+  // Một cổng báo nhầm thì lần sau người ta bỏ qua cả những lần nó báo đúng.
+  // Đúng chuyện vừa xảy ra: agent làm BB-129 phải dừng lại giải trình một
+  // cảnh báo không phải lỗi của mình.
+  // Xét TỪNG khối khai báo một, không quét trải dài.
+  //
+  // Bản đầu dùng một biểu thức lười chạy từ tên kiểu tới cặp ngoặc vuông gần
+  // nhất. Với hai kiểu nằm cạnh nhau:
+  //
+  //     interface ReviewRound { round: number; ... }
+  //     interface ReviewData  { rounds: ReviewRound[] }
+  //
+  // nó bắt được tên `ReviewRound` rồi nuốt luôn cả `ReviewData` — tức là ghi
+  // đúng cái tên KHÔNG được dùng làm props, và bỏ sót cái tên có dùng.
+  const kieuCoMang = [...code.matchAll(/(?:interface|type)\s+(\w+)[^{]*\{([^}]*)\}/g)]
+    .filter((m) => m[2].includes("[]"))
+    .map((m) => m[1]);
+  const mangQuaKieuDatTen = kieuCoMang.some((ten) =>
+    new RegExp("\\}\\s*:\\s*\\{[^}]*:\\s*" + ten + "\\b").test(code));
+
+  const getsData = /fetch\s*\(|use[A-Z]\w*Query|props\./.test(code)
+    || mangTrongChuKy || mangQuaKieuDatTen;
   if (showsList && !getsData) {
     report(file, "Hiển thị danh sách mà không có nguồn dữ liệu", "không fetch, không nhận qua props");
   }
