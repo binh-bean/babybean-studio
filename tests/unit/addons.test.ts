@@ -129,6 +129,8 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     if (selErr) throw selErr;
 
     session = {
+      // Link kiểu cũ gắn thẳng vào bộ ảnh nên không có khách nào kèm theo.
+      customerId: "",
       galleryId,
       shareLinkId,
       selectionId,

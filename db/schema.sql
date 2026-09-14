@@ -348,7 +348,9 @@ create table selections (
   updated_at      timestamptz not null default now()
 );
 
-create unique index uq_selections_share_link on selections(share_link_id);
+-- Một lượt chọn cho mỗi cặp (link, bộ ảnh), KHÔNG phải mỗi link: link gắn theo
+-- khách (0010) mở nhiều buổi chụp, mỗi buổi cần lượt chọn riêng — xem 0040.
+create unique index uq_selections_share_link_gallery on selections(share_link_id, gallery_id);
 create unique index uq_selections_primary on selections(gallery_id) where is_primary;
 create index idx_selections_gallery on selections(gallery_id);
 
