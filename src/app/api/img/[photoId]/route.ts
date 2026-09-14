@@ -3,6 +3,7 @@ import { fail, failUnexpected } from "@/lib/api-response";
 import { THUMBNAIL_WIDTHS, type ThumbnailWidth } from "@/types/domain";
 import { createServerClient } from "@/lib/supabase/server";
 import { requireStaff, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { driveFetch } from "@/lib/drive/client";
 
 export const runtime = "nodejs";
@@ -26,7 +27,18 @@ export async function GET(
     const supabase = await createServerClient();
     const { data: photo, error: photoErr } = await supabase
       .from("photos")
-      .select("drive_file_id, gallery_id, status, galleries!inner(branch_id)")
+      // Phải gọi ĐÍCH DANH khoá ngoại photos_gallery_id_fkey.
+      //
+      // Giữa photos và galleries có HAI khoá ngoại: photos.gallery_id trỏ sang
+      // galleries, và galleries.cover_photo_id trỏ ngược về photos. Viết
+      // `galleries!inner(...)` trần thì PostgREST không biết chọn đường nào và
+      // trả lỗi "more than one relationship was found" — câu truy vấn hỏng,
+      // route rơi vào nhánh NOT_FOUND, và MỌI người đều nhận "không tìm thấy
+      // ảnh", kể cả nhân viên.
+      // Một chuỗi liền, không nối bằng dấu cộng: Supabase suy kiểu kết quả từ
+      // CHÍNH chữ trong chuỗi này, nên chuỗi ghép làm mất kiểu và mọi trường
+      // phía sau thành lỗi biên dịch.
+      .select("drive_file_id, gallery_id, status, galleries!photos_gallery_id_fkey!inner(branch_id, customer_id)")
       .eq("id", photoId)
       .single();
 
@@ -34,19 +46,51 @@ export async function GET(
       return fail("NOT_FOUND", "Không tìm thấy ảnh");
     }
 
+    const gallery = (
+      Array.isArray(photo.galleries) ? photo.galleries[0] : photo.galleries
+    ) as unknown as { branch_id: string; customer_id: string | null } | undefined;
+
     try {
       const staff = await requireStaff();
-      const branchId = Array.isArray(photo.galleries)
-        ? photo.galleries[0]?.branch_id
-        : (photo.galleries as unknown as { branch_id: string })?.branch_id;
-      requireBranch(staff, branchId);
-    } catch (err) {
-      // TODO(BB-030): Implement customer auth using bb_gs cookie matching photo.gallery_id
-      // For now, if staff auth fails, block access.
-      if (err instanceof AuthError) {
-        return fail("FORBIDDEN", "Không có quyền truy cập ảnh");
+      // Không có chi nhánh thì không ai qua được cửa nhân viên. Truyền chuỗi
+      // rỗng cho `requireBranch` để nó từ chối, thay vì bỏ qua bước kiểm.
+      requireBranch(staff, gallery?.branch_id ?? "");
+    } catch (errNhanVien) {
+      if (!(errNhanVien instanceof AuthError)) return failUnexpected(errNhanVien, requestId);
+
+      // ---------------------------------------------------------------------
+      // Khách xem ảnh của CHÍNH MÌNH
+      // ---------------------------------------------------------------------
+      // Chỗ này từng là `TODO(BB-030)` kèm dòng "tạm thời, nhân viên không
+      // đăng nhập được thì chặn". Hậu quả không ai để ý suốt nhiều tháng: màn
+      // khách nạp MỌI tấm ảnh qua đúng đường này (`/api/img/<id>?w=...`), nên
+      // ba mẹ mở link ra sẽ thấy **không một tấm nào** — 403 toàn bộ.
+      //
+      // Không phép thử nào đỏ, không màn hình nào vỡ lúc dựng. Nó chỉ lộ ra
+      // vào đúng giây phút gửi link đầu tiên cho khách thật.
+      //
+      // Luật: quyền xem một tấm ảnh đến từ COOKIE PHIÊN ĐÃ KÝ, không bao giờ
+      // từ đường dẫn. Người gửi `photoId` không được quyết mình xem được gì.
+      try {
+        const session = await requireGallerySession();
+
+        const laLinkTheoBoAnh = session.galleryId !== "";
+        const duocXem = laLinkTheoBoAnh
+          ? // Link gắn theo bộ ảnh: tấm ảnh phải thuộc đúng bộ đã ký trong phiên.
+            session.galleryId === photo.gallery_id
+          : // Link gắn theo khách (cổng khách, BB-130): phiên chưa trỏ vào bộ
+            // nào, nên xét theo chủ sở hữu. `customer_id` rỗng hai đầu thì
+            // KHÔNG được coi là khớp — bằng không một bộ ảnh mồ côi sẽ mở cho
+            // bất kỳ phiên cổng khách nào.
+            !!session.customerId && session.customerId === gallery?.customer_id;
+
+        if (!duocXem) return fail("FORBIDDEN", "Không có quyền truy cập ảnh");
+      } catch (errKhach) {
+        if (errKhach instanceof GallerySessionError) {
+          return fail("FORBIDDEN", "Không có quyền truy cập ảnh");
+        }
+        return failUnexpected(errKhach, requestId);
       }
-      return failUnexpected(err, requestId);
     }
 
     const driveFileId = photo.drive_file_id;
