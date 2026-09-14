@@ -182,13 +182,35 @@ export function GalleryApp({ token }: GalleryAppProps) {
         extraAmount: gData.selection?.extraAmount ?? 0,
       });
 
-      // Tải danh sách ảnh
+      // Tải danh sách ảnh — TẤT CẢ, không chỉ trang đầu.
+      //
+      // Bản cũ gọi đúng một lần với limit=200 rồi dừng. Lúc viết, bộ ảnh mẫu
+      // nhiều nhất 35 tấm nên không ai chạm tới con số đó. Ngày 14.09.2026 kéo
+      // ảnh thật từ Drive về: trung bình 425 tấm một bộ, cao nhất 1.235, và
+      // 333/359 bộ vượt 200 — tức là 82.274 tấm khách sẽ KHÔNG BAO GIỜ nhìn
+      // thấy, mà cũng không có dấu hiệu gì cho biết còn ảnh ở phía sau.
+      //
+      // Khách trả tiền một buổi chụp rồi chỉ được chọn trong nửa số ảnh.
       setPhotosLoading(true);
-      const photosRes = await fetch("/api/g/photos?limit=200", { cache: "no-store" });
-      const photosJson = await photosRes.json().catch(() => null);
+      const tatCaAnh: PhotoPublic[] = [];
+      let cursor: string | undefined;
+      // Chặn trên để một lỗi con trỏ không thành vòng lặp vô tận: 1.235 tấm là
+      // bộ lớn nhất hiện có, 60 trang × 200 là dư gấp nhiều lần.
+      for (let trang = 0; trang < 60; trang++) {
+        const q = new URLSearchParams({ limit: "200" });
+        if (cursor) q.set("cursor", cursor);
+        const photosRes = await fetch(`/api/g/photos?${q}`, { cache: "no-store" });
+        const photosJson = await photosRes.json().catch(() => null);
+        if (!photosRes.ok || !Array.isArray(photosJson?.data)) break;
 
-      if (photosRes.ok && Array.isArray(photosJson?.data)) {
-        setPhotos(photosJson.data);
+        tatCaAnh.push(...photosJson.data);
+        // Hiện dần từng trang thay vì chờ trắng màn hình tới tấm cuối: bộ 1.235
+        // tấm mất vài giây, và vài giây nhìn vào trang trống là đủ để ba mẹ
+        // tưởng link hỏng.
+        setPhotos([...tatCaAnh]);
+
+        if (!photosJson.meta?.hasMore || !photosJson.meta?.cursor) break;
+        cursor = photosJson.meta.cursor;
       }
     } catch {
       setError({
