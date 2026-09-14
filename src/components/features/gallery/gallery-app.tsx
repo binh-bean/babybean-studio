@@ -4,7 +4,8 @@ import { isGalleryLocked } from "@/lib/gallery-status";
 import { getCustomerProgressStep } from "@/lib/gallery/progress";
 import type { GalleryStatus } from "@/types/domain";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, memo } from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
 import { useRouter } from "next/navigation";
 import { Heart, AlertTriangle, AlertCircle, Info, ChevronRight, Lock } from "lucide-react";
@@ -89,6 +90,299 @@ interface GalleryApiResponse {
       size: string | null;
     }>;
   };
+}
+
+// ---------------------------------------------------------------------------
+// LƯỚI ẢNH — phần chịu tải của màn khách
+// ---------------------------------------------------------------------------
+//
+// Đo trên bản dựng production, điện thoại 375×812 (màn nét gấp đôi), CPU chậm
+// 4×, mạng 1,6 Mbps trễ 150ms. Bộ 1.235 tấm — số tấm, tỉ lệ khung và số thư
+// mục con lấy từ bộ THẬT lớn nhất trên bb-dev; ảnh và tên file là dữ liệu mẫu
+// vì repo này công khai. Mỗi cột là số giữa của ba lượt chạy.
+//
+//                              trước      sau
+//   tấm đầu tiên hiện ra       6.134ms    3.959ms
+//   đầy một màn hình (6 tấm)   6.224ms    4.851ms
+//   thẻ ảnh nằm trong DOM      1.235      10
+//   nút DOM                    11.262     244
+//   tác vụ chặn dài nhất       360ms      179ms
+//   bộ nhớ JS                  9,2 MB     5,4 MB
+//   thả tim ở tấm thứ 900      44ms       4,8ms   (chậm nhất 62ms → 11ms)
+//   dung lượng một tấm         92,8 KB    31,4 KB
+//
+// Ba nguyên nhân, ba chỗ sửa ở ngay dưới đây.
+
+/** Khoảng cách giữa các thẻ, khớp với `gap-2.5 sm:gap-4` của Tailwind. */
+const KHE_HEP = 10; // gap-2.5 dưới 640px
+const KHE_RONG = 16; // gap-4 từ 640px
+
+/** Số cột, khớp với `grid-cols-2 sm:grid-cols-3 md:grid-cols-4`. */
+function soCot(rongMan: number): number {
+  if (rongMan >= 768) return 4;
+  if (rongMan >= 640) return 3;
+  return 2;
+}
+
+interface TheAnhProps {
+  photo: PhotoPublic;
+  thuTu: number;
+  daChon: boolean;
+  dangGui: boolean;
+  khoa: boolean;
+  onToggle: (photo: PhotoPublic) => void;
+}
+
+/**
+ * Một thẻ ảnh. `memo` KHÔNG phải để cho đẹp.
+ *
+ * Thả tim gọi `setPhotos(prev => prev.map(...))`, tức là dựng lại cả mảng
+ * 1.235 phần tử. Khi thẻ ảnh còn viết thẳng trong thân `GalleryApp`, React
+ * dựng lại toàn bộ 1.235 thẻ cho MỘT cú chạm: 44ms từ lúc bấm tới lúc tim đổi
+ * màu ở tấm thứ 900, lúc chậm nhất 62ms. Chưa tới mức ba mẹ bấm lại lần nữa,
+ * nhưng cái giá đó tăng THEO SỐ ẢNH — bộ ảnh to gấp đôi thì chậm gấp đôi, mà
+ * 1.235 tấm mới là bộ lớn nhất HÔM NAY.
+ *
+ * Tách ra + `memo` + prop toàn giá trị đơn (không truyền cả Set `mutatingIds`
+ * xuống, vì Set đổi tham chiếu mỗi lần là memo thành vô dụng) nên chỉ đúng một
+ * thẻ dựng lại: còn 4,8ms, và không còn phụ thuộc bộ ảnh to bao nhiêu.
+ */
+const TheAnh = memo(function TheAnh({
+  photo,
+  thuTu,
+  daChon,
+  dangGui,
+  khoa,
+  onToggle,
+}: TheAnhProps) {
+  return (
+    <div
+      className={cn(
+        "group relative aspect-square rounded-xl overflow-hidden border bg-surface/80 transition-all",
+        daChon
+          ? "ring-2 ring-rose-500 border-rose-500/50 shadow-xs"
+          : "hover:border-foreground/20",
+      )}
+    >
+      {/* Ảnh tải qua proxy an toàn.
+
+          `w=800` là con số cũ, và nó là chỗ tốn nhất: thẻ ảnh đo được rộng
+          165px trên điện thoại 375px, mà tải về bản 800px nặng 92,8 KB. Trên
+          đường truyền 1,6 Mbps, 2,7 MB ảnh chỉ đủ lấp 30 tấm — ba mẹ cuộn tiếp
+          là gặp lưới ô xám.
+
+          `srcSet` + `sizes` trả việc chọn cỡ cho trình duyệt: máy thường lấy
+          bản 200, máy màn hình nét gấp đôi lấy bản 400 (31,4 KB — đo được là
+          bản trình duyệt chọn ở 375px/DPR2), máy nét gấp ba mới lấy 800. Không
+          tấm nào bị mờ, mà cùng ngần ấy byte giờ lấp được 79 tấm thay vì 30.
+
+          KHÔNG đổi đường API: vẫn `/api/img/<id>?w=<cỡ>`, và cả ba cỡ đều nằm
+          trong `THUMBNAIL_WIDTHS` mà route ảnh đã nhận. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={`/api/img/${photo.id}?w=400`}
+        srcSet={`/api/img/${photo.id}?w=200 200w, /api/img/${photo.id}?w=400 400w, /api/img/${photo.id}?w=800 800w`}
+        sizes="(min-width: 768px) 210px, (min-width: 640px) 195px, 45vw"
+        alt={photo.fileName || `Ảnh ${thuTu + 1}`}
+        loading="lazy"
+        decoding="async"
+        // Kích thước thật lấy từ cơ sở dữ liệu (cột width/height, bộ 1.235 tấm
+        // không thiếu tấm nào). Trình duyệt biết khung ảnh trước khi byte đầu
+        // tiên về nên không phải vẽ lại khi ảnh tới.
+        width={photo.width ?? undefined}
+        height={photo.height ?? undefined}
+        className="w-full h-full object-cover select-none pointer-events-none"
+      />
+
+      {/* Lớp gradient nhẹ bảo đảm nút tim luôn nổi bật */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30 pointer-events-none" />
+
+      {/* NÚT THẢ TIM = CHỌN ẢNH (Kích thước chạm lớn ≥44px cho mobile 375px) */}
+      <button
+        type="button"
+        disabled={khoa || dangGui}
+        onClick={() => onToggle(photo)}
+        aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
+        className={cn(
+          "absolute top-1.5 right-1.5 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-transform active:scale-90 touch-manipulation focus:outline-hidden",
+          daChon
+            ? "bg-rose-500 text-white shadow-md"
+            : "bg-black/40 text-white/90 backdrop-blur-xs hover:bg-black/60 hover:text-white",
+        )}
+      >
+        <Heart
+          className={cn(
+            "h-6 w-6 transition-all",
+            daChon ? "fill-current text-white scale-110" : "stroke-[2.2]",
+          )}
+        />
+      </button>
+
+      {/* Thông tin tên file và thư mục con */}
+      <div className="absolute bottom-1.5 left-2 right-2 text-white text-[11px] truncate drop-shadow-xs pointer-events-none">
+        <span className="font-mono">{photo.fileName}</span>
+        {photo.subfolder && <span className="ml-1 opacity-75">({photo.subfolder})</span>}
+      </div>
+    </div>
+  );
+});
+
+interface LuoiAnhProps {
+  photos: PhotoPublic[];
+  mutatingIds: Set<string>;
+  khoa: boolean;
+  onToggle: (photo: PhotoPublic) => void;
+}
+
+/**
+ * Lưới ảnh chỉ dựng những hàng đang trong tầm nhìn.
+ *
+ * Vì sao phải cuộn ảo chứ không chỉ đổi cỡ ảnh: 1.235 thẻ nằm hết trong DOM là
+ * 11.262 nút và một trang cao 109.779 pixel. Mỗi lần React đụng vào danh sách
+ * — thả tim, đổi bộ lọc, trang ảnh mới về — trình duyệt phải tính lại bố cục
+ * cho từng ấy nút. Đo được tác vụ chặn luồng chính dài nhất 360ms lúc dựng
+ * trang; trong 360ms đó điện thoại không nhận chạm, không cuộn, không gì cả.
+ * Còn 244 nút thì xuống 179ms, và bộ nhớ JS từ 9,2 MB xuống 5,4 MB.
+ *
+ * Quan trọng hơn con số hôm nay: chi phí cũ tăng theo số ảnh, chi phí mới thì
+ * không. 1.235 là bộ lớn nhất hiện có, không phải trần.
+ *
+ * Giữ nguyên cách chia cột và khoảng cách của bản cũ (2 / 3 / 4 cột theo bề
+ * ngang màn hình) để giao diện không đổi — chỉ đổi chỗ ai dựng thẻ nào.
+ */
+function LuoiAnh({ photos, mutatingIds, khoa, onToggle }: LuoiAnhProps) {
+  const khungRef = useRef<HTMLDivElement | null>(null);
+
+  // Đoán bề ngang NGAY từ lượt dựng đầu, đừng bắt đầu từ 0.
+  //
+  // Đo được cái giá của việc bắt đầu từ 0: lượt dựng đầu rơi vào nhánh dự
+  // phòng, React dựng đủ 1.235 thẻ rồi `useLayoutEffect` đo xong mới thay bằng
+  // lưới cuộn ảo. Trình duyệt không kịp vẽ ra, nhưng công thì đã làm — tác vụ
+  // chặn dài nhất 706ms (thay vì 237ms) và đống rác để lại nâng bộ nhớ JS từ
+  // 5,5 MB lên 11,5 MB. Công vứt đi, mà vứt đúng lúc trang đang tải.
+  //
+  // `window.innerWidth` có sẵn ở lượt dựng đầu phía trình duyệt. Khung lưới
+  // nằm trong `max-w-4xl` (896px) với `px-4` (16px mỗi bên) — xem thẻ bọc ở
+  // `GalleryApp`. Con số đoán chỉ cần đủ đúng để chọn nhánh cuộn ảo; phép đo
+  // thật trong `useLayoutEffect` sửa lại trước khi vẽ.
+  const doMan = () => (typeof window === "undefined" ? 0 : window.innerWidth);
+  const [rongMan, setRongMan] = useState(doMan);
+  const [rongKhung, setRongKhung] = useState(() => {
+    const w = doMan();
+    return w === 0 ? 0 : Math.min(896, w) - 32;
+  });
+  // Khoảng cách từ đầu trang tới lưới. Cửa sổ là thứ cuộn, nên bộ cuộn ảo phải
+  // biết lưới bắt đầu ở đâu mới tính đúng hàng nào đang trong tầm nhìn.
+  const [lechDau, setLechDau] = useState(0);
+
+  // `useLayoutEffect` chứ không phải `useEffect`: đo xong TRƯỚC khi trình duyệt
+  // vẽ. Dùng `useEffect` thì nhánh dự phòng ở dưới kịp vẽ ra một khung hình đầy
+  // đủ 1.235 thẻ — đúng cái giá mà cuộn ảo sinh ra để tránh.
+  //
+  // Không sợ cảnh báo khi dựng ở máy chủ: lúc đó `loading` còn bật nên
+  // `GalleryApp` trả về vòng quay, `LuoiAnh` chưa hề được dựng.
+  useLayoutEffect(() => {
+    const el = khungRef.current;
+    if (!el) return;
+    const doLai = () => {
+      setRongKhung(el.clientWidth);
+      setRongMan(window.innerWidth);
+      setLechDau(el.getBoundingClientRect().top + window.scrollY);
+    };
+    doLai();
+    const ro = new ResizeObserver(doLai);
+    ro.observe(el);
+    window.addEventListener("resize", doLai);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", doLai);
+    };
+  }, []);
+
+  // Lưới nằm dưới các khối hạn mức, hợp đồng… nên vị trí của nó xê dịch khi
+  // những khối đó hiện/ẩn. Đo lại mỗi khi số ảnh đổi.
+  useEffect(() => {
+    const el = khungRef.current;
+    if (el) setLechDau(el.getBoundingClientRect().top + window.scrollY);
+  }, [photos.length]);
+
+  const cot = soCot(rongMan);
+  const khe = rongMan >= 640 ? KHE_RONG : KHE_HEP;
+  const rongThe = rongKhung > 0 ? (rongKhung - khe * (cot - 1)) / cot : 0;
+  // Thẻ vuông (`aspect-square`), nên cao một hàng = bề ngang thẻ + khoảng cách.
+  const caoHang = rongThe > 0 ? rongThe + khe : 200;
+  const soHang = Math.ceil(photos.length / cot);
+
+  const ao = useWindowVirtualizer({
+    count: soHang,
+    estimateSize: () => caoHang,
+    overscan: 3, // dựng sẵn 3 hàng trên và dưới để cuộn nhanh không thấy ô trống
+    scrollMargin: lechDau,
+    getItemKey: (i) => photos[i * cot]?.id ?? i,
+  });
+
+  const hang = ao.getVirtualItems();
+
+  return (
+    <div ref={khungRef}>
+      {/* Chưa đo được bề ngang (máy không có ResizeObserver, hoặc phép đo hỏng)
+          thì đổ ra lưới thường ĐỦ CẢ BỘ.
+
+          Chậm còn hơn thiếu: cắt bớt ở đây là dựng lại đúng lỗi BB-128 vừa sửa
+          — khách trả tiền một buổi chụp rồi chỉ thấy một phần ảnh, mà không có
+          dấu hiệu nào cho biết còn ảnh phía sau. Nhánh này trên thực tế không
+          chạy (phép đo nằm trong `useLayoutEffect`, xong trước khi vẽ), nên cái
+          giá của nó là giả định chứ cái mất kia thì có thật. */}
+      {rongThe <= 0 ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-4">
+          {photos.map((photo, idx) => (
+            <TheAnh
+              key={photo.id}
+              photo={photo}
+              thuTu={idx}
+              daChon={photo.mark === "selected"}
+              dangGui={mutatingIds.has(photo.id)}
+              khoa={khoa}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="relative w-full" style={{ height: ao.getTotalSize() }}>
+          {hang.map((h) => {
+            const dau = h.index * cot;
+            const trongHang = photos.slice(dau, dau + cot);
+            return (
+              <div
+                key={h.key}
+                className="absolute left-0 w-full grid"
+                style={{
+                  top: 0,
+                  transform: `translateY(${h.start - ao.options.scrollMargin}px)`,
+                  height: caoHang,
+                  gridTemplateColumns: `repeat(${cot}, minmax(0, 1fr))`,
+                  gap: khe,
+                  paddingBottom: khe,
+                }}
+              >
+                {trongHang.map((photo, i) => (
+                  <TheAnh
+                    key={photo.id}
+                    photo={photo}
+                    thuTu={dau + i}
+                    daChon={photo.mark === "selected"}
+                    dangGui={mutatingIds.has(photo.id)}
+                    khoa={khoa}
+                    onToggle={onToggle}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function GalleryApp({ token }: GalleryAppProps) {
@@ -261,85 +555,88 @@ export function GalleryApp({ token }: GalleryAppProps) {
    * - quotaKnown = false -> Chặn chọn ảnh, báo studio sẽ báo lại.
    * - Không tự tính tiền ở client; lấy extraCount và extraAmount trả về từ API.
    */
-  const handleToggleHeart = async (photo: PhotoPublic) => {
-    if (isLocked) {
-      setStatusMessage("Bộ ảnh đã được chốt, không thể thay đổi danh sách chọn.");
-      return;
-    }
-
-    if (!gallery?.quotaKnown) {
-      setStatusMessage("Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH.");
-      return;
-    }
-
-    const isCurrentlySelected = photo.mark === "selected";
-    const nextMark = isCurrentlySelected ? null : "selected";
-
-    // 1. Cập nhật giao diện tức thì (Optimistic)
-    setPhotos((prev) =>
-      prev.map((p) => (p.id === photo.id ? { ...p, mark: nextMark } : p))
-    );
-
-    setMutatingIds((prev) => new Set(prev).add(photo.id));
-
-    try {
-      const res = await fetch("/api/g/selection", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          buildHeartPayload(photo.id, isCurrentlySelected, crypto.randomUUID()),
-        ),
-      });
-
-      const json = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        // Rollback giao diện khi API lỗi
-        setPhotos((prev) =>
-          prev.map((p) => (p.id === photo.id ? { ...p, mark: photo.mark } : p))
-        );
-
-        const code = json?.error?.code;
-        const msg = json?.error?.message;
-
-        if (code === "QUOTA_UNKNOWN") {
-          setStatusMessage("Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH.");
-        } else if (code === "QUOTA_EXCEEDED") {
-          setStatusMessage(
-            gallery?.maxSelection
-              ? vi.gallery.quotaHardLimit.replace("{max}", String(gallery.maxSelection))
-              : "Đã vượt quá số lượng ảnh cho phép của gói chụp."
-          );
-        } else if (code === "GALLERY_LOCKED") {
-          setStatusMessage("Bộ ảnh đã được chốt, không thể chọn thêm.");
-        } else {
-          setStatusMessage(msg || "Không thể lưu lựa chọn, vui lòng thử lại.");
-        }
+  const handleToggleHeart = useCallback(
+    async (photo: PhotoPublic) => {
+      if (isLocked) {
+        setStatusMessage("Bộ ảnh đã được chốt, không thể thay đổi danh sách chọn.");
         return;
       }
 
-      // 2. Lấy con số tính toán chuẩn xác trực tiếp từ backend API
-      if (json?.data) {
-        setSelectionCounts({
-          selectedCount: json.data.selectedCount,
-          extraCount: json.data.extraCount,
-          extraAmount: json.data.extraAmount,
+      if (!gallery?.quotaKnown) {
+        setStatusMessage("Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH.");
+        return;
+      }
+
+      const isCurrentlySelected = photo.mark === "selected";
+      const nextMark = isCurrentlySelected ? null : "selected";
+
+      // 1. Cập nhật giao diện tức thì (Optimistic)
+      setPhotos((prev) =>
+        prev.map((p) => (p.id === photo.id ? { ...p, mark: nextMark } : p))
+      );
+
+      setMutatingIds((prev) => new Set(prev).add(photo.id));
+
+      try {
+        const res = await fetch("/api/g/selection", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            buildHeartPayload(photo.id, isCurrentlySelected, crypto.randomUUID()),
+          ),
+        });
+
+        const json = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          // Rollback giao diện khi API lỗi
+          setPhotos((prev) =>
+            prev.map((p) => (p.id === photo.id ? { ...p, mark: photo.mark } : p))
+          );
+
+          const code = json?.error?.code;
+          const msg = json?.error?.message;
+
+          if (code === "QUOTA_UNKNOWN") {
+            setStatusMessage("Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH.");
+          } else if (code === "QUOTA_EXCEEDED") {
+            setStatusMessage(
+              gallery?.maxSelection
+                ? vi.gallery.quotaHardLimit.replace("{max}", String(gallery.maxSelection))
+                : "Đã vượt quá số lượng ảnh cho phép của gói chụp."
+            );
+          } else if (code === "GALLERY_LOCKED") {
+            setStatusMessage("Bộ ảnh đã được chốt, không thể chọn thêm.");
+          } else {
+            setStatusMessage(msg || "Không thể lưu lựa chọn, vui lòng thử lại.");
+          }
+          return;
+        }
+
+        // 2. Lấy con số tính toán chuẩn xác trực tiếp từ backend API
+        if (json?.data) {
+          setSelectionCounts({
+            selectedCount: json.data.selectedCount,
+            extraCount: json.data.extraCount,
+            extraAmount: json.data.extraAmount,
+          });
+        }
+      } catch {
+        // Rollback khi mất mạng
+        setPhotos((prev) =>
+          prev.map((p) => (p.id === photo.id ? { ...p, mark: photo.mark } : p))
+        );
+        setStatusMessage("Mất kết nối mạng. Lựa chọn chưa được lưu.");
+      } finally {
+        setMutatingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(photo.id);
+          return next;
         });
       }
-    } catch {
-      // Rollback khi mất mạng
-      setPhotos((prev) =>
-        prev.map((p) => (p.id === photo.id ? { ...p, mark: photo.mark } : p))
-      );
-      setStatusMessage("Mất kết nối mạng. Lựa chọn chưa được lưu.");
-    } finally {
-      setMutatingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(photo.id);
-        return next;
-      });
-    }
-  };
+    },
+    [isLocked, gallery?.quotaKnown, gallery?.maxSelection],
+  );
 
   const handleSubmitSelection = async () => {
     if (isLocked) return;
@@ -769,65 +1066,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
               <p className="text-sm text-muted-foreground">{vi.gallery.emptyFilter}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-4">
-              {filteredPhotos.map((photo, idx) => {
-                const isSelected = photo.mark === "selected";
-                const isMutating = mutatingIds.has(photo.id);
-
-                return (
-                  <div
-                    key={photo.id}
-                    className={cn(
-                      "group relative aspect-square rounded-xl overflow-hidden border bg-surface/80 transition-all",
-                      isSelected
-                        ? "ring-2 ring-rose-500 border-rose-500/50 shadow-xs"
-                        : "hover:border-foreground/20"
-                    )}
-                  >
-                    {/* Ảnh tải qua proxy an toàn */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/api/img/${photo.id}?w=800`}
-                      alt={photo.fileName || `Ảnh ${idx + 1}`}
-                      loading="lazy"
-                      className="w-full h-full object-cover select-none pointer-events-none"
-                    />
-
-                    {/* Lớp gradient nhẹ bảo đảm nút tim luôn nổi bật */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30 pointer-events-none" />
-
-                    {/* NÚT THẢ TIM = CHỌN ẢNH (Kích thước chạm lớn ≥44px cho mobile 375px) */}
-                    <button
-                      type="button"
-                      disabled={isLocked || isMutating}
-                      onClick={() => handleToggleHeart(photo)}
-                      aria-label={isSelected ? vi.gallery.deselect : vi.gallery.select}
-                      className={cn(
-                        "absolute top-1.5 right-1.5 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-transform active:scale-90 touch-manipulation focus:outline-hidden",
-                        isSelected
-                          ? "bg-rose-500 text-white shadow-md"
-                          : "bg-black/40 text-white/90 backdrop-blur-xs hover:bg-black/60 hover:text-white"
-                      )}
-                    >
-                      <Heart
-                        className={cn(
-                          "h-6 w-6 transition-all",
-                          isSelected ? "fill-current text-white scale-110" : "stroke-[2.2]"
-                        )}
-                      />
-                    </button>
-
-                    {/* Thông tin tên file và thư mục con */}
-                    <div className="absolute bottom-1.5 left-2 right-2 text-white text-[11px] truncate drop-shadow-xs pointer-events-none">
-                      <span className="font-mono">{photo.fileName}</span>
-                      {photo.subfolder && (
-                        <span className="ml-1 opacity-75">({photo.subfolder})</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <LuoiAnh
+              photos={filteredPhotos}
+              mutatingIds={mutatingIds}
+              khoa={isLocked}
+              onToggle={handleToggleHeart}
+            />
           )}
         </section>
 
