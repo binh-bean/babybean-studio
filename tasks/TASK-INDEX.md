@@ -151,6 +151,7 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-120 | Màn quản trị mở báo cáo thất thoát: API lọc chi nhánh, trang, mục menu | PM | BB-106 | high | ✅ **DONE** — `0031`, 5 test kèm đối chứng cách ly chi nhánh |
 | BB-121 | Vòng duyệt ảnh đã chỉnh: CSKH gửi file, khách duyệt hoặc đòi sửa, lặp lại | PM | BB-114 | high | ✅ **DONE** — `0032`-`0034`, 9 test |
 | BB-132 | Ghi link app ngược về cột "Link app" bên Lark Bitable (PUT .../records/{id}) khi tạo share-link, có cờ chạy thử `--that`, fail-safe khi Lark lỗi | DEV-INT | BB-127 | med | ⏳ **DOING** — `src/lib/lark/ghi-link-app.ts`, route share-link, màn CSKH, script `npm run lark:ghi-link`, 21 test. **BLOCKED**: bảng Hậu Kỳ bên Lark chưa có cột "Link app" (xem `tasks/BLOCKERS.md`), nên chưa ghi thật được lần nào |
+| BB-136 | Hết chập chờn khi nhiều người chạy phép thử cùng lúc: nhãn runId ngẫu nhiên, dọn đúng nhãn mình, dọn rác cũ > 1 giờ | QA-BOT | BB-030 | med | ✅ **DONE** |
 | BB-119 | ~~Hợp nhất hai bản BB-111~~ — chủ studio chốt giữ bản PM, INT làm riêng BB-097 | — | — | — | 🚫 **HUỶ** |
 
 ---
