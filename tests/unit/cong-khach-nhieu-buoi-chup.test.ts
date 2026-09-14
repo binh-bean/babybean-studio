@@ -34,7 +34,8 @@ import {
   signGallerySession,
 } from "@/lib/auth/gallery-session";
 
-const NHAN_FIXTURE = "Fixture BB-130";
+const runId = Math.random().toString(36).slice(2, 10);
+const NHAN_FIXTURE = `Fixture BB-130 ${runId}`;
 
 describe("BB-130: cổng khách, một link nhiều buổi chụp", () => {
   let client: Client;
@@ -56,11 +57,11 @@ describe("BB-130: cổng khách, một link nhiều buổi chụp", () => {
   const bam = (s: string) => createHash("sha256").update(s).digest("hex");
 
   /**
-   * Mỗi lần chạy một dải IP riêng. Bộ giới hạn tần suất đếm theo IP trong 15
+   * Mỗi lần chạy một dải IP riêng kết hợp PID. Bộ giới hạn tần suất đếm theo IP trong 15
    * phút, nên IP cố định mang sẵn lịch sử của lần chạy trước — đúng bệnh đã
    * ghi trong tests/security/gallery-auth.test.ts.
    */
-  const ipRun = `10.${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 254) + 1}`;
+  const ipRun = `10.${((process.pid ?? 1) % 200) + 1}.${Math.floor(Math.random() * 250) + 1}`;
   let demIp = 0;
 
   async function themKhach(ten: string): Promise<string> {
@@ -138,9 +139,9 @@ describe("BB-130: cổng khách, một link nhiều buổi chụp", () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
 
-    // Dọn rác của lần chạy TRƯỚC ngay từ đầu: afterAll không chạy khi một lần
-    // chạy chết giữa chừng, và lần sau sẽ đọc nhầm sang dữ liệu cũ.
-    await donDep(client);
+    // Dọn rác của lần chạy TRƯỚC bị chết giữa chừng, nhưng CHỈ DỌN RÁC CŨ HƠN MỘT GIỜ.
+    // Không bao giờ dọn theo tiền tố chung vì sẽ giẫm vào tiến trình khác đang chạy song song.
+    await donDepRacCu(client);
 
     const { rows: br } = await client.query("select id from branches order by name limit 1");
     if (!br[0]) throw new Error("Cần ít nhất một chi nhánh, chạy npm run db:seed trước");
@@ -166,6 +167,25 @@ describe("BB-130: cổng khách, một link nhiều buổi chụp", () => {
     }
   });
 
+  /** Dọn rác chết dở của những lần chạy cũ hơn 1 giờ. */
+  async function donDepRacCu(c: Client): Promise<void> {
+    await c.query(
+      `delete from share_links where customer_id in
+         (select id from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '1 hour')`,
+    );
+    await c.query(
+      `delete from galleries where title like 'Fixture BB-130%' and created_at < now() - interval '1 hour'`,
+    );
+    await c.query(
+      `delete from shoots where customer_id in
+         (select id from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '1 hour')`,
+    );
+    await c.query(
+      `delete from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '1 hour'`,
+    );
+  }
+
+  /** Dọn dẹp chỉ đúng nhãn của lần chạy này. */
   async function donDep(c: Client): Promise<void> {
     await c.query(
       `delete from share_links where customer_id in
