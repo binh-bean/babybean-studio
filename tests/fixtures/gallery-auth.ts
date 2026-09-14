@@ -200,11 +200,39 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
   };
 }
 
-/** Galleries cascade to share_links and selections, so one delete is enough. */
+/**
+ * Dọn sạch fixture. Galleries cascade sang share_links và selections.
+ *
+ * ---------------------------------------------------------------------------
+ * Buổi chụp KHÔNG cascade theo khách — ghi chú cũ ở đây nói sai
+ * ---------------------------------------------------------------------------
+ * `shoots_customer_id_fkey` là `on delete NO ACTION`, nên chừng nào buổi chụp
+ * còn thì Postgres CHẶN việc xoá khách. Supabase `.delete()` không ném lỗi và
+ * bản cũ cũng không đọc `error`, nên lần dọn nào cũng "thành công" trong khi
+ * không xoá được dòng nào.
+ *
+ * Đo ngày 14.09.2026: bb-dev tồn **138 khách** và **138 buổi chụp**
+ * `Fixture BB-030` — mỗi lần chạy bộ test bồi thêm hai, suốt nhiều tuần.
+ *
+ * Xoá buổi chụp TRƯỚC, rồi mới tới khách. Và đọc `error` ở cả hai bước: một
+ * lần dọn hỏng phải kêu lên, vì đúng chỗ im lặng này đã nuôi 138 dòng rác.
+ */
 export async function cleanupAuthFixtures(): Promise<void> {
   const admin = await createAdminClient();
   await admin.from("activity_logs").delete().eq("action", AUTH_ACTION);
   await admin.from("galleries").delete().like("title", "Fixture BB-030%");
-  // Khách và buổi chụp fixture cũng phải dọn — buổi chụp cascade theo khách.
-  await admin.from("customers").delete().like("full_name", "Fixture BB-030 Khách%");
+
+  const { data: khach } = await admin
+    .from("customers")
+    .select("id")
+    .like("full_name", "Fixture BB-030 Khách%");
+
+  const ids = (khach ?? []).map((k) => k.id);
+  if (ids.length === 0) return;
+
+  const { error: loiShoot } = await admin.from("shoots").delete().in("customer_id", ids);
+  if (loiShoot) throw loiShoot;
+
+  const { error: loiKhach } = await admin.from("customers").delete().in("id", ids);
+  if (loiKhach) throw loiKhach;
 }
