@@ -437,7 +437,19 @@ export interface Setting {
 
 /** Payload of the signed `bb_gs` cookie. Never trust IDs from the request body. */
 export interface GallerySession {
+  /**
+   * Buổi chụp phiên đang trỏ tới. RỖNG khi link gắn theo khách và ba mẹ chưa
+   * chọn buổi nào — lúc đó chỉ có `customerId` là dùng được (BB-130).
+   */
   galleryId: string;
+  /**
+   * Khách sở hữu link. RỖNG với link kiểu cũ (gắn theo bộ ảnh).
+   *
+   * Trường này từng bị ký vào cookie qua một ép kiểu `as any` vì kiểu ở đây
+   * chưa có nó — nên trình biên dịch không hề canh chỗ nào đọc ra. Khai báo
+   * thật thì mọi chỗ lọc "chỉ của khách này" đều được kiểm lúc biên dịch.
+   */
+  customerId: string;
   shareLinkId: string;
   selectionId: string;
   role: ShareRole;

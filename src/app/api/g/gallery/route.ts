@@ -8,6 +8,21 @@ import { getGalleryContractSummary } from "@/lib/selection/contract";
 export async function GET() {
   try {
     const session = await requireGallerySession();
+
+    // Phiên của link gắn theo khách, chưa chọn buổi chụp nào (BB-130).
+    //
+    // Không có bộ ảnh để trả, và nếu cứ chạy tiếp thì `.eq("id", "")` ném lỗi
+    // uuid từ Postgres — tức là màn hình khách nhận "có lỗi xảy ra" đúng vào
+    // lúc đáng lẽ phải mời họ chọn buổi chụp.
+    //
+    // `canChonBuoiChup` là dấu hiệu để màn hình rẽ sang danh sách buổi chụp
+    // mà không phải đoán qua câu chữ của thông báo lỗi.
+    if (!session.galleryId) {
+      return fail("NOT_FOUND", "Ba mẹ chọn giúp buổi chụp muốn xem", {
+        canChonBuoiChup: true,
+      });
+    }
+
     const supabase = await createAdminClient();
 
     const { data: gallery, error: galleryError } = await supabase

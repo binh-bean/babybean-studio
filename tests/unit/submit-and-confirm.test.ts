@@ -157,6 +157,8 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
     if (photoErr) throw photoErr;
 
     const session: GallerySession = {
+      // Link kiểu cũ gắn thẳng vào bộ ảnh nên không có khách nào kèm theo.
+      customerId: "",
       galleryId,
       shareLinkId,
       selectionId,

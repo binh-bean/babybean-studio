@@ -4,6 +4,7 @@ import { isGalleryLocked } from "@/lib/gallery-status";
 import { getCustomerProgressStep } from "@/lib/gallery/progress";
 import type { GalleryStatus } from "@/types/domain";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
+import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
 import { useRouter } from "next/navigation";
@@ -98,6 +99,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  /**
+   * Phiên đang là link gắn theo KHÁCH và chưa chọn buổi chụp nào (BB-130).
+   *
+   * Không phải một màn hình khác: cùng một link, chỉ là ba mẹ phải nói muốn
+   * xem buổi nào trước. Chọn xong thì cờ này tắt và mọi thứ phía dưới chạy y
+   * như link kiểu cũ.
+   */
+  const [phaiChonBuoiChup, setPhaiChonBuoiChup] = useState(false);
+
   const [gallery, setGallery] = useState<GalleryApiResponse | null>(null);
   const [photos, setPhotos] = useState<PhotoPublic[]>([]);
   const [filter, setFilter] = useState<"all" | "selected" | "unselected">("all");
@@ -125,6 +135,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
     try {
       setLoading(true);
       setError(null);
+      setPhaiChonBuoiChup(false);
 
       let res = await fetch("/api/g/gallery", { cache: "no-store" });
 
@@ -144,6 +155,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
         }
 
         if (authRes.ok) {
+          // Link gắn theo KHÁCH: phiên vừa ký chưa trỏ vào bộ ảnh nào, vì một
+          // khách có nhiều buổi chụp (BB-130). Hỏi ba mẹ trước đã.
+          if (!authData?.data?.galleryId && authData?.data?.customerId) {
+            setPhaiChonBuoiChup(true);
+            setLoading(false);
+            return;
+          }
           // Thử gọi lại gallery sau khi đã có cookie phiên
           res = await fetch("/api/g/gallery", { cache: "no-store" });
         } else {
@@ -163,6 +181,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
         const code = json?.error?.code || "INTERNAL";
         if (code === "PIN_REQUIRED") {
           router.push(`/g/${token}/pin`);
+          return;
+        }
+        // Ba mẹ quay lại bằng cookie còn hạn của link theo khách, nhưng phiên
+        // chưa trỏ vào buổi nào — mời chọn lại thay vì hiện màn lỗi (BB-130).
+        if (json?.error?.details?.canChonBuoiChup) {
+          setPhaiChonBuoiChup(true);
+          setLoading(false);
           return;
         }
         setError({
@@ -498,6 +523,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
         <p className="text-sm text-muted-foreground">{vi.common.loading}</p>
       </div>
     );
+  }
+
+  // Link theo khách: hỏi buổi chụp trước khi hiện lưới ảnh. Đặt TRƯỚC nhánh
+  // lỗi bên dưới, vì lúc này `gallery` còn rỗng — rơi xuống đó là ba mẹ nhận
+  // "không tìm thấy album" đúng vào lúc album của họ vẫn còn nguyên.
+  if (phaiChonBuoiChup) {
+    return <DanhSachBuoiChup onDaChonBuoi={() => void loadGallery()} />;
   }
 
   if (error || !gallery) {

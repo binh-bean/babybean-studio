@@ -199,6 +199,8 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
     if (photoErr) throw photoErr;
 
     const session: GallerySession = {
+      // Link kiểu cũ gắn thẳng vào bộ ảnh nên không có khách nào kèm theo.
+      customerId: "",
       galleryId,
       shareLinkId,
       selectionId,

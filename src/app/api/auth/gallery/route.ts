@@ -156,13 +156,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // One selection per share link, created on first successful entry rather
     // than at gallery creation: BB-065 mints new share links later and they
     // would otherwise arrive without one.
-    // BUT only for legacy gallery links! Customer portal links have no specific gallery.
+    //
+    // Link gắn theo khách thì chưa biết buổi chụp nào, nên chưa tạo được lượt
+    // chọn ở đây. Ba mẹ chọn buổi ở `/api/g/buoi-chup`, và lượt chọn sinh ra ở
+    // đó (BB-130) — mỗi buổi chụp một lượt riêng.
     let selectionId = "";
     if (isLegacy && link.gallery_id) {
       const { data: existing } = await admin
         .from("selections")
         .select("id")
+        // Khoá thêm theo bộ ảnh: từ 0040 một link có thể mang nhiều lượt chọn,
+        // nên tìm theo mỗi link là có ngày bốc trúng lượt chọn của buổi khác.
         .eq("share_link_id", link.id)
+        .eq("gallery_id", link.gallery_id)
         .maybeSingle();
 
       if (existing) {
@@ -194,8 +200,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       shareLinkId: link.id,
       selectionId,
       role: link.role as ShareRole,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    });
 
     const response = ok({
       customerId: link.customer_id || "",
