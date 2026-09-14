@@ -19,7 +19,7 @@ import {
   SESSION_COOKIE,
 } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { setupAuthFixtures, cleanupAuthFixtures } from "../fixtures/gallery-auth";
+import { setupAuthFixtures, cleanupAuthFixtures, type AuthFixtures } from "../fixtures/gallery-auth";
 
 describe("BB-030 - POST /api/auth/gallery", () => {
   let gid: string;
@@ -28,19 +28,20 @@ describe("BB-030 - POST /api/auth/gallery", () => {
   let customerAId: string;
   let galleryBId: string;
   let customerToken: string;
+  let fixtures: AuthFixtures;
 
   beforeAll(async () => {
-    const res = await setupAuthFixtures();
-    gid = res.gid;
-    revId = res.revId;
-    pinLinkId = res.pinLinkId;
-    customerAId = res.customerAId;
-    galleryBId = res.galleryBId;
-    customerToken = res.customerToken;
+    fixtures = await setupAuthFixtures();
+    gid = fixtures.gid;
+    revId = fixtures.revId;
+    pinLinkId = fixtures.pinLinkId;
+    customerAId = fixtures.customerAId;
+    galleryBId = fixtures.galleryBId;
+    customerToken = fixtures.customerToken;
   });
 
   afterAll(async () => {
-    if (gid) await cleanupAuthFixtures();
+    if (fixtures) await cleanupAuthFixtures(fixtures);
   });
 
   /**
@@ -58,7 +59,7 @@ describe("BB-030 - POST /api/auth/gallery", () => {
    *
    * Dải ngẫu nhiên mỗi lần chạy thì không lần nào giẫm lên lần nào.
    */
-  const ipRun = `10.${Math.floor(Math.random() * 254) + 1}.${Math.floor(Math.random() * 254) + 1}`;
+  const ipRun = `10.${((process.pid ?? 1) % 200) + 1}.${Math.floor(Math.random() * 250) + 1}`;
   let ipCounter = 0;
   async function postAuth(token: string, pin?: string) {
     ipCounter += 1;
@@ -75,34 +76,34 @@ describe("BB-030 - POST /api/auth/gallery", () => {
   }
 
   it("Ca 1: token đúng, không cần PIN -> ký được phiên", async () => {
-    const { res } = await postAuth("token-no-pin");
+    const { res } = await postAuth(fixtures.tokenNoPin);
     expect(res.status).toBe(200);
     expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
   });
 
   it("Ca 2: token đúng + PIN đúng -> ký được phiên", async () => {
-    const { res, body } = await postAuth("token-with-pin", "1234");
+    const { res, body } = await postAuth(fixtures.tokenWithPin, "1234");
     expect(res.status).toBe(200);
     expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
     expect(body.data.galleryId).toBe(gid);
   });
 
   it("Ca 3: PIN sai -> PIN_INVALID và failed_attempts tăng", async () => {
-    const { res, body } = await postAuth("token-with-pin", "9999");
+    const { res, body } = await postAuth(fixtures.tokenWithPin, "9999");
     expect(res.status).toBe(401);
     expect(body.error.code).toBe("PIN_INVALID");
     expect(body.error.details.remainingAttempts).toBe(4);
   });
 
   it("Ca 4: sai lần thứ 5 -> PIN_LOCKED", async () => {
-    for (let i = 0; i < 3; i++) await postAuth("token-with-pin", "9999");
-    const { res, body } = await postAuth("token-with-pin", "9999");
+    for (let i = 0; i < 3; i++) await postAuth(fixtures.tokenWithPin, "9999");
+    const { res, body } = await postAuth(fixtures.tokenWithPin, "9999");
     expect(res.status).toBe(429);
     expect(body.error.code).toBe("PIN_LOCKED");
   });
 
   it("Ca 5: đang bị khoá -> PIN_LOCKED kể cả khi PIN đúng", async () => {
-    const { res, body } = await postAuth("token-with-pin", "1234");
+    const { res, body } = await postAuth(fixtures.tokenWithPin, "1234");
     expect(res.status).toBe(429);
     expect(body.error.code).toBe("PIN_LOCKED");
   });
@@ -116,20 +117,20 @@ describe("BB-030 - POST /api/auth/gallery", () => {
       .update({ locked_until: new Date(Date.now() - 1000).toISOString(), failed_attempts: 5 })
       .eq("id", pinLinkId);
 
-    const { res, body } = await postAuth("token-with-pin", "9999");
+    const { res, body } = await postAuth(fixtures.tokenWithPin, "9999");
     expect(res.status).toBe(401);
     expect(body.error.code).toBe("PIN_INVALID");
     expect(body.error.details.remainingAttempts).toBe(4);
   });
 
   it("Ca 6: link đã thu hồi -> NOT_FOUND", async () => {
-    const { res, body } = await postAuth("token-revoked");
+    const { res, body } = await postAuth(fixtures.tokenRevoked);
     expect(res.status).toBe(404);
     expect(body.error.code).toBe("NOT_FOUND");
   });
 
   it("Ca 7: expires_at ở quá khứ nhưng status vẫn 'active' -> NOT_FOUND", async () => {
-    const { res, body } = await postAuth("token-expired");
+    const { res, body } = await postAuth(fixtures.tokenExpired);
     expect(res.status).toBe(404);
     expect(body.error.code).toBe("NOT_FOUND");
   });
@@ -141,7 +142,7 @@ describe("BB-030 - POST /api/auth/gallery", () => {
   });
 
   it("Ca 9: share_link chưa có selection -> tạo mới rồi ký phiên", async () => {
-    const { res } = await postAuth("token-no-selections");
+    const { res } = await postAuth(fixtures.tokenNoSelections);
     expect(res.status).toBe(200);
 
     const admin = await createAdminClient();
