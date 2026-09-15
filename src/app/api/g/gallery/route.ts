@@ -192,6 +192,19 @@ export async function GET() {
     const finalExtraCount = hasSnapshot ? (selection?.snapshot_extra_count ?? 0) : extraCount;
     const finalExtraAmount = hasSnapshot ? (selection?.snapshot_extra_amount ?? 0) : extraAmount;
 
+    // BB-156: tổng dung lượng ảnh của bộ này. Cộng ở máy chủ vì màn khách chỉ
+    // tải về từng trang ảnh một — cộng ở trình duyệt là ra số của trang đang
+    // xem, không phải của cả bộ.
+    const { data: dungLuong } = await supabase
+      .from("photos")
+      .select("size_bytes")
+      .eq("gallery_id", session.galleryId)
+      .eq("status", "active");
+    const tongDungLuong = (dungLuong ?? []).reduce(
+      (t: number, r: { size_bytes: number | null }) => t + Number(r.size_bytes ?? 0),
+      0,
+    );
+
     const responseData = {
       id: gallery.id,
       title: gallery.title,
@@ -205,6 +218,9 @@ export async function GET() {
         zaloOa: (gallery.branch as unknown as { zalo_oa: string }[])?.[0]?.zalo_oa || (gallery.branch as unknown as { zalo_oa: string })?.zalo_oa
       },
       photoCount: gallery.photo_count,
+      // BB-156: tổng dung lượng ảnh, để màn khách nói trước "bộ này nặng 6,7 GB"
+      // chứ đừng để ba mẹ bấm tải rồi mới biết máy không đủ chỗ.
+      tongDungLuongAnh: tongDungLuong,
       quotaKnown: finalQuotaKnown,
       includedQuota: finalIncludedQuota,
       extraPhotoPrice: gallery.extra_photo_price,

@@ -6,6 +6,7 @@ import type { GalleryStatus } from "@/types/domain";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
+import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, memo } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
@@ -39,6 +40,9 @@ interface GalleryApiResponse {
     zaloOa?: string;
   };
   photoCount: number;
+  /** BB-156: tổng dung lượng ảnh, để nói trước cho ba mẹ biết bộ này nặng bao nhiêu. */
+  tongDungLuongAnh?: number;
+  options?: { download?: boolean; notes?: boolean; invite?: boolean };
   quotaKnown: boolean;
   includedQuota: number | null;
   extraPhotoPrice: number;
@@ -413,7 +417,38 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [phaiChonBuoiChup, setPhaiChonBuoiChup] = useState(false);
 
   const [gallery, setGallery] = useState<GalleryApiResponse | null>(null);
+
+
+  const [tienDoTai, setTienDoTai] = useState<TienDoTai | null>(null);
+  const dungTaiRef = React.useRef(false);
   const [photos, setPhotos] = useState<PhotoPublic[]>([]);
+
+  // BB-156 — tải ảnh về máy khách.
+  //
+  // Bộ nào tắt cho tải thì KHÔNG hiện nút — quyết định số 4 ở docs/13 để studio
+  // bật tắt theo từng bộ, không phải bật đại cho tất cả.
+  const choPhepTai = gallery?.options?.download === true;
+
+  const chayTai = useCallback(
+    async (danhSach: { id: string; fileName: string }[]) => {
+      if (danhSach.length === 0) return;
+      dungTaiRef.current = false;
+      setTienDoTai({ daXong: 0, tong: danhSach.length, dangTai: null, loi: null, hetChoTrongMay: false });
+      await taiTheoLo(danhSach, setTienDoTai, () => dungTaiRef.current);
+    },
+    [],
+  );
+
+  const taiMotAnh = useCallback(
+    (anh: { id: string; fileName: string }) => void chayTai([{ id: anh.id, fileName: anh.fileName }]),
+    [chayTai],
+  );
+
+  const taiCaBo = useCallback(() => {
+    // Ảnh đã tải đủ vào bộ nhớ từ lúc mở màn (vòng lặp nạp hết ở trên), nên
+    // không phải gọi lại máy chủ chỉ để biết danh sách.
+    void chayTai(photos.map((p) => ({ id: p.id, fileName: p.fileName })));
+  }, [chayTai, photos]);
   const [filter, setFilter] = useState<"all" | "selected" | "unselected">("all");
   const [selectedSubfolder, setSelectedSubfolder] = useState<string>("");
 
@@ -1256,6 +1291,48 @@ export function GalleryApp({ token }: GalleryAppProps) {
         </div>
       )}
 
+      {/* TẢI ẢNH VỀ MÁY — BB-156.
+          Chủ studio chốt: từng ảnh, và cả bộ tải dần từng lô, hết lô tự tiếp. */}
+      {choPhepTai && photos.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[var(--bb-border)] bg-surface p-3 text-sm shadow-lg">
+          {tienDoTai && tienDoTai.tong > 1 ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  Đang tải {tienDoTai.daXong}/{tienDoTai.tong} ảnh
+                  {tienDoTai.dangTai ? ` · ${tienDoTai.dangTai}` : ""}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { dungTaiRef.current = true; }}
+                  className="rounded-md border border-[var(--bb-border)] px-3 py-1"
+                >
+                  Dừng
+                </button>
+              </div>
+              {tienDoTai.loi && (
+                <p className={tienDoTai.hetChoTrongMay ? "text-[var(--bb-danger)]" : "text-[var(--bb-fg-muted)]"}>
+                  {tienDoTai.loi}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[var(--bb-fg-muted)]">
+                Cả bộ {photos.length} ảnh · {doDocDuocDungLuong(gallery?.tongDungLuongAnh)}
+              </span>
+              <button
+                type="button"
+                onClick={taiCaBo}
+                className="rounded-md bg-[var(--bb-accent)] px-4 py-2 text-white"
+              >
+                Tải cả bộ về máy
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* MÀN XEM ẢNH LỚN (PhotoLightbox) — BB-143 */}
       {lightboxIndex !== null && (
         <PhotoLightbox
@@ -1263,6 +1340,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onToggleHeart={handleToggleHeart}
+          onTaiAnh={choPhepTai ? (p) => taiMotAnh({ id: p.id, fileName: p.fileName }) : null}
           mutatingIds={mutatingIds}
           isLocked={isLocked}
         />

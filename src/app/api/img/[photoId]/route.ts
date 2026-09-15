@@ -50,7 +50,7 @@ export async function GET(
       // Một chuỗi liền, không nối bằng dấu cộng: Supabase suy kiểu kết quả từ
       // CHÍNH chữ trong chuỗi này, nên chuỗi ghép làm mất kiểu và mọi trường
       // phía sau thành lỗi biên dịch.
-      .select("drive_file_id, gallery_id, status, galleries!photos_gallery_id_fkey!inner(branch_id, customer_id)")
+      .select("drive_file_id, file_name, gallery_id, status, galleries!photos_gallery_id_fkey!inner(branch_id, customer_id)")
       .eq("id", photoId)
       .single();
 
@@ -106,10 +106,35 @@ export async function GET(
     }
 
     const driveFileId = photo.drive_file_id;
-    const headers = {
+
+    // BB-156: ?tai=1 thì trả kèm Content-Disposition để trình duyệt LƯU thay vì
+    // mở xem. Cùng một đường ảnh, cùng một tầng xét quyền — không mở thêm cửa
+    // nào cho người không có phiên.
+    const taiVe = new URL(request.url).searchParams.get("tai") === "1";
+    // Tên tệp phải sạch dấu nháy và xuống dòng, nếu không header hỏng.
+    const tenTep = (photo.file_name ?? String.fromCharCode(97, 110, 104) + ".jpg")
+      .split(String.fromCharCode(34))
+      .join("")
+      .split(String.fromCharCode(13))
+      .join("")
+      .split(String.fromCharCode(10))
+      .join("");
+
+    const headers: Record<string, string> = {
       "Cache-Control": "private, max-age=86400, stale-while-revalidate=604800",
       "X-Content-Type-Options": "nosniff",
     };
+    if (taiVe) {
+      // Hai dạng tên tệp: filename* mang UTF-8 cho tên tiếng Việt có dấu,
+      // filename thường chỉ giữ ký tự ASCII để trình duyệt cũ còn hiểu.
+      const chiAscii = Array.from(tenTep as string)
+        .map((ch: string) => (ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) <= 126 ? ch : "_"))
+        .join("");
+      headers["Content-Disposition"] =
+        "attachment; filename=" +
+        String.fromCharCode(34) + chiAscii + String.fromCharCode(34) +
+        "; filename*=UTF-8" + String.fromCharCode(39, 39) + encodeURIComponent(tenTep);
+    }
 
     const ctx = { requestId };
     
