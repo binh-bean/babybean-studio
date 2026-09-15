@@ -28,7 +28,7 @@
     "staff:link": "node --env-file-if-exists=.env.local scripts/link-staff.mjs",
     "sync:catalog": "node --env-file-if-exists=.env.local scripts/sync-lark-catalog.mjs",
     "sync:contracts": "node --env-file-if-exists=.env.local scripts/sync-lark-contracts.mjs",
-    "sync:hauky": "node --env-file-if-exists=.env.local scripts/sync-lark-hauky.mjs",
+    "sync:hauky": "node --env-file-if-exists=.env.local --import tsx scripts/sync-lark-hauky.mjs",
     "lark:ghi-link": "node --env-file-if-exists=.env.local --conditions=react-server --import tsx scripts/ghi-link-app-len-lark.ts",
     "suggest:names": "node --env-file-if-exists=.env.local --import tsx scripts/suggest-names.mjs",
     "soat:quyen": "node --env-file-if-exists=.env.local scripts/soat-quyen-doc.mjs"

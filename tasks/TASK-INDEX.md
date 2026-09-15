@@ -152,6 +152,8 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 | BB-121 | Vòng duyệt ảnh đã chỉnh: CSKH gửi file, khách duyệt hoặc đòi sửa, lặp lại | PM | BB-114 | high | ✅ **DONE** — `0032`-`0034`, 9 test |
 | BB-132 | Ghi link app ngược về cột "Link app" bên Lark Bitable (PUT .../records/{id}) khi tạo share-link, có cờ chạy thử `--that`, fail-safe khi Lark lỗi | DEV-INT | BB-127 | med | ⏳ **DOING** — `src/lib/lark/ghi-link-app.ts`, route share-link, màn CSKH, script `npm run lark:ghi-link`, 21 test. **BLOCKED**: bảng Hậu Kỳ bên Lark chưa có cột "Link app" (xem `tasks/BLOCKERS.md`), nên chưa ghi thật được lần nào |
 | BB-136 | Hết chập chờn khi nhiều người chạy phép thử cùng lúc: nhãn runId ngẫu nhiên, dọn đúng nhãn mình, dọn rác cũ > 1 giờ | QA-BOT | BB-030 | med | ✅ **DONE** — đã cô lập gallery-auth và cong-khach-nhieu-buoi-chup, 2 tiến trình npm test chạy song song cùng xanh 40/40 |
+| BB-143 | Ba mẹ mở ảnh lớn ra xem, vuốt qua lại, xoay theo thiết bị, thả tim ngay trong màn xem lớn | DEV-FE | BB-131 | med | ✅ **DONE** — PhotoLightbox, cỡ ảnh w=1600, sliding window 3 ảnh, vuốt mobile + phím mũi tên/Esc, thả tim trực tiếp, heap ổn định (+14.6KB/50 ảnh trên 1.235 tấm) |
+| BB-144 | Lưu ghi chú và nhãn từng ảnh: patchSelection ghi retouch_note và note_tags xuống selection_items, quy tắc xoá/giữ nguyên rõ ràng, kiểm chứng ngược | DEV-BE | BB-035 | med | ✅ **DONE** — `src/lib/selection/mutate.ts`, 7 test trong `bb-144-retouch-notes.test.ts` |
 | BB-119 | ~~Hợp nhất hai bản BB-111~~ — chủ studio chốt giữ bản PM, INT làm riêng BB-097 | — | — | — | 🚫 **HUỶ** |
 
 ---
@@ -197,3 +199,5 @@ Tài liệu tham chiếu: docs/xx §y
 - [ ] QA-BOT verify trên browser, có ảnh chụp
 - [ ] tài liệu cập nhật nếu có thay đổi hành vi
 ```
+
+| BB-138 | Dựng môi trường bb-prod, script setup, bảng kiểm | ARCH | - | med | DONE |

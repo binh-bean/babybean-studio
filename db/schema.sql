@@ -2,6 +2,11 @@
 -- BabyBean Studio Platform — Database schema
 -- Postgres 15 / Supabase
 -- Owner: ARCH. Không sửa file này trực tiếp — thêm file trong db/migrations/.
+
+-- BB-138: schema `app` phải có TRƯỚC mọi hàm app.*.
+-- Trước đây không tệp nào tạo nó: bb-dev có sẵn từ một lần ai đó gõ tay, nên
+-- không ai thấy thiếu cho tới khi dựng một cơ sở dữ liệu trống.
+create schema if not exists app;
 -- ============================================================================
 
 create extension if not exists "pgcrypto";
@@ -375,6 +380,138 @@ create table selection_items (
 create unique index uq_selection_items on selection_items(selection_id, photo_id);
 create index idx_selection_items_gallery on selection_items(gallery_id);
 create index idx_selection_items_photo on selection_items(photo_id);
+
+-- ---------------------------------------------------------------------------
+-- Danh mục sản phẩm
+-- ---------------------------------------------------------------------------
+--
+-- BB-138: khối này TỪNG chỉ nằm ở db/migrations/0014. schema.sql thì tham chiếu
+-- products ở selection_addons và gallery_items nhưng không hề tạo bảng đó, nên
+-- dựng một cơ sở dữ liệu TRỐNG từ schema.sql là hỏng ngay ở dòng khoá ngoại:
+--   relation "products" does not exist
+-- Không ai phát hiện vì bb-dev dựng từ hồi schema.sql còn chưa nhắc tới products,
+-- rồi 0014 thêm bảng vào sau. schema.sql là hợp đồng chung — nó phải dựng nổi
+-- một cơ sở dữ liệu trống, nếu không thì bb-prod và mọi bản sao sau này đều kẹt.
+
+create type product_kind as enum (
+  'shoot_package',  -- gói chụp: Baby 01..05, Fam, Newborn, Bầu, Lookbook...
+  'edited_photo',   -- Edit file — ĐÂY LÀ HẠN MỨC
+  'print',          -- in ấn: UV, Gỗ, Thủy tinh, Tráng gương, Khung, Album
+  'addon',          -- phát sinh: thêm set chụp, hoa tươi, bóng bay
+  'service'         -- makeup, dịch vụ hậu kỳ
+);
+
+create table products (
+  id            uuid primary key default gen_random_uuid(),
+  branch_id     uuid references branches(id),   -- null = áp dụng mọi chi nhánh
+
+  name          text not null,
+  kind          product_kind not null,
+
+  -- Bóc từ tên: "Gỗ 40x60" -> material 'Gỗ', size '40x60'. Cho null vì có sản
+  -- phẩm không mang kích thước (Makeup, Edit file, Baby 02).
+  material      text,
+  size          text,
+
+  -- ĐƠN GIÁ niêm yết, cho MỘT đơn vị.
+  --
+  -- Bảng danh mục bên Lark KHÔNG có cột giá. Giá chỉ tồn tại trên từng dòng
+  -- hóa đơn. Nên con số ở đây là giá QUAN SÁT ĐƯỢC: mức xuất hiện nhiều nhất
+  -- trong lịch sử bán. Đã kiểm trên 11.163 dòng có đủ hai cột:
+  -- "Thành Tiền niêm yết" = "Giá niêm yết" x "Số Lượng", đúng 11.163/11.163.
+  -- Nên "Giá niêm yết" đúng là ĐƠN GIÁ, không phải tiền cả dòng.
+  --
+  -- null = chưa từng bán, không suy ra được giá. KHÔNG được hiện 0 cho khách.
+  list_price    numeric(12,0),
+
+  -- Độ tin cậy của list_price: tỷ lệ số lần bán ở đúng mức giá đó, và tổng số
+  -- lần bán. Baby 02 là 1.393 lần cùng một giá; UV 10x15 chỉ 15 lần rải ra 12
+  -- mức. Hai thứ đó khác nhau về chất, giao diện phải phân biệt được: chỉ báo
+  -- giá cho khách khi đủ chắc, còn lại để CSKH báo tay.
+  price_confidence numeric(4,3) check (price_confidence between 0 and 1),
+  price_samples    integer not null default 0,
+
+  lark_category text,          -- Phân Loại Sản Xuất, giữ nguyên để đối chiếu
+
+  -- Neo sang Lark. Đồng bộ lần sau tìm theo đây, KHÔNG tìm theo tên — nhân
+  -- viên đổi tên hiển thị bất cứ lúc nào.
+  lark_record_id text unique,
+
+  is_active     boolean not null default true,   -- Ngừng Kinh Doanh -> false
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index idx_products_kind on products(kind) where is_active;
+create index idx_products_branch on products(branch_id);
+
+-- BB-138: gallery_items cũng chỉ nằm ở migrations/0014, cùng lý do với products.
+
+create table gallery_items (
+  id          uuid primary key default gen_random_uuid(),
+  gallery_id  uuid not null references galleries(id) on delete cascade,
+  product_id  uuid not null references products(id),
+
+  -- null   = dòng hợp đồng (tầng Hóa Đơn Chi Tiết) — có tiền
+  -- có giá = thành phần của dòng đó (tầng Chi Tiết Gói Chụp) — không có tiền
+  --
+  -- Một hợp đồng thật trông như thế này:
+  --   Baby 02            2.000.000đ      <- dòng hợp đồng
+  --     Edit file   x20                  <- thành phần, chính là hạn mức
+  --     Makeup      x1
+  --     Gỗ 15x21    x1
+  --   Edit file     x5      250.000đ     <- dòng hợp đồng, khách mua thêm
+  parent_item_id uuid references gallery_items(id) on delete cascade,
+
+  quantity    integer not null default 1 check (quantity > 0),
+
+  -- Đơn giá TẠI THỜI ĐIỂM KÝ, không tra lại products.list_price về sau.
+  -- Studio tăng giá tháng sau thì hợp đồng cũ vẫn giữ giá cũ, nếu không là
+  -- tranh chấp với khách. null ở dòng thành phần vì thành phần không có tiền.
+  unit_price  numeric(12,0),
+
+  -- Mã hợp đồng bên Lark. Một album có thể gom nhiều hợp đồng (khách mua nhiều
+  -- gói cho cùng buổi chụp), nên mã nằm ở DÒNG HÀNG chứ không ở album.
+  --
+  -- CẢNH BÁO: mã có dạng HD_YYYYMMDD rồi dấu thăng rồi số. Đưa vào URL bắt
+  -- buộc encodeURIComponent, nếu không trình duyệt cắt mất phần sau dấu thăng.
+  lark_contract_code text,
+
+  lark_record_id text unique,
+
+  created_at  timestamptz not null default now(),
+
+  -- Thành phần không được mang tiền, dòng hợp đồng thì được. Ràng buộc này
+  -- chặn việc cộng nhầm tiền hai lần khi tính tổng giá trị hợp đồng.
+  constraint chk_component_no_price
+    check (parent_item_id is null or unit_price is null)
+);
+
+create index idx_gallery_items_gallery on gallery_items(gallery_id);
+create index idx_gallery_items_parent on gallery_items(parent_item_id);
+create index idx_gallery_items_contract on gallery_items(lark_contract_code);
+
+comment on table gallery_items is
+  'Những gì hợp đồng hứa giao cho album này, hai tầng trong một bảng. '
+  'Hạn mức ảnh = tổng quantity của mọi dòng có product.kind = edited_photo.';
+
+-- BB-138: hàm hạn mức, lấy bản mới nhất ở migrations/0019. schema.sql dùng nó
+-- trong ba khung nhìn phía dưới nhưng chưa bao giờ định nghĩa — lại một chỗ chỉ
+-- lộ ra khi dựng cơ sở dữ liệu trống.
+create or replace function app.gallery_quota(p_gallery_id uuid)
+returns integer
+language sql stable set search_path = public as $$
+  select case
+    when exists (select 1 from gallery_items where gallery_id = p_gallery_id) then
+      (select nullif(sum(gi.quantity), 0)::integer
+         from gallery_items gi
+         join products p on p.id = gi.product_id
+        where gi.gallery_id = p_gallery_id
+          and p.kind = 'edited_photo')
+    else
+      (select g.included_quota from galleries g where g.id = p_gallery_id)
+  end;
+$$;
 
 create table selection_addons (
   id            uuid primary key default gen_random_uuid(),

@@ -45,8 +45,8 @@ thật trong nghiệp vụ, không phải trang thừa.
 
 ## Xong là khi
 
-- [ ] Phép thử đi hết đường: tạo link theo khách → đăng nhập → thấy đúng các
+- [x] Phép thử đi hết đường: tạo link theo khách → đăng nhập → thấy đúng các
       buổi chụp của khách đó, không thấy của khách khác
-- [ ] Phép thử: chọn một buổi thì phiên trỏ đúng bộ ảnh và có lượt chọn
-- [ ] Đột biến kiểm chứng: bỏ điều kiện lọc theo khách thì phép thử phải đỏ
-- [ ] `npm test`, `npx tsc --noEmit`, `npm run lint` sạch
+- [x] Phép thử: chọn một buổi thì phiên trỏ đúng bộ ảnh và có lượt chọn
+- [x] Đột biến kiểm chứng: bỏ điều kiện lọc theo khách thì phép thử phải đỏ
+- [x] `npm test`, `npx tsc --noEmit`, `npm run lint` sạch

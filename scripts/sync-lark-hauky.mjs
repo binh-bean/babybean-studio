@@ -40,6 +40,8 @@
  */
 
 import { createHash } from "node:crypto";
+import { choPhepTenThat } from "../src/lib/lark/muc-tieu-du-lieu.ts";
+import { parseFolderName } from "../src/lib/drive/parse-folder-name.ts";
 import pg from "pg";
 
 const HOST = "https://open.larksuite.com/open-apis";
@@ -265,6 +267,15 @@ async function main() {
   const client = new pg.Client({ connectionString: dbUrl });
   await client.connect();
 
+  // Chốt ĐÓNG SẴN: chỉ mã dự án nằm trong danh sách cho phép mới nhận tên thật.
+  // Xem src/lib/lark/muc-tieu-du-lieu.ts — và tests/unit/bb-139-chot-ten-that.
+  const fullMapping = choPhepTenThat(dbUrl);
+  console.log(
+    fullMapping
+      ? "  Đích CHO PHÉP tên thật: sẽ ghi tên khách, số điện thoại, ghi chú, tên bé."
+      : "  Đích KHÔNG cho phép tên thật: che tên và số điện thoại (docs/16 mục 7.3).",
+  );
+
   try {
     const { rows: branchRows } = await client.query("select id, name from branches");
     const branchIdByName = new Map(branchRows.map((b) => [b.name, b.id]));
@@ -333,18 +344,47 @@ async function main() {
         folderKey: key,
         shootDate,
         larkStatus: cellText(f["Trạng Thái"]).trim(),
+
+        rawCustomerName: cellText(f["Tên KH"]).trim(),
+        rawPhone: cellText(f["SDT KH"]).trim(),
+        rawNote: cellText(f["Ghi Chú"]).trim(),
+        driveFolderText: cellText(f["Link ảnh gửi khách"]).trim(),
       });
     }
 
-    const plan = [...byFolder.values()].map((g) => ({
-      ...g,
-      contractCode: g.contractCodes[0],
-      // Tên khách bám theo KHÁCH, không bám theo hợp đồng — nếu không thì một
-      // khách hai hợp đồng sẽ thành hai khách.
-      customerName: `KH · ${g.customerKey ?? g.contractCodes[0]}`,
-      // Tiêu đề album bám theo HỢP ĐỒNG, để nhân viên dán vào Lark tra ra ngay.
-      galleryTitle: g.contractCodes.join(" + "),
-    }));
+    const plan = [...byFolder.values()].map((g) => {
+      let customerName = `KH · ${g.customerKey ?? g.contractCodes[0]}`;
+      let customerPhone = "0000000000";
+      let customerNote = null;
+      let babyName = null;
+
+      if (fullMapping) {
+        if (g.rawCustomerName) customerName = g.rawCustomerName;
+        if (g.rawPhone) customerPhone = g.rawPhone;
+        if (g.rawNote) customerNote = g.rawNote;
+        // Tên bé nằm TRONG NGOẶC của tên thư mục: "FB Mẹ Thảo ( Anh Duong )".
+        // Lấy nguyên chuỗi làm tên bé là gán cả tên mẹ cho đứa bé. Bộ bóc này
+        // đã có phép thử riêng (tests/unit/parse-folder-name).
+        //
+        // Không có ngoặc thì parseFolderName trả babyName rỗng và isGuessed=true
+        // — để trống, KHÔNG đoán. Nhân viên thấy trống thì điền, chứ thấy tên
+        // sai thì tin là đúng.
+        if (g.driveFolderText) {
+          const bocTen = parseFolderName(g.driveFolderText);
+          babyName = bocTen.babyName || null;
+        }
+      }
+
+      return {
+        ...g,
+        contractCode: g.contractCodes[0],
+        customerName,
+        customerPhone,
+        customerNote,
+        babyName,
+        galleryTitle: g.contractCodes.join(" + "),
+      };
+    });
 
     console.log(`\nDựng được ${plan.length} album từ ${candidates.length} bản ghi hậu kỳ.`);
     if (noContract.length) console.log(`  ${noContract.length} bộ không có mã hợp đồng — bỏ qua.`);
@@ -382,7 +422,7 @@ async function main() {
       console.log("\nXem trước, chưa ghi gì. Thêm -- --write để ghi thật.");
       console.log("Ví dụ ba album đầu:");
       for (const p of plan.slice(0, 3)) {
-        console.log(`   ${p.customerName}  |  thư mục ${p.driveFolderId || "(không bóc được)"}`);
+        console.log(`   Tên: ${p.customerName} | SĐT: ${p.customerPhone} | Bé: ${p.babyName || "(trống)"} | Ghi chú: ${p.customerNote || "(trống)"} | thư mục ${p.driveFolderId || "(không bóc được)"}`);
       }
       return;
     }
@@ -403,18 +443,32 @@ async function main() {
         // Khoá là "Mã KH" bên Lark, ĐÃ BĂM vì mã gốc gộp cả tên lẫn số điện
         // thoại vào chuỗi.
         const { rows: cust } = await client.query(
-          `insert into customers (branch_id, full_name, facebook, lark_customer_key)
-           values ($1, $2, $3, $4)
+          `insert into customers (branch_id, full_name, facebook, lark_customer_key, phone, note)
+           values ($1, $2, $3, $4, coalesce(nullif($5, ''), '0000000000'), $6)
            on conflict (lark_customer_key) where lark_customer_key is not null
            do update set
              -- Link chat có thể đổi; tên bí danh thì không, nó dẫn xuất từ khoá.
              facebook = coalesce(excluded.facebook, customers.facebook),
+             full_name = excluded.full_name,
+             phone = coalesce(nullif(excluded.phone, '0000000000'), customers.phone),
+             note = excluded.note,
              updated_at = now()
            returning id`,
-          [p.branchId, p.customerName, p.chatUrl, p.customerKey],
+          [p.branchId, p.customerName, p.chatUrl, p.customerKey, p.customerPhone, p.customerNote],
         );
         const customerId = cust[0]?.id;
         if (!customerId) throw new Error(`Không lấy được customer cho ${p.customerKey}`);
+
+        let babyId = null;
+        if (p.babyName) {
+          const { rows: bab } = await client.query(
+            `insert into babies (customer_id, full_name)
+             values ($1, $2)
+             returning id`,
+            [customerId, p.babyName]
+          );
+          babyId = bab[0]?.id;
+        }
 
         // BUỔI CHỤP — tầng chủ studio chốt ngày 12.09.2026:
         //   khách hàng → nhiều buổi chụp → thường một hóa đơn mỗi buổi
@@ -435,15 +489,16 @@ async function main() {
 
         if (p.shootDate) {
           if (shootId) {
-            await client.query(`update shoots set shoot_date = $1 where id = $2`, [
+            await client.query(`update shoots set shoot_date = $1, baby_id = coalesce($3, baby_id) where id = $2`, [
               p.shootDate,
               shootId,
+              babyId,
             ]);
           } else {
             const { rows: sh } = await client.query(
-              `insert into shoots (branch_id, customer_id, shoot_date)
-               values ($1, $2, $3) returning id`,
-              [p.branchId, customerId, p.shootDate],
+              `insert into shoots (branch_id, customer_id, shoot_date, baby_id)
+               values ($1, $2, $3, $4) returning id`,
+              [p.branchId, customerId, p.shootDate, babyId],
             );
             shootId = sh[0].id;
           }
@@ -455,9 +510,9 @@ async function main() {
         // ghi hậu kỳ làm khoá, mỗi bộ một album riêng.
         const { rows: gal } = await client.query(
           `insert into galleries
-             (branch_id, customer_id, shoot_id, title, status, drive_folder_id,
+             (branch_id, customer_id, shoot_id, baby_id, title, status, drive_folder_id,
               drive_folder_url, lark_contract_code, lark_contract_codes, lark_hauky_record_id)
-           values ($1,$2,$3,$4,'draft',$5,$6,$7,$8,$9)
+           values ($1,$2,$3,$4,$5,'draft',$6,$7,$8,$9,$10)
            -- uq_galleries_drive_folder là chỉ số duy nhất CÓ ĐIỀU KIỆN
            -- (where status <> archived). ON CONFLICT phải khai lại đúng điều
            -- kiện đó, nếu không Postgres báo "no unique or exclusion constraint
@@ -465,6 +520,7 @@ async function main() {
            on conflict (drive_folder_id) where status <> 'archived'
            do update set
              shoot_id             = coalesce(galleries.shoot_id, excluded.shoot_id),
+             baby_id              = coalesce(galleries.baby_id, excluded.baby_id),
              drive_folder_url     = excluded.drive_folder_url,
              lark_contract_code   = excluded.lark_contract_code,
              lark_contract_codes  = excluded.lark_contract_codes,
@@ -472,7 +528,7 @@ async function main() {
              updated_at = now()
            returning (xmax = 0) as inserted`,
           [
-            p.branchId, customerId, shootId, p.galleryTitle,
+            p.branchId, customerId, shootId, babyId, p.galleryTitle,
             p.driveFolderId || p.haukyId, p.driveUrl, p.contractCode,
             p.contractCodes, p.haukyId,
           ],
