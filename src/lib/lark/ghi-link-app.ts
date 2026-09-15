@@ -278,13 +278,40 @@ export async function ghiLinkAppVeLark(opts: TuyChonGhiLink): Promise<KetQuaGhiL
         lyDo: `Không tìm thấy dòng Hậu Kỳ ${opts.recordId} bên Lark.`,
       };
     }
-    if (oDangCo && oDangCo !== opts.diaChi && !opts.ghiDe) {
+    // BB-155: link CŨ CỦA CHÍNH APP thì được ghi đè; thứ gì khác thì không.
+    //
+    // Chốt ban đầu chặn mọi giá trị khác — đúng ý "máy không lẳng lặng thay thứ
+    // người ta dán tay", nhưng nó chặn luôn chính app. Hậu quả đo được ngày
+    // 15.09.2026 trên bộ HD_20260820#4846:
+    //
+    //   17:35  tạo link Rgng3Q  -> app ghi sang Lark, tốt
+    //   18:02  cấp lại link     -> link cũ bị THU HỒI, ô Lark vẫn giữ Rgng3Q
+    //
+    // Nghĩa là mỗi lần CSKH cấp lại link, ô Lark kẹt lại ở một link đã chết, và
+    // khách bấm vào nhận "Link đã hết hạn". Cấp lại link sinh ra đúng cho lúc
+    // nghi link cũ lọt ra ngoài — để ô Lark trỏ vào link cũ là làm hỏng chính
+    // việc đó.
+    //
+    // Phân biệt bằng HÌNH DẠNG, không bằng nhãn: cùng tên miền và đường dẫn /g/
+    // thì đó là link app. Ghi chú, link Drive, link chat của nhân viên đều không
+    // khớp, nên vẫn được bảo vệ y như cũ.
+    const laLinkAppCuaMinh = (dia: string): boolean => {
+      try {
+        const cu2 = new URL(dia);
+        const moi2 = new URL(opts.diaChi);
+        return cu2.origin === moi2.origin && cu2.pathname.startsWith("/g/");
+      } catch {
+        return false;
+      }
+    };
+
+    if (oDangCo && oDangCo !== opts.diaChi && !opts.ghiDe && !laLinkAppCuaMinh(oDangCo)) {
       return {
         ghiDuoc: false,
         chayThu,
         viTri,
         recordId: opts.recordId,
-        lyDo: `Ô "${viTri.fieldName}" đã có link khác, không ghi đè. Nhờ người soát bên Lark.`,
+        lyDo: `Ô "${viTri.fieldName}" đang giữ một thứ KHÔNG PHẢI link app (${oDangCo.slice(0, 40)}…). Không ghi đè — nhờ người soát bên Lark.`,
       };
     }
 
