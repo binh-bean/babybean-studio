@@ -197,3 +197,5 @@ Tài liệu tham chiếu: docs/xx §y
 - [ ] QA-BOT verify trên browser, có ảnh chụp
 - [ ] tài liệu cập nhật nếu có thay đổi hành vi
 ```
+
+| BB-138 | Dựng môi trường bb-prod, script setup, bảng kiểm | ARCH | - | med | DONE |
