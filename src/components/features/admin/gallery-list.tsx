@@ -53,6 +53,7 @@ export interface GalleryCounts {
   all: number;
   draft: number;
   syncing: number;
+  sync_error: number;
   ready: number;
   in_review: number;
   submitted: number;
@@ -72,6 +73,8 @@ function getStatusBadgeConfig(status: string): {
       return { label: "Bản nháp", variant: "secondary" };
     case "syncing":
       return { label: "Đang đồng bộ", variant: "outline" };
+    case "sync_error":
+      return { label: "Lỗi tải ảnh", variant: "danger" };
     case "ready":
       return { label: "Sẵn sàng", variant: "accent" };
     case "in_review":
@@ -111,6 +114,7 @@ export function GalleryList() {
     all: 0,
     draft: 0,
     syncing: 0,
+    sync_error: 0,
     ready: 0,
     in_review: 0,
     submitted: 0,
@@ -255,11 +259,14 @@ export function GalleryList() {
 
   // Các cột trạng thái trong Kanban
   const kanbanStatuses = [
+    { key: "draft", label: "Mới nhập", variant: "secondary" as const },
+    { key: "sync_error", label: "Lỗi tải ảnh", variant: "danger" as const },
     { key: "ready", label: "Sẵn sàng", variant: "accent" as const },
     { key: "in_review", label: "Chờ khách chọn", variant: "warning" as const },
     { key: "submitted", label: "Đã chốt", variant: "success" as const },
     { key: "in_retouch", label: "Đang retouch", variant: "default" as const },
     { key: "delivered", label: "Đã giao", variant: "secondary" as const },
+    { key: "expired", label: "Quá hạn", variant: "danger" as const },
   ];
 
   return (
@@ -536,29 +543,53 @@ export function GalleryList() {
         </div>
       ) : (
         /* ================= CHẾ ĐỘ XEM KANBAN ================= */
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-4 min-w-[1000px]">
-            {kanbanStatuses.map((col) => {
-              const colItems = items.filter((it) => it.status === col.key);
-              const countNumber = counts[col.key] ?? colItems.length;
+        <div className="space-y-3">
+          {/* Lối hiển thị trạng thái ẩn */}
+          <div className="flex items-center gap-4 text-xs text-[var(--bb-fg-muted)] px-1">
+            <span>Trạng thái khác:</span>
+            <button
+              onClick={() => handleFilterChange({ status: "syncing", viewMode: "table" })}
+              className="hover:text-[var(--bb-primary)] transition-colors flex items-center gap-1"
+            >
+              Đang đồng bộ <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{counts.syncing || 0}</Badge>
+            </button>
+            <button
+              onClick={() => handleFilterChange({ status: "archived", viewMode: "table" })}
+              className="hover:text-[var(--bb-primary)] transition-colors flex items-center gap-1"
+            >
+              Lưu trữ <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{counts.archived || 0}</Badge>
+            </button>
+          </div>
 
-              return (
-                <div
-                  key={col.key}
-                  className="flex-1 min-w-[240px] max-w-[320px] rounded-[var(--bb-radius)] bg-[var(--bb-surface-2)]/50 border border-[var(--bb-border)] flex flex-col max-h-[calc(100vh-220px)]"
-                >
-                  {/* Tiêu đề cột */}
-                  <div className="p-3 border-b border-[var(--bb-border)] flex items-center justify-between bg-[var(--bb-surface)] rounded-t-[var(--bb-radius)]">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={col.variant} className="h-2 w-2 p-0 rounded-full" />
-                      <span className="font-semibold text-sm text-[var(--bb-fg)]">
-                        {col.label}
-                      </span>
+          <div className="overflow-x-auto pb-4">
+            <div className="flex gap-4 min-w-max pr-4">
+              {kanbanStatuses.map((col) => {
+                const colItems = items.filter((it) => it.status === col.key);
+                const countNumber = counts[col.key] ?? colItems.length;
+
+                return (
+                  <div
+                    key={col.key}
+                    className="flex-1 min-w-[260px] max-w-[320px] rounded-[var(--bb-radius)] bg-[var(--bb-surface-2)]/50 border border-[var(--bb-border)] flex flex-col max-h-[calc(100vh-220px)]"
+                  >
+                    {/* Tiêu đề cột */}
+                    <div className="p-3 border-b border-[var(--bb-border)] flex items-center justify-between bg-[var(--bb-surface)] rounded-t-[var(--bb-radius)]">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={col.variant} className="h-2 w-2 p-0 rounded-full" />
+                        {col.key === "sync_error" ? (
+                          <Link href="/admin/reports/loi-dong-bo" className="font-semibold text-sm text-[var(--bb-danger)] hover:underline flex items-center gap-1" title="Đến màn xử lý lỗi tải">
+                            {col.label}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-sm text-[var(--bb-fg)]">
+                            {col.label}
+                          </span>
+                        )}
+                      </div>
+                      <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                        {countNumber}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                      {countNumber}
-                    </Badge>
-                  </div>
 
                   {/* Danh sách thẻ trong cột */}
                   <div className="p-2.5 space-y-2.5 overflow-y-auto flex-1">
@@ -616,6 +647,7 @@ export function GalleryList() {
               );
             })}
           </div>
+        </div>
         </div>
       )}
 
