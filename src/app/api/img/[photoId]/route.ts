@@ -136,40 +136,74 @@ export async function GET(
         "; filename*=UTF-8" + String.fromCharCode(39, 39) + encodeURIComponent(tenTep);
     }
 
+    const cachePath = `${photoId}/${width}.jpg`;
+    const storage = supabase.storage.from("thumbnails");
+
+    // 1. Thử lấy ảnh từ bộ nhớ đệm (Storage)
+    const { data: cachedBlob } = await storage.download(cachePath);
+    if (cachedBlob) {
+      return new Response(cachedBlob, {
+        status: 200,
+        headers: {
+          ...headers,
+          "Content-Type": "image/jpeg", // thumbnail luôn là jpeg
+        },
+      });
+    }
+
     const ctx = { requestId };
+    let buffer: ArrayBuffer | null = null;
+    let contentType = "image/jpeg";
     
-    // Try lh3 first
+    // 2. Chưa có trong đệm -> Try lh3 first
     const lh3Url = `https://lh3.googleusercontent.com/d/${driveFileId}=w${width}`;
     try {
       const lh3Res = await driveFetch(lh3Url, {}, ctx);
       if (lh3Res.ok) {
-        return new Response(lh3Res.body, {
-          status: 200,
-          headers: {
-            ...headers,
-            "Content-Type": lh3Res.headers.get("Content-Type") || "image/jpeg",
-          }
-        });
+        buffer = await lh3Res.arrayBuffer();
+        contentType = lh3Res.headers.get("Content-Type") || "image/jpeg";
       }
     } catch {
       // fallback
     }
 
     // Try drive.google.com/thumbnail
-    const driveUrl = `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w${width}`;
-    try {
-      const driveRes = await driveFetch(driveUrl, {}, ctx);
-      if (driveRes.ok) {
-        return new Response(driveRes.body, {
-          status: 200,
-          headers: {
-            ...headers,
-            "Content-Type": driveRes.headers.get("Content-Type") || "image/jpeg",
-          }
+    if (!buffer) {
+      const driveUrl = `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w${width}`;
+      try {
+        const driveRes = await driveFetch(driveUrl, {}, ctx);
+        if (driveRes.ok) {
+          buffer = await driveRes.arrayBuffer();
+          contentType = driveRes.headers.get("Content-Type") || "image/jpeg";
+        }
+      } catch {
+        // failure
+      }
+    }
+
+    if (buffer) {
+      // 3. Ghi vào bộ nhớ đệm
+      const upRes = await storage.upload(cachePath, buffer, {
+        contentType,
+        upsert: true,
+      });
+
+      // Bucket chưa tồn tại? Tạo private bucket rồi ghi lại
+      if (upRes.error && (upRes.error as { code?: string }).code === "NoSuchBucket") {
+        await supabase.storage.createBucket("thumbnails", { public: false });
+        await storage.upload(cachePath, buffer, {
+          contentType,
+          upsert: true,
         });
       }
-    } catch {
-      // failure
+
+      return new Response(buffer, {
+        status: 200,
+        headers: {
+          ...headers,
+          "Content-Type": contentType,
+        },
+      });
     }
 
     return fail("DRIVE_UNAVAILABLE", "Không tải được ảnh từ Drive");
