@@ -298,8 +298,13 @@ export function GalleryList() {
             <table className="w-full text-left text-sm border-collapse">
               <thead className="bg-[var(--bb-surface-2)] border-b border-[var(--bb-border)] text-xs font-semibold text-[var(--bb-fg-muted)] uppercase tracking-wider">
                 <tr>
-                  <th className="px-4 py-3.5">Tên bé</th>
+                  {/* Thứ tự cột do chủ studio chốt 15.09.2026: số hoá đơn trước, rồi
+                      tên khách, rồi tên bé. Trước đó cột đầu mang nhãn "Tên bé" nhưng
+                      hiện mã hợp đồng — vì hầu hết bộ ảnh chưa có tên bé, và
+                      displayName rơi về item.title. Nhãn nói một đằng, nội dung một nẻo. */}
+                  <th className="px-4 py-3.5">Số hoá đơn</th>
                   <th className="px-4 py-3.5">Khách hàng</th>
+                  <th className="px-4 py-3.5">Tên bé</th>
                   <th className="px-4 py-3.5">Chi nhánh</th>
                   <th className="px-4 py-3.5">Photographer</th>
                   <th className="px-4 py-3.5">Retouch</th>
@@ -314,24 +319,21 @@ export function GalleryList() {
               <tbody className="divide-y divide-[var(--bb-border)]">
                 {items.map((item) => {
                   const statusConfig = getStatusBadgeConfig(item.status);
-                  const displayName = item.babyName || item.babyFullName || item.title;
+                  const tenBe = item.babyName || item.babyFullName || null;
 
                   return (
                     <tr
                       key={item.id}
                       className="hover:bg-[var(--bb-surface-2)]/60 transition-colors"
                     >
-                      {/* 1. Tên bé */}
+                      {/* 1. Số hoá đơn — mã hợp đồng, dán được thẳng vào ô tìm bên Lark */}
                       <td className="px-4 py-3 font-medium text-[var(--bb-fg)]">
                         <Link
                           href={`/admin/galleries/${item.id}`}
                           className="hover:text-[var(--bb-primary)] transition-colors"
                         >
-                          {displayName}
+                          {item.title}
                         </Link>
-                        {item.title !== displayName && (
-                          <p className="text-xs text-[var(--bb-fg-muted)]">{item.title}</p>
-                        )}
                       </td>
 
                       {/* 2. Khách hàng */}
@@ -340,6 +342,14 @@ export function GalleryList() {
                         <div className="text-xs text-[var(--bb-fg-muted)] font-mono">
                           {item.customerPhone}
                         </div>
+                      </td>
+
+                      {/* 3. Tên bé — trống ở hầu hết bộ ảnh kéo từ Lark: docs/16 §7.3 còn
+                          che tên cho tới khi có bb-prod (BB-138, BB-139). Để gạch ngang
+                          cho thật chứ đừng lấy mã hợp đồng lấp chỗ trống, vì lấp là
+                          nhân viên tưởng đã có tên. */}
+                      <td className="px-4 py-3 text-[var(--bb-fg)]">
+                        {tenBe ?? <span className="text-[var(--bb-fg-muted)]">—</span>}
                       </td>
 
                       {/* 3. Chi nhánh */}
@@ -436,7 +446,8 @@ export function GalleryList() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 lg:hidden">
             {items.map((item) => {
               const statusConfig = getStatusBadgeConfig(item.status);
-              const displayName = item.babyName || item.babyFullName || item.title;
+              // Cùng luật với bảng: số hoá đơn đứng đầu, tên bé chỉ hiện khi CÓ.
+              const tenBeThe = item.babyName || item.babyFullName || null;
 
               return (
                 <Card
@@ -450,11 +461,12 @@ export function GalleryList() {
                         href={`/admin/galleries/${item.id}`}
                         className="font-bold text-base text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
                       >
-                        {displayName}
+                        {item.title}
                       </Link>
-                      {item.title !== displayName && (
-                        <p className="text-xs text-[var(--bb-fg-muted)]">{item.title}</p>
-                      )}
+                      <p className="text-xs text-[var(--bb-fg-muted)]">
+                        {item.customerName}
+                        {tenBeThe ? ` · bé ${tenBeThe}` : ""}
+                      </p>
                     </div>
                     <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
                   </div>
@@ -599,8 +611,7 @@ export function GalleryList() {
                       </div>
                     ) : (
                       colItems.map((item) => {
-                        const displayName =
-                          item.babyName || item.babyFullName || item.title;
+                        const tenBeCot = item.babyName || item.babyFullName || null;
 
                         return (
                           <Card
@@ -611,8 +622,11 @@ export function GalleryList() {
                               href={`/admin/galleries/${item.id}`}
                               className="font-semibold text-sm text-[var(--bb-fg)] hover:text-[var(--bb-primary)] block transition-colors"
                             >
-                              {displayName}
+                              {item.title}
                             </Link>
+                            {tenBeCot && (
+                              <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>
+                            )}
 
                             <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
                               <div className="flex items-center justify-between">
