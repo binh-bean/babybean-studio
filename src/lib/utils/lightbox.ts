@@ -36,11 +36,11 @@ export function getVisibleIndices(
 
 /**
  * Tạo URL ảnh lớn an toàn theo hợp đồng chung THUMBNAIL_WIDTHS.
- * Mặc định w=1600 cho màn xem lớn chất lượng cao.
+ * Mặc định w=2048 cho màn xem lớn chất lượng cao (BB-161).
  */
 export function buildLightboxImageUrl(
   photoId: string,
-  width: (typeof THUMBNAIL_WIDTHS)[number] = 1600
+  width: (typeof THUMBNAIL_WIDTHS)[number] = 2048
 ): string {
   if (!THUMBNAIL_WIDTHS.includes(width)) {
     throw new Error(

@@ -33,8 +33,8 @@ describe("BB-143: Màn xem ảnh lớn & Quản lý bộ nhớ", () => {
   it("Từ chối các kích thước ảnh ngoài THUMBNAIL_WIDTHS để bảo vệ hợp đồng chung", () => {
     // @ts-expect-error test kích thước không hợp lệ
     expect(() => buildLightboxImageUrl("photo-xyz", 1200)).toThrow();
-    // @ts-expect-error test kích thước không hợp lệ
-    expect(() => buildLightboxImageUrl("photo-xyz", 2048)).toThrow();
+    // BB-161: 2048 giờ NẰM TRONG hợp đồng chung — màn xem lớn dùng nó.
+    expect(() => buildLightboxImageUrl("photo-xyz", 2048)).not.toThrow();
   });
 
   it("Thao tác Touch Swipe nhận diện đúng hướng vuốt", () => {

@@ -136,11 +136,20 @@ export async function GET(
         "; filename*=UTF-8" + String.fromCharCode(39, 39) + encodeURIComponent(tenTep);
     }
 
+    // BB-161: tải về là ảnh GỐC trên Drive, không phải bản thu nhỏ.
+    //
+    // Đo trên một ảnh 5472x3648: w1600 ra 146 KB, còn gốc ra 3.535 KB. Ba mẹ tải
+    // ảnh con về để giữ, không phải để xem lướt — đưa bản 146 KB là đưa một thứ
+    // không in được.
+    //
+    // Và ảnh gốc KHÔNG được vào bộ nhớ đệm: 152.472 ảnh nhân 3,5 MB là khoảng
+    // 660 GB. Bộ đệm sinh ra để chặn lượt gọi Google cho ảnh XEM, thứ được nhìn
+    // đi nhìn lại; ảnh gốc thì mỗi khách tải đúng một lần.
     const cachePath = `${photoId}/${width}.jpg`;
     const storage = supabase.storage.from("thumbnails");
 
     // 1. Thử lấy ảnh từ bộ nhớ đệm (Storage)
-    const { data: cachedBlob } = await storage.download(cachePath);
+    const { data: cachedBlob } = taiVe ? { data: null } : await storage.download(cachePath);
     if (cachedBlob) {
       return new Response(cachedBlob, {
         status: 200,
@@ -156,7 +165,10 @@ export async function GET(
     let contentType = "image/jpeg";
     
     // 2. Chưa có trong đệm -> Try lh3 first
-    const lh3Url = `https://lh3.googleusercontent.com/d/${driveFileId}=w${width}`;
+    // =s0 là ảnh gốc; =w<cỡ> là bản thu nhỏ.
+    const lh3Url = taiVe
+      ? `https://lh3.googleusercontent.com/d/${driveFileId}=s0`
+      : `https://lh3.googleusercontent.com/d/${driveFileId}=w${width}`;
     try {
       const lh3Res = await driveFetch(lh3Url, {}, ctx);
       if (lh3Res.ok) {
@@ -183,7 +195,9 @@ export async function GET(
 
     if (buffer) {
       // 3. Ghi vào bộ nhớ đệm
-      const upRes = await storage.upload(cachePath, buffer, {
+      const upRes = taiVe
+        ? { error: null }
+        : await storage.upload(cachePath, buffer, {
         contentType,
         upsert: true,
       });

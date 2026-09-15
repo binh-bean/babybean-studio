@@ -50,7 +50,8 @@ describe("BB-156: tải ảnh theo lô", () => {
     expect(xong).toBe(37);
     expect(daGoi.length).toBe(37);
     // đúng đường ảnh, đúng cờ tải
-    expect(daGoi[0]).toContain("/api/img/anh-0?w=1600&tai=1");
+    // BB-161: tải là ảnh GỐC, không gửi cỡ.
+    expect(daGoi[0]).toContain("/api/img/anh-0?tai=1");
   });
 
   it("Bấm dừng thì dừng, không tải nốt cho xong", async () => {

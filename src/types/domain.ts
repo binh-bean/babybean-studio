@@ -556,7 +556,11 @@ export interface DriveFolderPreview {
   sample: Array<{ driveFileId: string; fileName: string; thumbnailUrl: string }>;
 }
 
-export const THUMBNAIL_WIDTHS = [200, 400, 800, 1600] as const;
+// BB-161: thêm 2048 cho màn xem ảnh lớn. Đo trên một ảnh gốc 5472x3648:
+//   w1600 -> 146 KB · w2048 -> 228 KB · gốc (=s0) -> 3.535 KB
+// Google nén khá mạnh ở mọi cỡ, nên nhảy lên 2048 chỉ tốn thêm 80 KB mà ảnh
+// rõ hơn hẳn trên màn hình retina của ba mẹ.
+export const THUMBNAIL_WIDTHS = [200, 400, 800, 1600, 2048] as const;
 export type ThumbnailWidth = (typeof THUMBNAIL_WIDTHS)[number];
 
 // ---------------------------------------------------------------------------
