@@ -53,6 +53,7 @@ export interface GalleryCounts {
   all: number;
   draft: number;
   syncing: number;
+  sync_error: number;
   ready: number;
   in_review: number;
   submitted: number;
@@ -72,6 +73,8 @@ function getStatusBadgeConfig(status: string): {
       return { label: "Bản nháp", variant: "secondary" };
     case "syncing":
       return { label: "Đang đồng bộ", variant: "outline" };
+    case "sync_error":
+      return { label: "Lỗi tải ảnh", variant: "danger" };
     case "ready":
       return { label: "Sẵn sàng", variant: "accent" };
     case "in_review":
@@ -111,6 +114,7 @@ export function GalleryList() {
     all: 0,
     draft: 0,
     syncing: 0,
+    sync_error: 0,
     ready: 0,
     in_review: 0,
     submitted: 0,
@@ -206,7 +210,7 @@ export function GalleryList() {
 
         const body = await res.json();
         const fetchedItems: GalleryItem[] = body?.data?.items ?? [];
-        const fetchedCounts: GalleryCounts = body?.data?.counts ?? counts;
+        const fetchedCounts: GalleryCounts | null = body?.data?.counts ?? null;
         const more: boolean = Boolean(body?.data?.hasMore);
         const cursor: string | null = body?.data?.nextCursor ?? null;
 
@@ -216,7 +220,12 @@ export function GalleryList() {
           setItems(fetchedItems);
         }
 
-        setCounts(fetchedCounts);
+        // setCounts(prev => …) chứ không đọc `counts` ở đây: đọc là phải khai nó
+        // trong danh sách phụ thuộc, mà phản hồi luôn trả về một đối tượng MỚI —
+        // thành ra tải xong lại dựng lại hàm này, useEffect thấy hàm mới lại gọi
+        // tải, và mỗi vòng đặt lại loading = true. Con quay không bao giờ tắt dù
+        // dữ liệu về đủ mỗi lần, và mỗi tab đang mở gọi API hai lần mỗi giây.
+        setCounts((prev) => fetchedCounts ?? prev);
         setHasMore(more);
         setNextCursor(cursor);
       } catch (err) {
@@ -226,7 +235,7 @@ export function GalleryList() {
         setLoadingMore(false);
       }
     },
-    [filters, counts]
+    [filters]
   );
 
   // Gọi fetchGalleries khi bộ lọc thay đổi
@@ -250,11 +259,14 @@ export function GalleryList() {
 
   // Các cột trạng thái trong Kanban
   const kanbanStatuses = [
+    { key: "draft", label: "Mới nhập", variant: "secondary" as const },
+    { key: "sync_error", label: "Lỗi tải ảnh", variant: "danger" as const },
     { key: "ready", label: "Sẵn sàng", variant: "accent" as const },
     { key: "in_review", label: "Chờ khách chọn", variant: "warning" as const },
     { key: "submitted", label: "Đã chốt", variant: "success" as const },
     { key: "in_retouch", label: "Đang retouch", variant: "default" as const },
     { key: "delivered", label: "Đã giao", variant: "secondary" as const },
+    { key: "expired", label: "Quá hạn", variant: "danger" as const },
   ];
 
   return (
@@ -286,8 +298,13 @@ export function GalleryList() {
             <table className="w-full text-left text-sm border-collapse">
               <thead className="bg-[var(--bb-surface-2)] border-b border-[var(--bb-border)] text-xs font-semibold text-[var(--bb-fg-muted)] uppercase tracking-wider">
                 <tr>
-                  <th className="px-4 py-3.5">Tên bé</th>
+                  {/* Thứ tự cột do chủ studio chốt 15.09.2026: số hoá đơn trước, rồi
+                      tên khách, rồi tên bé. Trước đó cột đầu mang nhãn "Tên bé" nhưng
+                      hiện mã hợp đồng — vì hầu hết bộ ảnh chưa có tên bé, và
+                      displayName rơi về item.title. Nhãn nói một đằng, nội dung một nẻo. */}
+                  <th className="px-4 py-3.5">Số hoá đơn</th>
                   <th className="px-4 py-3.5">Khách hàng</th>
+                  <th className="px-4 py-3.5">Tên bé</th>
                   <th className="px-4 py-3.5">Chi nhánh</th>
                   <th className="px-4 py-3.5">Photographer</th>
                   <th className="px-4 py-3.5">Retouch</th>
@@ -302,24 +319,21 @@ export function GalleryList() {
               <tbody className="divide-y divide-[var(--bb-border)]">
                 {items.map((item) => {
                   const statusConfig = getStatusBadgeConfig(item.status);
-                  const displayName = item.babyName || item.babyFullName || item.title;
+                  const tenBe = item.babyName || item.babyFullName || null;
 
                   return (
                     <tr
                       key={item.id}
                       className="hover:bg-[var(--bb-surface-2)]/60 transition-colors"
                     >
-                      {/* 1. Tên bé */}
+                      {/* 1. Số hoá đơn — mã hợp đồng, dán được thẳng vào ô tìm bên Lark */}
                       <td className="px-4 py-3 font-medium text-[var(--bb-fg)]">
                         <Link
                           href={`/admin/galleries/${item.id}`}
                           className="hover:text-[var(--bb-primary)] transition-colors"
                         >
-                          {displayName}
+                          {item.title}
                         </Link>
-                        {item.title !== displayName && (
-                          <p className="text-xs text-[var(--bb-fg-muted)]">{item.title}</p>
-                        )}
                       </td>
 
                       {/* 2. Khách hàng */}
@@ -328,6 +342,14 @@ export function GalleryList() {
                         <div className="text-xs text-[var(--bb-fg-muted)] font-mono">
                           {item.customerPhone}
                         </div>
+                      </td>
+
+                      {/* 3. Tên bé — trống ở hầu hết bộ ảnh kéo từ Lark: docs/16 §7.3 còn
+                          che tên cho tới khi có bb-prod (BB-138, BB-139). Để gạch ngang
+                          cho thật chứ đừng lấy mã hợp đồng lấp chỗ trống, vì lấp là
+                          nhân viên tưởng đã có tên. */}
+                      <td className="px-4 py-3 text-[var(--bb-fg)]">
+                        {tenBe ?? <span className="text-[var(--bb-fg-muted)]">—</span>}
                       </td>
 
                       {/* 3. Chi nhánh */}
@@ -424,7 +446,8 @@ export function GalleryList() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 lg:hidden">
             {items.map((item) => {
               const statusConfig = getStatusBadgeConfig(item.status);
-              const displayName = item.babyName || item.babyFullName || item.title;
+              // Cùng luật với bảng: số hoá đơn đứng đầu, tên bé chỉ hiện khi CÓ.
+              const tenBeThe = item.babyName || item.babyFullName || null;
 
               return (
                 <Card
@@ -438,11 +461,12 @@ export function GalleryList() {
                         href={`/admin/galleries/${item.id}`}
                         className="font-bold text-base text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
                       >
-                        {displayName}
+                        {item.title}
                       </Link>
-                      {item.title !== displayName && (
-                        <p className="text-xs text-[var(--bb-fg-muted)]">{item.title}</p>
-                      )}
+                      <p className="text-xs text-[var(--bb-fg-muted)]">
+                        {item.customerName}
+                        {tenBeThe ? ` · bé ${tenBeThe}` : ""}
+                      </p>
                     </div>
                     <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
                   </div>
@@ -531,29 +555,53 @@ export function GalleryList() {
         </div>
       ) : (
         /* ================= CHẾ ĐỘ XEM KANBAN ================= */
-        <div className="overflow-x-auto pb-4">
-          <div className="flex gap-4 min-w-[1000px]">
-            {kanbanStatuses.map((col) => {
-              const colItems = items.filter((it) => it.status === col.key);
-              const countNumber = counts[col.key] ?? colItems.length;
+        <div className="space-y-3">
+          {/* Lối hiển thị trạng thái ẩn */}
+          <div className="flex items-center gap-4 text-xs text-[var(--bb-fg-muted)] px-1">
+            <span>Trạng thái khác:</span>
+            <button
+              onClick={() => handleFilterChange({ status: "syncing", viewMode: "table" })}
+              className="hover:text-[var(--bb-primary)] transition-colors flex items-center gap-1"
+            >
+              Đang đồng bộ <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{counts.syncing || 0}</Badge>
+            </button>
+            <button
+              onClick={() => handleFilterChange({ status: "archived", viewMode: "table" })}
+              className="hover:text-[var(--bb-primary)] transition-colors flex items-center gap-1"
+            >
+              Lưu trữ <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">{counts.archived || 0}</Badge>
+            </button>
+          </div>
 
-              return (
-                <div
-                  key={col.key}
-                  className="flex-1 min-w-[240px] max-w-[320px] rounded-[var(--bb-radius)] bg-[var(--bb-surface-2)]/50 border border-[var(--bb-border)] flex flex-col max-h-[calc(100vh-220px)]"
-                >
-                  {/* Tiêu đề cột */}
-                  <div className="p-3 border-b border-[var(--bb-border)] flex items-center justify-between bg-[var(--bb-surface)] rounded-t-[var(--bb-radius)]">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={col.variant} className="h-2 w-2 p-0 rounded-full" />
-                      <span className="font-semibold text-sm text-[var(--bb-fg)]">
-                        {col.label}
-                      </span>
+          <div className="overflow-x-auto pb-4">
+            <div className="flex gap-4 min-w-max pr-4">
+              {kanbanStatuses.map((col) => {
+                const colItems = items.filter((it) => it.status === col.key);
+                const countNumber = counts[col.key] ?? colItems.length;
+
+                return (
+                  <div
+                    key={col.key}
+                    className="flex-1 min-w-[260px] max-w-[320px] rounded-[var(--bb-radius)] bg-[var(--bb-surface-2)]/50 border border-[var(--bb-border)] flex flex-col max-h-[calc(100vh-220px)]"
+                  >
+                    {/* Tiêu đề cột */}
+                    <div className="p-3 border-b border-[var(--bb-border)] flex items-center justify-between bg-[var(--bb-surface)] rounded-t-[var(--bb-radius)]">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={col.variant} className="h-2 w-2 p-0 rounded-full" />
+                        {col.key === "sync_error" ? (
+                          <Link href="/admin/reports/loi-dong-bo" className="font-semibold text-sm text-[var(--bb-danger)] hover:underline flex items-center gap-1" title="Đến màn xử lý lỗi tải">
+                            {col.label}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-sm text-[var(--bb-fg)]">
+                            {col.label}
+                          </span>
+                        )}
+                      </div>
+                      <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                        {countNumber}
+                      </Badge>
                     </div>
-                    <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                      {countNumber}
-                    </Badge>
-                  </div>
 
                   {/* Danh sách thẻ trong cột */}
                   <div className="p-2.5 space-y-2.5 overflow-y-auto flex-1">
@@ -563,8 +611,7 @@ export function GalleryList() {
                       </div>
                     ) : (
                       colItems.map((item) => {
-                        const displayName =
-                          item.babyName || item.babyFullName || item.title;
+                        const tenBeCot = item.babyName || item.babyFullName || null;
 
                         return (
                           <Card
@@ -575,8 +622,11 @@ export function GalleryList() {
                               href={`/admin/galleries/${item.id}`}
                               className="font-semibold text-sm text-[var(--bb-fg)] hover:text-[var(--bb-primary)] block transition-colors"
                             >
-                              {displayName}
+                              {item.title}
                             </Link>
+                            {tenBeCot && (
+                              <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>
+                            )}
 
                             <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
                               <div className="flex items-center justify-between">
@@ -611,6 +661,7 @@ export function GalleryList() {
               );
             })}
           </div>
+        </div>
         </div>
       )}
 

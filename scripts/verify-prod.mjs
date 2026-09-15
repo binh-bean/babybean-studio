@@ -18,7 +18,9 @@
  *   npm run verify:prod -- https://babybean-studio.vercel.app
  */
 
-const DEFAULT_URL = "https://babybeanstudio.vn";
+// App chạy ở đây. babybeanstudio.vn là trang giới thiệu, không phải app — hỏi
+// nhầm nó thì mọi phép kiểm đều sai mà vẫn trả về "đạt" ở vài mục.
+const DEFAULT_URL = "https://hauky.babybeanstudio.vn";
 
 /**
  * Deliberately NOT NEXT_PUBLIC_APP_URL: on a dev machine that points at

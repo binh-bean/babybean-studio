@@ -73,6 +73,11 @@ interface Detail {
   revisions: Revision[];
   catalog: CatalogProduct[];
   finalDriveUrl: string | null;
+  /** Thư mục ảnh GỐC — khác finalDriveUrl ở trên (ảnh đã chỉnh gửi khách). */
+  driveFolderUrl: string | null;
+  driveFolderId: string | null;
+  lastSyncedAt: string | null;
+  syncError: string | null;
   photoCount: number;
   dueAmount: number;
   paidAmount: number;
@@ -85,6 +90,8 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   const [notice, setNotice] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [linkMoi, setLinkMoi] = React.useState<string | null>(null);
+  const [dangSuaThuMuc, setDangSuaThuMuc] = React.useState(false);
+  const [thuMucMoi, setThuMucMoi] = React.useState("");
   /**
    * BB-132: link vừa tạo đã được ghi thẳng sang cột "Link app" bên Lark chưa.
    *
@@ -174,6 +181,56 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         res.ok
           ? "Đã xác nhận, bộ ảnh chuyển sang giai đoạn chỉnh ảnh."
           : (json?.error?.message ?? "Không xác nhận được"),
+      );
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * BB-150 — đổi thư mục ẢNH GỐC.
+   *
+   * Đổi link mà không kéo ảnh về thì màn hình vẫn hiện ảnh của thư mục cũ và
+   * không ai hiểu vì sao, nên đổi xong là hỏi luôn có đồng bộ ngay không.
+   */
+  async function doiThuMuc(url: string) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/drive`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ driveUrl: url }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNotice(json?.error?.message ?? "Không đổi được thư mục.");
+        return;
+      }
+      setDangSuaThuMuc(false);
+      await load();
+      if (window.confirm("Đã đổi thư mục. Kéo ảnh từ thư mục mới về luôn?")) {
+        await dongBoLai();
+      } else {
+        setNotice("Đã đổi thư mục. Ảnh trên màn hình vẫn là của thư mục cũ cho tới khi đồng bộ.");
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Kéo lại ảnh từ thư mục hiện tại. Route trả 202 rồi chạy nền. */
+  async function dongBoLai() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/sync`, { method: "POST" });
+      const json = await res.json().catch(() => null);
+      setNotice(
+        res.ok
+          ? "Đang kéo ảnh về. Vài trăm ảnh mất một lúc — bấm tải lại trang sau vài phút để xem kết quả."
+          : (json?.error?.message ?? "Không chạy được lệnh đồng bộ."),
       );
       await load();
     } finally {
@@ -537,6 +594,87 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           <ReopenForm disabled={busy} onSubmit={(r) => void reopen(r)} />
         </section>
       )}
+
+      {/* BB-150 — Thư mục ảnh GỐC.
+          Đặt trên khối "Link gửi khách" vì thứ tự việc là: có ảnh trước, rồi mới
+          gửi link cho khách. KHÔNG gộp với ô "Link thư mục ảnh đã chỉnh" ở phần
+          retouch: gộp là có ngày ai đó ghi đè nguồn ảnh gốc bằng ảnh đã chỉnh. */}
+      <section className="rounded-lg border border-[var(--bb-border)] p-4">
+        <h2 className="text-base font-medium">Thư mục ảnh gốc</h2>
+
+        {detail.syncError && (
+          <p className="mt-2 rounded-md border border-[var(--bb-danger)] p-3 text-sm">
+            <strong>Lần kéo ảnh gần nhất hỏng.</strong> {detail.syncError}
+          </p>
+        )}
+
+        <div className="mt-2 text-sm">
+          {detail.driveFolderUrl ? (
+            <a
+              href={detail.driveFolderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="break-all font-mono text-xs underline"
+            >
+              {detail.driveFolderUrl}
+            </a>
+          ) : (
+            <span className="text-[var(--bb-fg-muted)]">Chưa gắn thư mục nào.</span>
+          )}
+        </div>
+
+        <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
+          {detail.photoCount} ảnh đã kéo về ·{" "}
+          {detail.lastSyncedAt
+            ? `đồng bộ lần cuối ${new Date(detail.lastSyncedAt).toLocaleString("vi-VN")}`
+            : "chưa đồng bộ lần nào"}
+        </p>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy || !detail.driveFolderUrl}
+            onClick={() => void dongBoLai()}
+            className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+          >
+            Đồng bộ lại
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setThuMucMoi(detail.driveFolderUrl ?? "");
+              setDangSuaThuMuc((v) => !v);
+            }}
+            className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+          >
+            {dangSuaThuMuc ? "Thôi" : "Đổi thư mục"}
+          </button>
+        </div>
+
+        {dangSuaThuMuc && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              type="url"
+              name="driveFolderUrl"
+              value={thuMucMoi}
+              disabled={busy}
+              onChange={(e) => setThuMucMoi(e.target.value)}
+              placeholder="Dán địa chỉ thư mục ảnh trên Google Drive"
+              aria-label="Địa chỉ thư mục ảnh gốc"
+              className="min-w-64 flex-1 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+            />
+            <button
+              type="button"
+              disabled={busy || thuMucMoi.trim().length < 12}
+              onClick={() => void doiThuMuc(thuMucMoi.trim())}
+              className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+            >
+              Lưu thư mục
+            </button>
+          </div>
+        )}
+      </section>
 
       <section className="rounded-lg border border-[var(--bb-border)] p-4">
         <h2 className="text-base font-medium">Link gửi khách</h2>

@@ -5,6 +5,7 @@ import { getCustomerProgressStep } from "@/lib/gallery/progress";
 import type { GalleryStatus } from "@/types/domain";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
+import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, memo } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
@@ -132,6 +133,7 @@ interface TheAnhProps {
   dangGui: boolean;
   khoa: boolean;
   onToggle: (photo: PhotoPublic) => void;
+  onOpen: (thuTu: number) => void;
 }
 
 /**
@@ -155,11 +157,13 @@ const TheAnh = memo(function TheAnh({
   dangGui,
   khoa,
   onToggle,
+  onOpen,
 }: TheAnhProps) {
   return (
     <div
+      onClick={() => onOpen(thuTu)}
       className={cn(
-        "group relative aspect-square rounded-xl overflow-hidden border bg-surface/80 transition-all",
+        "group relative aspect-square rounded-xl overflow-hidden border bg-surface/80 transition-all cursor-pointer",
         daChon
           ? "ring-2 ring-rose-500 border-rose-500/50 shadow-xs"
           : "hover:border-foreground/20",
@@ -202,7 +206,10 @@ const TheAnh = memo(function TheAnh({
       <button
         type="button"
         disabled={khoa || dangGui}
-        onClick={() => onToggle(photo)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle(photo);
+        }}
         aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
         className={cn(
           "absolute top-1.5 right-1.5 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-transform active:scale-90 touch-manipulation focus:outline-hidden",
@@ -233,6 +240,7 @@ interface LuoiAnhProps {
   mutatingIds: Set<string>;
   khoa: boolean;
   onToggle: (photo: PhotoPublic) => void;
+  onOpen: (thuTu: number) => void;
 }
 
 /**
@@ -251,7 +259,7 @@ interface LuoiAnhProps {
  * Giữ nguyên cách chia cột và khoảng cách của bản cũ (2 / 3 / 4 cột theo bề
  * ngang màn hình) để giao diện không đổi — chỉ đổi chỗ ai dựng thẻ nào.
  */
-function LuoiAnh({ photos, mutatingIds, khoa, onToggle }: LuoiAnhProps) {
+function LuoiAnh({ photos, mutatingIds, khoa, onToggle, onOpen }: LuoiAnhProps) {
   const khungRef = useRef<HTMLDivElement | null>(null);
 
   // Đoán bề ngang NGAY từ lượt dựng đầu, đừng bắt đầu từ 0.
@@ -345,6 +353,7 @@ function LuoiAnh({ photos, mutatingIds, khoa, onToggle }: LuoiAnhProps) {
               dangGui={mutatingIds.has(photo.id)}
               khoa={khoa}
               onToggle={onToggle}
+              onOpen={onOpen}
             />
           ))}
         </div>
@@ -375,6 +384,7 @@ function LuoiAnh({ photos, mutatingIds, khoa, onToggle }: LuoiAnhProps) {
                     dangGui={mutatingIds.has(photo.id)}
                     khoa={khoa}
                     onToggle={onToggle}
+                    onOpen={onOpen}
                   />
                 ))}
               </div>
@@ -419,6 +429,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [customerNote, setCustomerNote] = useState("");
   const [placements, setPlacements] = useState<{ photoId: string; galleryItemId: string }[]>([]);
   const [placing, setPlacing] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const isLocked = useMemo(() => {
     if (!gallery) return false;
@@ -1103,6 +1114,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               mutatingIds={mutatingIds}
               khoa={isLocked}
               onToggle={handleToggleHeart}
+              onOpen={(idx) => setLightboxIndex(idx)}
             />
           )}
         </section>
@@ -1242,6 +1254,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* MÀN XEM ẢNH LỚN (PhotoLightbox) — BB-143 */}
+      {lightboxIndex !== null && (
+        <PhotoLightbox
+          photos={filteredPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onToggleHeart={handleToggleHeart}
+          mutatingIds={mutatingIds}
+          isLocked={isLocked}
+        />
       )}
     </div>
   );

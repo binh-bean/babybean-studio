@@ -56,7 +56,15 @@ function LoginForm() {
       void fetch("/api/auth/session", { method: "POST" }).catch(() => {});
 
       const next = searchParams.get("next");
-      const target = next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin";
+      // Về thẳng Quản lý bộ ảnh, KHÔNG về /admin.
+      //
+      // /admin là Bảng điều khiển, mà màn đó mới chỉ có dòng "Chưa triển khai
+      // (BB-060)" — xem docs/17. Mục menu dẫn tới nó còn đang xám ghi "sắp có",
+      // nên hai chỗ nói hai điều khác nhau về cùng một màn, và thứ đầu tiên nhân
+      // viên thấy sau khi đăng nhập mỗi sáng là một trang trống.
+      //
+      // Đổi lại thành "/admin" khi BB-060 làm xong Bảng điều khiển.
+      const target = next && next.startsWith("/") && !next.startsWith("//") ? next : "/admin/galleries";
 
       router.push(target);
       router.refresh();

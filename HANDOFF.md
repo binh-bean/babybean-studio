@@ -115,11 +115,11 @@ Toàn bộ nằm ở [`docs/13-quyet-dinh-van-hanh.md`](docs/13-quyet-dinh-van-h
 | 2 | Hạn chốt mặc định | 7 ngày, nhắc ngày 3 và ngày 6 | Không |
 | 3 | PIN | Bật mặc định, = 4 số cuối SĐT | Không |
 | 4 | Cho tải ảnh | Tắt ở Phase 1, bật lẻ từ Phase 2 | Không |
-| 5 | Tên miền | `chon-anh.babybean.vn` | **Có** — studio phải sở hữu `babybean.vn` |
+| 5 | Tên miền | `hauky.babybeanstudio.vn` — **ĐANG CHẠY THẬT từ 15/09/2026** | Không — đã xong |
 | 6 | Nhóm Lark | 4 webhook: 3 chi nhánh + 1 nhóm quản lý | **Có** — cần URL webhook thật ở Phase 3 |
 | 7 | Ảnh preview | 2048px, JPEG q75, sRGB, xoá GPS | Không |
 
 Ba việc PM phải làm trước khi giao BB-023:
 1. Xác nhận hoặc sửa bảng giá trong `db/seed.sql`.
-2. Xác nhận đã sở hữu `babybean.vn` và thêm được CNAME.
+2. ~~Xác nhận đã sở hữu tên miền~~ — XONG 15/09/2026: `babybeanstudio.vn` quản lý DNS ở Tenten, bản ghi CNAME `hauky` trỏ về Vercel, HTTPS đã cấp.
 3. Gửi preset xuất ảnh ở `docs/13-quyet-dinh-van-hanh.md §7` cho thợ ảnh, kèm ba quy tắc vận hành ở cuối tài liệu đó.
