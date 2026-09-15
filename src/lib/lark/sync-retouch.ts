@@ -279,6 +279,7 @@ export async function readLarkTable(
   auth: LarkAuthHeader,
   baseToken: string,
   namePattern: RegExp,
+  options?: { lastModifiedTime?: number }
 ): Promise<{ tableId: string; tableName: string; records: LarkRecord[] }> {
   const listRes = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables?page_size=100`, {
     headers: { authorization: auth.authorization },
@@ -304,23 +305,41 @@ export async function readLarkTable(
   const records: LarkRecord[] = [];
   let pageToken = "";
   do {
-    const url =
-      `${HOST}/bitable/v1/apps/${baseToken}/tables/${table.table_id}/records?page_size=500` +
-      (pageToken ? `&page_token=${pageToken}` : "");
+    let url = `${HOST}/bitable/v1/apps/${baseToken}/tables/${table.table_id}/records?page_size=500`;
+    if (pageToken) url += `&page_token=${pageToken}`;
+    
+    if (options?.lastModifiedTime) {
+      url += `&automatic_fields=true&sort=["last_modified_time%20DESC"]`;
+    }
 
     const pageRes = await fetch(url, { headers: { authorization: auth.authorization } });
     const page = (await pageRes.json()) as {
       code: number;
       msg?: string;
-      data?: { items?: LarkRecord[]; has_more?: boolean; page_token?: string };
+      data?: { items?: (LarkRecord & { last_modified_time?: number })[]; has_more?: boolean; page_token?: string };
     };
 
     if (page.code !== 0 || !page.data) {
       throw new Error(`Lỗi đọc bảng ${table.name}: ${page.msg || "Lỗi API"}`);
     }
 
-    records.push(...(page.data.items ?? []));
-    pageToken = page.data.has_more ? page.data.page_token ?? "" : "";
+    let items = page.data.items ?? [];
+    let shouldStop = false;
+
+    if (options?.lastModifiedTime) {
+      const filtered = [];
+      for (const item of items) {
+        if (item.last_modified_time && item.last_modified_time <= options.lastModifiedTime) {
+          shouldStop = true;
+          break;
+        }
+        filtered.push(item);
+      }
+      items = filtered;
+    }
+
+    records.push(...items);
+    pageToken = (page.data.has_more && !shouldStop) ? page.data.page_token ?? "" : "";
   } while (pageToken);
 
   return { tableId: table.table_id, tableName: table.name, records };
