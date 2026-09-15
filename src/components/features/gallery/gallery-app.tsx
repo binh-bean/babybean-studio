@@ -428,6 +428,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
   // Bộ nào tắt cho tải thì KHÔNG hiện nút — quyết định số 4 ở docs/13 để studio
   // bật tắt theo từng bộ, không phải bật đại cho tất cả.
   const choPhepTai = gallery?.options?.download === true;
+  const soAnhDaChon = photos.filter((p) => p.mark === "selected" || p.isFavorite).length;
 
   const chayTai = useCallback(
     async (danhSach: { id: string; fileName: string }[]) => {
@@ -443,6 +444,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
     (anh: { id: string; fileName: string }) => void chayTai([{ id: anh.id, fileName: anh.fileName }]),
     [chayTai],
   );
+
+  /** BB-161: chỉ tải những tấm ba mẹ đã thả tim. */
+  const taiAnhDaChon = useCallback(() => {
+    const daChon = photos.filter((p) => p.mark === "selected" || p.isFavorite);
+    void chayTai(daChon.map((p) => ({ id: p.id, fileName: p.fileName })));
+  }, [chayTai, photos]);
 
   const taiCaBo = useCallback(() => {
     // Ảnh đã tải đủ vào bộ nhớ từ lúc mở màn (vòng lặp nạp hết ở trên), nên
@@ -1334,17 +1341,30 @@ export function GalleryApp({ token }: GalleryAppProps) {
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="text-[var(--bb-fg-muted)]">
-                Cả bộ {photos.length} ảnh · {doDocDuocDungLuong(gallery?.tongDungLuongAnh)}
+                Cả bộ {photos.length} ảnh · {doDocDuocDungLuong(gallery?.tongDungLuongAnh)} · ảnh gốc
               </span>
-              <button
-                type="button"
-                onClick={taiCaBo}
-                className="rounded-md bg-[var(--bb-accent)] px-4 py-2 text-white"
-              >
-                Tải cả bộ về máy
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {soAnhDaChon > 0 && (
+                  <button
+                    type="button"
+                    onClick={taiAnhDaChon}
+                    className="flex items-center gap-2 rounded-md border border-[var(--bb-border)] px-4 py-2"
+                  >
+                    <MuiTenTaiXuong />
+                    Tải {soAnhDaChon} ảnh đã chọn
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={taiCaBo}
+                  className="flex items-center gap-2 rounded-md bg-[var(--bb-accent)] px-4 py-2 text-white"
+                >
+                  <MuiTenTaiXuong />
+                  Tải cả bộ
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1363,5 +1383,26 @@ export function GalleryApp({ token }: GalleryAppProps) {
         />
       )}
     </div>
+  );
+}
+
+/** Mũi tên tải xuống — BB-161, chủ studio chốt dùng biểu tượng thay cho chữ. */
+function MuiTenTaiXuong() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3v12" />
+      <path d="M7 12l5 5 5-5" />
+      <path d="M4 20h16" />
+    </svg>
   );
 }

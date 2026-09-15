@@ -94,7 +94,6 @@ export async function taiTheoLo(
   danhSach: AnhCanTai[],
   capNhat: (tienDo: TienDoTai) => void,
   dungLai: () => boolean,
-  cỡ = 1600,
 ): Promise<number> {
   let xong = 0;
 
@@ -110,7 +109,8 @@ export async function taiTheoLo(
       capNhat({ daXong: xong, tong: danhSach.length, dangTai: anh.fileName, loi: null, hetChoTrongMay: false });
 
       try {
-        const res = await fetch(`/api/img/${anh.id}?w=${cỡ}&tai=1`, { cache: "no-store" });
+        // Không gửi cỡ: ?tai=1 luôn trả ảnh GỐC trên Drive (BB-161).
+        const res = await fetch(`/api/img/${anh.id}?tai=1`, { cache: "no-store" });
         if (!res.ok) throw new Error(`máy chủ trả ${res.status}`);
         const blob = await res.blob();
         luuXuongMay(blob, anh.fileName);

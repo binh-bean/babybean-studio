@@ -305,9 +305,25 @@ export function PhotoLightbox({
             type="button"
             onClick={() => onTaiAnh(currentPhoto)}
             aria-label="Tải ảnh này về máy"
-            className="rounded-full bg-white/10 px-4 py-2 text-sm text-white backdrop-blur hover:bg-white/20"
+            title="Tải ảnh này về máy (ảnh gốc)"
+            className="rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20"
           >
-            Tải ảnh này
+            {/* Mũi tên tải xuống — chủ studio chốt dùng biểu tượng, không dùng chữ */}
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 3v12" />
+              <path d="M7 12l5 5 5-5" />
+              <path d="M4 20h16" />
+            </svg>
           </button>
         )}        </div>
       </footer>
