@@ -35,7 +35,26 @@ lời đúng một câu hỏi: **với mỗi cột lấy từ Lark, ai là bản
   viên xem và tự chọn. Đắt nhất, nhưng không giấu chuyện gì.
 
 Kèm bảng từng cột: `full_name`, `phone`, `note`, `shoot_date`, `branch_id`,
-`drive_folder_url`, tên bé. Không cột nào được bỏ trống ô "ai là bản đúng".
+`drive_folder_url`, tên bé, và **`galleries.status`**. Không cột nào được bỏ
+trống ô "ai là bản đúng".
+
+**`status` là cột khó nhất, đừng để cuối.** Chủ studio hỏi thẳng ngày
+15.09.2026: *"trạng thái sẽ được cập nhật từ Lark sang phải không, tức là khi
+Lark thay đổi trạng thái thì app cũng thay đổi theo hay như thế nào"*.
+
+Hôm nay câu trả lời là KHÔNG, và không ai từng chốt điều đó — nó chỉ xảy ra:
+
+- `scripts/sync-lark-hauky.mjs` đọc cột `Trạng Thái` bên Lark **chỉ để LỌC**
+  lúc nhập (bỏ những bộ đã qua in), rồi vứt đi, không lưu.
+- Lệnh `insert` đặt cứng `status = 'draft'`, và `on conflict do update` **không
+  đụng tới `status`** — nên đồng bộ lại bao nhiêu lần cũng không đổi.
+- Từ đó trở đi `status` do app tự đổi theo hành vi khách: `ready` khi gửi link,
+  `in_review` khi khách mở, `submitted` khi khách chốt.
+
+Hai hệ thống cùng có khái niệm "trạng thái" mà ánh xạ không trùng nhau: Lark
+có `Đã Chọn Hình`, `Đang làm`, `Leader check hình`, `Đã gửi In`, `Đã Giao`;
+app có 10 giá trị trong `gallery_status`. ADR phải nói rõ hai bộ này ánh xạ ra
+sao, hay cố tình không ánh xạ.
 
 ## Ràng buộc
 
