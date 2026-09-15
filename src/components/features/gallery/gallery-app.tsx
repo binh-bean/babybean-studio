@@ -175,22 +175,27 @@ const TheAnh = memo(function TheAnh({
     >
       {/* Ảnh tải qua proxy an toàn.
 
-          `w=800` là con số cũ, và nó là chỗ tốn nhất: thẻ ảnh đo được rộng
-          165px trên điện thoại 375px, mà tải về bản 800px nặng 92,8 KB. Trên
-          đường truyền 1,6 Mbps, 2,7 MB ảnh chỉ đủ lấp 30 tấm — ba mẹ cuộn tiếp
-          là gặp lưới ô xám.
+          BB-162 — chủ studio chốt 15.09.2026: ảnh xem nhỏ cũng phải NÉT.
 
-          `srcSet` + `sizes` trả việc chọn cỡ cho trình duyệt: máy thường lấy
-          bản 200, máy màn hình nét gấp đôi lấy bản 400 (31,4 KB — đo được là
-          bản trình duyệt chọn ở 375px/DPR2), máy nét gấp ba mới lấy 800. Không
-          tấm nào bị mờ, mà cùng ngần ấy byte giờ lấp được 79 tấm thay vì 30.
+          Bản cũ (BB-131) chọn 200/400/800 để tiết kiệm đường truyền: trên điện
+          thoại 375px màn hình nét gấp đôi, trình duyệt lấy bản 400 nặng 31,4 KB.
+          Nhẹ thật, nhưng thẻ ảnh chỉ 165px mà ảnh 400px thì nhìn vẫn mềm — và
+          ba mẹ đang chọn ảnh cho con, không phải lướt tin.
 
-          KHÔNG đổi đường API: vẫn `/api/img/<id>?w=<cỡ>`, và cả ba cỡ đều nằm
+          Giờ còn 800 và 1600: máy thường lấy 800 (92,8 KB), máy nét gấp đôi trở
+          lên lấy 1600 (146 KB). Cuộn ảo của BB-131 chỉ giữ khoảng 24 tấm trong
+          trang, nên mỗi màn hình tốn cỡ 2–3,5 MB thay vì 0,8 MB.
+
+          Đánh đổi đã biết và chấp nhận: tốn đường truyền hơn, đổi lấy ảnh nét.
+          Bộ nhớ đệm của BB-137 gánh phần hạn mức Google, nên chi phí nằm ở
+          đường truyền của khách chứ không ở phía Google.
+
+          KHÔNG đổi đường API: vẫn `/api/img/<id>?w=<cỡ>`, và cả hai cỡ đều nằm
           trong `THUMBNAIL_WIDTHS` mà route ảnh đã nhận. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={`/api/img/${photo.id}?w=400`}
-        srcSet={`/api/img/${photo.id}?w=200 200w, /api/img/${photo.id}?w=400 400w, /api/img/${photo.id}?w=800 800w`}
+        src={`/api/img/${photo.id}?w=800`}
+        srcSet={`/api/img/${photo.id}?w=800 800w, /api/img/${photo.id}?w=1600 1600w`}
         sizes="(min-width: 768px) 210px, (min-width: 640px) 195px, 45vw"
         alt={photo.fileName || `Ảnh ${thuTu + 1}`}
         loading="lazy"
