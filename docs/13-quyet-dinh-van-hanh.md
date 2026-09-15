@@ -96,6 +96,25 @@ Chọn **subdomain của tên miền chính**, không phải tên miền riêng.
 
 **Sửa ở đâu**: biến `NEXT_PUBLIC_APP_URL`, và mục tên miền trong `docs/11-deployment.md §8`.
 
+### Đã làm thật — 15/09/2026
+
+Tên miền đang chạy là **`hauky.babybeanstudio.vn`**, chủ studio chọn.
+
+| | |
+|---|---|
+| Tên miền gốc | `babybeanstudio.vn`, DNS quản lý ở **Tenten.vn** |
+| Bản ghi | `CNAME hauky` → địa chỉ Vercel cấp riêng cho dự án |
+| HTTPS | Vercel tự cấp |
+| `NEXT_PUBLIC_APP_URL` | `https://hauky.babybeanstudio.vn`, môi trường Production |
+
+Lưu ý cái đã đánh đổi: phần trên lập luận nên dùng chữ `chon-anh` vì ba mẹ đọc
+là hiểu. `hauky` là từ trong nghề — khách nhận link không hiểu nghĩa. Chủ studio
+biết và vẫn chọn, để khớp cách đội nhân viên đang gọi quy trình. Ghi lại đây để
+người sau đừng tưởng là nhầm lẫn.
+
+`babybean.vn` (không có chữ `studio`) **chưa ai đăng ký** — tra DNS ngày
+15/09/2026 trả về không tồn tại. Đừng viết tên miền đó vào tài liệu nữa.
+
 ## 6. Lark — 4 webhook, không dùng chung một nhóm
 
 | Webhook | Nhóm Lark | Nhận sự kiện |
