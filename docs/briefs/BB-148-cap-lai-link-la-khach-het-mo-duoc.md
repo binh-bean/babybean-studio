@@ -40,6 +40,26 @@ khách mất luôn đường vào.
 Hôm nay mới 2 bộ từng cấp hơn một link nên chưa ai gặp. Gửi link cho khách thật
 rồi mới gặp thì mất lòng tin, không phải mất một lần bấm.
 
+## Chủ studio đã chốt — 15.09.2026
+
+> *"khi tạo link mới thì chỉ link mới mở được, link cũ sẽ bị dọn sạch ở mọi nơi"*
+
+Và khi được hỏi về những ảnh ba mẹ ĐÃ CHỌN bằng link cũ, chủ studio chốt:
+**chuyển sang link mới**. Ba mẹ mở link mới phải thấy nguyên những gì đã thả tim,
+không phải làm lại — vì studio cấp lại link vì lý do của studio, không phải lỗi
+của khách.
+
+Nên hướng sửa đã được quyết, không cần đề xuất lại:
+
+1. Link cũ **chết hẳn** và không còn giữ thứ gì chặn link mới: hết cờ
+   `is_primary`, không còn khoá nào, mở lên phải bị từ chối dứt khoát.
+2. Lượt chọn của link cũ được **chuyển sang link mới** cùng toàn bộ
+   `selection_items` — ảnh đã chọn, ghi chú, nhãn thẻ.
+3. Chỉ số `uq_selections_share_link_gallery` khoá theo cặp (link, bộ ảnh), nên
+   "chuyển" ở đây là đổi `share_link_id` của lượt chọn cũ sang link mới, hay tạo
+   lượt mới rồi dời `selection_items` — chọn cách nào cũng được, miễn không mất
+   dòng nào và không để hai lượt cùng mang cờ.
+
 ## Phải làm gì
 
 1. Quyết **cờ `is_primary` thuộc về ai khi link được cấp lại**, và viết lý do
