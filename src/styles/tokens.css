@@ -150,6 +150,16 @@
   --color-bb-bg: var(--bb-bg);
   --color-bb-surface: var(--bb-surface);
   --color-bb-surface-2: var(--bb-surface-2);
+
+  /* Bí danh không mang tiền tố bb-, vì màn của khách viết 'bg-surface' chứ
+     không viết 'bg-bb-surface'. Thiếu hai dòng này thì Tailwind gặp một class
+     không tồn tại và BỎ QUA IM LẶNG: hộp thoại 'Xác nhận chốt danh sách' mất
+     sạch nền, chữ đè thẳng lên lưới ảnh, ba mẹ không đọc được chữ nào. 16 chỗ
+     trong ba tệp của màn khách đều đang như vậy.
+     tsc, lint và npm run build đều không thấy — cùng họ với vụ font hồi
+     10/09/2026 đã sinh ra npm run verify:build. */
+  --color-surface: var(--bb-surface);
+  --color-surface-2: var(--bb-surface-2);
   --color-bb-border: var(--bb-border);
   --color-bb-fg: var(--bb-fg);
   --color-bb-fg-muted: var(--bb-fg-muted);

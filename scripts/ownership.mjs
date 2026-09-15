@@ -53,6 +53,13 @@ export const OWNERSHIP = {
     "db/schema.sql",
     "db/migrations/**",
     "src/types/domain.ts",
+    // Hình dạng phản hồi của mọi route — cùng họ với docs/04-api-spec.md, nên
+    // thuộc ARCH. Trước BB-148 tệp này KHÔNG có chủ, và verify:own chặn đúng
+    // lúc SEC-ARCH cần sửa nó để thôi ghi lỗi ra "[object Object]".
+    "src/lib/api-response.ts",
+    // Bộ dựng bb-prod và dữ liệu nền của nó: cùng họ với schema.sql.
+    "scripts/setup-prod.mjs",
+    "db/seed-prod.sql",
     "docs/**",
   ],
   "DEV-BE": [

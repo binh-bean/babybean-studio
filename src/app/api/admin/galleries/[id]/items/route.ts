@@ -36,7 +36,10 @@ export async function GET(
     // 3. Check gallery existence and branch authorization
     const { data: gallery, error: galleryError } = await admin
       .from("galleries")
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count")
+      // BB-150 thêm bốn cột cuối: màn chi tiết phải cho thấy ảnh đến từ thư mục
+      // nào. Viết liền một dòng vì Supabase suy kiểu từ CHÍNH chuỗi literal này —
+      // nối chuỗi là mất kiểu, và cả tệp đổ lỗi "GenericStringError".
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error")
       .eq("id", galleryId)
       .single();
 
@@ -125,6 +128,12 @@ export async function GET(
       revisions: revisions ?? [],
       catalog: catalog ?? [],
       finalDriveUrl: delivery?.final_drive_url ?? null,
+      // Thư mục ảnh GỐC — khác hẳn finalDriveUrl ở trên (ảnh ĐÃ CHỈNH gửi khách
+      // cuối quy trình). Hai thứ này mà lẫn nhau là có ngày ghi đè nguồn ảnh.
+      driveFolderUrl: gallery.drive_folder_url ?? null,
+      driveFolderId: gallery.drive_folder_id ?? null,
+      lastSyncedAt: gallery.last_synced_at ?? null,
+      syncError: gallery.sync_error ?? null,
       title: gallery.title,
       status: gallery.status,
       contractCodes: gallery.lark_contract_codes ?? [],

@@ -180,12 +180,29 @@ describe("BB-132: ghi link app về Lark", () => {
 
   // --- Không đụng vào link nhân viên đã dán tay -----------------------------
 
-  it("8. Ô đã có link khác thì không ghi đè", async () => {
-    const luot = lapFetch({ oDangCo: "https://cu.test/g/xxxxxx" });
+  it("8. Ô đang giữ thứ KHÔNG PHẢI link app thì không ghi đè", async () => {
+    // Link Drive, link chat, hay một dòng ghi chú nhân viên tự gõ — máy không
+    // được lẳng lặng thay.
+    const luot = lapFetch({ oDangCo: "https://drive.google.com/drive/folders/abc123" });
     const kq = await ghiLinkAppVeLark({ recordId: RECORD, diaChi: DIA_CHI, ghiThat: true });
     expect(kq.ghiDuoc).toBe(false);
-    expect(kq.lyDo).toMatch(/đã có link khác/);
+    expect(kq.lyDo).toMatch(/KHÔNG PHẢI link app/);
     expect(luot.some((l) => l.method === "PUT")).toBe(false);
+  });
+
+  /**
+   * BB-155. Ca này canh đúng cái làm khách nhận "Link đã hết hạn" ngày
+   * 15.09.2026: CSKH cấp lại link (link cũ bị thu hồi ngay), nhưng ô Lark kẹt
+   * lại ở link cũ vì chốt chống ghi đè chặn luôn chính app.
+   *
+   * Bỏ ca này thì bản sửa lặng lẽ hỏng lại, và chỉ khách phát hiện.
+   */
+  it("8b. Ô đang giữ LINK CŨ CỦA CHÍNH APP thì PHẢI ghi đè", async () => {
+    const goc = new URL(DIA_CHI).origin;
+    const luot = lapFetch({ oDangCo: `${goc}/g/maCuDaBiThuHoi` });
+    const kq = await ghiLinkAppVeLark({ recordId: RECORD, diaChi: DIA_CHI, ghiThat: true });
+    expect(kq.ghiDuoc).toBe(true);
+    expect(luot.some((l) => l.method === "PUT")).toBe(true);
   });
 
   it("9. Nói rõ --ghi-de thì mới ghi đè", async () => {

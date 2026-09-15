@@ -79,6 +79,7 @@ export function GalleryFilters({
               <option value="">{vi.admin.galleries.filterStatus}: Tất cả</option>
               <option value="draft">Bản nháp</option>
               <option value="syncing">Đang đồng bộ</option>
+              <option value="sync_error">Lỗi tải ảnh</option>
               <option value="ready">Sẵn sàng</option>
               <option value="in_review">Chờ khách chọn</option>
               <option value="submitted">Đã chốt</option>
