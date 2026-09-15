@@ -343,27 +343,29 @@ describe("BB-144: Lưu ghi chú và nhãn từng ảnh", () => {
     // Giả lập .from("selection_items").update() bị lỗi
     const originalFrom = adminClient.from.bind(adminClient);
     const fromSpy = vi.spyOn(adminClient, "from").mockImplementation((table: string) => {
-      const queryBuilder = originalFrom(table);
+      const builder = originalFrom(table);
       if (table === "selection_items") {
-        const originalUpdate = queryBuilder.update.bind(queryBuilder);
-        vi.spyOn(queryBuilder, "update").mockImplementation((values: unknown) => {
-          const updateBuilder = originalUpdate(values);
-          const originalEq = updateBuilder.eq.bind(updateBuilder);
-          vi.spyOn(updateBuilder, "eq").mockImplementation((col1: string, val1: unknown) => {
-            const eqBuilder = originalEq(col1, val1);
-            vi.spyOn(eqBuilder, "eq").mockResolvedValue({
-              error: { message: "Simulated database constraint failure" },
-              data: null,
-              count: null,
-              status: 400,
-              statusText: "Bad Request",
-            } as never);
-            return eqBuilder;
-          });
-          return updateBuilder;
+        return new Proxy(builder, {
+          get(target, prop, receiver) {
+            if (prop === "update") {
+              return () => ({
+                eq: () => ({
+                  eq: () =>
+                    Promise.resolve({
+                      error: { message: "Simulated database constraint failure" },
+                      data: null,
+                      count: null,
+                      status: 400,
+                      statusText: "Bad Request",
+                    }),
+                }),
+              });
+            }
+            return Reflect.get(target, prop, receiver);
+          },
         });
       }
-      return queryBuilder;
+      return builder;
     });
 
     try {
