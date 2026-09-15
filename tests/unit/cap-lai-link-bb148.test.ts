@@ -141,4 +141,66 @@ describe("BB-148: Cấp lại link không làm mất ảnh khách chọn", () =>
     const { rows: items } = await client.query("select count(*)::int as c from selection_items where selection_id = $1 and mark = 'selected'", [oldSelectionId]);
     expect(items[0].c).toBe(3);
   });
+
+  /**
+   * Ca này canh một cách hỏng KHÁC hẳn ca 1.
+   *
+   * Ca 1 nói: link cũ CHẾT thì lượt chọn đi theo link mới. Ca này nói: link cũ
+   * CÒN SỐNG thì tuyệt đối không được đụng vào. Thiếu nó, một bản sửa "cứ thấy
+   * lượt chọn mang cờ là kéo về mình" vẫn xanh ở ca 1 — mà ngoài đời là hai
+   * người mở hai link hợp lệ, người mở sau cướp mất lựa chọn của người mở
+   * trước, im lặng.
+   */
+  it("2. Link owner khác CÒN SỐNG thì không bị cướp mất lượt chọn", async () => {
+    const { rows: sTruoc } = await client.query(
+      "select id, share_link_id from selections where gallery_id = $1 and is_primary = true",
+      [galleryId],
+    );
+    expect(sTruoc.length).toBe(1);
+    const luotDangSong = sTruoc[0].id;
+    const linkDangGiu = sTruoc[0].share_link_id;
+
+    // Dựng tay một link owner thứ hai, CÒN hiệu lực — không qua đường cấp lại
+    // link, vì đường đó luôn thu hồi link cũ trước.
+    const maLinkHai = `bb148-song-song-${Date.now()}`;
+    const bamMaHai = createHash("sha256").update(maLinkHai).digest("hex");
+    await client.query(
+      `insert into share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin)
+       values ($1,$2,$3,'owner','active',false)`,
+      [galleryId, bamMaHai, maLinkHai.slice(0, 6)],
+    );
+
+    const res = await authGallery(
+      new NextRequest("http://localhost/api/auth/gallery", {
+        method: "POST",
+        body: JSON.stringify({ token: maLinkHai }),
+      }),
+    );
+    // Mở được — không được 500 như bệnh cũ
+    expect(res.status).toBe(200);
+
+    // Lượt chọn cũ VẪN thuộc link cũ, vẫn giữ cờ, vẫn đủ 3 ảnh
+    const { rows: sSau } = await client.query(
+      "select id, share_link_id, is_primary from selections where id = $1",
+      [luotDangSong],
+    );
+    expect(sSau[0].share_link_id).toBe(linkDangGiu);
+    expect(sSau[0].is_primary).toBe(true);
+
+    const { rows: anh } = await client.query(
+      "select count(*)::int c from selection_items where selection_id = $1",
+      [luotDangSong],
+    );
+    expect(anh[0].c).toBe(3);
+
+    // Và link thứ hai có lượt chọn riêng, KHÔNG mang cờ
+    const { rows: sMoi } = await client.query(
+      `select s.is_primary from selections s
+         join share_links sl on sl.id = s.share_link_id
+        where s.gallery_id = $1 and sl.token_hash = $2`,
+      [galleryId, bamMaHai],
+    );
+    expect(sMoi.length).toBe(1);
+    expect(sMoi[0].is_primary).toBe(false);
+  });
 });

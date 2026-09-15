@@ -174,29 +174,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (existing) {
         selectionId = existing.id;
       } else {
-        if (link.role === "owner") {
-          // BB-148: Hướng giải quyết — Lượt chọn cũ được dùng lại cho link mới.
-          // Lý do: Khi studio cấp lại link vì lý do kỹ thuật (ví dụ link cũ bị lộ),
-          // khách hàng không có lỗi và không được mất những ảnh đã cất công chọn.
-          // Thay vì tạo lượt chọn mới và đụng uq_selections_primary, ta tìm lượt
-          // chọn mang cờ is_primary hiện tại của bộ ảnh, sau đó gán share_link_id
-          // sang link mới. Việc này bảo toàn 100% selection_items và ghi chú cũ.
-          const { data: existingPrimary } = await admin
+        // BB-148 — cấp lại link thì lượt chọn ĐI THEO link mới.
+        //
+        // Chủ studio chốt 15.09.2026: link cũ chết hẳn, nhưng ảnh ba mẹ đã thả
+        // tim phải còn nguyên. Studio cấp lại link vì lý do của studio, không
+        // phải lỗi của khách.
+        //
+        // uq_selections_primary chỉ cho MỘT lượt chọn mang cờ trên mỗi bộ ảnh.
+        // Bản cũ cứ thế insert thêm một cái nữa, nên link thứ hai mở lên là
+        // đụng khoá trùng, ném lỗi, 500 — và màn khách hiện "Link đã hết hạn".
+        const { data: dangGiuCo } = await admin
+          .from("selections")
+          .select("id, share_links!inner(status)")
+          .eq("gallery_id", link.gallery_id)
+          .eq("is_primary", true)
+          .maybeSingle();
+
+        // Link giữ cờ đã chết thì lượt chọn đó là của khách này, chuyển sang.
+        // Link giữ cờ CÒN SỐNG thì không đụng vào: hai người mở hai link hợp lệ
+        // mà người sau kéo lượt chọn về mình là người trước mất sạch lựa chọn
+        // vừa làm, không có gì báo. Cấp lại link luôn thu hồi link cũ trước,
+        // nên nhánh này không cản đường đi thường ngày.
+        const giuBoiLinkDaChet =
+          dangGiuCo &&
+          (dangGiuCo as { share_links?: { status?: string } }).share_links?.status !== "active";
+
+        if (link.role === "owner" && dangGiuCo && giuBoiLinkDaChet) {
+          const { error: updErr } = await admin
             .from("selections")
-            .select("id")
-            .eq("gallery_id", link.gallery_id)
-            .eq("is_primary", true)
-            .maybeSingle();
+            .update({ share_link_id: link.id })
+            .eq("id", dangGiuCo.id);
 
-          if (existingPrimary) {
-            const { error: updErr } = await admin
-              .from("selections")
-              .update({ share_link_id: link.id })
-              .eq("id", existingPrimary.id);
-
-            if (updErr) throw updErr;
-            selectionId = existingPrimary.id;
-          }
+          if (updErr) throw updErr;
+          selectionId = dangGiuCo.id;
         }
 
         if (!selectionId) {
@@ -205,7 +215,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             .insert({
               gallery_id: link.gallery_id,
               share_link_id: link.id,
-              is_primary: link.role === "owner",
+              // Chỉ nhận cờ khi chưa ai giữ. Bộ ảnh đang có lượt chọn chính của
+              // một link còn sống thì link này là link phụ, không phải link hỏng.
+              is_primary: link.role === "owner" && !dangGiuCo,
             })
             .select("id")
             .single();
