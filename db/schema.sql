@@ -214,7 +214,9 @@ create table galleries (
   -- Tuỳ chọn hiển thị
   cover_photo_id      uuid,                           -- FK gán sau khi tạo photos
   watermark_enabled   boolean not null default true,
-  download_enabled    boolean not null default false,
+  -- BB-158: chủ studio chốt 15/09/2026 cho ba mẹ tải ảnh, bật mặc định.
+  -- Đổi quyết định số 4 ở docs/13. Xem db/migrations/0042.
+  download_enabled    boolean not null default true,
   notes_enabled       boolean not null default true,
   invite_enabled      boolean not null default true,
 
