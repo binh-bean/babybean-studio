@@ -335,4 +335,96 @@ describe("BB-144: Lưu ghi chú và nhãn từng ảnh", () => {
     expect(returnedPhoto.retouchNote).toBe("Bé bị xước nhẹ ở trán, nhờ sửa giúp");
     expect(returnedPhoto.noteTags).toEqual(["xoa_mun_sua", "lam_sang_da"]);
   });
+
+  it("8. Giả lập ghi hỏng (.update() trả lỗi) -> lối gọi NHẬN ĐƯỢC lỗi, không nuốt thành 200", async () => {
+    const admin = await import("@/lib/supabase/admin");
+    const adminClient = admin.createAdminClient();
+
+    // Giả lập .from("selection_items").update() bị lỗi
+    const originalFrom = adminClient.from.bind(adminClient);
+    const fromSpy = vi.spyOn(adminClient, "from").mockImplementation((table: string) => {
+      const queryBuilder = originalFrom(table);
+      if (table === "selection_items") {
+        const originalUpdate = queryBuilder.update.bind(queryBuilder);
+        vi.spyOn(queryBuilder, "update").mockImplementation((values: unknown) => {
+          const updateBuilder = originalUpdate(values);
+          const originalEq = updateBuilder.eq.bind(updateBuilder);
+          vi.spyOn(updateBuilder, "eq").mockImplementation((col1: string, val1: unknown) => {
+            const eqBuilder = originalEq(col1, val1);
+            vi.spyOn(eqBuilder, "eq").mockResolvedValue({
+              error: { message: "Simulated database constraint failure" },
+              data: null,
+              count: null,
+              status: 400,
+              statusText: "Bad Request",
+            } as never);
+            return eqBuilder;
+          });
+          return updateBuilder;
+        });
+      }
+      return queryBuilder;
+    });
+
+    try {
+      // 1. Kiểm tra tầng service: patchSelection phải trả về error code INTERNAL, không trả về data
+      const res = await patchSelection(
+        session,
+        {
+          clientOpId: randomUUID(),
+          ops: [
+            {
+              photoId: photo1,
+              retouchNote: "Thử ghi hỏng",
+            },
+          ],
+        },
+        null,
+        null
+      );
+
+      expect(res.data).toBeUndefined();
+      expect(res.error).toBeDefined();
+      expect(res.error?.code).toBe("INTERNAL");
+
+      // 2. Kiểm tra tầng API route: lối gọi nhận HTTP 500, TUYỆT ĐỐI KHÔNG nhận 200
+      const gallerySession = await import("@/lib/auth/gallery-session");
+      const sessionSpy = vi.spyOn(gallerySession, "requireGallerySession").mockResolvedValue({
+        galleryId,
+        shareLinkId,
+        selectionId,
+        customerId,
+        role: "owner",
+        exp: 0,
+      });
+
+      const { PATCH } = await import("@/app/api/g/selection/route");
+      const req = new Request("http://localhost/api/g/selection", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientOpId: randomUUID(),
+          ops: [
+            {
+              photoId: photo1,
+              retouchNote: "Thử ghi hỏng qua API",
+            },
+          ],
+        }),
+      });
+
+      const httpResponse = await PATCH(req);
+      const httpJson = await httpResponse.json();
+
+      sessionSpy.mockRestore();
+
+      // Khẳng định lối gọi nhận được lỗi HTTP 500, không nuốt thành 200
+      expect(httpResponse.status).toBe(500);
+      expect(httpJson.error).toBeDefined();
+      expect(httpJson.error.code).toBe("INTERNAL");
+      expect(httpJson.data).toBeUndefined();
+    } finally {
+      fromSpy.mockRestore();
+    }
+  });
 });

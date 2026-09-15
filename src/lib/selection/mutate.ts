@@ -194,36 +194,19 @@ export async function patchSelection(
       updatePayload.note_tags = op.noteTags ?? [];
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("selection_items")
       .update(updatePayload)
       .eq("selection_id", session.selectionId)
       .eq("photo_id", op.photoId);
 
-    // Nếu sau khi xoá ghi chú / thẻ mà dòng không còn bất kỳ liên hệ nào
-    // (mark is null, is_favorite is false, retouch_note is null, note_tags rỗng)
-    // thì dọn sạch dòng để không để lại rác trong database.
-    if (op.retouchNote === null || (hasNoteTags && (op.noteTags ?? []).length === 0)) {
-      const { data: current } = await supabase
-        .from("selection_items")
-        .select("mark, is_favorite, retouch_note, note_tags")
-        .eq("selection_id", session.selectionId)
-        .eq("photo_id", op.photoId)
-        .maybeSingle();
-
-      if (
-        current &&
-        current.mark === null &&
-        !current.is_favorite &&
-        current.retouch_note === null &&
-        (!current.note_tags || current.note_tags.length === 0)
-      ) {
-        await supabase
-          .from("selection_items")
-          .delete()
-          .eq("selection_id", session.selectionId)
-          .eq("photo_id", op.photoId);
-      }
+    if (updateError) {
+      return {
+        error: {
+          code: "INTERNAL",
+          message: updateError.message || "Không thể lưu ghi chú chỉnh sửa ảnh",
+        },
+      };
     }
   }
 
