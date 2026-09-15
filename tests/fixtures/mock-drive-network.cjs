@@ -17,9 +17,9 @@
 // real browser, which is the whole point of BB-134.
 // PNG chosen over JPEG because minimal JPEGs need complex Huffman tables
 // that some encoders get wrong; a minimal PNG is 70 bytes and universally
-// 1x1 JPEG
+// 10x10 PNG trong suốt
 const IMG_1x1 = Buffer.from(
-  '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
+  'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FAP5FDvcfRYWgAAAAAElFTkSuQmCC',
   'base64'
 );
 
@@ -39,7 +39,7 @@ globalThis.fetch = async function patchedFetch(input, init) {
     return new Response(body, {
       status: 200,
       headers: {
-        "Content-Type": "image/jpeg",
+        "Content-Type": "image/png",
         "Content-Length": String(body.byteLength),
       },
     });

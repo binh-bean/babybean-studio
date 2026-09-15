@@ -223,47 +223,13 @@ test.describe("BB-134: đi đúng đường của khách", () => {
     const imgLocator = page.locator('img[src*="/api/img/"]').first();
     await imgLocator.waitFor({ state: "visible", timeout: IMAGE_TIMEOUT });
 
-    // Listen to network to see why it fails
-    page.on('response', response => {
-      if (response.url().includes('/api/img/')) {
-        console.log(`IMAGE RESPONSE: ${response.url()} - ${response.status()} - ${response.headers()['content-type']} - len: ${response.headers()['content-length']}`);
-      }
-    });
-    page.on('requestfailed', request => {
-      if (request.url().includes('/api/img/')) {
-        console.log(`IMAGE FAILED: ${request.url()} - ${request.failure()?.errorText}`);
-      }
-    });
-
-    // In HTML của thẻ ảnh
-    const html = await imgLocator.evaluate(el => el.outerHTML);
-    const complete = await imgLocator.evaluate((el: HTMLImageElement) => el.complete);
-    console.log("DEBUG HTML:", html, "COMPLETE:", complete);
-
-    // Chờ ảnh tải xong (complete = true)
+    // Chờ ảnh tải xong — naturalWidth > 0 chứng minh byte PNG thật đã về
     await expect.poll(
       async () => {
-        return imgLocator.evaluate((el: HTMLImageElement) => el.complete);
+        return imgLocator.evaluate((el: HTMLImageElement) => el.naturalWidth);
       },
-      { timeout: IMAGE_TIMEOUT, message: "Ảnh không complete" },
-    ).toBe(true);
-
-    const nw = await imgLocator.evaluate((el: HTMLImageElement) => el.naturalWidth);
-    console.log("NATURAL WIDTH AFTER COMPLETE:", nw);
-    
-    // Draw to canvas to see what it looks like
-    const pixelData = await imgLocator.evaluate((el: HTMLImageElement) => {
-      const canvas = document.createElement('canvas');
-      canvas.width = el.width || 100;
-      canvas.height = el.height || 100;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return null;
-      ctx.drawImage(el, 0, 0, canvas.width, canvas.height);
-      return Array.from(ctx.getImageData(0, 0, 1, 1).data);
-    });
-    console.log("PIXEL DATA:", pixelData);
-
-    expect(nw).toBeGreaterThan(0);
+      { timeout: IMAGE_TIMEOUT, message: "Ảnh không tải được (naturalWidth vẫn là 0)" },
+    ).toBeGreaterThan(0);
   });
 
   test("2. Thả tim → con số Đã chọn tăng từ 0 lên 1", async ({ page }) => {
@@ -304,5 +270,51 @@ test.describe("BB-134: đi đúng đường của khách", () => {
     expect(res.status()).toBe(403);
     const body = await res.json();
     expect(body?.error?.code).toBe("FORBIDDEN");
+  });
+
+  test("4. Cấp lại link (BB-157 & BB-148): mở link mới đè lên cookie cũ", async ({ page }) => {
+    // 1. Mở trang bộ A bằng link cũ (có thể test trước đã mở, làm lại cho chắc)
+    await page.goto(`/g/${ids.maLink}`);
+    await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: IMAGE_TIMEOUT });
+
+    // 2. Chắc chắn ảnh đầu tiên đã được chọn (nếu test 2 đã chọn thì giờ nó vẫn là 1, nếu không thì phải chọn)
+    const counterBlock = page.locator("text=1. Đã chọn").locator("..");
+    const counter = counterBlock.locator("span.text-2xl");
+    let currentCount = "0";
+    try {
+      currentCount = await counter.innerText({ timeout: 2000 });
+    } catch {
+      // ignore
+    }
+    
+    if (currentCount === "0") {
+      const heartBtn = page.locator('button[aria-label="Chọn ảnh này"]').first();
+      await heartBtn.click();
+      await expect(counter).toHaveText("1", { timeout: 10_000 });
+    }
+
+    // 3. Cấp lại link mới bằng DB (như studio làm)
+    const maLinkMoi = `bb134-new-${randomUUID()}`;
+    const dbClient = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+    await dbClient.connect();
+    // Vô hiệu hóa link cũ
+    await dbClient.query(`UPDATE share_links SET status = 'revoked' WHERE id = $1`, [ids.linkId]);
+    // Tạo link mới
+    await dbClient.query(
+      `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin)
+       VALUES ($1,$2,$3,'owner','active',false)`,
+      [ids.boA, sha256(maLinkMoi), maLinkMoi.slice(0, 6)],
+    );
+    await dbClient.end();
+
+    // 4. Khách mở link mới (ngay trên browser đang có cookie phiên cũ)
+    await page.goto(`/g/${maLinkMoi}`);
+    
+    // Phải mở được, không bị văng ra "Link đã hết hạn" (BB-157)
+    await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: IMAGE_TIMEOUT });
+
+    // Ảnh đã chọn phải còn nguyên (BB-148)
+    const counterMoi = page.locator("text=1. Đã chọn").locator("..").locator("span.text-2xl");
+    await expect(counterMoi).toHaveText("1");
   });
 });
