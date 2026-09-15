@@ -4,6 +4,7 @@ import {
   readLarkTable,
   syncSingleRetouchRecord,
   checkRetouchTrigger,
+  LarkRecord,
 } from "@/lib/lark/sync-retouch";
 import { NextResponse } from "next/server";
 
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Thiếu cấu hình môi trường" }, { status: 500 });
   }
 
-  const client = new pg.Client({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
+  const client = new pg.Client({ connectionString: dbUrl });
   await client.connect();
 
   try {
@@ -80,8 +81,7 @@ export async function POST(request: Request) {
     let existingCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < qualifiedRecords.length; i++) {
-      const record = qualifiedRecords[i];
+    for (const [i, record] of qualifiedRecords.entries()) {
       try {
         const res = await syncSingleRetouchRecord({
           client,
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
           staffList: staffRows,
           write: true,
           index: i,
+          dbUrl,
         });
 
         if (res.action === "created") createdCount++;

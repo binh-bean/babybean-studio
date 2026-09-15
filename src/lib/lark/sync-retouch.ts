@@ -10,6 +10,8 @@
 
 import pg from "pg";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
+import { createHash } from "node:crypto";
+import { choPhepTenThat } from "@/lib/lark/muc-tieu-du-lieu";
 
 export const HOST = "https://open.larksuite.com/open-apis";
 
@@ -347,6 +349,10 @@ export async function readLarkTable(
 
 // --- Xử lý đồng bộ 1 bản ghi Hậu Kỳ xuống DB theo docs/16 §7.3 -------------
 
+export function customerKey(larkCustomerCode: string): string {
+  return createHash("sha256").update(String(larkCustomerCode)).digest("hex").slice(0, 12);
+}
+
 export interface SyncRetouchOptions {
   client: pg.Client;
   record: LarkRecord;
@@ -354,6 +360,7 @@ export interface SyncRetouchOptions {
   staffList: Array<{ id: string; fullName: string; role: string }>;
   write: boolean;
   index: number;
+  dbUrl?: string;
 }
 
 export interface SyncResult {
@@ -410,10 +417,15 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
   const contractCode = rawContract || null;
 
   // 5. Ánh xạ dữ liệu cá nhân đúng docs/16 §7.3:
-  //    customers.full_name: "KH · " + mã hợp đồng (hoặc record_id nếu thiếu)
-  //    customers.phone: null
-  //    customers.facebook: CHỈ lấy URL từ "Chat với khách", bỏ text
-  const customerFullName = contractCode ? `KH · ${contractCode}` : `KH · ${record.record_id}`;
+  const rawCustomerCode = cellText(getField(fields, /mã\s*kh|mã\s*khách\s*hàng/i)).trim();
+  const larkCustomerKey = rawCustomerCode ? customerKey(rawCustomerCode) : null;
+  const rawCustomerName = cellText(getField(fields, /tên\s*kh|tên\s*khách\s*hàng/i)).trim();
+
+  let customerFullName = larkCustomerKey ? `KH · ${larkCustomerKey}` : (contractCode ? `KH · ${contractCode}` : `KH · ${record.record_id}`);
+  if (opts.dbUrl && choPhepTenThat(opts.dbUrl) && rawCustomerName) {
+    customerFullName = rawCustomerName;
+  }
+
   const chatField = getField(fields, /chat\s*với\s*khách|link\s*chat|chat/i);
   const facebookChatUrl = extractChatLink(chatField);
 
@@ -460,28 +472,41 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
   // --- Ghi vào DB trong transaction (xoá-rồi-ghi-lại hoặc kiểm tra tồn tại) ---
   await client.query("begin");
   try {
-    // A. Tìm hoặc tạo Customer (khớp theo full_name = 'KH · HD_...' và branch_id)
-    const { rows: custRows } = await client.query(
-      `select id from customers where branch_id = $1 and full_name = $2 limit 1`,
-      [branchId, customerFullName],
-    );
-
+    // A. Tìm hoặc tạo Customer (khớp theo lark_customer_key nếu có, fallback full_name)
     let customerId: string;
+    let custRows = [];
+    
+    if (larkCustomerKey) {
+      const res = await client.query(
+        `select id from customers where lark_customer_key = $1 limit 1`,
+        [larkCustomerKey]
+      );
+      custRows = res.rows;
+    } else {
+      const res = await client.query(
+        `select id from customers where branch_id = $1 and full_name = $2 limit 1`,
+        [branchId, customerFullName]
+      );
+      custRows = res.rows;
+    }
+
     if (custRows.length > 0) {
       customerId = custRows[0].id;
-      // Cập nhật facebook link nếu chưa có
-      if (facebookChatUrl) {
-        await client.query(`update customers set facebook = coalesce(facebook, $1) where id = $2`, [
-          facebookChatUrl,
-          customerId,
-        ]);
-      }
+      // Cập nhật facebook link nếu chưa có, cập nhật lại tên và lark_customer_key
+      await client.query(
+        `update customers set 
+           facebook = coalesce(facebook, $1),
+           full_name = $2,
+           lark_customer_key = coalesce(lark_customer_key, $3)
+         where id = $4`,
+        [facebookChatUrl, customerFullName, larkCustomerKey, customerId]
+      );
     } else {
       const { rows: newCust } = await client.query(
-        `insert into customers (branch_id, full_name, phone, facebook, zalo, note, source, tags)
-         values ($1, $2, null, $3, null, null, 'lark_retouch', array['lark_draft', 'bb111'])
+        `insert into customers (branch_id, full_name, phone, facebook, zalo, note, source, tags, lark_customer_key)
+         values ($1, $2, null, $3, null, null, 'lark_retouch', array['lark_draft', 'bb111'], $4)
          returning id`,
-        [branchId, customerFullName, facebookChatUrl],
+        [branchId, customerFullName, facebookChatUrl, larkCustomerKey],
       );
       customerId = newCust[0].id;
     }

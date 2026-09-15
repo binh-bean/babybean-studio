@@ -1,0 +1,15 @@
+name: Sync Lark Retouch
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: "0 * * * *" # Chủ studio có thể mở comment ở đây để lên lịch tự động
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Sync Lark Route
+        run: |
+          curl -f -X POST -H "Authorization: Bearer ${{ secrets.SYNC_CRON_SECRET }}" \
+            ${{ secrets.APP_URL }}/api/cron/sync-lark
