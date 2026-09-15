@@ -69,6 +69,15 @@ export function fail(
  * never reach a customer's browser.
  */
 export function failUnexpected(err: unknown, requestId: string): NextResponse {
-  console.error(JSON.stringify({ evt: "unhandled_error", requestId, err: String(err) }));
+  let errDetails;
+  if (err instanceof Error) {
+    errDetails = { ...err, message: err.message, stack: err.stack };
+  } else if (typeof err === "object" && err !== null) {
+    errDetails = { ...err };
+  } else {
+    errDetails = String(err);
+  }
+  
+  console.error(JSON.stringify({ evt: "unhandled_error", requestId, err: errDetails }));
   return fail("INTERNAL", undefined, { requestId });
 }

@@ -174,18 +174,45 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (existing) {
         selectionId = existing.id;
       } else {
-        const { data: created, error: insErr } = await admin
-          .from("selections")
-          .insert({
-            gallery_id: link.gallery_id,
-            share_link_id: link.id,
-            is_primary: link.role === "owner",
-          })
-          .select("id")
-          .single();
+        if (link.role === "owner") {
+          // BB-148: Hướng giải quyết — Lượt chọn cũ được dùng lại cho link mới.
+          // Lý do: Khi studio cấp lại link vì lý do kỹ thuật (ví dụ link cũ bị lộ),
+          // khách hàng không có lỗi và không được mất những ảnh đã cất công chọn.
+          // Thay vì tạo lượt chọn mới và đụng uq_selections_primary, ta tìm lượt
+          // chọn mang cờ is_primary hiện tại của bộ ảnh, sau đó gán share_link_id
+          // sang link mới. Việc này bảo toàn 100% selection_items và ghi chú cũ.
+          const { data: existingPrimary } = await admin
+            .from("selections")
+            .select("id")
+            .eq("gallery_id", link.gallery_id)
+            .eq("is_primary", true)
+            .maybeSingle();
 
-        if (insErr || !created) throw insErr ?? new Error("selection insert returned nothing");
-        selectionId = created.id;
+          if (existingPrimary) {
+            const { error: updErr } = await admin
+              .from("selections")
+              .update({ share_link_id: link.id })
+              .eq("id", existingPrimary.id);
+
+            if (updErr) throw updErr;
+            selectionId = existingPrimary.id;
+          }
+        }
+
+        if (!selectionId) {
+          const { data: created, error: insErr } = await admin
+            .from("selections")
+            .insert({
+              gallery_id: link.gallery_id,
+              share_link_id: link.id,
+              is_primary: link.role === "owner",
+            })
+            .select("id")
+            .single();
+
+          if (insErr || !created) throw insErr ?? new Error("selection insert returned nothing");
+          selectionId = created.id;
+        }
       }
     }
 
