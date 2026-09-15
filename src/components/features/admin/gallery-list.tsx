@@ -206,7 +206,7 @@ export function GalleryList() {
 
         const body = await res.json();
         const fetchedItems: GalleryItem[] = body?.data?.items ?? [];
-        const fetchedCounts: GalleryCounts = body?.data?.counts ?? counts;
+        const fetchedCounts: GalleryCounts | null = body?.data?.counts ?? null;
         const more: boolean = Boolean(body?.data?.hasMore);
         const cursor: string | null = body?.data?.nextCursor ?? null;
 
@@ -216,7 +216,12 @@ export function GalleryList() {
           setItems(fetchedItems);
         }
 
-        setCounts(fetchedCounts);
+        // setCounts(prev => …) chứ không đọc `counts` ở đây: đọc là phải khai nó
+        // trong danh sách phụ thuộc, mà phản hồi luôn trả về một đối tượng MỚI —
+        // thành ra tải xong lại dựng lại hàm này, useEffect thấy hàm mới lại gọi
+        // tải, và mỗi vòng đặt lại loading = true. Con quay không bao giờ tắt dù
+        // dữ liệu về đủ mỗi lần, và mỗi tab đang mở gọi API hai lần mỗi giây.
+        setCounts((prev) => fetchedCounts ?? prev);
         setHasMore(more);
         setNextCursor(cursor);
       } catch (err) {
@@ -226,7 +231,7 @@ export function GalleryList() {
         setLoadingMore(false);
       }
     },
-    [filters, counts]
+    [filters]
   );
 
   // Gọi fetchGalleries khi bộ lọc thay đổi
