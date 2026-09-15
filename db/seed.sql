@@ -158,7 +158,7 @@ where id = 'dddddddd-0000-0000-0000-000000000003';
 insert into settings (key, branch_id, value) values
   ('gallery.default_due_days',      null, '7'::jsonb),
   ('gallery.require_pin_default',   null, 'true'::jsonb),
-  ('gallery.allow_download_default',null, 'false'::jsonb),
+  ('gallery.allow_download_default',null, 'true'::jsonb),
   ('gallery.watermark_default',     null, 'true'::jsonb),
   ('gallery.invite_default',        null, 'true'::jsonb),
   ('gallery.reminder_days',         null, '[3, 6]'::jsonb),

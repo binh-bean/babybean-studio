@@ -80,7 +80,19 @@ Ba lý do:
 
 **Bật cho ai**: khi Phase 2 xong, CSKH bật theo từng album cho khách quen hoặc khách đã mua thêm nhiều ảnh — dùng như một ưu đãi, không phải mặc định.
 
-**Cấu hình**: `settings` key `gallery.allow_download_default = false`.
+**Cấu hình**: `settings` key `gallery.allow_download_default = true`.
+
+### Đã đổi — 15/09/2026
+
+Chủ studio chốt **cho ba mẹ tải ảnh, bật mặc định cho mọi bộ**, không chờ
+Phase 2 nữa. Khách tải được từng ảnh đang xem, và cả bộ — tải dần từng lô 15
+ảnh, hết lô tự chạy tiếp (BB-156).
+
+Lập luận cũ ở trên vẫn đúng và vẫn nên đọc: ảnh chưa chỉnh mà ra ngoài thì
+studio mất phần hậu kỳ. Chủ studio biết và vẫn chọn bật. Ghi lại để người sau
+đừng tưởng là nhầm rồi tự tắt đi.
+
+Tắt cho MỘT bộ vẫn làm được: `galleries.download_enabled = false` cho bộ đó.
 
 ## 5. Tên miền — `babybeanstudio.vn`
 
