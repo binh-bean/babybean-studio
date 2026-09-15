@@ -3,19 +3,25 @@ begin;
 -- ---------------------------------------------------------------------------
 -- Branches
 -- ---------------------------------------------------------------------------
+-- BB-139: BA CHI NHÁNH THẬT của studio, tên phải khớp từng ký tự với
+-- BRANCH_MAP trong scripts/sync-lark-hauky.mjs và với bb-dev.
+--
+-- Bản đầu gieo "BabyBean Quận 1 / Thủ Đức / Gò Vấp" — chép từ seed demo thời
+-- chưa có dữ liệu thật. Hậu quả đo được: kéo 469 bộ ảnh từ Lark vào bb-prod thì
+-- dựng được ĐÚNG 0 album, vì không tên chi nhánh nào khớp. Không lỗi, không cảnh
+-- báo — chỉ là một cơ sở dữ liệu trống trơn trông như đã chạy xong.
 insert into branches (id, code, name, address, hotline, timezone) values
-  ('11111111-1111-1111-1111-111111111111', 'BB-Q1',
-   'BabyBean Quận 1',  '12 Nguyễn Huệ, Quận 1, TP.HCM',      '0901000001', 'Asia/Ho_Chi_Minh'),
+  ('11111111-1111-1111-1111-111111111111', 'BB-PT',
+   'Baby Bean Pasteur',   '95 Pasteur',              null,          'Asia/Ho_Chi_Minh'),
   ('22222222-2222-2222-2222-222222222222', 'BB-TD',
-   'BabyBean Thủ Đức', '45 Võ Văn Ngân, Thủ Đức, TP.HCM',    '0901000002', 'Asia/Ho_Chi_Minh'),
-  ('33333333-3333-3333-3333-333333333333', 'BB-GV',
-   'BabyBean Gò Vấp',  '88 Quang Trung, Gò Vấp, TP.HCM',     '0901000003', 'Asia/Ho_Chi_Minh')
+   'Baby Bean Thảo Điền', '18A1 Đường 43',           '0901000002',  'Asia/Ho_Chi_Minh'),
+  ('33333333-3333-3333-3333-333333333333', 'BB-NTB',
+   'Baby Bean Tân Bình',  '260/43 Nguyễn Thái Bình', null,          'Asia/Ho_Chi_Minh')
 on conflict (id) do update set
   code = excluded.code,
   name = excluded.name,
   address = excluded.address,
-  hotline = excluded.hotline,
-  timezone = excluded.timezone;
+  hotline = excluded.hotline;
 
 -- ---------------------------------------------------------------------------
 -- Packages
