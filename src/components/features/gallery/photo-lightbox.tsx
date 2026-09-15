@@ -17,6 +17,8 @@ export interface PhotoLightboxProps {
   initialIndex: number;
   onClose: () => void;
   onToggleHeart: (photo: PhotoPublic) => void;
+  /** BB-156: null = bộ ảnh này không cho tải. */
+  onTaiAnh?: ((photo: PhotoPublic) => void) | null;
   mutatingIds: Set<string>;
   isLocked: boolean;
 }
@@ -42,6 +44,7 @@ export function PhotoLightbox({
   initialIndex,
   onClose,
   onToggleHeart,
+  onTaiAnh,
   mutatingIds,
   isLocked,
 }: PhotoLightboxProps) {
@@ -296,7 +299,17 @@ export function PhotoLightbox({
             />
             <span>{isCurrentSelected ? vi.gallery.filterSelected : vi.gallery.select}</span>
           </button>
-        </div>
+
+        {onTaiAnh && (
+          <button
+            type="button"
+            onClick={() => onTaiAnh(currentPhoto)}
+            aria-label="Tải ảnh này về máy"
+            className="rounded-full bg-white/10 px-4 py-2 text-sm text-white backdrop-blur hover:bg-white/20"
+          >
+            Tải ảnh này
+          </button>
+        )}        </div>
       </footer>
     </div>
   );
