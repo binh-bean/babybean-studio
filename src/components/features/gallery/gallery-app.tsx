@@ -479,6 +479,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
       let res = await fetch("/api/g/gallery", { cache: "no-store" });
 
+      // BB-157: phiên CŨ trong máy không được chặn link MỚI trên thanh địa chỉ.
+      //
+      // Trước đây chỉ 401 mới đi đăng nhập lại bằng mã trên URL. Nhưng khi
+      // studio cấp lại link, phiên cũ trong trình duyệt trỏ vào link ĐÃ THU HỒI
+      // và /api/g/gallery trả 410 LINK_EXPIRED — không phải 401. Ba mẹ mở link
+      // mới toanh vẫn thấy "Link đã hết hạn", và bấm lại bao nhiêu lần cũng vậy
+      // cho tới khi ai đó biết đường xoá cookie. Chủ studio gặp đúng cảnh này
+      // ngày 15.09.2026 với một link vừa tạo xong một phút trước.
+      //
+      // 410 và 403 nghĩa là phiên đang cầm đã hỏng. Mã trên URL mới là thứ ba mẹ
+      // vừa bấm vào, nên nó phải được ưu tiên.
+      const phienCuHong = res.status === 410 || res.status === 403;
+      if (phienCuHong) {
+        // Đăng nhập lại bằng mã trên URL sẽ thay cookie cũ bằng phiên mới.
+        res = new Response(null, { status: 401 });
+      }
+
       if (res.status === 401) {
         // Thử đăng nhập phiên khách với token nếu link không yêu cầu PIN
         const authRes = await fetch("/api/auth/gallery", {
