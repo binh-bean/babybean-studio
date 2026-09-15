@@ -118,13 +118,22 @@ export async function patchSelection(
     return { error: { code: "QUOTA_EXCEEDED" } };
   }
 
+  // Tách các trường selection gửi xuống RPC để RPC quản lý lock, quota, mark, is_favorite và logs.
+  // Không truyền retouchNote/noteTags xuống RPC để logic ghi chú và chuẩn hoá nhãn thẻ được quản lý
+  // tập trung, an toàn và có kiểm chứng ngược rõ ràng tại tầng này.
+  const rpcOps = request.ops.map(op => ({
+    photoId: op.photoId,
+    mark: op.mark,
+    isFavorite: (op as { isFavorite?: boolean }).isFavorite,
+  }));
+
   // Call the RPC to do the actual atomic update and activity_logs
   const { data: result, error: rpcError } = await supabase.rpc("patch_selection_batch", {
     p_client_op_id: request.clientOpId,
     p_selection_id: session.selectionId,
     p_gallery_id: session.galleryId,
     p_role: session.role,
-    p_ops: request.ops,
+    p_ops: rpcOps,
     p_max_selection: gallery.max_selection,
     p_allow_extra: gallery.allow_extra,
     p_included_quota: effectiveQuota,
@@ -140,6 +149,82 @@ export async function patchSelection(
     if (rpcError.message === "FORBIDDEN_PHOTO") return { error: { code: "FORBIDDEN", message: "Photo does not belong to this gallery" } };
     if (rpcError.message === "QUOTA_EXCEEDED") return { error: { code: "QUOTA_EXCEEDED" } };
     throw rpcError;
+  }
+
+  // BB-144: Cập nhật ghi chú chỉnh sửa (retouch_note) và danh sách nhãn (note_tags).
+  //
+  // QUY TẮC BẮT BUỘC (docs/briefs/BB-144-luu-ghi-chu-tung-anh.md):
+  // 1. Gửi null: XOÁ ghi chú (retouch_note = null).
+  // 2. Không gửi trường đó (undefined): GIỮ NGUYÊN ghi chú hiện tại, không ghi đè.
+  // 3. Gửi chuỗi: CẬP NHẬT nội dung ghi chú mới.
+  //
+  // Với nhãn thẻ (note_tags):
+  // 1. Gửi mảng [] hoặc null: XOÁ danh sách thẻ (note_tags = []).
+  // 2. Không gửi trường đó (undefined): GIỮ NGUYÊN danh sách thẻ hiện tại.
+  // 3. Gửi mảng string: CẬP NHẬT danh sách thẻ.
+  //
+  // Xử lý ảnh CHƯA ĐƯỢC CHỌN (Mục 3 brief BB-144):
+  // Nếu ảnh chưa từng được chọn và op này không gửi kèm lệnh chọn ảnh (mark='selected'),
+  // RPC phía trên đã từ chối ảnh đó vào result.rejected với mã INVALID_INPUT
+  // ("Không ghi chú được cho ảnh chưa chọn"). Ta bỏ qua các op trong rejected.
+  // Lý do: Ghi chú chỉnh sửa chỉ có ý nghĩa với ảnh mà phụ huynh chọn để studio retouch;
+  // không lưu ghi chú trôi nổi cho ảnh chưa chọn để giữ dữ liệu sạch và nhất quán với quy trình.
+  for (const op of request.ops) {
+    if (result?.rejected?.some((r: { photoId: string }) => r.photoId === op.photoId)) {
+      continue;
+    }
+
+    const hasRetouchNote = op.retouchNote !== undefined;
+    const hasNoteTags = op.noteTags !== undefined;
+
+    // Không gửi cả hai trường thì giữ nguyên, không cần cập nhật
+    if (!hasRetouchNote && !hasNoteTags) {
+      continue;
+    }
+
+    const updatePayload: { retouch_note?: string | null; note_tags?: string[] } = {};
+
+    if (hasRetouchNote) {
+      // Gửi null là XOÁ ghi chú, gửi chuỗi là CẬP NHẬT
+      updatePayload.retouch_note = op.retouchNote;
+    }
+
+    if (hasNoteTags) {
+      // Gửi [] hoặc null là XOÁ thẻ, gửi mảng là CẬP NHẬT
+      updatePayload.note_tags = op.noteTags ?? [];
+    }
+
+    await supabase
+      .from("selection_items")
+      .update(updatePayload)
+      .eq("selection_id", session.selectionId)
+      .eq("photo_id", op.photoId);
+
+    // Nếu sau khi xoá ghi chú / thẻ mà dòng không còn bất kỳ liên hệ nào
+    // (mark is null, is_favorite is false, retouch_note is null, note_tags rỗng)
+    // thì dọn sạch dòng để không để lại rác trong database.
+    if (op.retouchNote === null || (hasNoteTags && (op.noteTags ?? []).length === 0)) {
+      const { data: current } = await supabase
+        .from("selection_items")
+        .select("mark, is_favorite, retouch_note, note_tags")
+        .eq("selection_id", session.selectionId)
+        .eq("photo_id", op.photoId)
+        .maybeSingle();
+
+      if (
+        current &&
+        current.mark === null &&
+        !current.is_favorite &&
+        current.retouch_note === null &&
+        (!current.note_tags || current.note_tags.length === 0)
+      ) {
+        await supabase
+          .from("selection_items")
+          .delete()
+          .eq("selection_id", session.selectionId)
+          .eq("photo_id", op.photoId);
+      }
+    }
   }
 
   return { data: result as SelectionPatchResponse };
