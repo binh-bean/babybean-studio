@@ -233,7 +233,7 @@ create policy share_links_write on share_links for all to authenticated
 
 -- View không chứa bí mật, dùng cho mọi màn hình quản trị.
 create or replace view v_share_links as
-select id, gallery_id, token_prefix, role, label, requires_pin, status,
+select id, gallery_id, token_prefix, role, label, status,
        expires_at, view_count, last_viewed_at, created_at, revoked_at
 from share_links;
 
