@@ -234,6 +234,29 @@ Ba điều phải biết TRƯỚC khi cần đến nó:
    bằng `UPDATE` ở cuối tệp. Thêm vòng mới mà mọi cạnh đều NOT NULL thì script
    **dừng và không ghi gì** — tệp không phục hồi được thì tệ hơn là không có.
 
+### Hẹn giờ hằng tuần trên máy studio (Windows)
+
+`scripts/sao-luu-hang-tuan.cmd` là mảnh nối cho Task Scheduler. Nó tồn tại vì
+Task Scheduler chạy lệnh với thư mục làm việc là `C:\Windows\System32`, nên
+`npm run ...` gọi thẳng sẽ báo "Missing script" — mà Task Scheduler chỉ ghi lại
+mã thoát chứ không ghi lỗi, nên cài sai kiểu đó im lặng hàng tháng trời.
+
+1. Mở **Task Scheduler** → **Create Task** (không phải *Basic Task*).
+2. Tab **General**: đặt tên; chọn **Run whether user is logged on or not**.
+3. Tab **Triggers** → **New**: Weekly, chọn thứ và giờ máy chắc chắn đang bật.
+4. Tab **Actions** → **New** → Program/script: trỏ tới
+   `...\babybean-studio\scripts\sao-luu-hang-tuan.cmd`. **Start in** để trống
+   cũng được — tệp `.cmd` tự `cd` bằng `%~dp0`.
+5. Tab **Settings**: bật **Run task as soon as possible after a scheduled start
+   is missed** — máy studio hay tắt.
+
+Mỗi lượt chạy ghi một dòng vào `nhat-ky-sao-luu.txt` cạnh thư mục sao lưu, kèm
+mã thoát. **Xem tệp đó mỗi tháng một lần.** Sao lưu hỏng mà không ai biết thì
+giống hệt như không có sao lưu, chỉ khác là có người tưởng mình đang được che.
+
+Tệp sao lưu **không tự xoá cũ**. bb-prod hôm nay 2 MB một lượt, một năm khoảng
+100 MB — chưa cần dọn. Khi `photos` đầy lên thì tính lại.
+
 - **Ảnh không cần backup** — vẫn nằm trên Drive của studio. Nhưng phải dặn studio: **không xoá thư mục Drive của album chưa giao xong.**
 - Gói Pro có thêm **Point-in-time Recovery**; nếu bật thì đây là lưới đỡ thứ hai, không thay thế cái trên.
 - Diễn tập khôi phục: 6 tháng một lần, khôi phục vào project tạm và kiểm tra dữ liệu.
