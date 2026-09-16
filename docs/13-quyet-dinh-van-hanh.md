@@ -53,7 +53,30 @@ Sau 1 tháng chạy thật, xem báo cáo "thời gian trung bình từ gửi li
 
 **Cấu hình**: `settings` key `gallery.default_due_days = 7`, ghi đè được theo từng album trong wizard.
 
-## 3. PIN — ~~bật mặc định~~ ĐÃ ĐỔI: **tắt mặc định**
+## 3. PIN — ~~bật mặc định~~ ~~tắt mặc định~~ **BỎ HẲN**
+
+> **Chốt 16/09/2026: bỏ hẳn mã PIN khỏi hệ thống.** Không phải tắt mặc định —
+> bỏ luôn cả đường bật. Xem BB-169.
+>
+> **Đổi lại được gì:** một tính năng chạm 46 tệp biến mất, kèm theo là lỗ
+> hổng BB-168 (PIN tự sinh từ bốn số cuối điện thoại, hoặc `1234`) — biến mất
+> theo, không cần vá.
+>
+> **Mất gì, nói thật:** sau khi bỏ, thứ duy nhất che ảnh của một nhà là **token
+> 22 ký tự trong link**. Token ấy không đoán được (~131 bit) — nhưng link thì
+> **chuyển tiếp được**, và đúng chuyện chuyển tiếp trong nhóm gia đình trên
+> Zalo là lý do mục này từng chọn bật PIN.
+>
+> **Đường xử lý khi link rò** từ nay là **thu hồi rồi cấp lại** — BB-148 đã làm
+> xong, lượt chọn của khách đi theo link mới, không ai mất ảnh đã chọn.
+>
+> **Vì sao vẫn hợp lý:** PIN đã tắt mặc định từ 12/09, và đo ngày 16/09 thì
+> **0/14 link đang bật PIN**. Nó không che cho ai cả, trong khi vẫn bắt cả dự án
+> nuôi một màn hình, một đường API, hai cột trong cơ sở dữ liệu và một nhánh
+> trong hàm dựng bộ ảnh. Một lớp phòng vệ không ai bật thì không phải lớp
+> phòng vệ, nó là mặt tiền để nhìn cho yên tâm.
+
+### Hai quyết định cũ, giữ lại để hiểu vì sao từng chọn như vậy
 
 > **Sửa 16/09/2026.** Mục này dưới đây là quyết định **cũ**. Chủ studio đã
 > đổi ngày 12/09/2026: **PIN tắt mặc định**, CSKH bật cho những ca nhạy cảm.
