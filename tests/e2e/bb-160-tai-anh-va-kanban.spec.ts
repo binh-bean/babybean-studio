@@ -4,7 +4,7 @@
  * OWNER: QA-BOT.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { Client } from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { createHash, randomUUID } from "node:crypto";
@@ -122,7 +122,7 @@ async function donDep(c: Client, ids: FixtureIds): Promise<void> {
 test.describe("BB-160: Tải ảnh và Kanban", () => {
   let pgClient: Client;
   let ids: FixtureIds;
-  let adminAuthClient: any;
+  let adminAuthClient: ReturnType<typeof createClient>;
 
   test.beforeAll(async () => {
     pgClient = new Client({ connectionString: process.env.SUPABASE_DB_URL });
