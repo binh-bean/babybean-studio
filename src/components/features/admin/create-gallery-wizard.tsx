@@ -75,8 +75,8 @@ export function CreateGalleryWizard() {
   const [quota, setQuota] = useState(20);
   const [extraPrice, setExtraPrice] = useState(50000);
   const [deadlineDays, setDeadlineDays] = useState(7);
-  const [requirePin, setRequirePin] = useState(true);
-  const [watermark, setWatermark] = useState(true);
+  const [requirePin, setRequirePin] = useState(false);
+  const [download, setDownload] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ResultData | null>(null);
@@ -157,7 +157,7 @@ export function CreateGalleryWizard() {
           includedQuota: quota,
           extraPhotoPrice: extraPrice,
           dueAt: dueAt.toISOString(),
-          options: { requirePin, watermark, download: false, notes: true, invite: true },
+          options: { requirePin, download, notes: true, invite: true },
         }),
       });
       const body = await res.json();
@@ -439,10 +439,10 @@ export function CreateGalleryWizard() {
               <label className="flex items-center gap-2 text-sm text-[var(--bb-fg)]">
                 <input
                   type="checkbox"
-                  checked={watermark}
-                  onChange={(e) => setWatermark(e.target.checked)}
+                  checked={download}
+                  onChange={(e) => setDownload(e.target.checked)}
                 />
-                {w.watermark}
+                {w.allowDownload}
               </label>
             </div>
 
