@@ -53,7 +53,22 @@ Sau 1 tháng chạy thật, xem báo cáo "thời gian trung bình từ gửi li
 
 **Cấu hình**: `settings` key `gallery.default_due_days = 7`, ghi đè được theo từng album trong wizard.
 
-## 3. PIN — bật mặc định cho mọi album
+## 3. PIN — ~~bật mặc định~~ ĐÃ ĐỔI: **tắt mặc định**
+
+> **Sửa 16/09/2026.** Mục này dưới đây là quyết định **cũ**. Chủ studio đã
+> đổi ngày 12/09/2026: **PIN tắt mặc định**, CSKH bật cho những ca nhạy cảm.
+> Khách mở link là xem được ngay, không phải gõ gì. Cột
+> `share_links.requires_pin` đã `default false` từ trước; BB-098 thêm đường
+> bật/tắt, và mã PIN **sinh ngẫu nhiên bằng `randomInt`**, tuyệt đối không
+> lấy từ số điện thoại.
+>
+> Hai thứ vẫn mang giá trị cũ và **chưa ai sửa**, ghi ra để không ai vấp:
+> `settings.gallery.require_pin_default = true` và `settings.gallery.watermark_default = true`.
+> Hiện **không dòng mã nào đọc hai khoá đó** (đã quét `src/` và `scripts/`), nên
+> hôm nay vô hại — nhưng người đầu tiên nối màn Cài đặt vào chúng sẽ nhận
+> đúng giá trị sai. Xem BB-168.
+
+### Quyết định cũ, giữ lại để hiểu vì sao từng chọn như vậy
 
 Ảnh trẻ sơ sinh là dữ liệu nhạy cảm nhất hệ thống này nắm giữ. Link bị chuyển tiếp là chuyện xảy ra thường xuyên trong nhóm gia đình trên Zalo.
 
@@ -269,24 +284,47 @@ trên chính trang đó. BB-074 đã tự host font Be Vietnam Pro chỉ để k
 chỉ IP của khách sang Google; nhúng Messenger vào đây là đi ngược đúng quyết
 định ấy, mà lần này còn nặng hơn.
 
-### Báo CSKH bằng chính bảng Hậu Kỳ
+**Đích: `https://m.me/113878833349843`** — một Page dùng chung cho cả ba chi
+nhánh, chủ studio chốt 16/09/2026.
 
-Khách chốt xong thì CSKH phải biết. Nơi CSKH đã ngồi sẵn cả ngày là bảng Hậu Kỳ
-bên Lark, nên báo ở đó chứ không dựng thêm một chỗ nữa để phải canh.
+Địa chỉ này **không ghi cứng trong mã**. Nó là thứ sẽ đổi khi studio đổi Page,
+tách theo chi nhánh, hay chuyển sang Zalo OA — và lúc đó không ai muốn phải
+dựng lại bản web chỉ để sửa một chuỗi. Bảng `branches` đã có sẵn `zalo_oa` và
+`hotline`; thêm đích chat vào cùng chỗ đó, một giá trị chung cho cả ba chi nhánh
+cho tới khi cần tách.
 
-Dùng lại đúng đường ghi ngược của BB-132, kèm nguyên bộ rào của nó: chỉ ghi một
-cột, chỉ ghi khi ô đang trống, tìm bảng và cột theo tên lúc chạy, không bao giờ
-ném lỗi ra ngoài đường đi của khách.
+Nút chỉ hiện khi có đích. Không cấu hình thì không vẽ nút — một nút bấm vào
+không ra gì còn tệ hơn là không có nút.
 
-Hai sự kiện, hai cột riêng — không dùng chung một cột, vì luật "chỉ ghi khi ô
-trống" sẽ làm sự kiện thứ hai không bao giờ ghi được:
+### Báo CSKH bằng tin nhắn vào nhóm Lark — không thêm cột nào
 
-| Sự kiện | Cột bên Lark |
-|---|---|
-| Khách chốt chọn ảnh | *chờ chủ studio đặt tên và tạo* |
-| Khách chốt ảnh in | *chờ chủ studio đặt tên và tạo* |
+Khách chốt xong thì CSKH phải biết. Bản đầu của mục này định thêm hai cột vào
+bảng Hậu Kỳ. Chủ studio bác, và bác đúng.
 
-**Còn treo:** hai cột đó chưa tồn tại bên Lark. BB-132 đã mất mấy ngày đúng vì
-chuyện này — cột "Link app" chưa có, app ghi vào khoảng không, và triệu chứng
-nhìn thấy chỉ là "ô Lark trống". Tạo cột trước, rồi mới giao BB-167.
+**Chốt: bot nhắn vào nhóm Lark.** Ba lý do, theo thứ tự quan trọng:
 
+1. Việc cần làm là **báo**, mà một ô đổi giá trị trong bảng thì không báo cho
+   ai cả — nó chỉ nằm đó chờ người mở bảng ra nhìn. Tin nhắn thì nảy lên
+   điện thoại.
+2. Không chạm vào cấu trúc bảng Hậu Kỳ, nên không mở thêm đường ghi hai chiều
+   nào. `docs/16 §2` tránh hai chiều là có lý do: hai bên ghi đè nhau.
+3. `§6` của chính tài liệu này **đã chốt sẵn** cách này từ đầu, và
+   `src/lib/lark/notify.ts` đã dựng sẵn cái vỏ cho đúng việc đó (BB-080,
+   hiện gọi vào là lỗi).
+
+Chỗ chứa địa chỉ webhook **cũng đã có sẵn**: bảng `settings`, khoá
+`lark.webhook_url`, hiện đang rỗng. Không cần migration, không cần cột mới —
+chủ studio dán một chuỗi vào đó là xong.
+
+Hai sự kiện gửi tin: **khách chốt chọn ảnh** và **khách chốt ảnh in**. Tin mang
+mã hợp đồng, tên khách, số ảnh, và link mở thẳng bộ ảnh trong app.
+
+**Không nhét địa chỉ ảnh vào tin**, và che bớt số điện thoại — nhóm Lark có
+nhiều người hơn số người được xem ảnh của một nhà. Ghi chú này đã nằm sẵn
+trong `notify.ts`; đừng gỡ nó đi.
+
+Cái mất: tin nhắn trôi đi, không có chỗ nào liệt kê "những hợp đồng đang chờ".
+Chỗ đó app đã có: bảng Kanban lọc theo trạng thái `submitted`.
+
+**Còn treo:** `settings.lark.webhook_url` đang rỗng, và chưa dòng mã nào đọc
+khoá đó. Xem BB-167.
