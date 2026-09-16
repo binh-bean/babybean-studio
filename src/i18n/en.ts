@@ -172,6 +172,7 @@ export const en: Messages = {
       zoomOut: "Zoom out",
       counter: "{current} / {total}",
     },
+    messageStudio: "Message studio",
   },
   admin: {
     branches: {

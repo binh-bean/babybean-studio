@@ -172,6 +172,7 @@ export const vi = {
       zoomOut: "Thu nhỏ",
       counter: "{current} / {total}",
     },
+    messageStudio: "Nhắn cho studio",
   },
   admin: {
     branches: {

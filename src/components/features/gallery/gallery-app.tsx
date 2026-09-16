@@ -38,6 +38,7 @@ interface GalleryApiResponse {
     name: string;
     hotline: string;
     zaloOa?: string;
+    chatUrl?: string | null;
   };
   photoCount: number;
   /** BB-156: tổng dung lượng ảnh, để nói trước cho ba mẹ biết bộ này nặng bao nhiêu. */
@@ -953,6 +954,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
             </h1>
             <p className="text-xs text-muted-foreground truncate">
               {gallery.branch.name} • {gallery.branch.hotline}
+              {gallery.branch.chatUrl && (
+                <>
+                  {" • "}
+                  <a
+                    href={gallery.branch.chatUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline font-medium"
+                  >
+                    {vi.gallery.messageStudio}
+                  </a>
+                </>
+              )}
             </p>
           </div>
 
