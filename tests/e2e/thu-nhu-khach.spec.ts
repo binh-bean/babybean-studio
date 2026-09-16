@@ -19,7 +19,7 @@
  * Kho mã nguồn công khai — không ảnh trẻ em thật, không tên khách thật.
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { Client } from "pg";
 import { createHash, randomUUID } from "node:crypto";
 
