@@ -91,6 +91,8 @@ Yêu cầu với `scripts/db-push.mjs`:
 | `APP_SECRET` | ✓ | ✓ | ✓ | **Bí mật.** Mỗi môi trường một giá trị khác nhau |
 | `NEXT_PUBLIC_APP_URL` | ✓ | ✓ | ✓ | Dùng để dựng link chia sẻ |
 | `CRON_SECRET` | — | — | ✓ | Bảo vệ `/api/cron/**` |
+| `SYNC_CRON_SECRET` | — | — | ✓ | **Bí mật.** Khoá riêng của `/api/cron/sync-lark` (BB-152). Cũng phải đặt trong GitHub Secrets. Xem §5a |
+| `SUPABASE_DB_URL` | ✓ | — | ✓ | **Bí mật.** `/api/cron/sync-lark` nối thẳng Postgres, không qua PostgREST |
 | `UPSTASH_REDIS_*` | tuỳ | ✓ | ✓ | Rate limit; thiếu thì fallback in-memory |
 | `LARK_*` | — | — | ✓ | Phase 3 |
 | `SENTRY_DSN` | — | ✓ | ✓ | |
@@ -164,6 +166,33 @@ Vì vậy `flush-notifications` (mỗi 5 phút, đẩy hàng đợi Lark/Zalo) �
 
 Giờ trong `vercel.json` là **UTC**. `0 18 * * *` UTC = 01:00 giờ Việt Nam. `0 2 * * *` UTC = 09:00 giờ Việt Nam.
 Mọi handler cron kiểm `Authorization: Bearer <CRON_SECRET>` trước khi làm gì.
+
+## 5a. Kéo Lark định kỳ (BB-152) — bốn thứ, thiếu một là im lặng
+
+`POST /api/cron/sync-lark` đọc bảng Hậu Kỳ của Lark rồi dựng bộ ảnh. Nó KHÔNG
+nằm trong `vercel.json`: gói Hobby chỉ cho hai cron và mỗi ngày một lần, mà việc
+này cần dày hơn. Người gọi là GitHub Actions (`.github/workflows/sync-lark.yml`).
+
+Bật lên cần đủ bốn thứ:
+
+1. Biến `SYNC_CRON_SECRET` trên Vercel (Production). Tự sinh một chuỗi dài.
+2. Biến `SUPABASE_DB_URL` trên Vercel (Production) — route này nối thẳng Postgres.
+3. GitHub Secrets: `SYNC_CRON_SECRET` (đúng giá trị ở bước 1) và `APP_URL`
+   (ví dụ `https://hauky.babybeanstudio.vn`, không có dấu `/` cuối).
+4. Bỏ dấu `#` ở hai dòng `schedule` trong `.github/workflows/sync-lark.yml`.
+
+Thiếu bước 1 thì route trả **401** mọi lượt gọi; thiếu bước 2 thì **500**. Cả
+hai đều là cửa đóng đúng cách — và vì thế không ai thấy gì hỏng, tính năng chỉ
+đơn giản là không chạy. Đo ngày 16/09/2026: `vercel env ls production` có 10
+biến, không có biến nào trong hai biến trên.
+
+Phép thử `tests/unit/bien-moi-truong-phai-co-trong-mau.test.ts` canh phần khai
+tên biến: mã nguồn đọc `process.env.X` nào thì `.env.example` phải có X. Nó
+không kiểm được Vercel — chỗ đó vẫn phải người đặt tay.
+
+Kiểm sau khi bật: chạy tay workflow một lần (tab Actions → Run workflow), rồi
+`select value from settings where key = 'lark_retouch_last_sync'` phải có mốc
+thời gian mới.
 
 ## 6. Giám sát
 
