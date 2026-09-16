@@ -45,13 +45,19 @@ export const CreateGallerySchema = z
     welcomeMessage: z.string().optional().nullable(),
     options: z
       .object({
-        requirePin: z.boolean().default(true),
+        // Mặc định phải khớp với quyết định vận hành, không khớp với thói quen
+        // cũ. Chủ studio chốt 12/09/2026: PIN **TẮT** mặc định — xem docs/13 §3.
+        // Màn tạo bộ ảnh luôn gửi giá trị tường minh, nên mặc định ở đây là thứ duy
+        // nhất che cho những lối gọi KHÔNG đi qua màn đó — script, tích hợp, màn sau này.
+        requirePin: z.boolean().default(false),
         pin: z
           .string()
           .regex(/^\d{4}$/, "Mã PIN phải gồm đúng 4 chữ số")
           .optional()
           .nullable(),
-        download: z.boolean().default(false),
+        // Cả 457 bộ trên bb-prod đều `download_enabled = true` (BB-158). Để mặc
+        // định `false` ở đây là bộ nào tạo từ lối gọi khác sẽ lệch với cả 457 bộ kia.
+        download: z.boolean().default(true),
         notes: z.boolean().default(true),
         invite: z.boolean().default(true),
       })

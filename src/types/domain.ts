@@ -230,7 +230,6 @@ export interface Gallery {
   allowExtra: boolean;
 
   coverPhotoId: string | null;
-  watermarkEnabled: boolean;
   downloadEnabled: boolean;
   notesEnabled: boolean;
   inviteEnabled: boolean;
