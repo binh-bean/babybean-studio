@@ -24,7 +24,6 @@ import { setupAuthFixtures, cleanupAuthFixtures, type AuthFixtures } from "../fi
 describe("BB-030 - POST /api/auth/gallery", () => {
   let gid: string;
   let revId: string;
-  let pinLinkId: string;
   let customerAId: string;
   let galleryBId: string;
   let customerToken: string;
@@ -34,7 +33,6 @@ describe("BB-030 - POST /api/auth/gallery", () => {
     fixtures = await setupAuthFixtures();
     gid = fixtures.gid;
     revId = fixtures.revId;
-    pinLinkId = fixtures.pinLinkId;
     customerAId = fixtures.customerAId;
     galleryBId = fixtures.galleryBId;
     customerToken = fixtures.customerToken;
@@ -81,46 +79,11 @@ describe("BB-030 - POST /api/auth/gallery", () => {
     expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
   });
 
-  it("Ca 2: token đúng + PIN đúng -> ký được phiên", async () => {
-    const { res, body } = await postAuth(fixtures.tokenWithPin, "1234");
+  it("Ca 2: link ngày xưa từng cài PIN -> giờ vào thẳng không cần PIN", async () => {
+    const { res, body } = await postAuth(fixtures.tokenWithPin);
     expect(res.status).toBe(200);
     expect(res.cookies.get(SESSION_COOKIE)?.value).toBeTruthy();
     expect(body.data.galleryId).toBe(gid);
-  });
-
-  it("Ca 3: PIN sai -> PIN_INVALID và failed_attempts tăng", async () => {
-    const { res, body } = await postAuth(fixtures.tokenWithPin, "9999");
-    expect(res.status).toBe(401);
-    expect(body.error.code).toBe("PIN_INVALID");
-    expect(body.error.details.remainingAttempts).toBe(4);
-  });
-
-  it("Ca 4: sai lần thứ 5 -> PIN_LOCKED", async () => {
-    for (let i = 0; i < 3; i++) await postAuth(fixtures.tokenWithPin, "9999");
-    const { res, body } = await postAuth(fixtures.tokenWithPin, "9999");
-    expect(res.status).toBe(429);
-    expect(body.error.code).toBe("PIN_LOCKED");
-  });
-
-  it("Ca 5: đang bị khoá -> PIN_LOCKED kể cả khi PIN đúng", async () => {
-    const { res, body } = await postAuth(fixtures.tokenWithPin, "1234");
-    expect(res.status).toBe(429);
-    expect(body.error.code).toBe("PIN_LOCKED");
-  });
-
-  it("Ca 5b: hết hạn khoá thì bộ đếm về 0, một lần gõ nhầm KHÔNG khoá lại", async () => {
-    const admin = await createAdminClient();
-    // Wind the lock back into the past, leaving failed_attempts at 5 exactly
-    // as a real expiring lock does.
-    await admin
-      .from("share_links")
-      .update({ locked_until: new Date(Date.now() - 1000).toISOString(), failed_attempts: 5 })
-      .eq("id", pinLinkId);
-
-    const { res, body } = await postAuth(fixtures.tokenWithPin, "9999");
-    expect(res.status).toBe(401);
-    expect(body.error.code).toBe("PIN_INVALID");
-    expect(body.error.details.remainingAttempts).toBe(4);
   });
 
   it("Ca 6: link đã thu hồi -> NOT_FOUND", async () => {

@@ -75,7 +75,7 @@ async function dungDuLieu(c: Client): Promise<FixtureIds> {
   // Link bộ A
   const maLinkA = `bb160-a-${randomUUID()}`;
   await c.query(
-    `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin) VALUES ($1,$2,$3,'owner','active',false)`,
+    `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status) VALUES ($1,$2,$3,'owner','active')`,
     [boA, sha256(maLinkA), maLinkA.slice(0, 6)],
   );
 
@@ -95,7 +95,7 @@ async function dungDuLieu(c: Client): Promise<FixtureIds> {
 
   const maLinkB = `bb160-b-${randomUUID()}`;
   await c.query(
-    `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin) VALUES ($1,$2,$3,'owner','active',false)`,
+    `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status) VALUES ($1,$2,$3,'owner','active')`,
     [boB, sha256(maLinkB), maLinkB.slice(0, 6)],
   );
 

@@ -518,10 +518,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
         const authData = await authRes.json().catch(() => null);
 
-        if (authRes.status === 401 && authData?.error?.code === "PIN_REQUIRED") {
-          router.push(`/g/${token}/pin`);
-          return;
-        }
+
 
         if (authRes.ok) {
           // Link gắn theo KHÁCH: phiên vừa ký chưa trỏ vào bộ ảnh nào, vì một
@@ -548,10 +545,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
       if (!res.ok) {
         const code = json?.error?.code || "INTERNAL";
-        if (code === "PIN_REQUIRED") {
-          router.push(`/g/${token}/pin`);
-          return;
-        }
+
         // Ba mẹ quay lại bằng cookie còn hạn của link theo khách, nhưng phiên
         // chưa trỏ vào buổi nào — mời chọn lại thay vì hiện màn lỗi (BB-130).
         if (json?.error?.details?.canChonBuoiChup) {

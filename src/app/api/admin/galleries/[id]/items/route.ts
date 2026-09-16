@@ -67,7 +67,7 @@ export async function GET(
     // Link chia sẻ chính, để màn hình bật/tắt PIN được (BB-098).
     const { data: link } = await admin
       .from("share_links")
-      .select("id, requires_pin, status")
+      .select("id, status")
       .eq("gallery_id", gallery.id)
       .eq("status", "active")
       .order("created_at")
@@ -142,7 +142,7 @@ export async function GET(
       includedQuota: summary.includedQuota,
       totalValue: summary.totalValue,
       selectedCount,
-      shareLink: link ? { id: link.id, requiresPin: link.requires_pin } : null,
+      shareLink: link ? { id: link.id } : null,
       items: summary.items,
     });
   } catch (err) {

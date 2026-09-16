@@ -296,7 +296,6 @@ export interface ShareLink {
   tokenPrefix: string;
   role: ShareRole;
   label: string | null;
-  requiresPin: boolean;
   status: ShareLinkStatus;
   expiresAt: string | null;
   viewCount: number;
@@ -304,9 +303,6 @@ export interface ShareLink {
 
   /** Database-only fields for administrative and security auditing */
   tokenHash?: string;
-  pinHash?: string | null;
-  failedAttempts?: number;
-  lockedUntil?: string | null;
   maxViews?: number | null;
   lastViewedIp?: string | null;
   createdBy?: string | null;
@@ -468,9 +464,6 @@ export interface StaffSession {
 export const ERROR_CODES = [
   "INVALID_INPUT",
   "UNAUTHENTICATED",
-  "PIN_REQUIRED",
-  "PIN_INVALID",
-  "PIN_LOCKED",
   "FORBIDDEN",
   "NOT_FOUND",
   "LINK_EXPIRED",
