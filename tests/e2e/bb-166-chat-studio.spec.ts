@@ -24,7 +24,7 @@ test.describe("BB-166: Nút Nhắn cho studio", () => {
     });
     await pgClient.connect();
 
-    const { data: gallery } = await supabase.from("galleries").select("id").limit(1).single() as any;
+    const { data: gallery } = await supabase.from("galleries").select("id").limit(1).single() as { data: { id: string } | null };
     if (!gallery) throw new Error("No gallery found");
     galleryId = gallery.id;
 
