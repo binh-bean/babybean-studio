@@ -46,6 +46,18 @@ export async function GET() {
       .eq("id", gallery.baby_id)
       .single() : { data: null };
 
+    const { data: chatSetting } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "chat.page_url")
+      .is("branch_id", null)
+      .maybeSingle();
+
+    let chatUrl = null;
+    if (chatSetting?.value && typeof chatSetting.value === "string" && chatSetting.value.startsWith("https://")) {
+      chatUrl = chatSetting.value;
+    }
+
     // Get subfolders for the gallery
     const { data: subfoldersData } = await supabase
       .from("photos")
@@ -215,7 +227,8 @@ export async function GET() {
       branch: {
         name: (gallery.branch as unknown as { name: string }[])?.[0]?.name || (gallery.branch as unknown as { name: string })?.name,
         hotline: (gallery.branch as unknown as { hotline: string }[])?.[0]?.hotline || (gallery.branch as unknown as { hotline: string })?.hotline,
-        zaloOa: (gallery.branch as unknown as { zalo_oa: string }[])?.[0]?.zalo_oa || (gallery.branch as unknown as { zalo_oa: string })?.zalo_oa
+        zaloOa: (gallery.branch as unknown as { zalo_oa: string }[])?.[0]?.zalo_oa || (gallery.branch as unknown as { zalo_oa: string })?.zalo_oa,
+        chatUrl
       },
       photoCount: gallery.photo_count,
       // BB-156: tổng dung lượng ảnh, để màn khách nói trước "bộ này nặng 6,7 GB"

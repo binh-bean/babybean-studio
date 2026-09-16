@@ -83,6 +83,7 @@ export interface Branch {
   address: string | null;
   hotline: string | null;
   zaloOa: string | null;
+  chatUrl?: string | null;
   logoUrl: string | null;
   timezone: string;
   isActive: boolean;
