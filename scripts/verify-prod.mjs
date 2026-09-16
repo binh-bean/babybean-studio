@@ -86,7 +86,12 @@ async function main() {
   check("/admin chuyển về /login kèm next", (admin.headers.get("location") ?? "").startsWith("/login?next="),
     admin.headers.get("location") ?? "không có Location");
   check("Trang album của khách trả 200", gallery.status === 200, `nhận ${gallery.status}`);
-  check("GET vào route chỉ nhận POST trả 405", api.status === 405, `nhận ${api.status}`);
+  // Đường /api/admin/galleries từng chỉ có POST, nên bản đầu của cổng này chờ 405.
+  // BB-024 thêm GET cho màn danh sách bộ ảnh, nên câu trả lời đúng bây giờ là 401:
+  // có route, nhưng chặn vì chưa đăng nhập. Điều cần canh vẫn là một thứ: khách lạ
+  // KHÔNG lấy được dữ liệu quản trị. 200 ở đây mới là tai hoạ.
+  check("Khách lạ không đọc được /api/admin/galleries", api.status === 401 || api.status === 403 || api.status === 405,
+    `nhận ${api.status}`);
 
   // --- running where we think it is running -------------------------------
 
