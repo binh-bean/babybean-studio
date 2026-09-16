@@ -253,6 +253,89 @@ async function main() {
     if (code && branch && !branchByContract.has(code)) branchByContract.set(code, branch);
   }
 
+  // --- chỉ làm mới danh tính, không tạo gì ------------------------------------
+  //
+  // Bộ lọc SKIP_STATUSES loại các đơn đã qua in. Đúng cho việc dựng album — đơn
+  // đã giao thì không cần album chọn ảnh nữa. Nhưng nó cũng có nghĩa là khách
+  // của những đơn đó không bao giờ được cập nhật lại: bộ ảnh của họ đã nằm sẵn
+  // trong cơ sở dữ liệu từ lần chạy trước, mà tên thì đứng yên ở bản che.
+  //
+  // Chế độ này gỡ đúng chỗ đó: đọc TOÀN BỘ bảng Hậu Kỳ, không lọc trạng thái,
+  // rồi chỉ UPDATE tên / số điện thoại / ghi chú cho khách ĐÃ CÓ. Không chèn
+  // khách mới, không dựng album, không đụng buổi chụp — nên chạy lại bao nhiêu
+  // lần cũng ra cùng một kết quả.
+  if (process.argv.includes("--lam-moi-ten")) {
+    if (!choPhepTenThat(dbUrl)) {
+      console.error("Đích này không được phép nhận tên thật — không có gì để làm mới.");
+      console.error("Xem src/lib/lark/muc-tieu-du-lieu.ts.");
+      process.exit(1);
+    }
+
+    const danhTinh = new Map();
+    for (const r of hauky) {
+      const f = r.fields;
+      const larkCustomer = cellText(f["Mã KH"]).trim();
+      if (!larkCustomer) continue;
+      const ten = cellText(f["Tên KH"]).trim();
+      if (!ten) continue;
+      // Bản ghi sau đè bản ghi trước: cùng một khách thì bản mới hơn đúng hơn.
+      danhTinh.set(customerKey(larkCustomer), {
+        ten,
+        sdt: cellText(f["SDT KH"]).trim(),
+        ghiChu: cellText(f["Ghi Chú"]).trim() || null,
+      });
+    }
+    console.log(`Đọc được danh tính của ${danhTinh.size} khách từ toàn bộ bảng Hậu Kỳ.`);
+
+    const client = new pg.Client({ connectionString: dbUrl });
+    await client.connect();
+    try {
+      const { rows: dangChe } = await client.query(
+        `select id, lark_customer_key, full_name from customers
+          where lark_customer_key is not null and full_name like 'KH · %'`,
+      );
+      console.log(`Trong cơ sở dữ liệu còn ${dangChe.length} khách mang tên che.`);
+
+      let sua = 0;
+      const khongThay = [];
+      for (const kh of dangChe) {
+        const d = danhTinh.get(kh.lark_customer_key);
+        if (!d) {
+          khongThay.push(kh.full_name);
+          continue;
+        }
+        if (!write) {
+          if (sua < 3) console.log(`   ${kh.full_name}  ->  ${d.ten} | ${d.sdt || "(không có SĐT)"}`);
+          sua++;
+          continue;
+        }
+        await client.query(
+          `update customers
+              set full_name = $2,
+                  phone = coalesce(nullif($3, ''), phone),
+                  note = coalesce($4, note),
+                  updated_at = now()
+            where id = $1`,
+          [kh.id, d.ten, d.sdt, d.ghiChu],
+        );
+        sua++;
+      }
+
+      console.log(
+        write
+          ? `Đã đổi tên cho ${sua} khách.`
+          : `Xem trước: sẽ đổi tên cho ${sua} khách. Thêm -- --write để ghi thật.`,
+      );
+      if (khongThay.length) {
+        console.log(`  ${khongThay.length} khách không tìm thấy bên Lark — giữ nguyên tên che:`);
+        for (const t of khongThay.slice(0, 10)) console.log(`     ${t}`);
+      }
+    } finally {
+      await client.end();
+    }
+    return;
+  }
+
   let candidates = hauky.filter(
     (r) =>
       !SKIP_STATUSES.includes(cellText(r.fields["Trạng Thái"]).trim()) &&
@@ -459,15 +542,33 @@ async function main() {
         const customerId = cust[0]?.id;
         if (!customerId) throw new Error(`Không lấy được customer cho ${p.customerKey}`);
 
+        // ĐỌC TRƯỚC RỒI MỚI GHI — cùng lý do như buổi chụp bên dưới.
+        //
+        // Nhánh này chỉ chạy khi đích được phép tên thật, nên trước 16.09.2026
+        // nó chưa từng chạy trên bb-dev và cái thiếu sót ở đây chưa lộ ra: một
+        // khách có ba bộ ảnh thì chèn ba lần cùng một tên bé, và mỗi lần chạy
+        // lại nhân đôi tiếp. Đúng cái lỗi đã để lại 2.154 khách rác trước đây.
+        //
+        // `babies` không có ràng buộc duy nhất trên (customer_id, full_name)
+        // nên không dùng được `on conflict`. Đọc trước là cách vá không cần
+        // migration — mỗi bộ ảnh một lượt đọc, và bộ dữ liệu này chỉ vài trăm.
         let babyId = null;
         if (p.babyName) {
-          const { rows: bab } = await client.query(
-            `insert into babies (customer_id, full_name)
-             values ($1, $2)
-             returning id`,
-            [customerId, p.babyName]
+          const { rows: cu } = await client.query(
+            `select id from babies where customer_id = $1 and full_name = $2 limit 1`,
+            [customerId, p.babyName],
           );
-          babyId = bab[0]?.id;
+          if (cu[0]) {
+            babyId = cu[0].id;
+          } else {
+            const { rows: bab } = await client.query(
+              `insert into babies (customer_id, full_name)
+               values ($1, $2)
+               returning id`,
+              [customerId, p.babyName]
+            );
+            babyId = bab[0]?.id;
+          }
         }
 
         // BUỔI CHỤP — tầng chủ studio chốt ngày 12.09.2026:

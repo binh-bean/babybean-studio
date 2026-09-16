@@ -278,6 +278,16 @@ Xong việc thì merge về `main` rồi `git worktree remove ../bb-008`.
 
 Áp dụng cho `db/seed.sql`, `tests/fixtures/**`, mọi script seed, mọi ảnh chụp màn hình đính vào PR, và mọi ví dụ trong tài liệu.
 
+> **Đổi từ 16/09/2026 — đọc kỹ.** Trước đây bb-dev mang tên che, nên chụp màn
+> hình hay dán kết quả truy vấn từ bb-dev là vô hại. **Không còn vậy nữa.**
+> Chủ studio đã chốt cho bb-dev nhận tên thật, nên bb-dev hiện chứa tên và số
+> điện thoại thật của 454 khách, cùng 258 tên bé.
+>
+> Nghĩa là: **bb-dev giờ là nguồn dữ liệu thật, không phải sân tập.** Mọi thứ
+> lấy ra từ nó — ảnh chụp màn hình, kết quả truy vấn, log, fixture — phải thay
+> tên trước khi commit, trước khi dán vào PR, trước khi dán vào khung chat.
+> Cần dữ liệu để thử thì bịa theo bảng quy ước bên dưới, đừng chép từ bb-dev ra.
+
 ### Cấm tuyệt đối
 
 | Không được dùng | Vì sao |

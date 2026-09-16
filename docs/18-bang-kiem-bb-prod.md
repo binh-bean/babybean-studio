@@ -92,8 +92,14 @@ phải lỗi.
   trong hai khung nhìn báo cáo. Đã soát cả `src/` và `tests/`: **không chỗ nào
   đọc chúng**. Dọn được bằng cách bỏ hẳn tên thừa khỏi `db/schema.sql` rồi dựng
   lại khung nhìn trên bb-dev — chưa làm vì chưa cần.
-- **Tên khách trên bb-dev vẫn là tên che.** Chốt ở `src/lib/lark/muc-tieu-du-lieu.ts`:
-  chỉ bb-prod nhận tên thật. Đừng nới danh sách đó để tiện thử.
+- **bb-dev giờ cũng hiện tên thật.** Chủ studio chốt 16/09/2026 để soát dữ liệu
+  trước khi cắt sang. Chốt vẫn ở `src/lib/lark/muc-tieu-du-lieu.ts`, vẫn là danh
+  sách CHO PHÉP — cơ sở dữ liệu nào không có tên trong đó vẫn bị che.
+
+  Cái giá phải nhớ: bb-dev là nơi agent **có** khoá, bb-prod thì không. Từ nay
+  ba việc sau không còn là lời khuyên — không dán kết quả truy vấn bb-dev ra
+  ngoài; fixture và ảnh chụp màn hình phải thay tên trước khi commit; tệp sao
+  lưu bb-dev đối xử như tệp của bb-prod.
 
 ## 5. Lịch sử: cách bb-prod được dựng
 

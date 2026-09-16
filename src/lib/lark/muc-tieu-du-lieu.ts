@@ -20,10 +20,39 @@
  * ai mở trình duyệt cũng thấy. Ghi vào đây không rò gì.
  */
 
-/** Mã dự án Supabase được phép nhận tên khách thật. */
+/**
+ * Mã dự án Supabase được phép nhận tên khách thật.
+ *
+ * Thêm vào đây là một quyết định của chủ studio, không phải việc agent tự nới
+ * cho tiện thử. Mỗi dòng ghi rõ ai quyết và ngày nào.
+ */
 export const MA_DU_AN_THAT: readonly string[] = [
   "hecpaiizklbuckqvdndk", // bb-prod — agent không có khoá vào đây
+  "ohkfoqqsrpvsponiwcij", // bb-dev — chủ studio chốt 16.09.2026, xem ghi chú dưới
 ];
+
+/**
+ * ---------------------------------------------------------------------------
+ * Vì sao bb-dev có trong danh sách, và cái giá của nó
+ * ---------------------------------------------------------------------------
+ * Chủ studio chốt ngày 16.09.2026: bb-dev hiện tên thật để soát dữ liệu trước
+ * khi cắt sang bb-prod — tên che làm không đối chiếu được bộ nào là của nhà nào.
+ *
+ * Cái giá, ghi ra để người sau không phải đoán: bb-dev là nơi agent CÓ khoá,
+ * còn bb-prod thì không. Từ hôm nay, 427 tên khách và số điện thoại thật nằm ở
+ * môi trường mà mọi agent, mọi lượt chạy phép thử đều đọc được. Kho mã lại là
+ * kho public.
+ *
+ * Kéo theo ba quy tắc, và chúng không còn là lời khuyên nữa:
+ *
+ *   1. Không dán kết quả truy vấn bb-dev vào khung chat, vào issue, vào commit.
+ *   2. Fixture và ảnh chụp màn hình lấy từ bb-dev phải thay tên trước khi commit.
+ *   3. Tệp sao lưu bb-dev giờ cũng là dữ liệu khách thật — đối xử như bb-prod.
+ *
+ * Cấu trúc danh sách CHO PHÉP giữ nguyên, và đó vẫn là phần quan trọng: một
+ * cơ sở dữ liệu thử dựng thêm ngày mai — bb-test, bản sao diễn tập, máy của
+ * nhân viên — vẫn bị che, vì nó không có tên ở đây.
+ */
 
 /**
  * Bóc mã dự án Supabase từ một chuỗi kết nối hoặc một địa chỉ API.
