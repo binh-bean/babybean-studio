@@ -21,6 +21,7 @@
     "verify:schema": "node --env-file-if-exists=.env.local scripts/verify-schema.mjs",
     "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
     "db:backup:prod": "node --env-file=.env.prod.local scripts/backup.mjs",
+    "db:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-test-galleries.mjs",
     "verify:db": "node --env-file-if-exists=.env.local scripts/verify-db.mjs",
     "verify:db:seed": "node --env-file-if-exists=.env.local scripts/verify-db.mjs --seed",
     "verify:own": "node scripts/verify-ownership.mjs",
