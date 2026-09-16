@@ -88,10 +88,13 @@ Ba việc này cần tài khoản thật, agent không có quyền truy cập. L
 
 | Mã | Việc | Agent | Phụ thuộc | Phức tạp | TT |
 |---|---|---|---|---|---|
-| BB-050 | `GET /api/admin/galleries/:id/export` — csv, txt, lightroom, json | DEV-BE | BB-039 | med | TODO |
-| BB-051 | Hộp thoại xuất + xem trước + copy clipboard | DEV-FE | BB-050 | low | TODO |
+| BB-050 | ~~`GET /api/admin/galleries/:id/export` — csv, txt, lightroom, json~~ | DEV-BE | BB-039 | med | 🚫 **HUỶ** 16/09/2026 — thay bằng BB-165 |
+| BB-051 | ~~Hộp thoại xuất + xem trước + copy clipboard~~ | DEV-FE | BB-050 | low | 🚫 **HUỶ** 16/09/2026 — thay bằng BB-165 |
+| BB-165 | **Copy danh sách ảnh khách chọn.** Nhân viên lọc trên app, bấm một nút, dán thẳng vào trình chọn ảnh ở máy lưu ảnh của chi nhánh. Không sinh tệp, không định dạng riêng cho Lightroom | DEV-FE | BB-039 | low | ⏸ **CHỜ ĐẶT TÊN PHẦN MỀM** — chưa biết trình chọn ảnh ở chi nhánh là gì thì chưa chốt được định dạng chuỗi |
+| BB-166 | **Nút "Nhắn cho studio" trên màn khách.** Mở thẳng ứng dụng chat qua deep link. **KHÔNG nhúng mã Facebook** — trang này hiện ảnh trẻ em, và BB-074 đã tự host font chỉ để không gửi IP khách ra ngoài | DEV-FE | — | low | TODO |
+| BB-167 | **Báo CSKH khi khách chốt.** Ghi ngược lên bảng Hậu Kỳ khi khách chốt chọn ảnh và khi chốt ảnh in. Dùng lại đường của BB-132 | DEV-INT | BB-132 | med | ⏸ **CHỜ CỘT BÊN LARK** — chủ studio phải tạo cột trước, đúng như BB-132 |
 | BB-052 | Rà soát: **mọi** hành động ghi dữ liệu đều có `activity_logs` cùng transaction | DEV-BE | BB-039 | med | TODO |
-| BB-053 | E2E E-1…E-12 theo `docs/10-testing-qa.md §5` | QA-BOT | BB-051 | high | TODO |
+| BB-053 | E2E E-1…E-12 theo `docs/10-testing-qa.md §5` | QA-BOT | BB-165 | high | TODO |
 | BB-054 | Rà soát bảo mật: 14 ca ở `docs/05-rbac.md §6` + grep secret trong bundle | SEC-ARCH | BB-053 | high | TODO |
 
 **Cổng ra Phase 1**: 14/14 test bảo mật pass · E2E xanh trên 3 trình duyệt · 1 chi nhánh dùng thật 1 tuần không lỗi chặn.

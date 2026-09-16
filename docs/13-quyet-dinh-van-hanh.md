@@ -234,3 +234,59 @@ vì khoá nhầm giữa ca chụp thì nhân viên không vào được máy.
 
 Theo `docs/05-rbac.md` §2: chỉ `owner` và `admin` có quyền CRUD nhân sự và gán
 vai trò. `branch_manager` chỉ được xem.
+
+## 9. Giao ảnh cho thợ: bỏ xuất Lightroom — chốt ngày 16/09/2026
+
+Kế hoạch cũ (BB-050/051) là dựng một đường xuất tệp nhiều định dạng: csv, txt,
+json, và một định dạng riêng cho Lightroom. **Huỷ.**
+
+Chủ studio chốt cách khác, ngắn hơn một bước: nhân viên lọc danh sách ngay trên
+app, bấm một nút copy, rồi **dán thẳng vào trình chọn ảnh ở máy lưu ảnh của
+chi nhánh**. Không sinh tệp, không tải về, không có tệp trung gian nằm lại trong
+thư mục Downloads của ai đó.
+
+Vì sao đổi: một tệp xuất ra là một bản sao danh sách ảnh khách chọn, và bản sao
+thì sống lâu hơn cái nó sao chép. Ba tháng sau không ai biết tệp nào là bản mới.
+Copy rồi dán thì không để lại gì.
+
+**Còn treo:** chưa chốt được định dạng chuỗi copy vì chưa biết trình chọn ảnh ở
+chi nhánh là phần mềm gì. Mỗi phần mềm nhận một kiểu khác nhau — Explorer cần
+`OR` nối trên một dòng, Bridge cần mỗi dòng một tên. Đoán sai thì nhân viên vẫn
+phải sửa tay, tức là không bỏ được việc mình đang muốn bỏ. Xem BB-165.
+
+## 10. Khách nhắn cho studio — chốt ngày 16/09/2026
+
+Hai phần, chốt cùng ngày.
+
+### Nút mở thẳng ứng dụng, KHÔNG nhúng hộp chat
+
+Màn khách có nút "Nhắn cho studio", mở thẳng ứng dụng chat của khách bằng deep
+link. **Không nạp mã của Facebook vào trang.**
+
+Đây không phải chuyện tiện hay không tiện. Trang này hiện ảnh trẻ em. Nhúng hộp
+chat của Facebook nghĩa là Facebook biết ai đang xem bộ ảnh nào và vào lúc nào —
+trên chính trang đó. BB-074 đã tự host font Be Vietnam Pro chỉ để không gửi địa
+chỉ IP của khách sang Google; nhúng Messenger vào đây là đi ngược đúng quyết
+định ấy, mà lần này còn nặng hơn.
+
+### Báo CSKH bằng chính bảng Hậu Kỳ
+
+Khách chốt xong thì CSKH phải biết. Nơi CSKH đã ngồi sẵn cả ngày là bảng Hậu Kỳ
+bên Lark, nên báo ở đó chứ không dựng thêm một chỗ nữa để phải canh.
+
+Dùng lại đúng đường ghi ngược của BB-132, kèm nguyên bộ rào của nó: chỉ ghi một
+cột, chỉ ghi khi ô đang trống, tìm bảng và cột theo tên lúc chạy, không bao giờ
+ném lỗi ra ngoài đường đi của khách.
+
+Hai sự kiện, hai cột riêng — không dùng chung một cột, vì luật "chỉ ghi khi ô
+trống" sẽ làm sự kiện thứ hai không bao giờ ghi được:
+
+| Sự kiện | Cột bên Lark |
+|---|---|
+| Khách chốt chọn ảnh | *chờ chủ studio đặt tên và tạo* |
+| Khách chốt ảnh in | *chờ chủ studio đặt tên và tạo* |
+
+**Còn treo:** hai cột đó chưa tồn tại bên Lark. BB-132 đã mất mấy ngày đúng vì
+chuyện này — cột "Link app" chưa có, app ghi vào khoảng không, và triệu chứng
+nhìn thấy chỉ là "ô Lark trống". Tạo cột trước, rồi mới giao BB-167.
+
