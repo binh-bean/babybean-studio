@@ -186,8 +186,8 @@ async function dungDuLieu(c: Client): Promise<FixtureIds> {
   // ── Link chia sẻ (legacy: gắn theo bộ ảnh, không PIN) ────────────────
   const maLink = `bb134-${randomUUID()}`;
   const { rows: sl } = await c.query(
-    `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin)
-     VALUES ($1,$2,$3,'owner','active',false) RETURNING id`,
+    `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status)
+     VALUES ($1,$2,$3,'owner','active') RETURNING id`,
     [boA, sha256(maLink), maLink.slice(0, 6)],
   );
   const linkId = sl[0].id as string;
@@ -301,8 +301,8 @@ test.describe("BB-134: đi đúng đường của khách", () => {
     await dbClient.query(`UPDATE share_links SET status = 'revoked' WHERE id = $1`, [ids.linkId]);
     // Tạo link mới
     await dbClient.query(
-      `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin)
-       VALUES ($1,$2,$3,'owner','active',false)`,
+      `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status)
+       VALUES ($1,$2,$3,'owner','active')`,
       [ids.boA, sha256(maLinkMoi), maLinkMoi.slice(0, 6)],
     );
     await dbClient.end();

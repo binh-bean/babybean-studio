@@ -77,9 +77,6 @@ export async function POST(request: Request): Promise<Response> {
     const tokenPrefix = token.substring(0, 6);
     const tokenHash = createHash("sha256").update(token).digest("hex");
 
-    const requirePin = input.options.requirePin !== false;
-    const pin = requirePin ? input.options.pin || null : null;
-
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
     const userAgent = request.headers.get("user-agent") || null;
 
@@ -109,8 +106,6 @@ export async function POST(request: Request): Promise<Response> {
       p_invite_enabled: input.options.invite,
       p_token_hash: tokenHash,
       p_token_prefix: tokenPrefix,
-      p_requires_pin: requirePin,
-      p_pin: pin,
       p_staff_id: staff.staffId,
       p_actor_label: staff.role,
       p_ip: ip,
@@ -150,19 +145,12 @@ export async function POST(request: Request): Promise<Response> {
     }
     const shareUrl = `${appUrl.replace(/\/$/, "")}/g/${token}`;
 
-    const pinHint = requirePin
-      ? input.options.pin
-        ? input.options.pin
-        : "4 số cuối SĐT"
-      : null;
-
     // 5. Respond -----------------------------------------------------------
     return NextResponse.json(
       {
         data: {
           galleryId: (result as { gallery_id: string }).gallery_id,
           shareUrl,
-          pinHint,
         },
       },
       {

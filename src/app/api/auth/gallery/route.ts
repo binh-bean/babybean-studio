@@ -11,7 +11,6 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signGallerySession, SESSION_COOKIE } from "@/lib/auth/gallery-session";
@@ -22,11 +21,8 @@ export const runtime = "nodejs";
 
 const schema = z.object({
   token: z.string().min(1).max(200),
-  pin: z.string().optional(),
 });
 
-const MAX_ATTEMPTS = 5;
-const LOCK_MINUTES = 15;
 const RATE_LIMIT_PER_IP = 10;
 const RATE_WINDOW_MINUTES = 15;
 
@@ -57,7 +53,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const parsed = schema.safeParse(await req.json());
     if (!parsed.success) return fail("INVALID_INPUT");
 
-    const { token, pin } = parsed.data;
+    const { token } = parsed.data;
     const admin = await createAdminClient();
     const ip = clientIp(req);
 
@@ -87,7 +83,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const { data: link } = await admin
       .from("share_links")
-      .select("id, gallery_id, customer_id, role, status, expires_at, requires_pin, pin_hash, failed_attempts, locked_until")
+      .select("id, gallery_id, customer_id, role, status, expires_at")
       .eq("token_hash", await sha256Hex(token))
       .maybeSingle();
 
@@ -100,58 +96,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       (!isLegacy || !link.expires_at || new Date(link.expires_at) > new Date());
 
     if (!usable) return fail("NOT_FOUND");
-
-    if (link.requires_pin) {
-      if (!link.pin_hash) {
-        // Never treat this as "no PIN needed" - that turns a misconfigured
-        // link into an open one.
-        console.error(JSON.stringify({ evt: "pin_hash_missing", shareLinkId: link.id, reqId }));
-        return fail("INTERNAL");
-      }
-
-      const lockedUntil = link.locked_until ? new Date(link.locked_until) : null;
-      const stillLocked = lockedUntil !== null && lockedUntil > new Date();
-
-      if (stillLocked) {
-        return fail("PIN_LOCKED", undefined, {
-          retryAfter: Math.ceil((lockedUntil.getTime() - Date.now()) / 1000),
-        });
-      }
-
-      // A lock that has run out clears the counter. Without this the counter
-      // stays at 5 forever, so the next single typo re-locks the album - and
-      // it is a parent on a phone typing the last four digits of their own
-      // number.
-      const priorAttempts = lockedUntil !== null ? 0 : (link.failed_attempts ?? 0);
-
-      if (!pin) return fail("PIN_REQUIRED");
-
-      if (!(await bcrypt.compare(pin, link.pin_hash))) {
-        const attempts = priorAttempts + 1;
-        const lockNow = attempts >= MAX_ATTEMPTS;
-
-        await admin
-          .from("share_links")
-          .update({
-            failed_attempts: attempts,
-            locked_until: lockNow
-              ? new Date(Date.now() + LOCK_MINUTES * 60_000).toISOString()
-              : null,
-          })
-          .eq("id", link.id);
-
-        return lockNow
-          ? fail("PIN_LOCKED", undefined, { retryAfter: LOCK_MINUTES * 60 })
-          : fail("PIN_INVALID", undefined, { remainingAttempts: MAX_ATTEMPTS - attempts });
-      }
-
-      if (priorAttempts > 0 || lockedUntil !== null) {
-        await admin
-          .from("share_links")
-          .update({ failed_attempts: 0, locked_until: null })
-          .eq("id", link.id);
-      }
-    }
 
     // One selection per share link, created on first successful entry rather
     // than at gallery creation: BB-065 mints new share links later and they

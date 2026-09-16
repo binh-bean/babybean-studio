@@ -10,9 +10,6 @@ import type { ApiError, ApiMeta, ErrorCode } from "@/types/domain";
 const HTTP_STATUS: Record<ErrorCode, number> = {
   INVALID_INPUT: 400,
   UNAUTHENTICATED: 401,
-  PIN_REQUIRED: 401,
-  PIN_INVALID: 401,
-  PIN_LOCKED: 429,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
   LINK_EXPIRED: 410,
@@ -30,9 +27,6 @@ const HTTP_STATUS: Record<ErrorCode, number> = {
 const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   INVALID_INPUT: "Dữ liệu không hợp lệ",
   UNAUTHENTICATED: "Vui lòng mở lại link album",
-  PIN_REQUIRED: "Album này cần mã PIN",
-  PIN_INVALID: "Mã PIN không đúng",
-  PIN_LOCKED: "Bạn đã nhập sai quá nhiều lần, vui lòng thử lại sau 15 phút",
   FORBIDDEN: "Bạn không có quyền thực hiện thao tác này",
   NOT_FOUND: "Không tìm thấy nội dung",
   LINK_EXPIRED: "Link đã hết hạn hoặc đã được thu hồi",

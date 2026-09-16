@@ -68,7 +68,7 @@ interface Detail {
   includedQuota: number | null;
   totalValue: number;
   selectedCount: number;
-  shareLink: { id: string; requiresPin: boolean } | null;
+  shareLink: { id: string } | null;
   items: Item[];
   revisions: Revision[];
   catalog: CatalogProduct[];
@@ -148,29 +148,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     }
   }
 
-  async function togglePin() {
-    if (!detail?.shareLink) return;
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/admin/share-links/${detail.shareLink.id}/pin`, {
-        method: detail.shareLink.requiresPin ? "DELETE" : "POST",
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        setNotice(json?.error?.message ?? "Không đổi được PIN");
-        return;
-      }
-      // Mã chỉ hiện MỘT LẦN — hệ thống chỉ lưu bản băm. Đọc cho khách ngay.
-      setNotice(
-        json.data.pin
-          ? `Mã PIN: ${json.data.pin} — đọc cho khách ngay, hệ thống không hiện lại.`
-          : "Đã tắt PIN cho link này.",
-      );
-      await load();
-    } finally {
-      setBusy(false);
-    }
-  }
+
 
   async function confirmSubmission() {
     setBusy(true);
@@ -738,16 +716,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       </section>
 
       <section className="flex flex-wrap gap-3">
-        {detail.shareLink && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void togglePin()}
-            className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm"
-          >
-            {detail.shareLink.requiresPin ? "Tắt mã PIN" : "Bật mã PIN"}
-          </button>
-        )}
+
 
         {detail.status === "submitted" && (
           <div className="flex flex-col gap-2">

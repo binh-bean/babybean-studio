@@ -45,7 +45,6 @@ interface Options {
 interface ResultData {
   galleryId: string;
   shareUrl: string;
-  pinHint: string | null;
 }
 
 /** Lỗi Drive kèm hướng dẫn từng bước, không phải lỗi kỹ thuật. */
@@ -75,7 +74,6 @@ export function CreateGalleryWizard() {
   const [quota, setQuota] = useState(20);
   const [extraPrice, setExtraPrice] = useState(50000);
   const [deadlineDays, setDeadlineDays] = useState(7);
-  const [requirePin, setRequirePin] = useState(false);
   const [download, setDownload] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);
@@ -157,7 +155,7 @@ export function CreateGalleryWizard() {
           includedQuota: quota,
           extraPhotoPrice: extraPrice,
           dueAt: dueAt.toISOString(),
-          options: { requirePin, download, notes: true, invite: true },
+          options: { download, notes: true, invite: true },
         }),
       });
       const body = await res.json();
@@ -195,12 +193,6 @@ export function CreateGalleryWizard() {
         <div className="rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-[var(--bb-surface-2)] p-3">
           <code className="break-all text-sm text-[var(--bb-fg)]">{result.shareUrl}</code>
         </div>
-
-        {result.pinHint && (
-          <p className="text-sm text-[var(--bb-fg-muted)]">
-            {w.pinLabel}: <strong className="text-[var(--bb-fg)]">{result.pinHint}</strong>
-          </p>
-        )}
 
         <div className="flex flex-wrap justify-center gap-2">
           <Button
@@ -428,14 +420,6 @@ export function CreateGalleryWizard() {
             </Field>
 
             <div className="space-y-3 pt-6">
-              <label className="flex items-center gap-2 text-sm text-[var(--bb-fg)]">
-                <input
-                  type="checkbox"
-                  checked={requirePin}
-                  onChange={(e) => setRequirePin(e.target.checked)}
-                />
-                {w.pinRequired}
-              </label>
               <label className="flex items-center gap-2 text-sm text-[var(--bb-fg)]">
                 <input
                   type="checkbox"
