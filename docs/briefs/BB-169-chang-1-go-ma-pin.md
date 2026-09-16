@@ -99,9 +99,24 @@ token sai hoặc link đã thu hồi thì chặn.
 - [ ] `git diff --stat` **không** đụng `db/`. Chạm `db/` là bạn đang làm chặng 2
       của ARCH.
 
-**Kiểm ngược, bắt buộc, dán kết quả thật vào bàn giao:** mở một link khách thật
-trên bb-dev và đi trọn đường — vào được, xem được ảnh, thả tim được. Rồi lấy một
-link đã thu hồi, mở ra, **phải bị chặn**. Dán cả hai kết quả.
+**Kiểm ngược, bắt buộc, dán kết quả thật vào bàn giao.**
+
+Chạy `npm run dev` **ngay trong worktree này**. `.env.local` đã trỏ sẵn vào
+bb-dev, nên `localhost:3000` phục vụ đúng dữ liệu đó. Tạo một bộ ảnh thử tên bắt
+đầu bằng `Fixture BB-169`, cấp link, rồi:
+
+1. Mở `http://localhost:3000/g/<token>` — vào được, xem được ảnh, thả tim được.
+2. Thu hồi link đó rồi mở lại — **phải bị chặn**.
+
+Dán cả hai kết quả.
+
+**KHÔNG gọi ra internet cho việc này.** Không có host nào tên `bb-dev.*`:
+`bb-dev` là tên một **dự án Supabase**, tức là một cơ sở dữ liệu, không phải
+website. Tên miền thật của studio là `babybeanstudio.vn` (app ở
+`hauky.babybeanstudio.vn`). `babybean.vn` — không có chữ `studio` — **chưa ai
+đăng ký**, tra DNS ngày 15/09/2026 trả về không tồn tại (`docs/13 §5`). Đừng
+ghép hostname từ chuỗi `@demo.babybean.vn` trong dữ liệu mẫu — đó là đuôi email
+giả của sáu tài khoản demo, không phải địa chỉ có thật.
 
 Ca thứ hai quan trọng hơn ca thứ nhất: nó chứng minh bạn gỡ PIN mà không gỡ nhầm
 lớp kiểm token. Ở BB-108 agent báo xong mà không có kiểm ngược nào — lần này
