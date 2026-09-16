@@ -208,9 +208,34 @@ thời gian mới.
 
 ## 7. Sao lưu & khôi phục
 
-- Supabase: bật **Point-in-time Recovery** (gói Pro), giữ 7 ngày.
-- Xuất `pg_dump` hằng tuần sang Google Drive của studio (script `scripts/backup.mjs`).
+`npm run db:backup` (bb-dev) / `npm run db:backup:prod` (bb-prod). Đo ngày
+16/09/2026 trên bb-dev: 23 bảng, 162.739 dòng, 86 MB, dưới một phút.
+
+**Không dùng pg_dump.** Máy chủ studio không có pg_dump, psql, Docker hay
+Supabase CLI. Script dùng `pg` — driver Postgres thuần JavaScript đã có sẵn
+trong devDependencies — nên chạy được ngay trên máy trắng.
+
+**Chỉ kết xuất dữ liệu, không kết xuất cấu trúc.** Cấu trúc đã nằm trong kho:
+`setup-prod.mjs` dựng lại được. Giữ hai bản của cùng một sự thật là để chúng
+trôi khỏi nhau.
+
+Ba điều phải biết TRƯỚC khi cần đến nó:
+
+1. **Tệp không chứa tài khoản đăng nhập.** `staff_profiles.id` trỏ sang
+   `auth.users`, schema `auth`, ngoài tầm script. Phục hồi phải tạo lại user
+   trong Authentication với **đúng UUID cũ** trước khi nạp, không thì gãy ngay
+   ở `staff_profiles`. Không tự kéo `auth.users` là cố ý: bảng đó chứa băm mật
+   khẩu và token phiên.
+2. **Script từ chối ghi vào trong kho**, kể cả thư mục đang gitignore. Kho này
+   public; tệp sao lưu chứa tên và số điện thoại khách thật. Đích mặc định là
+   `../babybean-backups/`, đổi bằng `--out` hoặc `BACKUP_DIR`.
+3. **Vòng khoá ngoại `galleries.cover_photo_id` ↔ `photos.gallery_id`** khiến
+   không thứ tự nạp nào thoả mãn cả hai. Script cắt cạnh cho-rỗng rồi vá lại
+   bằng `UPDATE` ở cuối tệp. Thêm vòng mới mà mọi cạnh đều NOT NULL thì script
+   **dừng và không ghi gì** — tệp không phục hồi được thì tệ hơn là không có.
+
 - **Ảnh không cần backup** — vẫn nằm trên Drive của studio. Nhưng phải dặn studio: **không xoá thư mục Drive của album chưa giao xong.**
+- Gói Pro có thêm **Point-in-time Recovery**; nếu bật thì đây là lưới đỡ thứ hai, không thay thế cái trên.
 - Diễn tập khôi phục: 6 tháng một lần, khôi phục vào project tạm và kiểm tra dữ liệu.
 
 ## 8. Tên miền

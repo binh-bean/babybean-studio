@@ -78,9 +78,15 @@ phải lỗi.
 
 ## 4. Những chỗ còn biết mà chưa làm
 
-- **Không có bản sao lưu nào.** `scripts/backup.mjs` chỉ in "Not implemented"
-  rồi thoát 1, dù `docs/11 §7` hứa pg_dump hàng tuần. Máy đang làm việc cũng
-  không có `pg_dump`. Trước khi bb-prod đón khách thật, đây là việc phải làm.
+- **Sao lưu: đã có, chạy được, nhưng chưa ai hẹn giờ.** `npm run db:backup:prod`
+  kết xuất dữ liệu ra một tệp `.sql` ngoài kho (đo trên bb-dev 16/09: 23 bảng,
+  162.739 dòng, 86 MB, dưới một phút). Không cần gói Pro, không cần cài gì.
+  Chi tiết và ba điều phải biết trước khi cần đến nó: `docs/11 §7`.
+
+  Mốc bắt buộc không phải là lúc cắt sang, mà là **lúc khách đầu tiên bấm chọn
+  ảnh**. Trước mốc đó, mọi thứ trong bb-prod dựng lại được từ Lark và Drive —
+  `selections`, `selection_items`, `share_links` đang rỗng. Sau mốc đó, mất
+  bb-prod là mất công của khách, và không nguồn nào dựng lại được.
 - **Lệch còn lại giữa bb-dev và bb-prod: 11 cột.** Đều là tên gọi khác của cột
   đã có (`album_title` cạnh `gallery_title`, `included_quota` cạnh `quota`…)
   trong hai khung nhìn báo cáo. Đã soát cả `src/` và `tests/`: **không chỗ nào

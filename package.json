@@ -20,6 +20,7 @@
     "verify": "npm run verify:schema && npm run typecheck && npm run lint && npm run test && npm run build && npm run verify:build && npm run verify:wired",
     "verify:schema": "node --env-file-if-exists=.env.local scripts/verify-schema.mjs",
     "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
+    "db:backup:prod": "node --env-file=.env.prod.local scripts/backup.mjs",
     "verify:db": "node --env-file-if-exists=.env.local scripts/verify-db.mjs",
     "verify:db:seed": "node --env-file-if-exists=.env.local scripts/verify-db.mjs --seed",
     "verify:own": "node scripts/verify-ownership.mjs",
