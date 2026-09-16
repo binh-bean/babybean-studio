@@ -137,8 +137,9 @@ src/
 │   ├── drive/
 │   │   ├── client.ts               # driveFetch + retry/backoff
 │   │   ├── parse-link.ts           # link Drive → folderId
+│   │   ├── parse-folder-name.ts    # bóc tên mẹ / tên bé từ tên thư mục
 │   │   ├── list-files.ts           # phân trang, đệ quy 2 cấp
-│   │   └── thumbnail.ts            # dựng URL thumbnail theo kích thước
+│   │   └── sync-gallery.ts         # kéo ảnh của một bộ về photos
 │   ├── supabase/
 │   │   ├── server.ts
 │   │   ├── admin.ts
