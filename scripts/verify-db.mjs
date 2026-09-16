@@ -83,6 +83,27 @@ async function main() {
   check("RLS bật trên mọi bảng", noRls.length === 0,
     noRls.length ? `chưa bật: ${noRls.join(", ")}` : `${EXPECTED_TABLES.length}/${EXPECTED_TABLES.length}`);
 
+  // Lưới an toàn cho BẢNG SẮP CÓ. Phép kiểm ngay trên chỉ thấy bảng đang có, và
+  // nó chạy sau khi bảng đã tồn tại — tức là sau khi cửa đã mở một lúc. Event
+  // trigger `ensure_rls` bật RLS ngay trong lúc `create table` chạy.
+  //
+  // BB-163: hàm và trigger này CHẠY trên bb-dev nhưng không có trong repo, nên
+  // bb-prod — chỗ có 427 tên khách và số điện thoại thật — không có lưới. Nay
+  // chúng nằm ở migration 0044, và phép kiểm này canh để không ai mất nó lần nữa.
+  const luoi = await client.query(
+    `select evtenabled from pg_event_trigger
+      where evtname = 'ensure_rls' and evtfoid::regproc::text = 'rls_auto_enable'`,
+  );
+  check(
+    "Bảng mới tạo là RLS tự bật",
+    luoi.rows.length === 1 && luoi.rows[0].evtenabled !== "D",
+    luoi.rows.length === 0
+      ? "THIẾU event trigger ensure_rls — bảng mới tạo ra sẽ không có RLS (migration 0044)"
+      : luoi.rows[0].evtenabled === "D"
+        ? "ensure_rls đang bị TẮT"
+        : "event trigger ensure_rls đang bật",
+  );
+
   const views = await client.query(
     `select viewname from pg_views where schemaname = 'public'`,
   );

@@ -106,7 +106,9 @@ create table customers (
   id             uuid primary key default gen_random_uuid(),
   branch_id      uuid not null references branches(id),
   full_name      text not null,
-  phone          text not null,
+  -- Cho null: khách đến từ bảng Hậu Kỳ của Lark không có số điện thoại (bảng đó
+  -- không có ô ấy — tên khách ở đó là mã hợp đồng). Xem 0043 và docs/16 §7.3.
+  phone          text,
   phone_normalized text generated always as (regexp_replace(phone, '\D', '', 'g')) stored,
   email          citext,
   zalo           text,

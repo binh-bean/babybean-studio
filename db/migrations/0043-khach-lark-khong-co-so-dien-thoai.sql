@@ -1,0 +1,28 @@
+-- ============================================================================
+-- Migration: 0043-khach-lark-khong-co-so-dien-thoai
+-- BB-163 — khách đến từ bảng Hậu Kỳ của Lark thì KHÔNG có số điện thoại.
+--
+-- Vì sao phải nới: đường đồng bộ định kỳ (BB-152, api/cron/sync-lark) gọi
+-- syncSingleRetouchRecord, và câu chèn khách ở src/lib/lark/sync-retouch.ts
+-- ghi THẲNG null vào cột phone — đúng bảng ánh xạ docs/16 §7.3, vì bảng Hậu Kỳ
+-- không có ô số điện thoại: tên khách ở đó chính là mã hợp đồng.
+--
+-- Trên bb-dev cột này đã cho null từ lâu (406/413 khách đang null) nên không
+-- ai thấy. Trên bb-prod cột vẫn `not null` theo schema.sql, nên câu chèn đó
+-- BỊ TỪ CHỐI: "null value in column phone violates not-null constraint". Đo
+-- thật ngày 16/09/2026 bằng một câu chèn trong transaction rồi rollback trên
+-- chính bb-prod.
+--
+-- Hậu quả nếu để nguyên: cắt app sang bb-prod là mỗi hợp đồng mới từ Lark đều
+-- rơi, đồng bộ định kỳ báo lỗi từng vòng, và không bộ ảnh nào mới xuất hiện.
+--
+-- Vì sao nới cột chứ không bịa số: số điện thoại bịa nằm trong bảng khách thật
+-- là thứ nhân viên sẽ gọi. Thà để trống. Chỗ cần số (Zalo ZNS) đã phải tự lo
+-- khi thiếu, và bb-dev chạy như vậy suốt.
+--
+-- uq_customers_phone_branch vẫn giữ: Postgres coi mỗi NULL là khác nhau, nên
+-- nhiều khách chưa có số vẫn vào được, mà hai khách CÙNG một số trong cùng chi
+-- nhánh thì vẫn bị chặn. Đường Hậu Kỳ gộp khách theo lark_customer_key.
+-- ============================================================================
+
+alter table customers alter column phone drop not null;

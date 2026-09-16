@@ -34,6 +34,27 @@ function preprocessSql(sql) {
     .replace(/(?<!["'])\bgin_trgm_ops\b(?!["'])/g, 'public.gin_trgm_ops');
 }
 
+/**
+ * Câu lệnh chạm vào thứ DÙNG CHUNG CẢ CƠ SỞ DỮ LIỆU, không nằm trong schema nào.
+ *
+ * Cổng này dựng schema.sql vào hai schema tạm bằng cách đổi `public.` thành
+ * `verify_schema_xxx_public.`. Event trigger KHÔNG thuộc schema nào — tên của nó
+ * là tên chung cho cả cơ sở dữ liệu. Nên câu `drop event trigger if exists
+ * ensure_rls` trong migration 0044 không bị đổi tên gì cả: nó xoá đúng cái
+ * ensure_rls THẬT của bb-dev, dựng lại một cái trỏ vào hàm trong schema tạm,
+ * rồi phần dọn dẹp xoá schema tạm và kéo luôn cái trigger đó đi.
+ *
+ * Xảy ra thật 16/09/2026: chạy verify:schema một lần là bb-dev mất lưới an toàn
+ * ensure_rls, im lặng, không báo gì. Một cổng kiểm mà phá cơ sở dữ liệu của
+ * người chạy nó thì tệ hơn là không có cổng.
+ *
+ * Nên cổng bỏ qua hẳn nhóm này và NÓI RA. Đường nạp thật (setup-prod.mjs,
+ * db-push.mjs) vẫn chạy chúng, vì ở đó chúng đúng là thứ cần tạo.
+ */
+function laDungChungCaDb(sql) {
+  return /(?:create|drop|alter)\s+event\s+trigger/i.test(sql);
+}
+
 function tachCauLenh(sql) {
   const ra = [];
   let cur = '';
@@ -156,6 +177,7 @@ async function main() {
     let daCo = 0;
     let vong = 0;
     const boQua = [];
+    const boQuaChung = [];
 
     while (hangDoi.length > 0) {
       vong += 1;
@@ -164,6 +186,10 @@ async function main() {
       let tienBo = 0;
 
       for (const c of hangDoi) {
+        if (laDungChungCaDb(c.sql)) {
+          boQuaChung.push(c);
+          continue;
+        }
         try {
           await client.query(c.sql);
           nap += 1;
@@ -198,6 +224,56 @@ async function main() {
         break;
       }
       hangDoi = conLai;
+    }
+
+    // -----------------------------------------------------------------------
+    // THỬ GHI ĐÚNG ĐƯỜNG LARK HẬU KỲ
+    //
+    // Dựng nổi không đủ: schema.sql dựng được mà vẫn không nhận nổi thứ mã
+    // nguồn ghi vào nó. BB-163: cột customers.phone khai `not null` trong
+    // schema.sql, còn src/lib/lark/sync-retouch.ts chèn THẲNG null vào đó —
+    // đúng bảng ánh xạ docs/16 §7.3, vì bảng Hậu Kỳ không có ô số điện thoại.
+    // bb-dev đã nới cột này từ lâu nên mọi phép thử đều xanh; bb-prod dựng theo
+    // schema.sql nên mỗi hợp đồng mới từ Lark đều rơi, và chỉ lộ ra khi cắt sang.
+    //
+    // Nên cổng này chèn THẬT bốn dòng theo đúng thứ tự của đường đó. Schema tạm
+    // bị xoá ở finally, không cần dọn.
+    // -----------------------------------------------------------------------
+    if (boQuaChung.length > 0) {
+      const ten = [...new Set(boQuaChung.map((c) => c.tep))].join(', ');
+      console.log('  bỏ qua ' + boQuaChung.length + ' câu lệnh dùng chung cả cơ sở dữ liệu (event trigger) từ ' + ten + ' — cổng này không dựng nổi chúng trong schema tạm; đường nạp thật vẫn chạy.');
+    }
+
+    if (exitCode === 0) {
+      try {
+        await client.query('begin');
+        const { rows: cn } = await client.query(
+          'insert into ' + tPublic + ".branches (code, name) values ('BB-THU', 'Chi nhánh thử') returning id",
+        );
+        const { rows: kh } = await client.query(
+          'insert into ' + tPublic + ".customers (branch_id, full_name, phone, source, tags, lark_customer_key)" +
+            " values ($1, 'KH · HD_THU', null, 'lark_retouch', array['lark_draft'], 'khoa-thu') returning id",
+          [cn[0].id],
+        );
+        const { rows: bc } = await client.query(
+          'insert into ' + tPublic + ".shoots (branch_id, customer_id, shoot_date) values ($1, $2, '2026-01-01') returning id",
+          [cn[0].id, kh[0].id],
+        );
+        await client.query(
+          'insert into ' + tPublic + '.galleries (branch_id, customer_id, shoot_id, title, status,' +
+            " drive_folder_id, drive_folder_url, lark_contract_code, included_quota, extra_photo_price)" +
+            " values ($1, $2, $3, 'Bộ ảnh thử', 'draft', 'thu-muc-thu', 'https://drive/thu', 'HD_THU', 20, 50000)",
+          [cn[0].id, kh[0].id, bc[0].id],
+        );
+        await client.query('rollback');
+        console.log('  ghi thử đường Lark Hậu Kỳ (khách KHÔNG có số điện thoại): được');
+      } catch (e) {
+        await client.query('rollback').catch(() => {});
+        console.error('LỖI: schema.sql không nhận nổi thứ mà đường Lark Hậu Kỳ ghi vào nó.');
+        console.error('     ' + e.message.split(String.fromCharCode(10))[0]);
+        console.error('     Đối chiếu src/lib/lark/sync-retouch.ts và docs/16 §7.3.');
+        exitCode = 1;
+      }
     }
 
     if (exitCode === 0) {
