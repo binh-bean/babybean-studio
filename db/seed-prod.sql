@@ -49,7 +49,6 @@ on conflict (id) do update set
 -- ---------------------------------------------------------------------------
 insert into settings (key, branch_id, value) values
   ('gallery.default_due_days',      null, '7'::jsonb),
-  ('gallery.require_pin_default',   null, 'true'::jsonb),
   ('gallery.allow_download_default',null, 'true'::jsonb),
   ('gallery.watermark_default',     null, 'true'::jsonb),
   ('gallery.invite_default',        null, 'true'::jsonb),
