@@ -1,6 +1,6 @@
 -- Migration: T?o ch?c nang check_staff_deletable
 
-create or replace function app.check_staff_deletable(p_staff_id uuid)
+create or replace function public.check_staff_deletable(p_staff_id uuid)
 returns text
 language plpgsql
 security definer
@@ -51,8 +51,8 @@ end;
 $$;
 
 -- View d? ki?m tra nhanh deletability c?a toàn b? nhân viên (dùng trong danh sách admin)
-create or replace view app.v_staff_deletable as
+create or replace view public.v_staff_deletable as
 select 
   id as staff_id,
-  app.check_staff_deletable(id) as delete_reason
+  public.check_staff_deletable(id) as delete_reason
 from staff_profiles;
