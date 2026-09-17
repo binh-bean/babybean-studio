@@ -377,4 +377,21 @@ export const en: Messages = {
     driveUnavailable: "Could not connect to Google Drive, please try again",
     internal: "An error occurred, please try again",
   },
+  landing: {
+    studioName: "BabyBean Studio",
+    tagline: "Preserving your baby's lovely moments",
+    lostBefore: "Your baby's photos are sent via a ",
+    lostStrong: "private link",
+    lostAfter: ". If you haven't received it or it won't open, please call us at the number below.",
+    messageCta: "Message studio",
+    loginCta: "Staff Login",
+  },
+  errorPages: {
+    notFoundTitle: "Page not found",
+    notFoundBody: "The page you are looking for does not exist or has been removed.",
+    serverErrorTitle: "An error occurred",
+    serverErrorBody: "We are experiencing a minor issue, please try again later.",
+    backHome: "Back to home",
+    contactSupport: "Contact support: {hotline}",
+  }
 };
