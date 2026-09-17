@@ -377,6 +377,23 @@ export const vi = {
     driveUnavailable: "Không kết nối được Google Drive, vui lòng thử lại",
     internal: "Có lỗi xảy ra, vui lòng thử lại",
   },
+  landing: {
+    studioName: "BabyBean Studio",
+    tagline: "Nơi lưu giữ những khoảnh khắc đáng yêu của bé",
+    lostBefore: "Ảnh của bé được gửi qua ",
+    lostStrong: "link riêng",
+    lostAfter: ". Chưa nhận được hoặc link không mở được, gọi giúp bên mình theo số ở dưới.",
+    messageCta: "Nhắn tin cho studio",
+    loginCta: "Nhân viên đăng nhập",
+  },
+  errorPages: {
+    notFoundTitle: "Không tìm thấy trang",
+    notFoundBody: "Trang ba mẹ tìm không tồn tại hoặc đã bị xoá.",
+    serverErrorTitle: "Đã xảy ra lỗi",
+    serverErrorBody: "Hệ thống đang gặp sự cố nhỏ, ba mẹ vui lòng thử lại sau.",
+    backHome: "Về trang chủ",
+    contactSupport: "Gọi hỗ trợ: {hotline}",
+  }
 } as const;
 
 /**
