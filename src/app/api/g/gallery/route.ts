@@ -29,7 +29,7 @@ export async function GET() {
       .from("galleries")
       .select(`
         id, title, welcome_message, status, baby_id, shoot_date:shoots(shoot_date),
-        branch:branches(name, hotline, zalo_oa),
+        branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
         cover_photo_id, download_enabled, notes_enabled, invite_enabled
       `)
@@ -226,6 +226,10 @@ export async function GET() {
       shootDate: (gallery.shoot_date as unknown as { shoot_date: string }[])?.[0]?.shoot_date || (gallery.shoot_date as unknown as { shoot_date: string })?.shoot_date || null,
       branch: {
         name: (gallery.branch as unknown as { name: string }[])?.[0]?.name || (gallery.branch as unknown as { name: string })?.name,
+        address:
+          (gallery.branch as unknown as { address: string | null }[])?.[0]?.address ??
+          (gallery.branch as unknown as { address: string | null })?.address ??
+          null,
         hotline: (gallery.branch as unknown as { hotline: string }[])?.[0]?.hotline || (gallery.branch as unknown as { hotline: string })?.hotline,
         zaloOa: (gallery.branch as unknown as { zalo_oa: string }[])?.[0]?.zalo_oa || (gallery.branch as unknown as { zalo_oa: string })?.zalo_oa,
         chatUrl

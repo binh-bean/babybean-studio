@@ -36,6 +36,7 @@ interface GalleryApiResponse {
   shootDate: string | null;
   branch: {
     name: string;
+    address?: string | null;
     hotline: string;
     zaloOa?: string;
     chatUrl?: string | null;
@@ -838,6 +839,25 @@ export function GalleryApp({ token }: GalleryAppProps) {
   }, [gallery]);
 
   /**
+   * BB-180 — đếm số ảnh của từng nhóm (thư mục con trong Drive).
+   *
+   * Đo trên bb-dev ngày 17/09: 148.881/152.637 ảnh đã mang tên thư mục, 184
+   * concept khác nhau. Dữ liệu có sẵn từ lâu, chỉ thiếu chỗ cho khách thấy.
+   *
+   * Đây cũng là nền cho việc sau: ảnh đã chỉnh, ảnh sửa lại, layout ghép album
+   * cho khách duyệt — mỗi loại là một thư mục. Nên **không ghi cứng tên concept
+   * nào vào mã**; nhóm theo cái gì có trong dữ liệu.
+   */
+  const demTheoNhom = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of photos) {
+      if (!p.subfolder) continue;
+      m.set(p.subfolder, (m.get(p.subfolder) ?? 0) + 1);
+    }
+    return m;
+  }, [photos]);
+
+  /**
    * BB-180 — sản phẩm in còn thiếu ảnh, để nhắc trước khi chốt.
    *
    * Chủ studio chốt 17/09: **nhắc chứ không chặn**. Khách đang cầm điện
@@ -1205,24 +1225,60 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 {vi.gallery.filterUnselected}
               </button>
 
-              {/* Lọc theo thư mục con nếu có */}
-              {gallery.subfolders.length > 0 && (
-                <select
-                  value={selectedSubfolder}
-                  onChange={(e) => setSelectedSubfolder(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-surface border text-foreground"
-                  aria-label={vi.gallery.filterSubfolder}
-                >
-                  <option value="">{vi.gallery.filterSubfolder}: Tất cả</option>
-                  {gallery.subfolders.map((folder) => (
-                    <option key={folder} value={folder}>
-                      {folder}
-                    </option>
-                  ))}
-                </select>
-              )}
             </div>
           </div>
+
+          {/* ----------------------------------------------------------------
+              BB-180 — NHÓM ẢNH, hiện thành thẻ bấm được thay vì danh sách thả xuống
+              ----------------------------------------------------------------
+              Danh sách thả xuống giấu mất thông tin: ba mẹ phải bấm ra mới biết bộ
+              ảnh có những nhóm nào, và không bao giờ thấy nhóm nào có bao nhiêu tấm.
+
+              **KHÔNG nhét tiêu đề nhóm vào giữa lưới ảnh.** Lưới đang cuộn ảo theo
+              hàng đều nhau (BB-131, chịu được 1.235 tấm trên điện thoại). Chèn hàng
+              cao thấp khác nhau vào đó là đụng đúng phần đã tối ưu cho bộ ảnh lớn —
+              cái giá không đáng so với cái được.
+          */}
+          {gallery.subfolders.length > 0 && (
+            <section aria-label={vi.gallery.subfolderTitle} className="space-y-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {vi.gallery.subfolderTitle}
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSubfolder("")}
+                  aria-pressed={selectedSubfolder === ""}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                    selectedSubfolder === ""
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-surface border text-foreground hover:bg-surface-2",
+                  )}
+                >
+                  {vi.gallery.subfolderAll}
+                  <span className="ml-1.5 opacity-70">{photos.length}</span>
+                </button>
+                {gallery.subfolders.map((folder) => (
+                  <button
+                    key={folder}
+                    type="button"
+                    onClick={() => setSelectedSubfolder(folder)}
+                    aria-pressed={selectedSubfolder === folder}
+                    className={cn(
+                      "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
+                      selectedSubfolder === folder
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-surface border text-foreground hover:bg-surface-2",
+                    )}
+                  >
+                    {folder}
+                    <span className="ml-1.5 opacity-70">{demTheoNhom.get(folder) ?? 0}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Lưới ảnh responsive (tối ưu từ mobile 375px) */}
           {filteredPhotos.length === 0 ? (
@@ -1314,6 +1370,50 @@ export function GalleryApp({ token }: GalleryAppProps) {
       </div>
 
       {/* HỘP THOẠI XÁC NHẬN CHỐT BỘ ẢNH */}
+      {/* ------------------------------------------------------------------
+          BB-180 — CHÂN MÀN KHÁCH: thông tin studio
+          ------------------------------------------------------------------
+          Ba mẹ xem ảnh xong thường có việc muốn hỏi, mà trước đây chỉ có một dòng
+          hotline bé xíu ở đầu màn, cuộn xuống là mất.
+
+          Thời gian lưu ảnh (2 tháng, `docs/13 §11`) **cố ý chưa hiện ở đây**. Đo
+          ngày 17/09: 0/15 link có ngày hết hạn và chưa có đường tự hết hạn — mọi link
+          đang sống vĩnh viễn. In con số đó lên trong khi hệ thống không tôn trọng nó
+          là dạy khách đừng tin những gì app nói. Bật sau khi BB-183 xong.
+      */}
+      <footer className="mt-10 border-t pt-6 pb-10 text-sm">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {vi.gallery.studioInfo}
+        </h2>
+        <p className="mt-2 font-semibold text-foreground">{gallery.branch.name}</p>
+        <div className="mt-1 space-y-1 text-muted-foreground">
+          {gallery.branch.address && <p>{gallery.branch.address}</p>}
+          {gallery.branch.hotline && (
+            <p>
+              <a
+                href={`tel:${gallery.branch.hotline.replace(/[^+\d]/g, "")}`}
+                className="font-medium text-foreground hover:underline"
+              >
+                {gallery.branch.hotline}
+              </a>
+              <span className="ml-1.5 opacity-70">— {vi.gallery.callUs}</span>
+            </p>
+          )}
+          {gallery.branch.chatUrl && (
+            <p>
+              <a
+                href={gallery.branch.chatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary hover:underline"
+              >
+                {vi.gallery.messageStudio}
+              </a>
+            </p>
+          )}
+        </div>
+      </footer>
+
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-md bg-surface border rounded-2xl p-6 shadow-2xl space-y-4">
