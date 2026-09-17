@@ -347,6 +347,52 @@ export async function readLarkTable(
   return { tableId: table.table_id, tableName: table.name, records };
 }
 
+/**
+ * Đọc một bản ghi cụ thể từ bảng theo record_id.
+ */
+export async function readLarkRecord(
+  auth: LarkAuthHeader,
+  baseToken: string,
+  namePattern: RegExp,
+  recordId: string
+): Promise<{ tableId: string; tableName: string; record: LarkRecord }> {
+  const listRes = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables?page_size=100`, {
+    headers: { authorization: auth.authorization },
+  });
+  const list = (await listRes.json()) as {
+    code: number;
+    msg?: string;
+    data?: { items?: Array<{ table_id: string; name: string }> };
+  };
+
+  if (list.code !== 0 || !list.data?.items) {
+    throw new Error(`Không liệt kê được bảng từ Lark: ${list.msg || "Lỗi kết nối"}`);
+  }
+
+  const table = list.data.items.find((t) => namePattern.test(t.name));
+  if (!table) {
+    throw new Error(
+      `Không tìm thấy bảng khớp ${namePattern}. Các bảng hiện có: ` +
+        list.data.items.map((t) => t.name).join(" | "),
+    );
+  }
+
+  const res = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables/${table.table_id}/records/${recordId}`, {
+    headers: { authorization: auth.authorization },
+  });
+  const data = (await res.json()) as {
+    code: number;
+    msg?: string;
+    data?: { record?: LarkRecord };
+  };
+
+  if (data.code !== 0 || !data.data?.record) {
+    throw new Error(`Lỗi đọc bản ghi ${recordId}: ${data.msg || "Lỗi API"}`);
+  }
+
+  return { tableId: table.table_id, tableName: table.name, record: data.data.record };
+}
+
 // --- Xử lý đồng bộ 1 bản ghi Hậu Kỳ xuống DB theo docs/16 §7.3 -------------
 
 export function customerKey(larkCustomerCode: string): string {
