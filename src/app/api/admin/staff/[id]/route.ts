@@ -138,3 +138,46 @@ export async function PATCH(
     return failUnexpected(err, requestId);
   }
 }
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const requestId = randomUUID();
+
+  try {
+    const staff = await requireStaff();
+    if (staff.role !== "owner") {
+      return fail("FORBIDDEN", "Chỉ chủ studio mới có quyền xoá tài khoản");
+    }
+
+    const { id } = await context.params;
+    const admin = createAdminClient();
+
+    if (id === staff.staffId) {
+      return fail("FORBIDDEN", "Không thể tự xoá tài khoản của mình");
+    }
+
+    const { data: reason, error: rpcErr } = await admin.rpc("check_staff_deletable", {
+      p_staff_id: id,
+    });
+    
+    if (rpcErr) throw rpcErr;
+    if (reason) {
+      return fail("CONFLICT", reason);
+    }
+
+    const { error: authErr } = await admin.auth.admin.deleteUser(id);
+    if (authErr) {
+      console.error(JSON.stringify({ evt: "delete_auth_user_failed", requestId, reason: authErr.message }));
+      return fail("INTERNAL", "Lỗi xoá tài khoản đăng nhập");
+    }
+    
+    return ok({ id, deleted: true });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);
+    }
+    return failUnexpected(err, requestId);
+  }
+}

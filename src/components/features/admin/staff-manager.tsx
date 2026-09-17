@@ -35,6 +35,7 @@ interface StaffRow {
   neverLoggedIn: boolean;
   stale: boolean;
   branchIds: string[];
+  deleteReason: string | null;
 }
 
 interface Branch {
