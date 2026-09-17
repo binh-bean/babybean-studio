@@ -21,6 +21,11 @@ export interface PhotoLightboxProps {
   onTaiAnh?: ((photo: PhotoPublic) => void) | null;
   mutatingIds: Set<string>;
   isLocked: boolean;
+  /** BB-180: so anh da chon va han muc, hien thuong truc trong man xem lon. */
+  daChon?: number;
+  hanMuc?: number | null;
+  /** BB-180: luu ghi chu cho tho chinh anh. Duong luu da co tu BB-144. */
+  onLuuGhiChu?: (photo: PhotoPublic, ghiChu: string) => Promise<boolean>;
 }
 
 /**
@@ -47,7 +52,18 @@ export function PhotoLightbox({
   onTaiAnh,
   mutatingIds,
   isLocked,
+  daChon,
+  hanMuc,
+  onLuuGhiChu,
 }: PhotoLightboxProps) {
+  // BB-180: o ghi chu cho tung anh, ngay trong man xem lon.
+  //
+  // BB-144 da dung xong duong luu (PATCH /api/g/selection, truong retouchNote)
+  // nhung khach chua bao gio co o de nhap. Day la nua con lai.
+  const [ghiChu, setGhiChu] = useState("");
+  const [dangLuuGhiChu, setDangLuuGhiChu] = useState(false);
+  const [ketQuaLuu, setKetQuaLuu] = useState<"ok" | "loi" | null>(null);
+
   const [currentIndex, setCurrentIndex] = useState(() => {
     if (initialIndex < 0) return 0;
     if (initialIndex >= photos.length) return Math.max(0, photos.length - 1);
@@ -65,6 +81,15 @@ export function PhotoLightbox({
 
   const total = photos.length;
   const currentPhoto = photos[currentIndex];
+
+  // Doi anh thi nap lai ghi chu cua anh do, va xoa thong bao cua anh truoc.
+  // Khong lam viec nay thi khach go ghi chu cho anh A roi vuot sang anh B van
+  // thay nguyen chu do, tuong minh da ghi cho B.
+  useEffect(() => {
+    setGhiChu(currentPhoto?.retouchNote ?? "");
+    setKetQuaLuu(null);
+  }, [currentPhoto?.id, currentPhoto?.retouchNote]);
+
 
   const goNext = useCallback(() => {
     setCurrentIndex((prev) => (prev < total - 1 ? prev + 1 : prev));
@@ -144,6 +169,26 @@ export function PhotoLightbox({
    * Chỉ giữ các tấm ảnh trong bán kính ±1 quanh currentIndex.
    * Tất cả các tấm ảnh còn lại trong số 1.235 tấm KHÔNG được đưa vào DOM.
    */
+  const luuGhiChu = useCallback(async () => {
+    // Ghi chú nằm trên `selection_items`, không phải trên `photos`. Ảnh chưa chọn
+    // thì không có dòng nào để cập nhật, và `.update()` chạy trúng 0 dòng vẫn
+    // báo THÀNH CÔNG. Không chặn ở đây thì khách gõ ghi chú, thấy báo "đã lưu",
+    // mà chữ mất trắng — và thợ chỉnh ảnh không bao giờ biết là có dặn dò.
+    if (!onLuuGhiChu || !currentPhoto || isLocked) return;
+    if (currentPhoto.mark !== "selected") return;
+    if ((currentPhoto.retouchNote ?? "") === ghiChu) return;
+    setDangLuuGhiChu(true);
+    setKetQuaLuu(null);
+    try {
+      const xong = await onLuuGhiChu(currentPhoto, ghiChu);
+      setKetQuaLuu(xong ? "ok" : "loi");
+    } catch {
+      setKetQuaLuu("loi");
+    } finally {
+      setDangLuuGhiChu(false);
+    }
+  }, [onLuuGhiChu, currentPhoto, ghiChu, isLocked]);
+
   const visibleIndices = useMemo(() => {
     return getVisibleIndices(currentIndex, total, 1);
   }, [currentIndex, total]);
@@ -151,6 +196,7 @@ export function PhotoLightbox({
   if (!currentPhoto) return null;
 
   const isCurrentSelected = currentPhoto.mark === "selected";
+
   const isMutating = mutatingIds.has(currentPhoto.id);
 
   return (
@@ -182,6 +228,86 @@ export function PhotoLightbox({
           </span>
         </div>
 
+        {/* ------------------------------------------------------------------
+            BB-180 — thanh thao tác ở GÓC TRÊN BÊN PHẢI
+            ------------------------------------------------------------------
+            Chủ studio chốt 17/09: hai nút to ở giữa đáy màn che mất chân ảnh.
+            Với ảnh trẻ con thì nhìn trọn tấm ảnh mới là thứ ba mẹ mở link để xem.
+
+            Biểu tượng vẽ nhỏ nhưng vùng chạm giữ 44×44 px (h-11 w-11) — nút nhỏ
+            mà bấm trượt thì tệ hơn nút to.
+        */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Số đã chọn trên hạn mức — trước đây biến mất khi mở ảnh lớn,
+              mà khách chọn ảnh chủ yếu lúc đang xem lớn. */}
+          {typeof daChon === "number" && (
+            <span
+              className={cn(
+                "hidden xs:inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap backdrop-blur-md",
+                hanMuc != null && daChon > hanMuc
+                  ? "bg-amber-500/25 text-amber-100 ring-1 ring-amber-300/40"
+                  : "bg-white/10 text-white/90",
+              )}
+              title={vi.gallery.quotaInline}
+            >
+              <Heart className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+              {daChon}
+              {hanMuc != null && <span className="opacity-70">/ {hanMuc}</span>}
+            </span>
+          )}
+
+          {/* Chọn ảnh */}
+          <button
+            type="button"
+            disabled={isLocked || isMutating}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleHeart(currentPhoto);
+            }}
+            aria-label={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
+            title={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
+            className={cn(
+              "flex h-11 w-11 items-center justify-center rounded-full transition-all active:scale-90 touch-manipulation focus:outline-hidden disabled:opacity-40",
+              isCurrentSelected
+                ? "bg-rose-500 text-white ring-2 ring-rose-300/50"
+                : "bg-white/10 text-white/90 hover:bg-white/20 backdrop-blur-md",
+            )}
+          >
+            <Heart
+              className={cn("h-5 w-5", isCurrentSelected ? "fill-current" : "stroke-[2.2]")}
+            />
+          </button>
+
+          {/* Tải ảnh gốc */}
+          {onTaiAnh && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onTaiAnh(currentPhoto);
+              }}
+              aria-label={vi.gallery.downloadThis}
+              title={vi.gallery.downloadThis}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white/90 backdrop-blur-md hover:bg-white/20 transition-colors active:scale-90 touch-manipulation focus:outline-hidden"
+            >
+              <svg
+                width="19"
+                height="19"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 3v12" />
+                <path d="M7 12l5 5 5-5" />
+                <path d="M4 20h16" />
+              </svg>
+            </button>
+          )}
+
         {/* Nút Đóng (X) */}
         <button
           type="button"
@@ -191,6 +317,7 @@ export function PhotoLightbox({
         >
           <X className="h-6 w-6" />
         </button>
+        </div>
       </header>
 
       {/* KHUNG HIỂN THỊ ẢNH TRUNG TÂM (Phù hợp cả dọc lẫn xoay ngang điện thoại) */}
@@ -274,58 +401,47 @@ export function PhotoLightbox({
       </main>
 
       {/* THANH ĐIỀU KHIỂN DƯỚI (Footer) — Nút thả tim to rõ ràng */}
-      <footer className="relative z-20 flex items-center justify-center px-4 py-4 pb-6 sm:pb-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent shrink-0">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            disabled={isLocked || isMutating}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleHeart(currentPhoto);
-            }}
-            aria-label={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
-            className={cn(
-              "flex items-center gap-2.5 px-6 py-3 rounded-full font-bold text-sm sm:text-base transition-all active:scale-95 touch-manipulation shadow-lg focus:outline-hidden",
-              isCurrentSelected
-                ? "bg-rose-500 text-white ring-2 ring-rose-400/50 shadow-rose-500/30"
-                : "bg-white/20 text-white hover:bg-white/30 backdrop-blur-md"
-            )}
-          >
-            <Heart
-              className={cn(
-                "h-6 w-6 transition-all",
-                isCurrentSelected ? "fill-current text-white scale-110" : "stroke-[2.2]"
-              )}
-            />
-            <span>{isCurrentSelected ? vi.gallery.filterSelected : vi.gallery.select}</span>
-          </button>
+      {/* ------------------------------------------------------------------
+          BB-180 — Ô GHI CHÚ CHO THỢ CHỈNH ẢNH
+          ------------------------------------------------------------------
+          BB-144 đã dựng xong đường lưu (`PATCH /api/g/selection`, trường
+          `retouchNote`) nhưng khách **chưa bao giờ có ô để nhập**. Đây là nửa
+          còn lại, đặt đúng chỗ khách nghĩ ra điều muốn dặn: lúc đang nhìn kỹ
+          một tấm, không phải lúc lướt lưới.
 
-        {onTaiAnh && (
-          <button
-            type="button"
-            onClick={() => onTaiAnh(currentPhoto)}
-            aria-label="Tải ảnh này về máy"
-            title="Tải ảnh này về máy (ảnh gốc)"
-            className="rounded-full bg-white/10 p-3 text-white backdrop-blur hover:bg-white/20"
-          >
-            {/* Mũi tên tải xuống — chủ studio chốt dùng biểu tượng, không dùng chữ */}
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 3v12" />
-              <path d="M7 12l5 5 5-5" />
-              <path d="M4 20h16" />
-            </svg>
-          </button>
-        )}        </div>
+          Lưu khi rời ô (onBlur), không lưu theo từng phím gõ: mạng yếu là
+          chuyện thường ở Việt Nam, gọi máy chủ mỗi chữ là vừa tốn vừa dễ trượt.
+      */}
+      <footer className="relative z-20 px-4 py-3 pb-5 sm:pb-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent shrink-0">
+        {onLuuGhiChu && (
+          <div className="mx-auto w-full max-w-2xl">
+            <label htmlFor="ghi-chu-anh" className="sr-only">
+              {vi.gallery.noteHint}
+            </label>
+            <textarea
+              id="ghi-chu-anh"
+              value={ghiChu}
+              onChange={(e) => setGhiChu(e.target.value)}
+              onBlur={luuGhiChu}
+              onClick={(e) => e.stopPropagation()}
+              disabled={isLocked || dangLuuGhiChu || !isCurrentSelected}
+              rows={2}
+              maxLength={500}
+              placeholder={
+                isLocked
+                  ? vi.gallery.noteLocked
+                  : !isCurrentSelected
+                    ? vi.gallery.noteNeedsSelect
+                    : vi.gallery.noteHint
+              }
+              className="w-full resize-none rounded-xl bg-white/10 px-3.5 py-2.5 text-sm text-white placeholder:text-white/45 backdrop-blur-md outline-hidden ring-1 ring-white/15 focus:ring-white/40 disabled:opacity-50"
+            />
+            <div className="mt-1 h-4 text-xs" aria-live="polite">
+              {ketQuaLuu === "ok" && <span className="text-emerald-300">{vi.gallery.noteSaved}</span>}
+              {ketQuaLuu === "loi" && <span className="text-amber-300">{vi.gallery.noteSaveFailed}</span>}
+            </div>
+          </div>
+        )}
       </footer>
     </div>
   );

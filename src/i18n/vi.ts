@@ -172,6 +172,13 @@ export const vi = {
       zoomOut: "Thu nhỏ",
       counter: "{current} / {total}",
     },
+    noteNeedsSelect: "Chọn ảnh này trước rồi mới ghi chú được",
+    noteHint: "Ghi chú cho thợ chỉnh ảnh này…",
+    noteSaved: "Đã lưu ghi chú",
+    noteSaveFailed: "Chưa lưu được ghi chú, thử lại giúp bên mình nhé",
+    noteLocked: "Bộ ảnh đã chốt nên không sửa ghi chú được nữa",
+    downloadThis: "Tải ảnh này về máy",
+    quotaInline: "đã chọn",
     messageStudio: "Nhắn cho studio",
   },
   admin: {
