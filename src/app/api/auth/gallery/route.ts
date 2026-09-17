@@ -90,12 +90,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Unknown, revoked and expired all answer identically. Telling them apart
     // would confirm which albums exist to someone who is guessing.
     const isLegacy = !link?.customer_id;
+    // BB-183: Kiểm tra expires_at với TẤT CẢ các loại link, không phân biệt legacy.
     const usable =
       link &&
       link.status === "active" &&
-      (!isLegacy || !link.expires_at || new Date(link.expires_at) > new Date());
+      (!link.expires_at || new Date(link.expires_at) > new Date());
 
-    if (!usable) return fail("NOT_FOUND");
+    if (!usable) {
+      if (link && link.expires_at && new Date(link.expires_at) <= new Date()) {
+         return fail("LINK_EXPIRED", "Ba mẹ liên hệ studio để được gửi lại link nhé.");
+      }
+      return fail("NOT_FOUND");
+    }
 
     // One selection per share link, created on first successful entry rather
     // than at gallery creation: BB-065 mints new share links later and they
