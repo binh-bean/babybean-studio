@@ -77,9 +77,24 @@ nhóm theo cái gì có trong dữ liệu.
 Thêm ở chân màn khách: tên và địa chỉ chi nhánh, hotline, nút nhắn cho studio
 (đã có từ BB-166), và **thời gian lưu ảnh**.
 
-> **Thời gian lưu ảnh: chờ chủ studio chốt con số.** Chưa có thì để chỗ trống và
-> ghi trong bàn giao, **đừng tự đoán một con số rồi in cho khách đọc**. Khách
-> đọc "lưu 6 tháng" rồi tháng thứ bảy mất ảnh là studio mất khách.
+> **Thời gian lưu ảnh — chủ studio chốt 17/09/2026: hai tháng kể từ ngày gửi
+> link.** Mốc tính từ `share_links.created_at`, không phải ngày chụp.
+>
+> **Câu chữ phải nói đúng thứ app làm được.** Ảnh gốc nằm trên Drive của studio
+> (ADR-0002); app không sở hữu và không xoá chúng. Viết *"link xem ảnh có hiệu
+> lực 2 tháng"*, **tuyệt đối không viết** *"ảnh của bé sẽ bị xoá sau 2 tháng"*.
+> Hứa xoá là hứa một việc app không làm, và `docs/11 §7` còn có luật ngược lại.
+> Thêm một câu trấn an: hết hạn thì gọi studio để được cấp link mới.
+>
+> **Hiện con số này theo từng bộ**, tính từ ngày cấp link của chính bộ đó — đừng
+> ghi cứng chữ "2 tháng" vào giao diện. Chủ studio đổi chính sách là phải dựng
+> lại bản web. `docs/13 §11` là nguồn, `settings` là chỗ chứa.
+>
+> **Lưu ý quan trọng:** đo ngày 17/09 thì **0/15 link có ngày hết hạn** và chưa có
+> đường tự hết hạn — mọi link đang sống vĩnh viễn. Việc làm cho điều đó thành
+> thật là **BB-183, không phải việc của bạn**. Bạn chỉ hiển thị. Nếu BB-183 chưa
+> xong thì ghi vào bàn giao rằng phần hiển thị này **chưa được bật cho khách thấy**
+> cho tới khi hệ thống thực sự tôn trọng con số đó.
 
 ## Tiêu chí xong
 

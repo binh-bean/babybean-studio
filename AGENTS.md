@@ -272,6 +272,39 @@ Xong việc thì merge về `main` rồi `git worktree remove ../bb-008`.
 
 ---
 
+## 5a. Phép thử phải bắt được lỗi, không phải để được xanh
+
+Ba lần rồi, và cả ba đều là phép thử nộp kèm một bản vá đúng. Mã thì sửa được,
+phép thử thì không canh gì cả:
+
+| Task | Phép thử làm gì | Vì sao vô dụng |
+|---|---|---|
+| BB-108 | `fs.readFileSync` chính tệp `.tsx` rồi khớp regex | Đổi tên biến là đỏ dù hành vi y nguyên; component hỏng lúc chạy thì vẫn xanh |
+| BB-166 | Ghi vào `settings` của bb-dev, không trả lại | Mỗi lần `npm run test` là nút nhắn tin biến mất khỏi app thật |
+| BB-170 | Giả lập cả `useState` lẫn `useEffect` của React | `useEffect` thành hàm rỗng nên chỗ cần thử không hề chạy; tự nhét thẻ giả rồi kiểm HTML có chứa chuỗi `"10"` |
+
+### Bốn điều cấm
+
+1. **Không đọc mã nguồn làm dữ liệu thử.** Không `readFileSync` một tệp nguồn rồi
+   khớp chuỗi trên nó. Đó là canh chính tả, không canh hành vi.
+2. **Không giả lập hook của React.** Giả lập `useState` hay `useEffect` là gỡ bỏ
+   đúng cái cơ chế bạn đang cần thử. Giả lập `fetch` thì được — đó là biên giới
+   ra ngoài, không phải ruột của component.
+3. **Phép thử ghi vào cơ sở dữ liệu thì phải trả lại giá trị cũ** bằng
+   `beforeAll`/`afterAll`. bb-dev là cơ sở dữ liệu thật của studio, không phải
+   sân tập.
+4. **Không kiểm những chuỗi có trong mọi HTML.** `toContain("10")` hay
+   `toContain("5")` là không kiểm gì cả.
+
+### Thước đo duy nhất
+
+Trước khi nộp, tự hỏi: **nếu tôi hoàn nguyên bản vá của mình, phép thử này có đỏ
+không?** Không đỏ thì nó không canh lỗi bạn vừa sửa, và viết nó ra chỉ làm người
+sau tin nhầm rằng chỗ đó đang được canh.
+
+Thử thật: hoàn nguyên, chạy phép thử, xem nó đỏ, rồi vá lại. **Dán cả hai kết
+quả vào bàn giao.**
+
 ## 6. Dữ liệu mẫu: chỉ dùng dữ liệu giả
 
 **Repo này là public.** Bất cứ thứ gì commit vào đây đều công khai vĩnh viễn — xoá ở commit sau cũng không gỡ được khỏi lịch sử.

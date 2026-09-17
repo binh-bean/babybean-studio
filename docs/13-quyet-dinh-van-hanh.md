@@ -351,3 +351,38 @@ Chỗ đó app đã có: bảng Kanban lọc theo trạng thái `submitted`.
 
 **Còn treo:** `settings.lark.webhook_url` đang rỗng, và chưa dòng mã nào đọc
 khoá đó. Xem BB-167.
+
+## 11. Ảnh của bé giữ bao lâu — chốt ngày 17/09/2026
+
+**Hai tháng kể từ ngày gửi link.** Chủ studio chốt.
+
+### Mốc tính từ ngày CẤP LINK, không phải ngày chụp
+
+`share_links.created_at`, không phải `shoots.shoot_date`. Bộ ảnh chụp xong có
+thể nằm chờ hậu kỳ vài tuần; tính từ ngày chụp là ăn mất phần thời gian ba mẹ
+chưa hề nhận được gì.
+
+### App hứa ĐƯỜNG VÀO, không hứa xoá ảnh
+
+Đây là chỗ dễ hiểu nhầm nhất, nên viết rõ ra.
+
+Ảnh gốc nằm trên **Drive của studio** (ADR-0002). App không sở hữu và không xoá
+chúng. Thứ app làm được là **cho link thôi hoạt động sau hai tháng**.
+
+Nên câu chữ hiện cho khách phải nói đúng điều đó — *"link xem ảnh có hiệu lực
+2 tháng"* — chứ không phải *"ảnh của bé sẽ bị xoá sau 2 tháng"*. Hứa xoá là hứa
+một việc app không làm, và `docs/11 §7` còn có luật ngược lại: **không xoá thư
+mục Drive của album chưa giao xong**.
+
+Khách quay lại sau hai tháng thì CSKH cấp link mới — BB-148 đã làm xong đường
+cấp lại, và lượt chọn cũ đi theo link mới.
+
+### Hôm nay hệ thống CHƯA làm điều này
+
+Đo ngày 17/09/2026: **0/15 link có ngày hết hạn**, **0 bộ ảnh có hạn chốt**, và
+chưa có đường tự hết hạn. Mọi link đang sống vĩnh viễn.
+
+Nên thứ tự bắt buộc là: **làm cho nó đúng trước, in cho khách đọc sau.** In con
+số "2 tháng" lên màn khách trong khi link sống mãi là dạy khách đừng tin những
+gì app nói. Xem BB-068 và BB-183.
+
