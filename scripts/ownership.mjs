@@ -101,6 +101,13 @@ export const OWNERSHIP = {
     "src/lib/drive/**",
     "src/lib/lark/**",
     "src/app/api/img/**",
+    // Cửa cho Lark gọi VÀO app. PM duyệt 17/09/2026, xem ADR-0006.
+    //
+    // Đường này chỉ là một lớp vỏ mỏng gọi thẳng vào `src/lib/lark/**`,
+    // vùng DEV-INT đã sở hữu. Để nó bên DEV-BE là tạo một lần bàn giao giữa
+    // hai agent cho một việc duy nhất — và chỗ nguy hiểm nhất của đường này
+    // nằm đúng ngay chỗ bàn giao.
+    "src/app/api/lark/**",
     "scripts/sync-drive.ts",
     "scripts/sync-lark-catalog.mjs",
     "scripts/sync-lark-contracts.mjs",
