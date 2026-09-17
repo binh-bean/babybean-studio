@@ -347,6 +347,8 @@ export async function readLarkTable(
   return { tableId: table.table_id, tableName: table.name, records };
 }
 
+let cachedTableId: { baseToken: string; namePatternString: string; tableId: string; tableName: string; expiresAt: number } | null = null;
+
 /**
  * Đọc một bản ghi cụ thể từ bảng theo record_id.
  */
@@ -356,41 +358,92 @@ export async function readLarkRecord(
   namePattern: RegExp,
   recordId: string
 ): Promise<{ tableId: string; tableName: string; record: LarkRecord }> {
-  const listRes = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables?page_size=100`, {
-    headers: { authorization: auth.authorization },
-  });
-  const list = (await listRes.json()) as {
-    code: number;
-    msg?: string;
-    data?: { items?: Array<{ table_id: string; name: string }> };
-  };
+  let tableId = "";
+  let tableName = "";
+  const patternKey = namePattern.toString();
+  const now = Date.now();
+  let usedCache = false;
 
-  if (list.code !== 0 || !list.data?.items) {
-    throw new Error(`Không liệt kê được bảng từ Lark: ${list.msg || "Lỗi kết nối"}`);
+  if (cachedTableId && cachedTableId.baseToken === baseToken && cachedTableId.namePatternString === patternKey && cachedTableId.expiresAt > now) {
+    tableId = cachedTableId.tableId;
+    tableName = cachedTableId.tableName;
+    usedCache = true;
+  } else {
+    const listRes = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables?page_size=100`, {
+      headers: { authorization: auth.authorization },
+    });
+    const list = (await listRes.json()) as {
+      code: number;
+      msg?: string;
+      data?: { items?: Array<{ table_id: string; name: string }> };
+    };
+
+    if (list.code !== 0 || !list.data?.items) {
+      throw new Error(`Không liệt kê được bảng từ Lark: ${list.msg || "Lỗi kết nối"}`);
+    }
+
+    const table = list.data.items.find((t) => namePattern.test(t.name));
+    if (!table) {
+      throw new Error(
+        `Không tìm thấy bảng khớp ${namePattern}. Các bảng hiện có: ` +
+          list.data.items.map((t) => t.name).join(" | "),
+      );
+    }
+    tableId = table.table_id;
+    tableName = table.name;
+    cachedTableId = {
+      baseToken,
+      namePatternString: patternKey,
+      tableId,
+      tableName,
+      expiresAt: now + 1000 * 60 * 60, // 1 giờ
+    };
   }
 
-  const table = list.data.items.find((t) => namePattern.test(t.name));
-  if (!table) {
-    throw new Error(
-      `Không tìm thấy bảng khớp ${namePattern}. Các bảng hiện có: ` +
-        list.data.items.map((t) => t.name).join(" | "),
-    );
-  }
-
-  const res = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables/${table.table_id}/records/${recordId}`, {
+  let res = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables/${tableId}/records/${recordId}`, {
     headers: { authorization: auth.authorization },
   });
-  const data = (await res.json()) as {
+  let data = (await res.json()) as {
     code: number;
     msg?: string;
     data?: { record?: LarkRecord };
   };
 
+  // Nếu dùng cache mà bị lỗi (có thể bảng bị xóa/tạo lại nên table_id đổi), thử quét lại 1 lần
+  if (data.code !== 0 && usedCache) {
+    cachedTableId = null; // Xóa cache
+    
+    const listRes = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables?page_size=100`, {
+      headers: { authorization: auth.authorization },
+    });
+    const list = (await listRes.json()) as { code: number; data?: { items?: Array<{ table_id: string; name: string }> } };
+    
+    if (list.code === 0 && list.data?.items) {
+      const table = list.data.items.find((t) => namePattern.test(t.name));
+      if (table) {
+        tableId = table.table_id;
+        tableName = table.name;
+        cachedTableId = {
+          baseToken,
+          namePatternString: patternKey,
+          tableId,
+          tableName,
+          expiresAt: Date.now() + 1000 * 60 * 60,
+        };
+        
+        res = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables/${tableId}/records/${recordId}`, {
+          headers: { authorization: auth.authorization },
+        });
+        data = await res.json();
+      }
+    }
+  }
+
   if (data.code !== 0 || !data.data?.record) {
     throw new Error(`Lỗi đọc bản ghi ${recordId}: ${data.msg || "Lỗi API"}`);
   }
 
-  return { tableId: table.table_id, tableName: table.name, record: data.data.record };
+  return { tableId, tableName, record: data.data.record };
 }
 
 // --- Xử lý đồng bộ 1 bản ghi Hậu Kỳ xuống DB theo docs/16 §7.3 -------------

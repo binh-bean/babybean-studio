@@ -51,10 +51,44 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Lấy khoá (không chờ, nếu đang chạy thì bỏ qua)
-    const { rows: lockRows } = await client.query("select pg_try_advisory_lock($1) as locked", [LOCK_ID]);
-    if (!lockRows[0].locked) {
-      return NextResponse.json({ skipped: "busy" }, { status: 200 });
+    // Lấy khoá (chờ tối đa 1 giây)
+    let locked = false;
+    for (let i = 0; i < 2; i++) {
+      const { rows: lockRows } = await client.query("select pg_try_advisory_lock($1) as locked", [LOCK_ID]);
+      if (lockRows[0].locked) {
+        locked = true;
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (!locked) {
+      console.log(`[Lark Hook] Khoá bận, đưa bản ghi ${recordId} vào hàng đợi`);
+      await client.query(`
+        insert into settings (key, value)
+        values ('lark_hook_queue', jsonb_build_object('record_ids', jsonb_build_array($1::text)))
+        on conflict (key, coalesce(branch_id, '00000000-0000-0000-0000-000000000000'::uuid))
+        do update set value = jsonb_set(
+          settings.value, 
+          '{record_ids}', 
+          (coalesce(settings.value->'record_ids', '[]'::jsonb) || jsonb_build_array($1::text))
+        )
+      `, [recordId]);
+      return NextResponse.json({ skipped: "busy_queued" }, { status: 200 });
+    }
+
+    let recordIdsToProcess = [recordId];
+    try {
+      const { rows: queueRows } = await client.query(`select value from settings where key = 'lark_hook_queue' and branch_id is null`);
+      if (queueRows.length > 0 && queueRows[0].value?.record_ids) {
+        const queuedIds = queueRows[0].value.record_ids;
+        if (Array.isArray(queuedIds)) {
+          recordIdsToProcess = [...new Set([...queuedIds, recordId])];
+        }
+        await client.query(`update settings set value = '{"record_ids": []}'::jsonb where key = 'lark_hook_queue' and branch_id is null`);
+      }
+    } catch (err) {
+      console.error("[Lark Hook] Lỗi đọc hàng đợi:", err);
     }
 
     // Load master data
@@ -68,23 +102,32 @@ export async function POST(request: Request) {
     // Xác thực Lark
     const auth = await larkAuth(appId, appSecret);
     
-    // Đọc bảng, lấy đúng 1 bản ghi
-    const { record } = await readLarkRecord(auth, baseToken, /h[aậ]u\s*k[yỳ]/i, recordId);
+    const results = [];
+    for (const rId of recordIdsToProcess) {
+      try {
+        // Đọc bảng, lấy đúng 1 bản ghi
+        const { record } = await readLarkRecord(auth, baseToken, /h[aậ]u\s*k[yỳ]/i, rId);
 
-    // Xử lý bản ghi
-    const res = await syncSingleRetouchRecord({
-      client,
-      record,
-      branches: branchRows,
-      staffList: staffRows,
-      write: true,
-      index: 0,
-      dbUrl,
-    });
+        // Xử lý bản ghi
+        const res = await syncSingleRetouchRecord({
+          client,
+          record,
+          branches: branchRows,
+          staffList: staffRows,
+          write: true,
+          index: 0,
+          dbUrl,
+        });
+        results.push({ record_id: rId, result: res });
+      } catch (err) {
+        console.error(`[Lark Hook] Lỗi xử lý bản ghi ${rId}:`, err);
+        results.push({ record_id: rId, error: String(err) });
+      }
+    }
 
     return NextResponse.json({
       message: "Success",
-      result: res
+      results: results
     }, { status: 200 });
 
   } catch (error) {
@@ -92,6 +135,7 @@ export async function POST(request: Request) {
     // Bắt buộc trả 200 để Lark không thử lại vô hạn
     return NextResponse.json({ message: "Lỗi xử lý nhưng trả 200 để báo Lark" }, { status: 200 });
   } finally {
+    // Luôn thử unlock (nếu không giữ thì cũng không lỗi)
     await client.query("select pg_advisory_unlock($1)", [LOCK_ID]);
     await client.end();
   }
