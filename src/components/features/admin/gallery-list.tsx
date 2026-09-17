@@ -108,6 +108,179 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+function KanbanColumn({
+  colKey,
+  label,
+  variant,
+  totalCount,
+  filters,
+}: {
+  colKey: string;
+  label: string;
+  variant: NonNullable<BadgeProps["variant"]>;
+  totalCount: number;
+  filters: GalleryFilterState;
+}) {
+  const [items, setItems] = useState<GalleryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+
+  const fetchItems = useCallback(
+    async (isLoadMore = false, cursorToUse?: string | null) => {
+      if (isLoadMore) setLoadingMore(true);
+      else setLoading(true);
+
+      try {
+        const queryParams = new URLSearchParams();
+        if (filters.branchId) queryParams.set("branchId", filters.branchId);
+        queryParams.set("status", colKey);
+        if (filters.photographerId) queryParams.set("photographerId", filters.photographerId);
+        if (filters.dateFrom) queryParams.set("dateFrom", filters.dateFrom);
+        if (filters.dateTo) queryParams.set("dateTo", filters.dateTo);
+        if (filters.search) queryParams.set("q", filters.search);
+
+        if (isLoadMore && cursorToUse) {
+          queryParams.set("cursor", cursorToUse);
+        }
+
+        queryParams.set("limit", "20");
+
+        const res = await fetch(`/api/admin/galleries?${queryParams.toString()}`, {
+          cache: "no-store",
+        });
+
+        if (!res.ok) throw new Error("Không thể tải danh sách bộ ảnh");
+        const body = await res.json();
+        const fetchedItems: GalleryItem[] = body?.data?.items ?? [];
+
+        if (isLoadMore) {
+          setItems((prev) => [...prev, ...fetchedItems]);
+        } else {
+          setItems(fetchedItems);
+        }
+
+        setHasMore(Boolean(body?.data?.hasMore));
+        setNextCursor(body?.data?.nextCursor ?? null);
+      } catch (err) {
+        console.error("Lỗi khi fetch kanban column:", err);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [filters, colKey]
+  );
+
+  useEffect(() => {
+    void fetchItems(false);
+  }, [fetchItems]);
+
+  const handleLoadMore = () => {
+    if (!hasMore || loadingMore || !nextCursor) return;
+    void fetchItems(true, nextCursor);
+  };
+
+  return (
+    <div className="flex-1 min-w-[260px] max-w-[320px] rounded-[var(--bb-radius)] bg-[var(--bb-surface-2)]/50 border border-[var(--bb-border)] flex flex-col max-h-[calc(100vh-220px)]">
+      {/* Tiêu đề cột */}
+      <div className="p-3 border-b border-[var(--bb-border)] flex items-center justify-between bg-[var(--bb-surface)] rounded-t-[var(--bb-radius)]">
+        <div className="flex items-center gap-2">
+          <Badge variant={variant} className="h-2 w-2 p-0 rounded-full" />
+          {colKey === "sync_error" ? (
+            <Link
+              href="/admin/reports/loi-dong-bo"
+              className="font-semibold text-sm text-[var(--bb-danger)] hover:underline flex items-center gap-1"
+              title="Đến màn xử lý lỗi tải"
+            >
+              {label}
+            </Link>
+          ) : (
+            <span className="font-semibold text-sm text-[var(--bb-fg)]">{label}</span>
+          )}
+        </div>
+        <Badge variant="secondary" className="text-xs px-2 py-0.5">
+          {totalCount}
+        </Badge>
+      </div>
+
+      {/* Danh sách thẻ trong cột */}
+      <div className="p-2.5 space-y-2.5 overflow-y-auto flex-1">
+        {loading && !loadingMore && items.length === 0 ? (
+          <div className="py-8 flex justify-center">
+            <Spinner size="sm" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="py-8 text-center text-xs text-[var(--bb-fg-muted)]">
+            Không có bộ ảnh
+          </div>
+        ) : (
+          <>
+            {items.map((item) => {
+              const tenBeCot = item.babyName || item.babyFullName || null;
+              return (
+                <Card
+                  key={item.id}
+                  className="p-3 bg-[var(--bb-surface)] border border-[var(--bb-border)] rounded-[var(--bb-radius-sm)] shadow-xs hover:border-[var(--bb-primary)] transition-all space-y-2"
+                >
+                  <Link
+                    href={`/admin/galleries/${item.id}`}
+                    className="font-semibold text-sm text-[var(--bb-fg)] hover:text-[var(--bb-primary)] block transition-colors"
+                  >
+                    {item.title}
+                  </Link>
+                  {tenBeCot && <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>}
+                  <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span>{item.customerName}</span>
+                      <span className="font-mono text-[11px]">{item.customerPhone}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span>{item.branchName}</span>
+                      <span>{formatDate(item.shootDate)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-[var(--bb-border)]/50 text-xs">
+                    <span className="font-medium text-[var(--bb-primary)]">{item.progress}</span>
+                    {item.dueAt && (
+                      <span className="text-[11px] text-[var(--bb-fg-muted)] flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDate(item.dueAt)}
+                      </span>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
+            {hasMore && (
+              <div className="pt-2 pb-1 flex justify-center">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="w-full text-xs h-8"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Spinner size="sm" className="mr-2" />
+                      Đang tải...
+                    </>
+                  ) : (
+                    "Tải thêm"
+                  )}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function GalleryList() {
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [counts, setCounts] = useState<GalleryCounts>({
@@ -576,97 +749,26 @@ export function GalleryList() {
           <div className="overflow-x-auto pb-4">
             <div className="flex gap-4 min-w-max pr-4">
               {kanbanStatuses.map((col) => {
-                const colItems = items.filter((it) => it.status === col.key);
-                const countNumber = counts[col.key] ?? colItems.length;
+                const countNumber = counts[col.key] ?? 0;
 
                 return (
-                  <div
+                  <KanbanColumn
                     key={col.key}
-                    className="flex-1 min-w-[260px] max-w-[320px] rounded-[var(--bb-radius)] bg-[var(--bb-surface-2)]/50 border border-[var(--bb-border)] flex flex-col max-h-[calc(100vh-220px)]"
-                  >
-                    {/* Tiêu đề cột */}
-                    <div className="p-3 border-b border-[var(--bb-border)] flex items-center justify-between bg-[var(--bb-surface)] rounded-t-[var(--bb-radius)]">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={col.variant} className="h-2 w-2 p-0 rounded-full" />
-                        {col.key === "sync_error" ? (
-                          <Link href="/admin/reports/loi-dong-bo" className="font-semibold text-sm text-[var(--bb-danger)] hover:underline flex items-center gap-1" title="Đến màn xử lý lỗi tải">
-                            {col.label}
-                          </Link>
-                        ) : (
-                          <span className="font-semibold text-sm text-[var(--bb-fg)]">
-                            {col.label}
-                          </span>
-                        )}
-                      </div>
-                      <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                        {countNumber}
-                      </Badge>
-                    </div>
-
-                  {/* Danh sách thẻ trong cột */}
-                  <div className="p-2.5 space-y-2.5 overflow-y-auto flex-1">
-                    {colItems.length === 0 ? (
-                      <div className="py-8 text-center text-xs text-[var(--bb-fg-muted)]">
-                        Không có bộ ảnh
-                      </div>
-                    ) : (
-                      colItems.map((item) => {
-                        const tenBeCot = item.babyName || item.babyFullName || null;
-
-                        return (
-                          <Card
-                            key={item.id}
-                            className="p-3 bg-[var(--bb-surface)] border border-[var(--bb-border)] rounded-[var(--bb-radius-sm)] shadow-xs hover:border-[var(--bb-primary)] transition-all space-y-2"
-                          >
-                            <Link
-                              href={`/admin/galleries/${item.id}`}
-                              className="font-semibold text-sm text-[var(--bb-fg)] hover:text-[var(--bb-primary)] block transition-colors"
-                            >
-                              {item.title}
-                            </Link>
-                            {tenBeCot && (
-                              <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>
-                            )}
-
-                            <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
-                              <div className="flex items-center justify-between">
-                                <span>{item.customerName}</span>
-                                <span className="font-mono text-[11px]">
-                                  {item.customerPhone}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-[11px]">
-                                <span>{item.branchName}</span>
-                                <span>{formatDate(item.shootDate)}</span>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-1 border-t border-[var(--bb-border)]/50 text-xs">
-                              <span className="font-medium text-[var(--bb-primary)]">
-                                {item.progress}
-                              </span>
-                              {item.dueAt && (
-                                <span className="text-[11px] text-[var(--bb-fg-muted)] flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {formatDate(item.dueAt)}
-                                </span>
-                              )}
-                            </div>
-                          </Card>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                    colKey={col.key}
+                    label={col.label}
+                    variant={col.variant}
+                    totalCount={countNumber}
+                    filters={filters}
+                  />
+                );
+              })}
           </div>
         </div>
         </div>
       )}
 
       {/* Phân trang Cursor / Tải thêm */}
-      {hasMore && (
+      {hasMore && filters.viewMode === "table" && (
         <div className="flex justify-center pt-4">
           <Button
             type="button"
