@@ -9,11 +9,9 @@
  * Everything is fake. The repository is public — see AGENTS.md §6.
  */
 
-import bcrypt from "bcryptjs";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const AUTH_ACTION = "gallery.auth";
-export const TEST_PIN = "1234";
 
 export interface AuthFixtures {
   runId: string;
@@ -160,7 +158,6 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
         token_prefix: token.slice(0, 6),
         role: "co_editor",
         status: "active",
-        requires_pin: false,
         ...options,
       })
       .select("id")
@@ -173,11 +170,12 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
   const tokenNoPin = `token-no-pin-${runId}`;
   await createLink(tokenNoPin, { role: "owner" });
 
-  const tokenWithPin = `token-with-pin-${runId}`;
-  const pinLinkId = await createLink(tokenWithPin, {
-    requires_pin: true,
-    pin_hash: await bcrypt.hash(TEST_PIN, 4),
-  });
+  // BB-169 đã bỏ hẳn PIN và migration 0045 đã xoá bốn cột liên quan, nên link
+  // "từng cài PIN" giờ không khác gì link thường ở tầng dữ liệu. Giữ lại fixture
+  // này vì ca dùng nó vẫn có giá trị: canh rằng đường khách đi vào **không còn
+  // chỗ nào đòi PIN** — nếu ai đó vô tình thêm lại, ca đó đỏ ngay.
+  const tokenWithPin = `token-cu-tung-co-pin-${runId}`;
+  const pinLinkId = await createLink(tokenWithPin, { role: "owner" });
 
   const tokenRevoked = `token-revoked-${runId}`;
   await createLink(tokenRevoked, { status: "revoked" });
