@@ -96,6 +96,22 @@ Thêm ở chân màn khách: tên và địa chỉ chi nhánh, hotline, nút nh�
 > xong thì ghi vào bàn giao rằng phần hiển thị này **chưa được bật cho khách thấy**
 > cho tới khi hệ thống thực sự tôn trọng con số đó.
 
+## Chữ nghĩa phải đi qua i18n — không ngoại lệ
+
+`src/i18n/vi.ts` và `en.ts`. BB-069 đã dọn hết chuỗi cứng khỏi dự án, đừng thêm
+lại. Áp cho **mọi** chuỗi khách đọc được, kể cả thông báo lỗi và chữ gợi ý trong
+ô nhập.
+
+Hai bẫy khi thêm khoá:
+
+- Khối `gallery` **đã có sẵn** `offline` và `notePlaceholder`. Đặt trùng tên là
+  TypeScript báo lỗi khoá trùng. Kiểm trước khi đặt.
+- Thêm vào `vi.ts` thì **phải thêm đúng khoá đó vào `en.ts`**. Hai tệp buộc phải
+  cùng bộ khoá, thiếu một cái là typecheck đỏ.
+
+Trong JSX nhớ hai ngữ cảnh khác nhau: `title={vi.gallery.x}` có ngoặc nhọn,
+còn `{vi.gallery.x}` giữa hai thẻ thì không.
+
 ## Tiêu chí xong
 
 - [ ] `npm run typecheck` sạch, `npm run lint` sạch.
