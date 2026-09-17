@@ -733,6 +733,38 @@ export function GalleryApp({ token }: GalleryAppProps) {
     [isLocked, gallery?.quotaKnown, gallery?.maxSelection],
   );
 
+  /**
+   * BB-180 — lưu ghi chú cho một ảnh, gọi từ màn xem lớn.
+   *
+   * Dùng lại đúng đường của BB-144 (`PATCH /api/g/selection`, trường
+   * `retouchNote`) — không dựng đường lưu thứ hai.
+   */
+  const luuGhiChuAnh = useCallback(
+    async (photo: PhotoPublic, ghiChu: string): Promise<boolean> => {
+      if (isLocked) return false;
+      try {
+        const res = await fetch("/api/g/selection", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ops: [{ photoId: photo.id, retouchNote: ghiChu.trim() || null }],
+          }),
+        });
+        if (!res.ok) return false;
+        setPhotos((truoc) =>
+          truoc.map((x) =>
+            x.id === photo.id ? { ...x, retouchNote: ghiChu.trim() || null } : x,
+          ),
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [isLocked],
+  );
+
+
   const handleSubmitSelection = async () => {
     if (isLocked) return;
     setSubmitting(true);
@@ -804,6 +836,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
     }
     return out;
   }, [gallery]);
+
+  /**
+   * BB-180 — sản phẩm in còn thiếu ảnh, để nhắc trước khi chốt.
+   *
+   * Chủ studio chốt 17/09: **nhắc chứ không chặn**. Khách đang cầm điện
+   * thoại, đang bế con — chặn là họ bỏ dở giữa chừng. Chỉ nói rõ cái được
+   * nếu chọn luôn, rồi để họ tự quyết.
+   */
+  const sanPhamThieuAnh = useMemo(
+    () =>
+      printProducts.filter(
+        (sp) =>
+          placements.filter((pl) => pl.galleryItemId === sp.galleryItemId).length <
+          sp.quantity,
+      ),
+    [printProducts, placements],
+  );
 
   /** Chỉ ảnh ĐÃ CHỌN mới đặt được vào sản phẩm in — ảnh in lấy từ tập đã chỉnh. */
   const placeablePhotos = useMemo(
@@ -1273,6 +1322,40 @@ export function GalleryApp({ token }: GalleryAppProps) {
               {vi.gallery.submitConfirm}
             </p>
 
+            {/* ----------------------------------------------------------------
+                BB-180 — NHẮC chọn ảnh phóng và bìa album, KHÔNG CHẶN
+                ----------------------------------------------------------------
+                Chủ studio chốt 17/09. Khách chốt thiếu thì CSKH phải gọi lại, và
+                có ca quên hẳn — việc này đang làm studio mất tiền.
+
+                Nhưng **không chặn nút Chốt**. Khách đang cầm điện thoại, đang bế
+                con; chặn là họ bỏ dở giữa chừng. Chỉ nói rõ cái được nếu chọn
+                luôn, rồi để họ tự quyết.
+            */}
+            {sanPhamThieuAnh.length > 0 && (
+              <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 text-xs dark:border-amber-500/30 dark:bg-amber-500/10">
+                <p className="font-semibold text-amber-900 dark:text-amber-200">
+                  Bạn chưa chọn ảnh cho:
+                </p>
+                <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-amber-900/90 dark:text-amber-100/90">
+                  {sanPhamThieuAnh.map((sp) => (
+                    <li key={sp.galleryItemId}>{sp.name}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 leading-relaxed text-amber-900/80 dark:text-amber-100/80">
+                  Chọn luôn thì bên mình làm nhanh hơn — để sau cũng được, CSKH sẽ
+                  hỏi lại.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowSubmitModal(false)}
+                  className="mt-2.5 rounded-lg bg-amber-200/70 px-3 py-1.5 font-semibold text-amber-950 hover:bg-amber-200 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30"
+                >
+                  Để tôi chọn thêm
+                </button>
+              </div>
+            )}
+
             <div className="p-3 bg-surface-2 rounded-xl text-xs space-y-1">
               <div className="flex justify-between font-medium">
                 <span>Số ảnh đã chọn:</span>
@@ -1393,6 +1476,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
           onTaiAnh={choPhepTai ? (p) => taiMotAnh({ id: p.id, fileName: p.fileName }) : null}
           mutatingIds={mutatingIds}
           isLocked={isLocked}
+          daChon={soAnhDaChon}
+          hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
+          onLuuGhiChu={luuGhiChuAnh}
         />
       )}
     </div>

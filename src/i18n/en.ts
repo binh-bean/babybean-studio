@@ -172,6 +172,13 @@ export const en: Messages = {
       zoomOut: "Zoom out",
       counter: "{current} / {total}",
     },
+    noteNeedsSelect: "Select this photo first, then you can add a note",
+    noteHint: "Notes for the retoucher on this photo…",
+    noteSaved: "Note saved",
+    noteSaveFailed: "Could not save the note — please try again",
+    noteLocked: "This gallery is submitted, so notes can no longer be changed",
+    downloadThis: "Download this photo",
+    quotaInline: "selected",
     messageStudio: "Message studio",
   },
   admin: {
