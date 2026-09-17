@@ -87,10 +87,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       .eq("token_hash", await sha256Hex(token))
       .maybeSingle();
 
-    // Unknown, revoked and expired all answer identically. Telling them apart
-    // would confirm which albums exist to someone who is guessing.
+    // -------------------------------------------------------------------
+    // Trả lời gì cho link không dùng được — đọc kỹ trước khi sửa
+    // -------------------------------------------------------------------
+    // Bản đầu cho **không tồn tại, đã thu hồi và hết hạn** trả lời giống hệt
+    // nhau, để người đang dò mã không biết mình đã trúng.
+    //
+    // BB-183 tách RIÊNG ca hết hạn, và đó là đánh đổi có tính toán:
+    //
+    //   - Mã link dài 22 ký tự (~131 bit). Dò trúng là chuyện không xảy ra được,
+    //     nên cái được che ở đây gần như bằng không.
+    //   - Ngược lại, ba mẹ cầm một link thật đã quá hai tháng mà thấy "không tìm
+    //     thấy" sẽ nghĩ studio xoá mất ảnh con mình. Đó mới là thiệt hại có thật.
+    //
+    // **Ca ĐÃ THU HỒI vẫn trả NOT_FOUND** — không được đổi. Link bị thu hồi
+    // thường là vì nó đã lọt ra ngoài; nói cho người đang cầm nó biết "link này
+    // từng thật, gọi studio đi" là chỉ đường cho đúng người không nên biết.
     const isLegacy = !link?.customer_id;
-    // BB-183: Kiểm tra expires_at với TẤT CẢ các loại link, không phân biệt legacy.
+    // BB-183: kiểm hạn dùng cho MỌI loại link. Trước đây chỉ link kiểu cũ bị kiểm,
+    // nên link gắn theo khách sống vĩnh viễn dù có đặt ngày hết hạn.
     const usable =
       link &&
       link.status === "active" &&
