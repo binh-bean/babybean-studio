@@ -30,7 +30,7 @@ test.describe("BB-166: Nút Nhắn cho studio", () => {
 
     token = `bb166-${randomUUID()}`;
     await pgClient.query(
-      `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin) VALUES ($1,$2,$3,'owner','active',false)`,
+      `INSERT INTO share_links (gallery_id, token_hash, token_prefix, role, status) VALUES ($1,$2,$3,'owner','active')`,
       [galleryId, sha256(token), token.slice(0, 6)]
     );
   });

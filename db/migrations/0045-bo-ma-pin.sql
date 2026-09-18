@@ -5,7 +5,21 @@
 -- ============================================================================
 
 -- 1. Dựng lại view v_share_links (bỏ requires_pin)
-create or replace view v_share_links as
+--
+-- PHẢI `drop` rồi `create`, KHÔNG dùng được `create or replace`.
+-- Postgres chỉ cho `replace` THÊM cột vào cuối, không cho BỎ BỚT cột — áp lên
+-- một cơ sở dữ liệu đã có khung nhìn cũ sẽ gãy với "cannot drop columns from view".
+--
+-- Cổng `verify:schema` KHÔNG bắt được lỗi này, và đó không phải lỗi của cổng:
+-- nó luôn dựng từ một schema TRỐNG nên không có khung nhìn cũ để va chạm.
+-- Lớp lỗi này chỉ lộ ra khi áp thật.
+--
+-- Không dùng `cascade`: đã tra pg_depend ngày 17/09, không khung nhìn nào và
+-- không chính sách quyền nào phụ thuộc vào nó. `cascade` ở đây sẽ là một con dao
+-- sắc cầm ngược: nó im lặng xoá luôn thứ mình không biết là có.
+drop view if exists v_share_links;
+
+create view v_share_links as
 select id, gallery_id, token_prefix, role, label, status,
        expires_at, view_count, last_viewed_at, created_at, revoked_at
 from share_links;
@@ -173,6 +187,17 @@ begin
 end;
 $$;
 
+-- THU HỒI TRƯẮC, CẤP SAU — và phải có đủ cả hai dòng.
+--
+-- `drop function` xoá luôn mọi lệnh thu hồi quyền đã áp trước đó (0006), và
+-- Postgres **mặc định cấp quyền chạy cho PUBLIC** với mọi hàm mới tạo. Hàm này
+-- là `security definer`, nên thiếu dòng revoke là khoá công khai gọi được nó và
+-- đi vòng qua toàn bộ lớp kiểm quyền — tạo khách, tạo bộ ảnh, tạo link chia sẻ.
+--
+-- Lỗ này đã mở thật trên bb-dev ngày 17/09, và `verify:db` bắt được ngay
+-- (“Khoá công khai không gọi được hàm SECURITY DEFINER”). Đó là lý do cổng đó
+-- tồn tại — đừng bỏ qua nó khi áp migration có đụng tới hàm.
+revoke execute on function public.create_gallery_bundle from public, anon;
 grant execute on function public.create_gallery_bundle to authenticated, service_role;
 
 -- 3. Xoá các cột mã PIN

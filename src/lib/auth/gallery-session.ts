@@ -166,7 +166,7 @@ export async function assertShareLinkUsable(shareLinkId: string): Promise<void> 
 
   if (!data) throw new GallerySessionError("LINK_EXPIRED");
   if (data.status !== "active") throw new GallerySessionError("LINK_EXPIRED");
-  if (!data.customer_id && data.expires_at && new Date(data.expires_at) < new Date()) {
+  if (data.expires_at && new Date(data.expires_at) < new Date()) {
     throw new GallerySessionError("LINK_EXPIRED");
   }
 }

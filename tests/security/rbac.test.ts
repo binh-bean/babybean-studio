@@ -296,8 +296,24 @@ describe("Database RLS Policies & Security (BB-020)", () => {
   it("Đối chứng dương cho Ca 13: accountant VẪN thấy được album, và cs VẪN thấy được ảnh", async () => {
     await client.query("BEGIN");
 
-    // Lấy 2 staff: ép 1 người làm accountant, người kia làm cs
-    const staffsRes = await client.query("SELECT id FROM staff_profiles WHERE role IN ('cs', 'photographer', 'branch_manager') LIMIT 2");
+    // Lấy 2 staff: ép 1 người làm accountant, người kia làm cs.
+    //
+    // PHẢI lấy người CÓ CHI NHÁNH và chi nhánh đó CÓ BỘ ẢNH. Luật quyền chỉ cho
+    // nhân viên nhìn bộ ảnh trong chi nhánh của mình, nên bốc nhầm một người
+    // không chi nhánh là thấy 0 dòng — và phép thử đỏ trong khi không ai sửa gì sai.
+    //
+    // Đã xảy ra thật ngày 17/09: một dòng `Fixture branch_manager` còn sót từ lượt
+    // chạy hỏng của chính phép thử này, không có chi nhánh nào, làm cả bộ phép thử
+    // bảo mật đỏ trên `main`. `LIMIT 2` không sắp thứ tự nên lúc trúng lúc không —
+    // kiểu đỏ chập chờn tốn nhiều giờ nhất để dò.
+    const staffsRes = await client.query(`
+      SELECT sp.id
+        FROM staff_profiles sp
+        JOIN staff_branches sb ON sb.staff_id = sp.id
+       WHERE sp.role IN ('cs', 'photographer', 'branch_manager')
+         AND EXISTS (SELECT 1 FROM galleries g WHERE g.branch_id = sb.branch_id)
+       ORDER BY sp.created_at
+       LIMIT 2`);
     expect(staffsRes.rows.length).toBeGreaterThanOrEqual(2);
     
     const accId = staffsRes.rows[0].id;
