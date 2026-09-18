@@ -102,4 +102,9 @@ revoke execute on function public.check_staff_deletable(uuid) from authenticated
 grant  execute on function public.check_staff_deletable(uuid) to service_role;
 
 -- 3 --------------------------------------------------------------------------
+-- Không chỉ một hàm: trong schema `app` có CẢ CẶP — hàm và khung nhìn đọc nó.
+-- Cả hai đều không nằm trong một tệp migration nào, không dòng mã nào gọi tới,
+-- và bb-prod sẽ không bao giờ có chúng. Phải bỏ khung nhìn trước, không thì
+-- Postgres từ chối: "cannot drop function ... because other objects depend on it".
+drop view     if exists app.v_staff_deletable;
 drop function if exists app.check_staff_deletable(uuid);
