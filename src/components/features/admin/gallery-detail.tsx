@@ -68,7 +68,15 @@ interface Detail {
   includedQuota: number | null;
   totalValue: number;
   selectedCount: number;
-  shareLink: { id: string } | null;
+  shareLink: {
+    id: string;
+    status: string;
+    expiresAt: string | null;
+    tokenPrefix: string | null;
+    createdAt: string | null;
+    viewCount: number;
+    revokedAt: string | null;
+  } | null;
   items: Item[];
   revisions: Revision[];
   catalog: CatalogProduct[];
@@ -310,6 +318,46 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       );
       setDaGhiLark(json.data.daGhiLark === true);
       setLyDoKhongGhiLark(json.data.lyDoKhongGhiLark ?? null);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Mở khoá lại link CŨ — giữ nguyên địa chỉ (BB-188).
+   *
+   * Khác hẳn `taoLink()`: không sinh mã mới, nên biểu tượng ba mẹ đã ghim ngoài
+   * màn hình điện thoại vẫn mở đúng bộ ảnh cũ.
+   */
+  async function moLaiLink() {
+    if (
+      detail?.shareLink?.revokedAt &&
+      !window.confirm(
+        "Link này đã BỊ THU HỒI, thường là vì nghi mã lọt ra ngoài. Mở khoá lại là mở cho cả " +
+          "người đang cầm mã đó. Vẫn mở?",
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/share-link/mo-lai`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNotice(json?.error?.message ?? "Không mở khoá được link");
+        return;
+      }
+      setNotice(
+        `Đã mở khoá link cũ — địa chỉ GIỮ NGUYÊN, ba mẹ dùng lại đúng link đã lưu. ` +
+          `Hạn mới: ${json.data.ttlDays} ngày.`,
+      );
       await load();
     } finally {
       setBusy(false);
@@ -713,23 +761,39 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             />
           </div>
         ) : (
-          <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
-            {detail.shareLink
-              ? "Bộ ảnh đã có link đang dùng. Tạo link mới sẽ thu hồi link cũ — dùng khi nghi link cũ lọt ra ngoài."
-              : detail.photoCount === 0
-                ? "Chưa có ảnh nào. Đồng bộ ảnh từ Drive xong rồi hãy tạo link."
-                : "Chưa có link nào cho bộ ảnh này."}
-          </p>
+          <TinhTrangLink detail={detail} />
         )}
 
-        <button
-          type="button"
-          disabled={busy || detail.photoCount === 0}
-          onClick={() => void taoLink()}
-          className="mt-3 rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
-        >
-          {detail.shareLink ? "Tạo link mới (thu hồi link cũ)" : "Tạo link gửi khách"}
-        </button>
+        {/* BB-188: hai nút, hai việc KHÁC HẲN NHAU.
+            — Mở khoá: giữ nguyên địa chỉ, biểu tượng ba mẹ đã ghim vẫn chạy.
+            — Tạo mới: đổi địa chỉ, mọi biểu tượng đã ghim đều chết.
+            Khi link cũ chỉ hết hạn thì việc ĐÚNG là mở khoá, nên nó là nút chính
+            và Tạo mới lui về nút phụ. Hai nút cùng màu là ngày nào đó bấm nhầm. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {detail.shareLink && detail.shareLink.status !== "active" && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void moLaiLink()}
+              className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+            >
+              Mở khoá link cũ (giữ nguyên địa chỉ)
+            </button>
+          )}
+
+          <button
+            type="button"
+            disabled={busy || detail.photoCount === 0}
+            onClick={() => void taoLink()}
+            className={
+              detail.shareLink && detail.shareLink.status !== "active"
+                ? "rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+                : "rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+            }
+          >
+            {detail.shareLink ? "Tạo link mới (ĐỔI địa chỉ)" : "Tạo link gửi khách"}
+          </button>
+        </div>
       </section>
 
       <section className="flex flex-wrap gap-3">
@@ -1073,6 +1137,74 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg border border-[var(--bb-border)] p-3">
       <div className="text-xs text-[var(--bb-fg-muted)]">{label}</div>
       <div className="mt-1 text-sm font-medium">{value}</div>
+    </div>
+  );
+}
+
+/**
+ * Tình trạng link gửi khách (BB-188).
+ *
+ * Trước đây khối này chỉ có một dòng chữ *"Bộ ảnh đã có link đang dùng"* —
+ * CSKH không biết link còn sống hay đã chết, còn bao lâu, hay ba mẹ đã mở chưa.
+ * Khách gọi lên hỏi "link không vào được" thì không ai trả lời được tại sao.
+ *
+ * KHÔNG hiện mã link ở đây. Sau khi bỏ PIN, chuỗi đó là thứ duy nhất che ảnh
+ * của một nhà; sáu ký tự đầu đủ để đối chiếu và không mở được gì.
+ */
+function TinhTrangLink({ detail }: { detail: Detail }) {
+  const link = detail.shareLink;
+
+  if (!link) {
+    return (
+      <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
+        {detail.photoCount === 0
+          ? "Chưa có ảnh nào. Đồng bộ ảnh từ Drive xong rồi hãy tạo link."
+          : "Chưa có link nào cho bộ ảnh này."}
+      </p>
+    );
+  }
+
+  const ngay = (v: string | null) =>
+    v ? new Date(v).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+
+  // Hết hạn là một tình trạng THẬT, nhưng cột `status` không tự đổi khi đồng hồ
+  // đi qua `expires_at` — không có ai chạy qua bảng để đổi nó. Tính ở đây, nếu
+  // không thì màn hình báo "đang dùng" trong khi khách đang nhìn trang báo hết hạn.
+  const daHetHan =
+    link.status === "active" && link.expiresAt !== null && new Date(link.expiresAt) < new Date();
+
+  const nhan = link.revokedAt
+    ? { chu: "Đã thu hồi", vien: "var(--bb-danger)" }
+    : daHetHan || link.status === "expired"
+      ? { chu: "Đã hết hạn", vien: "var(--bb-warning)" }
+      : link.status === "active"
+        ? { chu: "Đang dùng", vien: "var(--bb-success)" }
+        : { chu: link.status, vien: "var(--bb-border)" };
+
+  return (
+    <div className="mt-2 space-y-1 text-sm">
+      <p>
+        <span
+          className="mr-2 inline-block rounded-full border px-2 py-0.5 text-xs"
+          style={{ borderColor: nhan.vien }}
+        >
+          {nhan.chu}
+        </span>
+        <span className="text-[var(--bb-fg-muted)]">
+          mã <span className="font-mono">{link.tokenPrefix ?? "—"}…</span>
+        </span>
+      </p>
+      <p className="text-[var(--bb-fg-muted)]">
+        Cấp ngày {ngay(link.createdAt)} · hạn {ngay(link.expiresAt)} · khách đã mở {link.viewCount} lần
+      </p>
+      {(daHetHan || link.status !== "active") && (
+        <p className="rounded-md border border-[var(--bb-warning)] p-3">
+          Ba mẹ mở link này sẽ thấy báo hết hạn.{" "}
+          <strong>Mở khoá link cũ</strong> giữ nguyên địa chỉ — biểu tượng ba mẹ đã lưu ngoài
+          màn hình điện thoại vẫn dùng được. <strong>Tạo link mới</strong> đổi địa chỉ, và
+          biểu tượng đó sẽ chết.
+        </p>
+      )}
     </div>
   );
 }

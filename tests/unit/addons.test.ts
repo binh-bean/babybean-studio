@@ -325,7 +325,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
   it("Test 6: GET /api/g/gallery trả thêm khối addons đã mua của phiên", async () => {
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
 
-    const res = await getGallery();
+    const res = await getGallery(new Request("http://localhost/api/g/gallery"));
     expect(res.status).toBe(200);
 
     const body = await res.json();

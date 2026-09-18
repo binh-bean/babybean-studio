@@ -299,7 +299,7 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
 
     // 3. Mở rộng GET /api/g/gallery trả danh sách ảnh đã đặt
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
-    const galRes = await getGallery();
+    const galRes = await getGallery(new Request("http://localhost/api/g/gallery"));
     expect(galRes.status).toBe(200);
 
     const galBody = await galRes.json();
@@ -338,7 +338,7 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
 
     // Kiểm tra trước khi đặt ảnh vào sản phẩm in
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
-    const beforeRes = await getGallery();
+    const beforeRes = await getGallery(new Request("http://localhost/api/g/gallery"));
     const beforeData = (await beforeRes.json()).data;
     expect(beforeData.includedQuota).toBe(15);
     expect(beforeData.selection.selectedCount).toBe(5);
@@ -359,7 +359,7 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
 
     // Kiểm tra lại sau khi đặt: Hạn mức và số lượng chọn KHÔNG ĐỔI!
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
-    const afterRes = await getGallery();
+    const afterRes = await getGallery(new Request("http://localhost/api/g/gallery"));
     const afterData = (await afterRes.json()).data;
 
     expect(afterData.includedQuota).toBe(15);
@@ -421,7 +421,7 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
 
     // 3. Kiểm tra danh sách placements rỗng
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
-    const galRes = await getGallery();
+    const galRes = await getGallery(new Request("http://localhost/api/g/gallery"));
     const galBody = await galRes.json();
     expect(galBody.data.placements.length).toBe(0);
   }, 15000);
@@ -431,7 +431,7 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
 
     // 1. GET /api/g/gallery không còn trường watermark trong options
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
-    const galRes = await getGallery();
+    const galRes = await getGallery(new Request("http://localhost/api/g/gallery"));
     const galBody = await galRes.json();
 
     expect(galBody.data.options).toBeDefined();

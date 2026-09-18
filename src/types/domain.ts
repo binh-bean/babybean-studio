@@ -468,6 +468,11 @@ export const ERROR_CODES = [
   "FORBIDDEN",
   "NOT_FOUND",
   "LINK_EXPIRED",
+  // BB-187: phiên đang mở thuộc về MỘT LINK KHÁC với mã trên thanh địa chỉ.
+  //
+  // Khác LINK_EXPIRED: link cũ vẫn sống, chỉ là nó không phải link ba mẹ vừa bấm.
+  // Mã trên địa chỉ mới là thứ họ chủ động mở, nên nó thắng phiên đang cầm.
+  "SESSION_MISMATCH",
   "GALLERY_LOCKED",
   "QUOTA_EXCEEDED",
   // Khác QUOTA_EXCEEDED: khách chọn quá là một chuyện, studio chưa nhập hạn

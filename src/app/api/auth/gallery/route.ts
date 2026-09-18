@@ -16,6 +16,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { signGallerySession, SESSION_COOKIE } from "@/lib/auth/gallery-session";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import type { ShareRole } from "@/types/domain";
+import { bamMaLink } from "@/lib/auth/bam-ma-link";
 
 export const runtime = "nodejs";
 
@@ -39,11 +40,6 @@ function clientIp(req: NextRequest): string | null {
   const raw = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip");
   const first = raw?.split(",")[0]?.trim();
   return first && first.length > 0 ? first : null;
-}
-
-async function sha256Hex(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return Buffer.from(buf).toString("hex");
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -84,7 +80,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { data: link } = await admin
       .from("share_links")
       .select("id, gallery_id, customer_id, role, status, expires_at")
-      .eq("token_hash", await sha256Hex(token))
+      .eq("token_hash", await bamMaLink(token))
       .maybeSingle();
 
     // -------------------------------------------------------------------

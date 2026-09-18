@@ -491,7 +491,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
       setError(null);
       setPhaiChonBuoiChup(false);
 
-      let res = await fetch("/api/g/gallery", { cache: "no-store" });
+      // BB-187: gửi KÈM mã trên thanh địa chỉ. Máy chủ băm nó rồi so với link
+      // của phiên đang cầm; lệch thì trả 409 SESSION_MISMATCH. Không gửi thì
+      // máy chủ không có cách nào biết ba mẹ vừa bấm vào link nào.
+      const duongGallery = `/api/g/gallery?token=${encodeURIComponent(token)}`;
+
+      let res = await fetch(duongGallery, { cache: "no-store" });
 
       // BB-157: phiên CŨ trong máy không được chặn link MỚI trên thanh địa chỉ.
       //
@@ -504,7 +509,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
       //
       // 410 và 403 nghĩa là phiên đang cầm đã hỏng. Mã trên URL mới là thứ ba mẹ
       // vừa bấm vào, nên nó phải được ưu tiên.
-      const phienCuHong = res.status === 410 || res.status === 403;
+      // BB-187 thêm 409: phiên CÒN SỐNG nhưng thuộc về MỘT BỘ KHÁC.
+      //
+      // BB-157 trên đây chỉ vá ca phiên HỎNG. Ca còn lại nặng hơn hẳn: hai nhà
+      // dùng chung một máy, hoặc một nhà chụp hai bộ — phiên cũ còn hạn nên máy
+      // chủ trả 200, và màn khách hiện ảnh của bộ KIA. Chủ studio gặp ngày
+      // 18.09.2026: mở link bộ 210 ảnh (Pasteur) mà màn hiện bộ 261 ảnh (Thảo
+      // Điền). Đo lại trong cơ sở dữ liệu: mã link đúng, lỗi nằm ở chỗ này.
+      //
+      // Nguyên tắc chốt lại, áp cho cả ba mã: **mã trên thanh địa chỉ là nguồn
+      // đúng, phiên chỉ là thứ tiện lợi.** Lệch thì phiên thua, luôn luôn.
+      const phienCuHong =
+        res.status === 410 || res.status === 403 || res.status === 409;
       if (phienCuHong) {
         // Đăng nhập lại bằng mã trên URL sẽ thay cookie cũ bằng phiên mới.
         res = new Response(null, { status: 401 });
@@ -531,7 +547,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             return;
           }
           // Thử gọi lại gallery sau khi đã có cookie phiên
-          res = await fetch("/api/g/gallery", { cache: "no-store" });
+          res = await fetch(duongGallery, { cache: "no-store" });
         } else {
           const errCode = authData?.error?.code || "NOT_FOUND";
           setError({

@@ -223,3 +223,6 @@ Tài liệu tham chiếu: docs/xx §y
 ```
 
 | BB-138 | Dựng môi trường bb-prod, script setup, bảng kiểm | ARCH | - | med | DONE |
+| BB-187 | Mã trên thanh địa chỉ thắng phiên trong máy — hết hẳn cảnh "mở link nhà mình, hiện ảnh nhà khác" | PM | BB-157 | high | ✅ **DONE** — `GET /api/g/gallery` nhận `?token=`, băm rồi so với `share_links.id` của phiên; lệch → 409 `SESSION_MISMATCH`, màn khách đăng nhập lại bằng đúng mã. Phép băm gom về `src/lib/auth/bam-ma-link.ts`. 3 ca; hoàn nguyên → 2 ca ĐỬ |
+| BB-188 | Mở khoá link CŨ thay vì cấp link mới — giữ biểu tượng ba mẹ đã ghim ngoài màn hình | PM | BB-183 | high | ✅ **DONE** — `POST .../share-link/mo-lai` giữ nguyên `token_hash`, chỉ đổi tình trạng và hạn; màn chi tiết hiện tình trạng/hạn/số lượt mở và tách hẳn hai nút. 3 ca; hoàn nguyên → ĐỬ |
+| BB-189 | Khoá lại `check_staff_deletable` — 0047 để PUBLIC gọi được một hàm SECURITY DEFINER | PM | BB-171 | high | ⏳ **CHỜ DUYỆT** — migration `0048` đã viết và qua `verify:schema`, chưa áp lên bb-dev. `verify:db` đang 16/17 |

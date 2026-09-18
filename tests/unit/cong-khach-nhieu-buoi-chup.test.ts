@@ -381,7 +381,7 @@ describe("BB-130: cổng khách, một link nhiều buổi chụp", () => {
     dungPhien(cookie);
     const { GET } = await import("@/app/api/g/gallery/route");
 
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/g/gallery"));
     const json = await res.json();
 
     expect(res.status).toBe(404);

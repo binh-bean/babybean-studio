@@ -3,11 +3,47 @@ import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
+import { bamMaLink } from "@/lib/auth/bam-ma-link";
 
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await requireGallerySession();
+
+    // -------------------------------------------------------------------
+    // BB-187 — MÃ TRÊN THANH ĐỊA CHỈ LÀ NGUỒN ĐÚNG, KHÔNG PHẢI PHIÊN
+    // -------------------------------------------------------------------
+    // Trước bản vá này, màn khách gọi đường này BẰNG COOKIE rồi chỉ đăng nhập
+    // lại bằng mã trên địa chỉ khi bị 401, 410 hay 403. Phiên cũ CÒN SỐNG thì trả
+    // 200, và app hiện bộ ảnh của phiên đó — **bỏ qua hoàn toàn mã trên địa chỉ**.
+    //
+    // Hậu quả chủ studio gặp ngày 18/09: mở link của bộ HD_20260908#5055 (210
+    // ảnh, Pasteur) nhưng màn hiện bộ của nhà khác (261 ảnh, Thảo Điền) — vì
+    // trình duyệt đang giữ phiên còn hạn của bộ kia. Đo lại trong cơ sở dữ liệu:
+    // mã link HOÀN TOÀN ĐÚNG. Lỗi nằm ở đây, không nằm ở đường tạo link.
+    //
+    // BB-157 đã vá ca phiên HỎNG. Đây là ca phiên CÒN SỐNG nhưng CỦA BỘ KHÁC —
+    // nặng hơn hẳn, vì nó cho một nhà nhìn thấy ảnh con nhà khác.
+    //
+    // Cách vá: màn khách gửi kèm mã trên địa chỉ. Máy chủ băm nó ra rồi so với
+    // link của phiên. Lệch thì **từ chối**, để màn khách đăng nhập lại bằng đúng mã
+    // ba mẹ vừa bấm. Không gửi mã thì bỏ qua phần so — các đường gọi khác
+    // (đổi tim, tải ảnh…) vẫn chạy như cũ.
+    const maTrenDiaChi = new URL(request.url).searchParams.get("token");
+    if (maTrenDiaChi) {
+      const admin0 = await createAdminClient();
+      const { data: linkTheoMa } = await admin0
+        .from("share_links")
+        .select("id")
+        .eq("token_hash", await bamMaLink(maTrenDiaChi))
+        .maybeSingle();
+
+      if (!linkTheoMa || linkTheoMa.id !== session.shareLinkId) {
+        return fail(
+          "SESSION_MISMATCH",
+          "Phiên đang mở thuộc về một link khác",
+        );
+      }
+    }
 
     // Phiên của link gắn theo khách, chưa chọn buổi chụp nào (BB-130).
     //

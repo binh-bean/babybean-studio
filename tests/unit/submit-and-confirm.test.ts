@@ -373,7 +373,7 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
 
     // Khách mở lại album xem GET /api/g/gallery
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
-    const galRes = await getGallery();
+    const galRes = await getGallery(new Request("http://localhost/api/g/gallery"));
     expect(galRes.status).toBe(200);
 
     const body = await galRes.json();

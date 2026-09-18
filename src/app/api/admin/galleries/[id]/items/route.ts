@@ -64,13 +64,23 @@ export async function GET(
       .eq("mark", "selected");
     const selectedCount = new Set((selRows ?? []).map((r) => r.photo_id)).size;
 
-    // Link chia sẻ chính, để màn hình bật/tắt PIN được (BB-098).
+    // Link chia sẻ chính của bộ ảnh.
+    //
+    // BB-188: lấy link MỚI NHẤT **bất kể tình trạng**, không chỉ lấy link còn
+    // sống. Trước đây link hết hạn hay bị thu hồi là màn quản trị hiện "chưa có
+    // link nào" — CSKH không còn lựa chọn nào ngoài bấm Tạo link mới, mà tạo mới
+    // là **đổi mã trên thanh địa chỉ**. Ba mẹ đã lưu link thành biểu tượng ngoài
+    // màn hình điện thoại thì biểu tượng đó chết, và phải lưu lại từ đầu.
+    //
+    // Thấy được link cũ thì mới mở khoá tại chỗ được (đường `.../mo-lai`).
+    //
+    // `created_at` giảm dần, không phải tăng dần: có bộ mang nhiều link (tạo lại
+    // kèm `giuLinkCu`), và link đúng là cái vừa cấp chứ không phải cái đầu tiên.
     const { data: link } = await admin
       .from("share_links")
-      .select("id, status")
+      .select("id, status, expires_at, token_prefix, created_at, view_count, revoked_at")
       .eq("gallery_id", gallery.id)
-      .eq("status", "active")
-      .order("created_at")
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -142,7 +152,21 @@ export async function GET(
       includedQuota: summary.includedQuota,
       totalValue: summary.totalValue,
       selectedCount,
-      shareLink: link ? { id: link.id } : null,
+      // BB-188: đủ trường để màn CSKH nói được link đang ở tình trạng nào và
+      // còn bao lâu. Tuyệt đối KHÔNG trả `token_hash` — sau khi bỏ PIN, mã link
+      // là thứ duy nhất che ảnh của một nhà. `token_prefix` (6 ký tự) chỉ để đối
+      // chiếu, không mở được gì.
+      shareLink: link
+        ? {
+            id: link.id,
+            status: link.status,
+            expiresAt: link.expires_at ?? null,
+            tokenPrefix: link.token_prefix ?? null,
+            createdAt: link.created_at ?? null,
+            viewCount: link.view_count ?? 0,
+            revokedAt: link.revoked_at ?? null,
+          }
+        : null,
       items: summary.items,
     });
   } catch (err) {

@@ -54,7 +54,7 @@ describe("BB-166 API Route", () => {
       exp: Date.now() + 10000,
     } as never);
 
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/g/gallery"));
     expect(res.status).toBe(200);
     const json = await res.json();
     
@@ -81,13 +81,13 @@ describe("BB-166 API Route", () => {
 
     // Case 1: http string
     await supabase.from("settings").update({ value: "http://m.me/113878833349843" } as never).eq("key", "chat.page_url").is("branch_id", null);
-    let res = await GET();
+    let res = await GET(new Request("http://localhost/api/g/gallery"));
     let json = await res.json();
     expect(json.data.branch.chatUrl).toBeNull();
 
     // Case 2: Object
     await supabase.from("settings").update({ value: { url: "https://m.me/113878833349843" } } as never).eq("key", "chat.page_url").is("branch_id", null);
-    res = await GET();
+    res = await GET(new Request("http://localhost/api/g/gallery"));
     json = await res.json();
     expect(json.data.branch.chatUrl).toBeNull();
   });
