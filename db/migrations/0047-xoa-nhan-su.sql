@@ -8,13 +8,13 @@ as $$
 declare
   v_count integer;
 begin
-  -- 1. T?o b? ?nh (galleries.created_by)
+  -- 1. Đã tạo bộ ảnh nào chưa (galleries.created_by)
   select count(*) into v_count from galleries where created_by = p_staff_id;
   if v_count > 0 then
     return 'Tài khoản này đã tạo ' || v_count || ' bộ ảnh nên không xoá được. Dùng Cho nghỉ việc để giữ lịch sử.';
   end if;
 
-  -- 2. D?oc gán làm th? ?nh, th? ch?nh, hay CSKH c?a b? nào (galleries)
+  -- 2. Đang phụ trách bộ ảnh nào không — thợ ảnh, thợ chỉnh, hay CSKH
   select count(*) into v_count from galleries 
   where photographer_id = p_staff_id or cskh_id = p_staff_id or editor_id = p_staff_id;
   if v_count > 0 then
