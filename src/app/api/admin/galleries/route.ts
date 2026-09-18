@@ -132,6 +132,27 @@ export async function POST(request: Request): Promise<Response> {
       return failUnexpected(rpcError, requestId);
     }
 
+    // BB-183: Cập nhật hạn sử dụng của link vừa tạo theo cấu hình (mặc định 60 ngày)
+    const { data: ttlData } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "gallery.link_ttl_days")
+      .is("branch_id", null)
+      .maybeSingle();
+
+    let ttlDays = 60;
+    if (ttlData?.value && typeof ttlData.value === "number") {
+      ttlDays = ttlData.value;
+    }
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + ttlDays);
+
+    await supabase
+      .from("share_links")
+      .update({ expires_at: expiresAt.toISOString() })
+      .eq("id", (result as { share_link_id: string }).share_link_id);
+
     // No fallback on purpose. This used to guess "https://chon-anh.babybean.vn",
     // a domain the studio does not own and nobody has registered — so a missing
     // variable would mint share links pointing into thin air, and whoever

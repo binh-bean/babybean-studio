@@ -150,6 +150,20 @@ export async function POST(
         .eq("status", "active");
     }
 
+    const { data: ttlData } = await admin
+      .from("settings")
+      .select("value")
+      .eq("key", "gallery.link_ttl_days")
+      .is("branch_id", null)
+      .maybeSingle();
+
+    let ttlDays = 60;
+    if (ttlData?.value && typeof ttlData.value === "number") {
+      ttlDays = ttlData.value;
+    }
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + ttlDays);
+
     const ma = taoMa();
     const { data: link, error } = await admin
       .from("share_links")
@@ -162,9 +176,8 @@ export async function POST(
         role: "owner",
         label: label.length > 0 ? label : null,
         status: "active",
-        // KHÔNG đặt expires_at: link là địa chỉ lâu dài của khách. Hết hạn thì
-        // phụ huynh mở lại sau vài tháng là thấy trang lỗi, và họ sẽ nghĩ
-        // studio xoá mất ảnh con mình.
+        // BB-183: Đặt expires_at theo cấu hình. Link cũ vẫn giữ vô hạn (null).
+        expires_at: expiresAt.toISOString(),
         created_by: staff.staffId,
       })
       .select("id")

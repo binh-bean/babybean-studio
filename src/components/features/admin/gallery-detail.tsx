@@ -115,6 +115,23 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     void load();
   }, [load]);
 
+  /**
+   * Lớp chặn thứ hai cho cùng một lỗi.
+   *
+   * Chỗ gọi đã có `key={id}` nên React tháo và dựng lại component mỗi lần đổi
+   * bộ ảnh. Nhưng chốt ấy nằm ở **trên một tệp khác** — ai đó dựng
+   * `<GalleryDetail>` ở chỗ mới mà quên `key` là lỗi quay lại nguyên vẹn, và lần
+   * này không ai biết để đi tìm.
+   *
+   * Ba trạng thái dưới đây đều nói về **lần tạo link vừa rồi**. Chuyển sang bộ
+   * khác thì chúng không còn đúng về bất cứ thứ gì nữa.
+   */
+  React.useEffect(() => {
+    setLinkMoi(null);
+    setDaGhiLark(null);
+    setLyDoKhongGhiLark(null);
+  }, [galleryId]);
+
   if (error) return <p className="text-sm text-[var(--bb-danger)]">{error}</p>;
   if (!detail) return <p className="text-sm text-[var(--bb-fg-muted)]">Đang tải…</p>;
 

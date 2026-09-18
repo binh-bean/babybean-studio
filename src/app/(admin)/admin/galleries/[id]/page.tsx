@@ -29,7 +29,21 @@ export default async function GalleryDetailPage({
 
   return (
     <main className="mx-auto max-w-4xl p-6">
-      <GalleryDetail galleryId={id} />
+      {/* `key` KHÔNG phải trang trí — nó là lớp chặn thứ nhất của một lỗi
+          nghiêm trọng.
+
+          Điều hướng từ bộ A sang bộ B trong Next.js giữ nguyên component đang
+          dựng và chỉ đổi prop. Mọi trạng thái bên trong **ở lại** — trong đó có
+          `linkMoi`, chuỗi link gửi khách.
+
+          Hậu quả đo được ngày 17/09: CSKH tạo link cho nhà A, bấm sang bộ của
+          nhà B, và khung "Link gửi khách" vẫn treo link của nhà A dưới tiêu đề
+          của nhà B — kèm dòng chữ "gửi thẳng cho khách". Gửi đi là nhà B mở
+          được ảnh con nhà A.
+
+          `key` đổi thì React tháo component cũ và dựng lại từ đầu, nên mọi trạng
+          thái — kể cả trạng thái ai đó thêm sau này — đều sạch. Đừng gỡ dòng này. */}
+      <GalleryDetail key={id} galleryId={id} />
     </main>
   );
 }

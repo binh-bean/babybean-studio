@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { BranchSelector } from "./branch-selector";
 import { AdminBreadcrumb } from "./admin-breadcrumb";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Menu } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -40,13 +38,8 @@ export function AdminHeader({ role }: { role?: string }) {
         {/* Title for mobile when breadcrumb hidden */}
         <span className="font-display font-bold sm:hidden text-[var(--bb-fg)]">BabyBean</span>
       </div>
-      
       <div className="flex items-center gap-3">
-        <BranchSelector />
-        <Avatar className="h-8 w-8">
-          <AvatarImage src="https://i.pravatar.cc/150?u=admin" alt="Admin" />
-          <AvatarFallback>AD</AvatarFallback>
-        </Avatar>
+        {/* BranchSelector and Avatar removed per BB-174 (hidden until functional) */}
       </div>
     </header>
   );
