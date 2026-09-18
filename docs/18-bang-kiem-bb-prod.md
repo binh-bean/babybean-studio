@@ -41,10 +41,10 @@ nữa đáng làm. Dưới đây là danh sách đếm được. Xong hết bả
 
 | # | Cổng | Vì sao bắt buộc |
 |---|---|---|
-| 1 | **BB-183** — link thật sự hết hạn sau 2 tháng | Màn khách đã dựng sẵn chỗ hiện con số này. In "2 tháng" trong khi link sống vĩnh viễn là dạy khách đừng tin app |
-| 2 | **BB-174·175·176** — ba chỗ làm app như đang hỏng | Nhân viên dùng hằng ngày. Cảm giác hỏng đắt hơn lỗi thật: lỗi thật thì người ta báo, cảm giác hỏng thì người ta lặng lẽ thôi dùng |
-| 3 | **BB-177** — CSKH lấy được link app | CSKH dán link cho khách mỗi ngày. Không có nó thì quy trình đứt ngay bước đầu |
-| 4 | **BB-182** — Lark không đánh rơi thay đổi | Thay đổi rơi trong im lặng là bộ ảnh không dựng, mà không ai biết để đi tìm |
+| ✅ | **BB-183** — link thật sự hết hạn sau 2 tháng | Màn khách đã dựng sẵn chỗ hiện con số này. In "2 tháng" trong khi link sống vĩnh viễn là dạy khách đừng tin app |
+| ✅ | **BB-174·175·176** — ba chỗ làm app như đang hỏng | Nhân viên dùng hằng ngày. Cảm giác hỏng đắt hơn lỗi thật: lỗi thật thì người ta báo, cảm giác hỏng thì người ta lặng lẽ thôi dùng |
+| ✅ | **BB-177** — CSKH lấy được link app | CSKH dán link cho khách mỗi ngày. Không có nó thì quy trình đứt ngay bước đầu |
+| ✅ | **BB-182** — Lark không đánh rơi thay đổi | Thay đổi rơi trong im lặng là bộ ảnh không dựng, mà không ai biết để đi tìm |
 | 5 | **Ba việc tay ở mục 2** | Không có tài khoản quản trị thì không ai vào được màn quản trị, kể cả chủ studio |
 | 6 | **Hẹn giờ sao lưu hằng tuần** | `docs/11 §7`. Từ lúc khách đầu tiên bấm chọn ảnh, mất dữ liệu là mất công của khách |
 | 7 | **Một lượt đi trọn đường như khách thật** | Trên điện thoại thật, bằng 4G, với một bộ ảnh thật. Chủ studio làm, không phải máy |
