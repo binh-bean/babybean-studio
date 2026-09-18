@@ -7,10 +7,13 @@ import { AdminHeader } from "./admin-header";
 export function AdminLayoutShell({
   children,
   role,
+  hoTen,
 }: {
   children: React.ReactNode;
   /** Vai trò của người đang đăng nhập, để ẩn mục Nhân sự với người không có quyền. */
   role?: string;
+  /** Tên người đang đăng nhập — máy quầy là máy chung (BB-185). */
+  hoTen?: string | null;
 }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -22,7 +25,7 @@ export function AdminLayoutShell({
         role={role}
       />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <AdminHeader role={role} />
+        <AdminHeader role={role} hoTen={hoTen} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
         </main>

@@ -79,18 +79,57 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     return { photoId, custId: cust[0].id };
   }
 
+  /**
+   * Dựng một CSKH được gán ĐÚNG MỘT chi nhánh, ngay trong transaction của bài test.
+   *
+   * Bản cũ của Ca 1 đi tìm `role = 'cs' LIMIT 1` trong dữ liệu thật, rồi lấy
+   * `staff_branches ... LIMIT 1` làm "chi nhánh của người này" — và đòi không được
+   * thấy bộ ảnh nào ngoài chi nhánh đó.
+   *
+   * Ngày 18/09/2026 bài này đỏ: 264 bộ "lọt". Đo lại thì **luật quyền không hề
+   * sai** — cả hai tài khoản CSKH trên bb-dev đã được gán **cả ba** chi nhánh, một
+   * thao tác quản trị hoàn toàn bình thường. Bài test chỉ nhìn chi nhánh đầu tiên
+   * rồi gọi hai chi nhánh còn lại là "lọt".
+   *
+   * Tệ hơn cả việc đỏ oan: với tài khoản gán đủ ba chi nhánh thì **không còn chi
+   * nhánh nào ở ngoài để kiểm**, nên ngay cả khi nó xanh thì nó cũng không canh
+   * gì. Cùng bài học đã ghi ở `makePhotographerAndCustomer` bên trên: bài test bảo
+   * mật không được phụ thuộc vào thứ người dùng sửa được qua giao diện.
+   */
+  async function makeCsMotChiNhanh(): Promise<{ csId: string; branchId: string }> {
+    // Chi nhánh phải CÓ bộ ảnh, và phải có ít nhất một chi nhánh KHÁC cũng có bộ
+    // ảnh — không thì phép thử này rỗng ruột mà vẫn xanh.
+    const { rows: br } = await client.query(
+      `select branch_id, count(*)::int n from galleries
+        where branch_id is not null group by 1 having count(*) > 0 order by 2 desc`,
+    );
+    if (br.length < 2) throw new Error("Cần ít nhất hai chi nhánh có bộ ảnh, chạy npm run db:seed");
+    const branchId = br[0].branch_id;
+
+    const { rows: user } = await client.query(
+      `INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
+       VALUES (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+               'fixture.cs.' || gen_random_uuid() || '@staff.babybeanstudio.vn', '', now(), now(), now())
+       RETURNING id`,
+    );
+    const csId = user[0].id;
+
+    await client.query(
+      `INSERT INTO staff_profiles (id, full_name, email, role, is_active)
+       SELECT $1, 'Fixture CSKH', email, 'cs', true FROM auth.users WHERE id = $1`,
+      [csId],
+    );
+    await client.query("INSERT INTO staff_branches (staff_id, branch_id) VALUES ($1, $2)", [csId, branchId]);
+
+    return { csId, branchId };
+  }
+
   it("Ca 1: cs chi nhánh thấy album chi nhánh mình và KHÔNG thấy album chi nhánh khác", async () => {
     await client.query("BEGIN");
     
-    // Tìm 1 nhân viên CS
-    const csRes = await client.query("SELECT id FROM staff_profiles WHERE role = 'cs' LIMIT 1");
-    expect(csRes.rows.length).toBe(1);
-    const csId = csRes.rows[0].id;
-
-    // Tìm branch mà CS này quản lý
-    const sbRes = await client.query("SELECT branch_id FROM staff_branches WHERE staff_id = $1 LIMIT 1", [csId]);
-    expect(sbRes.rows.length).toBe(1);
-    const csBranchId = sbRes.rows[0].branch_id;
+    // Dựng CSKH của riêng bài test, gán ĐÚNG MỘT chi nhánh — xem ghi chú ở
+    // `makeCsMotChiNhanh`. Không đi tìm tài khoản thật nữa.
+    const { csId, branchId: csBranchId } = await makeCsMotChiNhanh();
 
     // Đăng nhập làm CS này
     await client.query("SET LOCAL ROLE authenticated");
@@ -106,6 +145,14 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     // Không được có album nào thuộc chi nhánh khác
     const otherGalleries = res.rows.filter(g => g.branch_id !== csBranchId);
     expect(otherGalleries.length).toBe(0);
+
+    // Đối chứng: phải thực sự CÓ bộ ảnh ở chi nhánh khác để mà giấu. Không có
+    // dòng này thì một cơ sở dữ liệu chỉ có bộ ảnh của một chi nhánh cũng làm ca
+    // này xanh — xanh mà không canh gì.
+    await client.query("SET LOCAL ROLE postgres");
+    const { rows: ngoai } = await client.query(
+      "select count(*)::int n from galleries where branch_id <> $1", [csBranchId]);
+    expect(ngoai[0].n).toBeGreaterThan(0);
     
     await client.query("ROLLBACK");
   });

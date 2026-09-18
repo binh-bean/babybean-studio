@@ -6,8 +6,9 @@ import { Menu } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { NavLinks } from "./admin-sidebar";
+import { AdminAccountMenu } from "./admin-account-menu";
 
-export function AdminHeader({ role }: { role?: string }) {
+export function AdminHeader({ role, hoTen }: { role?: string; hoTen?: string | null }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -39,7 +40,10 @@ export function AdminHeader({ role }: { role?: string }) {
         <span className="font-display font-bold sm:hidden text-[var(--bb-fg)]">BabyBean</span>
       </div>
       <div className="flex items-center gap-3">
-        {/* BranchSelector and Avatar removed per BB-174 (hidden until functional) */}
+        {/* BB-174 gỡ chọn chi nhánh và ảnh đại diện đi vì cả hai chưa làm gì.
+            BB-185 trả chỗ này lại — lần này có việc thật: nói rõ ai đang đăng
+            nhập, và cho người ta thoát ra. Máy quầy là máy chung. */}
+        <AdminAccountMenu hoTen={hoTen} role={role} />
       </div>
     </header>
   );
