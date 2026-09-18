@@ -162,6 +162,7 @@ insert into settings (key, branch_id, value) values
   ('gallery.invite_default',        null, 'true'::jsonb),
   ('gallery.reminder_days',         null, '[3, 6]'::jsonb),
   ('photo.expected_long_edge_px',   null, '2048'::jsonb),
+  ('gallery.link_ttl_days',         null, '60'::jsonb),
   -- One webhook per branch plus one management group; filled in at Phase 3.
   ('lark.webhook_url',              null, '""'::jsonb),
   ('chat.page_url',                 null, '""'::jsonb)

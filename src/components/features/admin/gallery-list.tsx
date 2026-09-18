@@ -232,37 +232,39 @@ function KanbanColumn({
             {items.map((item) => {
               const tenBeCot = item.babyName || item.babyFullName || null;
               return (
-                <Card
+                <Link
+                  href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
                   key={item.id}
-                  className="p-3 bg-[var(--bb-surface)] border border-[var(--bb-border)] rounded-[var(--bb-radius-sm)] shadow-xs hover:border-[var(--bb-primary)] transition-all space-y-2"
+                  className="block group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] rounded-[var(--bb-radius-sm)]"
                 >
-                  <Link
-                    href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
-                    className="font-semibold text-sm text-[var(--bb-fg)] hover:text-[var(--bb-primary)] block transition-colors"
+                  <Card
+                    className="p-3 bg-[var(--bb-surface)] border border-[var(--bb-border)] rounded-[var(--bb-radius-sm)] shadow-xs group-hover:border-[var(--bb-primary)] group-hover:bg-[var(--bb-surface-2)]/30 transition-all space-y-2 cursor-pointer h-full"
                   >
-                    {item.title}
-                  </Link>
-                  {tenBeCot && <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>}
-                  <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span>{item.customerName}</span>
-                      <span className="font-mono text-[11px]">{item.customerPhone}</span>
+                    <div className="font-semibold text-sm text-[var(--bb-fg)] group-hover:text-[var(--bb-primary)] transition-colors">
+                      {item.title}
                     </div>
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span>{item.branchName}</span>
-                      <span>{formatDate(item.shootDate)}</span>
+                    {tenBeCot && <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>}
+                    <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span>{item.customerName}</span>
+                        <span className="font-mono text-[11px]">{item.customerPhone}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span>{item.branchName}</span>
+                        <span>{formatDate(item.shootDate)}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-1 border-t border-[var(--bb-border)]/50 text-xs">
-                    <span className="font-medium text-[var(--bb-primary)]">{item.progress}</span>
-                    {item.dueAt && (
-                      <span className="text-[11px] text-[var(--bb-fg-muted)] flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatDate(item.dueAt)}
-                      </span>
-                    )}
-                  </div>
-                </Card>
+                    <div className="flex items-center justify-between pt-1 border-t border-[var(--bb-border)]/50 text-xs">
+                      <span className="font-medium text-[var(--bb-primary)]">{item.progress}</span>
+                      {item.dueAt && (
+                        <span className="text-[11px] text-[var(--bb-fg-muted)] flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDate(item.dueAt)}
+                        </span>
+                      )}
+                    </div>
+                  </Card>
+                </Link>
               );
             })}
             {hasMore && (

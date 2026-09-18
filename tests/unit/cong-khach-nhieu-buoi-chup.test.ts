@@ -97,8 +97,8 @@ describe("BB-130: cổng khách, một link nhiều buổi chụp", () => {
   async function themLinkTheoKhach(customerId: string): Promise<{ ma: string; id: string }> {
     const ma = `bb130-${randomUUID()}`;
     const { rows } = await client.query(
-      `insert into share_links (customer_id, token_hash, token_prefix, role, status, requires_pin)
-       values ($1,$2,$3,'owner','active',false) returning id`,
+      `insert into share_links (customer_id, token_hash, token_prefix, role, status)
+       values ($1,$2,$3,'owner','active') returning id`,
       [customerId, bam(ma), ma.slice(0, 6)],
     );
     return { ma, id: rows[0].id };
@@ -394,8 +394,8 @@ describe("BB-130: cổng khách, một link nhiều buổi chụp", () => {
     // Không dựng link mới: ký thẳng một phiên kiểu cũ, đúng hình dạng
     // `api/auth/gallery` tạo ra cho link gắn theo bộ ảnh.
     const { rows } = await client.query(
-      `insert into share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin)
-       values ($1,$2,$3,'owner','active',false) returning id`,
+      `insert into share_links (gallery_id, token_hash, token_prefix, role, status)
+       values ($1,$2,$3,'owner','active') returning id`,
       [buoiA1, bam(`cu-${randomUUID()}`), "cu0000"],
     );
     const { token } = await signGallerySession({
