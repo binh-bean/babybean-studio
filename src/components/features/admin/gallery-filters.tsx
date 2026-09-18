@@ -32,7 +32,7 @@ export function GalleryFilters({
   photographers,
 }: GalleryFiltersProps) {
   return (
-    <div className="sticky top-16 z-20 bg-[var(--bb-surface)] py-4 border-b border-[var(--bb-border)] space-y-3">
+    <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 bg-[var(--bb-bg)] border-b border-[var(--bb-border)] space-y-3">
       {/* Hàng 1: Tìm kiếm, Bộ lọc nhanh, Toggle Chế độ xem & Nút tạo mới */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">

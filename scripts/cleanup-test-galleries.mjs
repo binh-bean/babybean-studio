@@ -58,6 +58,23 @@ const BO_THU = `(
   or g.title like 'Fixture %'
 )`;
 
+/**
+ * Nhân sự do phép thử dựng ra.
+ *
+ * `tests/security/rbac.test.ts` dựng nhân viên trong một giao dịch rồi hoàn tác.
+ * Lượt nào hỏng giữa chừng thì dòng ấy ở lại — và nó ở lại **không có chi
+ * nhánh nào**. Phiền hơn rác thường: chính `rbac.test.ts` bốc nhân viên bằng
+ * `LIMIT 2` không sắp thứ tự, trúng phải dòng rác này là phép thử đỏ trong khi
+ * không ai sửa gì sai. Đo ngày 17/09: một dòng như vậy làm cả bộ phép thử
+ * bảo mật đỏ trên `main`.
+ *
+ * KHÔNG đụng sáu tài khoản `@demo.babybean.vn` — xem ghi chú đầu tệp.
+ */
+const NHAN_SU_THU = `(
+  sp.full_name like 'Fixture %'
+  and sp.email not like '%@demo.babybean.vn'
+)`;
+
 /** Khách do máy dựng ra. */
 const KHACH_THU = `(
   cu.id::text like 'cccccccc-0000-0000-0000-%'
@@ -103,6 +120,11 @@ async function main() {
 
     console.log(`Bộ ảnh do máy dựng: ${bo.length}`);
     for (const b of bo) console.log(`   ${b.title}  —  ${b.anh} ảnh  (${b.drive_folder_id})`);
+    const { rows: nsXem } = await client.query(
+      `select sp.full_name from staff_profiles sp where ${NHAN_SU_THU} order by sp.full_name`,
+    );
+    console.log(`Nhân sự do phép thử dựng: ${nsXem.length}`);
+    for (const x of nsXem) console.log(`   ${x.full_name}`);
     console.log(`Khách do máy dựng: ${kh.length}`);
     for (const k of kh) console.log(`   ${k.full_name}`);
 
@@ -112,7 +134,7 @@ async function main() {
     );
     console.log(`\nGiữ nguyên: ${giu[0].bo} bộ ảnh thật, ${giu[0].khach} khách thật.`);
 
-    if (!bo.length && !kh.length) {
+    if (!bo.length && !kh.length && !nsXem.length) {
       console.log("Không có gì để dọn.");
       return;
     }
@@ -153,6 +175,26 @@ async function main() {
       await client.query(`update galleries set cover_photo_id = null where id = any($1)`, [gIds]);
       await xoa("ảnh", `delete from photos where gallery_id = any($1)`, [gIds]);
       await xoa("bộ ảnh", `delete from galleries where id = any($1)`, [gIds]);
+    }
+
+    const { rows: ns } = await client.query(
+      `select sp.id, sp.full_name from staff_profiles sp where ${NHAN_SU_THU}`,
+    );
+    if (ns.length) {
+      const nIds = ns.map((x) => x.id);
+      // Nhân sự có dấu vết thật thì KHÔNG xoá — giữ lịch sử trên bộ ảnh cũ,
+      // đúng nguyên tắc docs/13 §8.
+      const { rows: vet } = await client.query(
+        `select count(*)::int n from galleries where created_by = any($1)
+            or photographer_id = any($1) or editor_id = any($1) or cskh_id = any($1)`,
+        [nIds],
+      );
+      if (vet[0].n > 0) {
+        console.log(`   ${ns.length} nhân sự Fixture nhưng có dấu vết trên bộ ảnh — GIỮ LẠI.`);
+      } else {
+        await xoa("gán chi nhánh", `delete from staff_branches where staff_id = any($1)`, [nIds]);
+        await xoa("nhân sự do phép thử dựng", `delete from staff_profiles where id = any($1)`, [nIds]);
+      }
     }
 
     if (cIds.length) {

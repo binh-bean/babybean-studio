@@ -27,6 +27,48 @@ chưa ai nhìn thấy nó qua web.
 Cổng: `node --env-file=.env.prod.local scripts/verify-db.mjs` → **17/17 đạt**.
 Cả 457 bộ ảnh đều `download_enabled = true` (áp 0042 ngày 16/09).
 
+## 1b. KHOAN CẮT SANG — chủ studio chốt 17/09/2026
+
+**Hoàn thiện tính năng và giao diện xong mới giao cho khách.** Ba việc ở mục 2
+bên dưới vẫn đúng, nhưng **chưa làm bây giờ**.
+
+### Vì sao phải viết ra cái đích
+
+"Hoàn thiện" mà không có định nghĩa thì không bao giờ tới — luôn còn một việc
+nữa đáng làm. Dưới đây là danh sách đếm được. Xong hết bảy dòng là cắt sang.
+
+### Bảy cổng bắt buộc
+
+| # | Cổng | Vì sao bắt buộc |
+|---|---|---|
+| 1 | **BB-183** — link thật sự hết hạn sau 2 tháng | Màn khách đã dựng sẵn chỗ hiện con số này. In "2 tháng" trong khi link sống vĩnh viễn là dạy khách đừng tin app |
+| 2 | **BB-174·175·176** — ba chỗ làm app như đang hỏng | Nhân viên dùng hằng ngày. Cảm giác hỏng đắt hơn lỗi thật: lỗi thật thì người ta báo, cảm giác hỏng thì người ta lặng lẽ thôi dùng |
+| 3 | **BB-177** — CSKH lấy được link app | CSKH dán link cho khách mỗi ngày. Không có nó thì quy trình đứt ngay bước đầu |
+| 4 | **BB-182** — Lark không đánh rơi thay đổi | Thay đổi rơi trong im lặng là bộ ảnh không dựng, mà không ai biết để đi tìm |
+| 5 | **Ba việc tay ở mục 2** | Không có tài khoản quản trị thì không ai vào được màn quản trị, kể cả chủ studio |
+| 6 | **Hẹn giờ sao lưu hằng tuần** | `docs/11 §7`. Từ lúc khách đầu tiên bấm chọn ảnh, mất dữ liệu là mất công của khách |
+| 7 | **Một lượt đi trọn đường như khách thật** | Trên điện thoại thật, bằng 4G, với một bộ ảnh thật. Chủ studio làm, không phải máy |
+
+### Những việc KHÔNG chặn
+
+Ghi ra để khỏi bị kéo dài vô hạn. Bốn việc này **làm sau khi giao khách cũng
+được**, vì chúng không chạm vào đường đi của ba mẹ hay công việc hằng ngày của
+nhân viên:
+
+- **BB-171** nút xoá tài khoản — "Cho nghỉ việc" đã dùng tạm được.
+- **BB-172** màn Vai trò và quyền — việc lớn nhất trong sổ, và chín vai trò hiện
+  có đủ dùng cho ba chi nhánh.
+- **BB-173** lịch sử thao tác — dữ liệu đang được ghi đủ (6.420 dòng), chỉ chưa
+  có màn để xem. Không mất gì khi chờ.
+- **BB-178** địa chỉ đọc được — tiện cho nhân viên, không ai ngoài thấy.
+
+### Một điều đừng để tuột
+
+Mỗi tuần chưa cắt sang là một tuần **457 bộ ảnh thật nằm trong bb-prod mà không
+ai xem được**, và CSKH vẫn gửi ảnh cho khách theo cách cũ. Hoàn thiện là đúng,
+nhưng danh sách trên cố tình ngắn — đừng thêm dòng vào đó trừ khi nó thật sự
+chặn ba mẹ hoặc chặn nhân viên.
+
 ## 2. Ba việc CHỦ STUDIO phải tự làm
 
 Cả ba đều là gõ mật khẩu hoặc dán khoá bí mật. Đó là việc của người, không phải

@@ -173,14 +173,13 @@ async function run() {
       const hash1 = crypto.createHash('sha256').update(token1).digest('hex');
       
       await client.query(`
-        INSERT INTO share_links (id, gallery_id, token_hash, token_prefix, role, label, requires_pin, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO share_links (id, gallery_id, token_hash, token_prefix, role, label, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (id) DO UPDATE SET
           token_hash = EXCLUDED.token_hash,
           token_prefix = EXCLUDED.token_prefix,
           role = EXCLUDED.role,
           label = EXCLUDED.label,
-          requires_pin = EXCLUDED.requires_pin,
           status = EXCLUDED.status;
       `, [
         shareLinkId1,
@@ -189,7 +188,6 @@ async function run() {
         token1.substring(0, 6),
         'owner',
         'Mẹ bé',
-        false,
         'active'
       ]);
 
@@ -198,14 +196,13 @@ async function run() {
       const tokenHash2 = crypto.createHash('sha256').update(token2).digest('hex');
       
       await client.query(`
-        INSERT INTO share_links (id, gallery_id, token_hash, token_prefix, role, label, requires_pin, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO share_links (id, gallery_id, token_hash, token_prefix, role, label, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (id) DO UPDATE SET
           token_hash = EXCLUDED.token_hash,
           token_prefix = EXCLUDED.token_prefix,
           role = EXCLUDED.role,
           label = EXCLUDED.label,
-          requires_pin = EXCLUDED.requires_pin,
           status = EXCLUDED.status;
       `, [
         shareLinkId2,
@@ -214,7 +211,6 @@ async function run() {
         'dev_pi',
         'co_editor',
         'Bố bé',
-        true,
         'active'
       ]);
 

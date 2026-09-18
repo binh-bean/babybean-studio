@@ -92,10 +92,22 @@ describe("BB-030 - POST /api/auth/gallery", () => {
     expect(body.error.code).toBe("NOT_FOUND");
   });
 
-  it("Ca 7: expires_at ở quá khứ nhưng status vẫn 'active' -> NOT_FOUND", async () => {
+  /**
+   * BB-183 đổi câu trả lời cho ca này, và đó là đánh đổi có tính toán.
+   *
+   * Trước: hết hạn trả 404 giống hệt link không tồn tại, để người dò mã không
+   * biết mình đã trúng. Nhưng mã link dài 22 ký tự (~131 bit) nên dò trúng là
+   * chuyện không xảy ra được — cái được che gần như bằng không, trong khi ba mẹ
+   * cầm link thật quá hạn mà thấy "không tìm thấy" sẽ nghĩ studio xoá mất ảnh con.
+   *
+   * Điều phải giữ nguyên: **không được cấp phiên**. Ca này canh đúng điều đó.
+   * Ca 6 (đã thu hồi) vẫn phải trả 404 câm — xem ghi chú trong route.
+   */
+  it("Ca 7: expires_at ở quá khứ nhưng status vẫn 'active' -> chặn, kèm lời nhắn cho ba mẹ", async () => {
     const { res, body } = await postAuth(fixtures.tokenExpired);
-    expect(res.status).toBe(404);
-    expect(body.error.code).toBe("NOT_FOUND");
+    expect(res.status).not.toBe(200);
+    expect(res.cookies.get(SESSION_COOKIE)?.value).toBeFalsy();
+    expect(body.error.code).toBe("LINK_EXPIRED");
   });
 
   it("Ca 8: token không tồn tại -> NOT_FOUND", async () => {
