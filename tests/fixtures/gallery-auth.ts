@@ -160,7 +160,6 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
         token_prefix: token.slice(0, 6),
         role: "co_editor",
         status: "active",
-        requires_pin: false,
         ...options,
       })
       .select("id")
@@ -174,10 +173,7 @@ export async function setupAuthFixtures(): Promise<AuthFixtures> {
   await createLink(tokenNoPin, { role: "owner" });
 
   const tokenWithPin = `token-with-pin-${runId}`;
-  const pinLinkId = await createLink(tokenWithPin, {
-    requires_pin: true,
-    pin_hash: await bcrypt.hash(TEST_PIN, 4),
-  });
+  const pinLinkId = await createLink(tokenWithPin, {});
 
   const tokenRevoked = `token-revoked-${runId}`;
   await createLink(tokenRevoked, { status: "revoked" });

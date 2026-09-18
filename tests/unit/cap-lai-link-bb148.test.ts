@@ -165,8 +165,8 @@ describe("BB-148: Cấp lại link không làm mất ảnh khách chọn", () =>
     const maLinkHai = `bb148-song-song-${Date.now()}`;
     const bamMaHai = createHash("sha256").update(maLinkHai).digest("hex");
     await client.query(
-      `insert into share_links (gallery_id, token_hash, token_prefix, role, status, requires_pin)
-       values ($1,$2,$3,'owner','active',false)`,
+      `insert into share_links (gallery_id, token_hash, token_prefix, role, status)
+       values ($1,$2,$3,'owner','active')`,
       [galleryId, bamMaHai, maLinkHai.slice(0, 6)],
     );
 

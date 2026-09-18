@@ -54,29 +54,35 @@ describe("BB-179: API POST /api/lark/hook", () => {
     expect(res.status).toBe(401);
   });
 
-  it("3. Mã bản ghi không tồn tại thì 200 và không ghi gì", async () => {
+  it("3. Mã bản ghi không tồn tại thì 200 và ghi lỗi vào results", async () => {
     // mock readLarkRecord will throw for rec_not_found
     const req = createRequest({ record_id: "rec_not_found" }, `Bearer ${SECRET}`);
     const res = await POST(req);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.message).toContain("Lỗi xử lý");
+    expect(body.message).toBe("Success");
+    expect(body.results[0].error).toMatch(/Lỗi đọc bản ghi/);
   });
 
-  it("4. Đang có lượt chạy thì 200 kèm skipped", async () => {
+  it("4. Đang có lượt chạy thì chờ 1s rồi 200 kèm busy_queued", async () => {
     // Cầm lock từ 1 connection khác
     client = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
     await client.query("select pg_try_advisory_lock($1)", [LOCK_ID]);
 
-    const req = createRequest({ record_id: "rec1" }, `Bearer ${SECRET}`);
-    const res = await POST(req);
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.skipped).toBe("busy");
+    try {
+      const req = createRequest({ record_id: "rec1" }, `Bearer ${SECRET}`);
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.skipped).toBe("busy_queued");
 
-    await client.query("select pg_advisory_unlock($1)", [LOCK_ID]);
-    await client.end();
+      const queueRes = await client.query("select value from settings where key = 'lark_hook_queue'");
+      expect(queueRes.rows[0].value.record_ids).toContain("rec1");
+    } finally {
+      await client.query("select pg_advisory_unlock($1)", [LOCK_ID]);
+      await client.end();
+    }
   });
 
   it("5. Chạy thành công", async () => {
@@ -85,5 +91,6 @@ describe("BB-179: API POST /api/lark/hook", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.message).toBe("Success");
+    expect(body.results[0].result.action).toBe("created");
   });
 });
