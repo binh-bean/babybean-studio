@@ -35,6 +35,7 @@ interface StaffRow {
   neverLoggedIn: boolean;
   stale: boolean;
   branchIds: string[];
+  deleteReason: string | null;
 }
 
 interface Branch {
@@ -145,6 +146,25 @@ export function StaffManager() {
     </Select>
   );
 
+  async function destroy(row: StaffRow) {
+    if (!confirm(`Bạn có chắc chắn muốn xoá vĩnh viễn tài khoản ${row.fullName}? Hành động này không thể hoàn tác.`)) return;
+    setBusyId(row.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/staff/${row.id}`, {
+        method: "DELETE",
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error?.message ?? "Không xoá được");
+      setNotice(`Đã xoá tài khoản ${row.fullName}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không xoá được");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const rowActions = (row: StaffRow) => (
     <>
       <Button
@@ -171,6 +191,20 @@ export function StaffManager() {
       >
         {row.isActive ? t.deactivate : t.reactivate}
       </Button>
+      {!row.deleteReason ? (
+        <Button
+          variant="danger"
+          size="sm"
+          disabled={busyId === row.id}
+          onClick={() => destroy(row)}
+        >
+          Xoá
+        </Button>
+      ) : (
+        <div className="flex flex-col text-xs text-amber-600/80 max-w-[200px] mt-1 text-right">
+          {row.deleteReason}
+        </div>
+      )}
     </>
   );
 

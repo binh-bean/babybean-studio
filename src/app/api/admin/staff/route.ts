@@ -66,10 +66,16 @@ export async function GET(): Promise<Response> {
 
     const { data: links } = await admin.from("staff_branches").select("staff_id, branch_id");
     const { data: branches } = await admin.from("branches").select("id, name").order("name");
+    const { data: deletables } = await admin.from("v_staff_deletable").select("staff_id, delete_reason");
 
     const byStaff = new Map<string, string[]>();
     for (const link of links ?? []) {
       byStaff.set(link.staff_id, [...(byStaff.get(link.staff_id) ?? []), link.branch_id]);
+    }
+    
+    const deleteReasonByStaff = new Map<string, string | null>();
+    for (const d of deletables ?? []) {
+      deleteReasonByStaff.set(d.staff_id, d.delete_reason);
     }
 
     const staleBefore = Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000;
@@ -90,6 +96,7 @@ export async function GET(): Promise<Response> {
           p.last_login_at !== null &&
           new Date(p.last_login_at).getTime() < staleBefore,
         branchIds: byStaff.get(p.id) ?? [],
+        deleteReason: deleteReasonByStaff.get(p.id) ?? null,
       })),
       branches: branches ?? [],
       assignableRoles: assignableBy(staff.role),
