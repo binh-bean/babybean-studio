@@ -305,6 +305,34 @@ sau tin nhầm rằng chỗ đó đang được canh.
 Thử thật: hoàn nguyên, chạy phép thử, xem nó đỏ, rồi vá lại. **Dán cả hai kết
 quả vào bàn giao.**
 
+## 5b. Viết hàm SQL thì phải viết kèm dòng `revoke`
+
+**Đã xảy ra HAI LẦN trong dự án này** — `0045` xoá mất dòng revoke của `0006`, rồi
+`0047` tạo một hàm mới mà không có dòng nào. Cả hai lần `verify:db` đều rơi từ
+17/17 xuống 16/17, và cả hai lần đều là lỗ hổng thật đang mở trên bb-dev.
+
+Luật của Postgres: **`create function` và `create or replace function` CẤP EXECUTE
+CHO PUBLIC theo mặc định.** `drop` rồi `create` lại cũng trả quyền về mặc định —
+nên mọi dòng revoke của migration cũ bị xoá sạch mà không báo gì.
+
+Khoá `anon` nằm công khai trong mã trình duyệt. Một hàm `security definer` mà
+PUBLIC gọi được là một cửa đi thẳng qua luật quyền theo dòng.
+
+Viết hàm thì **trong cùng tệp migration ấy**, ngay sau khối `create`:
+
+```sql
+revoke execute on function public.<ten>(<kieu>) from public, anon, authenticated;
+grant  execute on function public.<ten>(<kieu>) to service_role;  -- nếu app cần
+```
+
+Thứ tự quan trọng: `revoke` phải đứng **sau** `create or replace`, không phải
+trước. Đảo lại là chính dòng create xoá mất dòng revoke.
+
+Hàm `security definer` còn phải ghim `set search_path = public, pg_temp`.
+
+**Chạy `npm run verify:db` trước khi nộp, và dán con số vào bàn giao.** Cổng này
+bắt đúng lớp lỗi này; bàn giao không có con số đó là bàn giao chưa xong.
+
 ## 6. Dữ liệu mẫu: chỉ dùng dữ liệu giả
 
 **Repo này là public.** Bất cứ thứ gì commit vào đây đều công khai vĩnh viễn — xoá ở commit sau cũng không gỡ được khỏi lịch sử.
