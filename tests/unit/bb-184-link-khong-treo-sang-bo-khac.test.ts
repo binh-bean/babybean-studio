@@ -40,12 +40,29 @@ const goc = path.resolve(__dirname, "../..");
 const doc = (p: string) => fs.readFileSync(path.join(goc, p), "utf8");
 
 describe("BB-184 · link không treo sang bộ ảnh khác", () => {
-  it("1. Trang chi tiết dựng GalleryDetail kèm key theo id", () => {
+  /**
+   * Điều cần canh KHÔNG phải tên biến, mà là: `key` phải buộc vào ĐÚNG biến
+   * đang được truyền làm `galleryId`.
+   *
+   * BB-178 đổi địa chỉ sang mã hợp đồng, nên trang tra ra `galleryId` rồi mới
+   * truyền xuống. Khoá theo `galleryId` đúng hơn khoá theo `id` trên địa chỉ: hai
+   * địa chỉ khác nhau trỏ về cùng một bộ thì không cần dựng lại màn.
+   *
+   * Bắt đúng chữ `key={id}` là canh chính tả — đúng thứ `AGENTS.md §5a` cấm.
+   */
+  it("1. GalleryDetail có key buộc vào đúng biến được truyền làm galleryId", () => {
     const trang = doc("src/app/(admin)/admin/galleries/[id]/page.tsx");
+    const m = trang.match(
+      /<GalleryDetail\s+key=\{(\w+)\}\s+galleryId=\{(\w+)\}/,
+    );
     expect(
-      /<GalleryDetail[^>]*\bkey=\{id\}/.test(trang),
-      "Thiếu key={id} — điều hướng giữa hai bộ ảnh sẽ giữ nguyên link của bộ trước",
-    ).toBe(true);
+      m,
+      "Thiếu `key` trên <GalleryDetail> — điều hướng giữa hai bộ ảnh sẽ giữ nguyên link của bộ trước",
+    ).toBeTruthy();
+    expect(
+      m![1],
+      "`key` và `galleryId` buộc vào hai biến KHÁC NHAU — khoá không theo bộ ảnh đang hiển thị",
+    ).toBe(m![2]);
   });
 
   it("2. Component tự xoá ba trạng thái của lần tạo link khi đổi bộ ảnh", () => {

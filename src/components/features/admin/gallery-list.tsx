@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
+import { getContractCodesForGalleries } from "@/app/(admin)/admin/galleries/actions";
 import {
   Calendar,
   User,
@@ -122,6 +123,7 @@ function KanbanColumn({
   filters: GalleryFilterState;
 }) {
   const [items, setItems] = useState<GalleryItem[]>([]);
+  const [contractCodes, setContractCodes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -177,6 +179,16 @@ function KanbanColumn({
     void fetchItems(false);
   }, [fetchItems]);
 
+  
+  useEffect(() => {
+    if (items.length > 0) {
+      const ids = items.map(i => i.id);
+      getContractCodesForGalleries(ids).then(map => {
+        setContractCodes(prev => ({ ...prev, ...map }));
+      }).catch(console.error);
+    }
+  }, [items]);
+
   const handleLoadMore = () => {
     if (!hasMore || loadingMore || !nextCursor) return;
     void fetchItems(true, nextCursor);
@@ -221,7 +233,7 @@ function KanbanColumn({
               const tenBeCot = item.babyName || item.babyFullName || null;
               return (
                 <Link
-                  href={`/admin/galleries/${item.id}`}
+                  href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
                   key={item.id}
                   className="block group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] rounded-[var(--bb-radius-sm)]"
                 >
@@ -285,6 +297,7 @@ function KanbanColumn({
 
 export function GalleryList() {
   const [items, setItems] = useState<GalleryItem[]>([]);
+  const [contractCodes, setContractCodes] = useState<Record<string, string>>({});
   const [counts, setCounts] = useState<GalleryCounts>({
     all: 0,
     draft: 0,
@@ -418,6 +431,16 @@ export function GalleryList() {
     void fetchGalleries(false);
   }, [fetchGalleries]);
 
+  
+  useEffect(() => {
+    if (items.length > 0) {
+      const ids = items.map(i => i.id);
+      getContractCodesForGalleries(ids).then(map => {
+        setContractCodes(prev => ({ ...prev, ...map }));
+      }).catch(console.error);
+    }
+  }, [items]);
+
   const handleFilterChange = (updates: Partial<GalleryFilterState>) => {
     setFilters((prev) => ({ ...prev, ...updates }));
   };
@@ -428,7 +451,7 @@ export function GalleryList() {
   };
 
   const copyShareLink = (galleryId: string) => {
-    const link = `${window.location.origin}/admin/galleries/${galleryId}`;
+    const link = `${window.location.origin}/admin/galleries/${encodeURIComponent(contractCodes[galleryId] || galleryId)}`;
     void navigator.clipboard.writeText(link);
   };
 
@@ -504,7 +527,7 @@ export function GalleryList() {
                       {/* 1. Số hoá đơn — mã hợp đồng, dán được thẳng vào ô tìm bên Lark */}
                       <td className="px-4 py-3 font-medium text-[var(--bb-fg)]">
                         <Link
-                          href={`/admin/galleries/${item.id}`}
+                          href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
                           className="hover:text-[var(--bb-primary)] transition-colors"
                         >
                           {item.title}
@@ -587,7 +610,7 @@ export function GalleryList() {
                       {/* Thao tác */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Link href={`/admin/galleries/${item.id}`}>
+                          <Link href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -633,7 +656,7 @@ export function GalleryList() {
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <Link
-                        href={`/admin/galleries/${item.id}`}
+                        href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
                         className="font-bold text-base text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
                       >
                         {item.title}
@@ -708,7 +731,7 @@ export function GalleryList() {
 
                   {/* Nút hành động */}
                   <div className="flex items-center gap-2 pt-2 border-t border-[var(--bb-border)]/60">
-                    <Link href={`/admin/galleries/${item.id}`} className="flex-1">
+                    <Link href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`} className="flex-1">
                       <Button variant="outline" size="sm" className="w-full text-xs h-8">
                         <Eye className="h-3.5 w-3.5 mr-1" /> Xem bộ ảnh
                       </Button>
