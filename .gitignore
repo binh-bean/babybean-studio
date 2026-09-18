@@ -21,3 +21,15 @@ db/*.local.sql
 .vercel
 .env*
 !.env.example
+
+# Ảnh chụp màn hình ở gốc kho — KHÔNG BAO GIỜ commit.
+#
+# Ngày 18/09 một agent nộp `bb-176-clickable-card.png` làm bằng chứng kiểm
+# ngược. Trong ảnh có tên khách thật và số điện thoại thật, trên một kho
+# PUBLIC. Bắt được lúc đang gộp, chưa đẩy — lần sau có thể không may như vậy.
+#
+# Bằng chứng kiểm ngược dán vào bàn giao, không commit vào kho.
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
