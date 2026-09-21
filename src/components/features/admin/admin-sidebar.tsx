@@ -16,7 +16,8 @@ import {
   Link2,
   UserCog,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  History
 } from "lucide-react";
 
 /**
@@ -60,6 +61,13 @@ const navItems: {
     name: "Link sắp hết hạn",
     href: "/admin/reports/link-sap-het-han",
     icon: Link2,
+    ready: true,
+    hiddenForRoles: ["photoshop_ctv"],
+  },
+  {
+    name: "Nhật ký thao tác",
+    href: "/admin/reports/nhat-ky",
+    icon: History,
     ready: true,
     hiddenForRoles: ["photoshop_ctv"],
   },

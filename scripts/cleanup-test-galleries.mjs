@@ -141,7 +141,13 @@ async function main() {
     );
     console.log(`Thông báo do phép thử dựng: ${tbXem[0].n}`);
 
-    if (!bo.length && !kh.length && !nsXem.length && !tbXem[0].n) {
+    const { rows: logXem } = await client.query(
+      `select count(*)::int n from activity_logs
+        where entity_type = 'gallery' and entity_id not in (select id from galleries)`
+    );
+    console.log(`Nhật ký mồ côi (do phép thử xoá bộ ảnh): ${logXem[0].n}`);
+
+    if (!bo.length && !kh.length && !nsXem.length && !tbXem[0].n && !logXem[0].n) {
       console.log("Không có gì để dọn.");
       return;
     }
@@ -169,6 +175,12 @@ async function main() {
       `delete from notifications
         where payload->>'galleryTitle' like 'Test BB%'
            or payload->>'galleryTitle' like 'Fixture %'`,
+    );
+
+    await xoa(
+      "nhật ký mồ côi",
+      `delete from activity_logs
+        where entity_type = 'gallery' and entity_id not in (select id from galleries)`
     );
 
     if (gIds.length) {
