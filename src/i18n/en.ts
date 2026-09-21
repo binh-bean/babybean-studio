@@ -391,6 +391,7 @@ export const en: Messages = {
       searchPlaceholder: "Search by baby name, customer name, phone number…",
       searchClear: "Clear search",
       searchOpen: "Search galleries",
+      filterToggle: "Filters",
       filterBranch: "Branch",
       filterStatus: "Status",
       filterUrgency: "Urgency",

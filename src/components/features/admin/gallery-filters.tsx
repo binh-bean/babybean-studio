@@ -6,7 +6,7 @@ import { vi } from "@/i18n";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Table2, Kanban, Plus, X } from "lucide-react";
+import { Search, Table2, Kanban, Plus, X, SlidersHorizontal } from "lucide-react";
 
 export interface GalleryFilterState {
   branchId: string;
@@ -49,6 +49,29 @@ export function GalleryFilters({
   React.useEffect(() => {
     if (moRong) oRef.current?.focus();
   }, [moRong]);
+
+  /**
+   * Bốn ô lọc cũng thu lại trên màn hẹp — chủ studio 21/09/2026: "thu tất đi,
+   * che hết nửa màn điện thoại rồi".
+   *
+   * Đo trên máy 375px trước khi sửa: hàng lọc cao 268px trên màn cao 812px,
+   * tức một phần ba màn hình chỉ để hiện bốn ô mà phần lớn thời gian để "Tất
+   * cả". Người dùng mở màn này ra là để nhìn DANH SÁCH.
+   *
+   * Từ `lg` trở lên giữ nguyên hàng lọc nằm ngang: ở đó có chỗ, và thu vào chỉ
+   * tốn thêm một cú bấm.
+   *
+   * Con số trên nút là số bộ lọc ĐANG BẬT. Không có nó thì thu vào là giấu mất
+   * lý do danh sách đang ngắn — cùng lý do với ô tìm kiếm ở trên.
+   */
+  const [moBoLoc, setMoBoLoc] = React.useState(false);
+  const soBoLocDangBat = [
+    values.branchId,
+    values.status,
+    values.photographerId,
+    values.dateFrom,
+    values.dateTo,
+  ].filter(Boolean).length;
 
   return (
     <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 bg-[var(--bb-bg)] border-b border-[var(--bb-border)] space-y-3">
@@ -108,6 +131,30 @@ export function GalleryFilters({
             </Button>
           )}
 
+          {/* Nút mở bộ lọc — chỉ có trên màn hẹp */}
+          <Button
+            type="button"
+            variant={soBoLocDangBat > 0 ? "default" : "ghost"}
+            size="sm"
+            className="h-9 px-3 lg:hidden"
+            onClick={() => setMoBoLoc((v) => !v)}
+            aria-expanded={moBoLoc}
+            aria-controls="khoi-bo-loc"
+            title={vi.admin.galleries.filterToggle}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            <span className="ml-1.5 text-xs">{vi.admin.galleries.filterToggle}</span>
+            {soBoLocDangBat > 0 && (
+              <span className="ml-1.5 rounded-full bg-[var(--bb-bg)]/30 px-1.5 text-[10px]">
+                {soBoLocDangBat}
+              </span>
+            )}
+          </Button>
+
+          <div
+            id="khoi-bo-loc"
+            className={`${moBoLoc ? "flex" : "hidden"} w-full flex-wrap items-center gap-3 lg:flex lg:w-auto`}
+          >
           {/* Lọc chi nhánh */}
           <div className="w-full sm:w-auto">
             <Select
@@ -188,6 +235,7 @@ export function GalleryFilters({
               aria-label="Đến ngày chụp"
               title="Đến ngày chụp"
             />
+          </div>
           </div>
         </div>
 

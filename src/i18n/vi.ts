@@ -392,6 +392,7 @@ export const vi = {
       searchPlaceholder: "Tìm theo tên bé, tên khách, số điện thoại…",
       searchClear: "Xoá từ khoá tìm kiếm",
       searchOpen: "Tìm bộ ảnh",
+      filterToggle: "Bộ lọc",
       filterBranch: "Chi nhánh",
       filterStatus: "Trạng thái",
       filterUrgency: "Mức khẩn",
