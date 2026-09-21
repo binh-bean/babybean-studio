@@ -266,6 +266,35 @@ export const vi = {
         viewer: "Chỉ xem",
       },
     },
+    vaiTro: {
+      title: "Vai trò và quyền",
+      subtitle:
+        "Chín vai hệ thống chỉ xem được, vì lớp bảo mật đang dựa vào chúng. Vai tự tạo thì sửa và xoá thoải mái.",
+      dsVai: "Danh sách vai trò",
+      taoVai: "Tạo vai trò",
+      suaVai: "Sửa vai trò: {ten}",
+      tenVai: "Tên vai trò",
+      vaiHeThong: "Vai hệ thống",
+      soQuyen: "{n} quyền",
+      soNguoi: "{n} người đang giữ",
+      xem: "Xem",
+      sua: "Sửa",
+      xoa: "Xoá",
+      dong: "Đóng",
+      luu: "Lưu vai trò",
+      dangLuu: "Đang lưu…",
+      daLuu: "Đã lưu vai trò.",
+      daXoa: "Đã xoá vai trò.",
+      hoiXoa: "Xoá vai trò \"{ten}\"? Việc này không hoàn tác được.",
+      loiTai: "Không đọc được danh sách vai trò.",
+      loiLuu: "Lưu không thành công. Vai trò giữ nguyên như cũ.",
+      loiXoa: "Xoá không thành công.",
+      canhBaoHeThong:
+        "Đây là vai hệ thống. Bạn xem được bộ quyền của nó nhưng không sửa được — chủ studio phải luôn còn một vai đủ quyền để vào lại hệ thống.",
+      chuaCoHieuLuc: "(chưa có hiệu lực)",
+      ghiChuHieuLuc:
+        "Ô ghi \"chưa có hiệu lực\" đã lưu được nhưng lớp bảo mật chưa hỏi tới. Hôm nay chỉ bốn quyền thật sự đổi hành vi: tạo album, sửa album, sửa khách hàng, và vượt trên mọi chi nhánh.",
+    },
     caiDat: {
       title: "Cài đặt",
       subtitle:

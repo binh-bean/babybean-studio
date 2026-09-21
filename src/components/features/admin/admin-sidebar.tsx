@@ -17,7 +17,8 @@ import {
   UserCog,
   ChevronLeft,
   ChevronRight,
-  History
+  History,
+  ShieldCheck
 } from "lucide-react";
 
 /**
@@ -74,6 +75,7 @@ const navItems: {
   { name: "Chi nhánh", href: "/admin/branches", icon: Store, ready: true },
   { name: "Nhân sự", href: "/admin/staff", icon: UserCog, ready: true, ownerOnly: true },
   { name: "Khách hàng", href: "/admin/customers", icon: Users, ready: false },
+  { name: "Vai trò", href: "/admin/roles", icon: ShieldCheck, ready: true, ownerOnly: true },
   { name: "Cài đặt", href: "/admin/settings", icon: Settings, ready: true, ownerOnly: true },
 ];
 
