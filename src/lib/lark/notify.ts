@@ -64,6 +64,7 @@
 
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { dangChayPhepThu } from "@/lib/kiem-thu";
 
 export type LarkEvent =
   | "gallery.sent"
@@ -229,27 +230,7 @@ export function dungThe(
   return null;
 }
 
-/**
- * Đang chạy phép thử thì KHÔNG được bắn tin thật.
- *
- * Học bằng cách làm hỏng, 21/09/2026: bộ phép thử của BB-114 gọi thật
- * `/api/g/submit` trên bb-dev — cơ sở dữ liệu THẬT, `settings` THẬT, webhook
- * THẬT. Ngay sau khi đường bắn tin chạy được, sáu thẻ "Test BB114…" đã rơi
- * vào nhóm Lark thật của studio trong một lượt `npm run test`.
- *
- * Trước đó không ai gặp vì đường ghi cũ hỏng sẵn (PGRST204) — tức là chính
- * cái lỗi này đang che cái lỗi kia.
- *
- * Chốt ở đây chứ không ở từng phép thử: phép thử sẽ nhiều dần lên, và chỉ cần
- * một cái quên là nhân viên studio lại nhận tin rác giữa giờ làm.
- */
-function dangChayPhepThu(): boolean {
-  // Cửa thoát cho chính phép thử của đường này: nó thay `fetch` bằng hàm giả
-  // nên không có gì ra ngoài máy. Bộ phép thử nào gọi thật đường `/api/g/submit`
-  // thì KHÔNG đặt biến này, và vì thế không bắn được tin nào.
-  if (process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU === "1") return false;
-  return Boolean(process.env.VITEST) || process.env.NODE_ENV === "test";
-}
+
 
 /** Gửi một thẻ đi. Không ném; trả lý do bằng tiếng Việt khi hỏng. */
 async function gui(

@@ -31,6 +31,8 @@ import {
   bienMoiTruongConThieu,
 } from "@/lib/lark/ghi-link-app";
 
+process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU = "1";
+
 const AUTH = { authorization: "Bearer gia-lap" };
 const BASE = "app-token-gia-lap";
 const RECORD = "recgialap123";

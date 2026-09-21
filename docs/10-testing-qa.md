@@ -108,3 +108,29 @@ Thêm:
 - `tests/fixtures/drive-responses/` — bản ghi phản hồi Drive API thật (đã ẩn danh) cho: 50 ảnh, 1.000 ảnh, có thư mục con, lỗi 403, lỗi 429.
 - `db/seed.sql` — 3 chi nhánh, 4 gói, 5 nhân sự đủ 5 vai trò, 10 khách, 3 album ở 3 trạng thái khác nhau.
 - **Không dùng ảnh trẻ em thật trong test.** Dùng ảnh placeholder trung tính.
+
+## 8. Chốt an toàn ngăn rò rỉ ra thế giới thật (BB-191)
+
+Để đảm bảo phép thử không gửi tin nhắn thật hay ghi đè dữ liệu trên hệ thống thật (Lark, Google Drive), hệ thống sử dụng một chốt chặn tập trung tại src/lib/kiem-thu.ts. Các đường gọi fetch ra ngoài trong src/lib/ đều đã được kiểm duyệt:
+
+1. **src/lib/lark/notify.ts (Lark Webhook):** An toàn. Đã được chặn bằng dangChayPhepThu(), ngăn việc gửi tin nhắn rác vào nhóm Lark thật.
+2. **src/lib/lark/ghi-link-app.ts (Lark Bitable):** An toàn. Đã được chặn bằng dangChayPhepThu(), ngăn việc ghi đè cột "Link app" của khách hàng thật.
+3. **src/lib/drive/client.ts (Google Drive):** An toàn. Các phép thử gọi driveFetch đều đã dùng vi.spyOn để giả lập driveFetch hoặc fetch (như trong drive-fetch.test.ts), không gọi mạng thật.
+4. **src/lib/lark/sync-retouch.ts (Lark Bitable GET):** An toàn. Các phép thử (sync-lark-retouch.test.ts) đều giả lập globalThis.fetch.
+5. **src/lib/utils/tai-anh.ts:** An toàn. Gọi fetch tới địa chỉ nội bộ (/api/img/...), không gọi ra ngoài.
+
+Quy định: phép thử nào muốn đi qua chốt dangChayPhepThu() để kiểm tra định dạng gọi mạng thì bắt buộc phải giả lập fetch trước, sau đó bật process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU = "1".
+
+**Hai mục 3 và 4 chưa được một chốt nào canh** — reviewer ghi lại 21/09/2026.
+Chúng an toàn vì *mỗi phép thử hiện có tự nhớ giả lập `fetch`*, không vì có thứ
+gì chặn ở giữa. Đó đúng là hình dạng đã gây tai nạn sáng nay: phép thử sẽ nhiều
+dần lên, và chỉ cần một cái quên. Kéo `driveFetch` và `sync-retouch` vào cùng
+một chốt là một task riêng, không gộp vào BB-191.
+
+**Kiểm ngược đã làm thật**, không phải mô tả: tắt chốt trong `kiem-thu.ts` rồi
+chạy `tests/unit/submit-and-confirm.test.ts` — bộ phép thử BB-114 — thì có
+**hai lượt POST ra đúng webhook thật của studio**, bị chốt chặn của reviewer bắt
+lại. Bộ phép thử đó **vẫn báo 4/4 XANH** trong lúc bắn tin ra ngoài: không có gì
+trong bộ phép thử nhận ra. Bật chốt lại thì cả lượt chạy đủ bộ (64 tệp, 362 ca)
+có **0 lượt** ra Lark.
+
