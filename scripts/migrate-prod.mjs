@@ -89,8 +89,22 @@ const MOC = [
   },
   {
     ten: "PUBLIC KHÔNG gọi được hàm đó",
-    sql: `select coalesce(
-            (select has_function_privilege('public','public.check_staff_deletable(uuid)','execute')), false) ok`,
+    /**
+     * Hỏi bằng oid lấy từ pg_proc, KHÔNG bằng tên.
+     *
+     * `has_function_privilege('public','public.check_staff_deletable(uuid)','execute')`
+     * NÉM LỖI khi hàm chưa tồn tại, và `coalesce` không đỡ được lỗi — nó chỉ đỡ
+     * `null`. Đo bb-prod ngày 21/09/2026 sập đúng ở đây: hàm chưa có, cả script
+     * chết giữa chừng, sáu mốc còn lại không mốc nào được in ra.
+     *
+     * Dạng này không có hàm thì không có dòng nào, `coalesce` trả false — tức
+     * "PUBLIC không gọi được", đúng với sự thật là chẳng có gì để gọi.
+     */
+    sql: `select coalesce((
+            select has_function_privilege('public', p.oid, 'execute')
+            from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname='public' and p.proname='check_staff_deletable'
+            limit 1), false) ok`,
     doc: (r) => (r.ok ? "GỌI ĐƯỢC — hở" : "đã khoá"),
     dat: (r) => r.ok === false,
     hong: "Hàm SECURITY DEFINER mà PUBLIC gọi được là đi vòng qua lớp kiểm quyền (BB-189).",
@@ -136,11 +150,23 @@ function nhanDb() {
   return ref && ref !== u ? `${ref.slice(0, 6)}…supabase.co` : "không rõ";
 }
 
+/**
+ * Một mốc đo hỏng thì chỉ mốc đó hỏng.
+ *
+ * Bản đầu để lỗi của một câu truy vấn ném thẳng ra ngoài, và lần đo bb-prod đầu
+ * tiên chết ngay ở mốc thứ ba — sáu mốc còn lại không ai biết. Với một script
+ * mà cả công dụng là "nói cho tôi biết đang thiếu những gì", đó là hỏng đúng
+ * chỗ tệ nhất.
+ */
 async function doMoc(client) {
   const ketQua = [];
   for (const m of MOC) {
-    const r = (await client.query(m.sql)).rows[0];
-    ketQua.push({ moc: m, so: m.doc(r), dat: m.dat(r) });
+    try {
+      const r = (await client.query(m.sql)).rows[0];
+      ketQua.push({ moc: m, so: m.doc(r), dat: m.dat(r) });
+    } catch (e) {
+      ketQua.push({ moc: m, so: `KHÔNG ĐO ĐƯỢC — ${e.message}`, dat: false });
+    }
   }
   return ketQua;
 }

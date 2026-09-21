@@ -128,6 +128,27 @@ lại ngay sau đó.
 tự sao lưu, nhưng **chỉ chạy sau khi chủ studio duyệt**, và chạy lệnh đọc
 trước để xem bb-prod đang thiếu đúng những gì.
 
+### Đo thật bằng chính script, 21/09/2026
+
+`npm run db:migrate:prod` (chỉ đọc) trên bb-prod — **457 bộ ảnh, 0 nhân sự**:
+
+| Mốc | bb-prod |
+|---|---|
+| Khung nhìn `public.v_staff_deletable` | **THIẾU** |
+| Hàm `public.check_staff_deletable` | **THIẾU** |
+| PUBLIC không gọi được hàm đó | đã khoá (vì chưa có hàm nào để gọi) |
+| Cặp `app.*` lạc ngoài migration | sạch |
+| Cột mã PIN đã bỏ (0045) | **còn 4 cột thừa** |
+| `settings['gallery.link_ttl_days']` | **THIẾU** |
+| `settings['chat.page_url']` | **THIẾU** |
+
+**5/7 mốc đỏ**, đúng bằng bản soát tay ở đầu mục này — lần đo tay không bỏ sót
+gì, cũng không thổi phồng gì.
+
+Con số **0 nhân sự** là một chuyện khác, và nó nằm ở mục 2 bên dưới: bb-prod
+chưa có một tài khoản quản trị nào. Vá xong năm migration thì màn Nhân sự chạy
+được, nhưng vẫn chưa ai đăng nhập vào để mở nó ra.
+
 ## 2. Bốn việc CHỦ STUDIO phải tự làm
 
 Cả bốn đều là gõ mật khẩu hoặc dán khoá bí mật. Đó là việc của người, không phải
