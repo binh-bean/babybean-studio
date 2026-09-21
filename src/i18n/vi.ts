@@ -293,7 +293,7 @@ export const vi = {
         "Đây là vai hệ thống. Bạn xem được bộ quyền của nó nhưng không sửa được — chủ studio phải luôn còn một vai đủ quyền để vào lại hệ thống.",
       chuaCoHieuLuc: "(chưa có hiệu lực)",
       ghiChuHieuLuc:
-        "Ô ghi \"chưa có hiệu lực\" đã lưu được nhưng lớp bảo mật chưa hỏi tới. Hôm nay chỉ bốn quyền thật sự đổi hành vi: tạo album, sửa album, sửa khách hàng, và vượt trên mọi chi nhánh.",
+        "Ô ghi \"chưa có hiệu lực\" đã lưu được nhưng lớp bảo mật chưa hỏi tới. Sau chặng 2c, lớp bảo mật không còn đọc tên vai ở đâu nữa. Mười hai quyền đang thật sự đổi hành vi: xem ảnh, xem lựa chọn, thấy mọi album trong chi nhánh, tạo và sửa album, xem và sửa khách hàng, xem và sửa gói chụp, cập nhật giao ảnh, sửa cài đặt chi nhánh, và vượt trên mọi chi nhánh.",
     },
     caiDat: {
       title: "Cài đặt",

@@ -14,17 +14,25 @@
  * nối với gì cả, và không ai biết ô nào thật ô nào giả.
  *
  * ---------------------------------------------------------------------------
- * Ba quyền hôm nay THẬT SỰ đổi được hành vi
+ * Mười hai quyền hôm nay THẬT SỰ đổi được hành vi
  * ---------------------------------------------------------------------------
  * Nói thẳng để không ai tích một ô rồi tưởng mình vừa đổi được cái gì:
  *
- *   · `galleries:write` và `galleries:create` -> `app.can_write()`
- *   · `customers:write`                       -> `app.can_manage_customers()`
- *   · `system:superuser`                      -> `app.is_superuser()`
+ *   · `galleries:write` / `galleries:create` -> ghi album, ảnh, buổi chụp
+ *   · `galleries:all_in_branch`              -> thấy mọi album trong chi nhánh
+ *   · `photos:read`                          -> xem ảnh
+ *   · `selections:read`                      -> xem lựa chọn của khách
+ *   · `customers:read` / `customers:write`   -> xem / sửa khách hàng
+ *   · `packages:read` / `packages:write`     -> xem / sửa gói chụp
+ *   · `deliveries:write`                     -> cập nhật giao ảnh
+ *   · `settings:branch:write`                -> sửa cài đặt chi nhánh
+ *   · `system:superuser`                     -> vượt trên mọi chi nhánh
  *
- * Những quyền còn lại đã có tên và đã lưu được, nhưng lớp RLS chưa hỏi tới
- * chúng — chặng 2a cố ý chỉ đổi ba cổng đó, để không đụng lớp chặn chi nhánh
- * cùng lúc. Màn Vai trò hiển thị đúng sự thật này thay vì giấu đi.
+ * Sau chặng 2c (migration 0056 và 0057), lớp RLS KHÔNG còn đọc tên vai ở đâu
+ * nữa — mười ba chỗ so với 'photoshop_ctv', 'accountant', 'branch_manager' đã
+ * đổi hết sang hỏi quyền. Những quyền còn lại trong danh mục đã lưu được nhưng
+ * chưa có luật nào hỏi tới; màn Vai trò ghi thẳng "(chưa có hiệu lực)" lên
+ * chúng thay vì giấu đi.
  */
 
 export interface DinhNghiaQuyen {
@@ -41,6 +49,14 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
   { ma: "branch:dashboard", ten: "Xem bảng điều khiển chi nhánh", nhom: "Hệ thống" },
 
   { ma: "galleries:read", ten: "Xem danh sách và chi tiết album", nhom: "Album" },
+  {
+    ma: "galleries:all_in_branch",
+    ten: "Thấy MỌI album trong chi nhánh (không có thì chỉ thấy album mình được giao)",
+    nhom: "Album",
+    dangCoHieuLuc: true,
+  },
+  { ma: "photos:read", ten: "Xem ảnh trong album", nhom: "Album", dangCoHieuLuc: true },
+  { ma: "selections:read", ten: "Xem khách đã chọn ảnh nào", nhom: "Album", dangCoHieuLuc: true },
   { ma: "galleries:create", ten: "Tạo album mới", nhom: "Album", dangCoHieuLuc: true },
   { ma: "galleries:write", ten: "Sửa cấu hình album", nhom: "Album", dangCoHieuLuc: true },
   { ma: "galleries:sync", ten: "Đồng bộ ảnh từ Drive", nhom: "Album" },
@@ -49,12 +65,12 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
   { ma: "galleries:delete", ten: "Xoá hoặc lưu trữ album", nhom: "Album" },
   { ma: "galleries:export", ten: "Xuất danh sách ảnh", nhom: "Album" },
 
-  { ma: "customers:read", ten: "Xem danh sách khách hàng", nhom: "Khách hàng" },
+  { ma: "customers:read", ten: "Xem danh sách khách hàng", nhom: "Khách hàng", dangCoHieuLuc: true },
   { ma: "customers:write", ten: "Thêm và sửa khách hàng", nhom: "Khách hàng", dangCoHieuLuc: true },
   { ma: "customers:delete", ten: "Xoá khách hàng", nhom: "Khách hàng" },
 
-  { ma: "packages:read", ten: "Xem danh sách gói chụp", nhom: "Gói chụp" },
-  { ma: "packages:write", ten: "Thêm và sửa gói chụp", nhom: "Gói chụp" },
+  { ma: "packages:read", ten: "Xem danh sách gói chụp", nhom: "Gói chụp", dangCoHieuLuc: true },
+  { ma: "packages:write", ten: "Thêm và sửa gói chụp", nhom: "Gói chụp", dangCoHieuLuc: true },
   { ma: "packages:delete", ten: "Xoá gói chụp", nhom: "Gói chụp" },
 
   { ma: "branches:read", ten: "Xem danh sách chi nhánh", nhom: "Chi nhánh" },
@@ -71,13 +87,13 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
 
   { ma: "settings:system", ten: "Sửa cài đặt toàn hệ thống", nhom: "Cài đặt" },
   { ma: "settings:branch:read", ten: "Xem cài đặt chi nhánh", nhom: "Cài đặt" },
-  { ma: "settings:branch:write", ten: "Sửa cài đặt chi nhánh", nhom: "Cài đặt" },
+  { ma: "settings:branch:write", ten: "Sửa cài đặt chi nhánh", nhom: "Cài đặt", dangCoHieuLuc: true },
   { ma: "settings:branch:delete", ten: "Xoá cài đặt chi nhánh", nhom: "Cài đặt" },
 
   { ma: "retouch:read", ten: "Xem hàng đợi chỉnh ảnh", nhom: "Hậu kỳ" },
   { ma: "retouch:write", ten: "Cập nhật trạng thái chỉnh ảnh", nhom: "Hậu kỳ" },
   { ma: "deliveries:read", ten: "Xem lịch sử giao ảnh", nhom: "Hậu kỳ" },
-  { ma: "deliveries:write", ten: "Cập nhật tiến độ giao ảnh", nhom: "Hậu kỳ" },
+  { ma: "deliveries:write", ten: "Cập nhật tiến độ giao ảnh", nhom: "Hậu kỳ", dangCoHieuLuc: true },
   { ma: "deliveries:delete", ten: "Xoá dữ liệu giao ảnh", nhom: "Hậu kỳ" },
 ];
 

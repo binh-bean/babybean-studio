@@ -84,6 +84,8 @@ const DAY = [
   "0053-quyen-doc-tu-bang-roles.sql",
   "0054-bo-dong-require-pin-default.sql",
   "0055-chot-vai-he-thong-that-su-chan.sql",
+  "0056-policy-thoi-doc-ten-vai.sql",
+  "0057-quyen-ghi-thoi-tang-kem-quyen-doc.sql",
 ];
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */

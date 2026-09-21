@@ -161,11 +161,20 @@ create policy staff_branches_admin on staff_branches for all to authenticated
 -- ---------------------------------------------------------------------------
 
 create policy customers_select on customers for select to authenticated
-  using (app.can_see_branch(branch_id) and app.my_role() != 'photoshop_ctv');
+  using (app.can_see_branch(branch_id) and app.has_permission('customers:read'));
 
-create policy customers_write on customers for all to authenticated
+-- Tách khỏi `for all` ở migration 0057: chính sách `for all` góp mệnh đề
+-- `using` vào cả lượt SELECT, nên ai ghi được thì đọc được — kể cả khi cửa
+-- đọc ở trên đã nói không.
+create policy customers_insert on customers for insert to authenticated
+  with check (app.can_see_branch(branch_id) and app.can_manage_customers());
+
+create policy customers_update on customers for update to authenticated
   using (app.can_see_branch(branch_id) and app.can_manage_customers())
   with check (app.can_see_branch(branch_id) and app.can_manage_customers());
+
+create policy customers_delete on customers for delete to authenticated
+  using (app.can_see_branch(branch_id) and app.can_manage_customers());
 
 create policy babies_select on babies for select to authenticated
   using (exists (
@@ -187,14 +196,25 @@ create policy babies_write on babies for all to authenticated
 -- ---------------------------------------------------------------------------
 
 create policy packages_select on packages for select to authenticated
-  using ((branch_id is null or app.can_see_branch(branch_id)) and app.my_role() != 'photoshop_ctv');
+  using ((branch_id is null or app.can_see_branch(branch_id)) and app.has_permission('packages:read'));
 
 -- branch_id IS NULL means a system-wide package; only superusers touch those.
-create policy packages_write on packages for all to authenticated
-  using (app.is_superuser()
-    or (app.my_role() = 'branch_manager' and branch_id is not null and app.can_see_branch(branch_id)))
+-- Tách khỏi `for all` ở migration 0057: chính sách `for all` góp mệnh đề
+-- `using` vào cả lượt SELECT, nên ai ghi được thì đọc được — kể cả khi cửa
+-- đọc ở trên đã nói không.
+create policy packages_insert on packages for insert to authenticated
   with check (app.is_superuser()
-    or (app.my_role() = 'branch_manager' and branch_id is not null and app.can_see_branch(branch_id)));
+    or (app.has_permission('packages:write') and branch_id is not null and app.can_see_branch(branch_id)));
+
+create policy packages_update on packages for update to authenticated
+  using (app.is_superuser()
+    or (app.has_permission('packages:write') and branch_id is not null and app.can_see_branch(branch_id)))
+  with check (app.is_superuser()
+    or (app.has_permission('packages:write') and branch_id is not null and app.can_see_branch(branch_id)));
+
+create policy packages_delete on packages for delete to authenticated
+  using (app.is_superuser()
+    or (app.has_permission('packages:write') and branch_id is not null and app.can_see_branch(branch_id)));
 
 -- ---------------------------------------------------------------------------
 -- shoots / galleries / photos
@@ -208,7 +228,8 @@ create policy shoots_write on shoots for all to authenticated
   with check (app.can_see_branch(branch_id) and app.can_write());
 
 create policy galleries_select on galleries for select to authenticated
-  using (app.can_see_branch(branch_id) and (app.my_role() != 'photoshop_ctv' or editor_id = auth.uid()));
+  using (app.can_see_branch(branch_id)
+    and (app.has_permission('galleries:all_in_branch') or editor_id = auth.uid()));
 
 create policy galleries_write on galleries for all to authenticated
   using (app.can_see_branch(branch_id) and app.can_write())
@@ -216,20 +237,35 @@ create policy galleries_write on galleries for all to authenticated
 
 create policy photos_select on photos for select to authenticated
   using (
-    app.my_role() != 'accountant' and
+    app.has_permission('photos:read') and
     exists (
       select 1 from galleries g
       where g.id = photos.gallery_id and app.can_see_branch(g.branch_id)
-      and (app.my_role() != 'photoshop_ctv' or g.editor_id = auth.uid())
+      and (app.has_permission('galleries:all_in_branch') or g.editor_id = auth.uid())
     )
   );
 
-create policy photos_write on photos for all to authenticated
+-- Tách khỏi `for all` ở migration 0057: chính sách `for all` góp mệnh đề
+-- `using` vào cả lượt SELECT, nên ai ghi được thì đọc được — kể cả khi cửa
+-- đọc ở trên đã nói không.
+create policy photos_insert on photos for insert to authenticated
+  with check (exists (
+    select 1 from galleries g
+    where g.id = photos.gallery_id and app.can_see_branch(g.branch_id))
+    and app.can_write());
+
+create policy photos_update on photos for update to authenticated
   using (exists (
     select 1 from galleries g
     where g.id = photos.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write())
   with check (exists (
+    select 1 from galleries g
+    where g.id = photos.gallery_id and app.can_see_branch(g.branch_id))
+    and app.can_write());
+
+create policy photos_delete on photos for delete to authenticated
+  using (exists (
     select 1 from galleries g
     where g.id = photos.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
@@ -243,14 +279,29 @@ create policy share_links_select on share_links for select to authenticated
   using (exists (
     select 1 from galleries g
     where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id)
-    and (app.my_role() != 'photoshop_ctv' or g.editor_id = auth.uid())));
+    and (app.has_permission('galleries:all_in_branch') or g.editor_id = auth.uid())));
 
-create policy share_links_write on share_links for all to authenticated
+-- Tách khỏi `for all` ở migration 0057: chính sách `for all` góp mệnh đề
+-- `using` vào cả lượt SELECT, nên ai ghi được thì đọc được — kể cả khi cửa
+-- đọc ở trên đã nói không.
+create policy share_links_insert on share_links for insert to authenticated
+  with check (exists (
+    select 1 from galleries g
+    where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id))
+    and app.can_write());
+
+create policy share_links_update on share_links for update to authenticated
   using (exists (
     select 1 from galleries g
     where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write())
   with check (exists (
+    select 1 from galleries g
+    where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id))
+    and app.can_write());
+
+create policy share_links_delete on share_links for delete to authenticated
+  using (exists (
     select 1 from galleries g
     where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
@@ -266,11 +317,20 @@ from share_links;
 -- ---------------------------------------------------------------------------
 
 create policy selections_select on selections for select to authenticated
-  using (app.my_role() != 'photoshop_ctv' and exists (
+  using (app.has_permission('selections:read') and exists (
     select 1 from galleries g
     where g.id = selections.gallery_id and app.can_see_branch(g.branch_id)));
 
-create policy selections_write on selections for all to authenticated
+-- Tách khỏi `for all` ở migration 0057: chính sách `for all` góp mệnh đề
+-- `using` vào cả lượt SELECT, nên ai ghi được thì đọc được — kể cả khi cửa
+-- đọc ở trên đã nói không.
+create policy selections_insert on selections for insert to authenticated
+  with check (exists (
+    select 1 from galleries g
+    where g.id = selections.gallery_id and app.can_see_branch(g.branch_id))
+    and app.can_write());
+
+create policy selections_update on selections for update to authenticated
   using (exists (
     select 1 from galleries g
     where g.id = selections.gallery_id and app.can_see_branch(g.branch_id))
@@ -280,11 +340,17 @@ create policy selections_write on selections for all to authenticated
     where g.id = selections.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
 
+create policy selections_delete on selections for delete to authenticated
+  using (exists (
+    select 1 from galleries g
+    where g.id = selections.gallery_id and app.can_see_branch(g.branch_id))
+    and app.can_write());
+
 create policy selection_items_select on selection_items for select to authenticated
   using (exists (
     select 1 from galleries g
     where g.id = selection_items.gallery_id and app.can_see_branch(g.branch_id)
-    and (app.my_role() != 'photoshop_ctv' or g.editor_id = auth.uid())));
+    and (app.has_permission('galleries:all_in_branch') or g.editor_id = auth.uid())));
 
 -- Nhân viên KHÔNG được sửa lựa chọn của khách (tránh tranh cãi).
 -- Muốn đổi thì phải reopen album, hành động này có ghi log.
@@ -303,9 +369,9 @@ create policy deliveries_select on deliveries for select to authenticated
 
 create policy deliveries_write on deliveries for all to authenticated
   using (app.can_see_branch(branch_id)
-    and coalesce(app.my_role() in ('owner','admin','branch_manager','cs','retoucher'), false))
+    and app.has_permission('deliveries:write'))
   with check (app.can_see_branch(branch_id)
-    and coalesce(app.my_role() in ('owner','admin','branch_manager','cs','retoucher'), false));
+    and app.has_permission('deliveries:write'));
 
 -- ---------------------------------------------------------------------------
 -- activity_logs — chỉ đọc, không ai sửa/xoá được qua RLS.
@@ -340,9 +406,9 @@ create policy settings_select on settings for select to authenticated
 
 create policy settings_write on settings for all to authenticated
   using (app.is_superuser()
-    or (app.my_role() = 'branch_manager' and branch_id is not null and app.can_see_branch(branch_id)))
+    or (app.has_permission('settings:branch:write') and branch_id is not null and app.can_see_branch(branch_id)))
   with check (app.is_superuser()
-    or (app.my_role() = 'branch_manager' and branch_id is not null and app.can_see_branch(branch_id)));
+    or (app.has_permission('settings:branch:write') and branch_id is not null and app.can_see_branch(branch_id)));
 
 -- ---------------------------------------------------------------------------
 -- Chặn vai trò anon hoàn toàn. Khách hàng KHÔNG nói chuyện trực tiếp với Postgres.

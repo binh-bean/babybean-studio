@@ -293,7 +293,7 @@ export const en: Messages = {
         "This is a system role. You can view its permissions but not change them — the studio owner must always keep a role that can get back in.",
       chuaCoHieuLuc: "(not enforced yet)",
       ghiChuHieuLuc:
-        "Permissions marked \"not enforced yet\" are stored but the security layer does not ask for them yet. Today only four change behaviour: create gallery, edit gallery, edit customers, and cross-branch access.",
+        "Permissions marked \"not enforced yet\" are stored but the security layer does not ask for them yet. After stage 2c the security layer no longer reads role names anywhere. Twelve permissions currently change behaviour, including viewing photos and selections, seeing every gallery in a branch, creating and editing galleries, and cross-branch access.",
     },
     caiDat: {
       title: "Settings",
