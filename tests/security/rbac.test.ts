@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 import { requireRole, PERMISSIONS } from "../../src/lib/auth/staff";
@@ -183,6 +184,7 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     const session = {
       staffId: "user-cs",
       role: "cs" as const,
+      permissions: quyenCuaVai("cs"),
       branchIds: []
     };
     let error: unknown;

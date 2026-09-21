@@ -34,6 +34,12 @@ export const UpdateStaffSchema = z
   .object({
     fullName: z.string().trim().min(2).max(80).optional(),
     role: z.enum(ASSIGNABLE_ROLES).optional(),
+    /**
+     * Vai TỰ TẠO (BB-172 chặng 2d). Gửi kèm `roleId` thì vai đó thắng: cột
+     * `role` chỉ còn là vai nền để tương thích ngược, còn quyền thật đọc từ
+     * `roles.permissions` qua `role_id`.
+     */
+    roleId: z.string().uuid().nullable().optional(),
     branchIds: z.array(z.string().uuid()).max(20).optional(),
     isActive: z.boolean().optional(),
     phone: z.string().trim().max(20).nullable().optional(),

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import { Client } from "pg";
 import { createHash } from "node:crypto";
 import { POST as taoLink } from "@/app/api/admin/galleries/[id]/share-link/route";
@@ -22,6 +23,7 @@ describe("BB-148: Cấp lại link không làm mất ảnh khách chọn", () =>
       staffId,
       role,
       branchIds: [branchId],
+      permissions: quyenCuaVai(role),
     } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 

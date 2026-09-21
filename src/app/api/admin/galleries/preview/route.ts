@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
 import { driveFetch, DriveAccessDeniedError } from "@/lib/drive/client";
 import { listImageFiles } from "@/lib/drive/list-files";
@@ -21,7 +21,7 @@ export async function POST(request: Request): Promise<Response> {
     // gì — và máy chủ làm việc không công cho họ. Người lạ thì trả lời "anh là
     // ai" trước, mọi thứ khác sau.
     const staff = await requireStaff();
-    requireRole(staff, ["owner", "admin", "branch_manager", "cs"]);
+    requirePermission(staff, "galleries:write");
 
     let body: unknown;
     try {

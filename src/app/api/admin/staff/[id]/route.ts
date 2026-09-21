@@ -10,7 +10,7 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { passwordProblem } from "@/lib/auth/username";
 import { UpdateStaffSchema } from "../schema";
@@ -18,7 +18,6 @@ import type { StaffRole } from "@/types/domain";
 
 export const runtime = "nodejs";
 
-const CAN_MANAGE: StaffRole[] = ["owner", "admin"];
 
 function assignableBy(role: StaffRole): readonly StaffRole[] {
   if (role === "owner") {
@@ -35,7 +34,7 @@ export async function PATCH(
 
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "staff:manage");
 
     const { id } = await context.params;
     const parsed = UpdateStaffSchema.safeParse(await request.json());
@@ -95,6 +94,27 @@ export async function PATCH(
     const profilePatch: Record<string, unknown> = {};
     if (input.fullName !== undefined) profilePatch.full_name = input.fullName;
     if (input.role !== undefined) profilePatch.role = input.role;
+
+    /**
+     * Gán vai tự tạo. Kiểm vai có thật trước khi ghi — `role_id` là khoá ngoại
+     * nên cơ sở dữ liệu cũng chặn, nhưng thông báo của khoá ngoại thì người
+     * dùng không đọc được.
+     *
+     * `null` là ý "trả về vai nền theo cột role": trigger `app.dong_bo_role_id`
+     * sẽ điền lại giúp.
+     */
+    if (input.roleId !== undefined) {
+      if (input.roleId !== null) {
+        const { data: vai, error: loiVai } = await admin
+          .from("roles")
+          .select("id, name")
+          .eq("id", input.roleId)
+          .maybeSingle();
+        if (loiVai) throw loiVai;
+        if (!vai) return fail("INVALID_INPUT", "Không có vai trò này");
+      }
+      profilePatch.role_id = input.roleId;
+    }
     if (input.isActive !== undefined) profilePatch.is_active = input.isActive;
     if (input.phone !== undefined) profilePatch.phone = input.phone;
 

@@ -25,6 +25,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Client } from "pg";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 // KHÔNG giả lập máy khách cơ sở dữ liệu nữa.
@@ -69,8 +70,7 @@ describe("BB-133: khách xem được ảnh của mình, không xem được c�
       role: "owner",
       shareLinkId: "00000000-0000-4000-8000-000000000133",
       selectionId: "",
-      exp: 0,
-    } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
+      exp: 0, permissions: quyenCuaVai("owner"), } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
   }
 
   function khongCoPhien() {

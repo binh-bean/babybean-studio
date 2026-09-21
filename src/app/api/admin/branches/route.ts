@@ -13,7 +13,7 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateBranchSchema } from "./schema";
 import type { StaffRole } from "@/types/domain";
@@ -74,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_CREATE);
+    requirePermission(staff, "branches:manage");
 
     const parsed = CreateBranchSchema.safeParse(await request.json());
     if (!parsed.success) {

@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import { Client } from "pg";
 import { createHash } from "node:crypto";
 
@@ -39,6 +40,7 @@ describe("BB-127: tạo link gửi khách", () => {
       staffId,
       role,
       branchIds: [branchId],
+      permissions: quyenCuaVai(role),
     } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 

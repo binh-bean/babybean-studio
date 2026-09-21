@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Client } from "pg";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 import * as staffAuth from "@/lib/auth/staff";
@@ -38,8 +39,7 @@ describe("BB-103: CSKH sửa dòng hàng", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
       staffId: "00000000-0000-4000-8000-000000000103",
       role: "cs",
-      branchIds: [branchId],
-    } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
+      branchIds: [branchId], permissions: quyenCuaVai("cs"), } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 
   const params = (id: string) => ({ params: Promise.resolve({ id }) });

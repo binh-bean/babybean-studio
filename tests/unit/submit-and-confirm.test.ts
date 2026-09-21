@@ -8,6 +8,7 @@ import { patchSelection } from "@/lib/selection/mutate";
 import * as galleryAuth from "@/lib/auth/gallery-session";
 import * as staffAuth from "@/lib/auth/staff";
 import type { GallerySession } from "@/types/domain";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 
 vi.mock("server-only", () => ({}));
 
@@ -302,6 +303,7 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: randomUUID(),
       role: "viewer",
+      permissions: quyenCuaVai("viewer"),
       branchIds: [branchId],
     });
 
@@ -315,6 +317,7 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: randomUUID(),
       role: "cs",
+      permissions: quyenCuaVai("cs"),
       branchIds: [branchId],
     });
 

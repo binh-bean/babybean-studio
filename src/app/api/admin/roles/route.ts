@@ -11,18 +11,12 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DANH_MUC_QUYEN, MA_QUYEN_HOP_LE, tenVaiCoVanDeGi } from "@/lib/auth/danh-muc-quyen";
-import type { StaffRole } from "@/types/domain";
 
 export const runtime = "nodejs";
 
-/**
- * Vai trò quyết định ai làm được gì trên dữ liệu của 457 nhà thật, nên nó đứng
- * cùng hàng với quản lý nhân sự: chỉ chủ studio và quản trị.
- */
-const CAN_MANAGE: StaffRole[] = ["owner", "admin"];
 
 const TaoVaiSchema = z.object({
   name: z.string(),
@@ -33,7 +27,7 @@ export async function GET(): Promise<Response> {
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "roles:manage");
 
     const admin = createAdminClient();
 
@@ -80,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "roles:manage");
 
     const parsed = TaoVaiSchema.safeParse(await request.json());
     if (!parsed.success) {

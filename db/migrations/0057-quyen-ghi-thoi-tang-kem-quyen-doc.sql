@@ -28,17 +28,24 @@
 --
 -- Mười một chính sách `for all` còn lại giữ nguyên: bảng của chúng không có
 -- cửa đọc hẹp hơn cửa ghi, nên tách ra không đổi gì mà chỉ thêm chỗ sai.
+--
+-- Bản đầu của tệp này thiếu `drop policy if exists` trước mỗi `create policy`,
+-- nên lượt chạy thứ hai gãy với *policy "photos_insert" already exists*. Mà
+-- `db:migrate:prod` áp lại cả dãy mỗi lượt — tức bb-prod sẽ gãy ngay lần thứ
+-- hai. Đúng lỗi mà reviewer đã bắt ở `0052` sáng nay, và tôi vừa lặp lại.
 -- ============================================================================
 
 -- --- photos ----------------------------------------------------------------
 drop policy if exists photos_write on photos;
 
+drop policy if exists photos_insert on photos;
 create policy photos_insert on photos for insert to authenticated
   with check (exists (
     select 1 from galleries g
     where g.id = photos.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
 
+drop policy if exists photos_update on photos;
 create policy photos_update on photos for update to authenticated
   using (exists (
     select 1 from galleries g
@@ -49,6 +56,7 @@ create policy photos_update on photos for update to authenticated
     where g.id = photos.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
 
+drop policy if exists photos_delete on photos;
 create policy photos_delete on photos for delete to authenticated
   using (exists (
     select 1 from galleries g
@@ -58,29 +66,35 @@ create policy photos_delete on photos for delete to authenticated
 -- --- customers -------------------------------------------------------------
 drop policy if exists customers_write on customers;
 
+drop policy if exists customers_insert on customers;
 create policy customers_insert on customers for insert to authenticated
   with check (app.can_see_branch(branch_id) and app.can_manage_customers());
 
+drop policy if exists customers_update on customers;
 create policy customers_update on customers for update to authenticated
   using (app.can_see_branch(branch_id) and app.can_manage_customers())
   with check (app.can_see_branch(branch_id) and app.can_manage_customers());
 
+drop policy if exists customers_delete on customers;
 create policy customers_delete on customers for delete to authenticated
   using (app.can_see_branch(branch_id) and app.can_manage_customers());
 
 -- --- packages --------------------------------------------------------------
 drop policy if exists packages_write on packages;
 
+drop policy if exists packages_insert on packages;
 create policy packages_insert on packages for insert to authenticated
   with check (app.is_superuser()
     or (app.has_permission('packages:write') and branch_id is not null and app.can_see_branch(branch_id)));
 
+drop policy if exists packages_update on packages;
 create policy packages_update on packages for update to authenticated
   using (app.is_superuser()
     or (app.has_permission('packages:write') and branch_id is not null and app.can_see_branch(branch_id)))
   with check (app.is_superuser()
     or (app.has_permission('packages:write') and branch_id is not null and app.can_see_branch(branch_id)));
 
+drop policy if exists packages_delete on packages;
 create policy packages_delete on packages for delete to authenticated
   using (app.is_superuser()
     or (app.has_permission('packages:write') and branch_id is not null and app.can_see_branch(branch_id)));
@@ -88,12 +102,14 @@ create policy packages_delete on packages for delete to authenticated
 -- --- selections ------------------------------------------------------------
 drop policy if exists selections_write on selections;
 
+drop policy if exists selections_insert on selections;
 create policy selections_insert on selections for insert to authenticated
   with check (exists (
     select 1 from galleries g
     where g.id = selections.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
 
+drop policy if exists selections_update on selections;
 create policy selections_update on selections for update to authenticated
   using (exists (
     select 1 from galleries g
@@ -104,6 +120,7 @@ create policy selections_update on selections for update to authenticated
     where g.id = selections.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
 
+drop policy if exists selections_delete on selections;
 create policy selections_delete on selections for delete to authenticated
   using (exists (
     select 1 from galleries g
@@ -113,12 +130,14 @@ create policy selections_delete on selections for delete to authenticated
 -- --- share_links -----------------------------------------------------------
 drop policy if exists share_links_write on share_links;
 
+drop policy if exists share_links_insert on share_links;
 create policy share_links_insert on share_links for insert to authenticated
   with check (exists (
     select 1 from galleries g
     where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
 
+drop policy if exists share_links_update on share_links;
 create policy share_links_update on share_links for update to authenticated
   using (exists (
     select 1 from galleries g
@@ -129,6 +148,7 @@ create policy share_links_update on share_links for update to authenticated
     where g.id = share_links.gallery_id and app.can_see_branch(g.branch_id))
     and app.can_write());
 
+drop policy if exists share_links_delete on share_links;
 create policy share_links_delete on share_links for delete to authenticated
   using (exists (
     select 1 from galleries g

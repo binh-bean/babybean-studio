@@ -9,15 +9,12 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UpdateBranchSchema } from "../schema";
-import type { StaffRole } from "@/types/domain";
 
 export const runtime = "nodejs";
 
-const CAN_EDIT: StaffRole[] = ["owner", "admin", "branch_manager"];
-const CAN_TOGGLE: StaffRole[] = ["owner", "admin"];
 
 export async function PATCH(
   request: Request,
@@ -27,7 +24,7 @@ export async function PATCH(
 
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_EDIT);
+    requirePermission(staff, "branches:write");
 
     const { id } = await context.params;
     // branch_manager chỉ sửa được chi nhánh mình phụ trách.
@@ -50,7 +47,7 @@ export async function PATCH(
     if (!target) return fail("NOT_FOUND", "Không tìm thấy chi nhánh");
 
     if (input.isActive !== undefined) {
-      requireRole(staff, CAN_TOGGLE);
+      requirePermission(staff, "branches:manage");
 
       // Tắt chi nhánh cuối cùng là tắt cả studio: mọi album đều thuộc về một
       // chi nhánh, và phép kiểm quyền theo chi nhánh sẽ không còn gì để cho qua.

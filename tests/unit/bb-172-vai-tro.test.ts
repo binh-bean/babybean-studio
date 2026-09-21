@@ -7,6 +7,7 @@
  * chỉ chặn ở API thì bất kỳ đường ghi nào khác cũng xoá được vai `owner`.
  */
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import * as staffAuth from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -23,6 +24,7 @@ function nhuVai(role: string) {
     staffId: "00000000-0000-0000-0000-0000000000aa",
     role,
     branchIds: [],
+    permissions: quyenCuaVai(role),
   } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
 }
 

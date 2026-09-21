@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import { Client } from "pg";
 
 vi.mock("server-only", () => ({}));
@@ -71,6 +72,7 @@ describe("BB-120: báo cáo ảnh vượt hạn mức", () => {
       staffId: "00000000-0000-4000-8000-000000000120",
       role,
       branchIds,
+      permissions: quyenCuaVai(role),
     } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 

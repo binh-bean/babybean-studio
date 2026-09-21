@@ -14,6 +14,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { GET } from "@/app/api/admin/reports/link-sap-het-han/route";
 import * as staffAuth from "@/lib/auth/staff";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 const bam = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -34,8 +35,7 @@ describe("BB-186 — bảng link sắp hết hạn", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
       staffId,
       role: "cs",
-      branchIds,
-    } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
+      branchIds, permissions: quyenCuaVai("cs"), } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 
   beforeAll(async () => {

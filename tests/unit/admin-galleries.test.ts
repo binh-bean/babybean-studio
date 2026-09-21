@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 
 vi.mock("server-only", () => ({}));
 
@@ -34,6 +35,7 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: "00000000-0000-0000-0000-000000000001",
       role: "owner",
+      permissions: quyenCuaVai("owner"),
       branchIds: [sampleBranchId],
     });
 
@@ -54,6 +56,7 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: "00000000-0000-0000-0000-000000000001",
       role: "owner",
+      permissions: quyenCuaVai("owner"),
       branchIds: [sampleBranchId],
     });
 
@@ -87,6 +90,7 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: "00000000-0000-0000-0000-000000000001",
       role: "owner",
+      permissions: quyenCuaVai("owner"),
       branchIds: [sampleBranchId],
     });
 
@@ -106,6 +110,7 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: "00000000-0000-0000-0000-000000000001",
       role: "owner",
+      permissions: quyenCuaVai("owner"),
       branchIds: [sampleBranchId],
     });
 
@@ -141,6 +146,7 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: "00000000-0000-0000-0000-000000000001",
       role: "owner",
+      permissions: quyenCuaVai("owner"),
       branchIds: [sampleBranchId],
     });
 
@@ -156,6 +162,7 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: "00000000-0000-0000-0000-000000000002",
       role: "cs",
+      permissions: quyenCuaVai("cs"),
       branchIds: ["22222222-2222-2222-2222-222222222222"], // chỉ có quyền chi nhánh 2
     });
 
@@ -173,6 +180,7 @@ describe("GET /api/admin/galleries (BB-024)", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: "00000000-0000-0000-0000-000000000001",
       role: "owner",
+      permissions: quyenCuaVai("owner"),
       branchIds: [sampleBranchId],
     });
 

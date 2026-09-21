@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 
@@ -204,7 +204,6 @@ export async function GET(
  * Cùng luật với patch_selection_batch — xem docs/16 mục 4.
  */
 
-const EDIT_ROLES = ["owner", "admin", "branch_manager", "cs"] as const;
 const LOCKED_STATUSES = ["submitted", "in_retouch", "delivered", "archived"];
 
 /** Lấy bộ ảnh, kiểm quyền và kiểm khoá. Trả về null kèm lý do nếu không được. */
@@ -214,7 +213,7 @@ type EditableGallery =
 
 async function loadEditableGallery(galleryId: string): Promise<EditableGallery> {
   const staff = await requireStaff();
-  requireRole(staff, EDIT_ROLES as unknown as Parameters<typeof requireRole>[1]);
+  requirePermission(staff, "galleries:write");
 
   const admin = createAdminClient();
   const { data: gallery } = await admin

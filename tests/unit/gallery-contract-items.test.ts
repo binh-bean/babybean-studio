@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { GET as getAdminItems } from "@/app/api/admin/galleries/[id]/items/route";
 import * as staffAuth from "@/lib/auth/staff";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 
 vi.mock("server-only", () => ({}));
 
@@ -329,6 +330,7 @@ describe("BB-102: Thành phần hợp đồng và hạn mức ảnh (gallery_ite
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValueOnce({
       staffId: randomUUID(),
       role: "owner",
+      permissions: quyenCuaVai("owner"),
       branchIds: [branchId],
     });
 

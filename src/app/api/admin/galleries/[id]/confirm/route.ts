@@ -10,14 +10,13 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const CSKH_ROLES = ["owner", "admin", "branch_manager", "cs"] as const;
 
 export async function POST(
   _request: Request,
@@ -30,7 +29,7 @@ export async function POST(
     const staff = await requireStaff();
 
     // 2. Kiểm tra vai trò: Chỉ CSKH, Quản lý, Admin, Owner
-    requireRole(staff, CSKH_ROLES as unknown as Parameters<typeof requireRole>[1]);
+    requirePermission(staff, "galleries:write");
 
     // 3. Kiểm tra gallery ID
     const { id: galleryId } = await context.params;

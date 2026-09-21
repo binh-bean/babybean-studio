@@ -13,6 +13,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/staff", () => ({
   AuthError: class AuthError extends Error {
@@ -25,8 +26,7 @@ vi.mock("@/lib/auth/staff", () => ({
   requireStaff: vi.fn().mockResolvedValue({
     staffId: "staff-gia-lap",
     role: "cs",
-    branchIds: ["11111111-1111-1111-1111-111111111111"],
-  }),
+    branchIds: ["11111111-1111-1111-1111-111111111111"], permissions: quyenCuaVai("cs"), }),
   requireRole: vi.fn(),
 }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));

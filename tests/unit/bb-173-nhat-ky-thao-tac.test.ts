@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import { Client } from "pg";
 import { GET } from "@/app/api/admin/reports/nhat-ky/route";
 import * as staffAuth from "@/lib/auth/staff";
@@ -19,6 +20,7 @@ describe("BB-173 — màn lịch sử thao tác", () => {
       staffId,
       role,
       branchIds,
+      permissions: quyenCuaVai(role),
     } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 

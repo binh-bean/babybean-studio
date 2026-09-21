@@ -8,9 +8,20 @@ vi.mock("@/lib/supabase/admin", () => {
     createAdminClient: vi.fn(),
   };
 });
+/**
+ * Nhà máy của `vi.mock` được kéo lên đầu tệp, nên KHÔNG gọi được hàm nhập từ
+ * tệp khác ở trong đó — Vitest ném "error when mocking a module". Vì vậy bộ
+ * quyền ở đây viết thẳng, không gọi `quyenCuaVai`.
+ *
+ * Ca này chỉ kiểm đường ghi có nuốt lỗi hay không, nên chỉ cần đúng một quyền
+ * mở được cửa `staff:manage`.
+ */
 vi.mock("@/lib/auth/staff", () => ({
   AuthError: class AuthError extends Error { code: string; constructor(c: string) { super(); this.code = c; } },
-  requireRole: vi.fn(), requireStaff: vi.fn().mockResolvedValue({ staffId: "staff-1", role: "cs" })
+  requirePermission: vi.fn(),
+  requireStaff: vi
+    .fn()
+    .mockResolvedValue({ staffId: "staff-1", role: "owner", permissions: ["staff:manage"], branchIds: [] }),
 }));
 
 describe("Ca bắt buộc BB-190", () => {

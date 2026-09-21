@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Client } from "pg";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 import * as staffAuth from "@/lib/auth/staff";
@@ -49,8 +50,7 @@ describe("BB-137: ảnh nhỏ giữ lại, thôi gọi Drive mỗi lần", () =>
       role: "owner",
       shareLinkId: "00000000-0000-4000-8000-000000000137",
       selectionId: "",
-      exp: 0,
-    } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
+      exp: 0, permissions: quyenCuaVai("owner"), } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
   }
 
   function khongCoPhien() {

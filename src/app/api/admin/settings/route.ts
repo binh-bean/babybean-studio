@@ -12,24 +12,18 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { StaffRole } from "@/types/domain";
 import { CAI_DAT_SUA_DUOC, PatchSettingsSchema, cheBot, timDinhNghia } from "./schema";
 
 export const runtime = "nodejs";
 
-/**
- * Cài đặt là thứ ảnh hưởng tới MỌI album của MỌI chi nhánh, nên nó đứng cùng
- * hàng với quản lý nhân sự: chỉ chủ studio và quản trị.
- */
-const CAN_MANAGE: StaffRole[] = ["owner", "admin"];
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "settings:system");
 
     const admin = createAdminClient();
     const { data, error } = await admin
@@ -72,7 +66,7 @@ export async function PATCH(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "settings:system");
 
     const parsed = PatchSettingsSchema.safeParse(await request.json());
     if (!parsed.success) {

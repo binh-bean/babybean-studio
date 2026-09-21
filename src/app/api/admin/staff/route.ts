@@ -11,7 +11,7 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   isValidUsername,
@@ -26,8 +26,6 @@ import type { StaffRole } from "@/types/domain";
 
 export const runtime = "nodejs";
 
-/** docs/05-rbac.md §2: chỉ owner và admin có quyền CRUD nhân sự. */
-const CAN_MANAGE: StaffRole[] = ["owner", "admin"];
 
 /**
  * Ai được gán vai trò nào.
@@ -53,13 +51,13 @@ export async function GET(): Promise<Response> {
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "staff:manage");
 
     const admin = createAdminClient();
 
     const { data: profiles, error } = await admin
       .from("staff_profiles")
-      .select("id, full_name, email, phone, role, is_active, last_login_at, created_at")
+      .select("id, full_name, email, phone, role, role_id, is_active, last_login_at, created_at, roles(name, is_system)")
       .order("is_active", { ascending: false })
       .order("full_name");
     if (error) throw error;
@@ -78,6 +76,15 @@ export async function GET(): Promise<Response> {
       deleteReasonByStaff.set(d.staff_id, d.delete_reason);
     }
 
+    // Vai TỰ TẠO (BB-172 chặng 2d): màn Nhân sự phải gán được chúng, nên danh
+    // sách vai lấy từ bảng `roles` chứ không từ chín cái tên cứng.
+    const { data: vaiTuTao, error: loiVai } = await admin
+      .from("roles")
+      .select("id, name, is_system")
+      .eq("is_system", false)
+      .order("name");
+    if (loiVai) throw loiVai;
+
     const staleBefore = Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000;
 
     return ok({
@@ -88,6 +95,11 @@ export async function GET(): Promise<Response> {
         usesInternalName: p.email.endsWith(`@${STAFF_DOMAIN}`),
         phone: p.phone,
         role: p.role,
+        roleId: p.role_id,
+        roleName:
+          (p as { roles?: { name?: string; is_system?: boolean } | null }).roles?.name ?? p.role,
+        vaiTuTao:
+          (p as { roles?: { is_system?: boolean } | null }).roles?.is_system === false,
         isActive: p.is_active,
         lastLoginAt: p.last_login_at,
         neverLoggedIn: p.last_login_at === null,
@@ -100,6 +112,7 @@ export async function GET(): Promise<Response> {
       })),
       branches: branches ?? [],
       assignableRoles: assignableBy(staff.role),
+      customRoles: vaiTuTao ?? [],
       canManage: true,
     });
   } catch (err) {
@@ -119,7 +132,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "staff:manage");
 
     const parsed = CreateStaffSchema.safeParse(await request.json());
     if (!parsed.success) {

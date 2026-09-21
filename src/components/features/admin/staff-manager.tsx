@@ -30,6 +30,9 @@ interface StaffRow {
   usesInternalName: boolean;
   phone: string | null;
   role: string;
+  roleId: string | null;
+  roleName: string;
+  vaiTuTao: boolean;
   isActive: boolean;
   lastLoginAt: string | null;
   neverLoggedIn: boolean;
@@ -66,6 +69,8 @@ export function StaffManager() {
   const [rows, setRows] = useState<StaffRow[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [assignableRoles, setAssignableRoles] = useState<string[]>([]);
+  /** Vai tự tạo ở màn Vai trò (BB-172 chặng 2d). Giá trị trong ô chọn là `tu-tao:<id>`. */
+  const [customRoles, setCustomRoles] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -83,6 +88,7 @@ export function StaffManager() {
       setRows(body.data.staff);
       setBranches(body.data.branches);
       setAssignableRoles(body.data.assignableRoles);
+      setCustomRoles(body.data.customRoles ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được danh sách");
     } finally {
@@ -131,16 +137,33 @@ export function StaffManager() {
     <Select
       className={className}
       aria-label={t.colRole}
-      value={row.role}
-      disabled={busyId === row.id || !assignableRoles.includes(row.role)}
-      onChange={(e) => void patch(row.id, { role: e.target.value }, t.updated)}
+      value={row.vaiTuTao && row.roleId ? `tu-tao:${row.roleId}` : row.role}
+      disabled={busyId === row.id || (!row.vaiTuTao && !assignableRoles.includes(row.role))}
+      onChange={(e) => {
+        const v = e.target.value;
+        // Vai tự tạo gửi `roleId`; vai hệ thống gửi `role` như cũ. Gửi kèm
+        // `roleId: null` để trigger kéo `role_id` về đúng vai nền — nếu không,
+        // người vừa chuyển về vai hệ thống vẫn giữ quyền của vai tự tạo.
+        void patch(
+          row.id,
+          v.startsWith("tu-tao:")
+            ? { roleId: v.slice("tu-tao:".length) }
+            : { role: v, roleId: null },
+          t.updated,
+        );
+      }}
     >
-      {!assignableRoles.includes(row.role) && (
+      {!row.vaiTuTao && !assignableRoles.includes(row.role) && (
         <option value={row.role}>{roleLabel(row.role)}</option>
       )}
       {assignableRoles.map((r) => (
         <option key={r} value={r}>
           {roleLabel(r)}
+        </option>
+      ))}
+      {customRoles.map((r) => (
+        <option key={r.id} value={`tu-tao:${r.id}`}>
+          {r.name}
         </option>
       ))}
     </Select>

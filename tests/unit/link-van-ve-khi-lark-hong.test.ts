@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { Client } from "pg";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 /**
@@ -78,8 +79,7 @@ describe("BB-132: Lark hỏng thì link vẫn về tới tay CSKH", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
       staffId,
       role: "cs",
-      branchIds: [branchId],
-    } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
+      branchIds: [branchId], permissions: quyenCuaVai("cs"), } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   });
 
   afterAll(async () => {

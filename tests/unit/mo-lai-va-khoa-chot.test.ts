@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { Client } from "pg";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 import * as staffAuth from "@/lib/auth/staff";
@@ -39,8 +40,7 @@ describe("BB-122: mở lại bộ ảnh và cổng khoá chốt", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
       staffId: "00000000-0000-4000-8000-000000000122",
       role: "cs",
-      branchIds: [branchId],
-    } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
+      branchIds: [branchId], permissions: quyenCuaVai("cs"), } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 
   function asCustomer() {
@@ -50,8 +50,7 @@ describe("BB-122: mở lại bộ ảnh và cổng khoá chốt", () => {
       shareLinkId,
       selectionId,
       customerId,
-      exp: 0,
-    } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
+      exp: 0, permissions: quyenCuaVai("owner"), } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
   }
 
   const setStatus = (s: string) =>

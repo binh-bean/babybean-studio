@@ -464,7 +464,17 @@ export interface GallerySession {
 
 export interface StaffSession {
   staffId: string;
+  /**
+   * Vai theo cột enum cũ. Giữ lại vì một chính sách RLS còn dùng
+   * (`role = app.my_role()` chặn tự đổi vai của mình) và vì tương thích ngược.
+   * Từ BB-172 chặng 2d, cửa quyền ở tầng API hỏi `permissions`, không hỏi cột
+   * này — một người mang vai TỰ TẠO vẫn có `role` là một giá trị enum nào đó.
+   */
   role: StaffRole;
+  /** Tên vai đang thật sự giữ, kể cả vai tự tạo. */
+  roleName?: string;
+  /** Bộ quyền lấy từ bảng `roles` qua `staff_profiles.role_id`. */
+  permissions: string[];
   branchIds: string[];
 }
 

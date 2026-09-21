@@ -12,14 +12,12 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MA_QUYEN_HOP_LE, tenVaiCoVanDeGi } from "@/lib/auth/danh-muc-quyen";
-import type { StaffRole } from "@/types/domain";
 
 export const runtime = "nodejs";
 
-const CAN_MANAGE: StaffRole[] = ["owner", "admin"];
 
 const SuaVaiSchema = z.object({
   name: z.string().optional(),
@@ -33,7 +31,7 @@ export async function PATCH(
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "roles:manage");
     const { id } = await params;
 
     const parsed = SuaVaiSchema.safeParse(await request.json());
@@ -104,7 +102,7 @@ export async function DELETE(
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requireRole(staff, CAN_MANAGE);
+    requirePermission(staff, "roles:manage");
     const { id } = await params;
 
     const admin = createAdminClient();

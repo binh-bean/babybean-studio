@@ -28,7 +28,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
 
@@ -81,7 +81,7 @@ export async function PATCH(
     // được link, nếu không nhân viên gặp link sai lại không có đường đi tiếp.
     // Kế toán, thợ chỉnh ảnh và cộng tác viên photoshop KHÔNG đổi nguồn ảnh của
     // khách.
-    requireRole(staff, ["owner", "admin", "branch_manager", "cs"]);
+    requirePermission(staff, "galleries:write");
 
     const admin = await createAdminClient();
 

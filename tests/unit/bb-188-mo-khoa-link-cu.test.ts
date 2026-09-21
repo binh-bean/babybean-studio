@@ -16,6 +16,7 @@ import { POST as moLaiLink } from "@/app/api/admin/galleries/[id]/share-link/mo-
 import { POST as authGallery } from "@/app/api/auth/gallery/route";
 import * as staffAuth from "@/lib/auth/staff";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 describe("BB-188 — mở khoá link cũ không đổi địa chỉ", () => {
@@ -33,8 +34,7 @@ describe("BB-188 — mở khoá link cũ không đổi địa chỉ", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
       staffId,
       role: "cs",
-      branchIds: [branchId],
-    } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
+      branchIds: [branchId], permissions: quyenCuaVai("cs"), } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 
   beforeAll(async () => {

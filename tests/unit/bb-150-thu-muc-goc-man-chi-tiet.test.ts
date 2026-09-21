@@ -11,6 +11,7 @@ import { Client } from "pg";
 import { GET } from "@/app/api/admin/galleries/[id]/items/route";
 import * as staffAuth from "@/lib/auth/staff";
 
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
 const runId = Math.random().toString(36).slice(2, 10);
@@ -50,8 +51,7 @@ describe("BB-150: thư mục ảnh gốc trên màn chi tiết", () => {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
       staffId: st[0].id,
       role: "owner",
-      branchIds: [branchId],
-    } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
+      branchIds: [branchId], permissions: quyenCuaVai("owner"), } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   });
 
   afterAll(async () => {

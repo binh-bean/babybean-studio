@@ -12,7 +12,7 @@ import { NextResponse } from "next/server";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import {
   requireStaff,
-  requireRole,
+  requirePermission,
   requireBranch,
   AuthError,
 } from "@/lib/auth/staff";
@@ -68,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
     const staff = await requireStaff();
 
     // 3. Authorize: cs+ and must belong to branch ---------------------------
-    requireRole(staff, ["owner", "admin", "branch_manager", "cs"]);
+    requirePermission(staff, "galleries:write");
     requireBranch(staff, input.branchId);
 
     // 4. Mutate & Log (in a single database transaction) -------------------

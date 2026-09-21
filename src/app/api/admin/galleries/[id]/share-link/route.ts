@@ -68,7 +68,7 @@
 
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiLinkAppVeLark, diaChiDayDu } from "@/lib/lark/ghi-link-app";
 
@@ -76,7 +76,6 @@ export const runtime = "nodejs";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const TAO_LINK_ROLES = ["owner", "admin", "branch_manager", "cs"] as const;
 
 /**
  * 32 byte ngẫu nhiên, viết ở dạng base64url → 43 ký tự.
@@ -100,7 +99,7 @@ export async function POST(
 
   try {
     const staff = await requireStaff();
-    requireRole(staff, TAO_LINK_ROLES as unknown as Parameters<typeof requireRole>[1]);
+    requirePermission(staff, "galleries:share");
 
     const { id: galleryId } = await context.params;
     if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");

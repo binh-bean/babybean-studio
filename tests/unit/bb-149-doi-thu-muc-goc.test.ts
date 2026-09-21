@@ -7,6 +7,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import { Client } from "pg";
 import { PATCH } from "@/app/api/admin/galleries/[id]/drive/route";
 import * as staffAuth from "@/lib/auth/staff";
@@ -39,6 +40,7 @@ describe("BB-149: đổi thư mục ảnh gốc", () => {
       staffId,
       role,
       branchIds: [branchId],
+      permissions: quyenCuaVai(role),
     } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 

@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireRole, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createServerClient } from "@/lib/supabase/server";
 import {
   batDauDongBo,
@@ -37,7 +37,7 @@ export async function POST(
   try {
     const { id: galleryId } = await context.params;
     const staff = await requireStaff();
-    requireRole(staff, ["owner", "admin", "branch_manager", "cs"]);
+    requirePermission(staff, "galleries:write");
 
     const supabase = await createServerClient();
 

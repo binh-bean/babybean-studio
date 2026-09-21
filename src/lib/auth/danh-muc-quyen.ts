@@ -74,7 +74,8 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
   { ma: "packages:delete", ten: "Xoá gói chụp", nhom: "Gói chụp" },
 
   { ma: "branches:read", ten: "Xem danh sách chi nhánh", nhom: "Chi nhánh" },
-  { ma: "branches:write", ten: "Thêm và sửa chi nhánh", nhom: "Chi nhánh" },
+  { ma: "branches:write", ten: "Sửa chi nhánh", nhom: "Chi nhánh", dangCoHieuLuc: true },
+  { ma: "branches:manage", ten: "Tạo chi nhánh, bật/tắt chi nhánh", nhom: "Chi nhánh", dangCoHieuLuc: true },
   { ma: "branches:delete", ten: "Xoá chi nhánh", nhom: "Chi nhánh" },
 
   { ma: "staff:read", ten: "Xem danh sách nhân sự", nhom: "Nhân sự" },
