@@ -296,6 +296,7 @@ export const vi = {
       colDetails: "Chi tiết",
       inactiveLabel: "(đã nghỉ)",
       entityGallery: "Bộ ảnh",
+      entityGalleryDeleted: "Bộ ảnh (đã xoá)",
       linkCodePrefix: "Mã chia sẻ: {prefix}",
       emptyValue: "—",
       disconnected: "Mất kết nối, thử lại giúp."

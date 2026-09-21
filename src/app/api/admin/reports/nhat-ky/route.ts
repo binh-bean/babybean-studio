@@ -104,7 +104,11 @@ export async function GET(request: Request): Promise<Response> {
         actorName: displayName,
         isInactive,
         action: r.action,
-        entityType: (r.entity_type === "gallery" && !r.entity_id) ? "Bộ ảnh (đã xoá)" : r.entity_type,
+        entityType: r.entity_type,
+        // Bộ ảnh đã bị xoá: 0051 gỡ `entity_id` về null thay vì để nó trỏ vào
+        // hư không. Trả ra một cờ, KHÔNG trả ra nhãn tiếng Việt — nhãn là việc
+        // của màn hình, và app này có cả từ điển tiếng Anh.
+        entityDeleted: r.entity_type === "gallery" && !r.entity_id,
         entityId: r.entity_id,
         metadata: r.metadata,
       };

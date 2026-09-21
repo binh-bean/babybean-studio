@@ -296,6 +296,7 @@ export const en: Messages = {
       colDetails: "Details",
       inactiveLabel: "(inactive)",
       entityGallery: "Gallery",
+      entityGalleryDeleted: "Gallery (deleted)",
       linkCodePrefix: "Share code: {prefix}",
       emptyValue: "—",
       disconnected: "Connection lost, please try again."

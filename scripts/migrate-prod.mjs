@@ -56,6 +56,16 @@ const thucThi = process.argv.includes("--thuc-thi");
 const boQuaSaoLuu = process.argv.includes("--bo-qua-sao-luu");
 
 /**
+ * Áp cả khi chín mốc đều xanh.
+ *
+ * Chín mốc chỉ biết những thứ chúng được dạy để đo. Migration mới thêm vào DAY
+ * — ví dụ 0051 và 0052 ngày 21/09 — không có mốc nào canh, nên script sẽ báo
+ * "không có gì phải vá" rồi thoát, và tệp mới không bao giờ được áp. Cờ này để
+ * áp cả dãy khi biết rõ mình vừa thêm tệp.
+ */
+const epAp = process.argv.includes("--ep-ap");
+
+/**
  * Dãy migration bb-prod đang thiếu, theo đúng thứ tự phải áp.
  *
  * 0045 dựng lại `v_share_links` và `create_gallery_bundle` rồi mới bỏ cột PIN —
@@ -69,6 +79,8 @@ const DAY = [
   "0048-khoa-lai-check-staff-deletable.sql",
   "0049-dong-chat-page-url.sql",
   "0050-quyen-mac-dinh-cho-vat-sinh-sau.sql",
+  "0051-activity-logs-gallery-fk.sql",
+  "0052-vai-tro-dong.sql",
 ];
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */
@@ -255,10 +267,14 @@ async function main() {
   inBang("TRƯỚC KHI VÁ", truoc);
 
   const thieu = truoc.filter((k) => !k.dat);
-  if (thieu.length === 0) {
+  if (thieu.length === 0 && !epAp) {
     console.log("\nKhông có gì phải vá — chín mốc đều khớp bb-dev.");
+    console.log("Vừa thêm migration mới vào DAY? Chạy lại kèm --ep-ap.");
     await client.end();
     process.exit(0);
+  }
+  if (thieu.length === 0) {
+    console.log("\nChín mốc đều xanh, nhưng --ep-ap nên vẫn áp cả dãy.");
   }
 
   console.log(`\n${thieu.length} mốc chưa đạt. Hậu quả nếu cắt sang mà chưa vá:`);

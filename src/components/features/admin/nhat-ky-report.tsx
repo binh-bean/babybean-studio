@@ -14,6 +14,7 @@ interface LogItem {
   isInactive: boolean;
   action: string;
   entityType: string | null;
+  entityDeleted?: boolean;
   entityId: string | null;
   metadata: Record<string, unknown>;
 }
@@ -163,10 +164,12 @@ export function NhatKyReport() {
                     </td>
                     <td className="py-2 pr-3 font-mono text-xs">{it.action}</td>
                     <td className="py-2 pr-3">
-                      {it.entityType === "gallery" ? (
+                      {it.entityType === "gallery" && !it.entityDeleted ? (
                         <Link href={`/admin/galleries/${it.entityId}`} className="underline underline-offset-2">
                           {t.entityGallery}
                         </Link>
+                      ) : it.entityType === "gallery" ? (
+                        <span className="text-[var(--bb-fg-muted)]">{t.entityGalleryDeleted}</span>
                       ) : (
                         <span className="text-[var(--bb-fg-muted)]">{it.entityType}</span>
                       )}
