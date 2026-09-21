@@ -45,7 +45,7 @@ nữa đáng làm. Dưới đây là danh sách đếm được. Xong hết bả
 | ✅ | **BB-174·175·176** — ba chỗ làm app như đang hỏng | Nhân viên dùng hằng ngày. Cảm giác hỏng đắt hơn lỗi thật: lỗi thật thì người ta báo, cảm giác hỏng thì người ta lặng lẽ thôi dùng |
 | ✅ | **BB-177** — CSKH lấy được link app | CSKH dán link cho khách mỗi ngày. Không có nó thì quy trình đứt ngay bước đầu |
 | ✅ | **BB-182** — Lark không đánh rơi thay đổi | Thay đổi rơi trong im lặng là bộ ảnh không dựng, mà không ai biết để đi tìm |
-| 5 | **Ba việc tay ở mục 2** | Không có tài khoản quản trị thì không ai vào được màn quản trị, kể cả chủ studio |
+| 5 | **Bốn việc tay ở mục 2** (2.4 thêm ngày 18/09) | Không có tài khoản quản trị thì không ai vào được màn quản trị, kể cả chủ studio |
 | 6 | **Hẹn giờ sao lưu hằng tuần** | `docs/11 §7`. Từ lúc khách đầu tiên bấm chọn ảnh, mất dữ liệu là mất công của khách |
 | 7 | **Một lượt đi trọn đường như khách thật** | Trên điện thoại thật, bằng 4G, với một bộ ảnh thật. Chủ studio làm, không phải máy |
 
@@ -105,6 +105,28 @@ Sửa xong phải **Redeploy**: biến môi trường chỉ vào bản dựng m�
 Xem `docs/11-deployment.md §5a`. Bốn thứ, thiếu một là tính năng chết im lặng:
 `SYNC_CRON_SECRET` và `SUPABASE_DB_URL` trên Vercel, cùng hai GitHub Secrets,
 rồi bỏ dấu `#` ở dòng `schedule`.
+
+### 2.4. Một biến nữa: `CRON_SECRET` (BB-186)
+
+Vercel → Settings → Environment Variables → **Production** → thêm `CRON_SECRET`,
+giá trị là một chuỗi dài tự sinh (có thể dùng chung giá trị với
+`SYNC_CRON_SECRET`, hoặc một chuỗi khác — đường này nhận cả hai).
+
+**Tên biến do Vercel quy định, không đổi được.** Đặt nó là Vercel tự gắn
+`Authorization: Bearer <giá trị>` vào mọi lượt cron nó gọi.
+
+Thiếu biến này thì `/api/cron/expire-galleries` trả 401 mọi lượt, và **link
+không bao giờ chuyển sang trạng thái hết hạn** — cột `status` ghi `active`
+trong khi ba mẹ nhìn trang báo hết hạn. Đó đúng là tình trạng của dự án suốt
+từ lúc dựng tới 18/09/2026, cộng thêm lỗi phương thức đã vá ở BB-186.
+
+Kiểm sau khi Redeploy:
+
+```bash
+curl -i -H "Authorization: Bearer <CRON_SECRET>" https://hauky.babybeanstudio.vn/api/cron/expire-galleries
+```
+
+Phải ra `200` kèm `stats`. Ra `401` là biến chưa vào bản dựng — Redeploy lại.
 
 ## 3. Sau khi cắt — kiểm ngay bốn thứ
 
