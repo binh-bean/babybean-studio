@@ -26,10 +26,33 @@ language sql stable security definer set search_path = public as $$
   select role from staff_profiles where id = auth.uid() and is_active;
 $$;
 
+-- Hỏi quyền từ bảng `roles` (ADR-0007, migration 0053).
+--
+-- `security definer` vì hàm đọc `staff_profiles`, mà chính bảng đó có RLS gọi
+-- ngược lại nhóm hàm này — thiếu `definer` là đệ quy vô hạn.
+--
+-- Nhánh `role_id is null` là lưới đỡ: đường tạo nhân sự ghi cột `role`, và một
+-- trigger trong 0053 mới là thứ điền `role_id`. Thiếu nhánh này thì một tài
+-- khoản lọt qua trigger sẽ đăng nhập được mà không làm gì được — im lặng.
+create or replace function app.has_permission(p text)
+returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1
+      from staff_profiles sp
+      join roles r
+        on r.id = sp.role_id
+        or (sp.role_id is null and r.name = sp.role::text)
+     where sp.id = auth.uid()
+       and sp.is_active
+       and p = any(r.permissions)
+  );
+$$;
+
 create or replace function app.is_superuser()
 returns boolean
 language sql stable security definer set search_path = public as $$
-  select coalesce(app.my_role() in ('owner','admin'), false);
+  select coalesce(app.has_permission('system:superuser'), false);
 $$;
 
 -- Danh sách chi nhánh mà người dùng hiện tại được phép thấy.
@@ -49,11 +72,14 @@ $$;
 
 -- Được ghi dữ liệu SẢN XUẤT: album, ảnh, buổi chụp. Thợ ảnh nằm trong nhóm này
 -- vì họ tạo album và đồng bộ ảnh.
+-- Hỏi CẢ `galleries:create`: trong bảng quyền của 0052, thợ ảnh không có
+-- `galleries:write` mà có `galleries:create` + `galleries:sync`. Hỏi mỗi
+-- `galleries:write` là thợ ảnh mất quyền tạo album, mà không dòng nào nói ra.
 create or replace function app.can_write()
 returns boolean
 language sql stable security definer set search_path = public as $$
   select coalesce(
-    app.my_role() in ('owner','admin','branch_manager','cs','photographer'),
+    app.has_permission('galleries:write') or app.has_permission('galleries:create'),
     false);
 $$;
 
@@ -64,9 +90,7 @@ $$;
 create or replace function app.can_manage_customers()
 returns boolean
 language sql stable security definer set search_path = public as $$
-  select coalesce(
-    app.my_role() in ('owner','admin','branch_manager','cs'),
-    false);
+  select coalesce(app.has_permission('customers:write'), false);
 $$;
 
 -- ---------------------------------------------------------------------------
