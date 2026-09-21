@@ -92,12 +92,22 @@ export interface Branch {
   updatedAt?: string;
 }
 
+export interface Role {
+  id: string;
+  name: string;
+  permissions: string[];
+  isSystem: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface StaffProfile {
   id: string;
   fullName: string;
   email: string;
   phone: string | null;
   role: StaffRole;
+  roleId?: string | null;
   avatarUrl: string | null;
   isActive: boolean;
   branchIds: string[];

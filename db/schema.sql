@@ -73,13 +73,24 @@ create table branches (
 
 comment on table branches is 'Chi nhánh studio. Phase 1: 3 dòng.';
 
+-- Bảng phân vai trò động (BB-172)
+create table roles (
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,
+  permissions   text[] not null default '{}',
+  is_system     boolean not null default false,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
 -- Hồ sơ nhân sự, 1-1 với auth.users của Supabase
 create table staff_profiles (
   id            uuid primary key references auth.users(id) on delete cascade,
   full_name     text not null,
   email         citext not null unique,
   phone         text,
-  role          staff_role not null default 'cs',
+  role          staff_role not null default 'cs',   -- cột cũ, chờ xoá
+  role_id       uuid references roles(id),          -- cột mới
   avatar_url    text,
   is_active     boolean not null default true,
   last_login_at timestamptz,
@@ -673,7 +684,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'branches','staff_profiles','customers','babies','packages','shoots',
+    'branches','roles','staff_profiles','customers','babies','packages','shoots',
     'galleries','photos','selections','selection_items','deliveries','settings'
   ] loop
     execute format(
