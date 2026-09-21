@@ -390,6 +390,8 @@ export const vi = {
     galleries: {
       title: "Danh sách bộ ảnh",
       searchPlaceholder: "Tìm theo tên bé, tên khách, số điện thoại…",
+      searchClear: "Xoá từ khoá tìm kiếm",
+      searchOpen: "Tìm bộ ảnh",
       filterBranch: "Chi nhánh",
       filterStatus: "Trạng thái",
       filterUrgency: "Mức khẩn",

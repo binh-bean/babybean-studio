@@ -6,7 +6,7 @@ import { vi } from "@/i18n";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Table2, Kanban, Plus } from "lucide-react";
+import { Search, Table2, Kanban, Plus, X } from "lucide-react";
 
 export interface GalleryFilterState {
   branchId: string;
@@ -31,23 +31,82 @@ export function GalleryFilters({
   branches,
   photographers,
 }: GalleryFiltersProps) {
+  /**
+   * Ô tìm kiếm mặc định THU LẠI thành một nút kính lúp.
+   *
+   * Chủ studio chốt 21/09/2026: "cần dùng mới hiện ra, không dùng thì ẩn đi".
+   * Ô này rộng 288px và nằm ngay đầu hàng lọc, nên trên điện thoại nó chiếm
+   * trọn một dòng mà phần lớn thời gian không ai gõ vào.
+   *
+   * Một ngoại lệ: đang có chữ trong ô thì ô LUÔN mở. Thu một bộ lọc đang bật
+   * vào sau cái nút là giấu mất lý do danh sách đang thiếu bộ ảnh — người dùng
+   * sẽ tưởng dữ liệu hỏng.
+   */
+  const [moRong, setMoRong] = React.useState(false);
+  const oRef = React.useRef<HTMLInputElement>(null);
+  const dangHien = moRong || values.search.length > 0;
+
+  React.useEffect(() => {
+    if (moRong) oRef.current?.focus();
+  }, [moRong]);
+
   return (
     <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 bg-[var(--bb-bg)] border-b border-[var(--bb-border)] space-y-3">
       {/* Hàng 1: Tìm kiếm, Bộ lọc nhanh, Toggle Chế độ xem & Nút tạo mới */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
-          {/* Tìm kiếm Tên bé, Tên khách, SĐT */}
-          <div className="relative w-full sm:w-72">
-            <Input
-              name="search"
-              value={values.search}
-              onChange={(e) => onChange({ search: e.target.value })}
-              placeholder={vi.admin.galleries.searchPlaceholder}
-              className="pl-9"
-              aria-label={vi.admin.galleries.searchPlaceholder}
-            />
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--bb-fg-muted)] pointer-events-none" />
-          </div>
+          {/* Tìm kiếm Tên bé, Tên khách, SĐT — thu lại khi không dùng */}
+          {dangHien ? (
+            <div className="relative w-full sm:w-72">
+              <Input
+                ref={oRef}
+                name="search"
+                value={values.search}
+                onChange={(e) => onChange({ search: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    onChange({ search: "" });
+                    setMoRong(false);
+                  }
+                }}
+                onBlur={() => {
+                  // Rời ô mà không gõ gì thì thu lại. Có chữ thì giữ nguyên —
+                  // xem ghi chú ở đầu hàm.
+                  if (values.search.length === 0) setMoRong(false);
+                }}
+                placeholder={vi.admin.galleries.searchPlaceholder}
+                className="pl-9 pr-9"
+                aria-label={vi.admin.galleries.searchPlaceholder}
+              />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--bb-fg-muted)] pointer-events-none" />
+              {values.search.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange({ search: "" });
+                    setMoRong(false);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg)]"
+                  aria-label={vi.admin.galleries.searchClear}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 px-3"
+              onClick={() => setMoRong(true)}
+              aria-expanded={false}
+              aria-label={vi.admin.galleries.searchOpen}
+              title={vi.admin.galleries.searchOpen}
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+          )}
 
           {/* Lọc chi nhánh */}
           <div className="w-full sm:w-auto">
