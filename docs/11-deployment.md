@@ -90,7 +90,7 @@ Yêu cầu với `scripts/db-push.mjs`:
 | `GOOGLE_DRIVE_API_KEY` | ✓ | ✓ | ✓ | **Bí mật.** Prod dùng key riêng, giới hạn IP |
 | `APP_SECRET` | ✓ | ✓ | ✓ | **Bí mật.** Mỗi môi trường một giá trị khác nhau |
 | `NEXT_PUBLIC_APP_URL` | ✓ | ✓ | ✓ | Dùng để dựng link chia sẻ |
-| `CRON_SECRET` | — | — | ✓ | Bảo vệ `/api/cron/**` |
+| `CRON_SECRET` | — | — | ✓ | **Bí mật.** Tên biến do Vercel quy định: đặt nó là Vercel tự gắn `Bearer` vào mọi lượt cron nó gọi. Thiếu thì `/api/cron/expire-galleries` trả 401 mọi lượt — xem §5 |
 | `SYNC_CRON_SECRET` | — | — | ✓ | **Bí mật.** Khoá riêng của `/api/cron/sync-lark` (BB-152). Cũng phải đặt trong GitHub Secrets. Xem §5a |
 | `SUPABASE_DB_URL` | ✓ | — | ✓ | **Bí mật.** `/api/cron/sync-lark` nối thẳng Postgres, không qua PostgREST |
 | `UPSTASH_REDIS_*` | tuỳ | ✓ | ✓ | Rate limit; thiếu thì fallback in-memory |
@@ -154,12 +154,30 @@ feat/BB-xxx  ──PR──►  develop  ──PR──►  main
 ```json
 {
   "crons": [
-    { "path": "/api/cron/expire-galleries",    "schedule": "0 18 * * *" },
-    { "path": "/api/cron/send-reminders",      "schedule": "0 2 * * *"  },
-    { "path": "/api/cron/flush-notifications", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/expire-galleries", "schedule": "0 18 * * *" }
   ]
 }
 ```
+
+### Hai lỗi đã làm lịch này chạy rỗng suốt — sửa ở BB-186 (18/09/2026)
+
+Soát ngày 18/09 thấy `expire-galleries` **chưa bao giờ chạy được**, vì hai lỗi
+chồng nhau, và cả hai đều im lặng:
+
+1. Handler chỉ có `POST`. **Vercel Cron gọi bằng `GET`** → mỗi lượt là một cái
+   405 không ai nhìn. Nay có cả hai.
+2. Handler kiểm `SYNC_CRON_SECRET`, còn Vercel gửi `Bearer $CRON_SECRET` →
+   401. Nay nhận cả hai khoá.
+
+Và `send-reminders` nằm trong `crons` nhưng **route đó không tồn tại** — Vercel
+gọi vào một 404 mỗi ngày lúc 02:00 UTC từ lúc dựng tới nay. Đã gỡ khỏi
+`vercel.json`. Muốn có nhắc lịch thì viết route trước, thêm dòng cron sau —
+**đừng xếp lịch cho một đường chưa có.**
+
+Hậu quả chưa ai thấy vì bb-dev chưa có link nào tới hạn: link đầu tiên chết vào
+khoảng tháng 11.2026. Lúc đó cột `status` vẫn ghi `active` trong khi ba mẹ nhìn
+trang báo hết hạn.
+
 **Gói Hobby chỉ cho cron chạy một lần mỗi ngày.** Bất kỳ biểu thức nào chạy dày hơn — kể cả `*/5 * * * *` — làm **toàn bộ deployment bị từ chối**, và Vercel không hiện lỗi đó trên dashboard: bản deploy đơn giản không bao giờ xuất hiện. Chỉ `vercel --prod` qua CLI mới in ra nguyên nhân.
 
 Vì vậy `flush-notifications` (mỗi 5 phút, đẩy hàng đợi Lark/Zalo) đã **bị gỡ khỏi `vercel.json`**. Nó chỉ cần từ Phase 3. Khi tới đó, chọn một trong hai: nâng lên gói Pro, hoặc chuyển việc đẩy hàng đợi sang một dịch vụ cron ngoài gọi vào `/api/cron/flush-notifications`.

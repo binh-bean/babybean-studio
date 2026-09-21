@@ -13,6 +13,7 @@ import {
   Store,
   AlertTriangle,
   CloudOff,
+  Link2,
   UserCog,
   ChevronLeft,
   ChevronRight
@@ -51,6 +52,14 @@ const navItems: {
     name: "Bộ ảnh lỗi tải",
     href: "/admin/reports/loi-dong-bo",
     icon: CloudOff,
+    ready: true,
+    hiddenForRoles: ["photoshop_ctv"],
+  },
+  {
+    // BB-186: trước đây CSKH chỉ biết link chết khi khách gọi đến.
+    name: "Link sắp hết hạn",
+    href: "/admin/reports/link-sap-het-han",
+    icon: Link2,
     ready: true,
     hiddenForRoles: ["photoshop_ctv"],
   },
