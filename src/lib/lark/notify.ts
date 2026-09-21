@@ -295,10 +295,11 @@ export async function enqueueLarkNotification(tin: LarkNotification): Promise<vo
 
     if (dangChayPhepThu()) {
       if (dong?.id) {
-        await admin
+        const { error: err0 } = await admin
           .from("notifications")
           .update({ status: "skipped", last_error: "Đang chạy phép thử — không bắn tin thật" })
           .eq("id", dong.id);
+        if (err0) console.error("Lỗi cập nhật skipped cho " + dong.id, err0);
       }
       return;
     }
@@ -309,10 +310,11 @@ export async function enqueueLarkNotification(tin: LarkNotification): Promise<vo
       // thử lại vô ích, và để màn Cài đặt phân biệt được "chưa cấu hình" với
       // "cấu hình rồi mà gửi hỏng" — hai việc dẫn tới hai hành động khác hẳn.
       if (dong?.id) {
-        await admin
+        const { error: err1 } = await admin
           .from("notifications")
           .update({ status: "skipped", last_error: "Chưa cấu hình lark.webhook_url" })
           .eq("id", dong.id);
+        if (err1) console.error("Lỗi cập nhật skipped cho " + dong.id, err1);
       }
       return;
     }
@@ -320,17 +322,18 @@ export async function enqueueLarkNotification(tin: LarkNotification): Promise<vo
     const the = dungThe(tin.event, payload, diaChiBoAnh(payload.galleryId));
     if (!the) {
       if (dong?.id) {
-        await admin
+        const { error: err2 } = await admin
           .from("notifications")
           .update({ status: "skipped", last_error: `Chưa có mẫu thẻ cho ${tin.event}` })
           .eq("id", dong.id);
+        if (err2) console.error("Lỗi cập nhật skipped cho " + dong.id, err2);
       }
       return;
     }
 
     const kq = await gui(webhook, the);
     if (dong?.id) {
-      await admin
+      const { error: err3 } = await admin
         .from("notifications")
         .update(
           kq.duoc
@@ -338,6 +341,7 @@ export async function enqueueLarkNotification(tin: LarkNotification): Promise<vo
             : { status: "failed", attempts: 1, last_error: kq.lyDo ?? "không rõ" },
         )
         .eq("id", dong.id);
+      if (err3) console.error("Lỗi cập nhật trạng thái thông báo " + dong.id, err3);
     }
   } catch (err) {
     // Hàm này đứng sau một giao dịch ĐÃ commit. Ném ở đây là biến việc đã xong
@@ -407,19 +411,20 @@ export async function guiLaiThongBaoDangCho(): Promise<{
     const the = webhook ? dungThe(d.template as LarkEvent, d.payload, diaChiBoAnh(d.payload?.galleryId)) : null;
 
     if (!webhook || !the) {
-      await admin
+      const { error: err4 } = await admin
         .from("notifications")
         .update({
           status: "skipped",
           last_error: webhook ? `Chưa có mẫu thẻ cho ${d.template}` : "Chưa cấu hình lark.webhook_url",
         })
         .eq("id", d.id);
+      if (err4) console.error("Lỗi cập nhật skipped (retry) cho " + d.id, err4);
       continue;
     }
 
     const kq = await gui(webhook, the);
     const lanThu = d.attempts + 1;
-    await admin
+    const { error: err5 } = await admin
       .from("notifications")
       .update(
         kq.duoc
@@ -427,6 +432,7 @@ export async function guiLaiThongBaoDangCho(): Promise<{
           : { status: "failed", attempts: lanThu, last_error: kq.lyDo ?? "không rõ" },
       )
       .eq("id", d.id);
+    if (err5) console.error("Lỗi cập nhật trạng thái thông báo (retry) " + d.id, err5);
 
     if (kq.duoc) daGui++;
     else conHong++;

@@ -125,7 +125,8 @@ export async function ghiLoiDongBo(
 ): Promise<void> {
   const capNhat: Record<string, unknown> = { sync_error: moTaLoi(err) };
   if (giaiDoanDau) capNhat.status = "sync_error";
-  await db.from("galleries").update(capNhat).eq("id", galleryId);
+  const { error: loiGhi } = await db.from("galleries").update(capNhat).eq("id", galleryId);
+  if (loiGhi) throw loiGhi;
 }
 
 /**
@@ -214,7 +215,8 @@ export async function dongBoBoAnh(
   // Luật 3: chỉ đổi trạng thái khi còn ở giai đoạn đầu.
   if (thongTin.giaiDoanDau) ketThuc.status = "ready";
 
-  await db.from("galleries").update(ketThuc).eq("id", galleryId);
+  const { error: loiKetThuc } = await db.from("galleries").update(ketThuc).eq("id", galleryId);
+  if (loiKetThuc) throw loiKetThuc;
 
   const anhDau = images[0];
   if (!thongTin.coverPhotoId && anhDau) {
@@ -225,7 +227,8 @@ export async function dongBoBoAnh(
       .eq("drive_file_id", anhDau.id)
       .maybeSingle();
     if (photo) {
-      await db.from("galleries").update({ cover_photo_id: photo.id }).eq("id", galleryId);
+      const { error: loiCover } = await db.from("galleries").update({ cover_photo_id: photo.id }).eq("id", galleryId);
+      if (loiCover) throw loiCover;
     }
   }
 

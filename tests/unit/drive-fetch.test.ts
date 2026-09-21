@@ -15,6 +15,8 @@ import {
   MAX_ATTEMPTS,
 } from "@/lib/drive/client";
 
+process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU = "1";
+
 describe("BB-011: driveFetch & client", () => {
   const originalEnv = process.env.GOOGLE_DRIVE_API_KEY;
   const FAKE_KEY = "AIzaSyFakeKeyForTesting123456789";

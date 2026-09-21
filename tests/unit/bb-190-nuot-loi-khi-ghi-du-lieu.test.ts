@@ -24,8 +24,8 @@ describe("BB-190: Nuốt lỗi khi ghi dữ liệu", () => {
       
       for (let i = 0; i < lines.length; i++) {
         if (
-            (lines[i] || "").match(/^\s*await (admin|supabase)(\.|\s*$)/) || 
-            ((lines[i] || "").match(/await (admin|supabase)\./) && (lines[i] || "").match(/\.(insert|update|upsert|delete)\(/))
+            (lines[i] || "").match(/^\s*await (admin|supabase|db)(\.|\s*$)/) || 
+            ((lines[i] || "").match(/await (admin|supabase|db)\./) && (lines[i] || "").match(/\.(insert|update|upsert|delete)\(/))
         ) {
           let found = false;
           
@@ -48,6 +48,6 @@ describe("BB-190: Nuốt lỗi khi ghi dữ liệu", () => {
       }
     }
     
-    expect(loi, `Đang có ${loi.length} chỗ ghi dữ liệu không bắt lỗi (cho phép 8). Chi tiết:\n${loi.join('\n')}`).toHaveLength(8);
+    expect(loi, `Đang có ${loi.length} chỗ ghi dữ liệu không bắt lỗi (cho phép 2). Chi tiết:\n${loi.join('\n')}`).toHaveLength(2);
   });
 });

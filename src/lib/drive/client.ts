@@ -12,6 +12,7 @@
  */
 
 import "server-only";
+import { dangChayPhepThu } from "@/lib/kiem-thu";
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 export const TIMEOUT_MS = 10_000;
@@ -65,6 +66,10 @@ export async function driveFetch(
   params: Record<string, string>,
   ctx: DriveRequestContext,
 ): Promise<Response> {
+  if (dangChayPhepThu()) {
+    throw new Error("Đang chạy phép thử — không gọi Drive thật");
+  }
+
   const isAbsolute = path.startsWith("http");
   const url = new URL(isAbsolute ? path : `${DRIVE_API}${path}`);
   for (const [k, v] of Object.entries(params)) {
