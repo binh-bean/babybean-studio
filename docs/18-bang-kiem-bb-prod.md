@@ -98,14 +98,35 @@ Hậu quả nếu cắt sang mà chưa vá:
   chốt, nên không sai — nhưng một con số nằm trong mã chứ không nằm trong cài
   đặt là con số không ai đổi được qua giao diện.
 
-Cách vá: áp `db/migrations/0045` → `0046` → `0047` → `0048` lên bb-prod theo
-đúng thứ tự, rồi chèn hai dòng `settings` còn thiếu. **Không có script chạy
-migration cho bb-prod** — `npm run db:push` cố tình từ chối chạy ở đó
-(`scripts/db-push.mjs`: *"Production takes migrations from db/migrations/,
-never this script"*).
+### Đã có đường vá — soạn 21/09/2026, diễn tập xong trên bb-dev
 
-Đây là việc sửa dữ liệu của 427 nhà thật, không hoàn tác được. **Chạy bản sao
-lưu trước** (`npm run db:backup:prod`), và chỉ chạy sau khi chủ studio duyệt.
+Trước đây mục này ghi "không có script chạy migration cho bb-prod", và việc vá
+phải làm bằng tay: dán từng tệp SQL vào ô SQL Editor, không ai đo trước, không
+ai đo lại sau, không gì bắt buộc sao lưu. Nay có `scripts/migrate-prod.mjs`.
+
+| Lệnh | Làm gì |
+|---|---|
+| `npm run db:migrate:prod` | **Chỉ đọc.** In bảy mốc kiểm của bb-prod, nói rõ mốc nào chưa đạt và hỏng cái gì. Không ghi một chữ nào |
+| `npm run db:migrate:prod -- --thuc-thi` | Sao lưu trước, rồi áp `0045` → `0046` → `0047` → `0048` → `0049`, mỗi tệp một giao dịch riêng, gãy ở đâu hoàn nguyên đúng tệp đó. Xong thì đo lại bảy mốc; còn mốc nào đỏ là **thoát khác 0**, không báo xong |
+
+`0049-dong-chat-page-url.sql` là tệp mới: dòng `chat.page_url` từ trước tới nay
+chỉ nằm trong `db/seed.sql`, mà seed không bao giờ chạy trên production — nên
+không có đường nào bắc nó sang bb-prod. Giá trị đúng bằng giá trị đang chạy
+trên bb-dev (trang Messenger của studio, địa chỉ công khai).
+
+Không cần lo thứ tự hay chạy trùng: cả năm tệp đều chạy lại được nhiều lần mà
+kết quả không đổi (`if exists`, `or replace`, `on conflict do nothing`).
+
+**Diễn tập ngày 21/09/2026 trên bb-dev** (493 bộ ảnh, 8 nhân sự): xoá thật dòng
+`chat.page_url` để một mốc chuyển đỏ → chạy `--thuc-thi` → năm tệp áp xong,
+bảy mốc xanh lại, giá trị khôi phục đúng nguyên văn, `npm run verify:db`
+**17/17**, mã thoát 0. Mốc "PUBLIC không gọi được hàm" vẫn xanh sau khi chạy,
+tức thứ tự 0047 → 0048 giữ đúng: 0047 vô tình cấp quyền cho PUBLIC, 0048 thu
+lại ngay sau đó.
+
+Đây là việc sửa dữ liệu của hàng trăm nhà thật, không hoàn tác được. Script đã
+tự sao lưu, nhưng **chỉ chạy sau khi chủ studio duyệt**, và chạy lệnh đọc
+trước để xem bb-prod đang thiếu đúng những gì.
 
 ## 2. Bốn việc CHỦ STUDIO phải tự làm
 

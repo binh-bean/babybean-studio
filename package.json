@@ -19,6 +19,8 @@
     "drive:sync": "node --env-file-if-exists=.env.local --import tsx scripts/sync-drive.ts",
     "verify": "npm run verify:schema && npm run typecheck && npm run lint && npm run test && npm run build && npm run verify:build && npm run verify:wired",
     "verify:schema": "node --env-file-if-exists=.env.local scripts/verify-schema.mjs",
+    "db:migrate:dev": "node --env-file-if-exists=.env.local scripts/migrate-prod.mjs",
+    "db:migrate:prod": "node --env-file=.env.prod.local scripts/migrate-prod.mjs",
     "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
     "db:backup:prod": "node --env-file=.env.prod.local scripts/backup.mjs",
     "db:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-test-galleries.mjs",
