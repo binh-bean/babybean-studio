@@ -198,6 +198,29 @@ vấn riêng chứ không đọc lời script:
 
 `verify:db` trên bb-prod: **17/17**, mã thoát 0.
 
+### Ba migration nữa, CHỐT ĐỂ LẠI TỚI LÚC CẮT (chủ studio quyết 21/09/2026)
+
+Sau lượt vá chiều 21/09, bb-dev đi thêm ba bước mà bb-prod chưa có:
+
+| Tệp | Làm gì | Vì sao đáng |
+|---|---|---|
+| `0051-activity-logs-gallery-fk` | `gallery_id` có khoá ngoại `on delete set null` + trigger gỡ `entity_id` | Nhật ký thôi mồ côi khi bộ ảnh bị xoá |
+| `0052-vai-tro-dong` | Bảng `roles`, 9 vai hệ thống, 35 tên quyền | Nền cho màn Vai trò |
+| `0053-quyen-doc-tu-bang-roles` | `app.has_permission()`; ba cổng quyền hỏi qua bảng `roles` | Vai trò tự tạo mới có nghĩa |
+
+Cả ba đã nằm sẵn trong dãy của `npm run db:migrate:prod`, và đã áp **hai lượt
+liên tiếp** trên bb-dev, mã thoát 0 cả hai.
+
+**Quyết định: không áp ngay, áp vào đúng hôm cắt.** Lý do: `0053` viết lại lớp
+quyền trên cơ sở dữ liệu có 457 nhà thật, mà bb-prod hiện **chưa có tài khoản
+nào đăng nhập** (0 nhân sự) — nên chậm ba bước lúc này không ảnh hưởng một ai.
+Áp một thể vào hôm cắt thì chỉ đụng vào dữ liệu thật một lần, và lúc đó chủ
+studio ngồi ngay đó để mở màn Nhân sự xem thật ngay sau khi áp.
+
+Thứ tự hôm cắt: `db:migrate:prod` (sao lưu → áp → đo chín mốc) → `verify:db`
+trên bb-prod → tạo tài khoản quản trị đầu tiên (§2.1) → đổi ba biến Vercel
+(§2.2) → Redeploy → đi trọn một đường như khách thật.
+
 ## 2. Bốn việc CHỦ STUDIO phải tự làm
 
 Cả bốn đều là gõ mật khẩu hoặc dán khoá bí mật. Đó là việc của người, không phải
