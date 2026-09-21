@@ -243,11 +243,12 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (targetSelectionItemId) {
-      await admin
+      const { error: delErr } = await admin
         .from("selection_placements")
         .delete()
         .eq("selection_item_id", targetSelectionItemId)
         .eq("gallery_item_id", input.galleryItemId);
+      if (delErr) throw delErr;
     }
 
     return ok({ removed: true });

@@ -148,10 +148,11 @@ export async function POST(request: Request): Promise<Response> {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + ttlDays);
 
-    await supabase
+    const { error: updErr } = await supabase
       .from("share_links")
       .update({ expires_at: expiresAt.toISOString() })
       .eq("id", (result as { share_link_id: string }).share_link_id);
+    if (updErr) throw updErr;
 
     // No fallback on purpose. This used to guess "https://chon-anh.babybean.vn",
     // a domain the studio does not own and nobody has registered — so a missing

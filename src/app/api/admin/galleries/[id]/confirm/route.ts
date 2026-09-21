@@ -77,7 +77,7 @@ export async function POST(
     }
 
     // 7. Ghi nhật ký hoạt động
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
       actor_id: staff.staffId,
       actor_label: staff.role,
@@ -90,6 +90,7 @@ export async function POST(
         confirmedAt: now,
       },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     return ok({
       galleryId,

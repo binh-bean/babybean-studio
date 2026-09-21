@@ -104,7 +104,7 @@ export async function POST(request: Request): Promise<Response> {
       .single();
     if (error || !created) throw error ?? new Error("insert branch trả về rỗng");
 
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
       actor_id: staff.staffId,
       branch_id: created.id,
@@ -113,6 +113,7 @@ export async function POST(request: Request): Promise<Response> {
       entity_id: created.id,
       metadata: { code: input.code, name: input.name },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     return ok({ id: created.id, code: input.code });
   } catch (err) {

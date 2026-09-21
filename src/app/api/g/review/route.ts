@@ -95,11 +95,12 @@ export async function POST(request: Request): Promise<Response> {
         .eq("id", gallery.id);
       if (error) throw error;
 
-      await admin
+      const { error: resErr } = await admin
         .from("revision_requests")
         .update({ resolved_at: now })
         .eq("gallery_id", gallery.id)
         .is("resolved_at", null);
+      if (resErr) throw resErr;
 
       return ok({ status: "approved" });
     }

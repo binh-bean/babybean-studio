@@ -226,6 +226,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       laKhachChinh: session.role === "owner",
     });
 
+    // Ghi trượt thật sự không quan trọng: chỉ là timestamp cập nhật lần xem cuối,
+    // hụt thì lần sau cập nhật, không được chặn luồng khách vào xem ảnh.
     await admin
       .from("share_links")
       .update({ last_viewed_at: new Date().toISOString() })

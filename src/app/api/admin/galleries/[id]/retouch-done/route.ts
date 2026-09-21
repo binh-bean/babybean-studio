@@ -84,25 +84,28 @@ export async function POST(
       .maybeSingle();
 
     if (existing) {
-      await admin
+      const { error: delUpdErr } = await admin
         .from("deliveries")
         .update({ final_drive_url: url, status: "ready", updated_at: now })
         .eq("id", existing.id);
+      if (delUpdErr) throw delUpdErr;
     } else {
-      await admin.from("deliveries").insert({
+      const { error: delInsErr } = await admin.from("deliveries").insert({
         gallery_id: galleryId,
         branch_id: gallery.branch_id,
         status: "ready",
         final_drive_url: url,
       });
+      if (delInsErr) throw delInsErr;
     }
 
     // Đóng mọi vòng yêu cầu sửa đang mở.
-    await admin
+    const { error: revErr } = await admin
       .from("revision_requests")
       .update({ resolved_at: now })
       .eq("gallery_id", galleryId)
       .is("resolved_at", null);
+    if (revErr) throw revErr;
 
     const { error } = await admin
       .from("galleries")

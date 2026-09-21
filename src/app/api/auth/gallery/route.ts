@@ -69,13 +69,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if ((count ?? 0) >= RATE_LIMIT_PER_IP) return fail("RATE_LIMITED");
     }
 
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "customer",
       action: ACTION,
       ip,
       user_agent: req.headers.get("user-agent"),
       metadata: { tokenPrefix: token.slice(0, 6) },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     const { data: link } = await admin
       .from("share_links")
@@ -189,6 +190,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Ghi trượt thật sự không quan trọng: chỉ là timestamp cập nhật lần xem cuối,
+    // hụt thì lần sau cập nhật, không được chặn luồng khách vào xem ảnh.
     await admin
       .from("share_links")
       .update({ last_viewed_at: new Date().toISOString() })

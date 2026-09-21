@@ -189,7 +189,7 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     // 9. Ghi activity log
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "customer",
       actor_id: session.selectionId,
       actor_label: input.confirmedByName,
@@ -204,6 +204,7 @@ export async function POST(request: Request): Promise<Response> {
         extraAmount,
       },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     return ok({
       submittedAt,
