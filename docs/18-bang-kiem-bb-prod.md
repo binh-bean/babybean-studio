@@ -45,7 +45,7 @@ nữa đáng làm. Dưới đây là danh sách đếm được. Xong hết bả
 | ✅ | **BB-174·175·176** — ba chỗ làm app như đang hỏng | Nhân viên dùng hằng ngày. Cảm giác hỏng đắt hơn lỗi thật: lỗi thật thì người ta báo, cảm giác hỏng thì người ta lặng lẽ thôi dùng |
 | ✅ | **BB-177** — CSKH lấy được link app | CSKH dán link cho khách mỗi ngày. Không có nó thì quy trình đứt ngay bước đầu |
 | ✅ | **BB-182** — Lark không đánh rơi thay đổi | Thay đổi rơi trong im lặng là bộ ảnh không dựng, mà không ai biết để đi tìm |
-| 5 | **Bốn việc tay ở mục 2** (2.4 thêm ngày 18/09) | Không có tài khoản quản trị thì không ai vào được màn quản trị, kể cả chủ studio |
+| 5 | **Mục 2.0 (bốn migration) + bốn việc tay ở mục 2** | Không có tài khoản quản trị thì không ai vào được màn quản trị, kể cả chủ studio |
 | 6 | **Hẹn giờ sao lưu hằng tuần** | `docs/11 §7`. Từ lúc khách đầu tiên bấm chọn ảnh, mất dữ liệu là mất công của khách |
 | 7 | **Một lượt đi trọn đường như khách thật** | Trên điện thoại thật, bằng 4G, với một bộ ảnh thật. Chủ studio làm, không phải máy |
 
@@ -68,6 +68,44 @@ Mỗi tuần chưa cắt sang là một tuần **457 bộ ảnh thật nằm tro
 ai xem được**, và CSKH vẫn gửi ảnh cho khách theo cách cũ. Hoàn thiện là đúng,
 nhưng danh sách trên cố tình ngắn — đừng thêm dòng vào đó trừ khi nó thật sự
 chặn ba mẹ hoặc chặn nhân viên.
+
+## 2.0. TRƯỚC ĐÃ — bb-prod đang chậm hơn bb-dev bốn migration
+
+**Soát ngày 21/09/2026.** Việc này KHÔNG phải việc tay của chủ studio, nhưng
+nó phải xong **trước** bốn việc ở dưới, nếu không cắt sang là màn Nhân sự hỏng
+ngay phút đầu.
+
+Đo bằng cách so trực tiếp hai cơ sở dữ liệu:
+
+| | bb-dev | bb-prod |
+|---|---|---|
+| Bảng | đủ | **đủ** |
+| Khung nhìn `v_staff_deletable` | có | **THIẾU** |
+| Hàm `check_staff_deletable` | có | **THIẾU** |
+| Cột PIN đã bỏ (0045) | rồi | **chưa** (cột thừa, mã không còn đọc) |
+| `settings['gallery.link_ttl_days']` | có | **THIẾU** |
+| `settings['chat.page_url']` | có | **THIẾU** |
+| `settings['lark.webhook_url']` | có | có |
+
+Hậu quả nếu cắt sang mà chưa vá:
+
+- **Màn Nhân sự đọc `v_staff_deletable`** (`/api/admin/staff` dòng 69). Khung
+  nhìn không tồn tại thì truy vấn hỏng — và đúng dòng đó là **một trong 18 chỗ
+  bỏ qua `error`** của BB-190, nên nó hỏng trong im lặng: danh sách nhân sự
+  hiện ra nhưng không nút Xoá nào biết mình có được bấm hay không.
+- **Nút "Nhắn cho studio" của ba mẹ biến mất**, vì `chat.page_url` không có.
+- Hạn link rơi về mặc định 60 ngày trong mã. Bằng đúng "2 tháng" chủ studio
+  chốt, nên không sai — nhưng một con số nằm trong mã chứ không nằm trong cài
+  đặt là con số không ai đổi được qua giao diện.
+
+Cách vá: áp `db/migrations/0045` → `0046` → `0047` → `0048` lên bb-prod theo
+đúng thứ tự, rồi chèn hai dòng `settings` còn thiếu. **Không có script chạy
+migration cho bb-prod** — `npm run db:push` cố tình từ chối chạy ở đó
+(`scripts/db-push.mjs`: *"Production takes migrations from db/migrations/,
+never this script"*).
+
+Đây là việc sửa dữ liệu của 427 nhà thật, không hoàn tác được. **Chạy bản sao
+lưu trước** (`npm run db:backup:prod`), và chỉ chạy sau khi chủ studio duyệt.
 
 ## 2. Bốn việc CHỦ STUDIO phải tự làm
 
