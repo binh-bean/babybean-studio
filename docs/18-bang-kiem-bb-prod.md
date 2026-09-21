@@ -149,6 +149,42 @@ Con số **0 nhân sự** là một chuyện khác, và nó nằm ở mục 2 b�
 chưa có một tài khoản quản trị nào. Vá xong năm migration thì màn Nhân sự chạy
 được, nhưng vẫn chưa ai đăng nhập vào để mở nó ra.
 
+### 2.0b. Vá xong thì lộ ra một lớp lệch nữa — và nó nặng hơn (BB-193)
+
+Áp xong năm tệp, soát tiếp quyền trên bb-prod thì thấy:
+
+| | bb-dev | bb-prod |
+|---|---|---|
+| Quyền **mặc định** của bảng/khung nhìn sinh sau | `anon=Dxtm`, `authenticated=m` | **`anon=arwdDxtm`, `authenticated=arwdm`** |
+| Khung nhìn mở cho `anon` | không cái nào | **cả năm cái**, đủ SELECT/INSERT/UPDATE/DELETE |
+| `selection_ops` mở cho `authenticated` | không | **có** |
+
+Nghĩa là trên bb-prod, **mọi bảng và khung nhìn sinh ra từ nay đều mở sẵn cho
+`anon` ngay lúc chào đời**, không cần ai cấp. Chính lượt vá hôm nay chứng minh
+điều đó: `0045` dựng lại `v_share_links`, `0047` tạo `v_staff_deletable`, và cả
+hai sinh ra với `anon` đọc–ghi–xoá.
+
+Hai khung nhìn đó **không phải `security_invoker`**, nên chúng chạy bằng quyền
+của chủ khung nhìn và **đi vòng qua RLS** của `share_links` và `staff_profiles`.
+`v_share_links` lại là một select phẳng nên Postgres coi nó tự động ghi được —
+tức về lý thuyết là cả đường ĐỌC lẫn đường GHI, vòng qua toàn bộ lớp kiểm quyền.
+
+**Hôm nay chưa ai với tới được**: Data API của bb-prod trả 404 (`PGRST125`) cho
+mọi đường, kể cả `/rest/v1/share_links`. Nhưng đó là một **công tắc trong bảng
+điều khiển Supabase**, không phải một lớp quyền — bật nhầm là lộ tiền tố link,
+tình trạng và số lượt mở của 457 nhà thật. Trên bb-dev thì cùng câu hỏi đó trả
+401 kèm đúng câu *"permission denied"*: ở đó chặn bằng quyền, không bằng công tắc.
+
+**Vì sao kho không ai biết**: câu `alter default privileges ... from anon` không
+có trong bất kỳ migration nào, cũng không có trong `policies.sql` — `policies.sql`
+chỉ thu hồi trên những bảng ĐANG có, và tệp đó không bao giờ chạy trên
+production. Ai đó đã gõ tay lên bb-dev và không ghi lại. Một lớp bảo vệ chỉ tồn
+tại trong một cơ sở dữ liệu là lớp bảo vệ không ai kế thừa được.
+
+`0050-quyen-mac-dinh-cho-vat-sinh-sau.sql` vá cả ba dòng trong bảng trên, và
+`migrate-prod` nay đo **chín mốc** thay vì bảy — hai mốc mới quét cả họ khung
+nhìn chứ không gõ tên, để khung nhìn chưa ai viết cũng nằm trong lưới.
+
 ## 2. Bốn việc CHỦ STUDIO phải tự làm
 
 Cả bốn đều là gõ mật khẩu hoặc dán khoá bí mật. Đó là việc của người, không phải

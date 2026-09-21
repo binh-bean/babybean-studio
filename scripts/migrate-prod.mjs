@@ -19,7 +19,7 @@
  * ---------------------------------------------------------------------------
  * Ba điều script này bảo đảm
  * ---------------------------------------------------------------------------
- * 1. **Đo trước, đo sau.** In bảy mốc kiểm, so với trạng thái bb-dev. Không đo
+ * 1. **Đo trước, đo sau.** In chín mốc kiểm, so với trạng thái bb-dev. Không đo
  *    được thì không áp.
  * 2. **Mặc định KHÔNG ghi gì.** Chạy trần là chế độ soi. Muốn ghi phải gõ hẳn
  *    `--thuc-thi`.
@@ -68,9 +68,10 @@ const DAY = [
   "0047-xoa-nhan-su.sql",
   "0048-khoa-lai-check-staff-deletable.sql",
   "0049-dong-chat-page-url.sql",
+  "0050-quyen-mac-dinh-cho-vat-sinh-sau.sql",
 ];
 
-/** Bảy mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */
+/** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */
 const MOC = [
   {
     ten: "Khung nhìn public.v_staff_deletable",
@@ -133,6 +134,60 @@ const MOC = [
     doc: (r) => (r.n ? "có" : "THIẾU"),
     dat: (r) => r.n >= 1,
     hong: "Thiếu thì hạn link rơi về số 60 nằm trong mã — không ai đổi được qua giao diện.",
+  },
+  {
+    /**
+     * Khung nhìn KHÔNG bị RLS chặn.
+     *
+     * `v_share_links` và `v_staff_deletable` không phải `security_invoker`, nên
+     * chúng chạy bằng quyền của chủ khung nhìn: ai select được là đọc thẳng qua
+     * đầu mọi chính sách RLS của `share_links` và `staff_profiles`. Đo cả họ
+     * khung nhìn chứ không đo đích danh hai cái — mốc này phải bắt được cả
+     * khung nhìn chưa ai viết.
+     */
+    ten: "Khung nhìn: anon trắng tay, không ai ghi",
+    /**
+     * Ba việc bị coi là hỏng, gom vào một con số:
+     *   · anon có bất kỳ quyền gì trên bất kỳ khung nhìn nào;
+     *   · authenticated GHI được qua khung nhìn (khung nhìn phẳng là tự động
+     *     ghi được, và ghi qua đó là đi vòng qua RLS của bảng gốc);
+     *   · authenticated ĐỌC được hai khung nhìn quản trị — chỉ service_role cần.
+     *
+     * Ba khung nhìn báo cáo vẫn để authenticated đọc, đúng như bb-dev.
+     */
+    sql: `select count(*)::int n
+            from information_schema.role_table_grants
+           where table_schema='public'
+             and table_name in (select viewname from pg_views where schemaname='public')
+             and (
+               grantee = 'anon'
+               or (grantee = 'authenticated' and privilege_type in ('INSERT','UPDATE','DELETE'))
+               or (grantee = 'authenticated' and privilege_type = 'SELECT'
+                   and table_name in ('v_share_links','v_staff_deletable'))
+             )`,
+    doc: (r) => (r.n ? `${r.n} quyền đang mở` : "đã khoá"),
+    dat: (r) => r.n === 0,
+    hong: "Khung nhìn mở cho anon là đi vòng qua RLS — đọc thẳng link và nhân sự của mọi chi nhánh.",
+  },
+  {
+    /**
+     * Quyền MẶC ĐỊNH, tức quyền một bảng/khung nhìn nhận được lúc chào đời.
+     * Đây là chỗ đã sinh ra hai mốc hỏng ở trên: 0045 và 0047 tạo khung nhìn
+     * mới, và trên bb-prod chúng sinh ra với anon = đọc/ghi/xoá.
+     */
+    ten: "Vật sinh sau không tự mở cho anon",
+    sql: `select coalesce((
+            select array_to_string(d.defaclacl, ' ')
+              from pg_default_acl d join pg_namespace n on n.oid = d.defaclnamespace
+             where n.nspname='public' and d.defaclobjtype='r'
+               and pg_get_userbyid(d.defaclrole)='postgres'
+             limit 1), '') acl`,
+    doc: (r) => {
+      const q = /anon=([^/]*)/.exec(r.acl)?.[1] ?? "";
+      return /[arwd]/.test(q) ? `anon mặc định có "${q}"` : "đã thu hồi";
+    },
+    dat: (r) => !/[arwd]/.test(/anon=([^/]*)/.exec(r.acl)?.[1] ?? ""),
+    hong: "Bảng và khung nhìn nào sinh ra sau cũng mở sẵn cho anon, không ai phải cấp.",
   },
   {
     ten: "settings chat.page_url",
@@ -201,7 +256,7 @@ async function main() {
 
   const thieu = truoc.filter((k) => !k.dat);
   if (thieu.length === 0) {
-    console.log("\nKhông có gì phải vá — bảy mốc đều khớp bb-dev.");
+    console.log("\nKhông có gì phải vá — chín mốc đều khớp bb-dev.");
     await client.end();
     process.exit(0);
   }
@@ -266,7 +321,7 @@ async function main() {
     console.error(`\nCòn ${conThieu.length} mốc chưa đạt. KHÔNG được coi là xong.`);
     process.exit(1);
   }
-  console.log("\nBảy mốc đều đạt. Bước tiếp: npm run verify:db, rồi mở màn Nhân sự xem thật.");
+  console.log("\nChín mốc đều đạt. Bước tiếp: npm run verify:db, rồi mở màn Nhân sự xem thật.");
 }
 
 main().catch((e) => {
