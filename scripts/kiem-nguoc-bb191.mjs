@@ -6,9 +6,10 @@ const supabase = createClient(
 );
 
 async function run() {
-  const { data, count, error } = await supabase
+  // Chỉ cần con số, không cần dòng: lấy `head: true` để khỏi kéo cả bảng về.
+  const { count, error } = await supabase
     .from("notifications")
-    .select("*", { count: "exact" })
+    .select("*", { count: "exact", head: true })
     .eq("status", "sent");
 
   if (error) {
