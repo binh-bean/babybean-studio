@@ -29,7 +29,7 @@ Cả 457 bộ ảnh đều `download_enabled = true` (áp 0042 ngày 16/09).
 
 ## 1b. KHOAN CẮT SANG — chủ studio chốt 17/09/2026
 
-**Hoàn thiện tính năng và giao diện xong mới giao cho khách.** Ba việc ở mục 2
+**Hoàn thiện tính năng và giao diện xong mới giao cho khách.** Bốn việc ở mục 2
 bên dưới vẫn đúng, nhưng **chưa làm bây giờ**.
 
 ### Vì sao phải viết ra cái đích
@@ -69,9 +69,9 @@ ai xem được**, và CSKH vẫn gửi ảnh cho khách theo cách cũ. Hoàn t
 nhưng danh sách trên cố tình ngắn — đừng thêm dòng vào đó trừ khi nó thật sự
 chặn ba mẹ hoặc chặn nhân viên.
 
-## 2. Ba việc CHỦ STUDIO phải tự làm
+## 2. Bốn việc CHỦ STUDIO phải tự làm
 
-Cả ba đều là gõ mật khẩu hoặc dán khoá bí mật. Đó là việc của người, không phải
+Cả bốn đều là gõ mật khẩu hoặc dán khoá bí mật. Đó là việc của người, không phải
 việc của agent hay của Claude.
 
 ### 2.1. Tạo tài khoản quản trị trên bb-prod
