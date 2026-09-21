@@ -35,12 +35,32 @@ export async function GET(request: Request): Promise<Response> {
 
     const admin = createAdminClient();
 
+    /**
+     * Việc TOÀN HỆ THỐNG ghi `branch_id = null`: đổi cài đặt, tạo hay sửa vai
+     * trò, sửa nhân sự. Lọc bằng `.in("branch_id", …)` thì mọi dòng như vậy
+     * biến mất khỏi màn hình — đo ngày 21/09/2026 trên app thật: đổi cài đặt và
+     * tạo vai trò xong, nhật ký ghi đủ trong cơ sở dữ liệu nhưng màn Nhật ký
+     * hiện đúng 9 dòng cũ, không có dòng nào vừa xảy ra.
+     *
+     * Đây là bảng chủ studio tra khi có tranh cãi. Một bảng giấu mất chính
+     * những thao tác nhạy cảm nhất thì tệ hơn là không có bảng nào.
+     *
+     * Vai vượt chi nhánh thấy cả dòng toàn hệ thống; người của một chi nhánh
+     * chỉ thấy việc trong chi nhánh mình, như cũ. Lọc theo một chi nhánh cụ thể
+     * thì cũng không kèm dòng toàn hệ thống — người dùng đang hỏi về chi nhánh
+     * đó, không hỏi về hệ thống.
+     */
+    const thayToanHeThong = staff.permissions.includes("system:superuser") && !branchFilter;
+
     let query = admin
       .from("activity_logs")
       .select("id, created_at, actor_type, actor_id, actor_label, action, entity_type, entity_id, metadata", { count: "exact" })
-      .in("branch_id", branchIds)
       .order("created_at", { ascending: false })
       .limit(200);
+
+    query = thayToanHeThong
+      ? query.or(`branch_id.in.(${branchIds.join(",")}),branch_id.is.null`)
+      : query.in("branch_id", branchIds);
 
     if (actorType !== "all") {
       query = query.eq("actor_type", actorType);

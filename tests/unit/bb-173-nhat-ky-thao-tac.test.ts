@@ -92,4 +92,30 @@ describe("BB-173 — màn lịch sử thao tác", () => {
     // Đổi lại
     await client.query("update staff_profiles set is_active = true where id = $1", [staffId]);
   });
+  it("chủ studio thấy cả việc TOÀN HỆ THỐNG (branch_id rỗng)", async () => {
+    // Đổi cài đặt và sửa vai trò ghi nhật ký với `branch_id = null`. Bản đầu
+    // lọc bằng `.in("branch_id", …)` nên những dòng đó biến mất khỏi màn hình —
+    // đúng những thao tác nhạy cảm nhất thì không tra được.
+    const { rows } = await client.query(
+      `insert into activity_logs (branch_id, actor_type, actor_id, action, entity_type)
+       values (null, 'staff', $1, 'settings.update', 'settings') returning id`,
+      [staffId],
+    );
+    const dongId = rows[0].id;
+
+    try {
+      nhu("owner", [branchA, branchB]);
+      const res = await goi();
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      // `activity_logs.id` là bigint: pg trả về chuỗi, supabase-js trả về số.
+      // So bằng `===` là luôn trượt, và phép thử sẽ đỏ vì một lý do sai.
+      const thay = json.data.items.find(
+        (i: { id: string | number }) => String(i.id) === String(dongId),
+      );
+      expect(thay).toBeDefined();
+    } finally {
+      await client.query("delete from activity_logs where id = $1", [dongId]);
+    }
+  });
 });

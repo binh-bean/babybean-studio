@@ -136,7 +136,57 @@ export function NhatKyReport() {
       ) : (
         <div className="flex flex-col gap-2">
           <p className="text-sm text-[var(--bb-fg-muted)]">{t.summary.replace("{total}", String(total))}</p>
-          <div className="overflow-x-auto rounded-md border border-[var(--bb-border)]">
+
+          {/*
+            Dưới `lg` thì mỗi dòng là một thẻ, không phải một hàng bảng.
+            Luật này đã có sẵn ở màn Nhân sự và ghi rõ lý do ngay trong tệp đó:
+            "trên điện thoại người ta đọc theo chiều dọc chứ không kéo ngang".
+            Đo ngày 21/09/2026 trên máy 375px: bảng 5 cột rộng 832px nằm trong
+            một ô rộng 293px — nhìn thấy đúng cột Thời gian và một nửa cột
+            Người thao tác, ba cột còn lại phải vuốt ngang mới tới.
+          */}
+          <ul className="flex flex-col gap-2 lg:hidden">
+            {items.map((it) => (
+              <li
+                key={it.id}
+                className="rounded-md border border-[var(--bb-border)] p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium">
+                    {it.actorName}
+                    {it.isInactive && (
+                      <span className="ml-1 text-xs text-[var(--bb-fg-muted)]">
+                        {t.inactiveLabel}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs text-[var(--bb-fg-muted)]">
+                    {new Date(it.createdAt).toLocaleString("vi-VN")}
+                  </span>
+                </div>
+                <div className="mt-1 font-mono text-xs">{it.action}</div>
+                <div className="mt-1 text-xs">
+                  {it.entityType === "gallery" && !it.entityDeleted ? (
+                    <Link
+                      href={`/admin/galleries/${it.entityId}`}
+                      className="underline underline-offset-2"
+                    >
+                      {t.entityGallery}
+                    </Link>
+                  ) : it.entityType === "gallery" ? (
+                    <span className="text-[var(--bb-fg-muted)]">{t.entityGalleryDeleted}</span>
+                  ) : (
+                    <span className="text-[var(--bb-fg-muted)]">{it.entityType}</span>
+                  )}
+                </div>
+                <div className="mt-1 break-words text-xs text-[var(--bb-fg-muted)]">
+                  {renderMetadata(it, t)}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden overflow-x-auto rounded-md border border-[var(--bb-border)] lg:block">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
               <thead className="bg-[var(--bb-bg-muted)]">
                 <tr className="border-b border-[var(--bb-border)] text-left">

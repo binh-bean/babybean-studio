@@ -159,9 +159,15 @@ export function Dashboard() {
         ))}
       </div>
 
+      {/*
+        `min-w-0` trên hai thẻ con: ô lưới mặc định rộng tối thiểu bằng nội
+        dung (`min-width: auto`). Biểu đồ 14 ngày có nhãn `whitespace-nowrap`,
+        nên nó đẩy cả cột rộng 653px trên màn 375px — đo thật ngày 21/09/2026:
+        bảng điều khiển phải kéo ngang mới đọc được trên điện thoại.
+      */}
       <div className="grid lg:grid-cols-3 gap-8">
         {/* 2. Bảng cần xử lý ngay */}
-        <Card className="lg:col-span-2 flex flex-col overflow-hidden">
+        <Card className="lg:col-span-2 flex flex-col overflow-hidden min-w-0">
           <CardHeader>
             <CardTitle>Cần xử lý ngay</CardTitle>
           </CardHeader>
@@ -228,12 +234,18 @@ export function Dashboard() {
         </Card>
 
         {/* 3. Biểu đồ cột */}
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle>Album tạo mới (14 ngày)</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64 flex items-end gap-2 pt-4">
+            {/*
+              Biểu đồ cuộn ngang TRONG thẻ của nó, chứ không kéo giãn cả thẻ:
+              14 cột với nhãn ngày không nhét vừa 375px, và thu nhỏ nữa thì
+              nhãn chồng lên nhau, đọc được mới là thứ đáng giữ.
+            */}
+            <div className="overflow-x-auto">
+              <div className="h-64 flex items-end gap-2 pt-4 min-w-[26rem]">
               {data.chartData.map((d, i) => {
                 const heightPercent = (d.count / maxChartValue) * 100;
                 return (
@@ -252,6 +264,7 @@ export function Dashboard() {
                   </div>
                 );
               })}
+              </div>
             </div>
           </CardContent>
         </Card>

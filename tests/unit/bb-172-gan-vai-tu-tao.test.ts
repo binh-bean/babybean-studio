@@ -41,11 +41,31 @@ describe("BB-172 chặng 2d: gán vai tự tạo", () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
 
-    // Mượn một nhân sự đang có, nhớ vai cũ để trả lại nguyên trạng.
-    const { rows } = await client.query(
-      "select id, role_id from staff_profiles where role <> 'owner' limit 1",
+    // Dọn rác của lượt chạy trước TRƯỚC khi làm gì khác.
+    //
+    // Hai chuyện đã xảy ra thật ngày 21/09/2026: (1) vai cùng tên còn sót lại
+    // nên lượt sau tạo vai bị 409; (2) nhân sự vẫn đang giữ vai thử nghiệm, và
+    // `roleIdCu` của lượt sau chụp lại đúng cái vai thử đó — nên "trả về
+    // nguyên trạng" hoá ra là giữ nguyên cái sai. Bộ phép thử bảo mật đỏ ngay
+    // sau đó: CSKH mất quyền đọc khách hàng.
+    await client.query(
+      `update staff_profiles sp set role_id = r.id
+         from roles r
+        where r.is_system and r.name = sp.role::text
+          and sp.role_id in (select id from roles where is_system = false)`,
     );
-    if (rows.length === 0) throw new Error("Cần ít nhất một nhân sự không phải owner.");
+    await client.query("delete from roles where name = $1 and is_system = false", [TEN_VAI]);
+
+    // Mượn một nhân sự đang có, nhớ vai cũ để trả lại nguyên trạng. Chỉ nhận
+    // vai HỆ THỐNG làm mốc trả về — vai tự tạo không bao giờ là trạng thái gốc.
+    const { rows } = await client.query(
+      `select sp.id, sp.role_id
+         from staff_profiles sp
+         join roles r on r.id = sp.role_id and r.is_system
+        where sp.role <> 'owner'
+        limit 1`,
+    );
+    if (rows.length === 0) throw new Error("Cần một nhân sự không phải owner, đang giữ vai hệ thống.");
     nhanSuId = rows[0].id;
     roleIdCu = rows[0].role_id;
   });
