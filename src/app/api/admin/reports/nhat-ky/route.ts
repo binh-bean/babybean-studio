@@ -104,7 +104,7 @@ export async function GET(request: Request): Promise<Response> {
         actorName: displayName,
         isInactive,
         action: r.action,
-        entityType: r.entity_type,
+        entityType: (r.entity_type === "gallery" && !r.entity_id) ? "Bộ ảnh (đã xoá)" : r.entity_type,
         entityId: r.entity_id,
         metadata: r.metadata,
       };
