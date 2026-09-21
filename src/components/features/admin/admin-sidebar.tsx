@@ -41,7 +41,7 @@ const navItems: {
   ownerOnly?: boolean;
   hiddenForRoles?: string[];
 }[] = [
-  { name: "Bảng điều khiển", href: "/admin", icon: LayoutDashboard, ready: false },
+  { name: "Bảng điều khiển", href: "/admin", icon: LayoutDashboard, ready: true },
   { name: "Quản lý bộ ảnh", href: "/admin/galleries", icon: Images, ready: true },
   {
     name: "Ảnh vượt hạn mức",

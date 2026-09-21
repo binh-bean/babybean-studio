@@ -8,11 +8,13 @@
  * db/schema.sql §16. Do not recompute urgency on the client.
  */
 
+import { Dashboard } from "@/components/features/admin/dashboard";
+
 export default function AdminDashboardPage() {
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Bảng điều khiển</h1>
-      <p>Chưa triển khai (BB-060).</p>
+    <main className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
+      <h1 className="text-2xl font-bold tracking-tight mb-6">Bảng điều khiển</h1>
+      <Dashboard />
     </main>
   );
 }
