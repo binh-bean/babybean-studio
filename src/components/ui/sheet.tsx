@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "./utils";
@@ -136,9 +137,16 @@ const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
       };
     }, [open, context]);
 
+    /**
+     * Chỉ dựng sau khi đã gắn vào trình duyệt: `createPortal` cần `document`,
+     * mà lần dựng đầu tiên chạy trên máy chủ.
+     */
+    const [daGan, setDaGan] = React.useState(false);
+    React.useEffect(() => setDaGan(true), []);
+
     if (!open) return null;
 
-    return (
+    const than = (
       <div className="fixed inset-0 z-50 flex justify-end">
         {/* Backdrop */}
         <div
@@ -171,6 +179,24 @@ const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
         </div>
       </div>
     );
+
+    /**
+     * ĐƯA RA THẲNG `document.body`, không để nằm tại chỗ.
+     *
+     * Vì sao bắt buộc: thanh đầu trang của màn quản trị có `backdrop-blur-md`.
+     * Một phần tử có `backdrop-filter` trở thành **khối chứa** cho mọi con cháu
+     * `position: fixed` — nên `inset-y-0 h-full` của ngăn kéo không còn tính
+     * theo màn hình mà tính theo thanh đầu trang.
+     *
+     * Đo ngày 21/09/2026 trên máy 375px: ngăn kéo cao **63px** thay vì 812px.
+     * Nền mờ chỉ che đúng 63px đầu, còn mười mục menu tràn xuống dưới và đè
+     * thẳng lên tiêu đề, ô tìm kiếm và bộ lọc của trang — chữ chồng lên chữ.
+     *
+     * Bỏ `backdrop-blur` ở thanh đầu trang cũng chữa được, nhưng đó là chữa
+     * đúng một chỗ: bất kỳ `Sheet` nào sau này nằm trong một tổ tiên có
+     * `transform`, `filter` hay `backdrop-filter` sẽ vỡ lại y hệt.
+     */
+    return daGan ? createPortal(than, document.body) : null;
   }
 );
 SheetContent.displayName = "SheetContent";
