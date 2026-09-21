@@ -17,6 +17,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SubmitSelectionSchema } from "./schema";
+import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 
 export const runtime = "nodejs";
 
@@ -51,7 +52,7 @@ export async function POST(request: Request): Promise<Response> {
     // 3. Kiểm tra trạng thái album — Luật 1: Chốt xong là khoá
     const { data: gallery, error: galleryError } = await admin
       .from("galleries")
-      .select("id, branch_id, status, extra_photo_price, included_quota")
+      .select("id, branch_id, customer_id, title, status, extra_photo_price, included_quota")
       .eq("id", session.galleryId)
       .single();
 
@@ -148,28 +149,41 @@ export async function POST(request: Request): Promise<Response> {
 
     const tokenPrefix = link?.token_prefix || "******";
 
-    // 8. Kênh báo: Ghi notification cho studio (Zalo OA / Lark)
-    const { data: branch } = await admin
-      .from("branches")
-      .select("name, zalo_oa")
-      .eq("id", gallery.branch_id)
-      .single();
+    // 8. Báo CSKH — BB-167
+    //
+    // Đoạn cũ tự ghi thẳng vào `notifications` với hai cột `gallery_id` và
+    // `recipient`. Bảng KHÔNG có cột nào trong hai cột đó. Đo ngày 21/09/2026 bằng
+    // chính khoá của app:
+    //
+    //     PGRST204: Could not find the 'gallery_id' column of 'notifications'
+    //
+    // `supabase-js` không ném lỗi — nó trả `{ data, error }`, và mã cũ bỏ qua cả
+    // hai. Nên mỗi lượt khách bấm Chốt là một dòng thông báo rơi vào hư không, mà
+    // khách vẫn nhận 200. Bảng `notifications` rỗng trơn từ đầu tới nay.
+    //
+    // Đặt SAU mọi lần ghi nghiệp vụ, và `enqueueLarkNotification` cam kết không
+    // bao giờ ném: Lark chết không được phép làm hỏng nút Chốt của ba mẹ.
+    const { data: khach } = await admin
+      .from("customers")
+      .select("full_name, phone")
+      .eq("id", gallery.customer_id)
+      .maybeSingle();
 
-    await admin.from("notifications").insert({
-      gallery_id: session.galleryId,
-      channel: "lark",
-      recipient: branch?.name || "Studio CSKH",
-      template: "selection.submitted",
-      status: "pending",
+    await enqueueLarkNotification({
+      branchId: gallery.branch_id,
+      event: "selection.submitted",
       payload: {
         galleryId: session.galleryId,
-        branchId: gallery.branch_id,
-        tokenPrefix, // Chỉ log 6 ký tự đầu, không log full token
+        galleryTitle: gallery.title,
         selectedCount: selected,
         includedQuota,
         extraCount,
         extraAmount,
         confirmedByName: input.confirmedByName,
+        // Che giữa trước khi rời khỏi đây (docs/08 §5). Nhóm chat rộng hơn app
+        // rất nhiều, và tin nhắn Lark thì chuyển tiếp được.
+        customerPhone: cheSoDienThoai(khach?.phone),
+        customerName: khach?.full_name ?? null,
         submittedAt,
       },
     });

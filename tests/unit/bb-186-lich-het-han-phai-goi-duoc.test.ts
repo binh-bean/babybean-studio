@@ -27,7 +27,11 @@ vi.mock("@/lib/supabase/admin", () => ({
     // không kiểm phần đổi dữ liệu — phần đó đã có ca riêng của BB-183.
     const ketQua = { data: 0, error: null, count: 0 };
     const chuoi: Record<string, unknown> = {};
-    for (const ten of ["from", "update", "select", "eq", "not", "lt", "gte", "lte"]) {
+    for (const ten of [
+      "from", "update", "select", "eq", "not", "lt", "gte", "lte",
+      // BB-167: lượt chạy này còn gọi `guiLaiThongBaoDangCho`, dùng thêm ba móc nữa.
+      "in", "order", "limit",
+    ]) {
       chuoi[ten] = () => chuoi;
     }
     chuoi.then = (giai: (v: unknown) => unknown) => Promise.resolve(ketQua).then(giai);

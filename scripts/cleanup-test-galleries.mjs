@@ -134,7 +134,14 @@ async function main() {
     );
     console.log(`\nGiữ nguyên: ${giu[0].bo} bộ ảnh thật, ${giu[0].khach} khách thật.`);
 
-    if (!bo.length && !kh.length && !nsXem.length) {
+    const { rows: tbXem } = await client.query(
+      `select count(*)::int n from notifications
+        where payload->>'galleryTitle' like 'Test BB%'
+           or payload->>'galleryTitle' like 'Fixture %'`,
+    );
+    console.log(`Thông báo do phép thử dựng: ${tbXem[0].n}`);
+
+    if (!bo.length && !kh.length && !nsXem.length && !tbXem[0].n) {
       console.log("Không có gì để dọn.");
       return;
     }
@@ -154,6 +161,15 @@ async function main() {
       const r = await client.query(sql, val);
       if (r.rowCount) dem[ten] = r.rowCount;
     };
+
+    // Thông báo do phép thử dựng ra. Không gắn với bộ ảnh nào — bảng
+    // `notifications` chỉ có `branch_id` — nên phải nhận theo nội dung.
+    await xoa(
+      "thông báo do phép thử dựng",
+      `delete from notifications
+        where payload->>'galleryTitle' like 'Test BB%'
+           or payload->>'galleryTitle' like 'Fixture %'`,
+    );
 
     if (gIds.length) {
       // Thứ tự đi từ lá vào gốc. `galleries.cover_photo_id` trỏ sang `photos`

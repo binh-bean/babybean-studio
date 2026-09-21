@@ -23,8 +23,14 @@ import path from "node:path";
 
 const goc = path.resolve(__dirname, "../..");
 
-/** Biến Node tự có, không phải thứ studio khai. */
-const TU_CO = new Set(["NODE_ENV", "VERCEL", "VERCEL_ENV", "VERCEL_URL", "CI"]);
+/**
+ * Biến do môi trường chạy tự đặt, không phải thứ studio khai.
+ *
+ * `VITEST` do chính vitest đặt khi chạy — cùng loại với `CI` và `NODE_ENV`.
+ * `src/lib/lark/notify.ts` đọc nó để biết đừng bắn tin thật vào nhóm Lark của
+ * studio trong lúc chạy phép thử. Đặt nó trên Vercel là vô nghĩa và có hại.
+ */
+const TU_CO = new Set(["NODE_ENV", "VERCEL", "VERCEL_ENV", "VERCEL_URL", "CI", "VITEST"]);
 
 function moiTepTs(thuMuc: string): string[] {
   const ra: string[] = [];

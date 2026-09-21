@@ -33,6 +33,7 @@
 
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { guiLaiThongBaoDangCho } from "@/lib/lark/notify";
 
 export const runtime = "nodejs";
 
@@ -93,7 +94,7 @@ async function chay(request: Request) {
 
     // 3. BB-186: đếm link sắp chết, và ghi ra log.
     //
-    // Chưa bắn tin sang Lark ở đây — đường bắn tin là BB-167 và nó chưa xong.
+    // Phần bắn tin cho CSKH nằm ở mục 4 bên dưới (BB-167).
     // Nhưng con số này phải có mặt từ bây giờ: nó là thứ chứng minh lượt chạy
     // hôm nay THẬT SỰ nhìn vào dữ liệu, chứ không phải chạy rỗng rồi báo xanh.
     //
@@ -108,10 +109,29 @@ async function chay(request: Request) {
       .gte("expires_at", now)
       .lte("expires_at", bayNgayNua.toISOString());
 
+    // 4. BB-167: quét lại những tin Lark chưa gửi được.
+    //
+    // Đi nhờ lượt chạy này thay vì xin thêm một dòng cron: gói Hobby chỉ cho
+    // một lượt mỗi ngày, và chủ studio đã có bốn việc tay phải nhớ rồi. Đây là
+    // lưới đỡ — đường gửi chính là gửi ngay lúc khách bấm Chốt — nên chậm tới
+    // một ngày là chấp nhận được.
+    //
+    // Bọc riêng: phần cho link hết hạn ở trên đã CHẠY XONG rồi. Một lỗi ở đường
+    // bắn tin không được phép biến cả lượt chạy thành 500 — lịch sẽ báo đỏ hằng
+    // ngày trong khi việc chính vẫn đang tốt.
+    let lark: unknown = { boQua: "không chạy được" };
+    try {
+      lark = await guiLaiThongBaoDangCho();
+    } catch (err) {
+      console.error("[cron/expire-galleries] quét lại tin Lark hỏng:", err);
+      lark = { loi: err instanceof Error ? err.message : String(err) };
+    }
+
     const stats = {
       expiredGalleries: expiredGalleriesCount || 0,
       expiredLinks: expiredLinksCount || 0,
       linkChetTrong7Ngay: sapChet ?? 0,
+      larkGuiLai: lark,
     };
 
     console.info(JSON.stringify({ evt: "cron.expire_galleries", ...stats }));
