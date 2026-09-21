@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
+
+process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU = "1";
+
 import {
   cellText,
   extractChatLink,

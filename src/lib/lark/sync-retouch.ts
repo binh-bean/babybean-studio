@@ -12,6 +12,7 @@ import pg from "pg";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
 import { createHash } from "node:crypto";
 import { choPhepTenThat } from "@/lib/lark/muc-tieu-du-lieu";
+import { dangChayPhepThu } from "@/lib/kiem-thu";
 
 export const HOST = "https://open.larksuite.com/open-apis";
 
@@ -256,6 +257,9 @@ export interface LarkAuthHeader {
 }
 
 export async function larkAuth(appId: string, appSecret: string): Promise<LarkAuthHeader> {
+  if (dangChayPhepThu()) {
+    throw new Error("Đang chạy phép thử — không gọi Lark thật");
+  }
   const res = await fetch(`${HOST}/auth/v3/tenant_access_token/internal`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -283,6 +287,9 @@ export async function readLarkTable(
   namePattern: RegExp,
   options?: { lastModifiedTime?: number }
 ): Promise<{ tableId: string; tableName: string; records: LarkRecord[] }> {
+  if (dangChayPhepThu()) {
+    throw new Error("Đang chạy phép thử — không gọi Lark thật");
+  }
   const listRes = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables?page_size=100`, {
     headers: { authorization: auth.authorization },
   });
@@ -358,6 +365,9 @@ export async function readLarkRecord(
   namePattern: RegExp,
   recordId: string
 ): Promise<{ tableId: string; tableName: string; record: LarkRecord }> {
+  if (dangChayPhepThu()) {
+    throw new Error("Đang chạy phép thử — không gọi Lark thật");
+  }
   let tableId = "";
   let tableName = "";
   const patternKey = namePattern.toString();
