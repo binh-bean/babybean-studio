@@ -267,10 +267,20 @@ export function GalleryFilters({
             </Button>
           </div>
 
+          {/*
+            Trên điện thoại nút này chỉ còn dấu cộng: đo ở 375px, cả cụm
+            Bảng/Kanban + nút chữ đầy đủ dài 383px, tức thò 8px khỏi mép phải.
+            Chữ vẫn còn cho trình đọc màn hình qua `aria-label`.
+          */}
           <Link href="/admin/galleries/create">
-            <Button variant="default" className="h-9">
-              <Plus className="h-4 w-4 mr-1.5" />
-              {vi.admin.galleries.createGalleryCta}
+            <Button
+              variant="default"
+              className="h-9 px-3 sm:px-4"
+              aria-label={vi.admin.galleries.createGalleryCta}
+              title={vi.admin.galleries.createGalleryCta}
+            >
+              <Plus className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">{vi.admin.galleries.createGalleryCta}</span>
             </Button>
           </Link>
         </div>
