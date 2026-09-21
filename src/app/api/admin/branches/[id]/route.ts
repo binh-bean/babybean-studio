@@ -84,7 +84,7 @@ export async function PATCH(
     const { error } = await admin.from("branches").update(patch).eq("id", id);
     if (error) throw error;
 
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
       actor_id: staff.staffId,
       branch_id: id,
@@ -93,6 +93,7 @@ export async function PATCH(
       entity_id: id,
       metadata: { target: target.name, fields: Object.keys(input) },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     return ok({ id, updated: true });
   } catch (err) {

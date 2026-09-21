@@ -139,7 +139,7 @@ export async function POST(
     }
 
     if (!giuLinkCu) {
-      await admin
+      const { error: revokeErr } = await admin
         .from("share_links")
         .update({
           status: "revoked",
@@ -148,6 +148,7 @@ export async function POST(
         })
         .eq("gallery_id", galleryId)
         .eq("status", "active");
+      if (revokeErr) throw revokeErr;
     }
 
     const { data: ttlData } = await admin
@@ -185,7 +186,7 @@ export async function POST(
 
     if (error) throw error;
 
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
       actor_id: staff.staffId,
       actor_label: staff.role,
@@ -196,6 +197,7 @@ export async function POST(
       // link nhiều, nên ghi cả mã vào đây là dựng sẵn một đường vòng.
       metadata: { shareLinkId: link.id, tokenPrefix: ma.slice(0, 6) },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     const duongDan = `/g/${ma}`;
 

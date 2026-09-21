@@ -127,7 +127,7 @@ export async function POST(request: Request): Promise<Response> {
     );
 
     // 7. Log activity
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "customer",
       actor_id: session.selectionId,
       actor_label: "Customer",
@@ -143,6 +143,7 @@ export async function POST(request: Request): Promise<Response> {
         totalPrice: unitPrice * addon.quantity,
       },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     return NextResponse.json(
       {

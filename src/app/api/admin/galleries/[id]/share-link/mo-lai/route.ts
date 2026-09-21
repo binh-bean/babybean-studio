@@ -125,7 +125,7 @@ export async function POST(
 
     if (error) throw error;
 
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
       actor_id: staff.staffId,
       actor_label: staff.role,
@@ -142,6 +142,7 @@ export async function POST(
         daTungThuHoi,
       },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     console.info(
       JSON.stringify({

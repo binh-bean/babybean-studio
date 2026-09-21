@@ -105,7 +105,8 @@ export async function PATCH(
     }
 
     if (input.branchIds !== undefined) {
-      await admin.from("staff_branches").delete().eq("staff_id", id);
+      const { error: delErr } = await admin.from("staff_branches").delete().eq("staff_id", id);
+      if (delErr) throw delErr;
       if (input.branchIds.length > 0) {
         const { error } = await admin
           .from("staff_branches")
@@ -114,7 +115,7 @@ export async function PATCH(
       }
     }
 
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
       actor_id: staff.staffId,
       action: "staff.update",
@@ -127,6 +128,7 @@ export async function PATCH(
         passwordReset: input.password !== undefined,
       },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     return ok({ id, updated: true });
   } catch (err) {

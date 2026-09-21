@@ -186,7 +186,7 @@ export async function POST(request: Request): Promise<Response> {
       if (branchErr) throw branchErr;
     }
 
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
       actor_id: staff.staffId,
       action: "staff.create",
@@ -194,6 +194,7 @@ export async function POST(request: Request): Promise<Response> {
       entity_id: createdAuthId,
       metadata: { username, role: input.role, branchCount: input.branchIds.length },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     return ok({ id: createdAuthId, identifier: username, role: input.role });
   } catch (err) {

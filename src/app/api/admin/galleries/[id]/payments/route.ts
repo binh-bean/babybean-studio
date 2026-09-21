@@ -138,7 +138,7 @@ export async function POST(
     const paid = (paidRows ?? []).reduce((t, r) => t + Number(r.amount), 0);
     const due = Number(selection?.snapshot_extra_amount ?? 0);
 
-    await admin.from("activity_logs").insert({
+    const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
       actor_id: staff.staffId,
       actor_label: staff.role,
@@ -148,6 +148,7 @@ export async function POST(
       // KHÔNG ghi ghi chú vào nhật ký: ghi chú hay có mã giao dịch ngân hàng.
       metadata: { amount, method, paidAfter: paid },
     });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
     return ok({
       paidAmount: paid,
