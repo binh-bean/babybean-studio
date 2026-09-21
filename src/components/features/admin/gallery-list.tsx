@@ -653,20 +653,28 @@ export function GalleryList() {
                   className="rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] shadow-sm hover:border-[var(--bb-primary)]/60 transition-all p-4 space-y-3"
                 >
                   {/* Header thẻ: Tên bé & Trạng thái */}
+                  {/*
+                    `min-w-0` cho cột chữ và `shrink-0` cho nhãn trạng thái.
+                    Thiếu hai thứ đó thì nhãn "Chờ khách chọn" không co được mà
+                    cột chữ cũng không nhường — đo trên máy tính bảng 768px:
+                    nhãn thò ra 8px khỏi mép phải màn hình.
+                  */}
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="min-w-0">
                       <Link
                         href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
                         className="font-bold text-base text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
                       >
                         {item.title}
                       </Link>
-                      <p className="text-xs text-[var(--bb-fg-muted)]">
+                      <p className="truncate text-xs text-[var(--bb-fg-muted)]">
                         {item.customerName}
                         {tenBeThe ? ` · bé ${tenBeThe}` : ""}
                       </p>
                     </div>
-                    <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+                    <span className="shrink-0">
+                      <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+                    </span>
                   </div>
 
                   {/* Thông tin khách hàng & Chi nhánh */}
