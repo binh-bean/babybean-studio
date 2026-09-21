@@ -74,7 +74,7 @@ const navItems: {
   { name: "Chi nhánh", href: "/admin/branches", icon: Store, ready: true },
   { name: "Nhân sự", href: "/admin/staff", icon: UserCog, ready: true, ownerOnly: true },
   { name: "Khách hàng", href: "/admin/customers", icon: Users, ready: false },
-  { name: "Cài đặt", href: "/admin/settings", icon: Settings, ready: false },
+  { name: "Cài đặt", href: "/admin/settings", icon: Settings, ready: true, ownerOnly: true },
 ];
 
 interface AdminSidebarProps {
