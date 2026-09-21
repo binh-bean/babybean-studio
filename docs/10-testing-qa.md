@@ -119,7 +119,7 @@ Thêm:
 4. **src/lib/lark/sync-retouch.ts (Lark Bitable GET):** An toàn. Các phép thử (sync-lark-retouch.test.ts) đều giả lập globalThis.fetch.
 5. **src/lib/utils/tai-anh.ts:** An toàn. Gọi fetch tới địa chỉ nội bộ (/api/img/...), không gọi ra ngoài.
 
-Quy định: phép thử nào muốn đi qua chốt dangChayPhepThu() để kiểm tra định dạng gọi mạng thì bắt buộc phải giả lập fetch trước, sau đó bật process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU = "1".
+Quy định: phép thử nào muốn đi qua chốt dangChayPhepThu() để kiểm tra định dạng gọi mạng thì bắt buộc phải giả lập fetch trước, sau đó bật process.env.CHO_PHEP_GOI_MANG_TRONG_PHEP_THU = "1".
 
 **Hai mục 3 và 4 chưa được một chốt nào canh** — reviewer ghi lại 21/09/2026.
 Chúng an toàn vì *mỗi phép thử hiện có tự nhớ giả lập `fetch`*, không vì có thứ

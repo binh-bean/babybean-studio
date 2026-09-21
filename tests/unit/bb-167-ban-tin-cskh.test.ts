@@ -87,12 +87,12 @@ beforeEach(() => {
   // chốt "đang chạy phép thử thì không bắn tin". Xem `dangChayPhepThu` trong
   // src/lib/lark/notify.ts: chốt đó sinh ra sau khi sáu thẻ "Test BB114…" rơi
   // vào nhóm Lark thật của studio trong một lượt `npm run test` ngày 21/09.
-  process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU = "1";
+  process.env.CHO_PHEP_GOI_MANG_TRONG_PHEP_THU = "1";
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
-  delete process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU;
+  delete process.env.CHO_PHEP_GOI_MANG_TRONG_PHEP_THU;
 });
 
 const tinMau = {

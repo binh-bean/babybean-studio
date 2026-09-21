@@ -12,7 +12,7 @@
  * một cái lỗi đang che một cái lỗi khác.
  *
  * Ca này canh cái chốt đó. Nó cố ý **không** đặt
- * `LARK_CHO_PHEP_GUI_TRONG_PHEP_THU`, tức là đứng đúng ở vị trí của một bộ
+ * `CHO_PHEP_GOI_MANG_TRONG_PHEP_THU`, tức là đứng đúng ở vị trí của một bộ
  * phép thử bình thường trong dự án.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -68,7 +68,7 @@ beforeEach(() => {
   fetchGia.mockResolvedValue({ ok: true, status: 200, json: async () => ({ code: 0 }) });
   vi.stubGlobal("fetch", fetchGia);
   // KHÔNG mở cửa thoát. Đó là cả nội dung của ca này.
-  delete process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU;
+  delete process.env.CHO_PHEP_GOI_MANG_TRONG_PHEP_THU;
 });
 
 describe("BB-167 — phép thử không được bắn tin thật", () => {

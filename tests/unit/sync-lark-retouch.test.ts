@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 
-process.env.LARK_CHO_PHEP_GUI_TRONG_PHEP_THU = "1";
+process.env.CHO_PHEP_GOI_MANG_TRONG_PHEP_THU = "1";
 
 import {
   cellText,
