@@ -360,3 +360,46 @@ Mọi lần export đều ghi `activity_logs`.
 4. Mọi hành động thay đổi dữ liệu phải ghi `activity_logs` **trong cùng transaction**.
 5. Thao tác đọc dùng `createServerClient()`; thao tác thay mặt khách dùng `createAdminClient()` và **phải** ràng buộc `gallery_id` lấy từ cookie.
 6. Trả `Cache-Control: no-store` cho mọi endpoint chứa dữ liệu khách hàng, trừ `/api/img`.
+
+---
+
+## 7. Danh sách Quyền hạn (Permissions)
+
+Dưới đây là danh sách các quyền hạn động (dynamic RBAC) được hệ thống sử dụng. DEV-FE dùng danh sách này để render giao diện phân quyền.
+
+| Mã quyền | Tên hiển thị (Tiếng Việt) |
+|---|---|
+| `system:dashboard` | Xem Dashboard toàn hệ thống |
+| `branch:dashboard` | Xem Dashboard chi nhánh |
+| `galleries:read` | Xem danh sách và chi tiết album |
+| `galleries:create` | Tạo album mới |
+| `galleries:write` | Sửa cấu hình album |
+| `galleries:sync` | Đồng bộ ảnh từ Drive |
+| `galleries:share` | Gửi và thu hồi link chia sẻ |
+| `galleries:reopen` | Mở lại album đã chốt |
+| `galleries:delete` | Xóa hoặc lưu trữ album |
+| `galleries:export` | Xuất danh sách ảnh |
+| `customers:read` | Xem danh sách khách hàng |
+| `customers:write` | Thêm và sửa khách hàng |
+| `customers:delete` | Xóa khách hàng |
+| `packages:read` | Xem danh sách gói chụp |
+| `packages:write` | Thêm và sửa gói chụp |
+| `packages:delete` | Xóa gói chụp |
+| `branches:read` | Xem danh sách chi nhánh |
+| `branches:write` | Thêm và sửa chi nhánh |
+| `branches:delete` | Xóa chi nhánh |
+| `staff:read` | Xem danh sách nhân sự |
+| `staff:manage` | Quản lý nhân sự |
+| `roles:manage` | Quản lý phân quyền và vai trò |
+| `activity_logs:read` | Xem nhật ký hoạt động |
+| `reports:operations` | Xem báo cáo vận hành |
+| `reports:financial` | Xem báo cáo doanh thu |
+| `settings:system` | Cài đặt toàn hệ thống |
+| `settings:branch:read` | Xem cài đặt chi nhánh |
+| `settings:branch:write` | Sửa cài đặt chi nhánh |
+| `settings:branch:delete` | Xóa cài đặt chi nhánh |
+| `retouch:read` | Xem hàng đợi retouch |
+| `retouch:write` | Cập nhật trạng thái retouch |
+| `deliveries:read` | Xem lịch sử giao hàng |
+| `deliveries:write` | Cập nhật tiến độ giao hàng |
+| `deliveries:delete` | Xóa dữ liệu giao hàng |
