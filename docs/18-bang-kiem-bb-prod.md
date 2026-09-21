@@ -185,6 +185,19 @@ tại trong một cơ sở dữ liệu là lớp bảo vệ không ai kế thừ
 `migrate-prod` nay đo **chín mốc** thay vì bảy — hai mốc mới quét cả họ khung
 nhìn chứ không gõ tên, để khung nhìn chưa ai viết cũng nằm trong lưới.
 
+**Đã áp lên bb-prod chiều 21/09/2026**, sau bản sao lưu `…-1429.sql`. Trước khi
+áp: **45 quyền đang mở** trên năm khung nhìn. Sau khi áp, đo lại bằng câu truy
+vấn riêng chứ không đọc lời script:
+
+| | bb-prod sau khi vá |
+|---|---|
+| Khung nhìn còn mở cho `anon` | không cái nào |
+| Khung nhìn còn mở cho `authenticated` | đúng ba bảng báo cáo, chỉ `SELECT` — bằng bb-dev |
+| Quyền mặc định | `anon=m`, `authenticated=m` |
+| `selection_ops` | sạch |
+
+`verify:db` trên bb-prod: **17/17**, mã thoát 0.
+
 ## 2. Bốn việc CHỦ STUDIO phải tự làm
 
 Cả bốn đều là gõ mật khẩu hoặc dán khoá bí mật. Đó là việc của người, không phải
