@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isGalleryLocked } from "@/lib/gallery-status";
 import { canSelectMore, type QuotaRules } from "@/lib/selection/quota";
 import type { GallerySession, SelectionPatchRequest, SelectionPatchResponse, ErrorCode } from "@/types/domain";
 
@@ -33,7 +34,19 @@ export async function patchSelection(
     return { error: { code: "NOT_FOUND", message: "Gallery not found" } };
   }
 
-  if (gallery.status === "submitted" || gallery.status === "delivered" || gallery.status === "archived" || gallery.status === "in_retouch") {
+  /*
+    Danh sách trạng thái khoá dùng CHUNG, không chép tay.
+
+    Dòng cũ ở đây tự liệt kê bốn trạng thái và thiếu ba cái:
+    'awaiting_approval', 'approved', 'expired'. Đúng cái bệnh mà
+    `src/lib/gallery-status.ts` sinh ra để dẹp — ghi chú đầu tệp đó kể danh
+    sách này từng nằm ở BỐN chỗ và mỗi bản thiếu một kiểu khác nhau.
+
+    Đây là bản thứ tư, sót lại. Nó cũng là chỗ làm hỏng quyết định 22/09/2026
+    ("chốt xong vẫn sửa được cho tới khi CSKH xác nhận", migration 0060): hàm
+    SQL và bản TypeScript đều đã bỏ 'submitted', còn dòng này thì không.
+  */
+  if (isGalleryLocked(gallery.status)) {
     return { error: { code: "GALLERY_LOCKED", message: "Gallery is locked" } };
   }
 

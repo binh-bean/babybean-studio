@@ -164,8 +164,24 @@ khách bấm CHỐT
 
 Hai điểm phải đúng:
 
-- **Chốt xong là khoá.** `patch_selection_batch` đã ném `GALLERY_LOCKED` với
-  các trạng thái `submitted`, `in_retouch`, `delivered`, `archived`. Giữ nguyên.
+- **Khoá tính từ lúc CSKH XÁC NHẬN, không phải lúc khách bấm Chốt.**
+
+  Chủ studio quyết ngày 22/09/2026, trả lời thẳng câu "sau khi khách bấm Chốt
+  thì còn sửa được tới đâu": *"mở tự do cho tới khi nhân sự chốt"*. Lý do đứng
+  về phía việc thật: ba mẹ bấm Chốt xong, mở lại thấy thiếu một tấm bà nội
+  thích — lúc đó CSKH còn chưa xem tới bộ ảnh, nên khoá vào giây ấy không bảo
+  vệ điều gì, nó chỉ tạo ra một cuộc gọi. Từ giây CSKH xác nhận thì khác: công
+  của thợ chỉnh ảnh đã đổ vào đúng danh sách đó.
+
+  Cụ thể: `app.gallery_is_locked()` (migration `0060`) và bản TypeScript ở
+  `src/lib/gallery-status.ts` đều KHÔNG còn `submitted`. Khách chốt rồi vẫn
+  chọn thêm ảnh, sửa ghi chú, mua thêm sản phẩm, và **chốt lại** — mỗi lần chốt
+  lại thì con số chụp lại (số ảnh, số vượt, tiền phát sinh) cập nhật theo.
+
+  Cùng đợt đó gỡ được **bản danh sách thứ tư** chép tay trong
+  `src/lib/selection/mutate.ts`: nó tự liệt kê bốn trạng thái và thiếu ba cái
+  (`awaiting_approval`, `approved`, `expired`) — đúng cái bệnh mà
+  `src/lib/gallery-status.ts` sinh ra để dẹp.
 - **Chỉ CSKH mới chuyển được giai đoạn**, không phải khách, và không tự động
   theo việc thanh toán.
 

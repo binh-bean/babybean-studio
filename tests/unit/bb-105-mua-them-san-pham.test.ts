@@ -163,13 +163,26 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     expect(await demDong()).toEqual([]);
   });
 
-  it("6. Bộ ảnh đã chốt thì không mua thêm được nữa", async () => {
+  it("6. Chốt xong VẪN mua thêm được; CSKH xác nhận rồi mới khoá", async () => {
+    /*
+      Quyết định của chủ studio 22/09/2026: "mở tự do cho tới khi nhân sự
+      chốt" (migration 0060). Mua thêm sau khi chốt chính là tình huống hay
+      gặp nhất — ba mẹ chốt xong mới nghĩ tới chuyện in tấm nào ra khung.
+    */
     await client.query("update galleries set status='submitted' where id=$1", [galleryId]);
     phien();
-    const res = await goi(spBanDuoc, 1);
-    expect(res.status).toBe(409);
-    expect(await demDong()).toEqual([]);
+    expect((await goi(spBanDuoc, 1)).status).toBe(200);
+    expect((await demDong()).length).toBe(1);
+
+    await client.query("update galleries set status='in_retouch' where id=$1", [galleryId]);
+    phien();
+    expect((await goi(spBanDuoc, 3)).status).toBe(409);
+    // Số lượng giữ nguyên như trước khi khoá, không bị sửa trộm.
+    expect((await demDong())[0].quantity).toBe(1);
+
     await client.query("update galleries set status='ready' where id=$1", [galleryId]);
+    phien();
+    await goi(spBanDuoc, 0);
   });
 
   it("7. Màn khách nhận được DANH MỤC để bấm mua, không chỉ những thứ đã mua", async () => {

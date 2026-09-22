@@ -265,26 +265,49 @@ describe("BB-144: Lưu ghi chú và nhãn từng ảnh", () => {
     expect(item?.length).toBe(0);
   });
 
-  it("6. Bộ ảnh đã chốt (submitted) -> sửa ghi chú bị từ chối GALLERY_LOCKED", async () => {
+  it("6. Chốt xong vẫn sửa được ghi chú; CSKH xác nhận rồi mới GALLERY_LOCKED", async () => {
+    /*
+      Đổi luật 22/09/2026 (migration 0060): mốc khoá là lúc CSKH XÁC NHẬN, không
+      phải lúc ba mẹ bấm Chốt.
+
+      Ghi chú chỉnh sửa là ca rõ nhất cho quyết định đó: ba mẹ chốt xong mới
+      nhớ ra "tấm này xoá giúp em cái dây điện phía sau". Chừng nào CSKH chưa
+      chuyển cho thợ chỉnh ảnh thì thêm câu đó không làm hỏng việc của ai.
+    */
     await supabase.from("galleries").update({ status: "submitted" }).eq("id", galleryId);
 
-    const res = await patchSelection(
+    const resSauChot = await patchSelection(
       session,
       {
         clientOpId: randomUUID(),
-        ops: [
-          {
-            photoId: photo1,
-            retouchNote: "Cố sửa khi đã chốt",
-          },
-        ],
+        ops: [{ photoId: photo1, retouchNote: "Xoá giúp em cái dây điện phía sau" }],
       },
       null,
-      null
+      null,
     );
+    expect(resSauChot.error).toBeUndefined();
 
-    expect(res.error).toBeDefined();
-    expect(res.error?.code).toBe("GALLERY_LOCKED");
+    const { data: item } = await supabase
+      .from("selection_items")
+      .select("retouch_note")
+      .eq("selection_id", session.selectionId)
+      .eq("photo_id", photo1)
+      .single();
+    expect(item?.retouch_note).toBe("Xoá giúp em cái dây điện phía sau");
+
+    // CSKH xác nhận -> từ đây công đã đổ vào danh sách, khoá lại.
+    await supabase.from("galleries").update({ status: "in_retouch" }).eq("id", galleryId);
+
+    const resSauKhoa = await patchSelection(
+      session,
+      {
+        clientOpId: randomUUID(),
+        ops: [{ photoId: photo1, retouchNote: "Cố sửa khi đã khoá" }],
+      },
+      null,
+      null,
+    );
+    expect(resSauKhoa.error?.code).toBe("GALLERY_LOCKED");
 
     // Khôi phục lại ready
     await supabase.from("galleries").update({ status: "ready" }).eq("id", galleryId);

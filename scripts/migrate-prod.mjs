@@ -88,6 +88,7 @@ const DAY = [
   "0057-quyen-ghi-thoi-tang-kem-quyen-doc.sql",
   "0058-quyen-quan-ly-chi-nhanh-va-gan-vai-tay.sql",
   "0059-mot-san-pham-mua-them-mot-dong.sql",
+  "0060-chot-chua-phai-la-khoa.sql",
 ];
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */

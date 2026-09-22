@@ -197,7 +197,7 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
     expect(gal?.status).toBe("in_review");
   }, 15000);
 
-  it("Test 2 & 3: Chốt album thành công -> Chốt hai lần hoặc sửa lựa chọn sau khi chốt bị GALLERY_LOCKED", async () => {
+  it("Test 2 & 3: Chốt xong vẫn sửa được cho tới khi CSKH xác nhận, sau đó GALLERY_LOCKED", async () => {
     // Setup album với hạn mức 15 ảnh
     const { session, photoIds, galleryId } = await setupGalleryWithPhotos({ withQuota: true, quotaAmount: 15 });
 
@@ -250,24 +250,16 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
     expect(selAfterSubmit?.snapshot_extra_amount).toBe(150000);
     expect(selAfterSubmit?.submitted_by_name).toBe("Nguyễn Thị Mai");
 
-    // --- LẦN 2: Chốt hai lần -> GALLERY_LOCKED ---
-    vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
+    /*
+      --- CHỐT RỒI VẪN SỬA ĐƯỢC, CHỪNG NÀO CSKH CHƯA XÁC NHẬN ---
 
-    const req2 = new Request("http://localhost:3000/api/g/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        confirmedByName: "Nguyễn Thị Mai",
-        agreed: true,
-      }),
-    });
+      Đổi luật ngày 22/09/2026 theo quyết định của chủ studio: "mở tự do cho
+      tới khi nhân sự chốt" (migration 0060).
 
-    const res2 = await postSubmit(req2);
-    expect(res2.status).toBe(409);
-    const body2 = await res2.json();
-    expect(body2.error.code).toBe("GALLERY_LOCKED");
-
-    // --- SỬA LỰA CHỌN SAU KHI CHỐT -> GALLERY_LOCKED ---
+      Trước đó, ba mẹ bấm Chốt xong là khoá ngay. Mở lại xem thấy thiếu một tấm
+      bà nội thích thì không thêm được nữa — dù lúc đó CSKH còn chưa xem tới bộ
+      ảnh. Khoá vào lúc ấy không bảo vệ điều gì, nó chỉ tạo ra một cuộc gọi.
+    */
     const patchRes = await patchSelection(
       session,
       {
@@ -275,12 +267,59 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
         ops: [{ photoId: photoIds[19]!, mark: "selected" }],
       },
       "127.0.0.1",
-      "test-agent"
+      "test-agent",
     );
+    expect(patchRes.error).toBeUndefined();
 
-    expect(patchRes.error).toBeDefined();
-    expect(patchRes.error?.code).toBe("GALLERY_LOCKED");
-  }, 15000);
+    // Chốt lại: được, và con số chụp lại phải CẬP NHẬT theo lần chọn mới.
+    vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
+    const res2 = await postSubmit(
+      new Request("http://localhost:3000/api/g/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmedByName: "Nguyễn Thị Mai", agreed: true }),
+      }),
+    );
+    expect(res2.status).toBe(200);
+
+    const { data: selLan2 } = await supabase
+      .from("selections")
+      .select("snapshot_selected_count, snapshot_extra_count")
+      .eq("id", session.selectionId)
+      .single();
+    expect(selLan2?.snapshot_selected_count).toBe(19);
+    expect(selLan2?.snapshot_extra_count).toBe(4);
+
+    /*
+      --- CSKH XÁC NHẬN RỒI THÌ MỚI KHOÁ ---
+
+      Từ giây đó công của thợ chỉnh ảnh đã đổ vào đúng danh sách này, nên đổi
+      danh sách là đổi việc của người khác.
+    */
+    await supabase.from("galleries").update({ status: "in_retouch" }).eq("id", galleryId);
+
+    const patchSauKhoa = await patchSelection(
+      session,
+      {
+        clientOpId: randomUUID(),
+        ops: [{ photoId: photoIds[17]!, mark: "selected" }],
+      },
+      "127.0.0.1",
+      "test-agent",
+    );
+    expect(patchSauKhoa.error?.code).toBe("GALLERY_LOCKED");
+
+    vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
+    const res3 = await postSubmit(
+      new Request("http://localhost:3000/api/g/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmedByName: "Nguyễn Thị Mai", agreed: true }),
+      }),
+    );
+    expect(res3.status).toBe(409);
+    expect((await res3.json()).error.code).toBe("GALLERY_LOCKED");
+  }, 20000);
 
   it("Test 4: Khách không được tự chuyển giai đoạn, CHỈ CSKH mới chuyển được sang in_retouch", async () => {
     const { galleryId } = await setupGalleryWithPhotos({ withQuota: true, quotaAmount: 15 });

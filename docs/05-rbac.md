@@ -129,7 +129,7 @@ không còn `it.todo` nào.
 | 7 | Khách dùng cookie album A xin ảnh album B | 403 | `security/khach-xem-duoc-anh.test.ts` ca 2 |
 | 8 | `viewer` link gọi `PATCH /api/g/selection` | 403, và SQL cũng chặn | `security/bb-054-vai-cua-link-khach.test.ts` Ca 8a/8b/8c |
 | 9 | `suggester` gửi `mark: "selected"` | lưu thành `suggested`, không tính vào hạn mức | `security/bb-054-vai-cua-link-khach.test.ts` Ca 9 |
-| 10 | Gọi `/api/g/submit` hai lần | lần hai `GALLERY_LOCKED` | `unit/submit-and-confirm.test.ts` Test 2&3 |
+| 10 | Gọi `/api/g/submit` hai lần | CSKH **chưa** xác nhận: chốt lại được, con số chụp lại cập nhật theo. CSKH **đã** xác nhận: `GALLERY_LOCKED` (đổi luật 22/09/2026, xem `db/migrations/0060`) | `unit/submit-and-confirm.test.ts` Test 2&3 |
 | ~~11~~ | ~~Sai PIN 6 lần~~ | — | **Hết nghĩa**: mã PIN bỏ hẳn ở migration `0045`. Có phép thử canh việc PIN không quay lại |
 | 12 | `GET /api/img/<photo của album khác>` | 403 | `security/khach-xem-duoc-anh.test.ts` ca 4 |
 | 13 | `accountant` xem ảnh | 0 dòng / 403 | `security/rbac.test.ts` Ca 13 |

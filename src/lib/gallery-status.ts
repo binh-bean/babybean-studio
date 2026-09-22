@@ -56,7 +56,14 @@ export type GalleryStatusValue = (typeof GALLERY_STATUSES)[number];
  * bộ ảnh hết hạn vẫn đổi được lựa chọn. Migration 0035 vá bên SQL.
  */
 export const LOCKED_STATUSES = [
-  "submitted",
+  /*
+    'submitted' CỐ Ý KHÔNG có ở đây — xem migration 0060.
+
+    Chủ studio 22/09/2026: "mở tự do cho tới khi nhân sự chốt". Ba mẹ bấm Chốt
+    xong, mở lại thấy thiếu tấm bà nội thích, thì vẫn thêm được — lúc đó CSKH
+    còn chưa xem tới bộ ảnh, khoá vào lúc ấy không bảo vệ gì mà chỉ tạo ra một
+    cuộc gọi. Mốc khoá thật là lúc CSKH XÁC NHẬN và chuyển cho thợ chỉnh ảnh.
+  */
   "in_retouch",
   "awaiting_approval",
   "approved",
@@ -78,7 +85,11 @@ export function isGalleryLocked(status: string): boolean {
  * số 0, và màn hình báo khách chọn 0 ảnh.
  */
 export function isSubmittedOrLater(status: string): boolean {
-  return isGalleryLocked(status) && status !== "expired";
+  // Danh sách RIÊNG, không dẫn xuất từ `isGalleryLocked` nữa: từ 0060 'chốt'
+  // và 'khoá' là hai mốc khác nhau. Dẫn xuất thì bộ ảnh vừa chốt sẽ bị coi là
+  // "chưa chốt", và màn hình lấy số đếm sống thay vì số đã chụp lại.
+  return ["submitted", "in_retouch", "awaiting_approval", "approved", "delivered", "archived"]
+    .includes(status);
 }
 
 /** Nhãn tiếng Việt. Không ai ngoài lập trình viên đọc được tên trong máy. */
