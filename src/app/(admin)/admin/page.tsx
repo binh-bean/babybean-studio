@@ -12,8 +12,9 @@ import { Dashboard } from "@/components/features/admin/dashboard";
 
 export default function AdminDashboardPage() {
   return (
-    <main className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
-      <h1 className="text-2xl font-bold tracking-tight mb-6">Bảng điều khiển</h1>
+    <main className="mx-auto min-w-0 max-w-7xl">
+      {/* Thanh trên cùng đã ghi tên màn — xem ghi chú ở màn Khách hàng. */}
+      <h1 className="mb-6 hidden text-2xl font-bold tracking-tight lg:block">Bảng điều khiển</h1>
       <Dashboard />
     </main>
   );

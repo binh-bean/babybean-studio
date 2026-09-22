@@ -46,6 +46,23 @@ export function GalleryFilters({
   const oRef = React.useRef<HTMLInputElement>(null);
   const dangHien = moRong || values.search.length > 0;
 
+  /**
+   * Từ `lg` trở lên thì ô tìm LUÔN mở, và nó GIÃN RA lấp chỗ trống.
+   *
+   * Chủ studio 22/09/2026: "phần đánh dấu vẫn hở, dồn vào cho gọn và thẩm mỹ".
+   * Chỗ hở là khoảng giữa cụm trái (kính lúp + Bộ lọc) và cụm phải
+   * (Bảng/Kanban + Tạo mới) — `justify-between` đẩy hai cụm ra hai mép, còn
+   * giữa thì trống trơn khoảng 300px.
+   *
+   * Lấp bằng chính ô tìm kiếm thay vì kéo hai cụm lại gần nhau: kéo sát vào
+   * thì chỗ trống chỉ chuyển sang mép phải, mà hàng thẻ bên dưới lại trải hết
+   * bề ngang nên trông càng lệch. Trên máy tính có chỗ cho ô tìm, và mở sẵn
+   * còn đỡ cho CSKH một cú bấm.
+   *
+   * Luật thu lại vẫn giữ nguyên dưới `lg` — đó là chỗ chủ studio yêu cầu thu
+   * hôm 21/09, và cũng là chỗ ô tìm chiếm trọn một dòng.
+   */
+
   React.useEffect(() => {
     if (moRong) oRef.current?.focus();
   }, [moRong]);
@@ -85,17 +102,24 @@ export function GalleryFilters({
   return (
       <div className="sticky -top-4 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 bg-[var(--bb-bg)] border-b border-[var(--bb-border)] space-y-3">
       {/* Hàng 1: Tìm kiếm, Bộ lọc nhanh, Toggle Chế độ xem & Nút tạo mới */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/*
+        `lg:flex-nowrap`: trên máy tính hai cụm KHÔNG được xuống dòng.
+        Ô tìm giãn ra lấp chỗ hở, mà giãn thì cụm trái chạm đúng mép cụm
+        phải — chỉ lệch nửa điểm ảnh là trình duyệt đẩy cụm Bảng/Kanban
+        xuống nằm lẫn với hàng bộ lọc, nhìn như bố cục vỡ. Cấm xuống dòng
+        thì ô tìm tự co lại vừa chỗ còn trống.
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-3 lg:flex-nowrap">
         {/*
           `flex-1 min-w-[280px]` chỉ áp dụng từ `lg`. Trên điện thoại, hai thứ
           đó ép cụm bên trái chiếm trọn một dòng, đẩy cụm Bảng/Kanban xuống dòng
           dưới và dồn sang phải — để lại một khoảng trống to bên trái, nhìn như
           bố cục vỡ.
         */}
-        <div className="flex flex-wrap items-center gap-3 lg:min-w-[280px] lg:flex-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-3 lg:flex-1">
           {/* Tìm kiếm Tên bé, Tên khách, SĐT — thu lại khi không dùng */}
           {dangHien ? (
-            <div className="relative w-full sm:w-72">
+            <div className="relative w-full min-w-0 sm:w-72 lg:w-auto lg:flex-1">
               <Input
                 ref={oRef}
                 name="search"
@@ -132,18 +156,34 @@ export function GalleryFilters({
               )}
             </div>
           ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-9 px-3"
-              onClick={() => setMoRong(true)}
-              aria-expanded={false}
-              aria-label={vi.admin.galleries.searchOpen}
-              title={vi.admin.galleries.searchOpen}
-            >
-              <Search className="h-4 w-4" />
-            </Button>
+            <>
+              {/* Máy tính: ô tìm mở sẵn và giãn ra lấp khoảng hở ở giữa. */}
+              <div className="relative hidden min-w-0 lg:block lg:w-auto lg:flex-1">
+                <Input
+                  name="search"
+                  value={values.search}
+                  onChange={(e) => onChange({ search: e.target.value })}
+                  placeholder={vi.admin.galleries.searchPlaceholder}
+                  className="pl-9"
+                  aria-label={vi.admin.galleries.searchPlaceholder}
+                />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--bb-fg-muted)] pointer-events-none" />
+              </div>
+
+              {/* Điện thoại và máy tính bảng: chỉ một nút kính lúp. */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 px-3 lg:hidden"
+                onClick={() => setMoRong(true)}
+                aria-expanded={false}
+                aria-label={vi.admin.galleries.searchOpen}
+                title={vi.admin.galleries.searchOpen}
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </>
           )}
 
           {/* Nút mở bộ lọc — chỉ có trên màn hẹp */}
@@ -259,7 +299,7 @@ export function GalleryFilters({
         </div>
 
         {/* Nút Toggle View & Nút Tạo mới */}
-        <div className="flex items-center gap-2 lg:ml-auto lg:gap-3">
+        <div className="flex shrink-0 items-center gap-2 lg:ml-auto lg:gap-3 lg:self-start">
           {/* Segmented control: Bảng vs Kanban */}
           <div className="flex items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-[var(--bb-surface-2)] p-0.5">
             <Button

@@ -273,6 +273,7 @@ export const vi = {
       dsVai: "Danh sách vai trò",
       taoVai: "Tạo vai trò",
       suaVai: "Sửa vai trò: {ten}",
+      xemVai: "Xem vai trò: {ten}",
       tenVai: "Tên vai trò",
       vaiHeThong: "Vai hệ thống",
       soQuyen: "{n} quyền",
@@ -292,6 +293,10 @@ export const vi = {
       canhBaoHeThong:
         "Đây là vai hệ thống. Bạn xem được bộ quyền của nó nhưng không sửa được — chủ studio phải luôn còn một vai đủ quyền để vào lại hệ thống.",
       chuaCoHieuLuc: "(chưa có hiệu lực)",
+      khongSuaDuoc: "Vai hệ thống — không sửa hay xoá được",
+      toanQuyen: "Toàn quyền",
+      moTaToanQuyen:
+        "Vai này đã có đủ toàn bộ {n} quyền của hệ thống. Không cần cài đặt gì thêm, và cũng không sửa được — đây là vai để chủ studio luôn vào lại được.",
       ghiChuHieuLuc:
         "Ô ghi \"chưa có hiệu lực\" đã lưu được nhưng lớp bảo mật chưa hỏi tới. Sau chặng 2c, lớp bảo mật không còn đọc tên vai ở đâu nữa. Mười hai quyền đang thật sự đổi hành vi: xem ảnh, xem lựa chọn, thấy mọi album trong chi nhánh, tạo và sửa album, xem và sửa khách hàng, xem và sửa gói chụp, cập nhật giao ảnh, sửa cài đặt chi nhánh, và vượt trên mọi chi nhánh.",
     },

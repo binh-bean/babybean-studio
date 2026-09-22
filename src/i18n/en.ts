@@ -273,6 +273,7 @@ export const en: Messages = {
       dsVai: "Roles",
       taoVai: "Create role",
       suaVai: "Edit role: {ten}",
+      xemVai: "View role: {ten}",
       tenVai: "Role name",
       vaiHeThong: "System role",
       soQuyen: "{n} permissions",
@@ -292,6 +293,10 @@ export const en: Messages = {
       canhBaoHeThong:
         "This is a system role. You can view its permissions but not change them — the studio owner must always keep a role that can get back in.",
       chuaCoHieuLuc: "(not enforced yet)",
+      khongSuaDuoc: "System role — cannot be edited or deleted",
+      toanQuyen: "Full access",
+      moTaToanQuyen:
+        "This role already holds all {n} permissions. Nothing to configure, and nothing to edit — it is the role that keeps the owner able to get back in.",
       ghiChuHieuLuc:
         "Permissions marked \"not enforced yet\" are stored but the security layer does not ask for them yet. After stage 2c the security layer no longer reads role names anywhere. Twelve permissions currently change behaviour, including viewing photos and selections, seeing every gallery in a branch, creating and editing galleries, and cross-branch access.",
     },
