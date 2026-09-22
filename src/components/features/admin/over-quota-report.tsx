@@ -125,7 +125,43 @@ export function OverQuotaReport() {
           Chưa có bộ ảnh nào vượt hạn mức mà chưa thu tiền.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          {/*
+            Dưới `lg` mỗi bộ ảnh là một thẻ. Luật này đã có ở màn Nhân sự và
+            màn Nhật ký; bảng tám cột rộng 736px nằm trong khung 293px thì trên
+            điện thoại chỉ đọc được hai cột đầu, sáu cột tiền phải vuốt ngang.
+          */}
+          <ul className="flex flex-col gap-2 lg:hidden">
+            {items.map((it) => (
+              <li
+                key={it.galleryId}
+                className="rounded-lg border border-[var(--bb-border)] p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="select-all font-mono text-xs">{it.contractCode ?? "—"}</span>
+                  <span className="text-xs text-[var(--bb-fg-muted)]">
+                    {it.branchName} · {formatDate(it.shootDate)}
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <span className="text-[var(--bb-fg-muted)]">Hạn mức</span>
+                  <span className="text-right">{it.quota ?? "—"}</span>
+                  <span className="text-[var(--bb-fg-muted)]">Đã chọn</span>
+                  <span className="text-right">{it.selectedCount}</span>
+                  <span className="text-[var(--bb-fg-muted)]">Đã mua thêm</span>
+                  <span className="text-right">{it.addonCount}</span>
+                  <span className="text-[var(--bb-fg-muted)]">Chưa thu</span>
+                  <span className="text-right font-medium">{it.unbilledCount}</span>
+                </div>
+                <div className="mt-2 flex items-baseline justify-between border-t border-[var(--bb-border)] pt-2">
+                  <span className="text-xs text-[var(--bb-fg-muted)]">Thành tiền</span>
+                  <span className="font-medium">{formatCurrencyVND(it.unbilledAmount)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+        <div className="hidden overflow-x-auto lg:block">
           <table className="w-full min-w-[46rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bb-border)] text-left">
@@ -160,6 +196,7 @@ export function OverQuotaReport() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

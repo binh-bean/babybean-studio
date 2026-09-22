@@ -145,7 +145,67 @@ export function LinkSapHetHanReport() {
           nhìn xa.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+          {/*
+            Dưới `lg` mỗi link là một thẻ.
+            Ghi chú ngay trong tệp này nói "CSKH mở bảng này trên điện thoại ở
+            quầy" — mà nó là bảng TÁM CỘT rộng 832px nằm trong khung 293px. Số
+            điện thoại, thứ CSKH cần bấm để gọi, nằm ở cột thứ ba, tức phải
+            vuốt ngang mới thấy.
+          */}
+          <ul className="flex flex-col gap-2 lg:hidden">
+            {items.map((it) => (
+              <li
+                key={it.shareLinkId}
+                className="rounded-lg border border-[var(--bb-border)] p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Link
+                    href={`/admin/galleries/${it.galleryId}`}
+                    className="font-medium underline underline-offset-2"
+                  >
+                    {it.customerName ?? "—"}
+                  </Link>
+                  <span
+                    className="inline-block rounded-full border px-2 py-0.5 text-xs"
+                    style={{
+                      borderColor: it.daChet
+                        ? "var(--bb-danger)"
+                        : it.conLaiNgay <= 7
+                          ? "var(--bb-warning)"
+                          : "var(--bb-border)",
+                    }}
+                  >
+                    {it.daChet
+                      ? `chết ${Math.abs(it.conLaiNgay)} ngày`
+                      : `còn ${it.conLaiNgay} ngày`}
+                  </span>
+                </div>
+
+                {/* Số điện thoại lên hàng đầu và bấm gọi được ngay. */}
+                {it.customerPhone && (
+                  <a
+                    href={`tel:${it.customerPhone}`}
+                    className="mt-1 inline-block font-mono text-sm underline underline-offset-2"
+                  >
+                    {it.customerPhone}
+                  </a>
+                )}
+
+                <div className="mt-1 text-xs text-[var(--bb-fg-muted)]">
+                  {it.galleryTitle} · {it.branchName ?? "—"}
+                </div>
+                <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-xs text-[var(--bb-fg-muted)]">
+                  <span className="select-all font-mono">{it.contractCode ?? "—"}</span>
+                  <span>
+                    đã mở {it.viewCount} lần · hạn {ngay(it.expiresAt)}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+        <div className="hidden overflow-x-auto lg:block">
           <table className="w-full min-w-[52rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bb-border)] text-left">
@@ -211,6 +271,7 @@ export function LinkSapHetHanReport() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <p className="rounded-md border border-[var(--bb-border)] p-3 text-sm">

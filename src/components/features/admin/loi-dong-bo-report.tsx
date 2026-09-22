@@ -223,7 +223,45 @@ export function LoiDongBoReport() {
               </Button>
             </div>
 
-            <div className="mt-4 overflow-x-auto">
+            {/*
+              Dưới `lg` mỗi bộ ảnh là một thẻ — cùng luật với màn Nhân sự và
+              màn Nhật ký. Bảng bảy cột rộng 768px trong khung 293px thì nút
+              "Thử lại" nằm tận cột cuối, tức thứ CSKH cần bấm nhất lại là thứ
+              phải vuốt xa nhất mới tới.
+            */}
+            <ul className="mt-4 flex flex-col gap-2 lg:hidden">
+              {g.items.map((it) => (
+                <li
+                  key={it.galleryId}
+                  className="rounded-lg border border-[var(--bb-border)] p-3 text-sm"
+                >
+                  <div className="font-medium">{it.galleryTitle}</div>
+                  <div className="mt-0.5 select-all font-mono text-xs text-[var(--bb-fg-muted)]">
+                    {it.contractCode ?? "—"}
+                  </div>
+                  <div className="mt-1 text-xs text-[var(--bb-fg-muted)]">
+                    {it.branchName} · {it.statusLabel} · {formatDateTime(it.lastSyncedAt)}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <a
+                      href={it.driveFolderUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-[var(--bb-primary)] underline underline-offset-4"
+                    >
+                      Mở thư mục
+                    </a>
+                    <TrangThaiNut
+                      dangChay={dangThuLai.has(it.galleryId)}
+                      ketQua={ketQua[it.galleryId]}
+                      onClick={() => void thuLai([it])}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-4 hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[48rem] border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-[var(--bb-border)] text-left">
