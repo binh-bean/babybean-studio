@@ -253,12 +253,19 @@ export async function DELETE(request: NextRequest) {
       return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
-    if (
-      gallery.status === "submitted" ||
-      gallery.status === "in_retouch" ||
-      gallery.status === "delivered" ||
-      gallery.status === "archived"
-    ) {
+    /*
+      BẢN THỨ SÁU của danh sách trạng thái khoá, chép tay — và là bản lệch với
+      chính POST ở ngay trên.
+
+      Dòng cũ ở đây còn giữ 'submitted'. Hậu quả rất cụ thể: sau khi ba mẹ bấm
+      Chốt (mà CSKH chưa xác nhận), họ vẫn ĐẶT được ảnh vào sản phẩm in — POST
+      dùng `isGalleryLocked` nên cho qua — nhưng GỠ ra thì không. Đặt nhầm một
+      tấm là kẹt luôn, chỉ còn đường gọi điện.
+
+      Quyết định 22/09/2026 ("chốt xong vẫn sửa được cho tới khi CSKH xác nhận",
+      migration 0060) chỉ đúng khi cả hai đầu dùng chung một luật.
+    */
+    if (isGalleryLocked(gallery.status)) {
       return fail("GALLERY_LOCKED", "Bộ ảnh đã được chốt, không thể thay đổi ảnh in");
     }
 

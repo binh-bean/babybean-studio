@@ -67,9 +67,30 @@ export interface AlbumDaMua {
   soAnh: number;
 }
 
+/**
+ * Album nằm sẵn TRONG GÓI — ba mẹ đã trả tiền từ lúc ký hợp đồng.
+ *
+ * Chủ studio 22/09/2026: "album không phải là một ảnh, và ảnh ở trong gói đã
+ * mua rồi". Trước đây cuốn album trong gói bị xếp chung với suất ảnh in, nên
+ * "Album (Ultra HD) ×1" hiện thành "Còn 1 suất" rồi "Đã dùng hết suất" ngay sau
+ * tấm đầu tiên — ba mẹ mất đường đưa tấm thứ hai vào cuốn của chính mình.
+ *
+ * Khác `AlbumDaMua` ở chỗ nó gắn vào dòng hợp đồng (`gallery_items`) chứ không
+ * phải dòng mua thêm, nên ảnh đi vào `selection_placements`.
+ */
+export interface AlbumTrongGoi {
+  galleryItemId: string;
+  name: string;
+  coAnhNay: boolean;
+  soAnh: number;
+}
+
 export interface BangSanPhamCuaAnhProps {
+  /** Suất in/khung trong gói: mỗi suất đúng MỘT tấm. */
   suatTrongGoi: SuatTrongGoi[];
-  /** Album ba mẹ ĐÃ mua — mỗi cái nhận nhiều ảnh. */
+  /** Album có sẵn trong hợp đồng — mỗi cuốn nhận nhiều ảnh. */
+  albumTrongGoi: AlbumTrongGoi[];
+  /** Album ba mẹ ĐÃ mua thêm — mỗi cái nhận nhiều ảnh. */
   albumDaMua: AlbumDaMua[];
   monMuaThem: MonMuaThem[];
   /** Tấm đang xem đã được ba mẹ chọn chưa — chưa chọn thì chưa đặt in được. */
@@ -87,6 +108,7 @@ export interface BangSanPhamCuaAnhProps {
 
 export function BangSanPhamCuaAnh({
   suatTrongGoi,
+  albumTrongGoi,
   albumDaMua,
   monMuaThem,
   albumBanDuoc,
@@ -164,7 +186,7 @@ export function BangSanPhamCuaAnh({
       )}
 
       {/* ---------- 2. ALBUM ---------- */}
-      {(albumDaMua.length > 0 || albumBanDuoc.length > 0) && (
+      {(albumTrongGoi.length > 0 || albumDaMua.length > 0 || albumBanDuoc.length > 0) && (
         <section>
           <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">
             Album
@@ -178,7 +200,45 @@ export function BangSanPhamCuaAnh({
             mấy tấm. Chặn theo số tờ là việc của studio lúc dựng cuốn, không
             phải việc của màn chọn ảnh.
           */}
+          {/*
+            Album TRONG GÓI trước, album MUA THÊM sau — cùng luật với phần
+            "Trong gói" ở trên: thứ đã trả tiền rồi phải xài hết trước khi bán
+            thêm. Hai loại đi hai bảng khác nhau nên phải có hai nhánh, nhưng ba
+            mẹ nhìn thấy chúng như nhau: một cuốn album, đang có mấy tấm.
+          */}
           <ul className="space-y-1.5">
+            {albumTrongGoi.map((al) => (
+              <li key={al.galleryItemId}>
+                <button
+                  type="button"
+                  disabled={khoa || dangLuu}
+                  onClick={() => onDatVaoGoi(al.galleryItemId, !al.coAnhNay)}
+                  className={[
+                    "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors",
+                    al.coAnhNay
+                      ? "bg-emerald-500/20 ring-1 ring-emerald-300/50"
+                      : "bg-white/10 hover:bg-white/15",
+                    khoa || dangLuu ? "opacity-60" : "",
+                  ].join(" ")}
+                >
+                  <span className="min-w-0">
+                    <span className="block font-medium">
+                      {al.name}
+                      <span className="ml-1.5 rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-normal text-white/70">
+                        trong gói
+                      </span>
+                    </span>
+                    <span className="block text-white/55">
+                      {al.coAnhNay ? "Đã có tấm này" : `Đang có ${al.soAnh} tấm`}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-base leading-none">
+                    {al.coAnhNay ? "✓" : "+"}
+                  </span>
+                </button>
+              </li>
+            ))}
+
             {albumDaMua.map((al) => (
               <li key={al.addonId}>
                 <button

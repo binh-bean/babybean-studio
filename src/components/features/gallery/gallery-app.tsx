@@ -9,18 +9,19 @@ import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
 import { CuaHang } from "@/components/features/gallery/cua-hang";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
+import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
+import { TomTatSanPhamIn } from "@/components/features/gallery/tom-tat-san-pham-in";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, memo } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
 import { useRouter } from "next/navigation";
-import { Heart, AlertTriangle, AlertCircle, Info, ChevronRight, Lock } from "lucide-react";
+import { Heart, AlertTriangle, AlertCircle, Info, ChevronRight, Lock, Printer } from "lucide-react";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { QuotaDisplay } from "@/components/ui/quota-display";
 import { CustomerProgress } from "@/components/ui/customer-progress";
 import { ContractBreakdown, type ContractItem, formatCurrencyVND } from "@/components/ui/contract-breakdown";
-import { PhotoPlacementPicker } from "@/components/ui/photo-placement-picker";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { PhotoPublic } from "@/types/domain";
@@ -74,6 +75,11 @@ interface GalleryApiResponse {
       // trường này; bản khai đầu của giao diện bỏ sót nên không lọc được sản
       // phẩm in ra khỏi gói chụp.
       kind: string;
+      // `material` là thứ phân biệt ALBUM với ảnh in — "Album (Ultra HD)" so
+      // với "Gỗ", "UV". Máy chủ vẫn luôn trả trường này (lib/selection/contract),
+      // bản khai cũ của giao diện bỏ sót nên album trong gói bị đếm như một
+      // suất in một tấm.
+      material?: string | null;
       quantity: number;
       unitPrice: number | null;
       totalPrice: number | null;
@@ -81,6 +87,7 @@ interface GalleryApiResponse {
         id: string;
         name: string;
         kind: string;
+        material?: string | null;
         quantity: number;
       }>;
     }>;
@@ -160,6 +167,14 @@ interface TheAnhProps {
   daChon: boolean;
   dangGui: boolean;
   khoa: boolean;
+  /**
+   * Tấm này đang được dùng làm bao nhiêu sản phẩm (in, khung, album, mua thêm).
+   *
+   * Là một CON SỐ chứ không phải mảng hay Map: `TheAnh` được `memo`, và một
+   * tham chiếu đổi mỗi lần dựng lại là memo thành vô dụng (xem ghi chú ngay
+   * dưới đây về 1.235 thẻ).
+   */
+  soSanPham: number;
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
 }
@@ -184,6 +199,7 @@ const TheAnh = memo(function TheAnh({
   daChon,
   dangGui,
   khoa,
+  soSanPham,
   onToggle,
   onOpen,
 }: TheAnhProps) {
@@ -259,6 +275,27 @@ const TheAnh = memo(function TheAnh({
         />
       </button>
 
+      {/*
+        DẤU "TẤM NÀY ĐÃ ĐẶT IN".
+
+        Chủ studio 22/09/2026: "các ảnh chọn ảnh in phân biệt hiển thị với các
+        ảnh khác thế nào". Trước đây không phân biệt được gì: tim đỏ nghĩa là
+        "đã chọn", còn tấm nào đã xếp vào khung 40x60 thì phải mở từng tấm ra
+        mới biết. Trong bộ 460 tấm thì đó là không biết.
+
+        Đặt bên TRÁI, màu ngọc, để không đấu với tim đỏ bên phải — hai thứ
+        khác nhau: tim là "con muốn tấm này", dấu này là "tấm này in ra cái gì".
+      */}
+      {soSanPham > 0 && (
+        <span
+          className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-1 text-[11px] font-bold text-white shadow-md pointer-events-none"
+          title={`Tấm này đang làm ${soSanPham} sản phẩm`}
+        >
+          <Printer className="h-3.5 w-3.5" />
+          {soSanPham}
+        </span>
+      )}
+
       {/* Thông tin tên file và thư mục con */}
       <div className="absolute bottom-1.5 left-2 right-2 text-white text-[11px] truncate drop-shadow-xs pointer-events-none">
         <span className="font-mono">{photo.fileName}</span>
@@ -272,6 +309,8 @@ interface LuoiAnhProps {
   photos: PhotoPublic[];
   mutatingIds: Set<string>;
   khoa: boolean;
+  /** photoId -> tấm đó đang làm mấy sản phẩm. Thiếu khoá nghĩa là 0. */
+  soSanPhamTheoAnh: Map<string, number>;
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
 }
@@ -292,7 +331,14 @@ interface LuoiAnhProps {
  * Giữ nguyên cách chia cột và khoảng cách của bản cũ (2 / 3 / 4 cột theo bề
  * ngang màn hình) để giao diện không đổi — chỉ đổi chỗ ai dựng thẻ nào.
  */
-function LuoiAnh({ photos, mutatingIds, khoa, onToggle, onOpen }: LuoiAnhProps) {
+function LuoiAnh({
+  photos,
+  mutatingIds,
+  khoa,
+  soSanPhamTheoAnh,
+  onToggle,
+  onOpen,
+}: LuoiAnhProps) {
   const khungRef = useRef<HTMLDivElement | null>(null);
 
   // Đoán bề ngang NGAY từ lượt dựng đầu, đừng bắt đầu từ 0.
@@ -385,6 +431,7 @@ function LuoiAnh({ photos, mutatingIds, khoa, onToggle, onOpen }: LuoiAnhProps) 
               daChon={photo.mark === "selected"}
               dangGui={mutatingIds.has(photo.id)}
               khoa={khoa}
+              soSanPham={soSanPhamTheoAnh.get(photo.id) ?? 0}
               onToggle={onToggle}
               onOpen={onOpen}
             />
@@ -416,6 +463,7 @@ function LuoiAnh({ photos, mutatingIds, khoa, onToggle, onOpen }: LuoiAnhProps) 
                     daChon={photo.mark === "selected"}
                     dangGui={mutatingIds.has(photo.id)}
                     khoa={khoa}
+                    soSanPham={soSanPhamTheoAnh.get(photo.id) ?? 0}
                     onToggle={onToggle}
                     onOpen={onOpen}
                   />
@@ -905,21 +953,47 @@ export function GalleryApp({ token }: GalleryAppProps) {
    * và nó được thực thi ở ĐÂY chứ không phải bằng cách giấu nút, vì API cũng
    * từ chối dòng hàng không thuộc bộ ảnh.
    */
-  const printProducts = useMemo(() => {
-    const items = gallery?.contract?.items ?? [];
-    const out: { galleryItemId: string; name: string; quantity: number }[] = [];
-    for (const item of items) {
-      if (item.kind === "print") {
-        out.push({ galleryItemId: item.id, name: item.name, quantity: item.quantity });
-      }
-      for (const comp of item.components ?? []) {
-        if (comp.kind === "print") {
-          out.push({ galleryItemId: comp.id, name: comp.name, quantity: comp.quantity });
-        }
-      }
-    }
-    return out;
-  }, [gallery]);
+  const hangInTrongGoi = useMemo(
+    // Luật "dòng này ăn một tấm hay cả chục tấm" nằm ở `lib/products/
+    // hang-in-trong-goi`, không chép lại ở đây: đã có sáu bản chép tay của
+    // danh sách trạng thái khoá trong mã này rồi, không thêm bản thứ bảy của
+    // một luật khác.
+    () => locHangInTrongGoi(gallery?.contract?.items ?? []),
+    [gallery],
+  );
+
+  /** Số ảnh đã xếp vào một dòng hàng trong gói. */
+  const demAnhTrongDongHang = useCallback(
+    (galleryItemId: string) =>
+      placements.filter((pl) => pl.galleryItemId === galleryItemId).length,
+    [placements],
+  );
+
+  /**
+   * SUẤT in — ảnh phóng và khung: mỗi suất đúng MỘT tấm.
+   *
+   * "Gỗ 40x60 ×2" nghĩa là hai tấm ảnh, in ra hai bản. Hết hai suất là hết.
+   */
+  const suatInTrongGoi = useMemo(
+    () => hangInTrongGoi.filter((sp) => sp.nhom !== "album"),
+    [hangInTrongGoi],
+  );
+
+  /**
+   * ALBUM trong gói — chủ studio 22/09/2026: **"album không phải là một ảnh"**.
+   *
+   * Một cuốn album trong hợp đồng là MỘT CUỐN, và cuốn đó nhận bao nhiêu tấm là
+   * tuỳ ba mẹ. Bản cũ gộp album vào cùng danh sách suất in nên "Album (Ultra HD)
+   * 15x21 ×1" hiện thành "0/1 ảnh · còn thiếu": đưa một tấm vào là app báo đầy
+   * cuốn, đưa tấm thứ hai thì hết đường. Đó là lý do phải tách hẳn ra đây.
+   *
+   * Số tờ ruột (bao nhiêu tấm thì đủ một cuốn) là việc của studio lúc dựng
+   * cuốn, không phải việc của màn chọn ảnh — nên ở đây không chặn theo số.
+   */
+  const albumTrongGoi = useMemo(
+    () => hangInTrongGoi.filter((sp) => sp.nhom === "album"),
+    [hangInTrongGoi],
+  );
 
   /**
    * BB-180 — đếm số ảnh của từng nhóm (thư mục con trong Drive).
@@ -949,22 +1023,50 @@ export function GalleryApp({ token }: GalleryAppProps) {
    */
   const sanPhamThieuAnh = useMemo(
     () =>
-      printProducts.filter(
-        (sp) =>
-          placements.filter((pl) => pl.galleryItemId === sp.galleryItemId).length <
-          sp.quantity,
-      ),
-    [printProducts, placements],
+      hangInTrongGoi.filter((sp) => conThieuAnh(sp, demAnhTrongDongHang(sp.galleryItemId))),
+    [hangInTrongGoi, demAnhTrongDongHang],
   );
 
-  /** Chỉ ảnh ĐÃ CHỌN mới đặt được vào sản phẩm in — ảnh in lấy từ tập đã chỉnh. */
-  const placeablePhotos = useMemo(
-    () =>
-      photos
-        .filter((p) => p.mark === "selected")
-        .map((p) => ({ id: p.id, thumbnailUrl: `/api/img/${p.id}?w=200` })),
+  /**
+   * "Tấm này đang làm mấy sản phẩm" — cho dấu ngọc trên lưới ảnh.
+   *
+   * Gộp cả ba đường một tấm ảnh có thể biến thành hàng:
+   *   · `placements`       — suất in/khung/album TRONG GÓI
+   *   · `albumPlacements`  — ảnh đưa vào album MUA THÊM
+   *   · `addons.items`     — ảnh in/khung mua thêm, gắn thẳng vào tấm (0061)
+   *
+   * Đếm theo SỐ LƯỢNG chứ không theo số dòng: mua ba bản cùng một tấm thì tấm
+   * đó đang làm ba sản phẩm, dù chỉ là một dòng trong đơn.
+   */
+  /**
+   * Mở đúng một tấm ảnh ra màn xem lớn, dù nó đang bị bộ lọc giấu đi.
+   *
+   * Màn xem lớn chạy theo DANH SÁCH ĐANG LỌC, nên phải gỡ bộ lọc trước rồi mới
+   * tính thứ tự — bỏ bước gỡ thì bấm vào tấm trong bảng tóm tắt lúc đang lọc
+   * "Chưa chọn" sẽ mở ra một tấm khác hẳn.
+   */
+  const moAnhTheoId = useCallback(
+    (photoId: string) => {
+      const thuTu = photos.findIndex((p) => p.id === photoId);
+      if (thuTu < 0) return;
+      setFilter("all");
+      setSelectedSubfolder("");
+      setLightboxIndex(thuTu);
+    },
     [photos],
   );
+
+  const soSanPhamTheoAnh = useMemo(() => {
+    const m = new Map<string, number>();
+    const cong = (photoId: string | null | undefined, n = 1) => {
+      if (!photoId || n <= 0) return;
+      m.set(photoId, (m.get(photoId) ?? 0) + n);
+    };
+    for (const pl of placements) cong(pl.photoId);
+    for (const ap of gallery?.albumPlacements ?? []) cong(ap.photoId);
+    for (const ad of gallery?.addons?.items ?? []) cong(ad.photoId, ad.quantity);
+    return m;
+  }, [placements, gallery]);
 
   const changePlacement = useCallback(
     async (photoId: string, galleryItemId: string, add: boolean) => {
@@ -1479,6 +1581,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               photos={filteredPhotos}
               mutatingIds={mutatingIds}
               khoa={isLocked}
+              soSanPhamTheoAnh={soSanPhamTheoAnh}
               onToggle={handleToggleHeart}
               onOpen={(idx) => setLightboxIndex(idx)}
             />
@@ -1492,20 +1595,25 @@ export function GalleryApp({ token }: GalleryAppProps) {
           </section>
         )}
 
-        {/* ĐẶT ẢNH VÀO SẢN PHẨM IN
-            Component tự ẩn khi hợp đồng không có hàng in. Khoá lại sau khi
-            khách đã chốt — cùng luật với nút thả tim. */}
-        {!isLocked && (
-          <PhotoPlacementPicker
-            className="mt-4"
-            products={printProducts}
-            selectedPhotos={placeablePhotos}
-            placements={placements}
-            busy={placing}
-            onPlace={(photoId, itemId) => changePlacement(photoId, itemId, true)}
-            onRemove={(photoId, itemId) => changePlacement(photoId, itemId, false)}
-          />
-        )}
+        {/* SẢN PHẨM IN TRONG GÓI — bảng tóm tắt, CHỈ ĐỌC.
+            Chỗ gán ảnh nay nằm ở bảng bên phải màn xem ảnh lớn, nơi ba mẹ đang
+            nhìn thấy tấm ảnh thật. Xem ghi chú đầu `tom-tat-san-pham-in.tsx`. */}
+        <TomTatSanPhamIn
+          className="mt-4"
+          dong={hangInTrongGoi.map((sp) => ({
+            galleryItemId: sp.galleryItemId,
+            name: sp.name,
+            quantity: sp.quantity,
+            nhom: sp.nhom,
+            anh: placements
+              .filter((pl) => pl.galleryItemId === sp.galleryItemId)
+              .map((pl) => {
+                const a = photos.find((p) => p.id === pl.photoId);
+                return { id: pl.photoId, fileName: a?.fileName ?? "" };
+              }),
+          }))}
+          onMoAnh={moAnhTheoId}
+        />
 
         {/* SẢN PHẨM MUA THÊM (ADDON) — khối cũ, nay thay bằng cửa hàng riêng. */}
         {/*
@@ -1636,36 +1744,46 @@ export function GalleryApp({ token }: GalleryAppProps) {
           đang sống vĩnh viễn. In con số đó lên trong khi hệ thống không tôn trọng nó
           là dạy khách đừng tin những gì app nói. Bật sau khi BB-183 xong.
       */}
-      <footer className="mt-10 border-t pt-6 pb-10 text-sm">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {vi.gallery.studioInfo}
-        </h2>
-        <p className="mt-2 font-semibold text-foreground">{gallery.branch.name}</p>
-        <div className="mt-1 space-y-1 text-muted-foreground">
-          {gallery.branch.address && <p>{gallery.branch.address}</p>}
-          {gallery.branch.hotline && (
-            <p>
-              <a
-                href={`tel:${gallery.branch.hotline.replace(/[^+\d]/g, "")}`}
-                className="font-medium text-foreground hover:underline"
-              >
-                {gallery.branch.hotline}
-              </a>
-              <span className="ml-1.5 opacity-70">— {vi.gallery.callUs}</span>
-            </p>
-          )}
-          {gallery.branch.chatUrl && (
-            <p>
-              <a
-                href={gallery.branch.chatUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-primary hover:underline"
-              >
-                {vi.gallery.messageStudio}
-              </a>
-            </p>
-          )}
+      {/*
+          Chủ studio 22/09/2026: "lỗi cả thông tin ở chân trang".
+
+          Chân trang trước đây nằm NGOÀI thẻ bọc `max-w-4xl mx-auto px-4`, nên
+          chữ dính sát mép trái màn hình trong khi mọi khối khác đều thụt vào —
+          nhìn như trang bị vỡ. Viền `border-t` vẫn kéo hết bề ngang (đó là
+          đường ngăn, phải chạm mép), còn CHỮ thì vào đúng cột như phần trên.
+      */}
+      <footer className="mt-10 border-t text-sm">
+        <div className="mx-auto max-w-4xl px-4 pt-6 pb-10">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {vi.gallery.studioInfo}
+          </h2>
+          <p className="mt-2 font-semibold text-foreground">{gallery.branch.name}</p>
+          <div className="mt-1 space-y-1 text-muted-foreground">
+            {gallery.branch.address && <p>{gallery.branch.address}</p>}
+            {gallery.branch.hotline && (
+              <p>
+                <a
+                  href={`tel:${gallery.branch.hotline.replace(/[^+\d]/g, "")}`}
+                  className="font-medium text-foreground hover:underline"
+                >
+                  {gallery.branch.hotline}
+                </a>
+                <span className="ml-1.5 opacity-70">— {vi.gallery.callUs}</span>
+              </p>
+            )}
+            {gallery.branch.chatUrl && (
+              <p>
+                <a
+                  href={gallery.branch.chatUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-primary hover:underline"
+                >
+                  {vi.gallery.messageStudio}
+                </a>
+              </p>
+            )}
+          </div>
         </div>
       </footer>
 
@@ -1932,11 +2050,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
               anhDaChon={anh.mark === "selected"}
               khoa={isLocked}
               dangLuu={placing}
-              suatTrongGoi={printProducts.map((sp) => ({
+              suatTrongGoi={suatInTrongGoi.map((sp) => ({
                 galleryItemId: sp.galleryItemId,
                 name: sp.name,
                 quantity: sp.quantity,
-                daDat: placements.filter((pl) => pl.galleryItemId === sp.galleryItemId).length,
+                daDat: demAnhTrongDongHang(sp.galleryItemId),
+                coAnhNay: placements.some(
+                  (pl) => pl.galleryItemId === sp.galleryItemId && pl.photoId === anh.id,
+                ),
+              }))}
+              albumTrongGoi={albumTrongGoi.map((sp) => ({
+                galleryItemId: sp.galleryItemId,
+                name: sp.quantity > 1 ? `${sp.name} ×${sp.quantity}` : sp.name,
+                soAnh: demAnhTrongDongHang(sp.galleryItemId),
                 coAnhNay: placements.some(
                   (pl) => pl.galleryItemId === sp.galleryItemId && pl.photoId === anh.id,
                 ),

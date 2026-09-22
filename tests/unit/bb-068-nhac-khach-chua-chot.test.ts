@@ -34,6 +34,18 @@ describe("BB-068: nhắc khách chưa chốt", () => {
   const galleries: string[] = [];
   let mocGoc: unknown = null;
 
+  /*
+    Lùi thêm HAI GIỜ, đừng dựng đúng mốc chẵn.
+
+    `soNgayDaQua` làm tròn xuống, và `now()` ở đây là đồng hồ của máy chủ cơ sở
+    dữ liệu còn `Date.now()` trong lượt quét là đồng hồ máy chạy phép thử. Đo
+    ngày 22/09/2026: máy chủ chạy TRƯỚC 349ms. Chỉ chừng ấy thôi là bộ ảnh
+    "gửi 6 ngày trước" thành 5,99999 ngày, làm tròn xuống còn 5, và cả phép thử
+    đỏ lên vì một thứ không liên quan gì tới điều nó canh.
+
+    Hai giờ đệm giữ nguyên ý nghĩa của ca thử (vẫn là ngày thứ N) mà không còn
+    phụ thuộc vào việc hai đồng hồ lệch nhau bên nào.
+  */
   async function taoBoAnh(opts: {
     daGuiCachDay: number | null;
     status?: string;
@@ -43,7 +55,8 @@ describe("BB-068: nhắc khách chưa chốt", () => {
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
                               drive_folder_url, photo_count, sent_at, due_at, submitted_at)
        values ($1,$2,'Fixture BB-068 nhắc',$3,$4,'https://example.com/x',12,
-               case when $5::int is null then null else now() - ($5::int || ' days')::interval end,
+               case when $5::int is null then null
+                    else now() - ($5::int || ' days')::interval - interval '2 hours' end,
                now() + interval '4 days',
                case when $6::boolean then now() else null end)
        returning id`,

@@ -33,4 +33,3 @@ export * from "./customer-progress";
 export * from "./quota-display";
 export * from "./contract-breakdown";
 export * from "./addon-selector";
-export { PhotoPlacementPicker } from "./photo-placement-picker";
