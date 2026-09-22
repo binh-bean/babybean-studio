@@ -34,6 +34,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
 
 export const runtime = "nodejs";
 
@@ -70,7 +71,7 @@ export async function POST(
     const admin = createAdminClient();
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, branch_id, status")
+      .select("id, branch_id, status, due_at")
       .eq("id", galleryId)
       .maybeSingle();
 
@@ -88,18 +89,38 @@ export async function POST(
     }
 
     const now = new Date().toISOString();
+
+    /**
+     * MỞ LẠI THÌ PHẢI DỜI HẠN, nếu không lượt cron hôm sau tự huỷ việc này.
+     *
+     * `expire_overdue_galleries()` quét đúng trạng thái 'in_review' với
+     * `due_at < now()` rồi đẩy về 'expired'. Mở một bộ đã quá hạn mà để nguyên
+     * `due_at` cũ nghĩa là: CSKH bấm Mở lại, báo khách "chị chọn tiếp giúp em",
+     * rồi **18 giờ hôm đó bộ ảnh tự đóng lại**. Không ai được báo, và triệu
+     * chứng chỉ hiện ra khi khách mở link ngày hôm sau.
+     *
+     * Hôm nay chưa ai vấp vì `due_at` rỗng ở mọi bộ ảnh — cùng gốc với việc
+     * không đường nào ghi `sent_at` (xem `src/lib/gallery/han-chot.ts`). Sửa
+     * chỗ ghi mốc mà không sửa chỗ này là tự dựng ra cái bẫy đó.
+     *
+     * Mở lại là đường CÓ CHỦ Ý và có ghi lý do, nên nó dời hạn kể cả khi
+     * `due_at` còn hiệu lực: đó chính là điều CSKH muốn khi bấm nút.
+     */
+    const hanMoi = hanChotTuHomNay(await soNgayHanChot(admin, gallery.branch_id));
+
     const { error } = await admin
       .from("galleries")
       .update({
         status: "in_review",
         reopened_at: now,
         reopen_reason: reason,
+        due_at: hanMoi,
         updated_at: now,
       })
       .eq("id", galleryId);
     if (error) throw error;
 
-    return ok({ status: "in_review", reopenedAt: now });
+    return ok({ status: "in_review", reopenedAt: now, dueAt: hanMoi });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền mở lại bộ ảnh");
     return failUnexpected(err, requestId);

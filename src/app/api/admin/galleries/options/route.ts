@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { soNgayHanChot } from "@/lib/gallery/han-chot";
 
 export const runtime = "nodejs";
 
@@ -48,6 +49,18 @@ export async function GET(): Promise<Response> {
       .order("full_name");
 
     return ok({
+      /**
+       * Hạn chốt mặc định lấy từ màn Cài đặt, không chôn cứng trong thuật sĩ.
+       *
+       * Trước 22/09/2026 thuật sĩ khởi tạo `useState(7)`, nên chủ studio đổi
+       * "Hạn chốt mặc định" từ 7 sang 10 thì ô trong thuật sĩ vẫn hiện 7 —
+       * một dòng cài đặt không điều khiển thứ gì.
+       *
+       * Trả về ở đây chứ không để thuật sĩ đọc thẳng `/api/admin/settings`:
+       * đường đó đòi quyền `settings:system` (chủ studio và quản trị), còn
+       * người tạo bộ ảnh thường là CSKH.
+       */
+      macDinhHanChotNgay: await soNgayHanChot(admin),
       branches: branches ?? [],
       packages: (packages ?? []).map((p) => ({
         id: p.id,

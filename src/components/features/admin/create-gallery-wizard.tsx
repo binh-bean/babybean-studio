@@ -40,6 +40,8 @@ interface Options {
     extraPhotoPrice: number;
   }[];
   photographers: { id: string; name: string; branchIds: string[] }[];
+  /** Hạn chốt mặc định, do chủ studio đặt trong màn Cài đặt. */
+  macDinhHanChotNgay?: number;
 }
 
 interface ResultData {
@@ -87,6 +89,11 @@ export function CreateGalleryWizard() {
       if (!res.ok) throw new Error(body?.error?.message ?? "Không tải được danh sách");
       setOptions(body.data);
       if (body.data.branches.length === 1) setBranchId(body.data.branches[0].id);
+      // Số ngày này do chủ studio đặt trong màn Cài đặt. Chôn cứng ở đây thì ô
+      // cài đặt kia không điều khiển gì cả.
+      if (typeof body.data.macDinhHanChotNgay === "number") {
+        setDeadlineDays(body.data.macDinhHanChotNgay);
+      }
     } catch (e) {
       setError({ message: e instanceof Error ? e.message : "Không tải được danh sách" });
     }

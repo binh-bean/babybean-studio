@@ -71,6 +71,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiLinkAppVeLark, diaChiDayDu } from "@/lib/lark/ghi-link-app";
+import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
 
 export const runtime = "nodejs";
 
@@ -121,7 +122,7 @@ export async function POST(
       // lark_hauky_record_id: mã DÒNG Hậu Kỳ bên Lark, sẽ ghi link vào đúng
       // dòng đó. Tên cột là `lark_hauky_record_id` chứ không phải
       // `lark_record_id` — xem db/migrations/0027 và 0028.
-      .select("id, branch_id, customer_id, status, photo_count, lark_hauky_record_id")
+      .select("id, branch_id, customer_id, status, photo_count, lark_hauky_record_id, sent_at, due_at")
       .eq("id", galleryId)
       .maybeSingle();
 
@@ -184,6 +185,34 @@ export async function POST(
       .single();
 
     if (error) throw error;
+
+    /**
+     * ĐÂY là lúc bộ ảnh thật sự đến tay khách — nên đây là lúc đặt mốc.
+     *
+     * `sent_at` chỉ đặt LẦN ĐẦU. CSKH tạo lại link (link cũ lộ, hay khách xin
+     * link mới) không phải là gửi lại từ đầu; ghi đè mốc ấy là xoá mất câu trả
+     * lời cho "bộ này nằm chờ khách bao lâu rồi".
+     *
+     * `due_at` cũng chỉ đặt khi đang rỗng, vì lý do ngược lại: nếu mỗi lần tạo
+     * link lại dời hạn thêm bảy ngày thì cái hạn đó không còn là hạn. Muốn cho
+     * khách thêm thời gian thì có đường riêng và có ghi lý do — nút "Mở lại"
+     * (`/reopen`), chính nó dời hạn.
+     *
+     * Không chặn phản hồi nếu ghi hụt: link đã nằm trong cơ sở dữ liệu rồi,
+     * CSKH phải cầm được link. Ghi ra log để lượt soát sau nhặt được.
+     */
+    const capNhat: Record<string, unknown> = {};
+    if (!gallery.sent_at) capNhat.sent_at = new Date().toISOString();
+    if (!gallery.due_at) {
+      capNhat.due_at = hanChotTuHomNay(await soNgayHanChot(admin, gallery.branch_id));
+    }
+    if (Object.keys(capNhat).length > 0) {
+      const { error: mocErr } = await admin
+        .from("galleries")
+        .update({ ...capNhat, updated_at: new Date().toISOString() })
+        .eq("id", galleryId);
+      if (mocErr) console.error("[share-link] không đặt được mốc gửi/hạn chốt:", mocErr);
+    }
 
     const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
