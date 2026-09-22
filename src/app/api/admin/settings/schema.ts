@@ -17,7 +17,7 @@
 import { z } from "zod";
 
 /** Nhóm để màn hình xếp ô, không ảnh hưởng gì tới dữ liệu. */
-export type NhomCaiDat = "album" | "anh" | "lien-lac";
+export type NhomCaiDat = "album" | "anh" | "quang-cao" | "lien-lac";
 
 export interface DinhNghiaCaiDat {
   key: string;
@@ -62,6 +62,19 @@ export const CAI_DAT_SUA_DUOC: DinhNghiaCaiDat[] = [
   { key: "gallery.watermark_default", nhom: "anh", schema: z.boolean() },
   { key: "gallery.allow_download_default", nhom: "anh", schema: z.boolean() },
   { key: "photo.expected_long_edge_px", nhom: "anh", schema: z.number().int().min(512).max(4096) },
+
+  /*
+    --- Quảng cáo của studio trong màn xem ảnh lớn ---------------------------
+
+    Chủ studio 22/09/2026 khoanh vùng trống bên trái tấm ảnh: "phần màu đỏ là
+    banner quảng cáo". Để trống hai ô này thì không có gì hiện ra — không dựng
+    sẵn một ô xám ghi "quảng cáo tại đây".
+
+    Chỉ nhận https: dải ảnh này nằm trong trang của khách, và một địa chỉ http
+    làm trình duyệt báo trang không an toàn ngay giữa lúc ba mẹ đang chọn ảnh.
+  */
+  { key: "gallery.banner_image_url", nhom: "quang-cao", schema: diaChiHttps },
+  { key: "gallery.banner_link_url", nhom: "quang-cao", schema: diaChiHttps },
 
   // --- Liên lạc ------------------------------------------------------------
   { key: "chat.page_url", nhom: "lien-lac", schema: diaChiHttps },

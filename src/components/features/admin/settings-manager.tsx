@@ -22,7 +22,7 @@ const t = vi.admin.caiDat;
 
 interface CaiDat {
   key: string;
-  nhom: "album" | "anh" | "lien-lac";
+  nhom: "album" | "anh" | "quang-cao" | "lien-lac";
   biMat: boolean;
   value: unknown;
   daCauHinh: boolean;
@@ -31,6 +31,7 @@ interface CaiDat {
 const NHOM: { id: CaiDat["nhom"]; ten: string }[] = [
   { id: "album", ten: t.nhomAlbum },
   { id: "anh", ten: t.nhomAnh },
+  { id: "quang-cao", ten: t.nhomQuangCao },
   { id: "lien-lac", ten: t.nhomLienLac },
 ];
 

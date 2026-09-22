@@ -26,6 +26,16 @@ export interface PhotoLightboxProps {
   hanMuc?: number | null;
   /** BB-180: luu ghi chu cho tho chinh anh. Duong luu da co tu BB-144. */
   onLuuGhiChu?: (photo: PhotoPublic, ghiChu: string) => Promise<boolean>;
+  /**
+   * Bảng "tấm này in ra cái gì" — dựng bên ngoài rồi truyền vào, vì nó cần dữ
+   * liệu hợp đồng và danh mục giá mà lightbox không có.
+   *
+   * Nhận HÀM chứ không nhận phần tử dựng sẵn: bảng phụ thuộc vào tấm ĐANG XEM,
+   * mà lightbox mới là chỗ biết tấm nào đang xem.
+   */
+  bangSanPham?: (photo: PhotoPublic) => React.ReactNode;
+  /** Ô quảng cáo của studio, chỉ hiện ở màn rộng. */
+  banner?: React.ReactNode;
 }
 
 /**
@@ -55,6 +65,8 @@ export function PhotoLightbox({
   daChon,
   hanMuc,
   onLuuGhiChu,
+  bangSanPham,
+  banner,
 }: PhotoLightboxProps) {
   // BB-180: o ghi chu cho tung anh, ngay trong man xem lon.
   //
@@ -320,7 +332,21 @@ export function PhotoLightbox({
         </div>
       </header>
 
-      {/* KHUNG HIỂN THỊ ẢNH TRUNG TÂM (Phù hợp cả dọc lẫn xoay ngang điện thoại) */}
+      {/*
+        BỐ CỤC BA CỘT TỪ `lg`: quảng cáo — ảnh — bảng sản phẩm.
+
+        Chủ studio 22/09/2026 chỉ vào ảnh chụp màn hình: hai bên tấm ảnh đang
+        trống trơn trên máy tính, mà đó chính là chỗ nên hỏi "tấm này in ra cái
+        gì". Dưới `lg` thì không chia cột — điện thoại chỉ đủ chỗ cho tấm ảnh,
+        bảng sản phẩm rơi xuống dưới ô ghi chú.
+      */}
+      <div className="relative flex min-h-0 flex-1 w-full">
+        {banner && (
+          <aside className="hidden w-56 shrink-0 items-center justify-center p-3 xl:flex">
+            {banner}
+          </aside>
+        )}
+
       <main
         className="relative flex-1 w-full h-full min-h-0 flex items-center justify-center overflow-hidden p-2 sm:p-4"
         onTouchStart={handleTouchStart}
@@ -400,6 +426,17 @@ export function PhotoLightbox({
         )}
       </main>
 
+        {/* Bảng "tấm này in ra cái gì" — cột phải trên máy tính. */}
+        {bangSanPham && currentPhoto && (
+          <aside
+            className="hidden w-72 shrink-0 overflow-y-auto border-l border-white/10 bg-black/30 p-4 lg:block"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {bangSanPham(currentPhoto)}
+          </aside>
+        )}
+      </div>
+
       {/* THANH ĐIỀU KHIỂN DƯỚI (Footer) — Nút thả tim to rõ ràng */}
       {/* ------------------------------------------------------------------
           BB-180 — Ô GHI CHÚ CHO THỢ CHỈNH ẢNH
@@ -412,6 +449,22 @@ export function PhotoLightbox({
           Lưu khi rời ô (onBlur), không lưu theo từng phím gõ: mạng yếu là
           chuyện thường ở Việt Nam, gọi máy chủ mỗi chữ là vừa tốn vừa dễ trượt.
       */}
+      {/*
+        Điện thoại: bảng sản phẩm nằm ngay trên ô ghi chú, cuộn được.
+
+        Không nhét vào cột bên như máy tính — màn 375px không còn chỗ nào bên
+        cạnh tấm ảnh. Giới hạn chiều cao để tấm ảnh vẫn là thứ chiếm phần lớn
+        màn hình: ba mẹ vào đây để NHÌN ẢNH trước đã.
+      */}
+      {bangSanPham && currentPhoto && (
+        <div
+          className="relative z-20 max-h-[38vh] shrink-0 overflow-y-auto border-t border-white/10 bg-black/45 px-4 py-3 lg:hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {bangSanPham(currentPhoto)}
+        </div>
+      )}
+
       <footer className="relative z-20 px-4 py-3 pb-5 sm:pb-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent shrink-0">
         {onLuuGhiChu && (
           <div className="mx-auto w-full max-w-2xl">

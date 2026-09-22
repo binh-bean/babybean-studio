@@ -216,6 +216,30 @@ export async function GET(request: Request) {
       hoa, trái cây) bị loại khỏi danh mục: lúc ba mẹ ngồi chọn ảnh thì buổi
       chụp đã xong từ lâu, bày bánh sinh nhật ở đó là bán nhầm lúc.
     */
+    /*
+      Dải quảng cáo của studio, hiện ở khoảng trống bên tấm ảnh đang xem.
+
+      Đọc từ `settings` chứ không chôn trong mã: nội dung quảng cáo đổi theo
+      mùa (khuyến mãi Tết, gói chụp mới), và mỗi lần đổi mà phải sửa mã là mỗi
+      lần chờ một lượt phát hành.
+
+      Không có ảnh thì trả `null` — màn khách không dựng ô trống.
+    */
+    const { data: rawBanner } = await supabase
+      .from("settings")
+      .select("key, value")
+      .in("key", ["gallery.banner_image_url", "gallery.banner_link_url"])
+      .is("branch_id", null);
+
+    const layCaiDat = (k: string) => {
+      const v = (rawBanner ?? []).find((r) => r.key === k)?.value;
+      return typeof v === "string" && v.startsWith("https://") ? v : null;
+    };
+    const bannerAnh = layCaiDat("gallery.banner_image_url");
+    const banner = bannerAnh
+      ? { imageUrl: bannerAnh, linkUrl: layCaiDat("gallery.banner_link_url") }
+      : null;
+
     const catalogue = (rawCatalogue ?? [])
       .map((p) => ({
         productId: p.id,
@@ -356,6 +380,7 @@ export async function GET(request: Request) {
         totalValue: contractSummary.totalValue,
         items: contractSummary.items,
       },
+      banner,
       addons: {
         totalAmount: totalAddonsAmount,
         /** Những dòng ba mẹ ĐÃ đặt mua. */

@@ -305,6 +305,7 @@ export const en: Messages = {
       subtitle: "Defaults for NEW galleries. Existing galleries keep their own configuration.",
       nhomAlbum: "Galleries",
       nhomAnh: "Photos",
+      nhomQuangCao: "Promotion",
       nhomLienLac: "Contact",
       nhan: {
         "gallery.default_due_days": "Default deadline (days)",
@@ -314,6 +315,8 @@ export const en: Messages = {
         "gallery.watermark_default": "Watermark",
         "gallery.allow_download_default": "Allow downloads",
         "photo.expected_long_edge_px": "Preview long edge (px)",
+        "gallery.banner_image_url": "Promo image in the photo viewer",
+        "gallery.banner_link_url": "Where the promo image links to",
         "chat.page_url": "Studio chat page",
         "lark.webhook_url": "Lark group webhook",
       },
@@ -326,6 +329,10 @@ export const en: Messages = {
         "gallery.watermark_default": "Whether previews carry a watermark.",
         "gallery.allow_download_default": "Whether customers can download previews.",
         "photo.expected_long_edge_px": "Longest edge of a preview image, in pixels.",
+        "gallery.banner_image_url":
+          "Promo strip beside the photo in the large viewer, wide screens only. Empty shows nothing.",
+        "gallery.banner_link_url":
+          "Optional. Empty means the promo image is not clickable.",
         "chat.page_url": "Target of the 'Message the studio' button. Empty hides the button.",
         "lark.webhook_url": "Bot that posts into the Lark group. Secret, shown masked.",
       },

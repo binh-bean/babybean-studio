@@ -6,6 +6,8 @@ import type { GalleryStatus } from "@/types/domain";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
+import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
+import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, memo } from "react";
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
@@ -86,6 +88,11 @@ interface GalleryApiResponse {
   placements?: Array<{ photoId: string; galleryItemId: string }>;
   // Vòng duyệt ảnh đã chỉnh. null khi bộ ảnh chưa tới bước đó.
   review?: ReviewData | null;
+  /**
+   * Dải quảng cáo của studio, hiện ở khoảng trống bên tấm ảnh đang xem lớn.
+   * `null` khi chủ studio chưa đặt ảnh trong màn Cài đặt.
+   */
+  banner?: { imageUrl: string; linkUrl: string | null } | null;
   addons?: {
     totalAmount: number;
     items: Array<{
@@ -96,6 +103,8 @@ interface GalleryApiResponse {
       quantity: number;
       totalPrice: number;
       size: string | null;
+      /** Tấm ảnh sản phẩm này in ra (migration 0061). */
+      photoId?: string | null;
     }>;
     /** Danh mục ba mẹ CÓ THỂ mua thêm — xem ghi chú ở `/api/g/gallery`. */
     catalogue?: Array<{
@@ -105,6 +114,8 @@ interface GalleryApiResponse {
       material: string | null;
       size: string | null;
       unitPrice: number;
+      nhom: string | null;
+      canGanAnh: boolean;
     }>;
   };
 }
@@ -966,13 +977,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
    * phép đoán ở máy khách.
    */
   const datSoLuongMuaThem = useCallback(
-    async (productId: string, soLuong: number) => {
+    async (productId: string, soLuong: number, photoId?: string | null) => {
       setPlacing(true);
       try {
         const res = await fetch("/api/g/addons", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId, quantity: soLuong }),
+          body: JSON.stringify({ productId, quantity: soLuong, photoId: photoId ?? null }),
         });
         if (!res.ok) {
           const json = await res.json().catch(() => null);
@@ -1723,6 +1734,70 @@ export function GalleryApp({ token }: GalleryAppProps) {
           daChon={soAnhDaChon}
           hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
           onLuuGhiChu={luuGhiChuAnh}
+          banner={
+            gallery.banner ? (
+              // Quảng cáo KHÔNG chen vào chỗ bấm: nó nằm ở cột riêng, không
+              // đè lên ảnh, không nổi lên trên, và không có gì tự đóng.
+              gallery.banner.linkUrl ? (
+                <a
+                  href={gallery.banner.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={gallery.banner.imageUrl}
+                    alt="Ưu đãi của studio"
+                    className="max-h-[70vh] w-full rounded-xl object-contain"
+                  />
+                </a>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={gallery.banner.imageUrl}
+                  alt="Ưu đãi của studio"
+                  className="max-h-[70vh] w-full rounded-xl object-contain"
+                />
+              )
+            ) : null
+          }
+          bangSanPham={(anh) => (
+            <BangSanPhamCuaAnh
+              anhDaChon={anh.mark === "selected"}
+              khoa={isLocked}
+              dangLuu={placing}
+              suatTrongGoi={printProducts.map((sp) => ({
+                galleryItemId: sp.galleryItemId,
+                name: sp.name,
+                quantity: sp.quantity,
+                daDat: placements.filter((pl) => pl.galleryItemId === sp.galleryItemId).length,
+                coAnhNay: placements.some(
+                  (pl) => pl.galleryItemId === sp.galleryItemId && pl.photoId === anh.id,
+                ),
+              }))}
+              monMuaThem={(gallery.addons?.catalogue ?? [])
+                .filter((sp) => sp.canGanAnh)
+                .map((sp) => ({
+                  productId: sp.productId,
+                  name: sp.name,
+                  material: sp.material,
+                  size: sp.size,
+                  unitPrice: sp.unitPrice,
+                  nhom: sp.nhom as NhomSanPham,
+                  canGanAnh: sp.canGanAnh,
+                  // Số lượng của ĐÚNG tấm đang xem, không phải tổng cả bộ.
+                  soLuong:
+                    gallery.addons?.items?.find(
+                      (m) => m.productId === sp.productId && m.photoId === anh.id,
+                    )?.quantity ?? 0,
+                }))}
+              onDatVaoGoi={(galleryItemId, dat) => changePlacement(anh.id, galleryItemId, dat)}
+              onDatMuaThem={(productId, soLuong) =>
+                void datSoLuongMuaThem(productId, soLuong, anh.id)
+              }
+            />
+          )}
         />
       )}
     </div>
