@@ -17,7 +17,15 @@
 
   /* Chữ */
   --bb-fg: #2e2a27;
-  --bb-fg-muted: #7a716a;
+  /*
+   * Chữ phụ trong giao diện SÁNG. Đậm hơn bản đầu (#7a716a) vì bản đầu chỉ đạt
+   * tương phản 4,11 trên nền thẻ #f3ede6 — dưới ngưỡng 4,5 của WCAG AA cho chữ
+   * thường. Đo trên iPhone ngày 22/09/2026: ngày chụp và tên chi nhánh trong
+   * thẻ bộ ảnh mờ tới mức chủ studio báo "khó xem".
+   * Bản này: 5,26 trên nền trang và 4,83 trên nền thẻ — vẫn là chữ phụ, nhưng
+   * đọc được dưới nắng.
+   */
+  --bb-fg-muted: #6f665f;
 
   /* Trạng thái */
   --bb-success: #4e9a6b;
