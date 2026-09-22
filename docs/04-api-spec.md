@@ -302,11 +302,23 @@ Tiền tố `/api/admin`. Mọi endpoint kiểm tra: đã đăng nhập → vai 
 { "data": { "status": "syncing", "processed": 400, "total": 862, "added": 400, "missing": 0 } }
 ```
 
-**`GET /galleries/:id/export?format=lightroom`** → `text/plain`
-```
-BB_0123.jpg, BB_0187.jpg, BB_0245.jpg
-```
-Mọi lần export đều ghi `activity_logs`.
+**`GET /galleries/:id/export`** (BB-067, đã làm) — cần quyền `galleries:export`
+và đúng chi nhánh.
+
+- không có `format`, hoặc `format=lightroom` → `text/plain`, mỗi dòng một tên
+  file, sắp theo thứ tự ảnh trong thư mục Drive (không theo thứ tự khách bấm —
+  thợ chỉnh ảnh đi từ trên xuống trong thư mục).
+- `format=csv` → `text/csv`, bốn cột `ten_file,thu_muc_con,ghi_chu_chinh_sua,yeu_thich`,
+  kèm ghi chú chung của khách ở cuối.
+
+Chỉ lấy ảnh `mark = 'selected'` trong lượt chọn **chính** (`is_primary`). Ảnh
+người thân gợi ý (`suggested`, ở lượt chọn riêng của họ) KHÔNG được xuất — xuất
+nhầm là thợ chỉnh ảnh làm thừa và studio tính tiền ảnh khách không chọn.
+
+Ô CSV bắt đầu bằng `=`, `+`, `-` hay `@` được chắn một dấu nháy đơn: ghi chú do
+khách viết, và Excel coi những ký tự đó là công thức.
+
+Mọi lần export đều ghi `activity_logs` (`gallery.export`, kèm định dạng và số ảnh).
 
 ### 4.2 Khách hàng, gói, chi nhánh, nhân sự
 

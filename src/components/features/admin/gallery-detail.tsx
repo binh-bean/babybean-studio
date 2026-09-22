@@ -27,6 +27,7 @@ import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import { vi } from "@/i18n/vi";
 
 interface Component {
   id: string;
@@ -458,6 +459,43 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           }
         />
       </section>
+
+      {/*
+        Xuất danh sách ảnh đã chọn (BB-067).
+
+        Chỉ hiện khi khách ĐÃ chọn ít nhất một tấm: danh sách rỗng gửi cho thợ
+        chỉnh ảnh còn tệ hơn không gửi gì, vì họ tưởng khách chưa chọn tấm nào
+        trong khi thật ra là bấm nhầm nút.
+
+        Hai định dạng, hai việc khác nhau: `.txt` là danh sách tên file để dán
+        thẳng vào bộ lọc của Lightroom; `.csv` mở bằng Excel, mang theo ghi chú
+        từng ảnh và ghi chú chung của khách.
+
+        Dùng thẻ <a download> chứ không fetch rồi tự dựng Blob: trình duyệt lo
+        hộp thoại lưu tệp, và máy chủ đã gửi sẵn `Content-Disposition`.
+      */}
+      {detail.selectedCount > 0 && (
+        <section className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--bb-border)] p-4">
+          <span className="text-sm font-medium">{vi.admin.export.title}</span>
+          <span className="text-xs text-[var(--bb-fg-muted)]">{vi.admin.export.description}</span>
+          <span className="ml-auto flex gap-2">
+            <a
+              href={`/api/admin/galleries/${galleryId}/export`}
+              download
+              className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs hover:bg-[var(--bb-surface-2)]"
+            >
+              {vi.admin.export.formatLightroom}
+            </a>
+            <a
+              href={`/api/admin/galleries/${galleryId}/export?format=csv`}
+              download
+              className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs hover:bg-[var(--bb-surface-2)]"
+            >
+              {vi.admin.export.formatCsv}
+            </a>
+          </span>
+        </section>
+      )}
 
       {!detail.quotaKnown && (
         <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
