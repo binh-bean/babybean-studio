@@ -7,3 +7,35 @@ body {
   font-family: var(--bb-font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+/*
+  BÀN TAY TRÊN MỌI THỨ BẤM ĐƯỢC.
+
+  Chủ studio 22/09/2026: "khi trỏ chuột đến các vùng chọn được vẫn chưa hiện
+  bàn tay đủ trên toàn bộ các nút của app".
+
+  Nguyên nhân: Tailwind v4 bỏ `cursor: pointer` mặc định của nút — bản v3 thêm
+  hộ, v4 trả về đúng mặc định của trình duyệt là `cursor: default`. Nên mọi nút
+  trong app mất con trỏ bàn tay cùng lúc, mà không ai đổi dòng mã nào.
+
+  Vá ở MỘT CHỖ thay vì thêm `cursor-pointer` vào từng nút: nút mới viết tháng
+  sau sẽ đúng sẵn, không phải nhớ.
+
+  Nút đang khoá thì KHÔNG hiện bàn tay — con trỏ là lời hứa "bấm được", và hứa
+  sai còn tệ hơn không hứa.
+*/
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a[href],
+summary,
+label[for],
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+}

@@ -7,6 +7,7 @@ import { ReviewPanel, type ReviewData } from "@/components/features/gallery/revi
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
+import { CuaHang } from "@/components/features/gallery/cua-hang";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, memo } from "react";
@@ -20,7 +21,6 @@ import { QuotaDisplay } from "@/components/ui/quota-display";
 import { CustomerProgress } from "@/components/ui/customer-progress";
 import { ContractBreakdown, type ContractItem, formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { PhotoPlacementPicker } from "@/components/ui/photo-placement-picker";
-import { AddonSelector, type AddonProduct } from "@/components/ui/addon-selector";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { PhotoPublic } from "@/types/domain";
@@ -521,10 +521,30 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [placing, setPlacing] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  /**
+   * Ba mẹ đã bấm Chốt, CSKH chưa xác nhận → màn hình KHOÁ MỀM.
+   *
+   * Chủ studio 22/09/2026: "khi khách nhấn chốt danh sách xong mà muốn chọn
+   * thêm khi CSKH chưa chốt danh sách thì vẫn cần có nút mở khoá chọn".
+   *
+   * Máy chủ đã mở từ migration 0060 — về kỹ thuật ba mẹ sửa được ngay. Nhưng
+   * nếu màn hình cũng mở toang thì cái nút Chốt vừa bấm chẳng có nghĩa gì: thả
+   * tim nhầm một cái là danh sách đã chốt đổi mà không ai biết.
+   *
+   * Nên: khoá MỀM. Danh sách đứng yên như vừa chốt, kèm một nút mở ra — bấm
+   * một cái là chọn tiếp, không phải gọi ai.
+   */
+  const [moKhoaChon, setMoKhoaChon] = useState(false);
+  /** Cửa hàng mua thêm — mở từ nút riêng, không nằm cuối trang. */
+  const [moCuaHang, setMoCuaHang] = useState(false);
+
+  const daChotChoXacNhan = gallery?.status === "submitted" && !moKhoaChon;
+
   const isLocked = useMemo(() => {
     if (!gallery) return false;
-    return isGalleryLocked(gallery.status);
-  }, [gallery]);
+    return isGalleryLocked(gallery.status) || daChotChoXacNhan;
+  }, [gallery, daChotChoXacNhan]);
+
 
   const loadGallery = useCallback(async () => {
     try {
@@ -847,6 +867,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
       }
 
       setShowSubmitModal(false);
+      // Chốt lại là đóng khoá mềm: danh sách vừa chốt phải đứng yên cho tới
+      // khi ba mẹ chủ động mở ra lần nữa.
+      setMoKhoaChon(false);
       setStatusMessage("Đã chốt danh sách chọn ảnh thành công! Studio đã nhận được thông tin.");
       // Tải lại để cập nhật trạng thái đã chốt
       await loadGallery();
@@ -1081,37 +1104,6 @@ export function GalleryApp({ token }: GalleryAppProps) {
     }));
   }, [gallery]);
 
-  /**
-   * Danh sách sản phẩm bày ra cho ba mẹ chọn mua thêm.
-   *
-   * Lấy từ DANH MỤC (`addons.catalogue`), không phải từ những dòng đã mua.
-   * Bản cũ lấy từ `addons.items` — tức là chỉ hiện những thứ ba mẹ ĐÃ mua, nên
-   * khi chưa mua gì thì danh sách rỗng và component tự ẩn. Không bao giờ có
-   * cái gì để bấm mua lần đầu.
-   */
-  const addonProducts = useMemo<AddonProduct[]>(() => {
-    const dm = gallery?.addons?.catalogue;
-    if (!dm?.length) return [];
-    return dm.map((sp) => ({
-      id: sp.productId,
-      name: sp.name,
-      unitPrice: sp.unitPrice,
-      unit: sp.size || undefined,
-      // Máy chủ đã lọc theo ba luật tiền của BB-105 trước khi gửi xuống.
-      priceReliable: true,
-    }));
-  }, [gallery]);
-
-  const addonQuantities = useMemo(() => {
-    const map: Record<string, number> = {};
-    if (gallery?.addons?.items) {
-      for (const item of gallery.addons.items) {
-        map[item.productId] = item.quantity;
-      }
-    }
-    return map;
-  }, [gallery]);
-
   if (loading) {
     return (
       <div className="min-h-[80dvh] flex flex-col items-center justify-center p-6 gap-3">
@@ -1209,6 +1201,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
               className="shrink-0 font-medium"
             >
               {vi.gallery.submitCta}
+            </Button>
+          ) : daChotChoXacNhan ? (
+            /*
+              Đã chốt nhưng CSKH chưa xác nhận: mở lại là việc của chính ba mẹ,
+              một cú bấm, không phải một cuộc gọi.
+            */
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setMoKhoaChon(true)}
+              className="shrink-0 font-medium"
+            >
+              Chọn thêm ảnh
             </Button>
           ) : (
             /*
@@ -1502,36 +1507,49 @@ export function GalleryApp({ token }: GalleryAppProps) {
           />
         )}
 
-        {/* SẢN PHẨM MUA THÊM (ADDON) */}
-        {addonProducts.length > 0 && (
-          <section aria-labelledby="addons-heading" className="pt-4">
-            <AddonSelector
-              products={addonProducts}
-              value={addonQuantities}
-              disabled={isLocked || placing}
-              onChange={(soLuongMoi) => {
-                // Chỉ gửi sản phẩm VỪA ĐỔI, không gửi cả bảng: mỗi lượt gọi là
-                // một dòng nhật ký, và gửi cả bảng là ghi lại cả những thứ ba
-                // mẹ không đụng tới.
-                const cu = addonQuantities;
-                for (const [productId, sl] of Object.entries(soLuongMoi)) {
-                  if ((cu[productId] ?? 0) !== sl) {
-                    void datSoLuongMuaThem(productId, sl);
-                    return;
-                  }
-                }
-                // Sản phẩm bị bỏ hẳn khỏi bảng mới = đặt về 0.
-                for (const productId of Object.keys(cu)) {
-                  if (!(productId in soLuongMoi)) {
-                    void datSoLuongMuaThem(productId, 0);
-                    return;
-                  }
-                }
-              }}
-            />
-          </section>
-        )}
+        {/* SẢN PHẨM MUA THÊM (ADDON) — khối cũ, nay thay bằng cửa hàng riêng. */}
+        {/*
+          Khối "mua thêm" ĐÃ RỜI khỏi cuối trang.
+
+          Chủ studio 22/09/2026: "phần bán hàng cần có menu riêng, không đưa
+          xuống dưới như vậy sẽ không bán được hàng". Bộ ảnh thật có 460 tấm,
+          nên một khối nằm sau lưới ảnh chỉ gặp được sau khi cuộn hết 460 tấm —
+          và lúc đó ba mẹ đang đi tìm nút Chốt, không đi mua khung.
+
+          Nay có nút riêng ở thanh dưới đáy, mở ra `CuaHang`.
+        */}
       </div>
+
+      <CuaHang
+        mo={moCuaHang}
+        onDong={() => setMoCuaHang(false)}
+        khoa={isLocked}
+        dangLuu={placing}
+        danhMuc={(gallery.addons?.catalogue ?? []).map((sp) => ({
+          productId: sp.productId,
+          name: sp.name,
+          material: sp.material,
+          size: sp.size,
+          unitPrice: sp.unitPrice,
+          nhom: sp.nhom as NhomSanPham,
+          canGanAnh: sp.canGanAnh,
+        }))}
+        daMua={(gallery.addons?.items ?? []).map((m) => ({
+          id: m.id,
+          productId: m.productId,
+          name: m.name,
+          quantity: m.quantity,
+          totalPrice: m.totalPrice,
+          photoId: m.photoId ?? null,
+        }))}
+        tongTien={gallery.addons?.totalAmount ?? 0}
+        anhDaChon={photos
+          .filter((p) => p.mark === "selected")
+          .map((p) => ({ id: p.id, fileName: p.fileName }))}
+        onMua={(productId, soLuong, photoId) =>
+          void datSoLuongMuaThem(productId, soLuong, photoId)
+        }
+      />
 
       {/* THANH ĐIỀU HƯỚNG DÍNH DƯỚI ĐÁY CHO MOBILE (Sticky Bottom Bar) */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur-md px-4 py-3 shadow-lg">
@@ -1560,15 +1578,49 @@ export function GalleryApp({ token }: GalleryAppProps) {
             )}
           </div>
 
-          {!isLocked && (
-            <Button
-              onClick={() => setShowSubmitModal(true)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-5 h-11 rounded-xl shadow-md flex items-center gap-2"
-            >
-              <span>{vi.gallery.submitCta}</span>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/*
+              CỬA RIÊNG CHO PHẦN BÁN HÀNG.
+
+              Đứng cạnh nút Chốt, ở thanh luôn nhìn thấy — không phải cuộn hết
+              460 tấm mới gặp. Ẩn khi chưa có gì bán được, và khi bộ ảnh đã
+              khoá thật (CSKH xác nhận rồi thì đặt thêm phải qua CSKH).
+            */}
+            {(gallery.addons?.catalogue?.length ?? 0) > 0 && !isLocked && (
+              <Button
+                variant="outline"
+                onClick={() => setMoCuaHang(true)}
+                className="h-11 rounded-xl px-4 font-semibold"
+              >
+                Mua thêm
+                {(gallery.addons?.totalAmount ?? 0) > 0 && (
+                  <span className="ml-1.5 text-xs text-muted-foreground">
+                    {formatCurrencyVND(gallery.addons?.totalAmount ?? 0)}
+                  </span>
+                )}
+              </Button>
+            )}
+
+            {!isLocked && (
+              <Button
+                onClick={() => setShowSubmitModal(true)}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-5 h-11 rounded-xl shadow-md flex items-center gap-2"
+              >
+                <span>{vi.gallery.submitCta}</span>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            )}
+
+            {daChotChoXacNhan && (
+              <Button
+                variant="outline"
+                onClick={() => setMoKhoaChon(true)}
+                className="h-11 rounded-xl px-4 font-semibold"
+              >
+                Chọn thêm ảnh
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
