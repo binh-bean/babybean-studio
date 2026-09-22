@@ -16,6 +16,7 @@ import { fail, failUnexpected } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateAddonSchema } from "./schema";
+import { nhomSanPham, canGanAnh } from "@/lib/products/nhom-san-pham";
 
 export const runtime = "nodejs";
 
@@ -92,6 +93,47 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    /**
+     * Luật 5 (BB-105 + quyết định 22/09/2026): sản phẩm in phải GẮN VÀO ẢNH.
+     *
+     * Kiểm ba điều, mỗi điều chặn một kiểu sai khác nhau:
+     *
+     *  1. Nhóm cần gắn ảnh mà không gửi ảnh -> từ chối. Thợ in sẽ không biết
+     *     in tấm nào.
+     *  2. Ảnh phải thuộc ĐÚNG bộ ảnh này. Thiếu vế đó thì đoán một id ảnh bất
+     *     kỳ là đặt in ảnh của nhà khác.
+     *  3. Ảnh phải nằm trong danh sách ba mẹ ĐÃ CHỌN. Mua in một tấm không
+     *     chọn nghĩa là tấm đó không có trong đơn giao, và thợ chỉnh ảnh cũng
+     *     không chỉnh nó.
+     */
+    const nhom = nhomSanPham(product.kind, product.material);
+    const photoId = input.photoId ?? null;
+
+    if (canGanAnh(nhom) && !photoId) {
+      return fail("INVALID_INPUT", "Ba mẹ chọn giúp em tấm ảnh cần in cho sản phẩm này");
+    }
+
+    if (photoId) {
+      const { data: anh } = await admin
+        .from("photos")
+        .select("id")
+        .eq("id", photoId)
+        .eq("gallery_id", session.galleryId)
+        .maybeSingle();
+      if (!anh) return fail("NOT_FOUND", "Không tìm thấy tấm ảnh này trong bộ ảnh");
+
+      const { data: daChon } = await admin
+        .from("selection_items")
+        .select("id")
+        .eq("selection_id", session.selectionId)
+        .eq("photo_id", photoId)
+        .eq("mark", "selected")
+        .maybeSingle();
+      if (!daChon) {
+        return fail("INVALID_INPUT", "Ba mẹ chọn tấm ảnh này trước rồi mới đặt in được");
+      }
+    }
+
     // Luật 1: Đơn giá chốt tại thời điểm mua, lấy từ products.list_price
     const unitPrice = Number(product.list_price);
 
@@ -107,33 +149,65 @@ export async function POST(request: Request): Promise<Response> {
      * là giá áp dụng, và nó nằm ngay trên màn hình lúc họ bấm.
      */
     if (input.quantity === 0) {
-      const { error: delErr } = await admin
+      let xoa = admin
         .from("selection_addons")
         .delete()
         .eq("selection_id", session.selectionId)
         .eq("product_id", product.id);
+      // Bỏ mua ĐÚNG dòng của tấm ảnh đó, không quét sạch mọi tấm cùng sản phẩm.
+      xoa = photoId ? xoa.eq("photo_id", photoId) : xoa.is("photo_id", null);
+      const { error: delErr } = await xoa;
       if (delErr) throw delErr;
     }
 
-    const { data: addon, error: insertError } =
-      input.quantity === 0
-        ? { data: null, error: null }
-        : await admin
-            .from("selection_addons")
-            .upsert(
-              {
-                selection_id: session.selectionId,
-                product_id: product.id,
-                quantity: input.quantity,
-                unit_price: unitPrice,
-              },
-              { onConflict: "selection_id,product_id" },
-            )
-            .select("id, selection_id, product_id, quantity, unit_price, created_at")
-            .single();
+    /*
+      TÌM RỒI SỬA, không dùng `upsert`.
 
-    if (insertError || (input.quantity > 0 && !addon)) {
-      throw insertError || new Error("Không lưu được sản phẩm mua thêm");
+      Hai chỉ mục duy nhất của 0061 là chỉ mục TỪNG PHẦN (`where photo_id is
+      not null` và `where photo_id is null`). Postgres đòi mệnh đề `where` đó
+      phải nằm trong `on conflict`, mà supabase-js chỉ nhận danh sách cột —
+      nên `upsert` trả thẳng 42P10 "there is no unique or exclusion constraint
+      matching the ON CONFLICT specification". Đo thật 22/09/2026.
+
+      Tốn thêm một lượt đọc, đổi lại đường ghi nói đúng điều nó làm.
+    */
+    interface DongMuaThem {
+      id: string;
+      selection_id: string;
+      product_id: string;
+      quantity: number;
+      unit_price: number;
+      created_at: string;
+    }
+    let addon: DongMuaThem | null = null;
+
+    if (input.quantity > 0) {
+      let timDong = admin
+        .from("selection_addons")
+        .select("id")
+        .eq("selection_id", session.selectionId)
+        .eq("product_id", product.id);
+      timDong = photoId ? timDong.eq("photo_id", photoId) : timDong.is("photo_id", null);
+      const { data: dongCu } = await timDong.maybeSingle();
+
+      const ghi = dongCu
+        ? admin
+            .from("selection_addons")
+            .update({ quantity: input.quantity, unit_price: unitPrice })
+            .eq("id", dongCu.id)
+        : admin.from("selection_addons").insert({
+            selection_id: session.selectionId,
+            product_id: product.id,
+            photo_id: photoId,
+            quantity: input.quantity,
+            unit_price: unitPrice,
+          });
+
+      const { data, error: ghiErr } = await ghi
+        .select("id, selection_id, product_id, quantity, unit_price, created_at")
+        .single();
+      if (ghiErr || !data) throw ghiErr || new Error("Không lưu được sản phẩm mua thêm");
+      addon = data as unknown as DongMuaThem;
     }
 
     // 6. Calculate total addons amount for the current selection session
@@ -163,6 +237,7 @@ export async function POST(request: Request): Promise<Response> {
         addonId: addon?.id ?? null,
         productId: product.id,
         productName: product.name,
+        photoId,
         quantity: input.quantity,
         unitPrice,
         totalPrice: unitPrice * input.quantity,

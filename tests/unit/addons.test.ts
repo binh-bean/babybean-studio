@@ -19,6 +19,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
   let galleryId: string;
   let shareLinkId: string;
   let selectionId: string;
+  let photoId: string;
 
   const createdProductIds: string[] = [];
   let prodReliableId: string;
@@ -128,6 +129,34 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     });
     if (selErr) throw selErr;
 
+    /*
+      Từ 22/09/2026 sản phẩm in phải GẮN VÀO một tấm ảnh ĐÃ CHỌN (migration
+      0061). Fixture cũ không có tấm nào, nên mọi lượt mua đều bị từ chối —
+      đúng luật mới, nhưng làm tệp này đỏ. Thêm một tấm và chọn sẵn nó.
+    */
+    const { data: anh, error: anhErr } = await supabase
+      .from("photos")
+      .insert({
+        gallery_id: galleryId,
+        drive_file_id: `bb105-old-${randomUUID()}`,
+        file_name: "addon.jpg",
+        mime_type: "image/jpeg",
+        sort_index: 1,
+        status: "active",
+      })
+      .select("id")
+      .single();
+    if (anhErr) throw anhErr;
+    photoId = anh.id;
+
+    const { error: itemErr } = await supabase.from("selection_items").insert({
+      selection_id: selectionId,
+      photo_id: photoId,
+      gallery_id: galleryId,
+      mark: "selected",
+    });
+    if (itemErr) throw itemErr;
+
     session = {
       // Link kiểu cũ gắn thẳng vào bộ ảnh nên không có khách nào kèm theo.
       customerId: "",
@@ -165,6 +194,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       body: JSON.stringify({
         productId: prodReliableId,
         quantity: 2,
+        photoId,
       }),
     });
 
@@ -203,6 +233,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       body: JSON.stringify({
         productId: prodLowSamplesId,
         quantity: 1,
+        photoId,
       }),
     });
 
@@ -232,6 +263,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       body: JSON.stringify({
         productId: prodLowConfidenceId,
         quantity: 1,
+        photoId,
       }),
     });
 
@@ -252,6 +284,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       body: JSON.stringify({
         productId: prodNullPriceId,
         quantity: 1,
+        photoId,
       }),
     });
 
@@ -309,6 +342,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       body: JSON.stringify({
         productId: prodReliableId,
         quantity: 0,
+        photoId,
       }),
     });
     const resZero = await postAddon(reqZero);
@@ -322,6 +356,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       body: JSON.stringify({
         productId: prodReliableId,
         quantity: -3,
+        photoId,
       }),
     });
     const resNegative = await postAddon(reqNegative);
@@ -344,7 +379,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       new Request("http://localhost:3000/api/g/addons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ productId: prodReliableId, quantity: 2 }),
+        body: JSON.stringify({ productId: prodReliableId, quantity: 2, photoId }),
       }),
     );
 

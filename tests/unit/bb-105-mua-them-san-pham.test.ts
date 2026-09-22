@@ -36,6 +36,11 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
   let spBanDuoc = "";
   let giaNiemYet = 0;
   let spKhongBan = "";
+  let anhDaChon = "";
+  let anhDaChon2 = "";
+  let anhChuaChon = "";
+  let anhBoKhac = "";
+  let boKhac = "";
 
   function phien(role = "owner", khoa = false) {
     vi.spyOn(gallerySession, "requireGallerySession").mockResolvedValue({
@@ -48,17 +53,17 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
   }
 
-  const goi = (productId: string, quantity: number) =>
+  const goi = (productId: string, quantity: number, photoId?: string | null) =>
     muaThem(
       new Request("http://localhost/api/g/addons", {
         method: "POST",
-        body: JSON.stringify({ productId, quantity }),
+        body: JSON.stringify({ productId, quantity, photoId }),
       }),
     );
 
   const demDong = async () => {
     const { rows } = await client.query(
-      "select product_id, quantity, unit_price from selection_addons where selection_id = $1 order by product_id",
+      "select product_id, photo_id, quantity, unit_price from selection_addons where selection_id = $1 order by created_at",
       [selectionId],
     );
     return rows;
@@ -95,6 +100,40 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     );
     selectionId = sel[0].id;
 
+    // Ba tấm: hai tấm ba mẹ đã chọn, một tấm chưa chọn.
+    for (const [ten, idx] of [["A.jpg", 1], ["B.jpg", 2], ["C.jpg", 3]] as [string, number][]) {
+      const { rows } = await client.query(
+        `insert into photos (gallery_id, drive_file_id, file_name, mime_type, sort_index, status)
+         values ($1,$2,$3,'image/jpeg',$4,'active') returning id`,
+        [galleryId, `bb105-${ten}-${Date.now()}`, ten, idx],
+      );
+      if (ten === "A.jpg") anhDaChon = rows[0].id;
+      if (ten === "B.jpg") anhDaChon2 = rows[0].id;
+      if (ten === "C.jpg") anhChuaChon = rows[0].id;
+    }
+    for (const id of [anhDaChon, anhDaChon2]) {
+      await client.query(
+        `insert into selection_items (selection_id, photo_id, gallery_id, mark)
+         values ($1,$2,$3,'selected')`,
+        [selectionId, id, galleryId],
+      );
+    }
+
+    // Một tấm của BỘ ẢNH KHÁC, để đo việc đặt in ảnh nhà người ta.
+    const { rows: gk } = await client.query(
+      `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
+                              drive_folder_url, photo_count)
+       values ($1,$2,'Fixture BB-105 bộ khác','ready',$3,'https://example.com/y',1) returning id`,
+      [br[0].id, customerId, `fixture-bb105b-${Date.now()}`],
+    );
+    boKhac = gk[0].id;
+    const { rows: pk } = await client.query(
+      `insert into photos (gallery_id, drive_file_id, file_name, mime_type, sort_index, status)
+       values ($1,$2,'X.jpg','image/jpeg',1,'active') returning id`,
+      [boKhac, `bb105-x-${Date.now()}`],
+    );
+    anhBoKhac = pk[0].id;
+
     const { rows: sp } = await client.query(
       `select id, list_price from products
         where is_active and list_price is not null and price_confidence >= 0.8 and price_samples >= 5
@@ -111,14 +150,14 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
 
   afterAll(async () => {
     await client.query("delete from activity_logs where entity_id = $1", [galleryId]);
-    await client.query("delete from galleries where id = $1", [galleryId]);
+    await client.query("delete from galleries where id = any($1)", [[galleryId, boKhac]]);
     await client.query("delete from customers where id = $1", [customerId]);
     await client.end();
   });
 
   it("1. Đặt số lượng 2 thì có ĐÚNG một dòng, và giá chốt theo bảng giá", async () => {
     phien();
-    const res = await goi(spBanDuoc, 2);
+    const res = await goi(spBanDuoc, 2, anhDaChon);
     expect(res.status).toBe(200);
 
     const dong = await demDong();
@@ -134,7 +173,7 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     // Đây là lỗi sẽ xảy ra ngay nếu giữ lối chèn thẳng: ba mẹ bấm dấu cộng vài
     // lần là vài dòng cùng một sản phẩm, và hoá đơn cộng hết.
     phien();
-    expect((await goi(spBanDuoc, 5)).status).toBe(200);
+    expect((await goi(spBanDuoc, 5, anhDaChon)).status).toBe(200);
 
     const dong = await demDong();
     expect(dong.length).toBe(1);
@@ -143,7 +182,7 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
 
   it("3. Đặt về 0 là BỎ MUA — dòng biến mất, tiền về 0", async () => {
     phien();
-    const res = await goi(spBanDuoc, 0);
+    const res = await goi(spBanDuoc, 0, anhDaChon);
     expect(res.status).toBe(200);
     expect((await res.json()).data.totalAddonsAmount).toBe(0);
     expect(await demDong()).toEqual([]);
@@ -152,14 +191,14 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
   it("4. Sản phẩm chưa đủ tin cậy về giá thì KHÔNG bán", async () => {
     if (!spKhongBan) return; // bảng giá sạch thì bỏ qua ca này
     phien();
-    const res = await goi(spKhongBan, 1);
+    const res = await goi(spKhongBan, 1, anhDaChon);
     expect(res.status).toBe(400);
     expect(await demDong()).toEqual([]);
   });
 
   it("5. Link chỉ-xem không mua được", async () => {
     phien("viewer");
-    expect((await goi(spBanDuoc, 1)).status).toBe(403);
+    expect((await goi(spBanDuoc, 1, anhDaChon)).status).toBe(403);
     expect(await demDong()).toEqual([]);
   });
 
@@ -171,18 +210,69 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     */
     await client.query("update galleries set status='submitted' where id=$1", [galleryId]);
     phien();
-    expect((await goi(spBanDuoc, 1)).status).toBe(200);
+    expect((await goi(spBanDuoc, 1, anhDaChon)).status).toBe(200);
     expect((await demDong()).length).toBe(1);
 
     await client.query("update galleries set status='in_retouch' where id=$1", [galleryId]);
     phien();
-    expect((await goi(spBanDuoc, 3)).status).toBe(409);
+    expect((await goi(spBanDuoc, 3, anhDaChon)).status).toBe(409);
     // Số lượng giữ nguyên như trước khi khoá, không bị sửa trộm.
     expect((await demDong())[0].quantity).toBe(1);
 
     await client.query("update galleries set status='ready' where id=$1", [galleryId]);
     phien();
-    await goi(spBanDuoc, 0);
+    await goi(spBanDuoc, 0, anhDaChon);
+  });
+
+  it("6b. Sản phẩm in mà KHÔNG gắn ảnh thì từ chối", async () => {
+    /*
+      Chủ studio 22/09/2026: "sản phẩm hậu kỳ muốn mua thêm cần gắn với ảnh
+      chọn". Không gắn thì thợ in nhận được "1 khung gỗ 40x60" mà không biết
+      in tấm nào — và CSKH lại phải gọi hỏi, đúng cuộc gọi app này sinh ra để
+      bỏ đi.
+    */
+    phien();
+    const res = await goi(spBanDuoc, 1, null);
+    expect(res.status).toBe(400);
+    expect(await demDong()).toEqual([]);
+  });
+
+  it("6c. Không đặt in được ảnh của bộ khác, cũng không đặt in ảnh CHƯA chọn", async () => {
+    phien();
+    // Ảnh nhà người ta.
+    expect((await goi(spBanDuoc, 1, anhBoKhac)).status).toBe(404);
+
+    // Ảnh trong bộ này nhưng ba mẹ chưa chọn: in ra thì tấm đó không nằm trong
+    // đơn giao, và thợ chỉnh ảnh cũng không chỉnh nó.
+    expect((await goi(spBanDuoc, 1, anhChuaChon)).status).toBe(400);
+    expect(await demDong()).toEqual([]);
+  });
+
+  it("6d. Ba bản cùng một tấm = MỘT dòng; ba tấm khác nhau = NHIỀU dòng", async () => {
+    /*
+      Chủ studio trả lời thẳng câu hỏi mua ba khung thì gán ảnh thế nào:
+      "cả hai, tuỳ từng khách — có khách in ba ảnh khác nhau, có khách in ba
+      ảnh chung một tấm hình".
+    */
+    phien();
+    expect((await goi(spBanDuoc, 3, anhDaChon)).status).toBe(200);
+    let dong = await demDong();
+    expect(dong.length).toBe(1);
+    expect(dong[0].quantity).toBe(3);
+
+    // Thêm tấm thứ hai, CÙNG sản phẩm -> dòng riêng, không đè lên dòng cũ.
+    expect((await goi(spBanDuoc, 1, anhDaChon2)).status).toBe(200);
+    dong = await demDong();
+    expect(dong.length).toBe(2);
+    expect(dong.map((d) => d.photo_id).sort()).toEqual([anhDaChon, anhDaChon2].sort());
+
+    // Bỏ mua tấm thứ hai thì tấm thứ nhất còn nguyên.
+    expect((await goi(spBanDuoc, 0, anhDaChon2)).status).toBe(200);
+    dong = await demDong();
+    expect(dong.length).toBe(1);
+    expect(dong[0].photo_id).toBe(anhDaChon);
+
+    await goi(spBanDuoc, 0, anhDaChon);
   });
 
   it("7. Màn khách nhận được DANH MỤC để bấm mua, không chỉ những thứ đã mua", async () => {
@@ -203,13 +293,23 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     // Không bán buổi chụp qua nút mua thêm.
     expect(body.data.addons.catalogue.some((sp: { kind: string }) => sp.kind === "shoot_package"))
       .toBe(false);
+
+    // Mỗi món phải thuộc đúng một trong ba nhóm chủ studio gọi tên, và nhóm
+    // nào cần gắn ảnh thì nói rõ ra cho màn hình biết.
+    const nhomCoThat = ["anh_in", "album", "khung"];
+    for (const sp of body.data.addons.catalogue) {
+      expect(nhomCoThat).toContain(sp.nhom);
+      expect(sp.canGanAnh).toBe(sp.nhom === "anh_in" || sp.nhom === "khung");
+    }
+    // Đủ cả ba nhóm trong bảng giá thật của studio.
+    expect(new Set(body.data.addons.catalogue.map((sp: { nhom: string }) => sp.nhom)).size).toBe(3);
   });
 
   it("8. Mỗi lượt đặt để lại một dòng nhật ký", async () => {
     await client.query("delete from activity_logs where entity_id = $1", [galleryId]);
     phien();
-    await goi(spBanDuoc, 1);
-    await goi(spBanDuoc, 0);
+    await goi(spBanDuoc, 1, anhDaChon);
+    await goi(spBanDuoc, 0, anhDaChon);
 
     const { rows } = await client.query(
       "select action from activity_logs where entity_id = $1 order by created_at",

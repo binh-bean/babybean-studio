@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
+import { nhomSanPham, canGanAnh } from "@/lib/products/nhom-san-pham";
 
 export async function GET(request: Request) {
   try {
@@ -143,6 +144,7 @@ export async function GET(request: Request) {
         id,
         selection_id,
         product_id,
+        photo_id,
         quantity,
         unit_price,
         created_at,
@@ -169,6 +171,9 @@ export async function GET(request: Request) {
         quantity: row.quantity,
         unitPrice,
         totalPrice: unitPrice * row.quantity,
+        // Tấm ảnh sản phẩm này in ra — màn khách hiện ngay cạnh dòng hàng, để
+        // ba mẹ thấy mình đặt in ĐÚNG tấm nào.
+        photoId: (row as { photo_id?: string | null }).photo_id ?? null,
         createdAt: row.created_at,
       };
     });
@@ -202,14 +207,27 @@ export async function GET(request: Request) {
       .gte("price_samples", 5)
       .order("list_price", { ascending: true });
 
-    const catalogue = (rawCatalogue ?? []).map((p) => ({
-      productId: p.id,
-      name: p.name,
-      kind: p.kind,
-      material: p.material,
-      size: p.size,
-      unitPrice: Number(p.list_price),
-    }));
+    /*
+      Gắn NHÓM cho từng sản phẩm để màn khách bày theo ba nhóm chủ studio gọi
+      tên: ảnh in/ảnh phóng, album, khung. Trong mỗi nhóm phân theo chất liệu
+      và kích thước — hai trường đó bảng `products` đã mang sẵn từ Lark.
+
+      Sản phẩm không thuộc nhóm nào (dịch vụ kèm buổi chụp: bánh sinh nhật,
+      hoa, trái cây) bị loại khỏi danh mục: lúc ba mẹ ngồi chọn ảnh thì buổi
+      chụp đã xong từ lâu, bày bánh sinh nhật ở đó là bán nhầm lúc.
+    */
+    const catalogue = (rawCatalogue ?? [])
+      .map((p) => ({
+        productId: p.id,
+        name: p.name,
+        kind: p.kind,
+        material: p.material,
+        size: p.size,
+        unitPrice: Number(p.list_price),
+        nhom: nhomSanPham(p.kind, p.material),
+        canGanAnh: canGanAnh(nhomSanPham(p.kind, p.material)),
+      }))
+      .filter((p) => p.nhom !== null);
 
     // Lấy danh sách ảnh đã đặt vào sản phẩm in (selection_placements)
     const { data: userSelectionItems } = await supabase
