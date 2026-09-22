@@ -476,6 +476,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [customerNote, setCustomerNote] = useState("");
+  /**
+   * Tên người xác nhận và ô đồng ý — BẮT BUỘC, và trước 22/09/2026 màn hình
+   * KHÔNG có hai ô này.
+   *
+   * `/api/g/submit` đòi `confirmedByName` (không rỗng) và `agreed: true` ngay
+   * từ đầu. Màn khách thì gửi `{ confirmNotes, customerNote }` — sai cả ba
+   * trường. Nên mỗi lần ba mẹ bấm Xác nhận là một cái 400 "Dữ liệu không hợp
+   * lệ", và KHÔNG AI CHỐT ĐƯỢC BỘ ẢNH.
+   *
+   * Không phép thử nào đỏ: phép thử đơn vị gọi thẳng API với payload đúng, còn
+   * đường e2e thì chưa bao giờ đi tới bước chốt. Lỗi lộ ra đúng lúc E-1 được
+   * viết (BB-053).
+   */
+  const [tenXacNhan, setTenXacNhan] = useState("");
+  const [dongY, setDongY] = useState(false);
   const [placements, setPlacements] = useState<{ photoId: string; galleryItemId: string }[]>([]);
   const [placing, setPlacing] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -790,8 +805,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          confirmNotes: true,
-          customerNote: customerNote.trim() || undefined,
+          confirmedByName: tenXacNhan.trim(),
+          agreed: true,
+          // Tên trường bên máy chủ là `generalNote`; gửi `customerNote` thì lời
+          // dặn của ba mẹ rơi vào hư không kể cả khi mọi thứ khác đúng.
+          generalNote: customerNote.trim() || undefined,
         }),
       });
 
@@ -1502,6 +1520,37 @@ export function GalleryApp({ token }: GalleryAppProps) {
               )}
             </div>
 
+            {/*
+              Hai ô BẮT BUỘC — máy chủ đòi từ đầu, màn hình thì chưa từng có.
+              Xem ghi chú ở chỗ khai `tenXacNhan`.
+
+              Tên người xác nhận không phải thủ tục: bộ ảnh chốt xong là khoá,
+              và sáu tháng sau câu hỏi "ai chốt" chỉ trả lời được bằng dòng này
+              (`selections.submitted_by_name`).
+            */}
+            <div>
+              <label htmlFor="confirm-name-input" className="block text-xs font-semibold mb-1 text-muted-foreground">
+                {vi.gallery.parentName}
+              </label>
+              <input
+                id="confirm-name-input"
+                value={tenXacNhan}
+                onChange={(e) => setTenXacNhan(e.target.value)}
+                placeholder={vi.gallery.parentNamePlaceholder}
+                className="w-full p-2.5 rounded-xl border bg-background text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            <label className="flex items-start gap-2 text-xs leading-relaxed">
+              <input
+                type="checkbox"
+                checked={dongY}
+                onChange={(e) => setDongY(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>{vi.gallery.submitAgree}</span>
+            </label>
+
             <div>
               <label htmlFor="customer-note-input" className="block text-xs font-semibold mb-1 text-muted-foreground">
                 Ghi chú chung cho studio (nếu có):
@@ -1525,7 +1574,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
               </Button>
               <Button
                 onClick={handleSubmitSelection}
-                disabled={submitting}
+                // Khoá nút khi chưa đủ hai ô: bấm rồi nhận "Dữ liệu không hợp
+                // lệ" thì ba mẹ không biết thiếu gì, và câu đó không nói ra.
+                disabled={submitting || tenXacNhan.trim().length === 0 || !dongY}
                 className="bg-primary text-primary-foreground font-bold"
               >
                 {submitting ? <Spinner className="w-4 h-4 mr-2" /> : null}
