@@ -35,6 +35,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
+import { ghiNhatKy } from "@/lib/nhat-ky";
 
 export const runtime = "nodejs";
 
@@ -119,6 +120,23 @@ export async function POST(
       })
       .eq("id", galleryId);
     if (error) throw error;
+
+    /*
+      BB-052. Chính ghi chú đầu tệp này nói: "Sáu tháng sau, câu hỏi 'sao bộ
+      này mở lại' chỉ trả lời được nếu lúc đó có người viết vào" — nhưng lý do
+      chỉ được ghi vào `galleries.reopen_reason`, mà cột đó bị lần mở lại SAU
+      ghi đè. Nhật ký giữ được cả chuỗi.
+    */
+    await ghiNhatKy({
+      actorType: "staff",
+      actorId: staff.staffId,
+      branchId: gallery.branch_id,
+      action: "gallery.reopen",
+      entityType: "gallery",
+      entityId: galleryId,
+      galleryId,
+      metadata: { tuTrangThai: gallery.status, lyDo: reason, hanMoi },
+    });
 
     return ok({ status: "in_review", reopenedAt: now, dueAt: hanMoi });
   } catch (err) {

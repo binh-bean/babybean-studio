@@ -13,6 +13,20 @@ import { PlacePhotoSchema, RemovePhotoPlacementSchema } from "./schema";
  * 2. Đặt ảnh vào sản phẩm in KHÔNG tiêu thêm hạn mức.
  * 3. Một ảnh đặt được vào NHIỀU sản phẩm (bảng nối selection_placements).
  */
+/**
+ * BB-052 — CỐ Ý không ghi nhật ký cho từng lượt đặt ảnh.
+ *
+ * Rà soát 22/09/2026 chốt: mọi đường ghi dữ liệu đều phải có dòng nhật ký, trừ
+ * những chỗ có lý do viết ra. Đây là một trong số đó.
+ *
+ * Một bộ ảnh in mười khung là mười lượt đặt, và khách đổi ý giữa chừng thì
+ * thành ba bốn chục dòng cho MỘT buổi chụp. Nhật ký sẽ ngập những dòng không
+ * ai đọc, và dòng đáng đọc — sửa dòng hàng, mở lại bộ ảnh — chìm mất.
+ *
+ * Bản thân việc đặt ảnh đã là dữ liệu lưu trong `selection_placements`, xem
+ * được ở màn chi tiết bộ ảnh. Còn quyết định cuối của khách thì có
+ * `selection.submit` ghi lại đầy đủ.
+ */
 export async function POST(request: NextRequest) {
   try {
     const session = await requireGallerySession(EDITING_ROLES);

@@ -31,6 +31,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiNhatKy } from "@/lib/nhat-ky";
 
 export const runtime = "nodejs";
 
@@ -68,7 +69,7 @@ export async function POST(request: Request): Promise<Response> {
     const admin = createAdminClient();
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, status")
+      .select("id, branch_id, status")
       .eq("id", session.galleryId)
       .maybeSingle();
 
@@ -101,6 +102,19 @@ export async function POST(request: Request): Promise<Response> {
         .eq("gallery_id", gallery.id)
         .is("resolved_at", null);
       if (resErr) throw resErr;
+
+      // BB-052: đây là một QUYẾT ĐỊNH của khách, ngang với lúc chốt chọn ảnh.
+      // Không ghi thì sau này "khách duyệt lúc nào, hay studio tự chuyển" chỉ
+      // còn dựa vào `galleries.updated_at` — cột bị mọi lượt sửa khác ghi đè.
+      await ghiNhatKy({
+        actorType: "customer",
+        actorLabel: "khách",
+        branchId: gallery.branch_id,
+        action: "gallery.review_approved",
+        entityType: "gallery",
+        entityId: gallery.id,
+        galleryId: gallery.id,
+      });
 
       return ok({ status: "approved" });
     }
@@ -137,6 +151,19 @@ export async function POST(request: Request): Promise<Response> {
       .update({ status: "in_retouch", updated_at: now })
       .eq("id", gallery.id);
     if (error) throw error;
+
+    await ghiNhatKy({
+      actorType: "customer",
+      actorLabel: "khách",
+      branchId: gallery.branch_id,
+      action: "gallery.review_revise",
+      entityType: "gallery",
+      entityId: gallery.id,
+      galleryId: gallery.id,
+      // Nội dung khách viết nằm ở `revision_requests.note`; ở đây chỉ cần đủ
+      // để lần ra đúng vòng đó.
+      metadata: { round },
+    });
 
     return ok({ status: "in_retouch", round });
   } catch (err) {

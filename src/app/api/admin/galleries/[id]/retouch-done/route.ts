@@ -28,6 +28,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiNhatKy } from "@/lib/nhat-ky";
 
 export const runtime = "nodejs";
 
@@ -110,6 +111,21 @@ export async function POST(
       .update({ status: "awaiting_approval", updated_at: now })
       .eq("id", galleryId);
     if (error) throw error;
+
+    // BB-052: mốc "đã chuyển file cho khách" trước nay không nằm ở đâu ngoài
+    // cột `deliveries.updated_at`, mà cột đó bị lượt chuyển sau ghi đè.
+    await ghiNhatKy({
+      actorType: "staff",
+      actorId: staff.staffId,
+      branchId: gallery.branch_id,
+      action: "gallery.retouch_sent",
+      entityType: "gallery",
+      entityId: galleryId,
+      galleryId,
+      // Không ghi địa chỉ Drive: nhật ký đọc được rộng hơn, và đó là đường vào
+      // thẳng thư mục ảnh của một đứa bé.
+      metadata: { daCoBanGiaoTruoc: Boolean(existing) },
+    });
 
     return ok({ status: "awaiting_approval", finalDriveUrl: url });
   } catch (err) {

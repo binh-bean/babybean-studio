@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiNhatKy } from "@/lib/nhat-ky";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 
 export const runtime = "nodejs";
@@ -208,8 +209,14 @@ const LOCKED_STATUSES = ["submitted", "in_retouch", "delivered", "archived"];
 
 /** Lấy bộ ảnh, kiểm quyền và kiểm khoá. Trả về null kèm lý do nếu không được. */
 type EditableGallery =
-  | { error: Response; admin?: undefined; gallery?: undefined }
-  | { error?: undefined; admin: ReturnType<typeof createAdminClient>; gallery: { id: string; branch_id: string; status: string } };
+  | { error: Response; admin?: undefined; gallery?: undefined; staff?: undefined }
+  | {
+      error?: undefined;
+      admin: ReturnType<typeof createAdminClient>;
+      gallery: { id: string; branch_id: string; status: string };
+      /** Cần cho dòng nhật ký: ai sửa dòng hàng này (BB-052). */
+      staff: Awaited<ReturnType<typeof requireStaff>>;
+    };
 
 async function loadEditableGallery(galleryId: string): Promise<EditableGallery> {
   const staff = await requireStaff();
@@ -234,7 +241,7 @@ async function loadEditableGallery(galleryId: string): Promise<EditableGallery> 
     } as const;
   }
 
-  return { admin, gallery } as const;
+  return { admin, gallery, staff } as const;
 }
 
 async function quotaOf(
@@ -256,7 +263,7 @@ export async function POST(
 
     const loaded = await loadEditableGallery(galleryId);
     if (loaded.error) return loaded.error;
-    const { admin } = loaded;
+    const { admin, gallery, staff } = loaded;
 
     const body = (await request.json().catch(() => null)) as {
       productId?: string;
@@ -290,10 +297,23 @@ export async function POST(
 
     if (error) throw error;
 
+    const quotaAfter = await quotaOf(admin, galleryId);
+    await ghiNhatKy({
+      actorType: "staff",
+      actorId: staff.staffId,
+      branchId: gallery.branch_id,
+      action: "gallery.item_added",
+      entityType: "gallery",
+      entityId: galleryId,
+      galleryId,
+      // Hạn mức trước/sau là thứ đổi số tiền khách phải trả, nên ghi cả hai.
+      metadata: { itemId: inserted.id, productId: body.productId, quantity, quotaBefore, quotaAfter },
+    });
+
     return ok({
       id: inserted.id,
       quotaBefore,
-      quotaAfter: await quotaOf(admin, galleryId),
+      quotaAfter,
     });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
@@ -312,7 +332,7 @@ export async function PATCH(
 
     const loaded = await loadEditableGallery(galleryId);
     if (loaded.error) return loaded.error;
-    const { admin } = loaded;
+    const { admin, gallery, staff } = loaded;
 
     const body = (await request.json().catch(() => null)) as {
       itemId?: string;
@@ -340,7 +360,19 @@ export async function PATCH(
 
     if (error) throw error;
 
-    return ok({ quotaBefore, quotaAfter: await quotaOf(admin, galleryId) });
+    const quotaAfter = await quotaOf(admin, galleryId);
+    await ghiNhatKy({
+      actorType: "staff",
+      actorId: staff.staffId,
+      branchId: gallery.branch_id,
+      action: "gallery.item_changed",
+      entityType: "gallery",
+      entityId: galleryId,
+      galleryId,
+      metadata: { itemId: body.itemId, quantity, quotaBefore, quotaAfter },
+    });
+
+    return ok({ quotaBefore, quotaAfter });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
     return failUnexpected(err, requestId);
@@ -358,7 +390,7 @@ export async function DELETE(
 
     const loaded = await loadEditableGallery(galleryId);
     if (loaded.error) return loaded.error;
-    const { admin } = loaded;
+    const { admin, gallery, staff } = loaded;
 
     const url = new URL(request.url);
     const itemId =
@@ -380,7 +412,19 @@ export async function DELETE(
 
     if (error) throw error;
 
-    return ok({ quotaBefore, quotaAfter: await quotaOf(admin, galleryId) });
+    const quotaAfter = await quotaOf(admin, galleryId);
+    await ghiNhatKy({
+      actorType: "staff",
+      actorId: staff.staffId,
+      branchId: gallery.branch_id,
+      action: "gallery.item_removed",
+      entityType: "gallery",
+      entityId: galleryId,
+      galleryId,
+      metadata: { itemId, quotaBefore, quotaAfter },
+    });
+
+    return ok({ quotaBefore, quotaAfter });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
     return failUnexpected(err, requestId);
