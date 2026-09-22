@@ -304,7 +304,7 @@ export const vi = {
       nhomLienLac: "Liên lạc",
       nhan: {
         "gallery.default_due_days": "Hạn chốt mặc định (ngày)",
-        "gallery.reminder_days": "Nhắc khách vào ngày thứ",
+        "gallery.reminder_days": "Nhắc CSKH gọi khách vào ngày thứ",
         "gallery.link_ttl_days": "Link sống được (ngày)",
         "gallery.invite_default": "Cho mời người thân",
         "gallery.watermark_default": "Đóng dấu mờ",
@@ -315,7 +315,8 @@ export const vi = {
       },
       moTa: {
         "gallery.default_due_days": "Bao nhiêu ngày kể từ lúc gửi link thì khách phải chốt.",
-        "gallery.reminder_days": "Nhập cách nhau dấu phẩy, ví dụ 3, 6. Tối đa 5 lần nhắc.",
+        "gallery.reminder_days":
+          "Tính từ ngày gửi link. App KHÔNG nhắn thẳng cho khách — nó báo vào nhóm Lark của chi nhánh để CSKH gọi. Nhập cách nhau dấu phẩy, ví dụ 3, 6. Tối đa 5 mốc, để trống là tắt hẳn.",
         "gallery.link_ttl_days": "Quá hạn này link tự hết hiệu lực. Chủ studio chốt 60 ngày.",
         "gallery.invite_default": "Ba mẹ có được chia sẻ link cho người thân cùng xem không.",
         "gallery.watermark_default": "Ảnh xem trước có đóng dấu mờ hay không.",

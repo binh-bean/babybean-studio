@@ -34,6 +34,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guiLaiThongBaoDangCho } from "@/lib/lark/notify";
+import { quetNhacKhachChuaChot } from "@/lib/gallery/nhac-khach";
 
 export const runtime = "nodejs";
 
@@ -127,11 +128,25 @@ async function chay(request: Request) {
       lark = { loi: err instanceof Error ? err.message : String(err) };
     }
 
+    // 5. BB-068: nhắc những bộ khách chưa chốt, theo `gallery.reminder_days`.
+    //
+    // Cũng đi nhờ lượt chạy này, cùng lý do như mục 4. Bọc riêng vì cùng lý do
+    // nốt: mấy phần trên ĐÃ xong việc rồi, một lỗi ở đường bắn tin không được
+    // phép biến cả lượt chạy thành 500.
+    let nhac: unknown = { boQua: "không chạy được" };
+    try {
+      nhac = await quetNhacKhachChuaChot();
+    } catch (err) {
+      console.error("[cron/expire-galleries] quét nhắc khách hỏng:", err);
+      nhac = { loi: err instanceof Error ? err.message : String(err) };
+    }
+
     const stats = {
       expiredGalleries: expiredGalleriesCount || 0,
       expiredLinks: expiredLinksCount || 0,
       linkChetTrong7Ngay: sapChet ?? 0,
       larkGuiLai: lark,
+      nhacKhachChuaChot: nhac,
     };
 
     console.info(JSON.stringify({ evt: "cron.expire_galleries", ...stats }));

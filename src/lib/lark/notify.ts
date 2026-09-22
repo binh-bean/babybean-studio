@@ -227,6 +227,52 @@ export function dungThe(
     };
   }
 
+  /**
+   * BB-068 — nhắc bộ ảnh khách chưa chốt.
+   *
+   * Thẻ này là để CSKH NHẤC MÁY GỌI, nên nó phải trả lời đúng ba câu ngay trên
+   * màn khoá điện thoại: bộ nào, gửi mấy ngày rồi, còn mấy ngày nữa hết hạn.
+   * Thiếu câu thứ ba thì người đọc phải mở app ra mới biết có gấp hay không.
+   */
+  if (event === "gallery.due_soon") {
+    const conLai = p.conLaiNgay === null || p.conLaiNgay === undefined ? null : so(p.conLaiNgay);
+    const truong = [
+      o("Bộ ảnh", chu(p.galleryTitle)),
+      o("Khách", chu(p.customerName)),
+      o("Đã gửi", `${so(p.ngayThu)} ngày trước`),
+      o("Còn lại", conLai === null ? "chưa đặt hạn" : conLai <= 0 ? "đã tới hạn" : `${conLai} ngày`),
+    ];
+    if (p.customerPhone) truong.push(o("Điện thoại", chu(p.customerPhone)));
+
+    const elements: Record<string, unknown>[] = [{ tag: "div", fields: truong }];
+    if (diaChiAdmin) {
+      elements.push({
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "Mở bộ ảnh" },
+            type: "primary",
+            url: diaChiAdmin,
+          },
+        ],
+      });
+    }
+
+    return {
+      msg_type: "interactive",
+      card: {
+        // Đỏ khi còn dưới hai ngày: quá mốc đó thì gọi muộn là mất luôn khách
+        // vào vòng "link hết hạn, xin mở lại".
+        header: {
+          template: conLai !== null && conLai <= 2 ? "red" : "orange",
+          title: { tag: "plain_text", content: "Khách chưa chốt ảnh" },
+        },
+        elements,
+      },
+    };
+  }
+
   return null;
 }
 

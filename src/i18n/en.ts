@@ -303,7 +303,7 @@ export const en: Messages = {
       nhomLienLac: "Contact",
       nhan: {
         "gallery.default_due_days": "Default deadline (days)",
-        "gallery.reminder_days": "Remind on day",
+        "gallery.reminder_days": "Remind CS to call on day",
         "gallery.link_ttl_days": "Link lifetime (days)",
         "gallery.invite_default": "Allow inviting relatives",
         "gallery.watermark_default": "Watermark",
@@ -314,7 +314,8 @@ export const en: Messages = {
       },
       moTa: {
         "gallery.default_due_days": "Days from sending the link until the customer must confirm.",
-        "gallery.reminder_days": "Comma separated, e.g. 3, 6. At most 5 reminders.",
+        "gallery.reminder_days":
+          "Counted from the day the link was sent. The app does NOT message the customer — it posts to the branch Lark group so CS can call. Comma separated, e.g. 3, 6. At most 5, empty turns it off.",
         "gallery.link_ttl_days": "The link expires after this many days.",
         "gallery.invite_default": "Whether parents may share the link with relatives.",
         "gallery.watermark_default": "Whether previews carry a watermark.",
