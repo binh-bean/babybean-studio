@@ -103,13 +103,19 @@ export function GalleryFilters({
       <div className="sticky -top-4 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 bg-[var(--bb-bg)] border-b border-[var(--bb-border)] space-y-3">
       {/* Hàng 1: Tìm kiếm, Bộ lọc nhanh, Toggle Chế độ xem & Nút tạo mới */}
       {/*
-        `lg:flex-nowrap`: trên máy tính hai cụm KHÔNG được xuống dòng.
+        Dưới `lg` KHÔNG dùng `justify-between`: bốn thứ dồn sát nhau về bên
+        trái, chỗ trống dồn hết ra mép phải. Đó là cách đọc đúng câu "dồn vào
+        cho gọn" — trước đây `justify-between` xé đôi hàng và để một cái hố
+        300px ngay giữa. Từ `lg` mới bật lại `justify-between`, vì ở đó ô tìm
+        đã giãn ra lấp chỗ và nút Tạo nằm mép phải là đúng chỗ tay hay bấm.
+
+        `lg:flex-nowrap`: ô tìm giãn thì cụm trái chạm đúng mép cụm phải.
         Ô tìm giãn ra lấp chỗ hở, mà giãn thì cụm trái chạm đúng mép cụm
         phải — chỉ lệch nửa điểm ảnh là trình duyệt đẩy cụm Bảng/Kanban
         xuống nằm lẫn với hàng bộ lọc, nhìn như bố cục vỡ. Cấm xuống dòng
         thì ô tìm tự co lại vừa chỗ còn trống.
       */}
-      <div className="flex flex-wrap items-center justify-between gap-3 lg:flex-nowrap">
+      <div className="flex flex-wrap items-center gap-3 lg:flex-nowrap lg:justify-between">
         {/*
           `flex-1 min-w-[280px]` chỉ áp dụng từ `lg`. Trên điện thoại, hai thứ
           đó ép cụm bên trái chiếm trọn một dòng, đẩy cụm Bảng/Kanban xuống dòng
