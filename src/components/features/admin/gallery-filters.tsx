@@ -151,14 +151,18 @@ export function GalleryFilters({
             type="button"
             variant={soBoLocDangBat > 0 ? "default" : "ghost"}
             size="sm"
-            className="h-9 px-3 lg:hidden"
+            className="h-9 px-2.5 lg:hidden"
             onClick={() => setMoBoLoc((v) => !v)}
             aria-expanded={moBoLoc}
             aria-controls="khoi-bo-loc"
             title={vi.admin.galleries.filterToggle}
           >
             <SlidersHorizontal className="h-4 w-4" />
-            <span className="ml-1.5 text-xs">{vi.admin.galleries.filterToggle}</span>
+            {/* Chữ "Bộ lọc" ẩn dưới `sm` để bốn nút nằm gọn trên MỘT hàng ở
+                khổ 375px; con số bộ lọc đang bật thì luôn hiện. */}
+            <span className="ml-1.5 hidden text-xs sm:inline">
+              {vi.admin.galleries.filterToggle}
+            </span>
             {soBoLocDangBat > 0 && (
               <span className="ml-1.5 rounded-full bg-[var(--bb-bg)]/30 px-1.5 text-[10px]">
                 {soBoLocDangBat}
@@ -266,8 +270,8 @@ export function GalleryFilters({
               className="h-8 px-3 text-xs"
               aria-label="Xem dạng bảng"
             >
-              <Table2 className="h-3.5 w-3.5 mr-1" />
-              Bảng
+              <Table2 className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Bảng</span>
             </Button>
             <Button
               type="button"
@@ -277,8 +281,8 @@ export function GalleryFilters({
               className="h-8 px-3 text-xs"
               aria-label="Xem dạng Kanban"
             >
-              <Kanban className="h-3.5 w-3.5 mr-1" />
-              Kanban
+              <Kanban className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Kanban</span>
             </Button>
           </div>
 

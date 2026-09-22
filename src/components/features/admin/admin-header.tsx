@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { AdminBreadcrumb } from "./admin-breadcrumb";
+import { AdminBreadcrumb, TenManHinh } from "./admin-breadcrumb";
 import { Menu } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -36,8 +36,18 @@ export function AdminHeader({ role, hoTen }: { role?: string; hoTen?: string | n
         
         {/* Breadcrumb for desktop */}
         <AdminBreadcrumb />
-        {/* Title for mobile when breadcrumb hidden */}
-        <span className="font-display font-bold sm:hidden text-[var(--bb-fg)]">BabyBean</span>
+        {/*
+          Trên điện thoại thanh này chỉ có nút menu, chữ BabyBean và nút thoát —
+          giữa trống một mảng, trong khi tên màn đang xem lại chiếm hẳn một dòng
+          bên dưới. Nay tên màn nằm luôn ở đây.
+        */}
+        <span className="flex min-w-0 items-baseline gap-1.5 sm:hidden">
+          <span className="font-display font-bold text-[var(--bb-fg)]">BabyBean</span>
+          <span className="truncate text-sm text-[var(--bb-fg-muted)]">
+            <span aria-hidden="true">· </span>
+            <TenManHinh />
+          </span>
+        </span>
       </div>
       <div className="flex items-center gap-3">
         {/* BB-174 gỡ chọn chi nhánh và ảnh đại diện đi vì cả hai chưa làm gì.

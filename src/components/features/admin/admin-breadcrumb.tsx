@@ -5,18 +5,27 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
+function getBreadcrumbName(path: string) {
+  if (path === "admin") return "Bảng điều khiển";
+  if (path === "galleries") return "Quản lý Bộ ảnh";
+  if (path === "customers") return "Khách hàng";
+  if (path === "settings") return "Cài đặt";
+  if (path === "staff") return "Nhân sự";
+  if (path === "roles") return "Vai trò";
+  if (path === "branches") return "Chi nhánh";
+  if (path === "reports") return "Báo cáo";
+  if (path === "nhat-ky") return "Nhật ký thao tác";
+  if (path === "over-quota") return "Ảnh vượt hạn mức";
+  if (path === "loi-dong-bo") return "Bộ ảnh lỗi tải";
+  if (path === "link-sap-het-han") return "Link sắp hết hạn";
+  if (path === "create") return "Tạo bộ ảnh mới";
+  return path;
+}
+
 export function AdminBreadcrumb() {
   const pathname = usePathname();
-  
+
   const paths = pathname.split("/").filter(Boolean);
-  
-  const getBreadcrumbName = (path: string) => {
-    if (path === "admin") return "Bảng điều khiển";
-    if (path === "galleries") return "Quản lý Bộ ảnh";
-    if (path === "customers") return "Khách hàng";
-    if (path === "settings") return "Cài đặt";
-    return path; 
-  };
 
   const breadcrumbs = paths.map((path, index) => {
     const href = "/" + paths.slice(0, index + 1).join("/");
@@ -47,4 +56,18 @@ export function AdminBreadcrumb() {
       })}
     </nav>
   );
+}
+
+/**
+ * Tên của màn đang xem, một chữ duy nhất — dùng cho thanh đầu trang trên điện
+ * thoại, nơi không đủ chỗ cho cả đường dẫn.
+ *
+ * Dùng chung `getBreadcrumbName` với đường dẫn đầy đủ: hai bảng tên cho cùng
+ * một màn là hai bảng sẽ trôi khỏi nhau.
+ */
+export function TenManHinh() {
+  const pathname = usePathname();
+  const paths = pathname.split("/").filter(Boolean);
+  const cuoi = paths[paths.length - 1] ?? "admin";
+  return <>{getBreadcrumbName(cuoi)}</>;
 }
