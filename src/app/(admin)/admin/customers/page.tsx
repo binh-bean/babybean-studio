@@ -36,12 +36,23 @@ export default async function CustomersPage() {
   }
 
   return (
-    <main className="mx-auto min-w-0 max-w-6xl p-4 md:p-6">
-      <h1 className="mb-4 text-2xl font-bold tracking-tight">{vi.admin.khachHang.title}</h1>
+    /*
+      Không thêm padding ở đây: khung cuộn của layout đã có `p-4 sm:p-6 lg:p-8`.
+      Lồng thêm một lớp nữa là mất 32px bề ngang trên màn 375px.
+
+      Tiêu đề to chỉ hiện từ `lg`. Dưới đó, tên màn đã nằm ngay cạnh chữ
+      BabyBean ở thanh trên cùng (admin-header.tsx) — in lại lần nữa là đẩy
+      danh sách xuống thêm gần 100px trên một màn cao 812px. Cùng luật với màn
+      Quản lý bộ ảnh, theo yêu cầu của chủ studio 22/09/2026.
+    */
+    <div className="min-w-0 space-y-4 lg:space-y-6">
+      <h1 className="hidden text-2xl font-display font-bold tracking-tight lg:block">
+        {vi.admin.khachHang.title}
+      </h1>
       <CustomersManager
         coQuyenSua={permissions.includes("customers:write")}
         coQuyenXoa={permissions.includes("customers:delete")}
       />
-    </main>
+    </div>
   );
 }

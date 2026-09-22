@@ -342,7 +342,7 @@ export const vi = {
       oTim: "Tên khách hoặc số điện thoại",
       tim: "Tìm",
       xoaTim: "Xoá tìm kiếm",
-      goiY: "Gõ từ 3 chữ số trở lên thì tìm theo số điện thoại, còn lại tìm theo tên.",
+      goiY: "Gõ số thì tìm theo số điện thoại, gõ chữ thì tìm theo tên.",
       cot: {
         ten: "Khách hàng",
         sdt: "Số điện thoại",

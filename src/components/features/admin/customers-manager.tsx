@@ -124,11 +124,26 @@ export function CustomersManager({
     return () => clearTimeout(h);
   }, [tuKhoa, tai]);
 
+  /**
+   * Trên điện thoại, MỞ HỒ SƠ THÌ THAY CHỖ danh sách.
+   *
+   * Đo ngày 22/09/2026 trên màn 375px: hồ sơ vẽ ngay dưới danh sách, mà danh
+   * sách dài tới 50 dòng — chạm vào một khách xong thì màn hình không nhúc
+   * nhích, hồ sơ nằm cách đó mấy nghìn điểm ảnh bên dưới. Người dùng kết luận
+   * là bấm không ăn.
+   *
+   * Từ `lg` trở lên thì giữ cả hai: bảng ở trên, hồ sơ ở dưới, liếc mắt là
+   * thấy cả hai cùng lúc.
+   */
+  const anDanhSach = dangMo ? "hidden lg:block" : "";
+
   return (
     <div className="min-w-0 space-y-5">
-      <p className="text-sm text-[var(--bb-fg-muted)]">{t.subtitle}</p>
+      {/* Ba dòng chữ trước ô tìm trên màn 375px là ba dòng người ta phải
+          vuốt qua mỗi lần mở. Câu gợi ý ngay dưới ô tìm đã đủ dùng. */}
+      <p className="hidden text-sm text-[var(--bb-fg-muted)] sm:block">{t.subtitle}</p>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={`flex flex-wrap items-center gap-2 ${anDanhSach}`}>
         <div className="min-w-0 flex-1 sm:max-w-md">
           <label htmlFor="tim-khach" className="sr-only">
             {t.oTim}
@@ -147,7 +162,7 @@ export function CustomersManager({
           </Button>
         )}
       </div>
-      <p className="text-xs text-[var(--bb-fg-muted)]">{t.goiY}</p>
+      <p className={`text-xs text-[var(--bb-fg-muted)] ${anDanhSach}`}>{t.goiY}</p>
 
       {loi && (
         <div
@@ -158,6 +173,7 @@ export function CustomersManager({
         </div>
       )}
 
+      <div className={`space-y-3 ${anDanhSach}`}>
       {dangTai ? (
         <div className="flex justify-center py-12">
           <Spinner />
@@ -248,6 +264,7 @@ export function CustomersManager({
           )}
         </>
       )}
+      </div>
 
       {dangMo && (
         <HoSoKhach

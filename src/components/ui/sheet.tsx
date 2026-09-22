@@ -53,19 +53,45 @@ export interface SheetTriggerProps
   asChild?: boolean;
 }
 
+/**
+ * `asChild` LÀM THẬT, không chỉ khai trong kiểu dữ liệu.
+ *
+ * Trước 22/09/2026, `asChild` được khai trong `SheetTriggerProps` nhưng thân
+ * hàm không đọc tới: nó rơi vào `...props` rồi được đổ thẳng lên thẻ `<button>`
+ * của DOM. Hậu quả đo được trên mọi màn quản trị (nút mở menu ở
+ * `admin-header.tsx` dùng đúng kiểu này):
+ *
+ *   - `<button>` lồng trong `<button>` — HTML không cho phép, nên React báo
+ *     "Hydration failed because the server rendered HTML didn't match".
+ *     Hydration hỏng thì React vứt cây máy chủ dựng sẵn và vẽ lại toàn bộ bằng
+ *     máy khách: chậm hơn, và mọi trạng thái đặt trước đó biến mất.
+ *   - Cảnh báo "React does not recognize the `asChild` prop on a DOM element".
+ *
+ * Nay `asChild` được xử lý: giữ nguyên phần tử con, chỉ gắn thêm `onClick` vào
+ * nó. `onClick` của chính đứa con vẫn chạy trước.
+ */
 const SheetTrigger = React.forwardRef<HTMLButtonElement, SheetTriggerProps>(
-  ({ children, onClick, ...props }, ref) => {
+  ({ children, onClick, asChild, ...props }, ref) => {
     const context = React.useContext(SheetContext);
+    const moDong = (e: React.MouseEvent<HTMLButtonElement>) => {
+      onClick?.(e);
+      context?.onOpenChange(!context.open);
+    };
+
+    if (asChild && React.isValidElement(children)) {
+      const con = children as React.ReactElement<{
+        onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+      }>;
+      return React.cloneElement(con, {
+        onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
+          con.props.onClick?.(e);
+          moDong(e);
+        },
+      });
+    }
+
     return (
-      <button
-        ref={ref}
-        type="button"
-        onClick={(e) => {
-          onClick?.(e);
-          context?.onOpenChange(!context.open);
-        }}
-        {...props}
-      >
+      <button ref={ref} type="button" onClick={moDong} {...props}>
         {children}
       </button>
     );

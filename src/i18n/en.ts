@@ -341,7 +341,7 @@ export const en: Messages = {
       oTim: "Customer name or phone number",
       tim: "Search",
       xoaTim: "Clear search",
-      goiY: "Three digits or more searches by phone; anything else searches by name.",
+      goiY: "Typing digits searches by phone; anything else searches by name.",
       cot: {
         ten: "Customer",
         sdt: "Phone",
