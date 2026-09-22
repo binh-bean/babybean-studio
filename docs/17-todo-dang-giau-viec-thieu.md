@@ -67,3 +67,33 @@ ra điều đó.
   chạm tới, và riêng mục 1 quét thêm cả `src/` lẫn `scripts/` để chắc không có
   lối gọi nào.
 - Không xoá dòng TODO nào. Chúng là bằng chứng.
+
+---
+
+## Bổ sung 22/09/2026 — sửa hồ sơ khách rồi bị đồng bộ Lark ghi đè
+
+Tìm ra khi làm BB-061 (màn Khách hàng). Không phải dòng TODO, nên lần quét 15/09
+không thấy: nó nằm trong câu SQL của đường đồng bộ.
+
+**Việc xảy ra:** CSKH sửa tên hoặc số điện thoại của một khách trong app. Lần
+đồng bộ Lark kế tiếp ghi đè lại bằng bản bên Lark, và giá trị cũ quay về.
+
+**Vì sao:** cả hai đường đồng bộ đều ghi đè VÔ ĐIỀU KIỆN:
+
+| Đường | Câu ghi | Ghi đè cái gì |
+|---|---|---|
+| `scripts/sync-lark-hauky.mjs` | `full_name = excluded.full_name`, `note = excluded.note`, `phone = coalesce(nullif(excluded.phone,'0000000000'), customers.phone)` | tên, ghi chú, và số khi Lark có số |
+| `src/lib/lark/sync-retouch.ts` | `full_name = $2` | tên |
+
+**Đã làm gì:** `GET /api/admin/customers/:id` trả `truongBiGhiDe` cho khách có
+`lark_customer_key`, và màn hình hiện câu cảnh báo ngay trên hồ sơ trước khi
+người ta bấm Sửa. Tức là **nói ra**, chứ chưa chữa.
+
+**Chữa thật thì cần chủ studio quyết**, vì hai hướng đi ngược nhau:
+
+1. *Lark là nguồn thật* — khoá luôn ba ô đó trong app, ai muốn sửa thì sửa bên
+   Lark. Được cái nhất quán, mất cái tiện khi đang nghe điện thoại.
+2. *App được quyền đè Lark* — thêm cột đánh dấu "ô này người sửa tay", và đồng
+   bộ bỏ qua những ô đó. Tiện hơn, nhưng từ đó hai bên có thể lệch nhau mãi mãi.
+
+Chưa chọn thì giữ nguyên hướng hiện tại: cho sửa, và nói trước là sẽ bị đè.

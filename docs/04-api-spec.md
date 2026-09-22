@@ -312,14 +312,24 @@ Mọi lần export đều ghi `activity_logs`.
 
 | Method | Path | Vai trò |
 |---|---|---|
-| `GET/POST` | `/customers`, `/customers/:id` | cs+ |
-| `GET/POST/PATCH` | `/babies` | cs+ |
-| `GET` | `/customers/:id/history` | cs+ |
+| `GET` | `/customers` (BB-061, đã làm) | quyền `customers:read` |
+| `GET/PATCH` | `/customers/:id` (BB-061, đã làm — kèm bé, lịch sử chụp, hồ sơ trùng SĐT) | đọc: `customers:read`; sửa: `customers:write` |
+| `POST` | `/customers/:id/babies` (BB-061, đã làm) | `customers:write` |
+| `PATCH/DELETE` | `/customers/:id/babies/:babyId` (BB-061, đã làm) | sửa: `customers:write`; xoá: `customers:delete` |
+| `POST` | `/customers` — tạo khách tay, CHƯA làm. Khách hiện đều do đồng bộ Lark sinh ra | `customers:write` |
 | `GET/POST/PATCH` | `/packages` | manager+ |
 | `GET/POST/PATCH` | `/branches` | admin+ |
 | `GET/POST/PATCH` | `/staff` | admin+ |
 | `POST` | `/staff/invite` | admin+ |
 | `GET/PATCH` | `/settings` | manager+ (theo chi nhánh), admin+ (toàn hệ thống) |
+
+Lịch sử chụp **không có đường riêng** `/customers/:id/history` như bản phác đầu:
+nó nằm trong chính `GET /customers/:id`, vì màn hình luôn hiện hồ sơ và lịch sử
+cùng lúc — tách ra là hai vòng gọi mạng cho một màn.
+
+Lọc theo chi nhánh áp cho cả ba thứ trong đó: khách, bộ ảnh và hồ sơ trùng số.
+Bộ ảnh mang `branch_id` RIÊNG của nó, nên một khách chi nhánh A vẫn có thể có
+bộ ảnh ở chi nhánh B — không lọc là rò dữ liệu chi nhánh khác qua đường vòng.
 
 ### 4.3 Dashboard, báo cáo, nhật ký
 
