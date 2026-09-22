@@ -175,6 +175,42 @@ export async function GET(request: Request) {
 
     const totalAddonsAmount = addonsList.reduce((sum, a) => sum + a.totalPrice, 0);
 
+    /**
+     * DANH MỤC sản phẩm ba mẹ có thể mua thêm.
+     *
+     * Trước 22/09/2026 màn khách dựng `AddonSelector` từ chính những dòng ĐÃ
+     * MUA. Chưa mua gì thì danh sách rỗng, mà danh sách rỗng thì component tự
+     * ẩn — nên không bao giờ có cái gì để bấm mua. Vòng tròn khép kín, và
+     * `selection_addons` trên bb-dev đúng **0 dòng** từ đầu tới nay.
+     *
+     * Lọc theo đúng ba luật tiền của BB-105 (`/api/g/addons` kiểm lại lần nữa
+     * khi ghi): có giá niêm yết, độ tin cậy >= 0.8, và ít nhất 5 lần bán làm
+     * mẫu. Sản phẩm chưa đủ tin cậy thì KHÔNG bày ra — thà để CSKH báo giá còn
+     * hơn hiện một con số rồi phải cải chính.
+     *
+     * Không bày `shoot_package`: đó là một buổi chụp mới, không phải thứ mua
+     * thêm trong lúc đang chọn ảnh. Bán buổi chụp qua nút "+" trên màn ảnh là
+     * đường dẫn tới hiểu nhầm đắt tiền.
+     */
+    const { data: rawCatalogue } = await supabase
+      .from("products")
+      .select("id, name, kind, material, size, list_price")
+      .eq("is_active", true)
+      .in("kind", ["print", "addon", "edited_photo"])
+      .not("list_price", "is", null)
+      .gte("price_confidence", 0.8)
+      .gte("price_samples", 5)
+      .order("list_price", { ascending: true });
+
+    const catalogue = (rawCatalogue ?? []).map((p) => ({
+      productId: p.id,
+      name: p.name,
+      kind: p.kind,
+      material: p.material,
+      size: p.size,
+      unitPrice: Number(p.list_price),
+    }));
+
     // Lấy danh sách ảnh đã đặt vào sản phẩm in (selection_placements)
     const { data: userSelectionItems } = await supabase
       .from("selection_items")
@@ -304,7 +340,10 @@ export async function GET(request: Request) {
       },
       addons: {
         totalAmount: totalAddonsAmount,
+        /** Những dòng ba mẹ ĐÃ đặt mua. */
         items: addonsList,
+        /** Những thứ ba mẹ CÓ THỂ đặt mua. */
+        catalogue,
       },
       placements: placementsList,
       review,

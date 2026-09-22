@@ -97,6 +97,15 @@ interface GalleryApiResponse {
       totalPrice: number;
       size: string | null;
     }>;
+    /** Danh mục ba mẹ CÓ THỂ mua thêm — xem ghi chú ở `/api/g/gallery`. */
+    catalogue?: Array<{
+      productId: string;
+      name: string;
+      kind: string;
+      material: string | null;
+      size: string | null;
+      unitPrice: number;
+    }>;
   };
 }
 
@@ -949,6 +958,37 @@ export function GalleryApp({ token }: GalleryAppProps) {
     [placements],
   );
 
+  /**
+   * Đặt số lượng một sản phẩm mua thêm.
+   *
+   * Gửi SỐ LƯỢNG MONG MUỐN (0 là bỏ mua), rồi tải lại bộ ảnh để con số tiền
+   * trên màn hình đúng bằng con số máy chủ vừa tính — tiền là chỗ không được
+   * phép đoán ở máy khách.
+   */
+  const datSoLuongMuaThem = useCallback(
+    async (productId: string, soLuong: number) => {
+      setPlacing(true);
+      try {
+        const res = await fetch("/api/g/addons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId, quantity: soLuong }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          setStatusMessage(json?.error?.message ?? "Không lưu được, ba mẹ thử lại giúp.");
+          return;
+        }
+        await loadGallery();
+      } catch {
+        setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
+      } finally {
+        setPlacing(false);
+      }
+    },
+    [loadGallery],
+  );
+
   const contractBreakdownItems = useMemo<ContractItem[]>(() => {
     if (!gallery?.contract?.items) return [];
     return gallery.contract.items.map((item) => ({
@@ -964,14 +1004,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
     }));
   }, [gallery]);
 
-  // Danh sách addon sản phẩm mua thêm
+  /**
+   * Danh sách sản phẩm bày ra cho ba mẹ chọn mua thêm.
+   *
+   * Lấy từ DANH MỤC (`addons.catalogue`), không phải từ những dòng đã mua.
+   * Bản cũ lấy từ `addons.items` — tức là chỉ hiện những thứ ba mẹ ĐÃ mua, nên
+   * khi chưa mua gì thì danh sách rỗng và component tự ẩn. Không bao giờ có
+   * cái gì để bấm mua lần đầu.
+   */
   const addonProducts = useMemo<AddonProduct[]>(() => {
-    if (!gallery?.addons?.items) return [];
-    return gallery.addons.items.map((item) => ({
-      id: item.productId,
-      name: item.name,
-      unitPrice: item.unitPrice,
-      unit: item.size || undefined,
+    const dm = gallery?.addons?.catalogue;
+    if (!dm?.length) return [];
+    return dm.map((sp) => ({
+      id: sp.productId,
+      name: sp.name,
+      unitPrice: sp.unitPrice,
+      unit: sp.size || undefined,
+      // Máy chủ đã lọc theo ba luật tiền của BB-105 trước khi gửi xuống.
       priceReliable: true,
     }));
   }, [gallery]);
@@ -1367,7 +1416,26 @@ export function GalleryApp({ token }: GalleryAppProps) {
             <AddonSelector
               products={addonProducts}
               value={addonQuantities}
-              disabled={isLocked}
+              disabled={isLocked || placing}
+              onChange={(soLuongMoi) => {
+                // Chỉ gửi sản phẩm VỪA ĐỔI, không gửi cả bảng: mỗi lượt gọi là
+                // một dòng nhật ký, và gửi cả bảng là ghi lại cả những thứ ba
+                // mẹ không đụng tới.
+                const cu = addonQuantities;
+                for (const [productId, sl] of Object.entries(soLuongMoi)) {
+                  if ((cu[productId] ?? 0) !== sl) {
+                    void datSoLuongMuaThem(productId, sl);
+                    return;
+                  }
+                }
+                // Sản phẩm bị bỏ hẳn khỏi bảng mới = đặt về 0.
+                for (const productId of Object.keys(cu)) {
+                  if (!(productId in soLuongMoi)) {
+                    void datSoLuongMuaThem(productId, 0);
+                    return;
+                  }
+                }
+              }}
             />
           </section>
         )}

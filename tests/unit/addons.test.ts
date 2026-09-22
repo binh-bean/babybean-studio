@@ -169,7 +169,9 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     });
 
     const res = await postAddon(req);
-    expect(res.status).toBe(201);
+    // 200, không còn 201: đường này nay là ĐẶT SỐ LƯỢNG (upsert), không
+    // phải "tạo mới mỗi lượt gọi" — xem migration 0059.
+    expect(res.status).toBe(200);
 
     const body = await res.json();
     expect(body.data).toBeDefined();
@@ -290,10 +292,17 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     expect(Number(addons![0]!.unit_price)).toBe(250000);
   });
 
-  it("Test 5: Quantity 0 hoặc âm -> từ chối", async () => {
+  it("Test 5: Quantity âm -> từ chối; quantity 0 -> BỎ MUA", async () => {
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValue(session);
 
-    // Quantity = 0
+    /*
+      Đổi so với bản BB-105 gốc: `quantity: 0` KHÔNG còn là dữ liệu sai, nó là
+      "ba mẹ bỏ mua sản phẩm này". Trước đây không có đường nào bỏ mua — đường
+      này chèn thẳng một dòng mỗi lượt gọi, nên bấm cộng ba lần là ba dòng và
+      hoá đơn tính tiền ba lần. Xem migration 0059.
+
+      Số âm thì vẫn là dữ liệu sai.
+    */
     const reqZero = new Request("http://localhost:3000/api/g/addons", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -303,9 +312,8 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       }),
     });
     const resZero = await postAddon(reqZero);
-    expect(resZero.status).toBe(400);
-    const bodyZero = await resZero.json();
-    expect(bodyZero.error.code).toBe("INVALID_INPUT");
+    expect(resZero.status).toBe(200);
+    expect((await resZero.json()).data.totalAddonsAmount).toBe(0);
 
     // Quantity = -3
     const reqNegative = new Request("http://localhost:3000/api/g/addons", {
@@ -323,7 +331,22 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
   });
 
   it("Test 6: GET /api/g/gallery trả thêm khối addons đã mua của phiên", async () => {
-    vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
+    vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValue(session);
+
+    // Dọn sạch rồi dựng lại đúng thứ cần đọc.
+    //
+    // Các ca trước để lại dòng mua thêm của riêng chúng, và ca này khẳng định
+    // một con số tiền CỤ THỂ. Dựa vào thứ tự các ca là chỗ dễ vỡ nhất trong
+    // một tệp phép thử — chỉ cần thêm một ca ở giữa là con số lệch.
+    await supabase.from("selection_addons").delete().eq("selection_id", selectionId);
+
+    await postAddon(
+      new Request("http://localhost:3000/api/g/addons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productId: prodReliableId, quantity: 2 }),
+      }),
+    );
 
     const res = await getGallery(new Request("http://localhost/api/g/gallery"));
     expect(res.status).toBe(200);
@@ -331,13 +354,22 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     const body = await res.json();
     expect(body.data).toBeDefined();
     expect(body.data.addons).toBeDefined();
-    expect(body.data.addons.totalAmount).toBe(500000);
+    /*
+      350.000đ chứ không phải 250.000đ: ca 4 vừa đổi bảng giá lên 350.000, và ca
+      này ĐẶT LẠI số lượng sau đó.
+
+      Đây là chỗ hai luật gặp nhau, nên nói rõ:
+        · Dòng đã mua mà ba mẹ KHÔNG đụng tới thì giữ nguyên giá cũ (ca 4).
+        · Ba mẹ đổi số lượng là một lần đặt mua MỚI, chốt theo giá đang hiện
+          trên màn hình lúc họ bấm — tức giá mới.
+    */
+    expect(body.data.addons.totalAmount).toBe(700000);
     expect(body.data.addons.items).toHaveLength(1);
 
     const item = body.data.addons.items[0];
     expect(item.productId).toBe(prodReliableId);
     expect(item.quantity).toBe(2);
-    expect(item.unitPrice).toBe(250000);
-    expect(item.totalPrice).toBe(500000);
+    expect(item.unitPrice).toBe(350000);
+    expect(item.totalPrice).toBe(700000);
   });
 });

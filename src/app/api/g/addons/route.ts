@@ -95,20 +95,45 @@ export async function POST(request: Request): Promise<Response> {
     // Luật 1: Đơn giá chốt tại thời điểm mua, lấy từ products.list_price
     const unitPrice = Number(product.list_price);
 
-    // 5. Insert selection_addons
-    const { data: addon, error: insertError } = await admin
-      .from("selection_addons")
-      .insert({
-        selection_id: session.selectionId,
-        product_id: product.id,
-        quantity: input.quantity,
-        unit_price: unitPrice,
-      })
-      .select("id, selection_id, product_id, quantity, unit_price, created_at")
-      .single();
+    /**
+     * 5. ĐẶT số lượng, không phải cộng dồn.
+     *
+     * `quantity = 0` là bỏ mua. Ràng buộc `uq_selection_addons_selection_product`
+     * (migration 0059) bảo đảm một sản phẩm chỉ có một dòng, nên `upsert` ở đây
+     * là sửa đúng dòng đó chứ không sinh dòng mới.
+     *
+     * Đơn giá vẫn CHỐT LẠI mỗi lần đặt, theo giá niêm yết lúc bấm — đúng luật 1
+     * của BB-105. Ba mẹ đổi số lượng hôm sau mà studio vừa đổi giá thì giá mới
+     * là giá áp dụng, và nó nằm ngay trên màn hình lúc họ bấm.
+     */
+    if (input.quantity === 0) {
+      const { error: delErr } = await admin
+        .from("selection_addons")
+        .delete()
+        .eq("selection_id", session.selectionId)
+        .eq("product_id", product.id);
+      if (delErr) throw delErr;
+    }
 
-    if (insertError || !addon) {
-      throw insertError || new Error("Không thể tạo dòng mua thêm sản phẩm");
+    const { data: addon, error: insertError } =
+      input.quantity === 0
+        ? { data: null, error: null }
+        : await admin
+            .from("selection_addons")
+            .upsert(
+              {
+                selection_id: session.selectionId,
+                product_id: product.id,
+                quantity: input.quantity,
+                unit_price: unitPrice,
+              },
+              { onConflict: "selection_id,product_id" },
+            )
+            .select("id, selection_id, product_id, quantity, unit_price, created_at")
+            .single();
+
+    if (insertError || (input.quantity > 0 && !addon)) {
+      throw insertError || new Error("Không lưu được sản phẩm mua thêm");
     }
 
     // 6. Calculate total addons amount for the current selection session
@@ -131,16 +156,16 @@ export async function POST(request: Request): Promise<Response> {
       actor_type: "customer",
       actor_id: session.selectionId,
       actor_label: "Customer",
-      action: "addon.create",
+      action: input.quantity === 0 ? "addon.remove" : "addon.set",
       entity_type: "gallery",
       entity_id: session.galleryId,
       metadata: {
-        addonId: addon.id,
+        addonId: addon?.id ?? null,
         productId: product.id,
         productName: product.name,
-        quantity: addon.quantity,
+        quantity: input.quantity,
         unitPrice,
-        totalPrice: unitPrice * addon.quantity,
+        totalPrice: unitPrice * input.quantity,
       },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
@@ -148,23 +173,25 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json(
       {
         data: {
-          addon: {
-            id: addon.id,
-            selectionId: addon.selection_id,
-            productId: addon.product_id,
-            productName: product.name,
-            material: product.material,
-            size: product.size,
-            quantity: addon.quantity,
-            unitPrice,
-            totalPrice: unitPrice * addon.quantity,
-            createdAt: addon.created_at,
-          },
+          addon: addon
+            ? {
+                id: addon.id,
+                selectionId: addon.selection_id,
+                productId: addon.product_id,
+                productName: product.name,
+                material: product.material,
+                size: product.size,
+                quantity: addon.quantity,
+                unitPrice,
+                totalPrice: unitPrice * addon.quantity,
+                createdAt: addon.created_at,
+              }
+            : null,
           totalAddonsAmount,
         },
       },
       {
-        status: 201,
+        status: 200,
         headers: { "Cache-Control": "no-store" },
       }
     );
