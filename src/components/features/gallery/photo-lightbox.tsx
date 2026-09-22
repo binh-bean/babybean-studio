@@ -427,12 +427,48 @@ export function PhotoLightbox({
       </main>
 
         {/* Bảng "tấm này in ra cái gì" — cột phải trên máy tính. */}
-        {bangSanPham && currentPhoto && (
+        {(bangSanPham || onLuuGhiChu) && currentPhoto && (
           <aside
-            className="hidden w-72 shrink-0 overflow-y-auto border-l border-white/10 bg-black/30 p-4 lg:block"
+            className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-white/10 bg-black/30 p-4 lg:block"
             onClick={(e) => e.stopPropagation()}
           >
-            {bangSanPham(currentPhoto)}
+            {bangSanPham?.(currentPhoto)}
+
+            {onLuuGhiChu && (
+              <div>
+                <label
+                  htmlFor="ghi-chu-anh-ben-phai"
+                  className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-white/50"
+                >
+                  Ghi chú cho thợ chỉnh ảnh
+                </label>
+                <textarea
+                  id="ghi-chu-anh-ben-phai"
+                  value={ghiChu}
+                  onChange={(e) => setGhiChu(e.target.value)}
+                  onBlur={luuGhiChu}
+                  disabled={isLocked || dangLuuGhiChu || !isCurrentSelected}
+                  rows={3}
+                  maxLength={500}
+                  placeholder={
+                    isLocked
+                      ? vi.gallery.noteLocked
+                      : !isCurrentSelected
+                        ? vi.gallery.noteNeedsSelect
+                        : vi.gallery.noteHint
+                  }
+                  className="w-full resize-none rounded-xl bg-white/10 px-3 py-2 text-xs text-white outline-hidden ring-1 ring-white/15 placeholder:text-white/45 focus:ring-white/40 disabled:opacity-50"
+                />
+                <div className="mt-1 h-4 text-[11px]" aria-live="polite">
+                  {ketQuaLuu === "ok" && (
+                    <span className="text-emerald-300">{vi.gallery.noteSaved}</span>
+                  )}
+                  {ketQuaLuu === "loi" && (
+                    <span className="text-amber-300">{vi.gallery.noteSaveFailed}</span>
+                  )}
+                </div>
+              </div>
+            )}
           </aside>
         )}
       </div>
@@ -465,7 +501,14 @@ export function PhotoLightbox({
         </div>
       )}
 
-      <footer className="relative z-20 px-4 py-3 pb-5 sm:pb-3 bg-gradient-to-t from-black/90 via-black/50 to-transparent shrink-0">
+      {/*
+        Ô ghi chú CHỈ còn ở dưới đáy trên điện thoại.
+
+        Chủ studio 22/09/2026: "đưa cả ghi chú lên bên phải và không tạo khung
+        chiếm diện tích xem của ảnh". Trên máy tính, một khối cao 90px nằm dưới
+        tấm ảnh là 90px ảnh bị thu nhỏ lại — mà cột phải thì còn chỗ.
+      */}
+      <footer className="relative z-20 shrink-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent px-4 py-3 pb-5 sm:pb-3 lg:hidden">
         {onLuuGhiChu && (
           <div className="mx-auto w-full max-w-2xl">
             <label htmlFor="ghi-chu-anh" className="sr-only">
