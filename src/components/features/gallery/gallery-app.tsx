@@ -1031,22 +1031,31 @@ export function GalleryApp({ token }: GalleryAppProps) {
             <h1 className="text-base sm:text-lg font-bold truncate">
               {gallery.babyName ? `Ảnh của bé ${gallery.babyName}` : gallery.title}
             </h1>
+            {/*
+              Hai chỗ sửa, đo trên điện thoại 375px ngày 22/09/2026:
+
+              1. Dòng này `truncate`, và "Nhắn cho studio" nằm cuối nên bị cắt
+                 thành "Nhắn cho…". Đó là đường duy nhất ba mẹ liên lạc với
+                 studio ngay trên màn đang xem ảnh — không được phép cụt.
+                 Nay nó đứng riêng một dòng, không nằm trong phần bị cắt.
+              2. Chi nhánh chưa điền hotline thì hiện "Tên • " rồi " • " nữa,
+                 tức hai dấu chấm tròn liền nhau quanh một khoảng trống. Ghép
+                 bằng mảng đã lọc nên thiếu phần nào thì mất luôn dấu của phần
+                 đó.
+            */}
             <p className="text-xs text-muted-foreground truncate">
-              {gallery.branch.name} • {gallery.branch.hotline}
-              {gallery.branch.chatUrl && (
-                <>
-                  {" • "}
-                  <a
-                    href={gallery.branch.chatUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline font-medium"
-                  >
-                    {vi.gallery.messageStudio}
-                  </a>
-                </>
-              )}
+              {[gallery.branch.name, gallery.branch.hotline].filter(Boolean).join(" • ")}
             </p>
+            {gallery.branch.chatUrl && (
+              <a
+                href={gallery.branch.chatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-primary underline underline-offset-2"
+              >
+                {vi.gallery.messageStudio}
+              </a>
+            )}
           </div>
 
           {!isLocked && (
