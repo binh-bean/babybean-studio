@@ -105,21 +105,37 @@ UI ẩn nút theo quyền chỉ để đỡ rối mắt — **không tính là b
 
 ## 6. Ma trận nghiệm thu cho SEC-ARCH
 
-Mỗi dòng phải có một test tự động trong `tests/security/`:
+Mỗi dòng phải có một test tự động, và **cột cuối ghi test đó nằm ở đâu**.
 
-| # | Kịch bản | Kết quả mong đợi |
-|---|---|---|
-| 1 | `cs` chi nhánh A đọc album chi nhánh B | 0 dòng / 403 |
-| 2 | `photographer` gọi `PATCH /admin/galleries/:id` | 403 |
-| 3 | `cs` gọi `POST /admin/galleries/:id/reopen` | 403 |
-| 4 | Nhân viên bất kỳ `UPDATE selection_items` | lỗi RLS |
-| 5 | Nhân viên tự `UPDATE` `role` của mình | lỗi RLS |
-| 6 | `anon` `SELECT` bất kỳ bảng nào | lỗi quyền |
-| 7 | Khách dùng cookie album A gọi `/api/g/photos` khi cookie trỏ album B | chỉ ra ảnh album trong cookie |
-| 8 | `viewer` link gọi `PATCH /api/g/selection` | 403 |
-| 9 | `suggester` gửi `mark: "selected"` | lưu thành `suggested` |
-| 10 | Gọi `/api/g/submit` hai lần | lần hai `GALLERY_LOCKED` |
-| 11 | Sai PIN 6 lần | lần 6 trả `PIN_LOCKED` |
-| 12 | `GET /api/img/<photo của album khác>` | 403 |
-| 13 | `accountant` gọi `/api/g/photos` hoặc `/api/img` | 403 |
-| 14 | Token đã `revoked` | 410 `LINK_EXPIRED` |
+Cột ấy thêm vào ngày 22/09/2026 sau một lần đếm thật (BB-054): bảy dòng trong
+bảng này đang là `it.todo` trong `rbac.test.ts`, mỗi dòng ghi "Chờ BB-0xx" cho
+task đã xong từ lâu. Trong bảy dòng đó, **bốn ca thật ra đã có phép thử** — ở
+tệp khác, dưới tên khác, nên không ai đối chiếu ra; hai ca chưa có gì; một ca
+đã hết nghĩa. `it.todo` được Vitest đếm là "đã lên kế hoạch" chứ không phải
+"đang hỏng", nên bộ phép thử báo xanh suốt còn bảng này thì rỗng một nửa.
+
+`tests/security/bb-054-ma-tran-bao-mat.test.ts` giữ đúng bảng dưới đây và kiểm
+rằng mỗi tệp được viện dẫn có thật, có đúng ca đó, và trong `tests/security/`
+không còn `it.todo` nào.
+
+| # | Kịch bản | Kết quả mong đợi | Phép thử ở đâu |
+|---|---|---|---|
+| 1 | `cs` chi nhánh A đọc album chi nhánh B | 0 dòng / 403 | `security/rbac.test.ts` Ca 1 |
+| 2 | `photographer` sửa dữ liệu album | 403 / lỗi RLS | `security/rbac.test.ts` Ca 2 |
+| 3 | `cs` gọi `POST /admin/galleries/:id/reopen` | 403 | `security/rbac.test.ts` Ca 3 |
+| 4 | Nhân viên bất kỳ `UPDATE selection_items` | lỗi RLS | `security/rbac.test.ts` Ca 4 |
+| 5 | Nhân viên tự `UPDATE` `role` của mình | lỗi RLS | `security/rbac.test.ts` Ca 5 |
+| 6 | `anon` `SELECT` bất kỳ bảng nào | lỗi quyền | `security/rbac.test.ts` Ca 6 |
+| 7 | Khách dùng cookie album A xin ảnh album B | 403 | `security/khach-xem-duoc-anh.test.ts` ca 2 |
+| 8 | `viewer` link gọi `PATCH /api/g/selection` | 403, và SQL cũng chặn | `security/bb-054-vai-cua-link-khach.test.ts` Ca 8a/8b/8c |
+| 9 | `suggester` gửi `mark: "selected"` | lưu thành `suggested`, không tính vào hạn mức | `security/bb-054-vai-cua-link-khach.test.ts` Ca 9 |
+| 10 | Gọi `/api/g/submit` hai lần | lần hai `GALLERY_LOCKED` | `unit/submit-and-confirm.test.ts` Test 2&3 |
+| ~~11~~ | ~~Sai PIN 6 lần~~ | — | **Hết nghĩa**: mã PIN bỏ hẳn ở migration `0045`. Có phép thử canh việc PIN không quay lại |
+| 12 | `GET /api/img/<photo của album khác>` | 403 | `security/khach-xem-duoc-anh.test.ts` ca 4 |
+| 13 | `accountant` xem ảnh | 0 dòng / 403 | `security/rbac.test.ts` Ca 13 |
+| 14 | Token đã `revoked` | 410 `LINK_EXPIRED` | `security/gallery-auth.test.ts` Ca 10 |
+
+**Nửa còn lại của BB-054 — bí mật lọt vào bundle** do `npm run verify:build`
+canh, và nó đọc SẢN PHẨM build chứ không đọc lời trình biên dịch. Chạy ngày
+22/09/2026: 9/9 đạt, quét 109 tệp gửi xuống trình duyệt, không biến bí mật nào
+lọt, khoá Supabase công khai đúng loại `sb_publishable_`.

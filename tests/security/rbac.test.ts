@@ -287,17 +287,19 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     await client.query("ROLLBACK");
   });
 
-  it.todo("Ca 7: Khách dùng cookie album A gọi /api/g/photos khi cookie trỏ album B -> chỉ ra ảnh album trong cookie (Chờ BB-032)");
-
-  it.todo("Ca 8: viewer link gọi PATCH /api/g/selection -> 403 (Chờ BB-035)");
-
-  it.todo("Ca 9: suggester gửi mark: 'selected' -> lưu thành 'suggested' (Chờ BB-035)");
-
-  it.todo("Ca 10: Gọi /api/g/submit hai lần -> lần hai GALLERY_LOCKED (Chờ BB-039)");
-
-  it.todo("Ca 11: Sai PIN 6 lần -> lần 6 trả PIN_LOCKED (Chờ BB-031)");
-
-  it.todo("Ca 12: GET /api/img/<photo của album khác> -> 403 (Chờ BB-015)");
+  /**
+   * Ca 7 đến ca 12: KHÔNG còn `it.todo` nữa — xem `bb-054-ma-tran-bao-mat.test.ts`.
+   *
+   * Sáu dòng `it.todo` từng nằm ở đây, mỗi dòng ghi "Chờ BB-0xx" cho những
+   * task đã xong từ lâu. Vitest đếm `todo` là "đã lên kế hoạch" chứ không phải
+   * "đang hỏng", nên bộ phép thử vẫn xanh trong khi ma trận nghiệm thu của
+   * docs/05 mục 6 thiếu một nửa.
+   *
+   * Rà soát 22/09/2026 (BB-054) tìm ra: bốn ca ĐÃ có phép thử thật ở tệp khác,
+   * hai ca chưa có gì, và một ca đã hết nghĩa vì mã PIN bị bỏ ở migration 0045.
+   * Tệp `bb-054-ma-tran-bao-mat.test.ts` giữ bảng ánh xạ đó và KIỂM rằng mỗi
+   * tệp được viện dẫn có thật và có đúng ca đó.
+   */
 
   it("Ca 13: accountant không thấy ảnh (SELECT photos trả về 0 dòng)", async () => {
     await client.query("BEGIN");
@@ -385,7 +387,7 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     await client.query("ROLLBACK");
   });
 
-  it.todo("Ca 14: Token đã revoked -> 410 LINK_EXPIRED (Chờ BB-030)");
+  // Ca 14 (token đã thu hồi): xem `gallery-auth.test.ts` — xem ghi chú ở trên.
 
   it("photoshop_ctv không xem được customers, packages, selections, và chỉ thấy gallery của mình", async () => {
     await client.query("BEGIN");
