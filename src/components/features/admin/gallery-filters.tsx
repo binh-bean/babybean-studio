@@ -73,11 +73,26 @@ export function GalleryFilters({
     values.dateTo,
   ].filter(Boolean).length;
 
+  /*
+   * `-top-4` chứ không phải `top-0`.
+   *
+   * Vùng cuộn (`main`) có `p-4`, mà phần tử `sticky` neo theo **hộp padding**
+   * của vùng cuộn chứ không theo mép trên của nó. Với `top-0`, thanh này dừng
+   * lại ở 16px dưới mép — và 16px đó là một khe hở: nội dung cuộn qua phía sau
+   * vẫn nhìn thấy được, nên trên điện thoại tên bộ ảnh hiện lên NỬA DÒNG phía
+   * trên thanh lọc, trông như chữ bị cắt ngang.
+   */
   return (
-    <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 bg-[var(--bb-bg)] border-b border-[var(--bb-border)] space-y-3">
+      <div className="sticky -top-4 z-20 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-4 bg-[var(--bb-bg)] border-b border-[var(--bb-border)] space-y-3">
       {/* Hàng 1: Tìm kiếm, Bộ lọc nhanh, Toggle Chế độ xem & Nút tạo mới */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+        {/*
+          `flex-1 min-w-[280px]` chỉ áp dụng từ `lg`. Trên điện thoại, hai thứ
+          đó ép cụm bên trái chiếm trọn một dòng, đẩy cụm Bảng/Kanban xuống dòng
+          dưới và dồn sang phải — để lại một khoảng trống to bên trái, nhìn như
+          bố cục vỡ.
+        */}
+        <div className="flex flex-wrap items-center gap-3 lg:min-w-[280px] lg:flex-1">
           {/* Tìm kiếm Tên bé, Tên khách, SĐT — thu lại khi không dùng */}
           {dangHien ? (
             <div className="relative w-full sm:w-72">
@@ -240,7 +255,7 @@ export function GalleryFilters({
         </div>
 
         {/* Nút Toggle View & Nút Tạo mới */}
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="flex items-center gap-2 lg:ml-auto lg:gap-3">
           {/* Segmented control: Bảng vs Kanban */}
           <div className="flex items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-[var(--bb-surface-2)] p-0.5">
             <Button
