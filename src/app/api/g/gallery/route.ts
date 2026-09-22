@@ -263,6 +263,7 @@ export async function GET(request: Request) {
     const photoMap = new Map((userSelectionItems || []).map((si) => [si.id, si.photo_id]));
 
     let placementsList: { selectionItemId: string; photoId: string; galleryItemId: string }[] = [];
+    let albumPlacements: { addonId: string; photoId: string }[] = [];
     if (selectionItemIds.length > 0) {
       const { data: rawPlacements } = await supabase
         .from("selection_placements")
@@ -273,6 +274,18 @@ export async function GET(request: Request) {
         selectionItemId: p.selection_item_id,
         photoId: photoMap.get(p.selection_item_id) || "",
         galleryItemId: p.gallery_item_id,
+      }));
+
+      // Ảnh đã đưa vào album MUA THÊM (migration 0062). Bảng riêng vì album
+      // mua thêm nằm ở `selection_addons`, không phải ở dòng hợp đồng.
+      const { data: rawAlbum } = await supabase
+        .from("selection_addon_photos")
+        .select("addon_id, selection_item_id")
+        .in("selection_item_id", selectionItemIds);
+
+      albumPlacements = (rawAlbum || []).map((p) => ({
+        addonId: p.addon_id,
+        photoId: photoMap.get(p.selection_item_id) || "",
       }));
     }
 
@@ -389,6 +402,8 @@ export async function GET(request: Request) {
         catalogue,
       },
       placements: placementsList,
+      /** Ảnh nào nằm trong album mua thêm nào. */
+      albumPlacements,
       review,
     };
 

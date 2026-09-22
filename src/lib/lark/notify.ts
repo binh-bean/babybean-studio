@@ -73,6 +73,7 @@ export type LarkEvent =
   | "gallery.due_soon"
   | "gallery.overdue"
   | "gallery.sync_error"
+  | "gallery.reopen_requested"
   | "delivery.ready";
 
 export interface LarkNotification {
@@ -267,6 +268,51 @@ export function dungThe(
         header: {
           template: conLai !== null && conLai <= 2 ? "red" : "orange",
           title: { tag: "plain_text", content: "Khách chưa chốt ảnh" },
+        },
+        elements,
+      },
+    };
+  }
+
+  /**
+   * Ba mẹ xin mở lại bộ ảnh đã khoá.
+   *
+   * Thẻ ĐỎ, và lý do của ba mẹ hiện nguyên văn: đây là thứ CSKH phải đọc rồi
+   * quyết, không phải thứ để biết. Kèm nút mở thẳng màn quản trị vì việc kế
+   * tiếp luôn là mở bộ ảnh ra xem đã chỉnh tới đâu.
+   */
+  if (event === "gallery.reopen_requested") {
+    const elements: Record<string, unknown>[] = [
+      {
+        tag: "div",
+        fields: [o("Bộ ảnh", chu(p.galleryTitle)), o("Đang ở bước", chu(p.trangThai))],
+      },
+      {
+        tag: "div",
+        text: { tag: "lark_md", content: `**Ba mẹ nhắn:**
+${chu(p.lyDo)}` },
+      },
+    ];
+    if (diaChiAdmin) {
+      elements.push({
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "Mở bộ ảnh" },
+            type: "primary",
+            url: diaChiAdmin,
+          },
+        ],
+      });
+    }
+
+    return {
+      msg_type: "interactive",
+      card: {
+        header: {
+          template: "red",
+          title: { tag: "plain_text", content: "Khách xin sửa lại bộ ảnh đã chốt" },
         },
         elements,
       },

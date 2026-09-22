@@ -3,6 +3,7 @@ import { requireGallerySession, GallerySessionError, EDITING_ROLES } from "@/lib
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
 import { PlacePhotoSchema, RemovePhotoPlacementSchema } from "./schema";
+import { isGalleryLocked } from "@/lib/gallery-status";
 
 /**
  * POST /api/g/placements — Đặt một ảnh vào một sản phẩm in
@@ -57,17 +58,31 @@ export async function POST(request: NextRequest) {
       return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
-    if (
-      gallery.status === "submitted" ||
-      gallery.status === "in_retouch" ||
-      gallery.status === "delivered" ||
-      gallery.status === "archived"
-    ) {
+    /*
+      BẢN THỨ NĂM của danh sách trạng thái khoá, chép tay.
+
+      Dòng cũ ở đây tự liệt kê bốn trạng thái và thiếu ba cái
+      ('awaiting_approval', 'approved', 'expired'). Nó cũng là chỗ làm hỏng
+      quyết định 22/09/2026 ("chốt xong vẫn sửa được cho tới khi CSKH xác
+      nhận", migration 0060): hàm SQL và bản TypeScript đều đã bỏ 'submitted',
+      riêng dòng này thì không — nên ba mẹ chốt xong là hết đặt được ảnh vào
+      sản phẩm in, dù mọi chỗ khác đã mở.
+
+      Dùng chung `isGalleryLocked` như mọi nơi.
+    */
+    if (isGalleryLocked(gallery.status)) {
       return fail("GALLERY_LOCKED", "Bộ ảnh đã được chốt, không thể thay đổi ảnh in");
     }
 
-    // 2. Luật 1: Kiểm tra sản phẩm in trong hợp đồng (gallery_items)
-    const { data: galleryItem, error: itemError } = await admin
+    /*
+      2. Luật 1: sản phẩm in phải có trong hợp đồng (gallery_items).
+
+      Bỏ qua khi đích là ALBUM MUA THÊM: album đó nằm ở `selection_addons`,
+      không phải dòng hợp đồng, và nó được kiểm riêng ở bước 4.
+    */
+    const { data: galleryItem, error: itemError } = input.addonId
+      ? { data: null, error: null }
+      : await admin
       .from("gallery_items")
       .select(`
         id,
@@ -82,13 +97,17 @@ export async function POST(request: NextRequest) {
       .eq("gallery_id", session.galleryId)
       .single();
 
-    if (itemError || !galleryItem) {
-      return fail("NOT_FOUND", "Sản phẩm in không có trong hợp đồng của bộ ảnh này");
-    }
+    if (!input.addonId) {
+      if (itemError || !galleryItem) {
+        return fail("NOT_FOUND", "Sản phẩm in không có trong hợp đồng của bộ ảnh này");
+      }
 
-    const prod = Array.isArray(galleryItem.product) ? galleryItem.product[0] : galleryItem.product;
-    if (!prod || prod.kind !== "print") {
-      return fail("INVALID_INPUT", "Sản phẩm này không phải là sản phẩm in ấn");
+      const prod = Array.isArray(galleryItem.product)
+        ? galleryItem.product[0]
+        : galleryItem.product;
+      if (!prod || prod.kind !== "print") {
+        return fail("INVALID_INPUT", "Sản phẩm này không phải là sản phẩm in ấn");
+      }
     }
 
     // 3. Xác định selection_item_id
@@ -156,16 +175,47 @@ export async function POST(request: NextRequest) {
       return fail("INVALID_INPUT", "Không xác định được ảnh cần đặt");
     }
 
-    // 4. Lưu vào bảng selection_placements (Luật 3: Một ảnh đặt được vào nhiều sản phẩm)
-    const { error: placementError } = await admin
-      .from("selection_placements")
-      .upsert(
+    /*
+      4. Lưu chỗ đặt (Luật 3: một ảnh đặt được vào nhiều sản phẩm).
+
+      Hai đích, hai bảng:
+        · dòng hàng TRONG GÓI  -> selection_placements (đã có từ BB-101)
+        · album MUA THÊM       -> selection_addon_photos (migration 0062)
+
+      Album mua thêm phải là album THẬT của chính lượt chọn này. Thiếu vế đó
+      thì đoán một mã dòng mua thêm bất kỳ là nhét ảnh vào album nhà khác.
+    */
+    if (input.addonId) {
+      const { data: album } = await admin
+        .from("selection_addons")
+        .select("id")
+        .eq("id", input.addonId)
+        .eq("selection_id", session.selectionId)
+        .maybeSingle();
+      if (!album) return fail("NOT_FOUND", "Không tìm thấy album này trong đơn của ba mẹ");
+    }
+
+    // Hai nhánh viết rời, mỗi nhánh bắt lỗi ngay tại chỗ ghi. Gộp vào một biểu
+    // thức ba ngôi thì đọc lướt không thấy chỗ bắt lỗi — và phép thử BB-190,
+    // vốn quét đúng hình dạng đó, cũng không thấy.
+    let placementError: { message: string } | null = null;
+
+    if (input.addonId) {
+      const { error } = await admin.from("selection_addon_photos").upsert(
+        { addon_id: input.addonId, selection_item_id: targetSelectionItemId },
+        { onConflict: "addon_id,selection_item_id" },
+      );
+      placementError = error;
+    } else {
+      const { error } = await admin.from("selection_placements").upsert(
         {
           selection_item_id: targetSelectionItemId,
           gallery_item_id: input.galleryItemId,
         },
-        { onConflict: "selection_item_id,gallery_item_id" }
+        { onConflict: "selection_item_id,gallery_item_id" },
       );
+      placementError = error;
+    }
 
     if (placementError) {
       console.error("[POST /api/g/placements] Placement error:", placementError);
@@ -257,12 +307,21 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (targetSelectionItemId) {
-      const { error: delErr } = await admin
-        .from("selection_placements")
-        .delete()
-        .eq("selection_item_id", targetSelectionItemId)
-        .eq("gallery_item_id", input.galleryItemId);
-      if (delErr) throw delErr;
+      if (input.addonId) {
+        const { error } = await admin
+          .from("selection_addon_photos")
+          .delete()
+          .eq("selection_item_id", targetSelectionItemId)
+          .eq("addon_id", input.addonId);
+        if (error) throw error;
+      } else {
+        const { error } = await admin
+          .from("selection_placements")
+          .delete()
+          .eq("selection_item_id", targetSelectionItemId)
+          .eq("gallery_item_id", input.galleryItemId);
+        if (error) throw error;
+      }
     }
 
     return ok({ removed: true });

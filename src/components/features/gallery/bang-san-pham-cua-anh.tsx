@@ -58,25 +58,45 @@ export interface MonMuaThem {
   soLuong: number;
 }
 
+export interface AlbumDaMua {
+  addonId: string;
+  name: string;
+  /** Tấm đang xem đã nằm trong album này chưa. */
+  coAnhNay: boolean;
+  /** Tổng số ảnh đã đưa vào album này. */
+  soAnh: number;
+}
+
 export interface BangSanPhamCuaAnhProps {
   suatTrongGoi: SuatTrongGoi[];
+  /** Album ba mẹ ĐÃ mua — mỗi cái nhận nhiều ảnh. */
+  albumDaMua: AlbumDaMua[];
   monMuaThem: MonMuaThem[];
   /** Tấm đang xem đã được ba mẹ chọn chưa — chưa chọn thì chưa đặt in được. */
   anhDaChon: boolean;
   khoa: boolean;
   dangLuu: boolean;
   onDatVaoGoi: (galleryItemId: string, dat: boolean) => void;
+  onDatVaoAlbum: (addonId: string, dat: boolean) => void;
   onDatMuaThem: (productId: string, soLuong: number) => void;
+  /** Mua một album mới (không gắn ảnh — ảnh đưa vào sau). */
+  onMuaAlbum: (productId: string, soLuong: number) => void;
+  /** Album trong bảng giá, để ba mẹ mua thêm một cuốn. */
+  albumBanDuoc: MonMuaThem[];
 }
 
 export function BangSanPhamCuaAnh({
   suatTrongGoi,
+  albumDaMua,
   monMuaThem,
+  albumBanDuoc,
   anhDaChon,
   khoa,
   dangLuu,
   onDatVaoGoi,
+  onDatVaoAlbum,
   onDatMuaThem,
+  onMuaAlbum,
 }: BangSanPhamCuaAnhProps) {
   const [nhomDangMo, setNhomDangMo] = React.useState<NhomSanPham | null>(null);
 
@@ -143,7 +163,85 @@ export function BangSanPhamCuaAnh({
         </section>
       )}
 
-      {/* ---------- 2. MUA THÊM ---------- */}
+      {/* ---------- 2. ALBUM ---------- */}
+      {(albumDaMua.length > 0 || albumBanDuoc.length > 0) && (
+        <section>
+          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">
+            Album
+          </h3>
+
+          {/*
+            Album KHÔNG có "suất" như ảnh in.
+
+            Một cuốn album nhận bao nhiêu tấm là tuỳ ba mẹ, nên ở đây không đếm
+            ngược số suất còn lại như phần trong gói — chỉ nói cuốn đó đang có
+            mấy tấm. Chặn theo số tờ là việc của studio lúc dựng cuốn, không
+            phải việc của màn chọn ảnh.
+          */}
+          <ul className="space-y-1.5">
+            {albumDaMua.map((al) => (
+              <li key={al.addonId}>
+                <button
+                  type="button"
+                  disabled={khoa || dangLuu}
+                  onClick={() => onDatVaoAlbum(al.addonId, !al.coAnhNay)}
+                  className={[
+                    "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors",
+                    al.coAnhNay
+                      ? "bg-emerald-500/20 ring-1 ring-emerald-300/50"
+                      : "bg-white/10 hover:bg-white/15",
+                    khoa || dangLuu ? "opacity-60" : "",
+                  ].join(" ")}
+                >
+                  <span className="min-w-0">
+                    <span className="block font-medium">{al.name}</span>
+                    <span className="block text-white/55">
+                      {al.coAnhNay ? "Đã có tấm này" : `Đang có ${al.soAnh} tấm`}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-base leading-none">
+                    {al.coAnhNay ? "✓" : "+"}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {albumBanDuoc.length > 0 && (
+            <details className="mt-1.5">
+              <summary className="cursor-pointer rounded-xl bg-white/10 px-3 py-2 text-xs font-medium">
+                Mua thêm một cuốn album
+              </summary>
+              <ul className="mt-1 space-y-1">
+                {albumBanDuoc.map((al) => (
+                  <li
+                    key={al.productId}
+                    className="flex items-center justify-between gap-2 rounded-lg bg-black/25 px-2.5 py-1.5"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs">{al.name}</span>
+                      <span className="block text-[11px] text-white/55">
+                        {formatCurrencyVND(al.unitPrice)}
+                        {al.size ? ` · ${al.size}` : ""}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={khoa || dangLuu}
+                      onClick={() => onMuaAlbum(al.productId, al.soLuong + 1)}
+                      className="h-7 rounded-full bg-white/10 px-3 text-xs disabled:opacity-30"
+                    >
+                      Mua
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </section>
+      )}
+
+      {/* ---------- 3. MUA THÊM ---------- */}
       <section>
         <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">
           Mua thêm cho tấm này

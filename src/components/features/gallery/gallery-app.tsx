@@ -86,6 +86,8 @@ interface GalleryApiResponse {
     }>;
   };
   placements?: Array<{ photoId: string; galleryItemId: string }>;
+  /** Ảnh nào nằm trong album mua thêm nào (migration 0062). */
+  albumPlacements?: Array<{ addonId: string; photoId: string }>;
   // Vòng duyệt ảnh đã chỉnh. null khi bộ ảnh chưa tới bước đó.
   review?: ReviewData | null;
   /**
@@ -510,6 +512,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
    * viết (BB-053).
    */
   const [tenXacNhan, setTenXacNhan] = useState("");
+  /** Hộp "xin sửa lại" — chỉ dùng khi bộ ảnh đã khoá. */
+  const [xinSuaLai, setXinSuaLai] = useState(false);
+  const [lyDoSuaLai, setLyDoSuaLai] = useState("");
+  const [dangXin, setDangXin] = useState(false);
   const [dongY, setDongY] = useState(false);
   const [placements, setPlacements] = useState<{ photoId: string; galleryItemId: string }[]>([]);
   const [placing, setPlacing] = useState(false);
@@ -1000,6 +1006,66 @@ export function GalleryApp({ token }: GalleryAppProps) {
     [loadGallery],
   );
 
+  /**
+   * Đưa tấm ảnh vào (hoặc lấy ra khỏi) một album ĐÃ MUA.
+   *
+   * Đi cùng đường với việc đặt ảnh vào dòng hàng trong gói, chỉ khác đích:
+   * `addonId` thay cho `galleryItemId` (migration 0062).
+   */
+  /**
+   * Xin CSKH mở lại bộ ảnh đã khoá.
+   *
+   * Chỉ có nghĩa sau khi CSKH đã xác nhận (migration 0060) — trước đó ba mẹ
+   * sửa thẳng được. Máy chủ kiểm lại điều này, nên nút chỉ hiện khi đã khoá là
+   * chuyện tử tế với người dùng, không phải chốt an toàn.
+   */
+  const guiXinSuaLai = useCallback(async () => {
+    setDangXin(true);
+    try {
+      const res = await fetch("/api/g/xin-sua-lai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lyDo: lyDoSuaLai.trim() }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setStatusMessage(json?.error?.message ?? "Chưa gửi được, ba mẹ thử lại giúp.");
+        return;
+      }
+      setXinSuaLai(false);
+      setLyDoSuaLai("");
+      setStatusMessage(json?.data?.loiNhan ?? "Bên mình đã nhận yêu cầu của ba mẹ.");
+    } catch {
+      setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
+    } finally {
+      setDangXin(false);
+    }
+  }, [lyDoSuaLai]);
+
+  const datAnhVaoAlbum = useCallback(
+    async (photoId: string, addonId: string, dat: boolean) => {
+      setPlacing(true);
+      try {
+        const res = await fetch("/api/g/placements", {
+          method: dat ? "POST" : "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photoId, addonId }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          setStatusMessage(json?.error?.message ?? "Không lưu được, ba mẹ thử lại giúp.");
+          return;
+        }
+        await loadGallery();
+      } catch {
+        setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
+      } finally {
+        setPlacing(false);
+      }
+    },
+    [loadGallery],
+  );
+
   const contractBreakdownItems = useMemo<ContractItem[]>(() => {
     if (!gallery?.contract?.items) return [];
     return gallery.contract.items.map((item) => ({
@@ -1136,13 +1202,28 @@ export function GalleryApp({ token }: GalleryAppProps) {
             )}
           </div>
 
-          {!isLocked && (
+          {!isLocked ? (
             <Button
               size="sm"
               onClick={() => setShowSubmitModal(true)}
               className="shrink-0 font-medium"
             >
               {vi.gallery.submitCta}
+            </Button>
+          ) : (
+            /*
+              Bộ ảnh đã khoá: CSKH đã xác nhận và chuyển cho thợ chỉnh ảnh.
+              Ba mẹ không sửa thẳng được nữa, nhưng phải có ĐƯỜNG NÓI — không
+              có nút thì họ đi tìm số điện thoại, và cuộc gọi đó rơi vào lúc
+              CSKH đang bận với khách khác.
+            */
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setXinSuaLai(true)}
+              className="shrink-0 font-medium"
+            >
+              Yêu cầu sửa lại
             </Button>
           )}
         </div>
@@ -1536,6 +1617,38 @@ export function GalleryApp({ token }: GalleryAppProps) {
         </div>
       </footer>
 
+      {xinSuaLai && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md space-y-4 rounded-2xl border bg-surface p-6 shadow-2xl">
+            <h3 className="text-lg font-bold">Yêu cầu sửa lại</h3>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Bộ ảnh đã chuyển cho bên chỉnh ảnh nên ba mẹ không tự sửa được nữa. Ba mẹ ghi
+              giúp muốn sửa gì, bên mình xem còn kịp không rồi báo lại ngay ạ.
+            </p>
+            <textarea
+              value={lyDoSuaLai}
+              onChange={(e) => setLyDoSuaLai(e.target.value)}
+              maxLength={500}
+              rows={3}
+              placeholder="Ví dụ: em muốn đổi tấm số 12 sang tấm 15 giúp em"
+              className="h-24 w-full resize-none rounded-xl border bg-background p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
+            />
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setXinSuaLai(false)} disabled={dangXin}>
+                {vi.common.cancel}
+              </Button>
+              <Button
+                onClick={() => void guiXinSuaLai()}
+                disabled={dangXin || lyDoSuaLai.trim().length === 0}
+                className="bg-primary font-bold text-primary-foreground"
+              >
+                Gửi cho studio
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
           <div className="w-full max-w-md bg-surface border rounded-2xl p-6 shadow-2xl space-y-4">
@@ -1792,6 +1905,35 @@ export function GalleryApp({ token }: GalleryAppProps) {
                       (m) => m.productId === sp.productId && m.photoId === anh.id,
                     )?.quantity ?? 0,
                 }))}
+              albumDaMua={(gallery.addons?.items ?? [])
+                .filter((m) => !m.photoId)
+                .map((m) => ({
+                  addonId: m.id,
+                  name: m.quantity > 1 ? `${m.name} ×${m.quantity}` : m.name,
+                  coAnhNay: (gallery.albumPlacements ?? []).some(
+                    (ap) => ap.addonId === m.id && ap.photoId === anh.id,
+                  ),
+                  soAnh: (gallery.albumPlacements ?? []).filter((ap) => ap.addonId === m.id).length,
+                }))}
+              albumBanDuoc={(gallery.addons?.catalogue ?? [])
+                .filter((sp) => sp.nhom === "album")
+                .map((sp) => ({
+                  productId: sp.productId,
+                  name: sp.name,
+                  material: sp.material,
+                  size: sp.size,
+                  unitPrice: sp.unitPrice,
+                  nhom: "album" as NhomSanPham,
+                  canGanAnh: false,
+                  soLuong:
+                    gallery.addons?.items?.find((m) => m.productId === sp.productId && !m.photoId)
+                      ?.quantity ?? 0,
+                }))}
+              onDatVaoAlbum={(addonId, dat) => void datAnhVaoAlbum(anh.id, addonId, dat)}
+              onMuaAlbum={(productId, soLuong) =>
+                // Album mua KHÔNG gắn ảnh: ảnh đưa vào sau, từng tấm một.
+                void datSoLuongMuaThem(productId, soLuong, null)
+              }
               onDatVaoGoi={(galleryItemId, dat) => changePlacement(anh.id, galleryItemId, dat)}
               onDatMuaThem={(productId, soLuong) =>
                 void datSoLuongMuaThem(productId, soLuong, anh.id)
