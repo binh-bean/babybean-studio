@@ -48,8 +48,10 @@ test.describe("BB-166: Nút Nhắn cho studio", () => {
     
     await page.goto(`/g/${token}`);
     
-    // Đợi page load
-    const chatLink = page.locator("a:has-text(\"Nhắn cho studio\")");
+    // Link ở ĐẦU TRANG. Chân trang cũng có một link cùng chữ — cố ý, để ba
+    // mẹ cuộn hết ảnh vẫn thấy — nên phải chỉ rõ link nào, không thì Playwright
+    // báo "strict mode violation" (ca này đã đỏ vì thế từ trước 23/09/2026).
+    const chatLink = page.locator("#dau-luoi-anh").locator('a:has-text("Nhắn cho studio")');
     await expect(chatLink).toBeVisible();
     await expect(chatLink).toHaveAttribute("href", "https://m.me/113878833349843");
     await expect(chatLink).toHaveAttribute("target", "_blank");
@@ -59,23 +61,29 @@ test.describe("BB-166: Nút Nhắn cho studio", () => {
     // 2. Cấu hình trống -> không có nút
     await pgClient.query(`UPDATE settings SET value = '""' WHERE key = 'chat.page_url' AND branch_id IS NULL`);
     await page.reload();
+    // Chờ trang dựng xong (bộ thử này không có ảnh, nên chờ đầu trang).
+    await page.locator("#dau-luoi-anh").waitFor({ state: "visible" });
     await expect(page.locator("a:has-text(\"Nhắn cho studio\")")).toHaveCount(0);
 
     // 3. Cấu hình không bắt đầu bằng https:// -> không có nút
     await pgClient.query(`UPDATE settings SET value = '"http://m.me/123"' WHERE key = 'chat.page_url' AND branch_id IS NULL`);
     await page.reload();
+    // Chờ trang dựng xong (bộ thử này không có ảnh, nên chờ đầu trang).
+    await page.locator("#dau-luoi-anh").waitFor({ state: "visible" });
     await expect(page.locator("a:has-text(\"Nhắn cho studio\")")).toHaveCount(0);
 
     // 4. Khóa không tồn tại -> không có nút
     await pgClient.query(`DELETE FROM settings WHERE key = 'chat.page_url' AND branch_id IS NULL`);
     await page.reload();
+    // Chờ trang dựng xong (bộ thử này không có ảnh, nên chờ đầu trang).
+    await page.locator("#dau-luoi-anh").waitFor({ state: "visible" });
     await expect(page.locator("a:has-text(\"Nhắn cho studio\")")).toHaveCount(0);
 
     // 5. Cấu hình hợp lệ và bộ ảnh đã chốt -> nút vẫn hiện
     await pgClient.query(`INSERT INTO settings (key, branch_id, value) VALUES ('chat.page_url', null, '"https://m.me/113878833349843"')`);
     await pgClient.query(`UPDATE galleries SET status = 'submitted' WHERE id = $1`, [galleryId]);
     await page.reload();
-    await expect(page.locator("a:has-text(\"Nhắn cho studio\")")).toBeVisible();
+    await expect(page.locator("#dau-luoi-anh").locator('a:has-text("Nhắn cho studio")')).toBeVisible();
 
     // Revert status to keep fixture clean
     await pgClient.query(`UPDATE galleries SET status = 'in_review' WHERE id = $1`, [galleryId]);

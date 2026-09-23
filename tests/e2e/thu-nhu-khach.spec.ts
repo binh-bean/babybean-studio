@@ -244,9 +244,8 @@ test.describe("BB-134: đi đúng đường của khách", () => {
     ).toBeGreaterThan(0);
 
     // Xác nhận ban đầu = 0 ảnh đã chọn
-    // Block "1. Đã chọn" chứa span lớn hiển thị số
-    const counterBlock = page.locator("text=1. Đã chọn").locator("..");
-    const counter = counterBlock.locator("span.text-2xl");
+    // Bộ đếm ở thanh đáy (23/09/2026 thay cho 4 ô số "1. Đã chọn"…).
+    const counter = page.getByTestId("dem-da-chon");
     await expect(counter).toHaveText("0");
 
     // Bấm nút thả tim trên ảnh đầu tiên
@@ -278,8 +277,7 @@ test.describe("BB-134: đi đúng đường của khách", () => {
     await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: IMAGE_TIMEOUT });
 
     // 2. Chắc chắn ảnh đầu tiên đã được chọn (nếu test 2 đã chọn thì giờ nó vẫn là 1, nếu không thì phải chọn)
-    const counterBlock = page.locator("text=1. Đã chọn").locator("..");
-    const counter = counterBlock.locator("span.text-2xl");
+    const counter = page.getByTestId("dem-da-chon");
     let currentCount = "0";
     try {
       currentCount = await counter.innerText({ timeout: 2000 });
@@ -314,7 +312,7 @@ test.describe("BB-134: đi đúng đường của khách", () => {
     await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: IMAGE_TIMEOUT });
 
     // Ảnh đã chọn phải còn nguyên (BB-148)
-    const counterMoi = page.locator("text=1. Đã chọn").locator("..").locator("span.text-2xl");
+    const counterMoi = page.getByTestId("dem-da-chon");
     await expect(counterMoi).toHaveText("1");
   });
 });

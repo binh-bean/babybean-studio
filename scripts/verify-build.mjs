@@ -150,11 +150,18 @@ function main() {
 
   // Families the design system asks for, read from the source of truth so this
   // keeps working when DEV-UI changes the typeface.
+  //
+  // Bản cũ chỉ nhận tên CÓ DẤU CÁCH ("Be Vietnam Pro") để khỏi bắt nhầm phông
+  // hệ thống kiểu "Georgia" trong chuỗi dự phòng. Cái giá: phông tên một chữ
+  // lọt lưới. Ngày 23/09/2026 màn khách thêm "Fraunces" và dòng kiểm này vẫn
+  // báo "đã đối chiếu 2 font" — tức Fraunces không hề được kiểm. Nay nhận cả tên
+  // một chữ, và loại phông hệ thống bằng danh sách tường minh.
+  const PHONG_HE_THONG = new Set(["Georgia", "Arial", "Helvetica", "Times", "Verdana", "Tahoma"]);
   const declared = fs.existsSync(TOKENS_CSS)
     ? [...new Set(
         [...fs.readFileSync(TOKENS_CSS, "utf8").matchAll(/["']([A-Z][A-Za-z ]{3,30})["']/g)]
           .map((m) => m[1])
-          .filter((f) => /[a-z]/.test(f) && f.includes(" ")),
+          .filter((f) => /[a-z]/.test(f) && !PHONG_HE_THONG.has(f)),
       )]
     : [];
 

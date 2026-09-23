@@ -166,10 +166,10 @@ test.describe("BB-160: Tải ảnh và Kanban", () => {
   test("1. Tải một ảnh: xác nhận tải thành công", async ({ page }) => {
     await page.goto(`/g/${ids.linkA}`);
     
-    // Mở ảnh đầu tiên
-    const imgLocator = page.locator('img[src*="/api/img/"]').first();
-    await imgLocator.waitFor({ state: "visible" });
-    await imgLocator.locator('..').click();
+    // Mở ảnh đầu tiên TRONG LƯỚI — ảnh đầu tiên trên trang giờ là ảnh bìa.
+    const theAnh = page.getByTestId("the-anh").first();
+    await theAnh.waitFor({ state: "visible" });
+    await theAnh.click();
 
     // Chờ nút tải ảnh xuất hiện trong lightbox
     const downloadBtn = page.locator('button[aria-label="Tải ảnh này về máy"]');
@@ -188,8 +188,10 @@ test.describe("BB-160: Tải ảnh và Kanban", () => {
     test.setTimeout(60000);
     await page.goto(`/g/${ids.linkA}`);
     
-    // Nút tải cả bộ
-    const downloadAllBtn = page.locator('button:has-text("Tải cả bộ")');
+    // Nút tải cả bộ — nằm trong thực đơn "Tải ảnh về máy" ở đầu trang
+    // (23/09/2026, thay cho thanh tải dính ở đáy từng đè lên thanh chốt).
+    await page.getByRole("button", { name: "Tải ảnh về máy" }).click();
+    const downloadAllBtn = page.getByRole("menuitem", { name: /Tải cả bộ/ });
     await downloadAllBtn.waitFor({ state: "visible" });
 
     // Thu thập tất cả event download
@@ -205,14 +207,15 @@ test.describe("BB-160: Tải ảnh và Kanban", () => {
   test("3. Bộ tắt tải: không có nút tải", async ({ page }) => {
     await page.goto(`/g/${ids.linkB}`);
     
-    // Không có "Tải cả bộ"
-    const downloadAllBtn = page.locator('button:has-text("Tải cả bộ")');
-    await expect(downloadAllBtn).toHaveCount(0);
+    // Mở ảnh cũng không có nút tải. Mở TRƯỚC khi đếm nút thực đơn: lúc trang
+    // chưa tải xong thì nút nào cũng đếm ra 0, và phép thử xanh oan.
+    const theAnh = page.getByTestId("the-anh").first();
+    await theAnh.waitFor({ state: "visible" });
 
-    // Mở ảnh cũng không có nút tải
-    const imgLocator = page.locator('img[src*="/api/img/"]').first();
-    await imgLocator.waitFor({ state: "visible" });
-    await imgLocator.locator('..').click();
+    // Không có thực đơn "Tải ảnh về máy" ở đầu trang
+    await expect(page.getByRole("button", { name: "Tải ảnh về máy" })).toHaveCount(0);
+
+    await theAnh.click();
 
     const downloadBtn = page.locator('button[aria-label="Tải ảnh này về máy"]');
     await expect(downloadBtn).toHaveCount(0);

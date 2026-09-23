@@ -1,8 +1,6 @@
 "use client";
 
 import { isGalleryLocked } from "@/lib/gallery-status";
-import { getCustomerProgressStep } from "@/lib/gallery/progress";
-import type { GalleryStatus } from "@/types/domain";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
@@ -11,16 +9,17 @@ import { CuaHang } from "@/components/features/gallery/cua-hang";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
 import { TomTatSanPhamIn } from "@/components/features/gallery/tom-tat-san-pham-in";
+import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
+import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
+import { ThanhChon } from "@/components/features/gallery/thanh-chon";
+import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
-import React, { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, memo } from "react";
-import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
 import { useRouter } from "next/navigation";
-import { Heart, AlertTriangle, AlertCircle, Info, ChevronRight, Lock, Printer } from "lucide-react";
+import { AlertTriangle, AlertCircle, Info, Lock } from "lucide-react";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
-import { QuotaDisplay } from "@/components/ui/quota-display";
-import { CustomerProgress } from "@/components/ui/customer-progress";
 import { ContractBreakdown, type ContractItem, formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -55,6 +54,10 @@ interface GalleryApiResponse {
   allowExtra: boolean;
   dueAt: string | null;
   subfolders: string[];
+  /** Ảnh bìa CSKH đã chọn; `null` thì bìa lấy tấm đầu tiên. */
+  coverPhotoId?: string | null;
+  /** Vai trò của link đang mở: owner, co_editor, suggester hoặc viewer. */
+  myRole?: string;
   selection: {
     id: string;
     selectedCount: number;
@@ -130,352 +133,9 @@ interface GalleryApiResponse {
 }
 
 // ---------------------------------------------------------------------------
-// LƯỚI ẢNH — phần chịu tải của màn khách
+// LƯỚI ẢNH — nay ở `luoi-anh.tsx` (xếp so le, giữ đúng khung, cuộn ảo).
+// Bảng số đo hiệu năng của BB-131 đi cùng nó sang đó.
 // ---------------------------------------------------------------------------
-//
-// Đo trên bản dựng production, điện thoại 375×812 (màn nét gấp đôi), CPU chậm
-// 4×, mạng 1,6 Mbps trễ 150ms. Bộ 1.235 tấm — số tấm, tỉ lệ khung và số thư
-// mục con lấy từ bộ THẬT lớn nhất trên bb-dev; ảnh và tên file là dữ liệu mẫu
-// vì repo này công khai. Mỗi cột là số giữa của ba lượt chạy.
-//
-//                              trước      sau
-//   tấm đầu tiên hiện ra       6.134ms    3.959ms
-//   đầy một màn hình (6 tấm)   6.224ms    4.851ms
-//   thẻ ảnh nằm trong DOM      1.235      10
-//   nút DOM                    11.262     244
-//   tác vụ chặn dài nhất       360ms      179ms
-//   bộ nhớ JS                  9,2 MB     5,4 MB
-//   thả tim ở tấm thứ 900      44ms       4,8ms   (chậm nhất 62ms → 11ms)
-//   dung lượng một tấm         92,8 KB    31,4 KB
-//
-// Ba nguyên nhân, ba chỗ sửa ở ngay dưới đây.
-
-/** Khoảng cách giữa các thẻ, khớp với `gap-2.5 sm:gap-4` của Tailwind. */
-const KHE_HEP = 10; // gap-2.5 dưới 640px
-const KHE_RONG = 16; // gap-4 từ 640px
-
-/** Số cột, khớp với `grid-cols-2 sm:grid-cols-3 md:grid-cols-4`. */
-function soCot(rongMan: number): number {
-  if (rongMan >= 768) return 4;
-  if (rongMan >= 640) return 3;
-  return 2;
-}
-
-interface TheAnhProps {
-  photo: PhotoPublic;
-  thuTu: number;
-  daChon: boolean;
-  dangGui: boolean;
-  khoa: boolean;
-  /**
-   * Tấm này đang được dùng làm bao nhiêu sản phẩm (in, khung, album, mua thêm).
-   *
-   * Là một CON SỐ chứ không phải mảng hay Map: `TheAnh` được `memo`, và một
-   * tham chiếu đổi mỗi lần dựng lại là memo thành vô dụng (xem ghi chú ngay
-   * dưới đây về 1.235 thẻ).
-   */
-  soSanPham: number;
-  onToggle: (photo: PhotoPublic) => void;
-  onOpen: (thuTu: number) => void;
-}
-
-/**
- * Một thẻ ảnh. `memo` KHÔNG phải để cho đẹp.
- *
- * Thả tim gọi `setPhotos(prev => prev.map(...))`, tức là dựng lại cả mảng
- * 1.235 phần tử. Khi thẻ ảnh còn viết thẳng trong thân `GalleryApp`, React
- * dựng lại toàn bộ 1.235 thẻ cho MỘT cú chạm: 44ms từ lúc bấm tới lúc tim đổi
- * màu ở tấm thứ 900, lúc chậm nhất 62ms. Chưa tới mức ba mẹ bấm lại lần nữa,
- * nhưng cái giá đó tăng THEO SỐ ẢNH — bộ ảnh to gấp đôi thì chậm gấp đôi, mà
- * 1.235 tấm mới là bộ lớn nhất HÔM NAY.
- *
- * Tách ra + `memo` + prop toàn giá trị đơn (không truyền cả Set `mutatingIds`
- * xuống, vì Set đổi tham chiếu mỗi lần là memo thành vô dụng) nên chỉ đúng một
- * thẻ dựng lại: còn 4,8ms, và không còn phụ thuộc bộ ảnh to bao nhiêu.
- */
-const TheAnh = memo(function TheAnh({
-  photo,
-  thuTu,
-  daChon,
-  dangGui,
-  khoa,
-  soSanPham,
-  onToggle,
-  onOpen,
-}: TheAnhProps) {
-  return (
-    <div
-      onClick={() => onOpen(thuTu)}
-      className={cn(
-        "group relative aspect-square rounded-xl overflow-hidden border bg-surface/80 transition-all cursor-pointer",
-        daChon
-          ? "ring-2 ring-rose-500 border-rose-500/50 shadow-xs"
-          : "hover:border-foreground/20",
-      )}
-    >
-      {/* Ảnh tải qua proxy an toàn.
-
-          BB-162 — chủ studio chốt 15.09.2026: ảnh xem nhỏ cũng phải NÉT.
-
-          Bản cũ (BB-131) chọn 200/400/800 để tiết kiệm đường truyền: trên điện
-          thoại 375px màn hình nét gấp đôi, trình duyệt lấy bản 400 nặng 31,4 KB.
-          Nhẹ thật, nhưng thẻ ảnh chỉ 165px mà ảnh 400px thì nhìn vẫn mềm — và
-          ba mẹ đang chọn ảnh cho con, không phải lướt tin.
-
-          Giờ còn 800 và 1600: máy thường lấy 800 (92,8 KB), máy nét gấp đôi trở
-          lên lấy 1600 (146 KB). Cuộn ảo của BB-131 chỉ giữ khoảng 24 tấm trong
-          trang, nên mỗi màn hình tốn cỡ 2–3,5 MB thay vì 0,8 MB.
-
-          Đánh đổi đã biết và chấp nhận: tốn đường truyền hơn, đổi lấy ảnh nét.
-          Bộ nhớ đệm của BB-137 gánh phần hạn mức Google, nên chi phí nằm ở
-          đường truyền của khách chứ không ở phía Google.
-
-          KHÔNG đổi đường API: vẫn `/api/img/<id>?w=<cỡ>`, và cả hai cỡ đều nằm
-          trong `THUMBNAIL_WIDTHS` mà route ảnh đã nhận. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`/api/img/${photo.id}?w=800`}
-        srcSet={`/api/img/${photo.id}?w=800 800w, /api/img/${photo.id}?w=1600 1600w`}
-        sizes="(min-width: 768px) 210px, (min-width: 640px) 195px, 45vw"
-        alt={photo.fileName || `Ảnh ${thuTu + 1}`}
-        loading="lazy"
-        decoding="async"
-        // Kích thước thật lấy từ cơ sở dữ liệu (cột width/height, bộ 1.235 tấm
-        // không thiếu tấm nào). Trình duyệt biết khung ảnh trước khi byte đầu
-        // tiên về nên không phải vẽ lại khi ảnh tới.
-        width={photo.width ?? undefined}
-        height={photo.height ?? undefined}
-        className="w-full h-full object-cover select-none pointer-events-none"
-      />
-
-      {/* Lớp gradient nhẹ bảo đảm nút tim luôn nổi bật */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30 pointer-events-none" />
-
-      {/* NÚT THẢ TIM = CHỌN ẢNH (Kích thước chạm lớn ≥44px cho mobile 375px) */}
-      <button
-        type="button"
-        disabled={khoa || dangGui}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle(photo);
-        }}
-        aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
-        className={cn(
-          "absolute top-1.5 right-1.5 z-10 flex h-11 w-11 items-center justify-center rounded-full transition-transform active:scale-90 touch-manipulation focus:outline-hidden",
-          daChon
-            ? "bg-rose-500 text-white shadow-md"
-            : "bg-black/40 text-white/90 backdrop-blur-xs hover:bg-black/60 hover:text-white",
-        )}
-      >
-        <Heart
-          className={cn(
-            "h-6 w-6 transition-all",
-            daChon ? "fill-current text-white scale-110" : "stroke-[2.2]",
-          )}
-        />
-      </button>
-
-      {/*
-        DẤU "TẤM NÀY ĐÃ ĐẶT IN".
-
-        Chủ studio 22/09/2026: "các ảnh chọn ảnh in phân biệt hiển thị với các
-        ảnh khác thế nào". Trước đây không phân biệt được gì: tim đỏ nghĩa là
-        "đã chọn", còn tấm nào đã xếp vào khung 40x60 thì phải mở từng tấm ra
-        mới biết. Trong bộ 460 tấm thì đó là không biết.
-
-        Đặt bên TRÁI, màu ngọc, để không đấu với tim đỏ bên phải — hai thứ
-        khác nhau: tim là "con muốn tấm này", dấu này là "tấm này in ra cái gì".
-      */}
-      {soSanPham > 0 && (
-        <span
-          className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-1 text-[11px] font-bold text-white shadow-md pointer-events-none"
-          title={`Tấm này đang làm ${soSanPham} sản phẩm`}
-        >
-          <Printer className="h-3.5 w-3.5" />
-          {soSanPham}
-        </span>
-      )}
-
-      {/* Thông tin tên file và thư mục con */}
-      <div className="absolute bottom-1.5 left-2 right-2 text-white text-[11px] truncate drop-shadow-xs pointer-events-none">
-        <span className="font-mono">{photo.fileName}</span>
-        {photo.subfolder && <span className="ml-1 opacity-75">({photo.subfolder})</span>}
-      </div>
-    </div>
-  );
-});
-
-interface LuoiAnhProps {
-  photos: PhotoPublic[];
-  mutatingIds: Set<string>;
-  khoa: boolean;
-  /** photoId -> tấm đó đang làm mấy sản phẩm. Thiếu khoá nghĩa là 0. */
-  soSanPhamTheoAnh: Map<string, number>;
-  onToggle: (photo: PhotoPublic) => void;
-  onOpen: (thuTu: number) => void;
-}
-
-/**
- * Lưới ảnh chỉ dựng những hàng đang trong tầm nhìn.
- *
- * Vì sao phải cuộn ảo chứ không chỉ đổi cỡ ảnh: 1.235 thẻ nằm hết trong DOM là
- * 11.262 nút và một trang cao 109.779 pixel. Mỗi lần React đụng vào danh sách
- * — thả tim, đổi bộ lọc, trang ảnh mới về — trình duyệt phải tính lại bố cục
- * cho từng ấy nút. Đo được tác vụ chặn luồng chính dài nhất 360ms lúc dựng
- * trang; trong 360ms đó điện thoại không nhận chạm, không cuộn, không gì cả.
- * Còn 244 nút thì xuống 179ms, và bộ nhớ JS từ 9,2 MB xuống 5,4 MB.
- *
- * Quan trọng hơn con số hôm nay: chi phí cũ tăng theo số ảnh, chi phí mới thì
- * không. 1.235 là bộ lớn nhất hiện có, không phải trần.
- *
- * Giữ nguyên cách chia cột và khoảng cách của bản cũ (2 / 3 / 4 cột theo bề
- * ngang màn hình) để giao diện không đổi — chỉ đổi chỗ ai dựng thẻ nào.
- */
-function LuoiAnh({
-  photos,
-  mutatingIds,
-  khoa,
-  soSanPhamTheoAnh,
-  onToggle,
-  onOpen,
-}: LuoiAnhProps) {
-  const khungRef = useRef<HTMLDivElement | null>(null);
-
-  // Đoán bề ngang NGAY từ lượt dựng đầu, đừng bắt đầu từ 0.
-  //
-  // Đo được cái giá của việc bắt đầu từ 0: lượt dựng đầu rơi vào nhánh dự
-  // phòng, React dựng đủ 1.235 thẻ rồi `useLayoutEffect` đo xong mới thay bằng
-  // lưới cuộn ảo. Trình duyệt không kịp vẽ ra, nhưng công thì đã làm — tác vụ
-  // chặn dài nhất 706ms (thay vì 237ms) và đống rác để lại nâng bộ nhớ JS từ
-  // 5,5 MB lên 11,5 MB. Công vứt đi, mà vứt đúng lúc trang đang tải.
-  //
-  // `window.innerWidth` có sẵn ở lượt dựng đầu phía trình duyệt. Khung lưới
-  // nằm trong `max-w-4xl` (896px) với `px-4` (16px mỗi bên) — xem thẻ bọc ở
-  // `GalleryApp`. Con số đoán chỉ cần đủ đúng để chọn nhánh cuộn ảo; phép đo
-  // thật trong `useLayoutEffect` sửa lại trước khi vẽ.
-  const doMan = () => (typeof window === "undefined" ? 0 : window.innerWidth);
-  const [rongMan, setRongMan] = useState(doMan);
-  const [rongKhung, setRongKhung] = useState(() => {
-    const w = doMan();
-    return w === 0 ? 0 : Math.min(896, w) - 32;
-  });
-  // Khoảng cách từ đầu trang tới lưới. Cửa sổ là thứ cuộn, nên bộ cuộn ảo phải
-  // biết lưới bắt đầu ở đâu mới tính đúng hàng nào đang trong tầm nhìn.
-  const [lechDau, setLechDau] = useState(0);
-
-  // `useLayoutEffect` chứ không phải `useEffect`: đo xong TRƯỚC khi trình duyệt
-  // vẽ. Dùng `useEffect` thì nhánh dự phòng ở dưới kịp vẽ ra một khung hình đầy
-  // đủ 1.235 thẻ — đúng cái giá mà cuộn ảo sinh ra để tránh.
-  //
-  // Không sợ cảnh báo khi dựng ở máy chủ: lúc đó `loading` còn bật nên
-  // `GalleryApp` trả về vòng quay, `LuoiAnh` chưa hề được dựng.
-  useLayoutEffect(() => {
-    const el = khungRef.current;
-    if (!el) return;
-    const doLai = () => {
-      setRongKhung(el.clientWidth);
-      setRongMan(window.innerWidth);
-      setLechDau(el.getBoundingClientRect().top + window.scrollY);
-    };
-    doLai();
-    const ro = new ResizeObserver(doLai);
-    ro.observe(el);
-    window.addEventListener("resize", doLai);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", doLai);
-    };
-  }, []);
-
-  // Lưới nằm dưới các khối hạn mức, hợp đồng… nên vị trí của nó xê dịch khi
-  // những khối đó hiện/ẩn. Đo lại mỗi khi số ảnh đổi.
-  useEffect(() => {
-    const el = khungRef.current;
-    if (el) setLechDau(el.getBoundingClientRect().top + window.scrollY);
-  }, [photos.length]);
-
-  const cot = soCot(rongMan);
-  const khe = rongMan >= 640 ? KHE_RONG : KHE_HEP;
-  const rongThe = rongKhung > 0 ? (rongKhung - khe * (cot - 1)) / cot : 0;
-  // Thẻ vuông (`aspect-square`), nên cao một hàng = bề ngang thẻ + khoảng cách.
-  const caoHang = rongThe > 0 ? rongThe + khe : 200;
-  const soHang = Math.ceil(photos.length / cot);
-
-  const ao = useWindowVirtualizer({
-    count: soHang,
-    estimateSize: () => caoHang,
-    overscan: 3, // dựng sẵn 3 hàng trên và dưới để cuộn nhanh không thấy ô trống
-    scrollMargin: lechDau,
-    getItemKey: (i) => photos[i * cot]?.id ?? i,
-  });
-
-  const hang = ao.getVirtualItems();
-
-  return (
-    <div ref={khungRef}>
-      {/* Chưa đo được bề ngang (máy không có ResizeObserver, hoặc phép đo hỏng)
-          thì đổ ra lưới thường ĐỦ CẢ BỘ.
-
-          Chậm còn hơn thiếu: cắt bớt ở đây là dựng lại đúng lỗi BB-128 vừa sửa
-          — khách trả tiền một buổi chụp rồi chỉ thấy một phần ảnh, mà không có
-          dấu hiệu nào cho biết còn ảnh phía sau. Nhánh này trên thực tế không
-          chạy (phép đo nằm trong `useLayoutEffect`, xong trước khi vẽ), nên cái
-          giá của nó là giả định chứ cái mất kia thì có thật. */}
-      {rongThe <= 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-4">
-          {photos.map((photo, idx) => (
-            <TheAnh
-              key={photo.id}
-              photo={photo}
-              thuTu={idx}
-              daChon={photo.mark === "selected"}
-              dangGui={mutatingIds.has(photo.id)}
-              khoa={khoa}
-              soSanPham={soSanPhamTheoAnh.get(photo.id) ?? 0}
-              onToggle={onToggle}
-              onOpen={onOpen}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="relative w-full" style={{ height: ao.getTotalSize() }}>
-          {hang.map((h) => {
-            const dau = h.index * cot;
-            const trongHang = photos.slice(dau, dau + cot);
-            return (
-              <div
-                key={h.key}
-                className="absolute left-0 w-full grid"
-                style={{
-                  top: 0,
-                  transform: `translateY(${h.start - ao.options.scrollMargin}px)`,
-                  height: caoHang,
-                  gridTemplateColumns: `repeat(${cot}, minmax(0, 1fr))`,
-                  gap: khe,
-                  paddingBottom: khe,
-                }}
-              >
-                {trongHang.map((photo, i) => (
-                  <TheAnh
-                    key={photo.id}
-                    photo={photo}
-                    thuTu={dau + i}
-                    daChon={photo.mark === "selected"}
-                    dangGui={mutatingIds.has(photo.id)}
-                    khoa={khoa}
-                    soSanPham={soSanPhamTheoAnh.get(photo.id) ?? 0}
-                    onToggle={onToggle}
-                    onOpen={onOpen}
-                  />
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function GalleryApp({ token }: GalleryAppProps) {
   const router = useRouter();
@@ -1241,392 +901,307 @@ export function GalleryApp({ token }: GalleryAppProps) {
     );
   }
 
-  const stepNumber = getCustomerProgressStep(gallery.status as GalleryStatus);
+  const hanMuc = gallery.quotaKnown ? (gallery.includedQuota ?? 0) : null;
+
+  /*
+    Link nào được làm gì — CÙNG luật với máy chủ (EDITING_ROLES, SUBMIT_ROLES
+    trong lib/auth/gallery-session). Máy chủ vẫn là chỗ chặn thật; ở đây chỉ
+    để không bày ra nút mà bấm vào thì nhận lỗi.
+
+    Trước 23/09/2026 link chỉ-xem vẫn thấy "Chốt danh sách", tim và "Mua
+    thêm" — bấm là một cái 403 "không có quyền". Người cầm link chỉ-xem
+    thường là ông bà: họ không biết vì sao, và nghĩ app hỏng.
+
+    `myRole` thiếu (bản trả về cũ) thì coi như link chính — để không khoá nhầm
+    ba mẹ; máy chủ vẫn chặn nếu sai.
+  */
+  const vaiTro = gallery.myRole ?? "owner";
+  const duocChon = vaiTro === "owner" || vaiTro === "co_editor" || vaiTro === "suggester";
+  const duocChot = vaiTro === "owner";
+  const khoaTim = isLocked || !duocChon;
+  const soChuaChon = photos.length - photos.filter((p) => p.mark === "selected").length;
+  const anhBia = gallery.coverPhotoId
+    ? { id: gallery.coverPhotoId }
+    : photos[0]
+      ? { id: photos[0].id }
+      : null;
+
+  /** Từ ảnh bìa cuộn xuống đầu lưới — nút "Bắt đầu chọn ảnh". */
+  const cuonToiLuoi = () =>
+    document.getElementById("dau-luoi-anh")?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  /*
+    Nút chính của thanh đáy — cùng một câu hỏi "bước tiếp theo là gì" mà
+    đầu trang cũ trả lời, nay chỉ trả lời ở MỘT chỗ.
+  */
+  const nutChinh = !duocChot
+    ? null
+    : !isLocked
+    ? { nhan: vi.gallery.submitCta, onClick: () => setShowSubmitModal(true) }
+    : daChotChoXacNhan
+      ? // Đã chốt, CSKH chưa xác nhận: mở lại là việc của chính ba mẹ.
+        { nhan: "Chọn thêm ảnh", onClick: () => setMoKhoaChon(true) }
+      : // Đã khoá thật: không sửa thẳng được, nhưng phải có ĐƯỜNG NÓI.
+        { nhan: "Yêu cầu sửa lại", onClick: () => setXinSuaLai(true) };
+
+  const nutLoc = (loai: "all" | "selected" | "unselected", nhan: string, so: number) => (
+    <button
+      type="button"
+      onClick={() => setFilter(loai)}
+      aria-pressed={filter === loai}
+      className={cn(
+        "shrink-0 whitespace-nowrap pb-2.5 text-[13.5px] transition-colors",
+        filter === loai
+          ? "font-medium text-foreground shadow-[inset_0_-2px_0_currentColor]"
+          : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {nhan}
+      <span className="ml-1 opacity-60">{so.toLocaleString("vi-VN")}</span>
+    </button>
+  );
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground pb-32">
-      {/* Thông báo banner trạng thái nếu có */}
+    <div className="min-h-[100dvh] bg-background pb-28 text-foreground">
+      {/* Thông báo trạng thái */}
       {statusMessage && (
-        <div className="fixed top-4 left-4 right-4 z-50 max-w-md mx-auto p-4 bg-primary text-primary-foreground rounded-xl shadow-lg flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Info className="w-5 h-5 shrink-0" />
+        <div className="fixed left-4 right-4 top-4 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl bg-[#2a2420] p-4 text-[#fffdf9] shadow-lg animate-in fade-in slide-in-from-top-4">
+          <div className="flex items-center gap-2 text-sm">
+            <Info className="h-5 w-5 shrink-0 opacity-80" />
             <span>{statusMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setStatusMessage(null)}
-            className="text-primary-foreground/80 hover:text-primary-foreground text-sm font-bold px-2 py-1"
+            aria-label={vi.common.close}
+            className="px-2 py-1 text-sm opacity-70 hover:opacity-100"
           >
             ✕
           </button>
         </div>
       )}
 
-      {/* Header trang khách */}
-      <header className="border-b bg-surface sticky top-0 z-20 backdrop-blur-md bg-background/90">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-bold truncate">
-              {gallery.babyName ? `Ảnh của bé ${gallery.babyName}` : gallery.title}
-            </h1>
-            {/*
-              Hai chỗ sửa, đo trên điện thoại 375px ngày 22/09/2026:
+      {/* MÀN 1 — ẢNH BÌA */}
+      <BiaBoAnh
+        anhBia={anhBia}
+        tenBe={gallery.babyName}
+        ngayChup={gallery.shootDate}
+        chiNhanh={gallery.branch.name}
+        loiChao={gallery.welcomeMessage}
+        soAnh={photos.length || gallery.photoCount}
+        hanMuc={hanMuc}
+        daChon={selectionCounts.selectedCount}
+        hanChot={gallery.dueAt}
+        khoa={isLocked}
+        onBatDau={cuonToiLuoi}
+      />
 
-              1. Dòng này `truncate`, và "Nhắn cho studio" nằm cuối nên bị cắt
-                 thành "Nhắn cho…". Đó là đường duy nhất ba mẹ liên lạc với
-                 studio ngay trên màn đang xem ảnh — không được phép cụt.
-                 Nay nó đứng riêng một dòng, không nằm trong phần bị cắt.
-              2. Chi nhánh chưa điền hotline thì hiện "Tên • " rồi " • " nữa,
-                 tức hai dấu chấm tròn liền nhau quanh một khoảng trống. Ghép
-                 bằng mảng đã lọc nên thiếu phần nào thì mất luôn dấu của phần
-                 đó.
-            */}
-            <p className="text-xs text-muted-foreground truncate">
-              {[gallery.branch.name, gallery.branch.hotline].filter(Boolean).join(" • ")}
-            </p>
-            {gallery.branch.chatUrl && (
-              <a
-                href={gallery.branch.chatUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs font-medium text-primary underline underline-offset-2"
-              >
-                {vi.gallery.messageStudio}
-              </a>
-            )}
+      {/*
+        ĐẦU TRANG DÍNH — gọn còn tên, bộ lọc, và hai việc phụ (nhắn studio,
+        tải ảnh). Thanh 6 bước và 4 ô số đã rời khỏi đây: ba mẹ không cần biết
+        quy trình nội bộ của studio, và số tấm đã có ở thanh đáy.
+      */}
+      <header
+        id="dau-luoi-anh"
+        className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-md"
+      >
+        <div className="mx-auto max-w-[1600px] px-3 sm:px-6">
+          <div className="flex items-end justify-between gap-3 pt-3">
+            <div className="min-w-0">
+              <p className="truncate font-display text-[22px] leading-tight">
+                {gallery.babyName || "Khoảnh khắc của con"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {gallery.branch.name}
+              </p>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1.5">
+              {/*
+                "Nhắn cho studio" giữ nguyên CHỮ, không thu thành biểu tượng:
+                đây là đường duy nhất ba mẹ liên lạc với studio ngay trên màn
+                đang xem ảnh, và một biểu tượng bong bóng chat thì nhiều người
+                không bấm.
+              */}
+              {gallery.branch.chatUrl && (
+                <a
+                  href={gallery.branch.chatUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-9 items-center rounded-full border border-border px-3 text-xs font-medium transition hover:bg-surface-2"
+                >
+                  {vi.gallery.messageStudio}
+                </a>
+              )}
+              {choPhepTai && photos.length > 0 && (
+                <MenuTaiAnh
+                  soAnh={photos.length}
+                  dungLuong={doDocDuocDungLuong(gallery.tongDungLuongAnh)}
+                  soDaChon={soAnhDaChon}
+                  onTaiDaChon={taiAnhDaChon}
+                  onTaiCaBo={taiCaBo}
+                />
+              )}
+            </div>
           </div>
 
-          {!isLocked ? (
-            <Button
-              size="sm"
-              onClick={() => setShowSubmitModal(true)}
-              className="shrink-0 font-medium"
+          <nav aria-label="Lọc ảnh" className="mt-3 flex items-center gap-5 overflow-x-auto">
+            {nutLoc("all", vi.gallery.filterAll, photos.length)}
+            {nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
+            {nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
+            {photosLoading && <Spinner className="mb-2.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+          </nav>
+
+          {/*
+            BB-180 — nhóm ảnh (thư mục con trong Drive), thành thẻ bấm được.
+            Chỉ hiện khi có từ HAI nhóm: một thẻ "Quân JPG 300" duy nhất không
+            lọc được gì, chỉ thêm chữ.
+          */}
+          {gallery.subfolders.length > 1 && (
+            <div
+              aria-label={vi.gallery.subfolderTitle}
+              className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-3 sm:mx-0 sm:px-0"
             >
-              {vi.gallery.submitCta}
-            </Button>
-          ) : daChotChoXacNhan ? (
-            /*
-              Đã chốt nhưng CSKH chưa xác nhận: mở lại là việc của chính ba mẹ,
-              một cú bấm, không phải một cuộc gọi.
-            */
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setMoKhoaChon(true)}
-              className="shrink-0 font-medium"
-            >
-              Chọn thêm ảnh
-            </Button>
-          ) : (
-            /*
-              Bộ ảnh đã khoá: CSKH đã xác nhận và chuyển cho thợ chỉnh ảnh.
-              Ba mẹ không sửa thẳng được nữa, nhưng phải có ĐƯỜNG NÓI — không
-              có nút thì họ đi tìm số điện thoại, và cuộc gọi đó rơi vào lúc
-              CSKH đang bận với khách khác.
-            */
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setXinSuaLai(true)}
-              className="shrink-0 font-medium"
-            >
-              Yêu cầu sửa lại
-            </Button>
+              {["", ...gallery.subfolders].map((folder) => (
+                <button
+                  key={folder || "tat-ca"}
+                  type="button"
+                  onClick={() => setSelectedSubfolder(folder)}
+                  aria-pressed={selectedSubfolder === folder}
+                  className={cn(
+                    "shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors",
+                    selectedSubfolder === folder
+                      ? "bg-foreground text-background"
+                      : "border border-border hover:bg-surface-2",
+                  )}
+                >
+                  {folder || vi.gallery.subfolderAll}
+                  <span className="ml-1.5 opacity-60">
+                    {folder ? (demTheoNhom.get(folder) ?? 0) : photos.length}
+                  </span>
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 pt-4 space-y-6">
-        {/* Dải tiến trình 6 bước của khách */}
-        <div className="bg-surface rounded-xl border p-4 shadow-2xs">
-          <CustomerProgress currentStep={stepNumber} />
-        </div>
+      {/* Thông báo trạng thái bộ ảnh — chỉ hiện khi có điều cần nói. */}
+      {(gallery.review || isLocked || !gallery.quotaKnown || !duocChon) && (
+        <div className="mx-auto max-w-3xl space-y-3 px-4 pt-5">
+          {gallery.review && (
+            <ReviewPanel
+              status={gallery.status}
+              review={gallery.review}
+              hotline={gallery.branch.hotline}
+              onDecide={decideReview}
+            />
+          )}
 
-        {gallery.review && (
-          <ReviewPanel
-            status={gallery.status}
-            review={gallery.review}
-            hotline={gallery.branch.hotline}
-            onDecide={decideReview}
+          {!duocChon && !isLocked && (
+            <div className="rounded-2xl border border-border bg-surface p-4 text-sm">
+              <p className="font-medium">Link này để xem ảnh cùng gia đình</p>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">
+                Việc chọn ảnh do ba mẹ đứng tên hợp đồng. Thích tấm nào, nhắn ba mẹ nhé.
+              </p>
+            </div>
+          )}
+
+          {isLocked && (
+            <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-4">
+              <Lock className="mt-0.5 h-[18px] w-[18px] shrink-0 text-muted-foreground" />
+              <div className="text-sm">
+                <p className="font-medium">
+                  {daChotChoXacNhan ? "Ba mẹ đã chốt danh sách" : "Bộ ảnh đang ở chế độ xem lại"}
+                </p>
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
+                  {daChotChoXacNhan
+                    ? "Bên mình đang xác nhận. Muốn đổi hay chọn thêm, ba mẹ bấm “Chọn thêm ảnh” ở dưới nhé."
+                    : vi.gallery.lockedBanner.replace(
+                        "{date}",
+                        gallery.selection.submittedAt
+                          ? new Date(gallery.selection.submittedAt).toLocaleDateString("vi-VN")
+                          : "",
+                      )}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Hạn mức CHƯA BIẾT (quotaKnown = false) */}
+          {!gallery.quotaKnown && !isLocked && duocChon && (
+            <div className="flex items-start gap-3 rounded-2xl border border-[#e7cf9f] bg-[#fbf3e2] p-4 text-[#5c4413]">
+              <AlertTriangle className="mt-0.5 h-[18px] w-[18px] shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium">Studio sẽ báo lại số ảnh trong gói</p>
+                {/*
+                  Nói ĐÚNG điều app làm: khi chưa có hạn mức, thả tim bị chặn
+                  (handleToggleHeart trả về câu "vui lòng liên hệ CSKH"). Bảo ba
+                  mẹ "cứ thả tim" ở đây là hứa một việc app không cho làm.
+                */}
+                <p className="mt-0.5 text-[13px] leading-relaxed opacity-90">
+                  CSKH đang cập nhật số ảnh chỉnh sửa của gói. Ba mẹ xem ảnh trước nhé — bên mình mở
+                  chọn ảnh ngay khi xong
+                  {gallery.branch.hotline ? (
+                    <>
+                      , cần gấp thì gọi <span className="font-medium">{gallery.branch.hotline}</span>
+                    </>
+                  ) : null}
+                  .
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MÀN 2 — LƯỚI ẢNH so le, giữ đúng khung */}
+      <section
+        aria-label="Ảnh của buổi chụp"
+        className="mx-auto max-w-[1600px] px-1.5 pt-1.5 sm:px-3 sm:pt-3 lg:px-6"
+      >
+        {filteredPhotos.length === 0 ? (
+          <div className="mx-auto my-12 max-w-md rounded-2xl border border-dashed border-border p-8 text-center">
+            <p className="text-sm text-muted-foreground">{vi.gallery.emptyFilter}</p>
+          </div>
+        ) : (
+          <LuoiAnh
+            photos={filteredPhotos}
+            mutatingIds={mutatingIds}
+            khoa={khoaTim}
+            soSanPhamTheoAnh={soSanPhamTheoAnh}
+            onToggle={handleToggleHeart}
+            onOpen={(idx) => setLightboxIndex(idx)}
           />
         )}
+      </section>
 
-        {/* Cảnh báo bộ ảnh đã chốt */}
-        {isLocked && (
-          <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex items-start gap-3">
-            <Lock className="w-5 h-5 shrink-0 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-semibold">Bộ ảnh đang ở chế độ xem lại</p>
-              <p className="text-xs mt-0.5 opacity-90">
-                {vi.gallery.lockedBanner.replace(
-                  "{date}",
-                  gallery.selection.submittedAt
-                    ? new Date(gallery.selection.submittedAt).toLocaleDateString("vi-VN")
-                    : ""
-                )}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Cảnh báo khi HẠN MỨC CHƯA BIẾT (quotaKnown = false) */}
-        {!gallery.quotaKnown && !isLocked && (
-          <div className="p-4 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
-            <div className="text-sm">
-              <p className="font-bold">Studio sẽ báo lại số ảnh trong gói</p>
-              <p className="text-xs mt-1 leading-relaxed">
-                Hạn mức ảnh chỉnh sửa của gói chụp đang được CSKH cập nhật. Quý khách vui lòng liên hệ hotline{" "}
-                <span className="font-semibold">{gallery.branch.hotline}</span> để mở chọn ảnh.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* KHỐI 4 CON SỐ HẠN MỨC */}
-        <section aria-labelledby="quota-stats-heading" className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 id="quota-stats-heading" className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Hạn mức chọn ảnh
-            </h2>
-            <QuotaDisplay
-              includedQuota={gallery.quotaKnown ? gallery.includedQuota : null}
-              extraPrice={gallery.extraPhotoPrice}
-              selectedCount={selectionCounts.selectedCount}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {/* 1. Số ảnh đã chọn */}
-            <div className="p-3.5 rounded-xl border bg-surface flex flex-col justify-between">
-              <span className="text-xs text-muted-foreground">1. Đã chọn</span>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span className="text-2xl font-black tracking-tight text-rose-500">
-                  {selectionCounts.selectedCount}
-                </span>
-                <span className="text-xs text-muted-foreground">ảnh</span>
-              </div>
-            </div>
-
-            {/* 2. Số ảnh đã thanh toán */}
-            <div className="p-3.5 rounded-xl border bg-surface flex flex-col justify-between">
-              <span className="text-xs text-muted-foreground">2. Trong gói</span>
-              <div className="mt-2">
-                {gallery.quotaKnown ? (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-black tracking-tight text-foreground">
-                      {gallery.includedQuota ?? 0}
-                    </span>
-                    <span className="text-xs text-muted-foreground">ảnh</span>
-                  </div>
-                ) : (
-                  <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 block pt-1">
-                    Chưa có (báo lại)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* 3. Số ảnh chọn thừa */}
-            <div className="p-3.5 rounded-xl border bg-surface flex flex-col justify-between">
-              <span className="text-xs text-muted-foreground">3. Chọn thêm</span>
-              <div className="mt-2 flex items-baseline gap-1">
-                <span
-                  className={cn(
-                    "text-2xl font-black tracking-tight",
-                    selectionCounts.extraCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"
-                  )}
-                >
-                  {gallery.quotaKnown ? selectionCounts.extraCount : "—"}
-                </span>
-                {gallery.quotaKnown && <span className="text-xs text-muted-foreground">ảnh</span>}
-              </div>
-            </div>
-
-            {/* 4. Tiền của số ảnh thừa */}
-            <div className="p-3.5 rounded-xl border bg-surface flex flex-col justify-between">
-              <span className="text-xs text-muted-foreground">4. Phụ phí thêm</span>
-              <div className="mt-2">
-                {gallery.quotaKnown ? (
-                  <span
-                    className={cn(
-                      "text-base sm:text-lg font-black tracking-tight block",
-                      selectionCounts.extraAmount > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
-                    )}
-                  >
-                    {formatCurrencyVND(selectionCounts.extraAmount)}
-                  </span>
-                ) : (
-                  <span className="text-xs text-muted-foreground block pt-1">—</span>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* BỘ LỌC VÀ DANH SÁCH ẢNH */}
-        <section aria-labelledby="photos-grid-heading" className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-            <div className="flex items-center gap-2">
-              <h2 id="photos-grid-heading" className="text-base font-bold">
-                Danh sách ảnh ({filteredPhotos.length})
-              </h2>
-              {photosLoading && <Spinner className="h-4 w-4 text-muted-foreground" />}
-            </div>
-
-            {/* Các nút bấm lọc */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-              <button
-                type="button"
-                onClick={() => setFilter("all")}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
-                  filter === "all"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-surface border text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {vi.gallery.filterAll} ({photos.length})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFilter("selected")}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5",
-                  filter === "selected"
-                    ? "bg-rose-500 text-white"
-                    : "bg-surface border text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <Heart className="w-3.5 h-3.5 fill-current" />
-                {vi.gallery.filterSelected} ({selectionCounts.selectedCount})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setFilter("unselected")}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
-                  filter === "unselected"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-surface border text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {vi.gallery.filterUnselected}
-              </button>
-
-            </div>
-          </div>
-
-          {/* ----------------------------------------------------------------
-              BB-180 — NHÓM ẢNH, hiện thành thẻ bấm được thay vì danh sách thả xuống
-              ----------------------------------------------------------------
-              Danh sách thả xuống giấu mất thông tin: ba mẹ phải bấm ra mới biết bộ
-              ảnh có những nhóm nào, và không bao giờ thấy nhóm nào có bao nhiêu tấm.
-
-              **KHÔNG nhét tiêu đề nhóm vào giữa lưới ảnh.** Lưới đang cuộn ảo theo
-              hàng đều nhau (BB-131, chịu được 1.235 tấm trên điện thoại). Chèn hàng
-              cao thấp khác nhau vào đó là đụng đúng phần đã tối ưu cho bộ ảnh lớn —
-              cái giá không đáng so với cái được.
-          */}
-          {gallery.subfolders.length > 0 && (
-            <section aria-label={vi.gallery.subfolderTitle} className="space-y-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {vi.gallery.subfolderTitle}
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedSubfolder("")}
-                  aria-pressed={selectedSubfolder === ""}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                    selectedSubfolder === ""
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-surface border text-foreground hover:bg-surface-2",
-                  )}
-                >
-                  {vi.gallery.subfolderAll}
-                  <span className="ml-1.5 opacity-70">{photos.length}</span>
-                </button>
-                {gallery.subfolders.map((folder) => (
-                  <button
-                    key={folder}
-                    type="button"
-                    onClick={() => setSelectedSubfolder(folder)}
-                    aria-pressed={selectedSubfolder === folder}
-                    className={cn(
-                      "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
-                      selectedSubfolder === folder
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-surface border text-foreground hover:bg-surface-2",
-                    )}
-                  >
-                    {folder}
-                    <span className="ml-1.5 opacity-70">{demTheoNhom.get(folder) ?? 0}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Lưới ảnh responsive (tối ưu từ mobile 375px) */}
-          {filteredPhotos.length === 0 ? (
-            <div className="py-12 text-center rounded-xl border border-dashed bg-surface/50 p-6">
-              <p className="text-sm text-muted-foreground">{vi.gallery.emptyFilter}</p>
-            </div>
-          ) : (
-            <LuoiAnh
-              photos={filteredPhotos}
-              mutatingIds={mutatingIds}
-              khoa={isLocked}
-              soSanPhamTheoAnh={soSanPhamTheoAnh}
-              onToggle={handleToggleHeart}
-              onOpen={(idx) => setLightboxIndex(idx)}
-            />
-          )}
-        </section>
-
-        {/* THÀNH PHẦN HỢP ĐỒNG HAI TẦNG */}
-        {contractBreakdownItems.length > 0 && (
-          <section aria-labelledby="contract-breakdown-heading" className="pt-4">
-            <ContractBreakdown items={contractBreakdownItems} />
-          </section>
-        )}
-
-        {/* SẢN PHẨM IN TRONG GÓI — bảng tóm tắt, CHỈ ĐỌC.
-            Chỗ gán ảnh nay nằm ở bảng bên phải màn xem ảnh lớn, nơi ba mẹ đang
-            nhìn thấy tấm ảnh thật. Xem ghi chú đầu `tom-tat-san-pham-in.tsx`. */}
-        <TomTatSanPhamIn
-          className="mt-4"
-          dong={hangInTrongGoi.map((sp) => ({
-            galleryItemId: sp.galleryItemId,
-            name: sp.name,
-            quantity: sp.quantity,
-            nhom: sp.nhom,
-            anh: placements
-              .filter((pl) => pl.galleryItemId === sp.galleryItemId)
-              .map((pl) => {
-                const a = photos.find((p) => p.id === pl.photoId);
-                return { id: pl.photoId, fileName: a?.fileName ?? "" };
-              }),
-          }))}
-          onMoAnh={moAnhTheoId}
-        />
-
-        {/* SẢN PHẨM MUA THÊM (ADDON) — khối cũ, nay thay bằng cửa hàng riêng. */}
-        {/*
-          Khối "mua thêm" ĐÃ RỜI khỏi cuối trang.
-
-          Chủ studio 22/09/2026: "phần bán hàng cần có menu riêng, không đưa
-          xuống dưới như vậy sẽ không bán được hàng". Bộ ảnh thật có 460 tấm,
-          nên một khối nằm sau lưới ảnh chỉ gặp được sau khi cuộn hết 460 tấm —
-          và lúc đó ba mẹ đang đi tìm nút Chốt, không đi mua khung.
-
-          Nay có nút riêng ở thanh dưới đáy, mở ra `CuaHang`.
-        */}
-      </div>
+      {/*
+        TRONG GÓI CỦA BA MẸ — thành phần hợp đồng và sản phẩm in trong gói,
+        CHỈ ĐỌC. Nằm sau lưới vì đây là thông tin để đối chiếu, không phải việc
+        phải làm trước; chỗ gán ảnh vào sản phẩm là màn xem ảnh lớn.
+      */}
+      {(contractBreakdownItems.length > 0 || hangInTrongGoi.length > 0) && (
+        <div className="mx-auto mt-14 max-w-3xl space-y-5 px-4">
+          <h2 className="font-display text-[28px] font-light leading-tight">Trong gói của ba mẹ</h2>
+          {contractBreakdownItems.length > 0 && <ContractBreakdown items={contractBreakdownItems} />}
+          <TomTatSanPhamIn
+            dong={hangInTrongGoi.map((sp) => ({
+              galleryItemId: sp.galleryItemId,
+              name: sp.name,
+              quantity: sp.quantity,
+              nhom: sp.nhom,
+              anh: placements
+                .filter((pl) => pl.galleryItemId === sp.galleryItemId)
+                .map((pl) => {
+                  const a = photos.find((p) => p.id === pl.photoId);
+                  return { id: pl.photoId, fileName: a?.fileName ?? "" };
+                }),
+            }))}
+            onMoAnh={moAnhTheoId}
+          />
+        </div>
+      )}
 
       <CuaHang
         mo={moCuaHang}
@@ -1659,78 +1234,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
         }
       />
 
-      {/* THANH ĐIỀU HƯỚNG DÍNH DƯỚI ĐÁY CHO MOBILE (Sticky Bottom Bar) */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-background/95 backdrop-blur-md px-4 py-3 shadow-lg">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex flex-col">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-xs text-muted-foreground">Đã chọn:</span>
-              <span className="text-base font-black text-rose-500">
-                {selectionCounts.selectedCount}
-              </span>
-              {gallery.quotaKnown && (
-                <span className="text-xs text-muted-foreground">
-                  / {gallery.includedQuota ?? 0} ảnh
-                </span>
-              )}
-            </div>
-
-            {gallery.quotaKnown && selectionCounts.extraCount > 0 ? (
-              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                Vượt {selectionCounts.extraCount} ảnh (+{formatCurrencyVND(selectionCounts.extraAmount)})
-              </span>
-            ) : (
-              <span className="text-[11px] text-muted-foreground">
-                {gallery.quotaKnown ? "Trong hạn mức gói" : "Hạn mức chưa xác định"}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/*
-              CỬA RIÊNG CHO PHẦN BÁN HÀNG.
-
-              Đứng cạnh nút Chốt, ở thanh luôn nhìn thấy — không phải cuộn hết
-              460 tấm mới gặp. Ẩn khi chưa có gì bán được, và khi bộ ảnh đã
-              khoá thật (CSKH xác nhận rồi thì đặt thêm phải qua CSKH).
-            */}
-            {(gallery.addons?.catalogue?.length ?? 0) > 0 && !isLocked && (
-              <Button
-                variant="outline"
-                onClick={() => setMoCuaHang(true)}
-                className="h-11 rounded-xl px-4 font-semibold"
-              >
-                Mua thêm
-                {(gallery.addons?.totalAmount ?? 0) > 0 && (
-                  <span className="ml-1.5 text-xs text-muted-foreground">
-                    {formatCurrencyVND(gallery.addons?.totalAmount ?? 0)}
-                  </span>
-                )}
-              </Button>
-            )}
-
-            {!isLocked && (
-              <Button
-                onClick={() => setShowSubmitModal(true)}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-5 h-11 rounded-xl shadow-md flex items-center gap-2"
-              >
-                <span>{vi.gallery.submitCta}</span>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            )}
-
-            {daChotChoXacNhan && (
-              <Button
-                variant="outline"
-                onClick={() => setMoKhoaChon(true)}
-                className="h-11 rounded-xl px-4 font-semibold"
-              >
-                Chọn thêm ảnh
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* THANH ĐÁY — một viên duy nhất: đã chọn mấy tấm, bước tiếp theo. */}
+      <ThanhChon
+        daChon={selectionCounts.selectedCount}
+        hanMuc={hanMuc}
+        soTamThem={gallery.quotaKnown ? selectionCounts.extraCount : 0}
+        tienThem={gallery.quotaKnown ? selectionCounts.extraAmount : 0}
+        nutChinh={nutChinh}
+        muaThem={
+          (gallery.addons?.catalogue?.length ?? 0) > 0 && !isLocked && duocChon
+            ? { tien: gallery.addons?.totalAmount ?? 0, onClick: () => setMoCuaHang(true) }
+            : null
+        }
+      />
 
       {/* HỘP THOẠI XÁC NHẬN CHỐT BỘ ẢNH */}
       {/* ------------------------------------------------------------------
@@ -1752,12 +1268,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
           nhìn như trang bị vỡ. Viền `border-t` vẫn kéo hết bề ngang (đó là
           đường ngăn, phải chạm mép), còn CHỮ thì vào đúng cột như phần trên.
       */}
-      <footer className="mt-10 border-t text-sm">
+      <footer className="mt-16 border-t border-border text-sm">
         <div className="mx-auto max-w-4xl px-4 pt-6 pb-10">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {vi.gallery.studioInfo}
           </h2>
-          <p className="mt-2 font-semibold text-foreground">{gallery.branch.name}</p>
+          <p className="mt-2 font-display text-xl text-foreground">{gallery.branch.name}</p>
           <div className="mt-1 space-y-1 text-muted-foreground">
             {gallery.branch.address && <p>{gallery.branch.address}</p>}
             {gallery.branch.hotline && (
@@ -1838,23 +1354,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 luôn, rồi để họ tự quyết.
             */}
             {sanPhamThieuAnh.length > 0 && (
-              <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 text-xs dark:border-amber-500/30 dark:bg-amber-500/10">
-                <p className="font-semibold text-amber-900 dark:text-amber-200">
+              <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 text-xs">
+                <p className="font-semibold text-amber-900">
                   Bạn chưa chọn ảnh cho:
                 </p>
-                <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-amber-900/90 dark:text-amber-100/90">
+                <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-amber-900/90">
                   {sanPhamThieuAnh.map((sp) => (
                     <li key={sp.galleryItemId}>{sp.name}</li>
                   ))}
                 </ul>
-                <p className="mt-2 leading-relaxed text-amber-900/80 dark:text-amber-100/80">
+                <p className="mt-2 leading-relaxed text-amber-900/80">
                   Chọn luôn thì bên mình làm nhanh hơn — để sau cũng được, CSKH sẽ
                   hỏi lại.
                 </p>
                 <button
                   type="button"
                   onClick={() => setShowSubmitModal(false)}
-                  className="mt-2.5 rounded-lg bg-amber-200/70 px-3 py-1.5 font-semibold text-amber-950 hover:bg-amber-200 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30"
+                  className="mt-2.5 rounded-lg bg-amber-200/70 px-3 py-1.5 font-semibold text-amber-950 hover:bg-amber-200"
                 >
                   Để tôi chọn thêm
                 </button>
@@ -1950,56 +1466,35 @@ export function GalleryApp({ token }: GalleryAppProps) {
       )}
 
       {/* TẢI ẢNH VỀ MÁY — BB-156.
-          Chủ studio chốt: từng ảnh, và cả bộ tải dần từng lô, hết lô tự tiếp. */}
-      {choPhepTai && photos.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[var(--bb-border)] bg-surface p-3 text-sm shadow-lg">
-          {tienDoTai && tienDoTai.tong > 1 ? (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between gap-3">
-                <span>
-                  Đang tải {tienDoTai.daXong}/{tienDoTai.tong} ảnh
-                  {tienDoTai.dangTai ? ` · ${tienDoTai.dangTai}` : ""}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => { dungTaiRef.current = true; }}
-                  className="rounded-md border border-[var(--bb-border)] px-3 py-1"
-                >
-                  Dừng
-                </button>
-              </div>
-              {tienDoTai.loi && (
-                <p className={tienDoTai.hetChoTrongMay ? "text-[var(--bb-danger)]" : "text-[var(--bb-fg-muted)]"}>
-                  {tienDoTai.loi}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="text-[var(--bb-fg-muted)]">
-                Cả bộ {photos.length} ảnh · {doDocDuocDungLuong(gallery?.tongDungLuongAnh)} · ảnh gốc
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {soAnhDaChon > 0 && (
-                  <button
-                    type="button"
-                    onClick={taiAnhDaChon}
-                    className="flex items-center gap-2 rounded-md border border-[var(--bb-border)] px-4 py-2"
-                  >
-                    <MuiTenTaiXuong />
-                    Tải {soAnhDaChon} ảnh đã chọn
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={taiCaBo}
-                  className="flex items-center gap-2 rounded-md bg-[var(--bb-accent)] px-4 py-2 text-white"
-                >
-                  <MuiTenTaiXuong />
-                  Tải cả bộ
-                </button>
-              </div>
-            </div>
+          Nút chọn tải nay ở đầu trang (MenuTaiAnh). Ở đây chỉ còn ô báo tiến độ
+          khi đang tải nhiều tấm, nổi ngay trên thanh đáy chứ không đè lên nó. */}
+      {choPhepTai && tienDoTai && tienDoTai.tong > 1 && (
+        <div className="fixed inset-x-3 bottom-[84px] z-30 mx-auto max-w-xl rounded-2xl border border-border bg-surface p-3 text-sm shadow-lg">
+          <div className="flex items-center justify-between gap-3">
+            <span className="min-w-0 truncate">
+              Đang tải {tienDoTai.daXong}/{tienDoTai.tong} ảnh
+              {tienDoTai.dangTai ? ` · ${tienDoTai.dangTai}` : ""}
+            </span>
+            {tienDoTai.daXong < tienDoTai.tong && (
+              <button
+                type="button"
+                onClick={() => { dungTaiRef.current = true; }}
+                className="shrink-0 rounded-full border border-border px-3 py-1 text-xs"
+              >
+                Dừng
+              </button>
+            )}
+          </div>
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2">
+            <div
+              className="h-full rounded-full bg-foreground transition-[width] duration-300"
+              style={{ width: `${Math.round((tienDoTai.daXong / tienDoTai.tong) * 100)}%` }}
+            />
+          </div>
+          {tienDoTai.loi && (
+            <p className={cn("mt-1.5 text-xs", tienDoTai.hetChoTrongMay ? "text-[var(--bb-danger)]" : "text-muted-foreground")}>
+              {tienDoTai.loi}
+            </p>
           )}
         </div>
       )}
@@ -2013,10 +1508,29 @@ export function GalleryApp({ token }: GalleryAppProps) {
           onToggleHeart={handleToggleHeart}
           onTaiAnh={choPhepTai ? (p) => taiMotAnh({ id: p.id, fileName: p.fileName }) : null}
           mutatingIds={mutatingIds}
-          isLocked={isLocked}
+          isLocked={khoaTim}
           daChon={soAnhDaChon}
           hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
           onLuuGhiChu={luuGhiChuAnh}
+          dungCho={(anh) => {
+            // Gộp đủ ba đường một tấm ảnh thành hàng — cùng ba nguồn với dấu
+            // rêu trên lưới (`soSanPhamTheoAnh`), để hai chỗ không nói khác nhau.
+            const nhan: string[] = [];
+            for (const pl of placements) {
+              if (pl.photoId !== anh.id) continue;
+              const sp = hangInTrongGoi.find((h) => h.galleryItemId === pl.galleryItemId);
+              if (sp) nhan.push(`${sp.name} · trong gói`);
+            }
+            for (const m of gallery.addons?.items ?? []) {
+              if (m.photoId === anh.id) nhan.push(m.quantity > 1 ? `${m.name} ×${m.quantity}` : m.name);
+            }
+            for (const ap of gallery.albumPlacements ?? []) {
+              if (ap.photoId !== anh.id) continue;
+              const al = gallery.addons?.items?.find((m) => m.id === ap.addonId);
+              if (al) nhan.push(al.name);
+            }
+            return nhan;
+          }}
           banner={
             gallery.banner ? (
               // Quảng cáo KHÔNG chen vào chỗ bấm: nó nằm ở cột riêng, không
@@ -2121,26 +1635,5 @@ export function GalleryApp({ token }: GalleryAppProps) {
         />
       )}
     </div>
-  );
-}
-
-/** Mũi tên tải xuống — BB-161, chủ studio chốt dùng biểu tượng thay cho chữ. */
-function MuiTenTaiXuong() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 3v12" />
-      <path d="M7 12l5 5 5-5" />
-      <path d="M4 20h16" />
-    </svg>
   );
 }

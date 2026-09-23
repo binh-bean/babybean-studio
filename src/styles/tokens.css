@@ -178,6 +178,9 @@
   --color-bb-danger: var(--bb-danger);
   --color-bb-danger-fg: var(--bb-danger-fg);
   --color-bb-viewer-bg: var(--bb-viewer-bg);
+  /* Chỉ có giá trị bên trong .giao-dien-khach — xem khối cuối tệp. */
+  --color-heart: var(--bb-heart);
+  --color-moss: var(--bb-moss);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -205,4 +208,112 @@
   --radius-lg: var(--bb-radius);
   --radius-md: var(--bb-radius-sm);
   --radius-sm: calc(var(--bb-radius-sm) - 2px);
+}
+
+/* ---------------------------------------------------------------------------
+   MÀN KHÁCH — "cuốn album kỷ niệm". Chủ studio duyệt 23/09/2026.
+   ---------------------------------------------------------------------------
+   Luôn SÁNG, kể cả khi điện thoại của ba mẹ đang để chế độ tối. Ảnh em bé chụp
+   trên nền kem, tường xanh rêu, gỗ vàng — nền đen làm chúng trông như ảnh
+   trong phòng tối, và làm màn khách giống một công cụ quản trị.
+
+   Màu lấy từ chính ảnh của studio: kem, rêu, hồng đất ấm. Nút chính màu MỰC
+   thay vì hồng đất: hồng để dành riêng cho trái tim, để "đã thích" là thứ duy
+   nhất trên màn mang màu đó.
+
+   Vì sao phải khai lại CẢ BA tầng biến (--bb-*, --background…, --color-*):
+   `--background: var(--bb-bg)` được tính xong ở :root rồi mới truyền xuống.
+   Chỉ đổi --bb-bg ở đây thì --background vẫn mang giá trị của :root — tức màu
+   tối khi máy đang để chế độ tối. Tầng thứ ba còn hiểm hơn: Tailwind khai
+   `--color-background: var(--background)` trong @theme, cũng tính ở :root,
+   và MỌI lớp như bg-background / text-foreground đọc tầng này. Bỏ sót nó thì
+   màn khách vẫn đen y nguyên dù hai tầng trên đã đổi.
+
+   Tương phản đã đo: chữ phụ #6b6057 trên nền #f7f2eb = 5,6:1 (đạt AA). */
+.giao-dien-khach {
+  --bb-bg: #f7f2eb;
+  --bb-surface: #fffdf9;
+  --bb-surface-2: #efe8df;
+  --bb-border: #e4dace;
+  --bb-fg: #2a2420;
+  --bb-fg-muted: #6b6057;
+  --bb-primary: #2a2420;
+  --bb-primary-fg: #fffdf9;
+  --bb-accent: #6c7a5f;
+  --bb-accent-fg: #ffffff;
+  --bb-heart: #c4645a;
+  --bb-moss: #4f5b45;
+  --bb-viewer-bg: #1b1714;
+  --bb-font-display: var(--font-fraunces), "Fraunces", Georgia, serif;
+
+  --background: var(--bb-bg);
+  --foreground: var(--bb-fg);
+  --card: var(--bb-surface);
+  --card-foreground: var(--bb-fg);
+  --popover: var(--bb-surface);
+  --popover-foreground: var(--bb-fg);
+  --primary: var(--bb-primary);
+  --primary-foreground: var(--bb-primary-fg);
+  --secondary: var(--bb-surface-2);
+  --secondary-foreground: var(--bb-fg);
+  --muted: var(--bb-surface-2);
+  --muted-foreground: var(--bb-fg-muted);
+  --accent: var(--bb-accent);
+  --accent-foreground: var(--bb-accent-fg);
+  --border: var(--bb-border);
+  --input: var(--bb-border);
+  --ring: var(--bb-fg);
+
+  /* Tầng biến của Tailwind — khai lại, xem giải thích ngay trên khối này. */
+  --color-bb-primary: var(--bb-primary);
+  --color-bb-primary-fg: var(--bb-primary-fg);
+  --color-bb-accent: var(--bb-accent);
+  --color-bb-accent-fg: var(--bb-accent-fg);
+  --color-bb-cream: var(--bb-cream);
+  --color-bb-bg: var(--bb-bg);
+  --color-bb-surface: var(--bb-surface);
+  --color-bb-surface-2: var(--bb-surface-2);
+  --color-surface: var(--bb-surface);
+  --color-surface-2: var(--bb-surface-2);
+  --color-bb-border: var(--bb-border);
+  --color-bb-fg: var(--bb-fg);
+  --color-bb-fg-muted: var(--bb-fg-muted);
+  --color-bb-success: var(--bb-success);
+  --color-bb-success-fg: var(--bb-success-fg);
+  --color-bb-warning: var(--bb-warning);
+  --color-bb-warning-fg: var(--bb-warning-fg);
+  --color-bb-danger: var(--bb-danger);
+  --color-bb-danger-fg: var(--bb-danger-fg);
+  --color-bb-viewer-bg: var(--bb-viewer-bg);
+  --color-heart: var(--bb-heart);
+  --color-moss: var(--bb-moss);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-display: var(--bb-font-display);
+
+  color-scheme: light;
+  background: var(--bb-bg);
+  color: var(--bb-fg);
+}
+
+/* Nền của cả trang (phần kéo quá đà trên iPhone) cũng phải kem, không đen. */
+body:has(.giao-dien-khach) {
+  background: #f7f2eb;
 }

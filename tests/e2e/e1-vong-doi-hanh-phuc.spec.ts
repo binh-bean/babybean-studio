@@ -154,7 +154,7 @@ test.describe("E-1: vòng đời hạnh phúc", () => {
     // thứ tự ảnh trong thư mục Drive, không theo thứ tự ba mẹ bấm — thợ chỉnh
     // ảnh đi từ trên xuống trong thư mục.
     const nutChon = page.locator('button[aria-label="Chọn ảnh này"]');
-    const dem = page.locator("text=1. Đã chọn").locator("..").locator("span.text-2xl");
+    const dem = page.getByTestId("dem-da-chon");
     await expect(dem).toHaveText("0");
 
     await nutChon.nth(2).click();
