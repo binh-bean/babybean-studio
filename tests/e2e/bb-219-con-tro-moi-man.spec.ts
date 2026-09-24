@@ -87,6 +87,15 @@ function taoDoanDo() {
       chu: string;
       cursor: string;
     }[] = [];
+    let soDaDo = 0;
+
+    // Thẻ bấm được theo nghĩa HTML — CSS chung (globals.css) phủ chúng, nhưng
+    // một class đặt sau (vd `cursor-default`) vẫn ghi đè được. Không có onClick
+    // cũng phải dò: ô chọn chạy bằng onChange, <summary> chạy bằng trình duyệt.
+    const THE_TUONG_TAC =
+      'button, a[href], select, summary, label[for], input[type="checkbox"], input[type="radio"], ' +
+      'input[type="file"], [role="button"], [role="tab"], [role="menuitem"], [role="option"], ' +
+      '[role="switch"], [role="checkbox"], [role="radio"], [role="link"]';
 
     const tatCa = document.querySelectorAll<HTMLElement>("*");
     for (const el of Array.from(tatCa)) {
@@ -99,7 +108,8 @@ function taoDoanDo() {
       const handler = (props.onClick ?? props.onMouseDown ?? props.onPointerDown) as
         | ((...a: unknown[]) => unknown)
         | undefined;
-      if (typeof handler !== "function") continue;
+      const laTheTuongTac = el.matches(THE_TUONG_TAC);
+      if (typeof handler !== "function" && !laTheTuongTac) continue;
 
       // 2. Bỏ qua: phần tử vô hiệu.
       const disabled =
@@ -110,11 +120,11 @@ function taoDoanDo() {
       if (el.hasAttribute("data-con-tro")) continue;
 
       // 4. Bỏ qua: onClick chỉ gọi stopPropagation (không thật sự "bấm được gì").
-      const thanHam = handler.toString().replace(/\s+/g, " ").trim();
+      const thanHam = typeof handler === "function" ? handler.toString().replace(/\s+/g, " ").trim() : "";
       const chiChanNoi =
         /^\(?[\w$]*\)?\s*=>\s*\{?\s*[\w$]+\.stopPropagation\(\);?\s*\}?$/.test(thanHam) ||
         /^function\s*\(?[\w$]*\)?\s*\{\s*[\w$]+\.stopPropagation\(\);?\s*\}$/.test(thanHam);
-      if (chiChanNoi) continue;
+      if (chiChanNoi && !laTheTuongTac) continue;
 
       // 5. Bỏ qua: ô nhập chữ — con trỏ chữ (text caret) là ĐÚNG ở đây.
       const the = el.tagName.toLowerCase();
@@ -136,6 +146,7 @@ function taoDoanDo() {
       }
 
       // 7. Phần tử bấm được thật sự — con trỏ PHẢI là bàn tay.
+      soDaDo++;
       if (kieu.cursor !== "pointer") {
         ketQua.push({
           the,
@@ -145,7 +156,7 @@ function taoDoanDo() {
         });
       }
     }
-    return ketQua;
+    return { ketQua, soDaDo };
   };
 }
 
@@ -164,8 +175,14 @@ async function choTrangOnDinh(page: Page) {
 async function doMotTrang(page: Page, nhan: string, viPhamAll: ViPham[], ghiChu?: string) {
   const doanDo = taoDoanDo();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ds = await page.evaluate(doanDo as any);
-  for (const v of ds as { the: string; lop: string; chu: string; cursor: string }[]) {
+  const { ketQua: ds, soDaDo } = (await page.evaluate(doanDo as any)) as {
+    ketQua: { the: string; lop: string; chu: string; cursor: string }[];
+    soDaDo: number;
+  };
+  // Trang lỗi, trang trắng hay bị đẩy về /login thì không có gì để dò — nếu
+  // không chặn ở đây, phép thử XANH mà chưa kiểm gì.
+  expect(soDaDo, `${nhan}: không dò được phần tử bấm được nào — trang có hiện thật không?`).toBeGreaterThan(0);
+  for (const v of ds) {
     viPhamAll.push({ trang: nhan, the: v.the, lop: v.lop, chu: v.chu, cursor: v.cursor, ghiChu });
   }
 }
@@ -278,6 +295,9 @@ test.describe("BB-219: con trỏ bàn tay trên mọi màn", () => {
       .waitFor({ state: "visible", timeout: 30_000 })
       .catch(() => {});
     await choTrangOnDinh(page);
+    // Màn khách phải hiện lưới ảnh thật — nếu trang báo lỗi/hết hạn thì chỉ còn
+    // vài nút, vẫn >0 phần tử, nên chặn riêng.
+    await expect(page.getByTestId("the-anh").first()).toBeVisible();
     await doMotTrang(page, `/g/[token]`, viPham);
     trangDaDo.push("/g/[token] (màn khách bộ ảnh thử)");
 
@@ -296,6 +316,7 @@ test.describe("BB-219: con trỏ bàn tay trên mọi màn", () => {
       const routeThat = route.replace("[id]", galleryId);
       await page.goto(routeThat);
       await choTrangOnDinh(page);
+      expect(new URL(page.url()).pathname, `${routeThat} bị đẩy đi nơi khác`).toBe(routeThat);
       await doMotTrang(page, routeThat, viPham);
       trangDaDo.push(routeThat);
 
