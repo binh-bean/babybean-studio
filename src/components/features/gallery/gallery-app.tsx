@@ -14,7 +14,16 @@ import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { HuongDanThemManHinh } from "@/components/features/gallery/huong-dan-them-man-hinh";
-import { Smartphone } from "lucide-react";
+import { SoSanhAnh } from "@/components/features/gallery/so-sanh-anh";
+import {
+  themVaoSoSanh,
+  boKhoiSoSanh,
+  duSoSanh,
+  daDuSoSanh,
+  SO_SANH_TOI_DA,
+  SO_SANH_TOI_THIEU,
+} from "@/lib/gallery/so-sanh";
+import { Smartphone, Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
@@ -249,6 +258,24 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [placements, setPlacements] = useState<{ photoId: string; galleryItemId: string }[]>([]);
   const [placing, setPlacing] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  /**
+   * BB-218 — màn xem lớn thường xem trong danh sách đã LỌC (`filteredPhotos`).
+   * Mở từ "So sánh với tấm khác" thì tấm đó có thể không nằm trong bộ lọc
+   * hiện tại (ví dụ đang lọc "Chưa chọn" mà tấm so sánh đã được thả tim) — khi
+   * đó phải mở trong danh sách ĐẦY ĐỦ, không thì mất tấm/lệch chỉ số.
+   */
+  const [lightboxDungDanhSachDay, setLightboxDungDanhSachDay] = useState(false);
+
+  /**
+   * BB-218 — So sánh nhiều tấm. Lời chủ studio (24/09/2026): "So sánh hai
+   * tấm cạnh nhau — có thể cạnh nhau hoặc không cạnh nhau nếu khách hàng
+   * muốn. Ví dụ chọn quá nhiều cần bỏ bớt." Nên đây là MỘT chế độ riêng: bật
+   * lên thì bấm ảnh trong lưới là đánh dấu so sánh (tối đa 4), không mở màn
+   * xem lớn. Toán thêm/bớt/giới hạn nằm ở `lib/gallery/so-sanh.ts`.
+   */
+  const [soSanhBat, setSoSanhBat] = useState(false);
+  const [dsSoSanh, setDsSoSanh] = useState<string[]>([]);
+  const [moSoSanh, setMoSoSanh] = useState(false);
 
   /**
    * Ba mẹ đã bấm Chốt, CSKH chưa xác nhận → màn hình KHOÁ MỀM.
@@ -571,6 +598,66 @@ export function GalleryApp({ token }: GalleryAppProps) {
     [isLocked],
   );
 
+  /**
+   * BB-218 — đánh dấu/bỏ đánh dấu một tấm để so sánh. Bấm ảnh trong lưới khi
+   * chế độ so sánh đang bật gọi thẳng hàm này (xem `onToggle` của LuoiAnh).
+   *
+   * Đã đủ 4 tấm mà bấm thêm một tấm mới thì KHÔNG lặng lẽ bỏ qua — báo cho ba
+   * mẹ biết vì sao bấm không thấy gì xảy ra (cùng cơ chế `statusMessage` đã
+   * dùng cho các lỗi chọn ảnh khác).
+   */
+  const onToggleSoSanh = useCallback(
+    (photo: PhotoPublic) => {
+      setDsSoSanh((cu) => {
+        if (cu.includes(photo.id)) return boKhoiSoSanh(cu, photo.id);
+        if (daDuSoSanh(cu)) {
+          setStatusMessage(
+            `Chỉ so sánh được tối đa ${SO_SANH_TOI_DA} tấm — bỏ bớt một tấm đang so sánh trước đã nhé.`,
+          );
+          return cu;
+        }
+        return themVaoSoSanh(cu, photo.id);
+      });
+    },
+    [],
+  );
+
+  /** Huỷ hẳn chế độ so sánh: tắt chế độ chọn VÀ xoá danh sách đang đánh dấu. */
+  const huySoSanh = useCallback(() => {
+    setSoSanhBat(false);
+    setDsSoSanh([]);
+    setMoSoSanh(false);
+  }, []);
+
+  /**
+   * BB-218 — "So sánh với tấm khác" trong màn xem lớn: đưa tấm đang xem vào
+   * danh sách so sánh, đóng màn xem lớn, quay về lưới ở chế độ chọn (bật
+   * `soSanhBat` nếu chưa bật) để ba mẹ chọn thêm tấm còn lại.
+   */
+  const onSoSanhTuLightbox = useCallback((photo: PhotoPublic) => {
+    setDsSoSanh((cu) => (cu.includes(photo.id) ? cu : themVaoSoSanh(cu, photo.id)));
+    setSoSanhBat(true);
+    setLightboxIndex(null);
+  }, []);
+
+  /**
+   * BB-218 — chạm hai lần một tấm trong màn so sánh: mở tấm đó trong màn xem
+   * lớn (đã có sẵn phóng to — không chép lại toán đó ở màn so sánh).
+   *
+   * Dùng danh sách ĐẦY ĐỦ (`photos`), không phải `filteredPhotos`: tấm này
+   * có thể đã bị lọc khỏi bộ lọc hiện tại (ví dụ đang lọc "Chưa chọn" mà tấm
+   * so sánh vừa được thả tim ngay trong màn so sánh).
+   */
+  const onPhongToTuSoSanh = useCallback(
+    (photo: PhotoPublic) => {
+      const idx = photos.findIndex((p) => p.id === photo.id);
+      if (idx < 0) return;
+      setLightboxDungDanhSachDay(true);
+      setLightboxIndex(idx);
+      setMoSoSanh(false);
+    },
+    [photos],
+  );
 
   const handleSubmitSelection = async () => {
     if (isLocked) return;
@@ -620,6 +707,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
       return true;
     });
   }, [photos, filter, selectedSubfolder]);
+
+  /**
+   * BB-218 — photoId -> thứ tự 1–4 trong danh sách so sánh. Map (không phải
+   * mảng) truyền vào LuoiAnh để TheAnh chỉ nhận một SỐ nguyên thô (giá trị
+   * đơn) mỗi lần dựng, đúng LUẬT 2 ở đầu `luoi-anh.tsx`.
+   */
+  const soSanhTheoAnh = useMemo(() => {
+    const m = new Map<string, number>();
+    dsSoSanh.forEach((id, i) => m.set(id, i + 1));
+    return m;
+  }, [dsSoSanh]);
+
+  /** Các tấm đang so sánh, đúng thứ tự ba mẹ đã chọn — dùng cho màn so sánh. */
+  const anhDangSoSanh = useMemo(
+    () => dsSoSanh.map((id) => photos.find((p) => p.id === id)).filter((p): p is PhotoPublic => !!p),
+    [dsSoSanh, photos],
+  );
 
   // Chuyển đổi thành phần hợp đồng cho component ContractBreakdown
   /**
@@ -1111,7 +1215,38 @@ export function GalleryApp({ token }: GalleryAppProps) {
             {nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
             {nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
             {photosLoading && <Spinner className="mb-2.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+
+            {/*
+              BB-218 — bật/tắt chế độ "chọn để so sánh". Đặt cuối hàng bộ lọc
+              (không xen giữa Tất cả/Đã chọn/Chưa chọn) vì đây là một CHẾ ĐỘ
+              thao tác, không phải thêm một bộ lọc thứ tư.
+            */}
+            <button
+              type="button"
+              onClick={() => (soSanhBat ? huySoSanh() : setSoSanhBat(true))}
+              aria-pressed={soSanhBat}
+              className={cn(
+                "mb-2.5 ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+                soSanhBat
+                  ? "border-foreground bg-foreground text-background"
+                  : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
+              So sánh
+            </button>
           </nav>
+
+          {/*
+            Gợi ý đúng lúc chủ studio đã nói (24/09/2026): "Ví dụ chọn quá
+            nhiều cần bỏ bớt" — chỗ dễ dùng nhất là đang lọc "Đã chọn". Chỉ
+            hiện khi ba mẹ đang ở chế độ so sánh nhưng CHƯA lọc theo Đã chọn.
+          */}
+          {soSanhBat && filter !== "selected" && (
+            <p className="pb-2.5 text-[12px] text-muted-foreground">
+              Chọn quá nhiều ảnh, cần bỏ bớt? Lọc theo &ldquo;{vi.gallery.filterSelected}&rdquo; rồi so sánh cho dễ.
+            </p>
+          )}
 
           {/*
             BB-180 — nhóm ảnh (thư mục con trong Drive), thành thẻ bấm được.
@@ -1231,8 +1366,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
             mutatingIds={mutatingIds}
             khoa={khoaTim}
             soSanPhamTheoAnh={soSanPhamTheoAnh}
+            soSanhBat={soSanhBat}
+            soSanhTheoAnh={soSanhTheoAnh}
             onToggle={handleToggleHeart}
-            onOpen={(idx) => setLightboxIndex(idx)}
+            onOpen={(idx) => {
+              setLightboxDungDanhSachDay(false);
+              setLightboxIndex(idx);
+            }}
+            onToggleSoSanh={onToggleSoSanh}
           />
         )}
       </section>
@@ -1296,18 +1437,51 @@ export function GalleryApp({ token }: GalleryAppProps) {
       />
 
       {/* THANH ĐÁY — một viên duy nhất: đã chọn mấy tấm, bước tiếp theo. */}
-      <ThanhChon
-        daChon={selectionCounts.selectedCount}
-        hanMuc={hanMuc}
-        soTamThem={gallery.quotaKnown ? selectionCounts.extraCount : 0}
-        tienThem={gallery.quotaKnown ? selectionCounts.extraAmount : 0}
-        nutChinh={nutChinh}
-        muaThem={
-          (gallery.addons?.catalogue?.length ?? 0) > 0 && !isLocked && duocChon
-            ? { tien: gallery.addons?.totalAmount ?? 0, onClick: () => setMoCuaHang(true) }
-            : null
-        }
-      />
+      {soSanhBat ? (
+        /*
+          BB-218 — thanh đáy đổi hẳn sang thanh so sánh khi chế độ này đang
+          bật (không chồng lên ThanhChon): hai thanh cùng đáy màn hình cùng
+          lúc là hai câu hỏi tranh nhau chỗ ngón cái, và "đang so sánh" với
+          "bước tiếp theo của việc chốt ảnh" là hai việc khác nhau ba mẹ chỉ
+          làm MỘT lúc.
+        */
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <div className="pointer-events-auto mx-auto flex h-[60px] max-w-xl items-center gap-1 rounded-full bg-[#2a2420] pl-4 pr-2 text-[#fffdf9] shadow-[0_14px_32px_-10px_rgba(27,23,20,.55)]">
+            <button
+              type="button"
+              onClick={() => duSoSanh(dsSoSanh) && setMoSoSanh(true)}
+              disabled={!duSoSanh(dsSoSanh)}
+              className="min-w-0 flex-1 truncate text-left text-[14px] font-medium disabled:cursor-default disabled:opacity-70"
+            >
+              {duSoSanh(dsSoSanh)
+                ? `Đã chọn ${dsSoSanh.length} tấm để so sánh · Xem`
+                : `Chọn ít nhất 2 tấm để so sánh (đã chọn ${dsSoSanh.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={huySoSanh}
+              aria-label="Huỷ so sánh"
+              title="Huỷ so sánh"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/80 transition hover:bg-white/10"
+            >
+              <XIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <ThanhChon
+          daChon={selectionCounts.selectedCount}
+          hanMuc={hanMuc}
+          soTamThem={gallery.quotaKnown ? selectionCounts.extraCount : 0}
+          tienThem={gallery.quotaKnown ? selectionCounts.extraAmount : 0}
+          nutChinh={nutChinh}
+          muaThem={
+            (gallery.addons?.catalogue?.length ?? 0) > 0 && !isLocked && duocChon
+              ? { tien: gallery.addons?.totalAmount ?? 0, onClick: () => setMoCuaHang(true) }
+              : null
+          }
+        />
+      )}
 
       {/* HỘP THOẠI XÁC NHẬN CHỐT BỘ ẢNH */}
       {/* ------------------------------------------------------------------
@@ -1625,9 +1799,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
       {/* MÀN XEM ẢNH LỚN (PhotoLightbox) — BB-143 */}
       {lightboxIndex !== null && (
         <PhotoLightbox
-          photos={filteredPhotos}
+          // BB-218: mở từ "So sánh với tấm khác" dùng danh sách ĐẦY ĐỦ vì
+          // tấm đó có thể không nằm trong bộ lọc đang xem (xem khai báo
+          // `lightboxDungDanhSachDay`).
+          photos={lightboxDungDanhSachDay ? photos : filteredPhotos}
           initialIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
+          onClose={() => {
+            setLightboxIndex(null);
+            setLightboxDungDanhSachDay(false);
+          }}
           onToggleHeart={handleToggleHeart}
           onTaiAnh={choPhepTai ? (p) => taiMotAnh({ id: p.id, fileName: p.fileName }) : null}
           mutatingIds={mutatingIds}
@@ -1635,6 +1815,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           daChon={soAnhDaChon}
           hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
           onLuuGhiChu={luuGhiChuAnh}
+          onSoSanh={onSoSanhTuLightbox}
           dungCho={(anh) => {
             // Gộp đủ ba đường một tấm ảnh thành hàng — cùng ba nguồn với dấu
             // rêu trên lưới (`soSanPhamTheoAnh`), để hai chỗ không nói khác nhau.
@@ -1755,6 +1936,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
               }
             />
           )}
+        />
+      )}
+
+      {/* MÀN SO SÁNH NHIỀU TẤM (BB-218) — 2–4 tấm cạnh nhau, bỏ bớt ngay tại chỗ. */}
+      {moSoSanh && anhDangSoSanh.length >= SO_SANH_TOI_THIEU && (
+        <SoSanhAnh
+          photos={anhDangSoSanh}
+          mutatingIds={mutatingIds}
+          isLocked={khoaTim}
+          onToggleHeart={handleToggleHeart}
+          onBoKhoi={(anh) => setDsSoSanh((cu) => boKhoiSoSanh(cu, anh.id))}
+          onDong={() => setMoSoSanh(false)}
+          onPhongTo={onPhongToTuSoSanh}
+          daChon={soAnhDaChon}
+          hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
         />
       )}
 
