@@ -121,4 +121,54 @@ describe("Lưới so le", () => {
     // này không được trả về toạ độ giả để lưới tưởng mình đã xếp xong.
     expect(xepSoLe(boAnh(10), 0, 2, 6)).toEqual({ o: [], cao: 0 });
   });
+
+  // ---------------------------------------------------------------------
+  // BB-210: chú thích tên tệp ngay dưới mỗi ô ảnh.
+  // ---------------------------------------------------------------------
+
+  it("10. Không truyền caoChuThich thì y hệt bản cũ (mặc định 0)", () => {
+    const cu = xepSoLe(boAnh(40), 400, 2, 6);
+    const moi = xepSoLe(boAnh(40), 400, 2, 6, 0);
+    expect(moi).toEqual(cu);
+  });
+
+  it("11. Có chú thích thì ảnh vẫn giữ đúng tỉ lệ, chỉ khoảng cách dồn cột giãn thêm", () => {
+    const caoChuThich = 16;
+    const khongChu = xepSoLe([1.5, 1.5], 400, 1, 6, 0);
+    const coChu = xepSoLe([1.5, 1.5], 400, 1, 6, caoChuThich);
+
+    // Kích thước ô ảnh (w, h) không đổi — chú thích không bóp méo ảnh.
+    expect(coChu.o[0]!.w).toBe(khongChu.o[0]!.w);
+    expect(coChu.o[0]!.h).toBe(khongChu.o[0]!.h);
+
+    // Tấm thứ hai (cùng cột) bị đẩy xuống thêm đúng caoChuThich, vì chỗ cho
+    // dòng chú thích của tấm thứ nhất chen vào giữa.
+    expect(coChu.o[1]!.y).toBe(khongChu.o[1]!.y + caoChuThich);
+  });
+
+  it("12. Chú thích không chồng lên ô dưới nó, và chiều cao lưới đủ chỗ cho chú thích của tấm cuối", () => {
+    const caoChuThich = 16;
+    const { o, cao } = xepSoLe(boAnh(9), 400, 3, 6, caoChuThich);
+
+    // Trong từng cột, đáy chú thích của một tấm (y + h + caoChuThich) không
+    // được vượt quá đỉnh tấm kế tiếp CÙNG CỘT.
+    const theoCot = new Map<number, typeof o>();
+    for (const a of o) {
+      const ds = theoCot.get(a.x) ?? [];
+      ds.push(a);
+      theoCot.set(a.x, ds);
+    }
+    for (const ds of theoCot.values()) {
+      const xepTheoY = [...ds].sort((a, b) => a.y - b.y);
+      for (let i = 0; i + 1 < xepTheoY.length; i++) {
+        const day = xepTheoY[i]!.y + xepTheoY[i]!.h + caoChuThich;
+        expect(day).toBeLessThanOrEqual(xepTheoY[i + 1]!.y + 0.01);
+      }
+    }
+
+    // Chiều cao lưới phải chứa cả dòng chú thích của tấm thấp nhất mỗi cột
+    // (đáy tấm CUỐI trong cột không cần chừa khe dưới nó, nên không cộng khe).
+    const dayThapNhat = Math.max(...o.map((a) => a.y + a.h + caoChuThich));
+    expect(cao).toBe(dayThapNhat);
+  });
 });

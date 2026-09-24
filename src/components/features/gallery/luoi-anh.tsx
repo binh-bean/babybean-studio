@@ -46,6 +46,13 @@ import {
   xepSoLe,
 } from "@/lib/gallery/xep-so-le";
 
+/**
+ * Chiều cao dành cho dòng chú thích tên tệp dưới mỗi ô ảnh (BB-210) — khớp
+ * với `caoChuThich` cộng vào `xepSoLe` bên dưới. Đủ cho một dòng 11px cộng
+ * khoảng cách nhỏ phía trên, không cần đo chữ thật vì luôn cắt một dòng.
+ */
+const CAO_CHU_THICH = 18;
+
 interface TheAnhProps {
   photo: PhotoPublic;
   thuTu: number;
@@ -86,96 +93,107 @@ const TheAnh = memo(function TheAnh({
       // không còn là ảnh trong lưới từ khi có ảnh bìa (23/09/2026).
       data-testid="the-anh"
       className={cn(
-        "group overflow-hidden rounded-[4px] bg-[#e9e1d6] cursor-pointer",
-        coViTri ? "absolute" : "relative mb-1.5 break-inside-avoid",
+        "cursor-pointer",
+        coViTri ? "absolute" : "relative mb-3 break-inside-avoid",
       )}
-      style={
-        coViTri
-          ? { left: x, top: y, width: w, height: h }
-          : { aspectRatio: `1 / ${tiLeCuaAnh(photo.width, photo.height)}` }
-      }
+      style={coViTri ? { left: x, top: y, width: w, height: h! + CAO_CHU_THICH } : undefined}
     >
-      {/*
-        Ảnh qua proxy `/api/img`. Hai cỡ 800 và 1600 giữ nguyên từ BB-162 (chủ
-        studio chốt: ảnh xem nhỏ cũng phải NÉT). Khác trước ở `sizes`: nay biết
-        CHÍNH XÁC bề ngang ô, nên trình duyệt chọn đúng cỡ theo độ nét của máy
-        thay vì đoán theo phần trăm màn hình.
-      */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`/api/img/${photo.id}?w=800`}
-        srcSet={`/api/img/${photo.id}?w=800 800w, /api/img/${photo.id}?w=1600 1600w`}
-        sizes={w ? `${Math.ceil(w)}px` : "50vw"}
-        alt={`Ảnh ${thuTu + 1}`}
-        loading="lazy"
-        decoding="async"
-        width={photo.width ?? undefined}
-        height={photo.height ?? undefined}
-        className="pointer-events-none h-full w-full select-none object-cover transition-transform duration-500 ease-out group-hover:scale-[1.015]"
-      />
+      {/* Ô ảnh — kích thước ĐÚNG ảnh, không lẫn với dòng chú thích bên dưới. */}
+      <div
+        className="group relative overflow-hidden rounded-[4px] bg-[#e9e1d6]"
+        style={coViTri ? { width: w, height: h } : { aspectRatio: `1 / ${tiLeCuaAnh(photo.width, photo.height)}` }}
+      >
+        {/*
+          Ảnh qua proxy `/api/img`. Hai cỡ 800 và 1600 giữ nguyên từ BB-162 (chủ
+          studio chốt: ảnh xem nhỏ cũng phải NÉT). Khác trước ở `sizes`: nay biết
+          CHÍNH XÁC bề ngang ô, nên trình duyệt chọn đúng cỡ theo độ nét của máy
+          thay vì đoán theo phần trăm màn hình.
+        */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/img/${photo.id}?w=800`}
+          srcSet={`/api/img/${photo.id}?w=800 800w, /api/img/${photo.id}?w=1600 1600w`}
+          sizes={w ? `${Math.ceil(w)}px` : "50vw"}
+          alt={`Ảnh ${thuTu + 1}`}
+          loading="lazy"
+          decoding="async"
+          width={photo.width ?? undefined}
+          height={photo.height ?? undefined}
+          className="pointer-events-none h-full w-full select-none object-cover transition-transform duration-500 ease-out group-hover:scale-[1.015]"
+        />
 
-      {/*
-        KHÔNG in tên file lên ảnh nữa.
+        {daChon && (
+          <span className="pointer-events-none absolute inset-0 rounded-[4px] ring-2 ring-inset ring-heart" />
+        )}
 
-        Tên file ("R01_0004.jpg") là di chứng của thời chọn ảnh qua Zalo, khi ba
-        mẹ phải chép tên tấm gửi cho studio. Nay thả tim là xong — cái tên chỉ
-        còn là chữ đè lên mặt bé.
-      */}
-
-      {daChon && (
-        <span className="pointer-events-none absolute inset-0 rounded-[4px] ring-2 ring-inset ring-heart" />
-      )}
-
-      {/* Tấm đã dùng làm sản phẩm in — màu rêu, bên TRÁI, không đấu với tim. */}
-      {soSanPham > 0 && (
-        <span
-          className="pointer-events-none absolute left-2 top-2 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-moss shadow-sm"
-          title={`Tấm này đang làm ${soSanPham} sản phẩm`}
-        >
-          <Printer className="h-3 w-3" aria-hidden="true" />
-          {soSanPham}
-        </span>
-      )}
-
-      {/*
-        TIM: vùng chạm 48×48 ở góc, hình vẽ chỉ 32px.
-
-        Tim cũ là vòng tròn đen 44px trên MỌI tấm — lưới 300 tấm thành 300 chấm
-        đen. Hình nhỏ lại cho ảnh là thứ nổi bật, nhưng vùng chạm vẫn đủ lớn cho
-        ngón tay.
-
-        Bộ ảnh đã khoá thì tấm chưa chọn không hiện tim: một nút bấm không được
-        là một lời hứa sai.
-      */}
-      {(!khoa || daChon) && (
-        <button
-          type="button"
-          disabled={khoa || dangGui}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle(photo);
-          }}
-          aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
-          aria-pressed={daChon}
-          className="absolute bottom-0 right-0 z-10 grid h-12 w-12 place-items-center touch-manipulation focus:outline-hidden disabled:cursor-default"
-        >
+        {/* Tấm đã dùng làm sản phẩm in — màu rêu, bên TRÁI, không đấu với tim. */}
+        {soSanPham > 0 && (
           <span
-            className={cn(
-              "grid h-8 w-8 place-items-center rounded-full transition-all duration-150 active:scale-90",
-              daChon
-                ? "bg-heart text-white shadow-md"
-                : "bg-[#fffdf9]/80 text-[#2a2420] backdrop-blur-sm group-hover:bg-[#fffdf9]",
-              dangGui && "opacity-60",
-            )}
+            className="pointer-events-none absolute left-2 top-2 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-moss shadow-sm"
+            title={`Tấm này đang làm ${soSanPham} sản phẩm`}
           >
-            <Heart
-              className="h-[17px] w-[17px]"
-              fill={daChon ? "currentColor" : "none"}
-              strokeWidth={2}
-              aria-hidden="true"
-            />
+            <Printer className="h-3 w-3" aria-hidden="true" />
+            {soSanPham}
           </span>
-        </button>
+        )}
+
+        {/*
+          TIM: vùng chạm 48×48 ở góc, hình vẽ chỉ 32px.
+
+          Tim cũ là vòng tròn đen 44px trên MỌI tấm — lưới 300 tấm thành 300 chấm
+          đen. Hình nhỏ lại cho ảnh là thứ nổi bật, nhưng vùng chạm vẫn đủ lớn cho
+          ngón tay.
+
+          Bộ ảnh đã khoá thì tấm chưa chọn không hiện tim: một nút bấm không được
+          là một lời hứa sai.
+        */}
+        {(!khoa || daChon) && (
+          <button
+            type="button"
+            disabled={khoa || dangGui}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(photo);
+            }}
+            aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
+            aria-pressed={daChon}
+            className="absolute bottom-0 right-0 z-10 grid h-12 w-12 place-items-center touch-manipulation focus:outline-hidden disabled:cursor-default"
+          >
+            <span
+              className={cn(
+                "grid h-8 w-8 place-items-center rounded-full transition-all duration-150 active:scale-90",
+                daChon
+                  ? "bg-heart text-white shadow-md"
+                  : "bg-[#fffdf9]/80 text-[#2a2420] backdrop-blur-sm group-hover:bg-[#fffdf9]",
+                dangGui && "opacity-60",
+              )}
+            >
+              <Heart
+                className="h-[17px] w-[17px]"
+                fill={daChon ? "currentColor" : "none"}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+            </span>
+          </button>
+        )}
+      </div>
+
+      {/*
+        Tên tệp NGAY DƯỚI ảnh, không đè lên ảnh (BB-210, lời chủ studio
+        24/09/2026): "hiện tên file để khách dễ kiểm soát và đối chiếu với
+        file tải về cũng như danh sách mà CSKH tải về ảnh khách chọn chỉnh
+        sửa". Trước đó (23/09) từng cố tình BỎ tên file vì nó đè lên mặt bé —
+        nay chỗ này nằm ngoài khung ảnh nên không còn đụng vấn đề đó.
+      */}
+      {photo.fileName && (
+        <p
+          className="mt-1 truncate px-0.5 text-[11px] leading-[14px] text-muted-foreground"
+          style={coViTri ? { height: CAO_CHU_THICH } : undefined}
+          title={photo.fileName}
+        >
+          {photo.fileName}
+        </p>
       )}
     </div>
   );
@@ -271,7 +289,10 @@ export function LuoiAnh({
   const cot = soCotSoLe(rongMan);
   const khe = kheSoLe(rongMan);
   const tiLe = useMemo(() => photos.map((p) => tiLeCuaAnh(p.width, p.height)), [photos]);
-  const { o, cao } = useMemo(() => xepSoLe(tiLe, rongKhung, cot, khe), [tiLe, rongKhung, cot, khe]);
+  const { o, cao } = useMemo(
+    () => xepSoLe(tiLe, rongKhung, cot, khe, CAO_CHU_THICH),
+    [tiLe, rongKhung, cot, khe],
+  );
   const { tu, den } = cuaSoTheoBac(bac, caoMan);
   const hien = useMemo(() => oTrongTamNhin(o, tu, den), [o, tu, den]);
 

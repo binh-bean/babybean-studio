@@ -69,12 +69,18 @@ export function kheSoLe(rongMan: number): number {
  *
  * Cách này giữ gần đúng thứ tự chụp khi đọc từ trên xuống — điều quan trọng,
  * vì ba mẹ nhớ ảnh theo diễn biến buổi chụp ("mấy tấm lúc con cầm bóng").
+ *
+ * `caoChuThich` (BB-210, mặc định 0 — các chỗ gọi cũ không đổi): mỗi ô dành
+ * thêm bấy nhiêu px NGAY DƯỚI ảnh cho dòng tên tệp, để chú thích không đè
+ * lên ô bên dưới nó trong cùng cột. `w`/`h` trả về vẫn là kích thước riêng
+ * của ẢNH (đúng tỉ lệ) — `caoChuThich` chỉ cộng vào khoảng cách dồn cột.
  */
 export function xepSoLe(
   tiLe: readonly number[],
   rongKhung: number,
   soCot: number,
   khe: number,
+  caoChuThich = 0,
 ): { o: OAnh[]; cao: number } {
   if (rongKhung <= 0 || soCot <= 0) return { o: [], cao: 0 };
 
@@ -88,7 +94,7 @@ export function xepSoLe(
 
     const h = Math.round(rongCot * (tiLe[i] ?? TI_LE_MAC_DINH));
     o[i] = { x: cot * (rongCot + khe), y: caoCot[cot]!, w: rongCot, h };
-    caoCot[cot] = caoCot[cot]! + h + khe;
+    caoCot[cot] = caoCot[cot]! + h + caoChuThich + khe;
   }
 
   const cao = Math.max(0, ...caoCot) - (tiLe.length > 0 ? khe : 0);
