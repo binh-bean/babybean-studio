@@ -543,6 +543,7 @@ export const vi = {
       description: "Chọn định dạng phù hợp để chuyển cho Người Photoshop.",
       formatLightroom: "Lightroom (.txt / danh sách tên file)",
       formatCsv: "Bảng tính Excel / CSV kèm ghi chú",
+      formatChiTiet: "Văn bản chi tiết cho CSKH (.txt)",
       formatJson: "Dữ liệu JSON đầy đủ",
       copyClipboard: "Sao chép vào clipboard",
       copiedNotice: "Đã sao chép danh sách vào bộ nhớ tạm",

@@ -542,6 +542,7 @@ export const en: Messages = {
       description: "Choose the appropriate format for Người Photoshop.",
       formatLightroom: "Lightroom (.txt / filenames list)",
       formatCsv: "Excel / CSV spreadsheet with notes",
+      formatChiTiet: "Detailed text for CS (.txt)",
       formatJson: "Full JSON data",
       copyClipboard: "Copy to clipboard",
       copiedNotice: "Copied list to clipboard",
