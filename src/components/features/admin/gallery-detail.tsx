@@ -121,7 +121,12 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     const res = await fetch(`/api/admin/galleries/${galleryId}/items`);
     const json = await res.json().catch(() => null);
     if (!res.ok) {
-      setError(json?.error?.message ?? "Không tải được bộ ảnh");
+      // Máy chủ có thể trả mã trần ("FORBIDDEN") làm message — nhân viên mở bộ
+      // của chi nhánh khác từng thấy đúng chữ đó (BB-230 E-10). Chặn/không có
+      // thì nói bằng câu người đọc được.
+      if (res.status === 403) setError("Bạn không có quyền xem bộ ảnh này (bộ thuộc chi nhánh khác).");
+      else if (res.status === 404) setError("Không tìm thấy bộ ảnh này.");
+      else setError(json?.error?.message ?? "Không tải được bộ ảnh");
       return;
     }
     setDetail(json.data);

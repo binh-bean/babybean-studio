@@ -1,5 +1,4 @@
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
-import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 
@@ -70,6 +69,9 @@ test.describe("E-12: Điện thoại", () => {
   test.afterAll(async () => {
     if (client) {
       if (galleryId) await client.query("delete from activity_logs where entity_id = $1", [galleryId]);
+      // selections phải đi trước galleries — thiếu dòng này là bộ ảnh thử ở lại
+      // trong cơ sở dữ liệu thật mỗi lần phép thử đã chốt được.
+      if (galleryId) await client.query("delete from selections where gallery_id = $1", [galleryId]);
       if (galleryId) await client.query("delete from galleries where id = $1", [galleryId]);
       if (customerId) await client.query("delete from customers where id = $1", [customerId]);
       await client.end();
@@ -82,41 +84,56 @@ test.describe("E-12: Điện thoại", () => {
     const anhDau = page.locator('img[src*="/api/img/"]').first();
     await anhDau.waitFor({ state: "visible", timeout: CHO_ANH });
 
-    // Thả tim ảnh 1 từ lưới
+    // Thả tim ảnh 1 từ lưới — CHẠM, không bấm chuột.
     const nutChon = page.locator('button[aria-label="Chọn ảnh này"]');
-    await nutChon.nth(0).click();
+    await nutChon.nth(0).tap();
 
     // Mở màn xem lớn ảnh 1
     const oAnh = page.getByTestId("the-anh");
-    await oAnh.nth(0).click();
+    await oAnh.nth(0).tap();
 
-    // Chờ màn xem lớn hiện ra (có thể chờ nút Đóng xuất hiện)
-    const nutDong = page.getByRole("button", { name: "Đóng" });
-    await expect(nutDong).toBeVisible();
+    const xemLon = page.getByRole("dialog").first();
+    await expect(xemLon.getByText(/1 \/ 2/)).toBeVisible();
 
-    // Vuốt sang trái để sang ảnh 2 (do Playwright touch dispatch không ổn định với React, dùng phím tắt)
-    await page.keyboard.press("ArrowRight");
+    // Vuốt ngón tay từ phải sang trái: phát TouchEvent thật (touchstart →
+    // nhiều touchmove → touchend) lên vùng ảnh, đúng những gì React của màn
+    // xem lớn nghe. Đề bài E-12 là "vuốt sang tấm sau" — phím mũi tên thì
+    // chẳng canh gì cho điện thoại. (Không dùng CDP Input.dispatchTouchEvent:
+    // sau đó Chrome giả lập nuốt mọi lượt chạm kế tiếp, kể cả nút tim.)
+    await xemLon.locator("main").evaluate((vung) => {
+      const y = 400;
+      const cham = (x: number) =>
+        new Touch({ identifier: 1, target: vung, clientX: x, clientY: y, pageX: x, pageY: y });
+      const phat = (loai: string, x: number, dangCham: boolean) =>
+        vung.dispatchEvent(
+          new TouchEvent(loai, {
+            bubbles: true,
+            cancelable: true,
+            touches: dangCham ? [cham(x)] : [],
+            targetTouches: dangCham ? [cham(x)] : [],
+            changedTouches: [cham(x)],
+          }),
+        );
+      phat("touchstart", 320, true);
+      for (let x = 290; x >= 50; x -= 30) phat("touchmove", x, true);
+      phat("touchend", 50, false);
+    });
+    await expect(xemLon.getByText(/2 \/ 2/)).toBeVisible();
 
-    // Đợi ảnh chuyển sang (bộ đếm 2/2 hoặc tên thay đổi)
-    await page.waitForTimeout(500);
+    // Thả tim ảnh 2 ngay trong màn xem lớn
+    await xemLon.getByRole("button", { name: "Chọn ảnh này" }).tap();
 
-    // Thả tim ảnh 2 (trong màn xem lớn thì nút này vẫn có hoặc ta đóng rồi thả tim lưới)
-    // Nút thả tim trong màn xem lớn 
-    const nutChonTrongXemLon = page.getByRole("dialog").getByRole("button", { name: "Chọn ảnh này" });
-    await nutChonTrongXemLon.click();
-
-    // Kiểm tra bộ đếm = 2
     const dem = page.getByTestId("dem-da-chon");
     await expect(dem).toHaveText("2", { timeout: 10000 });
 
     // Đóng để chốt
-    await nutDong.click();
+    await xemLon.getByRole("button", { name: "Đóng" }).first().tap();
 
     // Chốt
-    await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
+    await page.getByRole("button", { name: "Chốt danh sách" }).first().tap();
     await page.fill("#confirm-name-input", "Mẹ Bean");
-    await page.getByRole("checkbox").check();
-    await page.getByRole("button", { name: "Xác nhận" }).click();
+    await page.getByRole("checkbox").tap();
+    await page.getByRole("button", { name: "Xác nhận" }).tap();
 
     await expect
       .poll(

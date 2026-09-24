@@ -1,5 +1,4 @@
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
-import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 
@@ -96,8 +95,11 @@ test.describe("E-2: Vượt hạn mức", () => {
     await expect(dem).toHaveText("7", { timeout: 10_000 });
     
     // Check quota and payment info
-    await expect(page.locator("text=7 / 5").first()).toBeVisible();
-    await expect(page.locator("text=Thêm").first()).toBeVisible();
+    // Thanh đáy: 7 / 5 tấm và phụ phí 2 × 50.000đ. "text=Thêm" cũ khớp chữ ở
+    // bất kỳ đâu trên trang nên không chứng minh được gì về phụ phí.
+    const thanhDay = dem.locator("xpath=ancestor::*[contains(@class,'rounded-full')][1]");
+    await expect(thanhDay).toContainText("7 / 5");
+    await expect(thanhDay).toContainText("100.000");
 
     // Chốt
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();

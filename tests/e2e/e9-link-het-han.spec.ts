@@ -66,6 +66,9 @@ test.describe("E-9: Link hết hạn", () => {
   test.afterAll(async () => {
     if (client) {
       if (galleryId) await client.query("delete from activity_logs where entity_id = $1", [galleryId]);
+      // selections phải đi trước galleries — thiếu dòng này là bộ ảnh thử ở lại
+      // trong cơ sở dữ liệu thật mỗi lần phép thử đã chốt được.
+      if (galleryId) await client.query("delete from selections where gallery_id = $1", [galleryId]);
       if (galleryId) await client.query("delete from galleries where id = $1", [galleryId]);
       if (customerId) await client.query("delete from customers where id = $1", [customerId]);
       await client.end();

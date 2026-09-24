@@ -592,6 +592,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
           body: JSON.stringify(buildGhiChuPayload(photo.id, ghiChu, crypto.randomUUID())),
         });
         if (!res.ok) return false;
+        // Máy chủ trả 200 kể cả khi TỪ CHỐI riêng op này (ảnh chưa có dòng chọn
+        // — ví dụ ghi chú tới trước lượt thả tim). Chỉ xem res.ok thì báo "Đã
+        // lưu" trong khi ghi chú mất trắng (BB-230 E-3, 24/09/2026).
+        const json = (await res.json().catch(() => null)) as
+          | { data?: { rejected?: { photoId: string }[] } }
+          | null;
+        if (json?.data?.rejected?.some((r) => r.photoId === photo.id)) return false;
         setPhotos((truoc) =>
           truoc.map((x) =>
             x.id === photo.id ? { ...x, retouchNote: ghiChu.trim() || null } : x,

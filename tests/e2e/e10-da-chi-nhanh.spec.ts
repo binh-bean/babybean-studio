@@ -44,7 +44,7 @@ test.describe("E-10: Đa chi nhánh", () => {
     userId = data.user!.id;
 
     await client.query(
-      `insert into staff_profiles (id, full_name, email, role) values ($1,$2,$3,'cskh')`,
+      `insert into staff_profiles (id, full_name, email, role) values ($1,$2,$3,'cs')`,
       [userId, `${NHAN} NV`, email]
     );
     await client.query(
@@ -93,6 +93,7 @@ test.describe("E-10: Đa chi nhánh", () => {
       if (galleryB) await client.query("delete from galleries where id = $1", [galleryB]);
       if (customerIdA) await client.query("delete from customers where id = $1", [customerIdA]);
       if (customerIdB) await client.query("delete from customers where id = $1", [customerIdB]);
+      if (userId) await client.query("delete from staff_branches where staff_id = $1", [userId]);
       if (userId) await client.query("delete from staff_profiles where id = $1", [userId]);
       await client.end();
     }
@@ -111,17 +112,15 @@ test.describe("E-10: Đa chi nhánh", () => {
     await page.goto("/admin/galleries");
     
     // Thấy bộ A
-    await expect(page.locator(`text=${NHAN} Bộ A`)).toBeVisible({ timeout: 15000 });
+    // Mỗi bộ hiện ở hai chỗ (dạng bảng + dạng thẻ) — lấy chỗ đầu.
+    await expect(page.getByText(`${NHAN} Bộ A`).first()).toBeVisible({ timeout: 15000 });
     // Không thấy bộ B
-    await expect(page.locator(`text=${NHAN} Bộ B`)).toHaveCount(0);
+    await expect(page.getByText(`${NHAN} Bộ B`)).toHaveCount(0);
 
-    // Mở thẳng trang chi tiết bộ B
-    const res = await page.goto(`/admin/galleries/${galleryB}`);
-    // Sẽ bị chặn (chuyển hướng hoặc báo lỗi Not Found)
-    if (res?.status() === 200) {
-      await expect(page.locator("text=Không tìm thấy").or(page.locator("text=Bạn không có quyền"))).toBeVisible();
-    } else {
-      expect(res?.status()).toBeGreaterThanOrEqual(400); // 404 hoặc 403
-    }
+    // Mở thẳng trang chi tiết bộ B: phải bị chặn bằng câu đọc được, và
+    // KHÔNG lộ tên bộ B. (Trước 24/09 trang in chữ trần "FORBIDDEN".)
+    await page.goto(`/admin/galleries/${galleryB}`);
+    await expect(page.getByText("Bạn không có quyền xem bộ ảnh này")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(`${NHAN} Bộ B`)).toHaveCount(0);
   });
 });

@@ -131,10 +131,16 @@ export function PhotoLightbox({
   // Doi anh thi nap lai ghi chu cua anh do, va xoa thong bao cua anh truoc.
   // Khong lam viec nay thi khach go ghi chu cho anh A roi vuot sang anh B van
   // thay nguyen chu do, tuong minh da ghi cho B.
+  //
+  // CHỈ theo id, không theo retouchNote: lưu xong thì gallery-app ghi
+  // retouchNote mới vào ảnh, và nếu effect này nghe cả retouchNote thì nó
+  // xoá ngay chữ "Đã lưu ghi chú" vừa hiện — ba mẹ không bao giờ thấy lưu
+  // được (BB-230 E-3, 24/09/2026).
   useEffect(() => {
     setGhiChu(currentPhoto?.retouchNote ?? "");
     setKetQuaLuu(null);
-  }, [currentPhoto?.id, currentPhoto?.retouchNote]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPhoto?.id]);
 
 
   const goNext = useCallback(() => {
@@ -519,6 +525,8 @@ export function PhotoLightbox({
 
   const isCurrentSelected = currentPhoto.mark === "selected";
 
+  // Lượt thả tim của tấm này còn đang gửi thì chưa có dòng chọn trên máy chủ —
+  // ghi chú gửi lúc này bị từ chối. Khoá ô ghi chú tới khi tim lưu xong.
   const isMutating = mutatingIds.has(currentPhoto.id);
   const nhanDungCho = dungCho?.(currentPhoto) ?? [];
 
@@ -772,7 +780,7 @@ export function PhotoLightbox({
                   value={ghiChu}
                   onChange={(e) => setGhiChu(e.target.value)}
                   onBlur={luuGhiChu}
-                  disabled={isLocked || dangLuuGhiChu || !isCurrentSelected}
+                  disabled={isLocked || dangLuuGhiChu || !isCurrentSelected || isMutating}
                   rows={3}
                   maxLength={500}
                   placeholder={
@@ -934,7 +942,7 @@ export function PhotoLightbox({
                   value={ghiChu}
                   onChange={(e) => setGhiChu(e.target.value)}
                   onBlur={luuGhiChu}
-                  disabled={isLocked || dangLuuGhiChu || !isCurrentSelected}
+                  disabled={isLocked || dangLuuGhiChu || !isCurrentSelected || isMutating}
                   rows={4}
                   maxLength={500}
                   placeholder={
