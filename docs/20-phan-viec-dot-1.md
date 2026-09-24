@@ -111,3 +111,24 @@ trên mô hình đó.
 8. Việc đụng màn khách: màn khách luôn sáng, màu và phông lấy từ khối
    `.giao-dien-khach` trong `src/styles/tokens.css` (kem `#f7f2eb`, mực `#2a2420`,
    tim `#c4645a`, rêu `#4f5b45`, tiêu đề phông Fraunces qua `font-display`).
+
+---
+
+## Đợt 2 — chia ngày 24/09/2026 (sau khi đợt 1 gộp xong, `c9975d9`)
+
+Chủ studio: "có thể chia việc thêm cho Antigravity (Banana) hoặc các model khác,
+và việc cho Sonnet nếu còn việc Sonnet làm được". Lưu ý: Antigravity 2.0 KHÔNG có
+Nano Banana — ảnh tạo bằng ứng dụng Gemini (chủ studio tự dán lời nhắc).
+
+| Mã | Ai | Việc |
+|---|---|---|
+| BB-217 | Sonnet | **Màn treo ảnh lên tường** trên ảnh phòng thật (BB-220), đúng tỷ lệ cm, chất liệu/cỡ/khung đổi tại chỗ, giá thật, thêm vào đơn |
+| BB-218 | Sonnet | **So sánh nhiều tấm** (2–4 tấm, cạnh nhau hay không đều được), bỏ bớt ngay trong màn so sánh |
+| BB-219 | Sonnet | **Phép thử trình duyệt dò con trỏ** trên MỌI màn quản trị + màn khách, sửa chỗ thiếu |
+| BB-230 | Antigravity — Giao diện (DEV-FE) | **Kịch bản thử trình duyệt đợt 2**: E-2, E-3, E-7, E-9, E-10, E-12 (docs/10 §5). Đề bài `docs/briefs/BB-230-e2e-dot-2.md` |
+| BB-221 | Chủ studio + Gemini | Ảnh góc khung (4 kiểu) và tạo lại ảnh sảnh vào nhà khổ dọc (tường quá thấp). Lời nhắc: `babybean-assets/BB-220/LOI-NHAC-GEMINI-DOT-2.txt` |
+| BB-200 | Opus | Luồng trạng thái + bộ nhắc theo `docs/21` (nguồn chuẩn: sơ đồ quy trình của chủ studio) |
+
+Luật thêm cho đợt 2: phép thử trình duyệt chạy với `PW_PORT` riêng (Sonnet
+3160–3169, Antigravity 3170) — KHÔNG dùng 3099/3100. Lệnh bị môi trường chặn
+thì DỪNG và báo, không lách (vụ BB-215 đợt 1).
