@@ -26,14 +26,33 @@
 
 import type { AnhPhong } from "./phong-treo";
 
-/** Cỡ khung theo cm, LUÔN viết cạnh ngắn trước — "40x60", không phải "60x40". */
-export type CoKhungCm = "40x60" | "50x75" | "60x90";
+/**
+ * Cỡ khung theo cm, dạng "40x60" — đúng như cột `size` của bảng `products`
+ * (đồng bộ từ Lark). KHÔNG khoá cứng vài cỡ: danh mục thật có từ 15x21 tới
+ * 120x180, và gói hay có cỡ nhỏ (Gỗ 30x45, Tráng gương 20x30) — khoá cứng thì
+ * ba mẹ không bao giờ thấy đúng tấm được in trong gói của mình trên tường.
+ */
+export type CoKhungCm = string;
 
-export const DANH_SACH_CO_KHUNG: CoKhungCm[] = ["40x60", "50x75", "60x90"];
+/** "40x60" → cạnh ngắn/dài. Viết ngược ("60x40") vẫn hiểu đúng. Sai dạng → null. */
+export function tachCoKhung(co: string): { canhNgan: number; canhDai: number } | null {
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*[xX×]\s*(\d+(?:[.,]\d+)?)\s*$/.exec(co);
+  if (!m) return null;
+  const a = Number((m[1] ?? "").replace(",", "."));
+  const b = Number((m[2] ?? "").replace(",", "."));
+  if (!(a > 0 && b > 0)) return null;
+  return { canhNgan: Math.min(a, b), canhDai: Math.max(a, b) };
+}
 
-function tachCoKhung(co: CoKhungCm): { canhNgan: number; canhDai: number } {
-  const [a, b] = co.split("x");
-  return { canhNgan: Number(a), canhDai: Number(b) };
+/** Các cỡ đọc được trong danh mục, không trùng, nhỏ trước lớn sau. */
+export function cacCoTuDanhMuc(sizes: ReadonlyArray<string | null | undefined>): CoKhungCm[] {
+  const ds = new Map<string, number>();
+  for (const s of sizes) {
+    if (!s) continue;
+    const c = tachCoKhung(s);
+    if (c) ds.set(s, c.canhNgan * c.canhDai);
+  }
+  return [...ds.entries()].sort((a, b) => a[1] - b[1]).map(([s]) => s);
 }
 
 /**
@@ -57,7 +76,7 @@ export interface KhungTrenTuong {
 export interface KhungKhongVua {
   vua: false;
   /** Vì sao không vừa — để giao diện/console dò lỗi, không bắt buộc hiện cho khách. */
-  lyDo: "rong_qua_kho" | "cao_qua_kho";
+  lyDo: "rong_qua_kho" | "cao_qua_kho" | "co_khong_doc_duoc";
 }
 
 export type KetQuaKhungTrenTuong = KhungTrenTuong | KhungKhongVua;
@@ -77,7 +96,9 @@ export function tinhKhungTrenTuong(
   huongKhung: "doc" | "ngang",
   coKhung: boolean
 ): KetQuaKhungTrenTuong {
-  const { canhNgan, canhDai } = tachCoKhung(co);
+  const kichThuoc = tachCoKhung(co);
+  if (!kichThuoc) return { vua: false, lyDo: "co_khong_doc_duoc" };
+  const { canhNgan, canhDai } = kichThuoc;
   const rongCmTam = huongKhung === "doc" ? canhNgan : canhDai;
   const caoCmTam = huongKhung === "doc" ? canhDai : canhNgan;
 

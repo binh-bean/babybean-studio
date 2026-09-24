@@ -41,7 +41,7 @@ import {
 } from "@/lib/gallery/phong-treo";
 import {
   tinhKhungTrenTuong,
-  DANH_SACH_CO_KHUNG,
+  cacCoTuDanhMuc,
   type CoKhungCm,
 } from "@/lib/gallery/khung-tren-tuong";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
@@ -253,10 +253,26 @@ export function ManTreoTuong({
     [monAnhIn]
   );
 
+  /**
+   * Ảnh in CÓ SẴN trong gói (khớp tên với suất hợp đồng) — mở màn là thấy
+   * ngay đúng tấm ba mẹ sẽ nhận, không phải một chất liệu/cỡ ngẫu nhiên đầu
+   * danh mục rồi tự dò lại.
+   */
+  const monTrongGoi = useMemo(
+    () => monAnhIn.find((m) => m.material && m.size && suatTrongGoi.some((s) => s.name === m.name)) ?? null,
+    [monAnhIn, suatTrongGoi]
+  );
+
   useEffect(() => {
+    if (chatLieu !== null) return;
+    if (monTrongGoi?.material && monTrongGoi.size) {
+      setChatLieu(monTrongGoi.material);
+      setCo(monTrongGoi.size);
+      return;
+    }
     const dau = dsChatLieu[0];
-    if (chatLieu === null && dau) setChatLieu(dau);
-  }, [chatLieu, dsChatLieu]);
+    if (dau) setChatLieu(dau);
+  }, [chatLieu, dsChatLieu, monTrongGoi]);
 
   const kho: KhoAnhPhong = manRong ? "ngang" : "doc";
   const phong = PHONG_TREO[maPhong][kho];
@@ -270,7 +286,7 @@ export function ManTreoTuong({
   // xem — quét lại mỗi khi đổi phòng/khổ màn hình, không chỉ lúc mở màn.
   const coCoBan = useMemo(
     () =>
-      DANH_SACH_CO_KHUNG.filter((c) => monAnhIn.some((m) => m.material === chatLieu && m.size === c)),
+      cacCoTuDanhMuc(monAnhIn.filter((m) => m.material === chatLieu).map((m) => m.size)),
     [monAnhIn, chatLieu]
   );
   const coVua = useMemo(
