@@ -120,8 +120,22 @@ for (const file of files) {
   const mangQuaKieuDatTen = kieuCoMang.some((ten) =>
     new RegExp("\\}\\s*:\\s*\\{[^}]*:\\s*" + ten + "\\b").test(code));
 
+  // Nhận mảng qua props, nhưng CẢ THAM SỐ được gõ thẳng bằng một kiểu đặt tên
+  // riêng — không phải một trường bên trong, mà chính đối tượng destructure:
+  //
+  //     interface FooProps { items: Item[]; onClick: () => void }
+  //     function Foo({ items, onClick }: FooProps) { ... }
+  //
+  // `mangQuaKieuDatTen` ở trên chỉ bắt được khi kiểu nằm LỒNG bên trong một
+  // object type khác (`}: { field: FooProps }`); đây là ca phổ biến hơn —
+  // props type đứng trực tiếp sau dấu `}:` của phần destructure. Bỏ sót ca
+  // này báo nhầm ba màn hình có thật (BB-214d): chúng nhận danh sách qua
+  // đúng props, chỉ khác cách viết kiểu.
+  const mangQuaThamSoDatTenKieu = kieuCoMang.some((ten) =>
+    new RegExp("\\}\\s*:\\s*" + ten + "\\b").test(code));
+
   const getsData = /fetch\s*\(|use[A-Z]\w*Query|props\./.test(code)
-    || mangTrongChuKy || mangQuaKieuDatTen;
+    || mangTrongChuKy || mangQuaKieuDatTen || mangQuaThamSoDatTenKieu;
   if (showsList && !getsData) {
     report(file, "Hiển thị danh sách mà không có nguồn dữ liệu", "không fetch, không nhận qua props");
   }
