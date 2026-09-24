@@ -80,7 +80,12 @@ describe("BB-214b: xuất văn bản chi tiết cho CSKH", () => {
     );
     galleryId = g[0].id;
 
-    for (const ten of ["IMG_0101.jpg", "IMG_0102.jpg"]) {
+    // Chèn 0102 TRƯỚC 0101, cùng sort_index = 1: thứ tự tự nhiên của cơ sở dữ
+    // liệu (thứ tự chèn) khi đó NGƯỢC với thứ tự tên file. Route phải tự xếp
+    // tiếp theo tên file khi trùng sort_index. Soát khi gộp 24/09/2026: chèn
+    // 0101 trước thì bỏ tiêu chí phụ mà phép thử vẫn xanh (thứ tự chèn tình cờ
+    // trùng thứ tự đúng) — tức nó không canh gì cả, chỉ đỏ lúc có lúc không.
+    for (const ten of ["IMG_0102.jpg", "IMG_0101.jpg"]) {
       const { rows } = await client.query(
         `insert into photos (gallery_id, drive_file_id, file_name, mime_type, sort_index, status)
          values ($1,$2,$3,'image/jpeg',1,'active') returning id`,
@@ -101,19 +106,21 @@ describe("BB-214b: xuất văn bản chi tiết cho CSKH", () => {
     );
     const selectionId = sel[0].id;
 
-    const { rows: si1 } = await client.query(
-      `insert into selection_items (selection_id, photo_id, gallery_id, mark, retouch_note, order_index)
-       values ($1,$2,$3,'selected','Xoá mụn sữa',1) returning id`,
-      [selectionId, anh["IMG_0101.jpg"], galleryId],
-    );
-    const item1 = si1[0].id;
-
+    // Chèn 0102 trước — cùng lý do với ảnh ở trên: route đọc theo bảng ảnh
+    // đã chọn, nên thứ tự chèn ở ĐÂY mới là thứ tự tự nhiên nó nhận được.
     const { rows: si2 } = await client.query(
       `insert into selection_items (selection_id, photo_id, gallery_id, mark, order_index)
        values ($1,$2,$3,'selected',2) returning id`,
       [selectionId, anh["IMG_0102.jpg"], galleryId],
     );
     const item2 = si2[0].id;
+
+    const { rows: si1 } = await client.query(
+      `insert into selection_items (selection_id, photo_id, gallery_id, mark, retouch_note, order_index)
+       values ($1,$2,$3,'selected','Xoá mụn sữa',1) returning id`,
+      [selectionId, anh["IMG_0101.jpg"], galleryId],
+    );
+    const item1 = si1[0].id;
 
     // 1. Suất trong gói: một sản phẩm in đã có sẵn trong hợp đồng.
     const { rows: pGoi } = await client.query(

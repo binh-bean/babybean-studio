@@ -263,7 +263,15 @@ export async function GET(
         };
       })
       .filter((d) => d.file_name !== "")
-      .sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
+      // Hai ảnh trùng sort_index (ảnh ở hai thư mục con khác nhau, hoặc đồng
+      // bộ lại giữa chừng) thì xếp tiếp theo tên file. Thiếu vế này thì thứ
+      // tự do cơ sở dữ liệu trả về — tệp CSKH tải hai lần ra hai thứ tự khác
+      // nhau, và phép thử BB-214b đỏ lúc có lúc không (soát khi gộp 24/09).
+      .sort(
+        (a, b) =>
+          (a.sort_index ?? 0) - (b.sort_index ?? 0) ||
+          a.file_name.localeCompare(b.file_name, "vi", { numeric: true }),
+      );
 
     let than: string;
 
