@@ -13,6 +13,8 @@ import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
+import { HuongDanThemManHinh } from "@/components/features/gallery/huong-dan-them-man-hinh";
+import { Smartphone } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
@@ -195,6 +197,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
   }, [chayTai, photos]);
   const [filter, setFilter] = useState<"all" | "selected" | "unselected">("all");
   const [selectedSubfolder, setSelectedSubfolder] = useState<string>("");
+  // BB-213 — tấm trượt "Lưu app ra màn hình chính", mở từ nút ở đầu trang.
+  const [moHuongDanLuuApp, setMoHuongDanLuuApp] = useState(false);
 
   const [selectionCounts, setSelectionCounts] = useState({
     selectedCount: 0,
@@ -1033,6 +1037,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   {vi.gallery.messageStudio}
                 </a>
               )}
+              {/*
+                BB-213 — "Lưu app": mở tấm hướng dẫn thêm ra màn hình chính,
+                đúng theo máy khách đang dùng (huong-dan-them-man-hinh.tsx).
+                Icon điện thoại + chữ ngắn, cùng cỡ nút tròn với "Tải ảnh" bên
+                cạnh để không lệch hàng trên màn 375px.
+              */}
+              <button
+                type="button"
+                onClick={() => setMoHuongDanLuuApp(true)}
+                aria-label="Lưu app ra màn hình chính"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium transition hover:bg-surface-2"
+              >
+                <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
+                Lưu app
+              </button>
               {choPhepTai && photos.length > 0 && (
                 <MenuTaiAnh
                   soAnh={photos.length}
@@ -1634,6 +1653,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
           )}
         />
       )}
+
+      {/* BB-213 — tấm hướng dẫn "Lưu app", mở từ nút ở đầu trang. */}
+      <HuongDanThemManHinh mo={moHuongDanLuuApp} onDong={() => setMoHuongDanLuuApp(false)} />
     </div>
   );
 }

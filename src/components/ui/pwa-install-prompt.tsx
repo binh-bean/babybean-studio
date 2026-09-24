@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 import { Download, Share2, X, Sparkles } from "lucide-react";
 import { Button } from "./button";
 import { cn } from "./utils";
@@ -30,7 +31,19 @@ export function PWAInstallPrompt({
   const [showPrompt, setShowPrompt] = React.useState(false);
   const [showIOSGuide, setShowIOSGuide] = React.useState(false);
 
+  // BB-213 — trên trang khách (/g/<token>) đã có tấm hướng dẫn RIÊNG
+  // (huong-dan-them-man-hinh.tsx): nhận đúng loại máy (kể cả trình duyệt
+  // trong Zalo/Facebook — nơi lời mời chung này không dùng được), mở từ nút
+  // "Lưu app". Giữ cả hai cùng lúc thì ba mẹ thấy HAI lời mời cài chồng nhau
+  // ngay khi mở link. Chọn ẨN lời mời chung ở đây thay vì gộp hai tệp làm
+  // một: tấm mới đã bao được mọi ca của lời mời chung (kể cả iOS Safari) và
+  // còn nhiều hơn, còn lời mời chung vẫn cần sống nguyên cho các trang khác
+  // (đầu trang chủ, quản trị) mà /g/<token> không đụng tới.
+  const pathname = usePathname();
+  const trangKhach = pathname?.startsWith("/g/") ?? false;
+
   React.useEffect(() => {
+    if (trangKhach) return;
     // 1. If already running as standalone PWA, do not show
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
@@ -69,7 +82,7 @@ export function PWAInstallPrompt({
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     };
-  }, []);
+  }, [trangKhach]);
 
   const handleDismiss = () => {
     setShowPrompt(false);
@@ -96,7 +109,7 @@ export function PWAInstallPrompt({
     setDeferredPrompt(null);
   };
 
-  if (!showPrompt) return null;
+  if (!showPrompt || trangKhach) return null;
 
   return (
     <div
