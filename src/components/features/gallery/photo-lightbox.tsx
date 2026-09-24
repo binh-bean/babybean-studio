@@ -197,6 +197,9 @@ export function PhotoLightbox({
     if (!el) return;
     const { scale, x, y } = zoomRef.current;
     el.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+    // Đang phóng thì kéo được ảnh → con trỏ "nắm"; về 1× thì trả lại kính
+    // lúp của lớp cursor-zoom-in (gán rỗng = dùng lại giá trị từ className).
+    el.style.cursor = scale > 1.01 ? "grab" : "";
   }, []);
 
   const lenLichApDungPhong = useCallback(() => {
@@ -235,6 +238,7 @@ export function PhotoLightbox({
       if (el) {
         el.style.transition = mem ? "transform .22s ease-out" : "none";
         el.style.transform = "translate(0px, 0px) scale(1)";
+        el.style.cursor = "";
         if (mem) {
           window.setTimeout(() => {
             if (anhHienTaiRef.current === el) el.style.transition = "";
@@ -516,6 +520,10 @@ export function PhotoLightbox({
       aria-modal="true"
       aria-label={vi.common.view || "Xem ảnh"}
       className="fixed inset-0 z-50 flex flex-col justify-between bg-bb-viewer-bg text-white select-none overflow-hidden touch-none"
+      // Cố ý KHÔNG hiện bàn tay trên nền: con trỏ kế thừa xuống mọi thứ bên
+      // trong (tấm ảnh, ô ghi chú), và nền trống chỉ là một dải mỏng quanh
+      // ảnh. Xem tests/unit/con-tro-ban-tay.test.ts.
+      data-con-tro="mac-dinh"
       onClick={(e) => {
         // Bấm vào vùng trống bên ngoài ảnh thì đóng lightbox
         if (e.target === e.currentTarget) {
@@ -605,6 +613,8 @@ export function PhotoLightbox({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        // Cùng lý do với nền ngoài cùng: vùng này phần lớn là tấm ảnh.
+        data-con-tro="mac-dinh"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             onClose();
@@ -648,7 +658,10 @@ export function PhotoLightbox({
                 sizes={dungAnhNet ? undefined : "100vw"}
                 alt={photo.fileName || `Ảnh ${idx + 1}`}
                 decoding="async"
-                className="max-h-full max-w-full w-auto h-auto object-contain select-none shadow-2xl pointer-events-auto"
+                // Kính lúp thay cho bàn tay: nhấp đúp vào ảnh là PHÓNG TO
+                // (BB-210), nên con trỏ nói đúng việc đó. Đang phóng thì
+                // handleImgMouseDown kéo ảnh — con trỏ đổi sang "nắm".
+                className="max-h-full max-w-full w-auto h-auto object-contain select-none shadow-2xl pointer-events-auto cursor-zoom-in"
                 style={
                   isCurrent
                     ? {
@@ -865,7 +878,10 @@ export function PhotoLightbox({
       */}
       {tamMo && (
         <div
-          className="fixed inset-0 z-40 flex flex-col justify-end bg-black/55 lg:hidden"
+          // Bấm nền tối là đóng tấm trượt → bàn tay ở nền. Tấm trượt bên
+          // trong trả về con trỏ thường (cursor-auto), không thì cả ô ghi chú
+          // cũng hiện bàn tay vì con trỏ được kế thừa.
+          className="fixed inset-0 z-40 flex flex-col justify-end bg-black/55 lg:hidden cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             if (e.target === e.currentTarget) {
@@ -877,7 +893,7 @@ export function PhotoLightbox({
           <div
             role="dialog"
             aria-label={tamMo === "san-pham" ? "In ảnh này" : "Ghi chú cho thợ chỉnh ảnh"}
-            className="max-h-[75vh] touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#231e1a] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-white shadow-2xl animate-in slide-in-from-bottom-8"
+            className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#231e1a] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-white shadow-2xl animate-in slide-in-from-bottom-8"
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/25" aria-hidden="true" />
 
