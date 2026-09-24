@@ -30,6 +30,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -64,6 +65,134 @@ interface DongAnh {
   order_index: number | null;
   sort_index: number | null;
   subfolder: string | null;
+  selection_item_id?: string;
+  photo_id?: string;
+}
+
+/** Một dòng ngày giờ kiểu VN, cho phần đầu tệp chi tiết — không phải ISO. */
+function ngayVi(iso: string | null): string {
+  if (!iso) return "(chưa chốt)";
+  return new Date(iso).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+}
+
+/**
+ * Dạng xuất "chi-tiet" — BB-214(b), lời chủ studio: "CSKH tải file text mã
+ * chọn và note chi tiết từng ảnh khách note hoặc ảnh chọn in là gì".
+ *
+ * Khác hai dạng cũ ở chỗ: mỗi ảnh không chỉ có tên file + ghi chú chỉnh sửa,
+ * mà còn liệt kê ảnh đó đang được DÙNG CHO sản phẩm nào, gom từ ba nguồn:
+ *
+ *   1. Suất trong gói  — selection_placements -> gallery_items -> products
+ *      (album/khung/ảnh phóng đã có sẵn trong hợp đồng, khách gắn ảnh vào).
+ *   2. Sản phẩm mua thêm gắn thẳng vào MỘT ảnh — selection_addons.photo_id.
+ *   3. Album mua thêm, ảnh gộp nhiều tấm — selection_addon_photos, nối qua
+ *      addon_id sang selection_addons.product_id.
+ *
+ * Ba nguồn không loại trừ nhau: một tấm có thể vừa nằm trong suất của gói,
+ * vừa được đưa thêm vào một album mua thêm.
+ */
+async function xuatChiTiet(
+  admin: SupabaseClient,
+  ctx: {
+    gallery: { id: string; title: string | null; customer_id: string | null; baby_id: string | null };
+    luotChon: { id: string; general_note: string | null; submitted_at: string | null; submitted_by_name: string | null };
+    dong: DongAnh[];
+  },
+): Promise<string> {
+  const { gallery, luotChon, dong } = ctx;
+  const itemIds = dong.map((d) => d.selection_item_id).filter((v): v is string => Boolean(v));
+  const photoIds = dong.map((d) => d.photo_id).filter((v): v is string => Boolean(v));
+
+  const [khachRes, beRes, datGoiRes, muaThemAnhRes, albumAnhRes] = await Promise.all([
+    gallery.customer_id
+      ? admin.from("customers").select("full_name").eq("id", gallery.customer_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    gallery.baby_id
+      ? admin.from("babies").select("full_name").eq("id", gallery.baby_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    itemIds.length
+      ? admin
+          .from("selection_placements")
+          .select("selection_item_id, gallery_items(products(name))")
+          .in("selection_item_id", itemIds)
+      : Promise.resolve({ data: [] }),
+    photoIds.length
+      ? admin
+          .from("selection_addons")
+          .select("photo_id, quantity, products(name)")
+          .eq("selection_id", luotChon.id)
+          .in("photo_id", photoIds)
+      : Promise.resolve({ data: [] }),
+    itemIds.length
+      ? admin
+          .from("selection_addon_photos")
+          .select("selection_item_id, selection_addons(products(name))")
+          .in("selection_item_id", itemIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const tenSanPhamTheoItem = new Map<string, string[]>();
+  const themVao = (id: string | null | undefined, ten: string | null | undefined) => {
+    if (!id || !ten) return;
+    const ds = tenSanPhamTheoItem.get(id) ?? [];
+    ds.push(ten);
+    tenSanPhamTheoItem.set(id, ds);
+  };
+
+  for (const r of (datGoiRes.data ?? []) as unknown as {
+    selection_item_id: string;
+    gallery_items?: { products?: { name?: string } | null } | null;
+  }[]) {
+    themVao(r.selection_item_id, r.gallery_items?.products?.name);
+  }
+
+  const tenSanPhamTheoAnh = new Map<string, string[]>();
+  for (const r of (muaThemAnhRes.data ?? []) as unknown as {
+    photo_id: string;
+    quantity?: number;
+    products?: { name?: string } | null;
+  }[]) {
+    const ten = r.products?.name;
+    if (!ten) continue;
+    const nhan = r.quantity && r.quantity > 1 ? `${ten} (mua thêm x${r.quantity})` : `${ten} (mua thêm)`;
+    const ds = tenSanPhamTheoAnh.get(r.photo_id) ?? [];
+    ds.push(nhan);
+    tenSanPhamTheoAnh.set(r.photo_id, ds);
+  }
+
+  for (const r of (albumAnhRes.data ?? []) as unknown as {
+    selection_item_id: string;
+    selection_addons?: { products?: { name?: string } | null } | null;
+  }[]) {
+    const ten = r.selection_addons?.products?.name;
+    themVao(r.selection_item_id, ten ? `${ten} (album mua thêm)` : null);
+  }
+
+  const dongViet: string[] = [];
+  dongViet.push(`Bộ ảnh: ${gallery.title ?? "(chưa đặt tên)"}`);
+  dongViet.push(`Khách: ${(khachRes.data as { full_name?: string } | null)?.full_name ?? "(chưa rõ)"}`);
+  const tenBe = (beRes.data as { full_name?: string } | null)?.full_name;
+  if (tenBe) dongViet.push(`Bé: ${tenBe}`);
+  dongViet.push(`Ngày chốt: ${ngayVi(luotChon.submitted_at)}`);
+  dongViet.push(`Người xác nhận: ${luotChon.submitted_by_name ?? "(chưa rõ)"}`);
+  if (luotChon.general_note) dongViet.push(`Ghi chú chung: ${luotChon.general_note}`);
+  dongViet.push(`Số ảnh đã chọn: ${dong.length}`);
+  dongViet.push("");
+  dongViet.push("=".repeat(60));
+  dongViet.push("");
+
+  for (const d of dong) {
+    dongViet.push(d.file_name);
+    dongViet.push(`  Ghi chú chỉnh sửa: ${d.retouch_note ?? "(không có)"}`);
+    const dungCho = [
+      ...(d.selection_item_id ? tenSanPhamTheoItem.get(d.selection_item_id) ?? [] : []),
+      ...(d.photo_id ? tenSanPhamTheoAnh.get(d.photo_id) ?? [] : []),
+    ];
+    dongViet.push(`  Dùng cho: ${dungCho.length ? dungCho.join(", ") : "(chưa gắn sản phẩm nào)"}`);
+    dongViet.push("");
+  }
+
+  return dongViet.join("\r\n");
 }
 
 export async function GET(
@@ -78,12 +207,14 @@ export async function GET(
     const { id: galleryId } = await context.params;
     if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
 
-    const dinhDang = new URL(request.url).searchParams.get("format") === "csv" ? "csv" : "txt";
+    const formatParam = new URL(request.url).searchParams.get("format");
+    const dinhDang =
+      formatParam === "csv" ? "csv" : formatParam === "chi-tiet" ? "chi-tiet" : "txt";
     const admin = createAdminClient();
 
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, branch_id, title, status")
+      .select("id, branch_id, title, status, customer_id, baby_id")
       .eq("id", galleryId)
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
@@ -91,7 +222,7 @@ export async function GET(
 
     const { data: luotChon } = await admin
       .from("selections")
-      .select("id, general_note")
+      .select("id, general_note, submitted_at, submitted_by_name")
       .eq("gallery_id", galleryId)
       .eq("is_primary", true)
       .maybeSingle();
@@ -102,7 +233,9 @@ export async function GET(
 
     const { data, error } = await admin
       .from("selection_items")
-      .select("order_index, retouch_note, is_favorite, photos(file_name, sort_index, subfolder)")
+      .select(
+        "id, photo_id, order_index, retouch_note, is_favorite, photos(file_name, sort_index, subfolder)",
+      )
       .eq("selection_id", luotChon.id)
       .eq("mark", "selected");
     if (error) throw error;
@@ -125,30 +258,37 @@ export async function GET(
           order_index: (d as { order_index?: number | null }).order_index ?? null,
           sort_index: p?.sort_index ?? null,
           subfolder: p?.subfolder ?? null,
+          selection_item_id: (d as { id?: string }).id,
+          photo_id: (d as { photo_id?: string }).photo_id,
         };
       })
       .filter((d) => d.file_name !== "")
       .sort((a, b) => (a.sort_index ?? 0) - (b.sort_index ?? 0));
 
-    const than =
-      dinhDang === "csv"
-        ? [
-            ["ten_file", "thu_muc_con", "ghi_chu_chinh_sua", "yeu_thich"].join(","),
-            ...dong.map((d) =>
-              [
-                oCsv(d.file_name),
-                oCsv(d.subfolder),
-                oCsv(d.retouch_note),
-                oCsv(d.is_favorite ? "x" : ""),
-              ].join(","),
-            ),
-            // Ghi chú chung của khách đi kèm, nếu có: nó là lời dặn cho CẢ bộ,
-            // mất nó thì thợ chỉnh ảnh không biết gia đình muốn tông màu nào.
-            ...(luotChon.general_note
-              ? ["", oCsv("Ghi chú chung của khách") + "," + oCsv(luotChon.general_note)]
-              : []),
-          ].join("\r\n")
-        : dong.map((d) => d.file_name).join("\r\n");
+    let than: string;
+
+    if (dinhDang === "chi-tiet") {
+      than = await xuatChiTiet(admin, { gallery, luotChon, dong });
+    } else if (dinhDang === "csv") {
+      than = [
+        ["ten_file", "thu_muc_con", "ghi_chu_chinh_sua", "yeu_thich"].join(","),
+        ...dong.map((d) =>
+          [
+            oCsv(d.file_name),
+            oCsv(d.subfolder),
+            oCsv(d.retouch_note),
+            oCsv(d.is_favorite ? "x" : ""),
+          ].join(","),
+        ),
+        // Ghi chú chung của khách đi kèm, nếu có: nó là lời dặn cho CẢ bộ,
+        // mất nó thì thợ chỉnh ảnh không biết gia đình muốn tông màu nào.
+        ...(luotChon.general_note
+          ? ["", oCsv("Ghi chú chung của khách") + "," + oCsv(luotChon.general_note)]
+          : []),
+      ].join("\r\n");
+    } else {
+      than = dong.map((d) => d.file_name).join("\r\n");
+    }
 
     await ghiNhatKy({
       actorType: "staff",
@@ -167,7 +307,9 @@ export async function GET(
      * Tệp này rơi vào thư mục Tải xuống của máy chung ở studio, và tên tệp thì
      * hiện ra ở mọi cửa sổ chọn file. Mã bộ ảnh là đủ để tra ngược.
      */
-    const tenTep = `bo-anh-${galleryId.slice(0, 8)}.${dinhDang}`;
+    const duoiTep = dinhDang === "csv" ? "csv" : "txt";
+    const hauTo = dinhDang === "chi-tiet" ? "-chi-tiet" : "";
+    const tenTep = `bo-anh-${galleryId.slice(0, 8)}${hauTo}.${duoiTep}`;
 
     return new Response(than, {
       status: 200,

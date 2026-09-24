@@ -537,6 +537,13 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             >
               {vi.admin.export.formatCsv}
             </a>
+            <a
+              href={`/api/admin/galleries/${galleryId}/export?format=chi-tiet`}
+              download
+              className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs hover:bg-[var(--bb-surface-2)]"
+            >
+              {vi.admin.export.formatChiTiet}
+            </a>
           </span>
         </section>
       )}

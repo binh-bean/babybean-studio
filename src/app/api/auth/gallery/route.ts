@@ -190,12 +190,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // Ghi trượt thật sự không quan trọng: chỉ là timestamp cập nhật lần xem cuối,
-    // hụt thì lần sau cập nhật, không được chặn luồng khách vào xem ảnh.
-    await admin
-      .from("share_links")
-      .update({ last_viewed_at: new Date().toISOString() })
-      .eq("id", link.id);
+    // Tăng view_count và đặt last_viewed_at NGUYÊN TỬ qua hàm SQL (migration
+    // 0064) — không đọc-rồi-ghi ở đây, vì hai lượt mở gần như cùng lúc sẽ mất
+    // một lượt nếu làm kiểu đó (BB-214a). Ghi trượt thật sự không quan trọng:
+    // đây chỉ là bộ đếm hiển thị, hụt thì lần sau cộng tiếp, không được chặn
+    // luồng khách vào xem ảnh.
+    const { error: demErr } = await admin.rpc("tang_luot_mo_link", {
+      p_share_link_id: link.id,
+    });
+    if (demErr) console.error("[share_links] Đếm lượt mở hụt:", demErr);
 
     const { token: sessionToken, expiresAt } = await signGallerySession({
       customerId: link.customer_id || "",

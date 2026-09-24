@@ -315,6 +315,7 @@ export const en: Messages = {
         "gallery.watermark_default": "Watermark",
         "gallery.allow_download_default": "Allow downloads",
         "photo.expected_long_edge_px": "Preview long edge (px)",
+        "gallery.extra_photo_price_default": "Price per extra photo (VND)",
         "gallery.banner_image_url": "Promo image in the photo viewer",
         "gallery.banner_link_url": "Where the promo image links to",
         "chat.page_url": "Studio chat page",
@@ -329,6 +330,8 @@ export const en: Messages = {
         "gallery.watermark_default": "Whether previews carry a watermark.",
         "gallery.allow_download_default": "Whether customers can download previews.",
         "photo.expected_long_edge_px": "Longest edge of a preview image, in pixels.",
+        "gallery.extra_photo_price_default":
+          "Applied when creating a NEW gallery, before a package's own price if any. Existing galleries keep the price they were created with.",
         "gallery.banner_image_url":
           "Promo strip beside the photo in the large viewer, wide screens only. Empty shows nothing.",
         "gallery.banner_link_url":
@@ -539,6 +542,7 @@ export const en: Messages = {
       description: "Choose the appropriate format for Người Photoshop.",
       formatLightroom: "Lightroom (.txt / filenames list)",
       formatCsv: "Excel / CSV spreadsheet with notes",
+      formatChiTiet: "Detailed text for CS (.txt)",
       formatJson: "Full JSON data",
       copyClipboard: "Copy to clipboard",
       copiedNotice: "Copied list to clipboard",

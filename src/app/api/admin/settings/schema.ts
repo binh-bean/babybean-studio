@@ -62,6 +62,14 @@ export const CAI_DAT_SUA_DUOC: DinhNghiaCaiDat[] = [
   { key: "gallery.watermark_default", nhom: "anh", schema: z.boolean() },
   { key: "gallery.allow_download_default", nhom: "anh", schema: z.boolean() },
   { key: "photo.expected_long_edge_px", nhom: "anh", schema: z.number().int().min(512).max(4096) },
+  {
+    // Giá một ảnh chọn thêm mặc định, dùng khi TẠO bộ ảnh mới (BB-214c).
+    // Đổi ở đây không đổi giá của bộ ảnh đã có — cột galleries.extra_photo_price
+    // giữ nguyên giá trị đã ghi lúc tạo, không đọc lại settings sau đó.
+    key: "gallery.extra_photo_price_default",
+    nhom: "anh",
+    schema: z.number().int().min(0).max(10_000_000),
+  },
 
   /*
     --- Quảng cáo của studio trong màn xem ảnh lớn ---------------------------

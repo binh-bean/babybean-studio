@@ -99,8 +99,16 @@ test.describe("BB-186: bảng link sắp hết hạn", () => {
     await page.waitForURL("**/admin/reports/link-sap-het-han");
 
     // 2. Nhà sắp mất link phải hiện lên, kèm số ngày còn lại.
+    //
+    // Bảng này render HAI LẦN trong DOM cùng lúc — thẻ cho điện thoại
+    // (`lg:hidden`) và bảng cho màn rộng (`hidden lg:block`), xem
+    // link-sap-het-han-report.tsx. `getByText` khớp theo nội dung DOM thô,
+    // không lọc phần tử `display:none`, nên `/còn 3 ngày/` khớp CẢ HAI —
+    // strict mode ném lỗi dù chỉ một cái thật sự hiện ra ở viewport mặc định
+    // (1280px, qua ngưỡng `lg`). Khoanh vùng vào đúng bảng đang hiện, không
+    // đổi ý phép thử đang canh (nhà sắp mất link phải thấy số ngày còn lại).
     await expect(page.getByRole("link", { name: tenKhach })).toBeVisible();
-    await expect(page.getByText(/còn 3 ngày/)).toBeVisible();
+    await expect(page.getByRole("table").getByText(/còn 3 ngày/)).toBeVisible();
 
     // 3. Bấm tên khách đi thẳng sang màn chi tiết — nơi có nút Mở khoá link cũ.
     await page.getByRole("link", { name: tenKhach }).click();
