@@ -30,12 +30,22 @@ chủ studio trả lời (mục "Đang chờ" cuối tệp).
 
 Luật chung cho mọi agent Sonnet: xem mục "Luật cho agent" cuối tệp.
 
-### Antigravity — 2 phần việc
+### Antigravity — 1 phần việc ngay, 1 phần sau
 
 | Mã | Cửa sổ | Thư mục | Việc |
 |---|---|---|---|
-| BB-220 | **Thiết kế** (DESIGNER, Nano Banana) | — (chỉ xuất ảnh) | Ảnh phòng thật cho màn treo tường: phòng khách, phòng ngủ bé, hành lang — có mảng tường trống nhìn thẳng, ánh sáng thật. Đề bài: `docs/briefs/BB-220-anh-phong-cho-man-treo-tuong.md` |
-| BB-062 | **Giao diện** (DEV-FE) | `babybean-dev-fe` | Màn quản lý gói chụp. Đề bài: `docs/briefs/BB-062-man-goi-chup.md` |
+| BB-220 | **Thiết kế** (DESIGNER, Nano Banana) | `babybean-assets\BB-220` (chỉ xuất ảnh) | Ảnh phòng thật cho màn treo tường: 4 phòng × 2 khổ, mảng tường trống nhìn thẳng, kèm số liệu tỷ lệ. Đề bài: `docs/briefs/BB-220-anh-phong-cho-man-treo-tuong.md` |
+| BB-062 | **Giao diện** (DEV-FE) | `babybean-dev-fe` | Màn quản lý gói chụp — **LÙI lại sau BB-203**. |
+
+**Vì sao lùi BB-062** (soát 24/09): gói chụp thật là **38 sản phẩm** loại
+`shoot_package` đồng bộ từ Lark (Baby 02 dùng cho 129 bộ, Fam 02 cho 83 bộ…),
+còn bảng `packages` trong app chỉ có 4 dòng và không ai dùng. Thành phần của
+mỗi gói (bao nhiêu ảnh chỉnh, kèm sản phẩm in nào) hiện KHÔNG có bảng mẫu nào
+trong app — nó đến theo từng bộ ảnh từ dòng hoá đơn Lark, và chủ studio cho biết
+Lark có bảng "chi tiết gói chụp". Giao màn gói chụp trước khi chốt mô hình lấy
+dữ liệu từ Lark (BB-203) là để agent tự đặt ra một mô hình thứ hai — đúng kiểu
+lệch nhau mà dự án đã phải dọn nhiều lần. BB-203 xong thì đề bài BB-062 viết
+trên mô hình đó.
 
 ### Claude Opus — tự làm
 
