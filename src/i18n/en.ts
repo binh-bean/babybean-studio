@@ -575,6 +575,8 @@ export const en: Messages = {
     lostBefore: "Your baby's photos are sent via a ",
     lostStrong: "private link",
     lostAfter: ". If you haven't received it or it won't open, please call us at the number below.",
+    lostAfterNhanTin: ". If you haven't received it or it won't open, please message us using the button below.",
+    lostAfterChiNhanh: ". If you haven't received it or it won't open, please contact the branch where your shoot took place.",
     messageCta: "Message studio",
     loginCta: "Staff Login",
   },

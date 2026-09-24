@@ -578,7 +578,12 @@ export const vi = {
     branchesHeading: "Các chi nhánh",
     lostBefore: "Ảnh của bé được gửi qua ",
     lostStrong: "link riêng",
+    // Ba biến thể, chọn theo dữ liệu THẬT của chi nhánh (trang gốc). Soát
+    // 24/09/2026: câu cũ bảo "gọi theo số ở dưới" trong khi cả 3 chi nhánh
+    // chưa điền hotline — dưới đó không có số nào.
     lostAfter: ". Chưa nhận được hoặc link không mở được, ba mẹ gọi giúp bên mình theo số ở dưới nhé.",
+    lostAfterNhanTin: ". Chưa nhận được hoặc link không mở được, ba mẹ nhắn tin cho studio ở nút phía dưới nhé.",
+    lostAfterChiNhanh: ". Chưa nhận được hoặc link không mở được, ba mẹ liên hệ chi nhánh đã chụp giúp bên mình nhé.",
     messageCta: "Nhắn tin cho studio",
     loginCta: "Nhân viên đăng nhập",
   },

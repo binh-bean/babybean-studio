@@ -48,7 +48,11 @@ export default async function LandingPage() {
           <p>
             {t.landing.lostBefore}
             <strong className="text-foreground">{t.landing.lostStrong}</strong>
-            {t.landing.lostAfter}
+            {branches?.some((b) => b.hotline)
+              ? t.landing.lostAfter
+              : chatUrl
+                ? t.landing.lostAfterNhanTin
+                : t.landing.lostAfterChiNhanh}
           </p>
         </div>
 
