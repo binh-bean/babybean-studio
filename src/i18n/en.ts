@@ -143,7 +143,7 @@ export const en: Messages = {
     reviewUnusedQuota: "You still have {n} free photos unused. Submit anyway?",
     submitCta: "Submit selection",
     submitConfirmTitle: "Confirm selection submission",
-    submitConfirm: "You will not be able to change this afterwards. Are you sure?",
+    submitConfirm: "We will review and confirm your list. Until then you can still add or change photos.",
     submitAgree: "I confirm the information above is correct",
     parentName: "Parent name",
     parentNamePlaceholder: "Enter mother or father's name",

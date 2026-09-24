@@ -1078,17 +1078,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
               {/*
                 BB-213 — "Lưu app": mở tấm hướng dẫn thêm ra màn hình chính,
                 đúng theo máy khách đang dùng (huong-dan-them-man-hinh.tsx).
-                Icon điện thoại + chữ ngắn, cùng cỡ nút tròn với "Tải ảnh" bên
-                cạnh để không lệch hàng trên màn 375px.
+                Dưới 640px chỉ còn biểu tượng: soát khi gộp (24/09/2026) trên
+                màn 375px, ba nút có chữ ("Nhắn cho studio", "Lưu app", tải
+                ảnh) đẩy tên bé còn đúng "Minh…". Tên bé là thứ ba mẹ nhìn
+                để biết mình đang ở đúng bộ ảnh — không được là thứ bị cắt.
+                "Nhắn cho studio" giữ chữ vì lý do ghi ngay phía trên.
               */}
               <button
                 type="button"
                 onClick={() => setMoHuongDanLuuApp(true)}
                 aria-label="Lưu app ra màn hình chính"
-                className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium transition hover:bg-surface-2"
+                title="Lưu app ra màn hình chính"
+                className="inline-flex h-9 w-9 items-center justify-center gap-1.5 rounded-full border border-border text-xs font-medium transition hover:bg-surface-2 sm:w-auto sm:px-3"
               >
-                <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
-                Lưu app
+                <Smartphone className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">Lưu app</span>
               </button>
               {choPhepTai && photos.length > 0 && (
                 <MenuTaiAnh
@@ -1502,7 +1506,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               */}
               {sanPhamThieuAnh.length > 0 && (
                 <div className="mt-3 rounded-2xl border border-heart/25 bg-heart/[0.06] p-3.5 text-xs">
-                  <p className="font-semibold text-heart">Bạn chưa chọn ảnh cho:</p>
+                  <p className="font-semibold text-heart">Ba mẹ chưa chọn ảnh cho:</p>
                   <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[#2a2420]/80">
                     {sanPhamThieuAnh.map((sp) => (
                       <li key={sp.galleryItemId}>{sp.name}</li>
@@ -1532,7 +1536,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         key={a.id}
-                        src={`/api/img/${a.id}?w=120`}
+                        src={`/api/img/${a.id}?w=200`}
                         alt={a.fileName}
                         loading="lazy"
                         className="h-14 w-14 shrink-0 rounded-lg object-cover"

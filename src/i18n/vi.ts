@@ -143,7 +143,9 @@ export const vi = {
     reviewUnusedQuota: "Ba mẹ còn {n} ảnh miễn phí chưa dùng. Chốt luôn ạ?",
     submitCta: "Chốt danh sách",
     submitConfirmTitle: "Xác nhận chốt danh sách",
-    submitConfirm: "Sau khi chốt, ba mẹ không đổi được nữa. Chắc chắn chứ ạ?",
+    // Sửa 24/09/2026: câu cũ "sau khi chốt không đổi được nữa" sai từ quyết định
+    // 22/09 (migration 0060) — chốt xong vẫn chọn thêm/đổi được tới khi CSKH xác nhận.
+    submitConfirm: "Chốt xong, bên mình sẽ kiểm và xác nhận. Trước lúc đó ba mẹ vẫn chọn thêm hoặc đổi ảnh được.",
     // BB-212 — chủ studio 22/09/2026: "dấu tích ghi xác nhận đúng thông tin".
     submitAgree: "Tôi xác nhận các thông tin trên là đúng",
     parentName: "Tên ba/mẹ xác nhận",
