@@ -17,7 +17,7 @@ chủ studio trả lời (mục "Đang chờ" cuối tệp).
 
 ## Đợt 1 — chạy song song ngay
 
-### Claude Sonnet — 6 phần việc, mỗi phần một worktree
+### Claude Sonnet — 7 phần việc, mỗi phần một worktree
 
 | Mã | Việc | Mục trong docs/19 | Mức |
 |---|---|---|---|
@@ -27,6 +27,7 @@ chủ studio trả lời (mục "Đang chờ" cuối tệp).
 | BB-213 | **Biểu tượng app**: biểu tượng trang là logo; thêm ra màn hình chính thì biểu tượng là ảnh bìa bộ ảnh; **hướng dẫn thêm ra màn hình chính** theo từng loại máy | icon + hướng dẫn | P0 |
 | BB-214 | Việc nhỏ phía máy chủ: **bộ đếm lượt mở link**; **tệp văn bản cho CSKH** (mã ảnh chọn + ghi chú từng ảnh + ảnh đó in gì); **giá ảnh chọn thêm cấu hình được** (mặc định 50.000 ₫); bộ quét báo nhầm; **phân tích hai phép thử đỏ** | đếm link · file CSKH · giá · bộ quét · phép thử | P1–P3 |
 | BB-215 | **CSKH chọn ảnh bìa** và **chữ trên bìa** (điền sẵn kiểu tạp chí thời trang, CSKH sửa được) | ảnh bìa + chữ bìa | P0 |
+| BB-216 | **Trang gốc** hauky.babybeanstudio.vn theo chuẩn thiết kế mới; sửa nút "Nhắn cho studio" đang trỏ `https://m.me/` chung | "sửa màn này theo chuẩn thiết kế" | P0 |
 
 Luật chung cho mọi agent Sonnet: xem mục "Luật cho agent" cuối tệp.
 
@@ -72,8 +73,8 @@ trên mô hình đó.
 
 ## Đang chờ chủ studio
 
-1. **"Sửa màn này theo chuẩn thiết kế hauky"** — màn nào? (thư mục `UI-tham khao` là bộ chuẩn trích từ màn khách.)
-2. **Tệp logo BabyBean thật** — biểu tượng hiện tại là hình hạt đậu do agent vẽ lúc dựng khung, không phải logo của studio. BB-213 dùng tạm, thay khi có tệp.
+1. ~~Màn nào cần theo chuẩn thiết kế~~ — chủ studio trả lời 24/09: **trang gốc** hauky.babybeanstudio.vn → BB-216.
+2. ~~Tệp logo thật~~ — chủ studio gửi 24/09: `thuong hieu/1.jpg` cạnh thư mục dự án (hạt đậu nét xám). Đã chuyển cho BB-213.
 3. Đặc tả "Mời ông bà" và danh sách chỉ số báo cáo — Claude soạn, chủ studio duyệt.
 
 ## Quyết định Claude đã chốt khi chia (chủ studio có thể lật lại)

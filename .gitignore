@@ -33,3 +33,6 @@ db/*.local.sql
 /*.jpg
 /*.jpeg
 /*.webp
+
+# Worktree của agent (Claude Code tạo khi giao việc song song) — không bao giờ commit.
+.claude/worktrees/
