@@ -68,7 +68,7 @@ export async function GET(request: Request) {
         id, title, welcome_message, status, baby_id, shoot_date:shoots(shoot_date),
         branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
-        cover_photo_id, download_enabled, notes_enabled, invite_enabled
+        cover_photo_id, cover_headline, download_enabled, notes_enabled, invite_enabled
       `)
       .eq("id", session.galleryId)
       .single();
@@ -378,6 +378,9 @@ export async function GET(request: Request) {
       },
       subfolders,
       coverPhotoId: gallery.cover_photo_id,
+      // BB-215: tiêu đề bìa CSKH tự viết. `null` thì màn khách tự suy ra (tên
+      // bé, rồi mới tới câu mặc định) — xem bia-bo-anh.tsx.
+      coverHeadline: gallery.cover_headline,
       myRole: session.role,
       selection: {
         id: session.selectionId,
