@@ -1,0 +1,102 @@
+# 20. Phân việc cho bản yêu cầu đợt 1
+
+**Lập ngày 24/09/2026** từ `docs/19-ban-yeu-cau-dot-1.md` (29 mục chủ studio giữ).
+Chủ studio giao: "tư duy và phân bổ công việc cho model Sonnet làm những phần có
+thể; còn agent Antigravity nếu cần thì tạo phần việc cho nó".
+
+## Nguyên tắc chia
+
+| Ai | Nhận loại việc gì | Vì sao |
+|---|---|---|
+| **Claude Opus** (điều phối) | Việc đổi MÔ HÌNH dữ liệu, bảo mật, nối Lark, và mọi việc cần chủ studio quyết. Soát và gộp mọi phần việc của agent. | Sai ở đây là sai dây chuyền: trạng thái bộ ảnh, quyền link, tiền. Và theo `bao-xong-phai-tu-chay-lai`, báo cáo của agent không phải bằng chứng — phải có người tự chạy lại. |
+| **Claude Sonnet** (agent, mỗi việc một worktree) | Việc có đề bài rõ, tiêu chí đạt đo được, nằm gọn trong vài tệp. | Nhanh, chạy song song được, và đề bài đủ chặt thì không cần tự quyết điều gì lớn. |
+| **Antigravity** (thư mục vai cố định) | Việc tách biệt hẳn khỏi phần Sonnet đang sửa, và việc tạo HÌNH ẢNH (Nano Banana). | Tránh hai đội đụng cùng một tệp. Tạo ảnh phòng thật cho màn treo tường là việc chỉ vai Thiết kế làm được. |
+
+**Không chia**: chuyển sang bb-prod (cần chủ studio có mặt), và mọi việc còn chờ
+chủ studio trả lời (mục "Đang chờ" cuối tệp).
+
+## Đợt 1 — chạy song song ngay
+
+### Claude Sonnet — 6 phần việc, mỗi phần một worktree
+
+| Mã | Việc | Mục trong docs/19 | Mức |
+|---|---|---|---|
+| BB-210 | Màn xem ảnh lớn **phóng to được** (chụm hai ngón, lăn chuột, chạm hai lần), kéo khi đang phóng, vuốt lật mượt; **hiện lại tên file** ở lưới và màn lớn | zoom · hiện tên file | P0 · P1 |
+| BB-211 | **Con trỏ bàn tay** trên mọi chỗ bấm được, cả màn khách lẫn quản trị, kèm phép thử canh | bàn tay | P0 |
+| BB-212 | **Hộp chốt mới** (tên khách điền sẵn, ô xác nhận đúng thông tin), **cửa hàng mua thêm** và **các màn phụ** theo giao diện mới | chốt · cửa hàng · màn phụ | P0 · P2 |
+| BB-213 | **Biểu tượng app**: biểu tượng trang là logo; thêm ra màn hình chính thì biểu tượng là ảnh bìa bộ ảnh; **hướng dẫn thêm ra màn hình chính** theo từng loại máy | icon + hướng dẫn | P0 |
+| BB-214 | Việc nhỏ phía máy chủ: **bộ đếm lượt mở link**; **tệp văn bản cho CSKH** (mã ảnh chọn + ghi chú từng ảnh + ảnh đó in gì); **giá ảnh chọn thêm cấu hình được** (mặc định 50.000 ₫); bộ quét báo nhầm; **phân tích hai phép thử đỏ** | đếm link · file CSKH · giá · bộ quét · phép thử | P1–P3 |
+| BB-215 | **CSKH chọn ảnh bìa** và **chữ trên bìa** (điền sẵn kiểu tạp chí thời trang, CSKH sửa được) | ảnh bìa + chữ bìa | P0 |
+
+Luật chung cho mọi agent Sonnet: xem mục "Luật cho agent" cuối tệp.
+
+### Antigravity — 2 phần việc
+
+| Mã | Cửa sổ | Thư mục | Việc |
+|---|---|---|---|
+| BB-220 | **Thiết kế** (DESIGNER, Nano Banana) | — (chỉ xuất ảnh) | Ảnh phòng thật cho màn treo tường: phòng khách, phòng ngủ bé, hành lang — có mảng tường trống nhìn thẳng, ánh sáng thật. Đề bài: `docs/briefs/BB-220-anh-phong-cho-man-treo-tuong.md` |
+| BB-062 | **Giao diện** (DEV-FE) | `babybean-dev-fe` | Màn quản lý gói chụp. Đề bài: `docs/briefs/BB-062-man-goi-chup.md` |
+
+### Claude Opus — tự làm
+
+| Mã | Việc | Mức |
+|---|---|---|
+| BB-200 | **Luồng trạng thái nối Lark**: khách chốt → "đã ghi nhận yêu cầu"; CSKH chốt → Lark "đã chọn ảnh, xếp hàng chờ chỉnh"; Lark "đang làm" → cả hai màn "đang chỉnh sửa" | P0 |
+| BB-201 | **Giữ link app trên màn quản trị** — hiện nay mã link chỉ lưu dạng băm nên tạo xong là mất; cần lưu mã hoá để xem lại được | P0 |
+| BB-202 | **Album đúng khái niệm**: album trong gói → gợi ý chọn **ảnh bìa** album; bán album → **màn bán hàng**, không bắt chọn 20–30 ảnh | P0 |
+| BB-203 | **Tự lấy dữ liệu từ hoá đơn Lark** (khách, sản phẩm, gói chụp), CSKH sửa/bỏ phần thừa; màn quản trị có **link hoá đơn** để đối chiếu. Đi cùng việc chuyển bb-prod | P0 |
+| BB-204 | **Bộ ảnh rỗng theo hoá đơn**: không có dịch vụ chụp → hoá đơn hậu kỳ, luồng riêng; có gói chụp mà link rỗng → cảnh báo CSKH | P0 · không gấp |
+| — | Soát, gộp, chạy đủ phép thử và phép thử trình duyệt cho mọi phần việc của agent | — |
+
+## Đợt 2 — sau khi đợt 1 gộp xong
+
+| Việc | Ai | Điều kiện |
+|---|---|---|
+| Màn treo tường đẹp, hiện đại (ảnh phòng thật của BB-220) | Opus dựng khung, Sonnet làm chi tiết | BB-220 giao ảnh |
+| So sánh nhiều tấm (chọn bất kỳ, bỏ bớt khi chọn quá) | Sonnet | BB-210 đã gộp (cùng màn xem lớn) |
+| Mời mua lần hai **khi khách duyệt in không yêu cầu chỉnh lại** | Sonnet | BB-200 xong (cần trạng thái đúng) |
+| Thông báo đẩy từ app | Sonnet | BB-213 xong (cùng nền PWA) |
+| Mời ông bà cùng xem | Opus đặc tả quyền → chủ studio duyệt → Sonnet làm | Chủ studio duyệt đặc tả |
+| Bộ báo cáo điều hành và bán hàng | Opus đặc tả → Sonnet làm | Chủ studio duyệt danh sách chỉ số |
+| Bộ ảnh chưa có tên bé | đi cùng BB-203 | — |
+
+## Đang chờ chủ studio
+
+1. **"Sửa màn này theo chuẩn thiết kế hauky"** — màn nào? (thư mục `UI-tham khao` là bộ chuẩn trích từ màn khách.)
+2. **Tệp logo BabyBean thật** — biểu tượng hiện tại là hình hạt đậu do agent vẽ lúc dựng khung, không phải logo của studio. BB-213 dùng tạm, thay khi có tệp.
+3. Đặc tả "Mời ông bà" và danh sách chỉ số báo cáo — Claude soạn, chủ studio duyệt.
+
+## Quyết định Claude đã chốt khi chia (chủ studio có thể lật lại)
+
+- **Chạm hai lần vào ảnh = phóng to**, không còn là thả tim (bản 23/09). Chủ studio
+  xếp phóng to vào P0, và mọi trình xem ảnh ba mẹ quen (Ảnh của iPhone, Google
+  Photos) đều dùng chạm hai lần để phóng. Thả tim vẫn ở nút tim to dưới đáy.
+- **Hiện lại tên file** (bản 23/09 đã bỏ): chủ studio cần để ba mẹ đối chiếu với
+  file tải về và với danh sách CSKH xuất ra. Tên file nhỏ, dưới ảnh, không đè lên
+  mặt bé.
+- **Bỏ** gom ảnh gần giống và bán combo; **giữ nguyên** cho tải ảnh gốc từ đầu —
+  đúng như chủ studio chọn Bỏ trong bản yêu cầu.
+
+## Luật cho agent
+
+Áp dụng cho mọi agent (Sonnet và Antigravity):
+
+1. **Không đụng thư mục chính `babybean-studio` và nhánh `main`.** Làm trên nhánh
+   của mình, không đẩy lên GitHub, không gộp. Claude Opus soát rồi gộp.
+2. **Không bật máy chủ ở cổng 3100 và 3099** (cổng xem trước của chủ studio và
+   cổng phép thử trình duyệt). Cần máy chủ thì dùng cổng 3150 trở lên.
+3. **Cơ sở dữ liệu dùng chung là dữ liệu THẬT** (bb-dev đang chạy app). Phép thử
+   chỉ tạo dữ liệu tên `Fixture BB-2xx…` và tự dọn; không sửa dòng thật; không đổi
+   dòng `settings` chung trừ khi trả lại đúng giá trị cũ trong `afterAll`.
+4. Chỉ chạy các tệp phép thử mình thêm hoặc sửa (`npx vitest run <tệp>`). Bộ phép
+   thử đầy đủ và phép thử trình duyệt do Claude Opus chạy sau khi gộp — nhiều
+   agent cùng chạy cả bộ trên một cơ sở dữ liệu sẽ giẫm lên nhau.
+5. Ghi chú trong mã và thông điệp commit **bằng tiếng Việt**, theo giọng của các
+   ghi chú sẵn có: nói VÌ SAO, kèm con số hoặc lời chủ studio làm bằng chứng.
+6. **Mọi phép thử canh phải kiểm ngược**: cố tình làm hỏng thứ nó canh, thấy nó ĐỎ
+   đúng lý do, rồi trả lại. Ghi việc kiểm ngược vào thông điệp commit.
+7. Trước khi báo xong: `npx tsc --noEmit -p tsconfig.json` sạch, `npm run lint`
+   0 lỗi, các phép thử của mình xanh. **Dán mã thoát**, không kể lại bằng lời.
+8. Việc đụng màn khách: màn khách luôn sáng, màu và phông lấy từ khối
+   `.giao-dien-khach` trong `src/styles/tokens.css` (kem `#f7f2eb`, mực `#2a2420`,
+   tim `#c4645a`, rêu `#4f5b45`, tiêu đề phông Fraunces qua `font-display`).
