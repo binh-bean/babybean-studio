@@ -214,3 +214,16 @@ hiện TRỐNG cả 3.340 bản ghi — khớp với luật "bộ ảnh rỗng t
 **Cột phục vụ việc khác:** "Link HD" và "Hợp đồng chi tiết" (BB-203 — link hoá
 đơn ở màn quản trị), "Nhãn Dán" (Sinh Nhật Gấp · Thêm Tên · Đã Nhắc Chọn · Đã in
 ảnh phóng), "Trạng thái nhắc duyệt" (Đã nhắc), "Link app" (app đã ghi sang).
+
+## Chủ studio chốt (24/09/2026)
+
+1. **Thang màu ↔ cột "Cảnh Báo":** xanh = An Toàn · cam = Cảnh Báo · đỏ = Nguy
+   Hiểm · tím = Phải Xong Trong Ngày.
+2. **App KHÔNG ghi cột "Cảnh Báo" lên Lark** — "hiện tại Lark đã set tự động cho
+   việc đó nên không cần ghi đè lên". Hệ quả cho BB-200: app ĐỌC trạng thái và
+   mức cảnh báo từ Lark rồi hiện lại (màn quản trị, màn khách), không tự tính
+   màu song song — hai nơi tính một thứ là có ngày lệch nhau.
+   Còn phải hỏi: các tin NHẮC (CSKH, quản lý, 17:00) Lark đã tự gửi chưa — nếu
+   rồi thì app không gửi trùng.
+3. **Nhánh B (làm trước ảnh phóng/album):** để mở — "CSKH đang làm việc trên
+   Lark, nên sẽ để mở để hoàn thiện sau".
