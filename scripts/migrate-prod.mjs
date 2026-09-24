@@ -93,6 +93,7 @@ const DAY = [
   "0062-anh-trong-album-mua-them.sql",
   // 0063 để dành cho agent khác (đang làm song song trên nhánh khác).
   "0064-dem-luot-mo-link.sql",
+  "0065-gia-anh-chon-them-mac-dinh.sql",
 ];
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */

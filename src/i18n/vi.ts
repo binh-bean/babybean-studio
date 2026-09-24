@@ -316,6 +316,7 @@ export const vi = {
         "gallery.watermark_default": "Đóng dấu mờ",
         "gallery.allow_download_default": "Cho khách tải ảnh",
         "photo.expected_long_edge_px": "Cạnh dài ảnh xem trước (px)",
+        "gallery.extra_photo_price_default": "Giá một ảnh chọn thêm (đ)",
         "gallery.banner_image_url": "Ảnh quảng cáo trong màn xem ảnh",
         "gallery.banner_link_url": "Bấm vào ảnh quảng cáo thì mở trang nào",
         "chat.page_url": "Trang nhắn tin của studio",
@@ -330,6 +331,8 @@ export const vi = {
         "gallery.watermark_default": "Ảnh xem trước có đóng dấu mờ hay không.",
         "gallery.allow_download_default": "Khách có tải được ảnh xem trước về máy không.",
         "photo.expected_long_edge_px": "Ảnh xem trước dài bao nhiêu điểm ảnh ở cạnh lớn nhất.",
+        "gallery.extra_photo_price_default":
+          "Áp dụng khi TẠO bộ ảnh mới, chưa chọn gói hoặc gói không có giá riêng. Bộ ảnh đã có giữ nguyên giá đã chốt lúc tạo, đổi ở đây không đụng tới.",
         "gallery.banner_image_url":
           "Dải quảng cáo hiện ở khoảng trống bên tấm ảnh khi ba mẹ xem lớn, chỉ trên màn hình rộng. Để trống thì không hiện gì.",
         "gallery.banner_link_url":

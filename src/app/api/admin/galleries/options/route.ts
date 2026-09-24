@@ -15,6 +15,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { soNgayHanChot } from "@/lib/gallery/han-chot";
+import { giaAnhChonThemMacDinh } from "@/lib/gallery/gia-anh-chon-them";
 
 export const runtime = "nodejs";
 
@@ -61,6 +62,13 @@ export async function GET(): Promise<Response> {
        * người tạo bộ ảnh thường là CSKH.
        */
       macDinhHanChotNgay: await soNgayHanChot(admin),
+      /**
+       * Giá một ảnh chọn thêm mặc định, cùng lý do và cùng cách với
+       * `macDinhHanChotNgay` ở trên (BB-214c). Thuật sĩ vẫn ưu tiên giá của
+       * gói đã chọn khi có (xem `create-gallery-wizard.tsx`), số này chỉ là
+       * giá trị TRƯỚC khi chọn gói / khi gói không có giá riêng.
+       */
+      macDinhGiaAnhChonThem: await giaAnhChonThemMacDinh(admin),
       branches: branches ?? [],
       packages: (packages ?? []).map((p) => ({
         id: p.id,
