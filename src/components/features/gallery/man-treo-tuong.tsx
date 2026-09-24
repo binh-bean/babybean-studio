@@ -232,6 +232,19 @@ export function ManTreoTuong({
     return () => ro.disconnect();
   }, [mo]);
 
+  // Esc đóng màn này — bắt ở pha capture và chặn lan, vì màn xem lớn nằm ngay
+  // dưới cũng nghe Esc: không chặn thì một lần bấm đóng luôn cả hai lớp.
+  useEffect(() => {
+    if (!mo) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      onDong();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [mo, onDong]);
+
   // Khoá cuộn trang nền — màn này chiếm toàn màn hình.
   useEffect(() => {
     if (!mo) return;
@@ -390,7 +403,12 @@ export function ManTreoTuong({
   const style = lopChatLieu(chatLieu);
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-black md:flex-row">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Xem ảnh trên tường"
+      className="fixed inset-0 z-[60] flex flex-col bg-black md:flex-row"
+    >
       {/* ẢNH PHÒNG TRÀN KHUNG */}
       <div
         ref={containerRef}
