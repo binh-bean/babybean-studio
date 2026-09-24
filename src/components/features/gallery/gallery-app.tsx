@@ -59,6 +59,8 @@ interface GalleryApiResponse {
   subfolders: string[];
   /** Ảnh bìa CSKH đã chọn; `null` thì bìa lấy tấm đầu tiên. */
   coverPhotoId?: string | null;
+  /** Tiêu đề bìa CSKH tự viết (BB-215); `null` thì bìa rơi về tên bé. */
+  coverHeadline?: string | null;
   /** Vai trò của link đang mở: owner, co_editor, suggester hoặc viewer. */
   myRole?: string;
   selection: {
@@ -1023,6 +1025,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       {/* MÀN 1 — ẢNH BÌA */}
       <BiaBoAnh
         anhBia={anhBia}
+        coverHeadline={gallery.coverHeadline ?? null}
         tenBe={gallery.babyName}
         ngayChup={gallery.shootDate}
         chiNhanh={gallery.branch.name}

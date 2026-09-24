@@ -40,7 +40,10 @@ export async function GET(
       // BB-150 thêm bốn cột cuối: màn chi tiết phải cho thấy ảnh đến từ thư mục
       // nào. Viết liền một dòng vì Supabase suy kiểu từ CHÍNH chuỗi literal này —
       // nối chuỗi là mất kiểu, và cả tệp đổ lỗi "GenericStringError".
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error")
+      // BB-215 thêm ba cột cuối: khối "Bìa bộ ảnh" cần biết bìa đang chọn và
+      // baby_id để suy tên bé — cùng luật viết liền một dòng như BB-150 ở trên
+      // vì Supabase suy kiểu từ chuỗi literal.
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, baby_id")
       .eq("id", galleryId)
       .single();
 
@@ -130,6 +133,18 @@ export async function GET(
     const dueAmount = Number(primarySel?.snapshot_extra_amount ?? 0);
     const paidAmount = (payRows ?? []).reduce((t, r) => t + Number(r.amount), 0);
 
+    // BB-215: tên bé cho khối "Bìa bộ ảnh" — cùng cách lấy với /api/g/gallery
+    // (nickname ưu tiên hơn họ tên đầy đủ), để chip mẫu chữ và ô xem trước
+    // khớp với đúng cái màn khách sẽ thấy.
+    const { data: baby } = gallery.baby_id
+      ? await admin.from("babies").select("full_name, nickname").eq("id", gallery.baby_id).maybeSingle()
+      : { data: null };
+    const { data: branch } = await admin
+      .from("branches")
+      .select("name")
+      .eq("id", gallery.branch_id)
+      .maybeSingle();
+
     return ok({
       galleryId: gallery.id,
       photoCount: gallery.photo_count,
@@ -147,6 +162,12 @@ export async function GET(
       syncError: gallery.sync_error ?? null,
       title: gallery.title,
       status: gallery.status,
+      // BB-215: dữ liệu cho khối "Bìa bộ ảnh".
+      coverPhotoId: gallery.cover_photo_id ?? null,
+      coverHeadline: gallery.cover_headline ?? null,
+      welcomeMessage: gallery.welcome_message ?? null,
+      babyName: baby?.nickname || baby?.full_name || null,
+      branchName: branch?.name ?? null,
       contractCodes: gallery.lark_contract_codes ?? [],
       extraPhotoPrice: Number(gallery.extra_photo_price ?? 0),
       quotaKnown: summary.quotaKnown,
