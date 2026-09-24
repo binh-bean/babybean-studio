@@ -47,11 +47,10 @@ button:disabled,
   to { opacity: 1; transform: scale(1); }
 }
 
-/* Tim bật lên khi chạm hai lần vào ảnh trong màn xem lớn. */
-@keyframes tim-bat {
-  0% { opacity: 0; transform: scale(0.4); }
-  25% { opacity: 1; transform: scale(1.12); }
-  45% { transform: scale(0.96); }
-  70% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.05); }
-}
+/* BB-210 (24/09/2026): bỏ hiệu ứng tim bật khi chạm hai lần — chủ studio xếp
+   PHÓNG TO vào P0, và chạm hai lần là cử chỉ mọi trình xem ảnh ba mẹ đã quen
+   (Ảnh của iPhone, Google Photos) dùng để phóng, không phải để thả tim. Nút
+   tim to ở đáy màn xem lớn vẫn là chỗ chọn ảnh chính. Từng có
+   `@keyframes tim-bat` ở đây (BB-180, 23/09/2026) — gỡ cùng lúc với
+   `thaTimNhanh` trong photo-lightbox.tsx.
+*/
