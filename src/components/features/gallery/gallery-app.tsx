@@ -27,7 +27,7 @@ import {
 import { Smartphone, Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { buildHeartPayload } from "@/lib/selection/heart-payload";
+import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, AlertCircle, Info, Lock } from "lucide-react";
 import { vi } from "@/i18n";
@@ -589,9 +589,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         const res = await fetch("/api/g/selection", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ops: [{ photoId: photo.id, retouchNote: ghiChu.trim() || null }],
-          }),
+          body: JSON.stringify(buildGhiChuPayload(photo.id, ghiChu, crypto.randomUUID())),
         });
         if (!res.ok) return false;
         setPhotos((truoc) =>

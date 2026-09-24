@@ -50,3 +50,19 @@ export function buildHeartPayload(
     ops: [{ photoId, mark: isCurrentlySelected ? null : "selected" }],
   };
 }
+
+/**
+ * Lưu ghi chú cho thợ chỉnh ảnh của một tấm (BB-180).
+ *
+ * Tách ra đây vì bản cũ tự viết thân yêu cầu ngay trong gallery-app và QUÊN
+ * `clientOpId` — máy chủ bắt buộc trường này, nên mọi lần lưu ghi chú đều bị
+ * trả 400 và ba mẹ thấy "Chưa lưu được ghi chú" (BB-230 E-3 bắt được,
+ * 24/09/2026). Chuỗi rỗng/toàn dấu cách nghĩa là xoá ghi chú → null.
+ */
+export function buildGhiChuPayload(
+  photoId: string,
+  ghiChu: string,
+  clientOpId: string,
+): { clientOpId: string; ops: [{ photoId: string; retouchNote: string | null }] } {
+  return { clientOpId, ops: [{ photoId, retouchNote: ghiChu.trim() || null }] };
+}
