@@ -5,6 +5,7 @@ import { ReviewPanel, type ReviewData } from "@/components/features/gallery/revi
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
+import { ManTreoTuong } from "@/components/features/gallery/man-treo-tuong";
 import { CuaHang } from "@/components/features/gallery/cua-hang";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
@@ -293,6 +294,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [moKhoaChon, setMoKhoaChon] = useState(false);
   /** Cửa hàng mua thêm — mở từ nút riêng, không nằm cuối trang. */
   const [moCuaHang, setMoCuaHang] = useState(false);
+  /**
+   * BB-217 — màn "treo ảnh của con lên tường", mở từ nút trong bảng sản phẩm
+   * của màn xem ảnh lớn. Nhớ ID ảnh đang xem lúc bấm, không phải chỉ true/
+   * false: màn treo tường cho lướt sang tấm khác trong danh sách đã chọn, và
+   * lúc đóng lại thì màn xem ảnh lớn phải quay về ĐÚNG tấm ba mẹ đang xem
+   * trước đó, không nhảy về tấm đầu.
+   */
+  const [manTreoTuongTuAnh, setManTreoTuongTuAnh] = useState<string | null>(null);
 
   const daChotChoXacNhan = gallery?.status === "submitted" && !moKhoaChon;
 
@@ -1954,6 +1963,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
               onDatMuaThem={(productId, soLuong) =>
                 void datSoLuongMuaThem(productId, soLuong, anh.id)
               }
+              // BB-217 — chỉ hiện lối vào màn treo tường khi tấm đang xem đã
+              // được chọn (đúng đề bài) và danh mục thật sự có ảnh in để treo.
+              onXemTuong={
+                anh.mark === "selected" &&
+                (gallery.addons?.catalogue ?? []).some((sp) => sp.nhom === "anh_in")
+                  ? () => setManTreoTuongTuAnh(anh.id)
+                  : undefined
+              }
             />
           )}
         />
@@ -1971,6 +1988,52 @@ export function GalleryApp({ token }: GalleryAppProps) {
           onPhongTo={onPhongToTuSoSanh}
           daChon={soAnhDaChon}
           hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
+        />
+      )}
+
+      {/* BB-217 — màn "treo ảnh của con lên tường", toàn màn hình. */}
+      {manTreoTuongTuAnh && (
+        <ManTreoTuong
+          mo
+          onDong={() => setManTreoTuongTuAnh(null)}
+          anh={anhDaChonHopThoai.map((p) => ({
+            id: p.id,
+            fileName: p.fileName,
+            width: p.width,
+            height: p.height,
+          }))}
+          chiSoBanDau={Math.max(
+            0,
+            anhDaChonHopThoai.findIndex((p) => p.id === manTreoTuongTuAnh)
+          )}
+          danhMuc={(gallery.addons?.catalogue ?? [])
+            .filter((sp) => sp.nhom === "anh_in" || sp.nhom === "khung")
+            .map((sp) => ({
+              productId: sp.productId,
+              name: sp.name,
+              material: sp.material,
+              size: sp.size,
+              unitPrice: sp.unitPrice,
+              nhom: sp.nhom as NhomSanPham,
+            }))}
+          suatTrongGoi={suatInTrongGoi.map((sp) => ({
+            galleryItemId: sp.galleryItemId,
+            name: sp.name,
+            quantity: sp.quantity,
+          }))}
+          placements={placements}
+          addonsDaDat={(gallery.addons?.items ?? []).map((m) => ({
+            productId: m.productId,
+            photoId: m.photoId ?? null,
+            quantity: m.quantity,
+          }))}
+          khoa={isLocked}
+          duocChon={duocChon}
+          dangLuu={placing}
+          onDatVaoGoi={(photoId, galleryItemId, dat) => changePlacement(photoId, galleryItemId, dat)}
+          onDatMuaThem={(photoId, productId, soLuong) =>
+            void datSoLuongMuaThem(productId, soLuong, photoId)
+          }
         />
       )}
 

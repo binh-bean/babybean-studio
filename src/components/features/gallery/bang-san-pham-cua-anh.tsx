@@ -104,6 +104,13 @@ export interface BangSanPhamCuaAnhProps {
   onMuaAlbum: (productId: string, soLuong: number) => void;
   /** Album trong bảng giá, để ba mẹ mua thêm một cuốn. */
   albumBanDuoc: MonMuaThem[];
+  /**
+   * BB-217 — mở màn "treo ảnh của con lên tường" cho đúng tấm đang xem.
+   *
+   * `undefined` thì nút không hiện (ví dụ danh mục chưa có sản phẩm ảnh in
+   * nào để treo — không có gì để ướm lên tường).
+   */
+  onXemTuong?: () => void;
 }
 
 export function BangSanPhamCuaAnh({
@@ -119,6 +126,7 @@ export function BangSanPhamCuaAnh({
   onDatVaoAlbum,
   onDatMuaThem,
   onMuaAlbum,
+  onXemTuong,
 }: BangSanPhamCuaAnhProps) {
   const [nhomDangMo, setNhomDangMo] = React.useState<NhomSanPham | null>(null);
 
@@ -136,6 +144,26 @@ export function BangSanPhamCuaAnh({
 
   return (
     <div className="space-y-4 text-white">
+      {/*
+        BB-217 — lối vào chính của màn bán hàng "treo lên tường". Chủ studio:
+        ba mẹ mua ảnh treo tường khi THẤY nó trên tường nhà mình, nên nút này
+        phải nổi bật, ở TRÊN mọi danh mục khác — không chờ cuộn xuống mới thấy.
+        Chỉ hiện khi có sản phẩm ảnh in để treo (không có thì màn kia trống trơn).
+      */}
+      {onXemTuong && (
+        <button
+          type="button"
+          onClick={onXemTuong}
+          className="flex w-full items-center justify-between gap-2 rounded-xl bg-gradient-to-r from-amber-500/25 to-rose-500/20 px-3.5 py-3 text-left ring-1 ring-amber-300/40 transition hover:from-amber-500/35 hover:to-rose-500/30"
+        >
+          <span>
+            <span className="block text-sm font-semibold">Xem trên tường nhà mình</span>
+            <span className="block text-[11px] text-white/70">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
+          </span>
+          <span className="shrink-0 text-base leading-none">→</span>
+        </button>
+      )}
+
       {/* ---------- 1. TRONG GÓI ---------- */}
       {suatTrongGoi.length > 0 && (
         <section>
