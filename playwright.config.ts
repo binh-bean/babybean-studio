@@ -19,7 +19,11 @@ try {
   // .env.local may not exist in CI
 }
 
-const PORT = 3099;
+// Cổng chọn được qua PW_PORT (mặc định 3099). Có từ 24/09/2026 khi nhiều agent
+// chạy phép thử trình duyệt song song, mỗi agent một worktree: cùng một cổng
+// thì agent sau dùng lại máy chủ của agent trước (reuseExistingServer) — tức
+// chạy phép thử trên MÃ CỦA NGƯỜI KHÁC mà vẫn báo xanh.
+const PORT = Number(process.env.PW_PORT) || 3099;
 
 export default defineConfig({
   testDir: "./tests/e2e",
