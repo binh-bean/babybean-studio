@@ -144,7 +144,7 @@ export const en: Messages = {
     submitCta: "Submit selection",
     submitConfirmTitle: "Confirm selection submission",
     submitConfirm: "You will not be able to change this afterwards. Are you sure?",
-    submitAgree: "I confirm this list is final",
+    submitAgree: "I confirm the information above is correct",
     parentName: "Parent name",
     parentNamePlaceholder: "Enter mother or father's name",
 

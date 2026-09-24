@@ -17,12 +17,14 @@
  * Bấm vào một buổi thì máy chủ ký lại phiên cho trỏ vào bộ ảnh đó, rồi màn
  * hình tải lại theo đường cũ. Không có nhánh hiển thị nào mới phía sau: từ
  * giây đó trở đi ba mẹ đang ở đúng màn chọn ảnh vẫn chạy lâu nay.
+ *
+ * BB-212 — đổi sang ngôn ngữ "cuốn album kỷ niệm" (font-display Fraunces,
+ * nền kem, nút viên tròn màu mực). Hành vi giữ nguyên.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { Camera, ChevronRight, AlertCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui/utils";
 
 export interface BuoiChupTomTat {
@@ -106,7 +108,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
 
   if (dangTai) {
     return (
-      <div className="min-h-[80dvh] flex flex-col items-center justify-center p-6 gap-3">
+      <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-3 bg-background p-6 text-foreground">
         <Spinner className="h-8 w-8 text-primary" />
         <p className="text-sm text-muted-foreground">Đang mở album của ba mẹ…</p>
       </div>
@@ -117,27 +119,33 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
   // trấn an và chỉ việc tiếp theo, chứ không để ba mẹ tưởng mất ảnh.
   if (danhSach.length === 0 && !loi) {
     return (
-      <div className="min-h-[80dvh] flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-        <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-4">
-          <Camera className="w-6 h-6" />
+      <div className="mx-auto flex min-h-[80dvh] max-w-md flex-col items-center justify-center bg-background p-6 text-center text-foreground">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-primary">
+          <Camera className="h-6 w-6" />
         </div>
-        <h1 className="text-xl font-bold mb-2">Album đang được chuẩn bị</h1>
-        <p className="text-sm text-muted-foreground mb-6">
+        <h1 className="font-display text-2xl font-light">Album đang được chuẩn bị</h1>
+        <p className="mb-6 mt-2 text-sm text-muted-foreground">
           Studio đang sắp ảnh buổi chụp của bé. Ba mẹ mở lại link này sau một chút giúp nhé,
           link không hết hạn đâu ạ.
         </p>
-        <Button onClick={() => void tai()} variant="outline">
+        <button
+          type="button"
+          onClick={() => void tai()}
+          className="h-11 rounded-full border border-border px-6 text-sm font-medium transition hover:bg-surface-2"
+        >
           Tải lại
-        </Button>
+        </button>
       </div>
     );
   }
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
-      <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
+      <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
         <header className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Album của bé</h1>
+          <h1 className="font-display text-3xl font-light tracking-tight sm:text-4xl">
+            Album của bé
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Ba mẹ chọn buổi chụp muốn xem ạ. Link này là của riêng gia đình mình và không hết hạn,
             ba mẹ lưu lại để xem ảnh bất cứ lúc nào.
@@ -145,7 +153,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
         </header>
 
         {loi && (
-          <div className="mb-5 flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          <div className="mb-5 flex items-start gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{loi}</span>
           </div>
@@ -165,13 +173,13 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
                   className={cn(
                     // Ô chạm cao ≥ 88px: ba mẹ bấm trên điện thoại một tay,
                     // thường là đang bế bé.
-                    "group flex w-full items-center gap-4 rounded-2xl border bg-surface/80 p-3 text-left transition-all",
+                    "group flex w-full items-center gap-4 rounded-2xl border border-border bg-surface p-3 text-left transition-all",
                     "min-h-[88px] touch-manipulation focus:outline-hidden",
                     dangMo !== null && !dangMoBuoiNay && "opacity-50",
                     buoi.dangXem ? "border-primary/50 ring-1 ring-primary/30" : "hover:border-foreground/20",
                   )}
                 >
-                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-muted sm:h-20 sm:w-20">
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-2 sm:h-20 sm:w-20">
                     {buoi.anhBiaId ? (
                       /* Ảnh đi qua proxy, không lộ id tệp bên Drive. */
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -189,13 +197,13 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold">{buoi.ten}</p>
+                    <p className="truncate font-medium">{buoi.ten}</p>
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       {ngay ? `Chụp ngày ${ngay}` : "Chưa ghi ngày chụp"}
                       {" · "}
                       {buoi.soAnh} ảnh
                     </p>
-                    <p className="mt-1 text-xs text-primary">{buoi.nhanTrangThai}</p>
+                    <p className="mt-1 text-xs text-moss">{buoi.nhanTrangThai}</p>
                   </div>
 
                   {dangMoBuoiNay ? (

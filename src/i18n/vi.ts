@@ -144,7 +144,8 @@ export const vi = {
     submitCta: "Chốt danh sách",
     submitConfirmTitle: "Xác nhận chốt danh sách",
     submitConfirm: "Sau khi chốt, ba mẹ không đổi được nữa. Chắc chắn chứ ạ?",
-    submitAgree: "Em xác nhận danh sách trên là cuối cùng",
+    // BB-212 — chủ studio 22/09/2026: "dấu tích ghi xác nhận đúng thông tin".
+    submitAgree: "Tôi xác nhận các thông tin trên là đúng",
     parentName: "Tên ba/mẹ xác nhận",
     parentNamePlaceholder: "Nhập tên ba hoặc mẹ",
 
