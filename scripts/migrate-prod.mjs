@@ -91,6 +91,9 @@ const DAY = [
   "0060-chot-chua-phai-la-khoa.sql",
   "0061-mua-them-gan-vao-anh-cu-the.sql",
   "0062-anh-trong-album-mua-them.sql",
+  "0063-chu-tren-bia.sql",
+  "0064-dem-luot-mo-link.sql",
+  "0065-gia-anh-chon-them-mac-dinh.sql",
 ];
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */

@@ -5,9 +5,10 @@
  *
  * OWNER: DEV-FE.
  *
- * Chín con số dưới đây điều khiển app thật: hạn chốt, ngày nhắc khách, hạn
- * link, watermark, cho tải, link Messenger, webhook Lark. Trước màn này, đổi
- * một con số nghĩa là có người gõ SQL thẳng vào cơ sở dữ liệu.
+ * Những con số dưới đây điều khiển app thật: hạn chốt, ngày nhắc khách, hạn
+ * link, watermark, cho tải, giá ảnh chọn thêm, link Messenger, webhook Lark.
+ * Trước màn này, đổi một con số nghĩa là có người gõ SQL thẳng vào cơ sở
+ * dữ liệu.
  *
  * Xếp theo VIỆC, không theo tên khoá: chủ studio nghĩ "album" và "ảnh", không
  * nghĩ `gallery.default_due_days`.
@@ -93,7 +94,12 @@ export function SettingsManager() {
         .filter(Boolean)
         .map(Number);
     }
-    if (c.key.endsWith("_days") || c.key.endsWith("_px")) return Number(v);
+    if (
+      c.key.endsWith("_days") ||
+      c.key.endsWith("_px") ||
+      c.key === "gallery.extra_photo_price_default"
+    )
+      return Number(v);
     return v.trim();
   }
 

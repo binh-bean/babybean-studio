@@ -143,8 +143,11 @@ export const vi = {
     reviewUnusedQuota: "Ba mẹ còn {n} ảnh miễn phí chưa dùng. Chốt luôn ạ?",
     submitCta: "Chốt danh sách",
     submitConfirmTitle: "Xác nhận chốt danh sách",
-    submitConfirm: "Sau khi chốt, ba mẹ không đổi được nữa. Chắc chắn chứ ạ?",
-    submitAgree: "Em xác nhận danh sách trên là cuối cùng",
+    // Sửa 24/09/2026: câu cũ "sau khi chốt không đổi được nữa" sai từ quyết định
+    // 22/09 (migration 0060) — chốt xong vẫn chọn thêm/đổi được tới khi CSKH xác nhận.
+    submitConfirm: "Chốt xong, bên mình sẽ kiểm và xác nhận. Trước lúc đó ba mẹ vẫn chọn thêm hoặc đổi ảnh được.",
+    // BB-212 — chủ studio 22/09/2026: "dấu tích ghi xác nhận đúng thông tin".
+    submitAgree: "Tôi xác nhận các thông tin trên là đúng",
     parentName: "Tên ba/mẹ xác nhận",
     parentNamePlaceholder: "Nhập tên ba hoặc mẹ",
 
@@ -316,6 +319,7 @@ export const vi = {
         "gallery.watermark_default": "Đóng dấu mờ",
         "gallery.allow_download_default": "Cho khách tải ảnh",
         "photo.expected_long_edge_px": "Cạnh dài ảnh xem trước (px)",
+        "gallery.extra_photo_price_default": "Giá một ảnh chọn thêm (đ)",
         "gallery.banner_image_url": "Ảnh quảng cáo trong màn xem ảnh",
         "gallery.banner_link_url": "Bấm vào ảnh quảng cáo thì mở trang nào",
         "chat.page_url": "Trang nhắn tin của studio",
@@ -330,6 +334,8 @@ export const vi = {
         "gallery.watermark_default": "Ảnh xem trước có đóng dấu mờ hay không.",
         "gallery.allow_download_default": "Khách có tải được ảnh xem trước về máy không.",
         "photo.expected_long_edge_px": "Ảnh xem trước dài bao nhiêu điểm ảnh ở cạnh lớn nhất.",
+        "gallery.extra_photo_price_default":
+          "Áp dụng khi TẠO bộ ảnh mới, chưa chọn gói hoặc gói không có giá riêng. Bộ ảnh đã có giữ nguyên giá đã chốt lúc tạo, đổi ở đây không đụng tới.",
         "gallery.banner_image_url":
           "Dải quảng cáo hiện ở khoảng trống bên tấm ảnh khi ba mẹ xem lớn, chỉ trên màn hình rộng. Để trống thì không hiện gì.",
         "gallery.banner_link_url":
@@ -540,6 +546,7 @@ export const vi = {
       description: "Chọn định dạng phù hợp để chuyển cho Người Photoshop.",
       formatLightroom: "Lightroom (.txt / danh sách tên file)",
       formatCsv: "Bảng tính Excel / CSV kèm ghi chú",
+      formatChiTiet: "Văn bản chi tiết cho CSKH (.txt)",
       formatJson: "Dữ liệu JSON đầy đủ",
       copyClipboard: "Sao chép vào clipboard",
       copiedNotice: "Đã sao chép danh sách vào bộ nhớ tạm",
@@ -571,10 +578,16 @@ export const vi = {
   },
   landing: {
     studioName: "BabyBean Studio",
-    tagline: "Nơi lưu giữ những khoảnh khắc đáng yêu của bé",
+    tagline: "Nơi lưu giữ từng khoảnh khắc đáng yêu của con, gói ghém thành một cuốn album để dành",
+    branchesHeading: "Các chi nhánh",
     lostBefore: "Ảnh của bé được gửi qua ",
     lostStrong: "link riêng",
-    lostAfter: ". Chưa nhận được hoặc link không mở được, gọi giúp bên mình theo số ở dưới.",
+    // Ba biến thể, chọn theo dữ liệu THẬT của chi nhánh (trang gốc). Soát
+    // 24/09/2026: câu cũ bảo "gọi theo số ở dưới" trong khi cả 3 chi nhánh
+    // chưa điền hotline — dưới đó không có số nào.
+    lostAfter: ". Chưa nhận được hoặc link không mở được, ba mẹ gọi giúp bên mình theo số ở dưới nhé.",
+    lostAfterNhanTin: ". Chưa nhận được hoặc link không mở được, ba mẹ nhắn tin cho studio ở nút phía dưới nhé.",
+    lostAfterChiNhanh: ". Chưa nhận được hoặc link không mở được, ba mẹ liên hệ chi nhánh đã chụp giúp bên mình nhé.",
     messageCta: "Nhắn tin cho studio",
     loginCta: "Nhân viên đăng nhập",
   },

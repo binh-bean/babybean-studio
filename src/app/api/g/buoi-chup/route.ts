@@ -227,11 +227,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     // Ghi trượt thật sự không quan trọng: chỉ là timestamp cập nhật lần xem cuối,
-    // hụt thì lần sau cập nhật, không được chặn luồng khách vào xem ảnh.
-    await admin
+    // hụt thì lần sau cập nhật, không được chặn luồng khách vào xem ảnh. Vẫn
+    // phải bắt lỗi đúng dạng (BB-190) — nuốt lỗi im lặng khác với chủ ý bỏ qua
+    // một lỗi đã bắt được.
+    const { error: capNhatLoiErr } = await admin
       .from("share_links")
       .update({ last_viewed_at: new Date().toISOString() })
       .eq("id", session.shareLinkId);
+    if (capNhatLoiErr) {
+      console.error("[share_links] Cập nhật last_viewed_at hụt:", capNhatLoiErr);
+    }
 
     const { token, expiresAt } = await signGallerySession({
       customerId: session.customerId,

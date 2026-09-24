@@ -13,6 +13,8 @@ import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
+import { HuongDanThemManHinh } from "@/components/features/gallery/huong-dan-them-man-hinh";
+import { Smartphone } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload } from "@/lib/selection/heart-payload";
@@ -21,7 +23,6 @@ import { AlertTriangle, AlertCircle, Info, Lock } from "lucide-react";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { ContractBreakdown, type ContractItem, formatCurrencyVND } from "@/components/ui/contract-breakdown";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import type { PhotoPublic } from "@/types/domain";
 
@@ -35,6 +36,8 @@ interface GalleryApiResponse {
   welcomeMessage: string | null;
   status: string;
   babyName: string | null;
+  /** BB-212: tên khách hàng đứng bộ ảnh — điền sẵn ô "người xác nhận" lúc chốt. */
+  customerName?: string | null;
   shootDate: string | null;
   branch: {
     name: string;
@@ -56,6 +59,8 @@ interface GalleryApiResponse {
   subfolders: string[];
   /** Ảnh bìa CSKH đã chọn; `null` thì bìa lấy tấm đầu tiên. */
   coverPhotoId?: string | null;
+  /** Tiêu đề bìa CSKH tự viết (BB-215); `null` thì bìa rơi về tên bé. */
+  coverHeadline?: string | null;
   /** Vai trò của link đang mở: owner, co_editor, suggester hoặc viewer. */
   myRole?: string;
   selection: {
@@ -195,6 +200,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
   }, [chayTai, photos]);
   const [filter, setFilter] = useState<"all" | "selected" | "unselected">("all");
   const [selectedSubfolder, setSelectedSubfolder] = useState<string>("");
+  // BB-213 — tấm trượt "Lưu app ra màn hình chính", mở từ nút ở đầu trang.
+  const [moHuongDanLuuApp, setMoHuongDanLuuApp] = useState(false);
 
   const [selectionCounts, setSelectionCounts] = useState({
     selectedCount: 0,
@@ -220,6 +227,20 @@ export function GalleryApp({ token }: GalleryAppProps) {
    * viết (BB-053).
    */
   const [tenXacNhan, setTenXacNhan] = useState("");
+
+  /**
+   * BB-212 — điền sẵn tên người xác nhận bằng tên khách hàng của bộ.
+   *
+   * Chủ studio 22/09/2026: "tên người xác nhận là tên khách hàng trong bộ".
+   * Chỉ điền khi ô còn TRỐNG (`prev || …`) — ba mẹ gõ tay rồi thì giữ nguyên,
+   * không để lần tải lại (sau khi mua thêm, ví dụ) ghi đè chữ họ vừa sửa.
+   * Thiếu tên khách thì ô vẫn trống như trước — không tự bịa ra một cái tên.
+   */
+  useEffect(() => {
+    if (gallery?.customerName) {
+      setTenXacNhan((prev) => prev || gallery.customerName!);
+    }
+  }, [gallery?.customerName]);
   /** Hộp "xin sửa lại" — chỉ dùng khi bộ ảnh đã khoá. */
   const [xinSuaLai, setXinSuaLai] = useState(false);
   const [lyDoSuaLai, setLyDoSuaLai] = useState("");
@@ -688,6 +709,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
   );
 
   /**
+   * BB-212 — dải ảnh nhỏ trong hộp "Chốt danh sách": những tấm ba mẹ SẮP chốt.
+   *
+   * Đây là lúc cuối để ba mẹ thấy lại đúng những gì mình đã thả tim trước khi
+   * bấm nút không sửa được nữa. Bộ thật tới 1.235 tấm nên chỉ hiện 40 tấm đầu
+   * kèm số còn lại — cuộn ngang cả nghìn ảnh trong một hộp thoại là vô ích.
+   */
+  const anhDaChonHopThoai = useMemo(
+    () => photos.filter((p) => p.mark === "selected" || p.isFavorite),
+    [photos],
+  );
+
+  /**
    * "Tấm này đang làm mấy sản phẩm" — cho dấu ngọc trên lưới ảnh.
    *
    * Gộp cả ba đường một tấm ảnh có thể biến thành hàng:
@@ -866,9 +899,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
     }));
   }, [gallery]);
 
+  // BB-212 — màn đang tải, đổi sang ngôn ngữ "cuốn album kỷ niệm": nền kem
+  // (`bg-background` bên trong `.giao-dien-khach`), chữ mực, không còn nền
+  // trắng lạnh của khung quản trị.
   if (loading) {
     return (
-      <div className="min-h-[80dvh] flex flex-col items-center justify-center p-6 gap-3">
+      <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-3 bg-background p-6 text-foreground">
         <Spinner className="h-8 w-8 text-primary" />
         <p className="text-sm text-muted-foreground">{vi.common.loading}</p>
       </div>
@@ -882,21 +918,26 @@ export function GalleryApp({ token }: GalleryAppProps) {
     return <DanhSachBuoiChup onDaChonBuoi={() => void loadGallery()} />;
   }
 
+  // BB-212 — màn lỗi / link hết hạn / không tìm thấy, cùng ngôn ngữ mới.
   if (error || !gallery) {
     return (
-      <div className="min-h-[80dvh] flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-        <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-4">
-          <AlertCircle className="w-6 h-6" />
+      <div className="mx-auto flex min-h-[80dvh] max-w-md flex-col items-center justify-center bg-background p-6 text-center text-foreground">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertCircle className="h-6 w-6" />
         </div>
-        <h1 className="text-xl font-bold mb-2">
+        <h1 className="font-display text-2xl font-light">
           {error?.code === "LINK_EXPIRED" ? vi.gallery.expiredTitle : vi.gallery.notFoundTitle}
         </h1>
-        <p className="text-sm text-muted-foreground mb-6">
+        <p className="mb-6 mt-2 text-sm text-muted-foreground">
           {error?.message || vi.gallery.notFoundBody}
         </p>
-        <Button onClick={() => window.location.reload()} variant="outline">
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="h-11 rounded-full border border-border px-6 text-sm font-medium transition hover:bg-surface-2"
+        >
           {vi.common.retry}
-        </Button>
+        </button>
       </div>
     );
   }
@@ -984,6 +1025,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       {/* MÀN 1 — ẢNH BÌA */}
       <BiaBoAnh
         anhBia={anhBia}
+        coverHeadline={gallery.coverHeadline ?? null}
         tenBe={gallery.babyName}
         ngayChup={gallery.shootDate}
         chiNhanh={gallery.branch.name}
@@ -1033,6 +1075,25 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   {vi.gallery.messageStudio}
                 </a>
               )}
+              {/*
+                BB-213 — "Lưu app": mở tấm hướng dẫn thêm ra màn hình chính,
+                đúng theo máy khách đang dùng (huong-dan-them-man-hinh.tsx).
+                Dưới 640px chỉ còn biểu tượng: soát khi gộp (24/09/2026) trên
+                màn 375px, ba nút có chữ ("Nhắn cho studio", "Lưu app", tải
+                ảnh) đẩy tên bé còn đúng "Minh…". Tên bé là thứ ba mẹ nhìn
+                để biết mình đang ở đúng bộ ảnh — không được là thứ bị cắt.
+                "Nhắn cho studio" giữ chữ vì lý do ghi ngay phía trên.
+              */}
+              <button
+                type="button"
+                onClick={() => setMoHuongDanLuuApp(true)}
+                aria-label="Lưu app ra màn hình chính"
+                title="Lưu app ra màn hình chính"
+                className="inline-flex h-9 w-9 items-center justify-center gap-1.5 rounded-full border border-border text-xs font-medium transition hover:bg-surface-2 sm:w-auto sm:px-3"
+              >
+                <Smartphone className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                <span className="hidden sm:inline">Lưu app</span>
+              </button>
               {choPhepTai && photos.length > 0 && (
                 <MenuTaiAnh
                   soAnh={photos.length}
@@ -1303,11 +1364,17 @@ export function GalleryApp({ token }: GalleryAppProps) {
         </div>
       </footer>
 
+      {/*
+        BB-212 — làm lại theo ngôn ngữ "cuốn album kỷ niệm": tấm trượt từ dưới
+        lên trên điện thoại, bảng giữa màn trên máy tính (từ `sm`). Nút chính
+        viên tròn màu mực, nút phụ chỉ viền — cùng kiểu với ThanhChon/BiaBoAnh.
+      */}
       {xinSuaLai && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md space-y-4 rounded-2xl border bg-surface p-6 shadow-2xl">
-            <h3 className="text-lg font-bold">Yêu cầu sửa lại</h3>
-            <p className="text-sm leading-relaxed text-muted-foreground">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#2a2420]/55 backdrop-blur-xs sm:items-center sm:p-4">
+          <div className="w-full max-h-[88svh] overflow-y-auto rounded-t-[28px] bg-surface p-6 pb-[max(24px,env(safe-area-inset-bottom))] shadow-2xl animate-in slide-in-from-bottom duration-300 sm:max-w-md sm:rounded-3xl sm:p-7 sm:pb-7 sm:slide-in-from-bottom-4">
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
+            <h3 className="font-display text-2xl font-light">Yêu cầu sửa lại</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Bộ ảnh đã chuyển cho bên chỉnh ảnh nên ba mẹ không tự sửa được nữa. Ba mẹ ghi
               giúp muốn sửa gì, bên mình xem còn kịp không rồi báo lại ngay ạ.
             </p>
@@ -1317,149 +1384,205 @@ export function GalleryApp({ token }: GalleryAppProps) {
               maxLength={500}
               rows={3}
               placeholder="Ví dụ: em muốn đổi tấm số 12 sang tấm 15 giúp em"
-              className="h-24 w-full resize-none rounded-xl border bg-background p-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
+              className="mt-4 h-24 w-full resize-none rounded-2xl border border-border bg-background p-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
             />
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setXinSuaLai(false)} disabled={dangXin}>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setXinSuaLai(false)}
+                disabled={dangXin}
+                className="h-11 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-50"
+              >
                 {vi.common.cancel}
-              </Button>
-              <Button
+              </button>
+              <button
+                type="button"
                 onClick={() => void guiXinSuaLai()}
                 disabled={dangXin || lyDoSuaLai.trim().length === 0}
-                className="bg-primary font-bold text-primary-foreground"
+                className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
               >
+                {dangXin && <Spinner className="h-4 w-4" />}
                 Gửi cho studio
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/*
+        BB-212 — HỘP "CHỐT DANH SÁCH", làm lại theo ngôn ngữ "cuốn album kỷ
+        niệm". Tấm trượt từ dưới lên trên điện thoại, bảng giữa màn trên máy
+        tính. Thứ tự chủ studio đặt ra 22/09/2026: tên người xác nhận (điền
+        sẵn tên khách hàng), rồi TÓM TẮT (số ảnh, thiếu gì, dải ảnh đã chọn),
+        rồi mới tới ô tích "đúng thông tin" — để ba mẹ tích SAU KHI đã đọc lại,
+        không phải tích trước rồi mới thấy tóm tắt.
+      */}
       {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md bg-surface border rounded-2xl p-6 shadow-2xl space-y-4">
-            <h3 className="text-lg font-bold">{vi.gallery.submitConfirmTitle}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {vi.gallery.submitConfirm}
-            </p>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#2a2420]/55 backdrop-blur-xs sm:items-center sm:p-4">
+          <div className="flex max-h-[92svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-surface shadow-2xl animate-in slide-in-from-bottom duration-300 sm:max-w-lg sm:rounded-3xl sm:slide-in-from-bottom-4">
+            <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" aria-hidden="true" />
 
-            {/* ----------------------------------------------------------------
-                BB-180 — NHẮC chọn ảnh phóng và bìa album, KHÔNG CHẶN
-                ----------------------------------------------------------------
-                Chủ studio chốt 17/09. Khách chốt thiếu thì CSKH phải gọi lại, và
-                có ca quên hẳn — việc này đang làm studio mất tiền.
+            <div className="overflow-y-auto px-6 pb-6 pt-4 sm:p-7">
+              <h3 className="font-display text-[26px] font-light leading-tight">
+                {vi.gallery.submitConfirmTitle}
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                {vi.gallery.submitConfirm}
+              </p>
 
-                Nhưng **không chặn nút Chốt**. Khách đang cầm điện thoại, đang bế
-                con; chặn là họ bỏ dở giữa chừng. Chỉ nói rõ cái được nếu chọn
-                luôn, rồi để họ tự quyết.
-            */}
-            {sanPhamThieuAnh.length > 0 && (
-              <div className="rounded-xl border border-amber-300/60 bg-amber-50 p-3 text-xs">
-                <p className="font-semibold text-amber-900">
-                  Bạn chưa chọn ảnh cho:
-                </p>
-                <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-amber-900/90">
-                  {sanPhamThieuAnh.map((sp) => (
-                    <li key={sp.galleryItemId}>{sp.name}</li>
-                  ))}
-                </ul>
-                <p className="mt-2 leading-relaxed text-amber-900/80">
-                  Chọn luôn thì bên mình làm nhanh hơn — để sau cũng được, CSKH sẽ
-                  hỏi lại.
-                </p>
+              {/*
+                Hai ô BẮT BUỘC — máy chủ đòi từ đầu. Xem ghi chú ở chỗ khai
+                `tenXacNhan`: tên người xác nhận là tên khách hàng của bộ,
+                điền sẵn nhưng vẫn sửa được (chủ studio 22/09/2026).
+              */}
+              <div className="mt-5">
+                <label
+                  htmlFor="confirm-name-input"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  {vi.gallery.parentName}
+                </label>
+                <input
+                  id="confirm-name-input"
+                  value={tenXacNhan}
+                  onChange={(e) => setTenXacNhan(e.target.value)}
+                  placeholder={vi.gallery.parentNamePlaceholder}
+                  className="w-full rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              <div className="mt-4">
+                <label
+                  htmlFor="customer-note-input"
+                  className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  Ghi chú chung cho studio (nếu có)
+                </label>
+                <textarea
+                  id="customer-note-input"
+                  value={customerNote}
+                  onChange={(e) => setCustomerNote(e.target.value)}
+                  placeholder="Lời nhắn thêm cho thợ chỉnh sửa..."
+                  rows={3}
+                  className="h-20 w-full resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
+                />
+              </div>
+
+              {/* ---------------------------------------------------------
+                  TÓM TẮT — số ảnh, thiếu gì, và dải ảnh đã chọn.
+                  --------------------------------------------------------- */}
+              <div className="mt-5 space-y-2.5 rounded-2xl bg-surface-2 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Số ảnh đã chọn</span>
+                  <span className="font-semibold">{selectionCounts.selectedCount} ảnh</span>
+                </div>
+                {gallery.quotaKnown && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Số ảnh trong gói</span>
+                      <span>{gallery.includedQuota ?? 0} ảnh</span>
+                    </div>
+                    {selectionCounts.extraCount > 0 && (
+                      <div className="flex items-center justify-between text-heart">
+                        <span>Số ảnh chọn thêm</span>
+                        <span className="font-semibold">
+                          {selectionCounts.extraCount} ảnh · {formatCurrencyVND(selectionCounts.extraAmount)}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* ----------------------------------------------------------------
+                  BB-180 — NHẮC chọn ảnh phóng và bìa album, KHÔNG CHẶN
+                  ----------------------------------------------------------------
+                  Chủ studio chốt 17/09. Khách chốt thiếu thì CSKH phải gọi lại, và
+                  có ca quên hẳn — việc này đang làm studio mất tiền.
+
+                  Nhưng **không chặn nút Chốt**. Khách đang cầm điện thoại, đang bế
+                  con; chặn là họ bỏ dở giữa chừng. Chỉ nói rõ cái được nếu chọn
+                  luôn, rồi để họ tự quyết.
+              */}
+              {sanPhamThieuAnh.length > 0 && (
+                <div className="mt-3 rounded-2xl border border-heart/25 bg-heart/[0.06] p-3.5 text-xs">
+                  <p className="font-semibold text-heart">Ba mẹ chưa chọn ảnh cho:</p>
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[#2a2420]/80">
+                    {sanPhamThieuAnh.map((sp) => (
+                      <li key={sp.galleryItemId}>{sp.name}</li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 leading-relaxed text-muted-foreground">
+                    Chọn luôn thì bên mình làm nhanh hơn — để sau cũng được, CSKH sẽ
+                    hỏi lại.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowSubmitModal(false)}
+                    className="mt-2.5 rounded-full border border-heart/40 px-3 py-1.5 font-medium text-heart transition hover:bg-heart/10"
+                  >
+                    Để tôi chọn thêm
+                  </button>
+                </div>
+              )}
+
+              {anhDaChonHopThoai.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Ảnh đã chọn
+                  </p>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    {anhDaChonHopThoai.slice(0, 40).map((a) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={a.id}
+                        src={`/api/img/${a.id}?w=200`}
+                        alt={a.fileName}
+                        loading="lazy"
+                        className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                      />
+                    ))}
+                    {anhDaChonHopThoai.length > 40 && (
+                      <div className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-surface-2 text-xs text-muted-foreground">
+                        +{anhDaChonHopThoai.length - 40}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Ô tích — đặt SAU tóm tắt, để ba mẹ đọc lại rồi mới xác nhận. */}
+              <label className="mt-5 flex items-start gap-2.5 text-sm leading-relaxed">
+                <input
+                  type="checkbox"
+                  checked={dongY}
+                  onChange={(e) => setDongY(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <span>{vi.gallery.submitAgree}</span>
+              </label>
+
+              <div className="mt-6 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowSubmitModal(false)}
-                  className="mt-2.5 rounded-lg bg-amber-200/70 px-3 py-1.5 font-semibold text-amber-950 hover:bg-amber-200"
+                  disabled={submitting}
+                  className="h-11 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-50"
                 >
-                  Để tôi chọn thêm
+                  {vi.common.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitSelection}
+                  // Khoá nút khi chưa đủ hai ô: bấm rồi nhận "Dữ liệu không hợp
+                  // lệ" thì ba mẹ không biết thiếu gì, và câu đó không nói ra.
+                  disabled={submitting || tenXacNhan.trim().length === 0 || !dongY}
+                  className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                >
+                  {submitting && <Spinner className="h-4 w-4" />}
+                  {vi.common.confirm}
                 </button>
               </div>
-            )}
-
-            <div className="p-3 bg-surface-2 rounded-xl text-xs space-y-1">
-              <div className="flex justify-between font-medium">
-                <span>Số ảnh đã chọn:</span>
-                <span className="font-bold">{selectionCounts.selectedCount} ảnh</span>
-              </div>
-              {gallery.quotaKnown && (
-                <>
-                  <div className="flex justify-between">
-                    <span>Số ảnh trong gói:</span>
-                    <span>{gallery.includedQuota ?? 0} ảnh</span>
-                  </div>
-                  {selectionCounts.extraCount > 0 && (
-                    <div className="flex justify-between text-amber-600 font-medium">
-                      <span>Số ảnh mua thêm:</span>
-                      <span>{selectionCounts.extraCount} ảnh ({formatCurrencyVND(selectionCounts.extraAmount)})</span>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/*
-              Hai ô BẮT BUỘC — máy chủ đòi từ đầu, màn hình thì chưa từng có.
-              Xem ghi chú ở chỗ khai `tenXacNhan`.
-
-              Tên người xác nhận không phải thủ tục: bộ ảnh chốt xong là khoá,
-              và sáu tháng sau câu hỏi "ai chốt" chỉ trả lời được bằng dòng này
-              (`selections.submitted_by_name`).
-            */}
-            <div>
-              <label htmlFor="confirm-name-input" className="block text-xs font-semibold mb-1 text-muted-foreground">
-                {vi.gallery.parentName}
-              </label>
-              <input
-                id="confirm-name-input"
-                value={tenXacNhan}
-                onChange={(e) => setTenXacNhan(e.target.value)}
-                placeholder={vi.gallery.parentNamePlaceholder}
-                className="w-full p-2.5 rounded-xl border bg-background text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <label className="flex items-start gap-2 text-xs leading-relaxed">
-              <input
-                type="checkbox"
-                checked={dongY}
-                onChange={(e) => setDongY(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span>{vi.gallery.submitAgree}</span>
-            </label>
-
-            <div>
-              <label htmlFor="customer-note-input" className="block text-xs font-semibold mb-1 text-muted-foreground">
-                Ghi chú chung cho studio (nếu có):
-              </label>
-              <textarea
-                id="customer-note-input"
-                value={customerNote}
-                onChange={(e) => setCustomerNote(e.target.value)}
-                placeholder="Lời nhắn thêm cho thợ chỉnh sửa..."
-                className="w-full p-2.5 rounded-xl border bg-background text-sm resize-none h-20 focus:outline-hidden focus:ring-1 focus:ring-primary"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowSubmitModal(false)}
-                disabled={submitting}
-              >
-                {vi.common.cancel}
-              </Button>
-              <Button
-                onClick={handleSubmitSelection}
-                // Khoá nút khi chưa đủ hai ô: bấm rồi nhận "Dữ liệu không hợp
-                // lệ" thì ba mẹ không biết thiếu gì, và câu đó không nói ra.
-                disabled={submitting || tenXacNhan.trim().length === 0 || !dongY}
-                className="bg-primary text-primary-foreground font-bold"
-              >
-                {submitting ? <Spinner className="w-4 h-4 mr-2" /> : null}
-                {vi.common.confirm}
-              </Button>
             </div>
           </div>
         </div>
@@ -1634,6 +1757,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
           )}
         />
       )}
+
+      {/* BB-213 — tấm hướng dẫn "Lưu app", mở từ nút ở đầu trang. */}
+      <HuongDanThemManHinh mo={moHuongDanLuuApp} onDong={() => setMoHuongDanLuuApp(false)} />
     </div>
   );
 }

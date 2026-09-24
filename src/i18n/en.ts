@@ -143,8 +143,8 @@ export const en: Messages = {
     reviewUnusedQuota: "You still have {n} free photos unused. Submit anyway?",
     submitCta: "Submit selection",
     submitConfirmTitle: "Confirm selection submission",
-    submitConfirm: "You will not be able to change this afterwards. Are you sure?",
-    submitAgree: "I confirm this list is final",
+    submitConfirm: "We will review and confirm your list. Until then you can still add or change photos.",
+    submitAgree: "I confirm the information above is correct",
     parentName: "Parent name",
     parentNamePlaceholder: "Enter mother or father's name",
 
@@ -315,6 +315,7 @@ export const en: Messages = {
         "gallery.watermark_default": "Watermark",
         "gallery.allow_download_default": "Allow downloads",
         "photo.expected_long_edge_px": "Preview long edge (px)",
+        "gallery.extra_photo_price_default": "Price per extra photo (VND)",
         "gallery.banner_image_url": "Promo image in the photo viewer",
         "gallery.banner_link_url": "Where the promo image links to",
         "chat.page_url": "Studio chat page",
@@ -329,6 +330,8 @@ export const en: Messages = {
         "gallery.watermark_default": "Whether previews carry a watermark.",
         "gallery.allow_download_default": "Whether customers can download previews.",
         "photo.expected_long_edge_px": "Longest edge of a preview image, in pixels.",
+        "gallery.extra_photo_price_default":
+          "Applied when creating a NEW gallery, before a package's own price if any. Existing galleries keep the price they were created with.",
         "gallery.banner_image_url":
           "Promo strip beside the photo in the large viewer, wide screens only. Empty shows nothing.",
         "gallery.banner_link_url":
@@ -539,6 +542,7 @@ export const en: Messages = {
       description: "Choose the appropriate format for Người Photoshop.",
       formatLightroom: "Lightroom (.txt / filenames list)",
       formatCsv: "Excel / CSV spreadsheet with notes",
+      formatChiTiet: "Detailed text for CS (.txt)",
       formatJson: "Full JSON data",
       copyClipboard: "Copy to clipboard",
       copiedNotice: "Copied list to clipboard",
@@ -570,10 +574,13 @@ export const en: Messages = {
   },
   landing: {
     studioName: "BabyBean Studio",
-    tagline: "Preserving your baby's lovely moments",
+    tagline: "Every lovely moment of your little one, kept in a keepsake album",
+    branchesHeading: "Our branches",
     lostBefore: "Your baby's photos are sent via a ",
     lostStrong: "private link",
     lostAfter: ". If you haven't received it or it won't open, please call us at the number below.",
+    lostAfterNhanTin: ". If you haven't received it or it won't open, please message us using the button below.",
+    lostAfterChiNhanh: ". If you haven't received it or it won't open, please contact the branch where your shoot took place.",
     messageCta: "Message studio",
     loginCta: "Staff Login",
   },

@@ -23,20 +23,56 @@ body {
 
   Nút đang khoá thì KHÔNG hiện bàn tay — con trỏ là lời hứa "bấm được", và hứa
   sai còn tệ hơn không hứa.
+
+  24/09/2026 — chủ studio báo LẦN THỨ HAI, vì luật 22/09 chỉ phủ được thẻ
+  <button>, [role=button], <a href>, <summary>, <label for>, <select>,
+  checkbox/radio. Các vùng bấm KHÔNG dùng thẻ ngữ nghĩa (div/main/img/aside/
+  footer có onClick — ví dụ lớp phủ đóng lightbox, khung ảnh trong lưới) và
+  các role tương tác khác (tab, menuitem, option, switch, treeitem, link,
+  combobox, slider) chưa được liệt — mỗi chỗ đó phải tự thêm `cursor-pointer`
+  vào className (xem tests/unit/con-tro-ban-tay.test.ts), còn các role ARIA
+  và kiểu input dưới đây được phủ chung ở đây để khỏi phải nhớ từng chỗ.
 */
 button:not(:disabled),
 [role="button"]:not([aria-disabled="true"]),
+[role="tab"]:not([aria-disabled="true"]),
+[role="menuitem"]:not([aria-disabled="true"]),
+[role="menuitemcheckbox"]:not([aria-disabled="true"]),
+[role="menuitemradio"]:not([aria-disabled="true"]),
+[role="option"]:not([aria-disabled="true"]),
+[role="switch"]:not([aria-disabled="true"]),
+[role="checkbox"]:not([aria-disabled="true"]),
+[role="radio"]:not([aria-disabled="true"]),
+[role="treeitem"]:not([aria-disabled="true"]),
+[role="link"]:not([aria-disabled="true"]),
+[role="combobox"]:not([aria-disabled="true"]),
+[role="slider"]:not([aria-disabled="true"]),
 a[href],
 summary,
 label[for],
 select:not(:disabled),
 input[type="checkbox"]:not(:disabled),
-input[type="radio"]:not(:disabled) {
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled),
+input[type="range"]:not(:disabled),
+input[type="color"]:not(:disabled) {
   cursor: pointer;
 }
 
 button:disabled,
-[role="button"][aria-disabled="true"] {
+[role="button"][aria-disabled="true"],
+[role="tab"][aria-disabled="true"],
+[role="menuitem"][aria-disabled="true"],
+[role="menuitemcheckbox"][aria-disabled="true"],
+[role="menuitemradio"][aria-disabled="true"],
+[role="option"][aria-disabled="true"],
+[role="switch"][aria-disabled="true"],
+[role="checkbox"][aria-disabled="true"],
+[role="radio"][aria-disabled="true"],
+[role="treeitem"][aria-disabled="true"],
+[role="link"][aria-disabled="true"],
+[role="combobox"][aria-disabled="true"],
+[role="slider"][aria-disabled="true"] {
   cursor: not-allowed;
 }
 
@@ -47,11 +83,10 @@ button:disabled,
   to { opacity: 1; transform: scale(1); }
 }
 
-/* Tim bật lên khi chạm hai lần vào ảnh trong màn xem lớn. */
-@keyframes tim-bat {
-  0% { opacity: 0; transform: scale(0.4); }
-  25% { opacity: 1; transform: scale(1.12); }
-  45% { transform: scale(0.96); }
-  70% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(1.05); }
-}
+/* BB-210 (24/09/2026): bỏ hiệu ứng tim bật khi chạm hai lần — chủ studio xếp
+   PHÓNG TO vào P0, và chạm hai lần là cử chỉ mọi trình xem ảnh ba mẹ đã quen
+   (Ảnh của iPhone, Google Photos) dùng để phóng, không phải để thả tim. Nút
+   tim to ở đáy màn xem lớn vẫn là chỗ chọn ảnh chính. Từng có
+   `@keyframes tim-bat` ở đây (BB-180, 23/09/2026) — gỡ cùng lúc với
+   `thaTimNhanh` trong photo-lightbox.tsx.
+*/

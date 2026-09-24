@@ -48,6 +48,9 @@ describe("BB-190: Nuốt lỗi khi ghi dữ liệu", () => {
       }
     }
     
-    expect(loi, `Đang có ${loi.length} chỗ ghi dữ liệu không bắt lỗi (cho phép 2). Chi tiết:\n${loi.join('\n')}`).toHaveLength(2);
+    // BB-214: sửa nốt chỗ cuối cùng còn sót (src/app/api/g/buoi-chup/route.ts:231,
+    // cập nhật last_viewed_at không bắt lỗi) — danh sách cho phép giờ rỗng.
+    // Không hạ chuẩn: đây là con số CÒN LẠI đúng bằng 0, không phải nới lỏng.
+    expect(loi, `Đang có ${loi.length} chỗ ghi dữ liệu không bắt lỗi (cho phép 0). Chi tiết:\n${loi.join('\n')}`).toHaveLength(0);
   });
 });

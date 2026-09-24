@@ -28,6 +28,7 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { vi } from "@/i18n/vi";
+import { MAU_CHU_BIA, dienMau, type DuLieuBia } from "@/lib/gallery/mau-chu-bia";
 
 interface Component {
   id: string;
@@ -91,6 +92,12 @@ interface Detail {
   dueAmount: number;
   paidAmount: number;
   outstanding: number;
+  /** BB-215 — khối "Bìa bộ ảnh". */
+  coverPhotoId: string | null;
+  coverHeadline: string | null;
+  welcomeMessage: string | null;
+  babyName: string | null;
+  branchName: string | null;
 }
 
 export function GalleryDetail({ galleryId }: { galleryId: string }) {
@@ -287,6 +294,36 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   }
 
   /**
+   * BB-215 — lưu ảnh bìa, tiêu đề bìa và lời trên bìa, một lượt cho cả ba.
+   *
+   * Chỉ gửi những trường đổi — `undefined` thì route PATCH giữ nguyên giá trị
+   * cũ (xem bia/route.ts). Route kiểm lại quyền, chi nhánh và ảnh có thuộc
+   * đúng bộ này không; màn hình chỉ hỏi để hiện lỗi cho CSKH đọc.
+   */
+  async function saveCover(
+    thayDoi: { coverPhotoId?: string | null; coverHeadline?: string | null; welcomeMessage?: string | null },
+  ) {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/bia`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(thayDoi),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNotice(json?.error?.message ?? "Không lưu được bìa");
+        return;
+      }
+      setNotice("Đã lưu bìa.");
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
    * Tạo link gửi khách. Link hiện ĐÚNG MỘT LẦN — cơ sở dữ liệu chỉ giữ bản băm.
    *
    * Giữ trong state riêng chứ không nhét vào `notice`: nhắn thông báo nào khác
@@ -460,6 +497,13 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         />
       </section>
 
+      <CoverEditor
+        galleryId={galleryId}
+        detail={detail}
+        busy={busy}
+        onSave={(thayDoi) => void saveCover(thayDoi)}
+      />
+
       {/*
         Xuất danh sách ảnh đã chọn (BB-067).
 
@@ -492,6 +536,13 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs hover:bg-[var(--bb-surface-2)]"
             >
               {vi.admin.export.formatCsv}
+            </a>
+            <a
+              href={`/api/admin/galleries/${galleryId}/export?format=chi-tiet`}
+              download
+              className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs hover:bg-[var(--bb-surface-2)]"
+            >
+              {vi.admin.export.formatChiTiet}
             </a>
           </span>
         </section>
@@ -860,6 +911,263 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         )}
       </section>
     </div>
+  );
+}
+
+interface AnhLuoi {
+  id: string;
+  fileName: string;
+  width: number | null;
+  height: number | null;
+}
+
+/**
+ * BB-215 — khối "Bìa bộ ảnh": ảnh bìa hiện tại, đổi ảnh, tiêu đề và lời trên
+ * bìa, xem trước giống bìa khách.
+ *
+ * Ba trường lưu chung một lần bấm "Lưu" — tách "Đổi ảnh bìa" (mở lưới, chọn,
+ * đóng lưới) khỏi việc LƯU thật để CSKH đổi cả ba thứ trong một phiên sửa rồi
+ * mới ghi, thay vì mỗi lần bấm ảnh là một lượt ghi dữ liệu.
+ */
+function CoverEditor({
+  galleryId,
+  detail,
+  busy,
+  onSave,
+}: {
+  galleryId: string;
+  detail: Detail;
+  busy: boolean;
+  onSave: (thayDoi: {
+    coverPhotoId?: string | null;
+    coverHeadline?: string | null;
+    welcomeMessage?: string | null;
+  }) => void;
+}) {
+  const [moLuoi, setMoLuoi] = React.useState(false);
+  const [anhBiaNhap, setAnhBiaNhap] = React.useState(detail.coverPhotoId);
+  const [tieuDe, setTieuDe] = React.useState(detail.coverHeadline ?? "");
+  const [loi, setLoi] = React.useState(detail.welcomeMessage ?? "");
+  const [luoi, setLuoi] = React.useState<AnhLuoi[]>([]);
+  const [dangTaiLuoi, setDangTaiLuoi] = React.useState(false);
+  const [conTiep, setConTiep] = React.useState(false);
+  const [contentCursor, setContentCursor] = React.useState<string | undefined>(undefined);
+
+  // Bộ ảnh đang xem đổi (chuyển sang bộ khác) thì đồng bộ lại nháp theo dữ
+  // liệu mới — không thì CSKH thấy chữ của bộ TRƯỚC còn dính trên bộ vừa mở.
+  React.useEffect(() => {
+    setAnhBiaNhap(detail.coverPhotoId);
+    setTieuDe(detail.coverHeadline ?? "");
+    setLoi(detail.welcomeMessage ?? "");
+  }, [galleryId, detail.coverPhotoId, detail.coverHeadline, detail.welcomeMessage]);
+
+  async function taiLuoi(tuDau: boolean) {
+    setDangTaiLuoi(true);
+    try {
+      const qs = new URLSearchParams({ limit: "60" });
+      if (!tuDau && contentCursor) qs.set("sauSortIndex", contentCursor);
+      const res = await fetch(`/api/admin/galleries/${galleryId}/photos?${qs.toString()}`);
+      const json = await res.json().catch(() => null);
+      if (!res.ok) return;
+      const trang: AnhLuoi[] = json.data ?? [];
+      setLuoi((cu) => (tuDau ? trang : [...cu, ...trang]));
+      setConTiep(Boolean(json.meta?.hasMore));
+      setContentCursor(json.meta?.cursor);
+    } finally {
+      setDangTaiLuoi(false);
+    }
+  }
+
+  function moChonAnh() {
+    setMoLuoi(true);
+    if (luoi.length === 0) void taiLuoi(true);
+  }
+
+  const duLieuBia: DuLieuBia = {
+    tenBe: detail.babyName,
+    ngayChup: null,
+    chiNhanh: detail.branchName,
+  };
+  const mauDaChonId = MAU_CHU_BIA.find((m) => m.tieuDe === tieuDe || m.loi === loi)?.id ?? null;
+
+  const doiGi =
+    anhBiaNhap !== detail.coverPhotoId ||
+    tieuDe.trim() !== (detail.coverHeadline ?? "") ||
+    loi.trim() !== (detail.welcomeMessage ?? "");
+
+  return (
+    <section className="rounded-lg border border-[var(--bb-border)] p-4">
+      <h2 className="text-base font-medium">Bìa bộ ảnh</h2>
+      <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
+        Đây là màn đầu tiên ba mẹ thấy khi mở link — ảnh, tiêu đề và một câu lời
+        chào.
+      </p>
+
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+        {/* Xem trước — cùng tỉ lệ tối và chữ trắng đè lên như bia-bo-anh.tsx,
+            thu nhỏ, để CSKH biết đang gửi khách cái gì mà không phải mở link
+            thật. */}
+        <div className="relative aspect-[3/4] w-full max-w-[220px] shrink-0 overflow-hidden rounded-md bg-[#2a2420] text-white">
+          {anhBiaNhap && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/img/${anhBiaNhap}?w=400`}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          )}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,16,12,0)_45%,rgba(20,16,12,.85)_100%)]"
+          />
+          <div className="absolute inset-x-0 bottom-0 p-3">
+            <p className="font-display text-lg font-light leading-tight">
+              {tieuDe.trim() || detail.babyName || "Khoảnh khắc của con"}
+            </p>
+            <p className="mt-1 line-clamp-2 text-[11px] text-white/85">
+              {loi.trim() || "Những khoảnh khắc của con đã sẵn sàng."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col gap-3">
+          <div>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={moChonAnh}
+              className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+            >
+              Đổi ảnh bìa
+            </button>
+          </div>
+
+          <label className="flex flex-col gap-1 text-sm">
+            Tiêu đề bìa
+            <input
+              type="text"
+              maxLength={120}
+              value={tieuDe}
+              disabled={busy}
+              onChange={(e) => setTieuDe(e.target.value)}
+              placeholder={detail.babyName || "Khoảnh khắc của con"}
+              className="rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            Lời trên bìa
+            <textarea
+              maxLength={400}
+              rows={2}
+              value={loi}
+              disabled={busy}
+              onChange={(e) => setLoi(e.target.value)}
+              placeholder="Những khoảnh khắc của con đã sẵn sàng."
+              className="rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+            />
+          </label>
+
+          <div className="flex flex-wrap gap-1.5">
+            {MAU_CHU_BIA.map((m) => {
+              const dien = dienMau(m, duLieuBia);
+              // Mẫu cần một trường bộ ảnh này chưa có (tên bé, chi nhánh…) thì
+              // không bày ra — bấm vào một chip mà chữ vẫn còn "{...}" là lỗi.
+              if (!dien) return null;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setTieuDe(dien.tieuDe);
+                    setLoi(dien.loi);
+                  }}
+                  aria-pressed={mauDaChonId === m.id}
+                  className={`rounded-full border px-2.5 py-1 text-xs disabled:opacity-40 ${
+                    mauDaChonId === m.id
+                      ? "border-[var(--bb-accent)] bg-[var(--bb-accent)]/10"
+                      : "border-[var(--bb-border)] hover:bg-[var(--bb-surface-2)]"
+                  }`}
+                >
+                  {m.nhan}
+                </button>
+              );
+            })}
+          </div>
+
+          <div>
+            <button
+              type="button"
+              disabled={busy || !doiGi}
+              onClick={() =>
+                onSave({
+                  coverPhotoId: anhBiaNhap,
+                  coverHeadline: tieuDe.trim() || null,
+                  welcomeMessage: loi.trim() || null,
+                })
+              }
+              className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+            >
+              Lưu bìa
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {moLuoi && (
+        <div className="mt-4 rounded-md border border-[var(--bb-border)] p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-medium">Chọn ảnh bìa</span>
+            <button
+              type="button"
+              onClick={() => setMoLuoi(false)}
+              className="text-xs text-[var(--bb-fg-muted)] underline"
+            >
+              Đóng
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            {luoi.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => {
+                  setAnhBiaNhap(a.id);
+                  setMoLuoi(false);
+                }}
+                className={`aspect-square overflow-hidden rounded border-2 ${
+                  anhBiaNhap === a.id ? "border-[var(--bb-accent)]" : "border-transparent"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/img/${a.id}?w=200`}
+                  alt={a.fileName}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+
+          {luoi.length === 0 && !dangTaiLuoi && (
+            <p className="text-sm text-[var(--bb-fg-muted)]">Bộ ảnh này chưa có tấm nào.</p>
+          )}
+
+          {conTiep && (
+            <button
+              type="button"
+              disabled={dangTaiLuoi}
+              onClick={() => void taiLuoi(false)}
+              className="mt-2 text-sm text-[var(--bb-fg-muted)] underline disabled:opacity-40"
+            >
+              {dangTaiLuoi ? "Đang tải…" : "Tải thêm"}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -42,6 +42,8 @@ interface Options {
   photographers: { id: string; name: string; branchIds: string[] }[];
   /** Hạn chốt mặc định, do chủ studio đặt trong màn Cài đặt. */
   macDinhHanChotNgay?: number;
+  /** Giá một ảnh chọn thêm mặc định, do chủ studio đặt trong màn Cài đặt. */
+  macDinhGiaAnhChonThem?: number;
 }
 
 interface ResultData {
@@ -93,6 +95,11 @@ export function CreateGalleryWizard() {
       // cài đặt kia không điều khiển gì cả.
       if (typeof body.data.macDinhHanChotNgay === "number") {
         setDeadlineDays(body.data.macDinhHanChotNgay);
+      }
+      // Giá ảnh chọn thêm: cùng lý do với hạn chốt ở trên (BB-214c). Chọn gói
+      // sau đó vẫn ghi đè giá này bằng giá riêng của gói, xem effect bên dưới.
+      if (typeof body.data.macDinhGiaAnhChonThem === "number") {
+        setExtraPrice(body.data.macDinhGiaAnhChonThem);
       }
     } catch (e) {
       setError({ message: e instanceof Error ? e.message : "Không tải được danh sách" });

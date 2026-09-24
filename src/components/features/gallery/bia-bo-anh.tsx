@@ -19,6 +19,15 @@
  * Đo 23/09/2026: 234/488 bộ ảnh chưa gắn tên bé, và tiêu đề của chúng là mã
  * hợp đồng kiểu "HD_20260828#4924". Bìa album mà in mã đó là hỏng cả trang.
  * Thiếu tên bé thì dùng một câu chung, ấm, đúng cho mọi nhà.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-215 — tiêu đề bìa CSKH tự viết
+ * ---------------------------------------------------------------------------
+ * Thứ tự ưu tiên cho dòng lớn trên bìa: `coverHeadline` CSKH đã viết (giọng
+ * biên tập, xem src/lib/gallery/mau-chu-bia.ts) → tên bé → câu mặc định
+ * "Khoảnh khắc của con". `coverHeadline` do CSKH gõ tay qua route
+ * `/api/admin/galleries/[id]/bia`, route đó đã kiểm không lọt mã hợp đồng —
+ * màn này không cần kiểm lại.
  */
 
 import React from "react";
@@ -27,6 +36,8 @@ import { Clock, Heart, Lock, ArrowDown } from "lucide-react";
 export interface BiaBoAnhProps {
   /** Ảnh bìa. `null` khi bộ ảnh chưa có tấm nào (đang đồng bộ). */
   anhBia: { id: string } | null;
+  /** Tiêu đề bìa CSKH tự viết. `null` thì rơi về tên bé, rồi câu mặc định. */
+  coverHeadline: string | null;
   tenBe: string | null;
   ngayChup: string | null;
   chiNhanh: string;
@@ -59,6 +70,7 @@ function conMayNgay(hanChot: string | null): number | null {
 
 export function BiaBoAnh({
   anhBia,
+  coverHeadline,
   tenBe,
   ngayChup,
   chiNhanh,
@@ -132,7 +144,7 @@ export function BiaBoAnh({
           </p>
 
           <h1 className="mt-2 font-display text-[54px] font-light leading-[0.98] tracking-[-0.02em] sm:text-[68px] lg:mt-4 lg:text-[84px]">
-            {tenBe || "Khoảnh khắc của con"}
+            {coverHeadline?.trim() || tenBe || "Khoảnh khắc của con"}
           </h1>
 
           <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-white/90 lg:mt-5 lg:text-base lg:text-muted-foreground">
