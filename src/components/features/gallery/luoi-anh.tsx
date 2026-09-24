@@ -61,6 +61,14 @@ interface TheAnhProps {
   khoa: boolean;
   /** Tấm này đang làm bao nhiêu sản phẩm (in, khung, album, mua thêm). */
   soSanPham: number;
+  /**
+   * BB-218 — chế độ "chọn để so sánh" đang bật: bấm ảnh là ĐÁNH DẤU so sánh,
+   * không mở màn xem lớn. Giá trị đơn (boolean), giống mọi prop khác của thẻ
+   * này — xem LUẬT 2 đầu tệp.
+   */
+  soSanhBat: boolean;
+  /** Thứ tự 1–4 trong danh sách so sánh; 0 = tấm này chưa được đánh dấu. */
+  soSanhThuTu: number;
   /** Vị trí trong lưới. Thiếu (nhánh dự phòng) thì thẻ tự xếp theo dòng chảy. */
   x?: number;
   y?: number;
@@ -68,6 +76,7 @@ interface TheAnhProps {
   h?: number;
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
+  onToggleSoSanh: (photo: PhotoPublic) => void;
 }
 
 const TheAnh = memo(function TheAnh({
@@ -77,18 +86,24 @@ const TheAnh = memo(function TheAnh({
   dangGui,
   khoa,
   soSanPham,
+  soSanhBat,
+  soSanhThuTu,
   x,
   y,
   w,
   h,
   onToggle,
   onOpen,
+  onToggleSoSanh,
 }: TheAnhProps) {
   const coViTri = x !== undefined && y !== undefined && w !== undefined && h !== undefined;
 
   return (
     <div
-      onClick={() => onOpen(thuTu)}
+      // BB-218: chế độ so sánh đang bật thì bấm ảnh là đánh dấu so sánh, không
+      // mở màn xem lớn — nút tim (stopPropagation riêng) vẫn thả tim bình
+      // thường trong cả hai chế độ.
+      onClick={() => (soSanhBat ? onToggleSoSanh(photo) : onOpen(thuTu))}
       // Chỗ bám cố định cho phép thử trình duyệt. "Ảnh đầu tiên trên trang"
       // không còn là ảnh trong lưới từ khi có ảnh bìa (23/09/2026).
       data-testid="the-anh"
@@ -124,6 +139,16 @@ const TheAnh = memo(function TheAnh({
 
         {daChon && (
           <span className="pointer-events-none absolute inset-0 rounded-[4px] ring-2 ring-inset ring-heart" />
+        )}
+
+        {/*
+          BB-218 — dấu số 1–4 khi tấm đang được đánh dấu để so sánh. Góc PHẢI
+          TRÊN: bên trái đã có dấu sản phẩm in, bên dưới phải là tim.
+        */}
+        {soSanhBat && soSanhThuTu > 0 && (
+          <span className="pointer-events-none absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-[#2a2420] text-[12px] font-semibold text-white shadow-sm">
+            {soSanhThuTu}
+          </span>
         )}
 
         {/* Tấm đã dùng làm sản phẩm in — màu rêu, bên TRÁI, không đấu với tim. */}
@@ -205,8 +230,13 @@ export interface LuoiAnhProps {
   khoa: boolean;
   /** photoId -> tấm đó đang làm mấy sản phẩm. Thiếu khoá nghĩa là 0. */
   soSanPhamTheoAnh: Map<string, number>;
+  /** BB-218 — chế độ "chọn để so sánh" đang bật. */
+  soSanhBat: boolean;
+  /** photoId -> thứ tự 1–4 trong danh sách so sánh. Thiếu khoá nghĩa là 0. */
+  soSanhTheoAnh: Map<string, number>;
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
+  onToggleSoSanh: (photo: PhotoPublic) => void;
 }
 
 /** Cửa sổ dựng tính theo "bậc" nửa màn hình — xem luật 3 ở đầu tệp. */
@@ -220,8 +250,11 @@ export function LuoiAnh({
   mutatingIds,
   khoa,
   soSanPhamTheoAnh,
+  soSanhBat,
+  soSanhTheoAnh,
   onToggle,
   onOpen,
+  onToggleSoSanh,
 }: LuoiAnhProps) {
   const khungRef = useRef<HTMLDivElement | null>(null);
 
@@ -314,8 +347,11 @@ export function LuoiAnh({
               dangGui={mutatingIds.has(photo.id)}
               khoa={khoa}
               soSanPham={soSanPhamTheoAnh.get(photo.id) ?? 0}
+              soSanhBat={soSanhBat}
+              soSanhThuTu={soSanhTheoAnh.get(photo.id) ?? 0}
               onToggle={onToggle}
               onOpen={onOpen}
+              onToggleSoSanh={onToggleSoSanh}
             />
           ))}
         </div>
@@ -333,12 +369,15 @@ export function LuoiAnh({
                 dangGui={mutatingIds.has(photo.id)}
                 khoa={khoa}
                 soSanPham={soSanPhamTheoAnh.get(photo.id) ?? 0}
+                soSanhBat={soSanhBat}
+                soSanhThuTu={soSanhTheoAnh.get(photo.id) ?? 0}
                 x={vt.x}
                 y={vt.y}
                 w={vt.w}
                 h={vt.h}
                 onToggle={onToggle}
                 onOpen={onOpen}
+                onToggleSoSanh={onToggleSoSanh}
               />
             );
           })}

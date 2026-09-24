@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Heart, Minimize2 } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Columns2 } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { vi } from "@/i18n";
 import type { PhotoPublic } from "@/types/domain";
@@ -52,6 +52,13 @@ export interface PhotoLightboxProps {
    * đang xem sẽ in ra cái gì mà không phải mở bảng sản phẩm.
    */
   dungCho?: (photo: PhotoPublic) => string[];
+  /**
+   * BB-218 — "So sánh với tấm khác": đưa tấm đang xem vào danh sách so sánh
+   * rồi đóng màn xem lớn (chỗ gọi tự quay về lưới ở chế độ chọn so sánh).
+   * Thiếu prop này thì không hiện nút — màn xem lớn dùng ở chỗ khác (nếu có)
+   * không bị ép phải biết về tính năng so sánh.
+   */
+  onSoSanh?: (photo: PhotoPublic) => void;
 }
 
 /**
@@ -84,6 +91,7 @@ export function PhotoLightbox({
   bangSanPham,
   banner,
   dungCho,
+  onSoSanh,
 }: PhotoLightboxProps) {
   /**
    * Tấm trượt từ dưới lên trên điện thoại: bảng sản phẩm hoặc ô ghi chú.
@@ -578,6 +586,23 @@ export function PhotoLightbox({
                 <path d="M7 11l5 5 5-5" />
                 <path d="M4 20h16" />
               </svg>
+            </button>
+          )}
+
+          {/* BB-218 — "So sánh với tấm khác": đưa tấm này vào danh sách so
+              sánh rồi quay về lưới ở chế độ chọn. */}
+          {onSoSanh && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSoSanh(currentPhoto);
+              }}
+              aria-label="So sánh với tấm khác"
+              title="So sánh với tấm khác"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus:outline-hidden"
+            >
+              <Columns2 className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden="true" />
             </button>
           )}
 
