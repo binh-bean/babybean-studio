@@ -571,10 +571,11 @@ export const vi = {
   },
   landing: {
     studioName: "BabyBean Studio",
-    tagline: "Nơi lưu giữ những khoảnh khắc đáng yêu của bé",
+    tagline: "Nơi lưu giữ từng khoảnh khắc đáng yêu của con, gói ghém thành một cuốn album để dành",
+    branchesHeading: "Các chi nhánh",
     lostBefore: "Ảnh của bé được gửi qua ",
     lostStrong: "link riêng",
-    lostAfter: ". Chưa nhận được hoặc link không mở được, gọi giúp bên mình theo số ở dưới.",
+    lostAfter: ". Chưa nhận được hoặc link không mở được, ba mẹ gọi giúp bên mình theo số ở dưới nhé.",
     messageCta: "Nhắn tin cho studio",
     loginCta: "Nhân viên đăng nhập",
   },

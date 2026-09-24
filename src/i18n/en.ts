@@ -570,7 +570,8 @@ export const en: Messages = {
   },
   landing: {
     studioName: "BabyBean Studio",
-    tagline: "Preserving your baby's lovely moments",
+    tagline: "Every lovely moment of your little one, kept in a keepsake album",
+    branchesHeading: "Our branches",
     lostBefore: "Your baby's photos are sent via a ",
     lostStrong: "private link",
     lostAfter: ". If you haven't received it or it won't open, please call us at the number below.",
