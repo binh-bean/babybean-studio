@@ -608,18 +608,35 @@ export function GalleryApp({ token }: GalleryAppProps) {
    */
   const onToggleSoSanh = useCallback(
     (photo: PhotoPublic) => {
-      setDsSoSanh((cu) => {
-        if (cu.includes(photo.id)) return boKhoiSoSanh(cu, photo.id);
-        if (daDuSoSanh(cu)) {
-          setStatusMessage(
-            `Chỉ so sánh được tối đa ${SO_SANH_TOI_DA} tấm — bỏ bớt một tấm đang so sánh trước đã nhé.`,
-          );
-          return cu;
-        }
-        return themVaoSoSanh(cu, photo.id);
-      });
+      // Đọc danh sách hiện tại rồi mới đặt — báo lỗi nằm NGOÀI hàm cập nhật
+      // trạng thái, vì React có thể gọi hàm cập nhật hai lần.
+      if (dsSoSanh.includes(photo.id)) {
+        setDsSoSanh(boKhoiSoSanh(dsSoSanh, photo.id));
+        return;
+      }
+      if (daDuSoSanh(dsSoSanh)) {
+        setStatusMessage(
+          `Chỉ so sánh được tối đa ${SO_SANH_TOI_DA} tấm — bỏ bớt một tấm đang so sánh trước đã nhé.`,
+        );
+        return;
+      }
+      setDsSoSanh(themVaoSoSanh(dsSoSanh, photo.id));
     },
-    [],
+    [dsSoSanh],
+  );
+
+  /**
+   * Bỏ một tấm ngay trong màn so sánh. Còn dưới 2 tấm thì ĐÓNG màn so sánh
+   * luôn — nếu chỉ ẩn nó đi (moSoSanh vẫn bật), lần sau ba mẹ đánh dấu thêm
+   * một tấm ở lưới thì màn so sánh tự bật lên không báo trước.
+   */
+  const boKhoiManSoSanh = useCallback(
+    (photo: PhotoPublic) => {
+      const conLai = boKhoiSoSanh(dsSoSanh, photo.id);
+      setDsSoSanh(conLai);
+      if (!duSoSanh(conLai)) setMoSoSanh(false);
+    },
+    [dsSoSanh],
   );
 
   /** Huỷ hẳn chế độ so sánh: tắt chế độ chọn VÀ xoá danh sách đang đánh dấu. */
@@ -1807,6 +1824,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
           onClose={() => {
             setLightboxIndex(null);
             setLightboxDungDanhSachDay(false);
+            // Mở từ màn so sánh (chạm hai lần) thì đóng xong quay lại màn so
+            // sánh — ba mẹ đang so dở, không phải đang xem lưới.
+            if (lightboxDungDanhSachDay && soSanhBat && duSoSanh(dsSoSanh)) setMoSoSanh(true);
           }}
           onToggleHeart={handleToggleHeart}
           onTaiAnh={choPhepTai ? (p) => taiMotAnh({ id: p.id, fileName: p.fileName }) : null}
@@ -1946,7 +1966,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           mutatingIds={mutatingIds}
           isLocked={khoaTim}
           onToggleHeart={handleToggleHeart}
-          onBoKhoi={(anh) => setDsSoSanh((cu) => boKhoiSoSanh(cu, anh.id))}
+          onBoKhoi={boKhoiManSoSanh}
           onDong={() => setMoSoSanh(false)}
           onPhongTo={onPhongToTuSoSanh}
           daChon={soAnhDaChon}
