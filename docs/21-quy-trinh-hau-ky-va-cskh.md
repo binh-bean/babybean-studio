@@ -166,3 +166,51 @@ riêng giai đoạn 2 là lời chủ studio.
    phóng/album" (nhánh A/B).
 3. Luật "60 ngày xoá file gốc, quá hạn coi như hoàn thành dịch vụ" đụng tới
    `docs/13 §11` (thời gian lưu ảnh) và BB-183 (link hết hạn) — phải khớp một số.
+
+---
+
+## Phụ lục — đối chiếu với bảng "🎯Hậu Kỳ" thật trên Lark (đọc 24/09/2026, chỉ đọc)
+
+**Cột "Trạng Thái"** — 12 lựa chọn. Khớp theo **mã lựa chọn**, không theo tên
+(luật docs/15 §2: nhân viên đổi tên hiển thị bất cứ lúc nào).
+
+| GĐ | Mã lựa chọn | Tên trên Lark | Số bản ghi |
+|---|---|---|---|
+| 1 | `optDAI9nFV` | Đã gửi file gốc | 316 |
+| 2 | `optl5DyKLx` | Đã Chọn Hình | 98 |
+| 3 | `optmhzW4sL` | Đang làm | 11 |
+| 4 | `optWz9BTWy` | Leader check hình | 4 |
+| 5 | `optjJ9MNLL` | Đã Gửi Duyệt | 104 |
+| 6 | `optjhQwMrT` | sửa | 8 |
+| 6 (lần ≥2) | `optW0pvHGd` | Sửa lần 2,3,4 | 0 |
+| 7 | `optsXat0f1` | Đã chốt chưa in | 9 |
+| 8 | `optxMAdtNX` | Đã gửi In | 72 |
+| 9 | `opttKmVbce` | Hình đã về | 284 |
+| 10 | `opttHXFpgy` | Đã Giao | 2.055 |
+| 11 | `optZUXP6XK` | Đã CSKH | 365 |
+| — | (trống) | | 14 |
+
+Tổng 3.340 bản ghi. Giai đoạn 0 ("Chưa phân loại") **không có** lựa chọn riêng
+trên Lark — khớp với 14 bản ghi trống.
+
+**Cột "Cảnh Báo"** — 4 mức: `optSj1R6PM` An Toàn (2.742) · `opt1E9Y1AQ` Cảnh Báo
+(27) · `optmFaSbfW` Nguy Hiểm (36) · `optQEfwHOy` Phải Xong Trong Ngày (35) ·
+trống (500). Ứng với thang màu của sơ đồ: an toàn = xanh; cam/đỏ/tím phải chốt
+với chủ studio mức nào ứng mức nào.
+
+**Mốc thời gian có sẵn trên Lark:** Ngày gửi file gốc · Ngày chọn ảnh · Ngày
+Gửi In · Ngày ảnh về · Ngày giao ảnh · Ngày Deadline · "Số ngày chờ.".
+
+**Nhánh A/B (làm nhanh / làm trước):**
+- "Yêu cầu từ Hóa đơn" là cột tra cứu CHỮ TỰ DO (444 giá trị khác nhau: mã
+  khung, quà tặng…; 2.805/3.340 trống) — không dùng làm cờ được.
+- Bảng giá có sản phẩm **"Làm ảnh nhanh"** (500.000 ₫) → nhánh A nhận biết được
+  qua dòng hoá đơn của bộ ảnh.
+- Nhánh B chưa có trường nào có cấu trúc — chờ chủ studio chỉ cách nhận biết.
+
+**Cột mới "Loại Hậu Kỳ"**: lựa chọn "Chup anh" / "Mua them/San pham in an",
+hiện TRỐNG cả 3.340 bản ghi — khớp với luật "bộ ảnh rỗng theo hoá đơn" (BB-204).
+
+**Cột phục vụ việc khác:** "Link HD" và "Hợp đồng chi tiết" (BB-203 — link hoá
+đơn ở màn quản trị), "Nhãn Dán" (Sinh Nhật Gấp · Thêm Tên · Đã Nhắc Chọn · Đã in
+ảnh phóng), "Trạng thái nhắc duyệt" (Đã nhắc), "Link app" (app đã ghi sang).
