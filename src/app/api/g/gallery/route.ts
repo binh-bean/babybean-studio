@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     const { data: gallery, error: galleryError } = await supabase
       .from("galleries")
       .select(`
-        id, title, welcome_message, status, baby_id, shoot_date:shoots(shoot_date),
+        id, title, welcome_message, status, baby_id, customer_id, shoot_date:shoots(shoot_date),
         branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
         cover_photo_id, download_enabled, notes_enabled, invite_enabled
@@ -82,6 +82,21 @@ export async function GET(request: Request) {
       .select("full_name, nickname")
       .eq("id", gallery.baby_id)
       .single() : { data: null };
+
+    // BB-212 — tên khách hàng để ĐIỀN SẴN ô "người xác nhận" trong hộp chốt.
+    //
+    // Chủ studio 22/09/2026: "tên người xác nhận là tên khách hàng trong bộ".
+    // Trước đây ô này luôn trống, ba mẹ phải tự gõ lại đúng cái tên đã ký hợp
+    // đồng — một việc thừa mà máy đã biết sẵn.
+    //
+    // `customer_id` là NOT NULL trên `galleries` nên về lý thuyết dòng khách
+    // luôn có; vẫn tách truy vấn riêng và trả `null` khi không thấy, để một
+    // dòng dữ liệu thiếu không làm sập cả màn hình chọn ảnh.
+    const { data: customer } = await supabase
+      .from("customers")
+      .select("full_name")
+      .eq("id", gallery.customer_id)
+      .maybeSingle();
 
     const { data: chatSetting } = await supabase
       .from("settings")
@@ -350,6 +365,8 @@ export async function GET(request: Request) {
       welcomeMessage: gallery.welcome_message,
       status: gallery.status,
       babyName: baby?.nickname || baby?.full_name || null,
+      // BB-212 — xem ghi chú ở chỗ truy vấn `customer` phía trên.
+      customerName: customer?.full_name || null,
       shootDate: (gallery.shoot_date as unknown as { shoot_date: string }[])?.[0]?.shoot_date || (gallery.shoot_date as unknown as { shoot_date: string })?.shoot_date || null,
       branch: {
         name: (gallery.branch as unknown as { name: string }[])?.[0]?.name || (gallery.branch as unknown as { name: string })?.name,
