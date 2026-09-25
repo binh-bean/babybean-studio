@@ -202,4 +202,51 @@ test.describe("E-6: Ngắt mạng giữa lúc chọn ảnh", () => {
       )
       .toBe(6);
   });
+
+  /**
+   * Opus soát BB-232 (25/09/2026): máy chủ TỪ CHỐI HẲN lô gửi lại (bộ ảnh bị
+   * khoá trong lúc ba mẹ mất mạng) thì hàng chờ không được kẹt mãi — bản đầu
+   * giữ lô lại vĩnh viễn: "Chưa lưu" không bao giờ tắt, tim lệch dữ liệu thật,
+   * nút Chốt bị chặn với câu báo "mất mạng" sai.
+   */
+  test("Máy chủ từ chối lô gửi lại (bộ ảnh bị khoá lúc mất mạng) → hàng chờ thông, báo, tim khớp lại", async ({
+    page,
+    context,
+  }) => {
+    const soTruoc = async () =>
+      (
+        await client.query(
+          `select count(*)::int n from selection_items where gallery_id = $1 and mark = 'selected'`,
+          [galleryId],
+        )
+      ).rows[0].n as number;
+    // Ca trước có thể đã chọn hết 6 tấm — bắt đầu từ trắng (chỉ dữ liệu Fixture).
+    await client.query(`delete from selections where gallery_id = $1`, [galleryId]);
+    const truocDb = await soTruoc();
+
+    await page.goto(`/g/${maLink}`);
+    await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: CHO_ANH });
+    const dem = page.getByTestId("dem-da-chon");
+    await expect(dem).not.toHaveText("", { timeout: 10_000 });
+    // Bộ đếm trên màn có thể khác số dòng selection_items (ca trước để lại) —
+    // canh "KHÔNG ĐỔI so với trước", mỗi bên so với chính nó.
+    const truoc = Number(await dem.textContent());
+
+    await context.setOffline(true);
+    await page.locator('button[aria-label="Chọn ảnh này"]').first().click();
+    await expect(dem).toHaveText(String(truoc + 1), { timeout: 10_000 });
+    await expect(page.getByTestId("chua-luu")).toBeVisible();
+
+    // CSKH khoá bộ ảnh trong lúc ba mẹ đang mất mạng.
+    await client.query(`update galleries set status = 'in_retouch' where id = $1`, [galleryId]);
+    try {
+      await context.setOffline(false);
+      await expect(page.getByTestId("chua-luu")).toBeHidden({ timeout: 20_000 });
+      await expect(page.getByText(/chưa lưu được/i).first()).toBeVisible({ timeout: 10_000 });
+      await expect(dem).toHaveText(String(truoc), { timeout: 15_000 });
+      expect(await soTruoc()).toBe(truocDb);
+    } finally {
+      await client.query(`update galleries set status = 'ready' where id = $1`, [galleryId]);
+    }
+  });
 });

@@ -98,8 +98,20 @@ export interface UseHangChoTimResult {
   guiNgay: () => Promise<boolean>;
 }
 
-export function useHangChoTim(token: string): UseHangChoTimResult {
+export interface TuyChonHangCho {
+  /**
+   * Máy chủ TỪ CHỐI HẲN một lô gửi ngầm (4xx: GALLERY_LOCKED, QUOTA_EXCEEDED…).
+   * Lô đó đã bị bỏ khỏi hàng chờ — chỗ gọi báo cho ba mẹ và tải lại bộ ảnh để
+   * tim trên màn khớp lại dữ liệu thật.
+   */
+  khiBiTuChoi?: (code: string | null, message: string | null) => void;
+}
+
+export function useHangChoTim(token: string, tuyChon: TuyChonHangCho = {}): UseHangChoTimResult {
   const [soChuaGui, setSoChuaGui] = useState(0);
+  // Ref, không đưa vào phụ thuộc: chỗ gọi truyền một hàm mới mỗi render.
+  const khiBiTuChoiRef = useRef(tuyChon.khiBiTuChoi);
+  khiBiTuChoiRef.current = tuyChon.khiBiTuChoi;
 
   // Nguồn thật của hàng chờ là REF, không phải state: vòng lặp gửi trong
   // guiHangCho() chạy xuyên nhiều `await`, và xepHangTim() có thể được gọi
@@ -177,12 +189,20 @@ export function useHangChoTim(token: string): UseHangChoTimResult {
         }
 
         if (!res.ok) {
-          // Lỗi nghiệp vụ của MÁY CHỦ (không phải mất mạng) cho một lô ngầm.
-          // Không rõ nguyên nhân cụ thể (GALLERY_LOCKED, QUOTA_EXCEEDED, ...)
-          // có đáng thử lại hay không nếu không đọc thân lỗi — nhưng dừng vòng
-          // lặp và thử lại sau vẫn an toàn hơn xoá khỏi hàng chờ một thao tác
-          // chưa chắc đã được ghi nhận.
-          return;
+          // 5xx / 429: máy chủ trục trặc TẠM THỜI — giữ lô, thử lại vòng sau.
+          if (res.status >= 500 || res.status === 429) return;
+          // 4xx: máy chủ TỪ CHỐI HẲN (bộ ảnh đã bị khoá trong lúc ba mẹ mất
+          // mạng, vượt trần…). Gửi lại bao nhiêu lần cũng vậy — giữ trong hàng
+          // chờ là kẹt mãi: tim trên màn lệch dữ liệu thật và nút Chốt bị chặn
+          // với câu báo "mất mạng" sai (Opus soát BB-232, 25/09/2026). Bỏ lô
+          // khỏi hàng chờ, để chỗ gọi báo và tải lại cho khớp.
+          const json = (await res.json().catch(() => null)) as
+            | { error?: { code?: string; message?: string } }
+            | null;
+          luuVaBaoRender(boDaGui(hangChoRef.current, lo.ops));
+          loDangGuiRef.current = null;
+          khiBiTuChoiRef.current?.(json?.error?.code ?? null, json?.error?.message ?? null);
+          continue;
         }
 
         const ops: HangChoOp[] = lo.ops;

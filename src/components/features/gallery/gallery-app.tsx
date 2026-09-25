@@ -173,7 +173,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
   // BB-232 — hàng chờ thả tim ngoại tuyến. Toàn bộ logic (gộp/triệt tiêu, tự
   // gửi lại, localStorage) sống trong hook riêng — xem use-hang-cho-tim.ts.
-  const hangChoTim = useHangChoTim(token);
+  // Máy chủ từ chối hẳn một lô gửi lại (4xx): báo và tải lại bộ ảnh cho tim
+  // khớp dữ liệu thật. Ref vì loadGallery khai báo SAU và phụ thuộc hangChoTim.
+  const taiLaiRef = React.useRef<() => void>(() => {});
+  const hangChoTim = useHangChoTim(token, {
+    khiBiTuChoi: (_code, message) => {
+      setStatusMessage(
+        message
+          ? `Có ảnh chọn lúc mất mạng chưa lưu được: ${message}`
+          : "Có ảnh chọn lúc mất mạng chưa lưu được — bên mình đã tải lại danh sách đúng.",
+      );
+      taiLaiRef.current();
+    },
+  });
 
 
   const [tienDoTai, setTienDoTai] = useState<TienDoTai | null>(null);
@@ -475,6 +487,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
     // was detached from the DOM, retrying" chạy tới hết 60s không dừng).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, router, hangChoTim.apDungLenAnh, hangChoTim.guiNgay]);
+  taiLaiRef.current = () => void loadGallery();
 
   /**
    * Khách duyệt hoặc yêu cầu sửa. Tải lại cả bộ ảnh sau đó — quyết định này
