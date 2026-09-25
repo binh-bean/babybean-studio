@@ -29,6 +29,8 @@ import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { vi } from "@/i18n/vi";
 import { MAU_CHU_BIA, dienMau, type DuLieuBia } from "@/lib/gallery/mau-chu-bia";
+import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
+import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 
 interface Component {
   id: string;
@@ -100,6 +102,16 @@ interface Detail {
   welcomeMessage: string | null;
   babyName: string | null;
   branchName: string | null;
+  /** BB-200 (3/3) — nhãn quản trị đã tính từ trạng thái app + mã Lark. */
+  statusLabel?: string;
+  /** Mức cảnh báo từ Lark; null = chưa đọc được hoặc không áp dụng. */
+  warningColor?: MauCanhBao | null;
+  /** Tên trạng thái bên Lark (TRANG_THAI_LARK), để dòng "Lark: …". */
+  larkTenTrangThai?: string | null;
+  /** Lần cuối app đọc được từ Lark; null = chưa đọc bao giờ. */
+  larkDocLuc?: string | null;
+  /** Nhân viên đang đăng nhập có quyền `galleries:reopen` không. */
+  canReopen?: boolean;
 }
 
 export function GalleryDetail({ galleryId }: { galleryId: string }) {
@@ -479,6 +491,14 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             {detail.contractCodes.join(" + ")}
           </p>
         )}
+        {/* BB-200 (3/3) — dòng nhỏ nói app đang thấy gì bên Lark, và đọc từ
+            lúc nào. Không có gì để đọc (chưa đồng bộ lần nào) thì nói thẳng,
+            không im lặng: CSKH cần biết số liệu trước mắt có mới hay không. */}
+        <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
+          {detail.larkTenTrangThai
+            ? `Lark: ${detail.larkTenTrangThai} · đọc lúc ${new Date(detail.larkDocLuc ?? "").toLocaleString("vi-VN")}`
+            : "Chưa đọc được trạng thái từ Lark"}
+        </p>
       </header>
 
       {notice && (
@@ -486,7 +506,11 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       )}
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Trạng thái" value={GALLERY_STATUS_LABEL[detail.status] ?? detail.status} />
+        <Stat
+          label="Trạng thái"
+          value={detail.statusLabel ?? GALLERY_STATUS_LABEL[detail.status] ?? detail.status}
+          canhBao={detail.warningColor}
+        />
         <Stat
           label="Hạn mức"
           value={detail.quotaKnown ? String(detail.includedQuota) : "chưa biết"}
@@ -722,7 +746,14 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         </section>
       )}
 
-      {(detail.status === "expired" || detail.status === "submitted") && (
+      {/*
+        BB-200 (3/3) — form chỉ hiện khi nhân viên CÓ quyền `galleries:reopen`.
+        Trước bản vá này, thợ ảnh (không có quyền) vẫn thấy form đầy đủ, bấm
+        vào mới bị route API chặn — bắt người ta làm một việc rồi mới báo
+        không được làm. Route vẫn là ranh giới an ninh thật (xem đầu tệp);
+        đây chỉ là không bày ra thứ chắc chắn sẽ bị từ chối.
+      */}
+      {(detail.status === "expired" || detail.status === "submitted") && detail.canReopen && (
         <section className="rounded-lg border border-[var(--bb-border)] p-4">
           <h2 className="text-base font-medium">Mở lại cho khách chọn tiếp</h2>
           <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
@@ -1484,11 +1515,32 @@ function AddItemForm({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  canhBao,
+}: {
+  label: string;
+  value: string;
+  /** BB-200 — chấm màu mức cảnh báo từ Lark, chỉ hiện ở ô Trạng thái. */
+  canhBao?: MauCanhBao | null;
+}) {
+  const ui = canhBao ? canhBaoUi(canhBao) : null;
   return (
     <div className="rounded-lg border border-[var(--bb-border)] p-3">
       <div className="text-xs text-[var(--bb-fg-muted)]">{label}</div>
-      <div className="mt-1 text-sm font-medium">{value}</div>
+      <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
+        {ui && (
+          <span
+            role="img"
+            aria-label={`Mức cảnh báo: ${ui.nhan}`}
+            title={ui.nhan}
+            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/10"
+            style={{ backgroundColor: ui.mauToken }}
+          />
+        )}
+        {value}
+      </div>
     </div>
   );
 }

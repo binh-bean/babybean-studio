@@ -20,6 +20,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
 import { CreateGallerySchema, GetGalleriesQuerySchema } from "./schema";
+import { nhanHienThi, mauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
+import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 
 export const runtime = "nodejs";
 
@@ -275,8 +277,31 @@ export async function GET(request: Request): Promise<Response> {
     };
 
     const rpcData = (result ?? {}) as AdminGalleriesRpcResult;
-    const items = rpcData.items || [];
+    const rawItems = rpcData.items || [];
     const hasMore = Boolean(rpcData.hasMore);
+
+    /**
+     * BB-200 (2/3) — nhãn quản trị và mức cảnh báo tính TỪ MÃ LARK thô mà RPC
+     * (0068) vừa trả (larkTrangThai/larkCanhBao/larkDocLuc), dùng đúng luật
+     * dùng chung với màn khách (`nhanHienThi`/`mauCanhBao` ở
+     * src/lib/lark/trang-thai-hau-ky.ts) — không tính lại luật ở đây.
+     *
+     * Không trả `larkTrangThai`/`larkCanhBao` (mã thô) ra ngoài: màn hình chỉ
+     * cần nhãn đã tính (`statusLabel`) và mức màu (`warningColor`), giữ mã Lark
+     * là chi tiết triển khai nội bộ.
+     */
+    const items = rawItems.map((raw) => {
+      const item = raw as Record<string, unknown>;
+      const status = String(item.status ?? "");
+      const larkTrangThai = (item.larkTrangThai as string | null) ?? null;
+      const larkCanhBao = (item.larkCanhBao as string | null) ?? null;
+      const { larkTrangThai: _lt, larkCanhBao: _lcb, larkDocLuc: _ldl, ...rest } = item;
+      return {
+        ...rest,
+        statusLabel: nhanHienThi(status, larkTrangThai, (s) => GALLERY_STATUS_LABEL[s] ?? s).quanTri,
+        warningColor: mauCanhBao(larkCanhBao),
+      };
+    });
 
     const nextCursor = hasMore
       ? Buffer.from(JSON.stringify({ o: offset + items.length })).toString("base64url")
