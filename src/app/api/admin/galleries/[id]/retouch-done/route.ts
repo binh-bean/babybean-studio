@@ -29,6 +29,7 @@ import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { guiThongBaoBoAnh } from "@/lib/thong-bao/gui-day";
 
 export const runtime = "nodejs";
 
@@ -126,6 +127,15 @@ export async function POST(
       // Không ghi địa chỉ Drive: nhật ký đọc được rộng hơn, và đó là đường vào
       // thẳng thư mục ảnh của một đứa bé.
       metadata: { daCoBanGiaoTruoc: Boolean(existing) },
+    });
+
+    // BB-246: báo cho ba mẹ đã bật thông báo — SAU khi ghi DB xong, và hàm
+    // này tự không bao giờ ném (xem src/lib/thong-bao/gui-day.ts). Gửi hỏng
+    // không được phép biến việc CSKH vừa làm xong (chuyển file cho khách)
+    // thành lỗi 500 trước mặt họ.
+    await guiThongBaoBoAnh(admin, galleryId, {
+      tieuDe: "Ảnh của bé đã chỉnh xong",
+      noiDung: "Mời ba mẹ xem và duyệt bộ ảnh.",
     });
 
     return ok({ status: "awaiting_approval", finalDriveUrl: url });

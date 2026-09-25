@@ -16,6 +16,7 @@ import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { HuongDanThemManHinh } from "@/components/features/gallery/huong-dan-them-man-hinh";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
+import { BatThongBao } from "@/components/features/gallery/bat-thong-bao";
 import { SoSanhAnh } from "@/components/features/gallery/so-sanh-anh";
 import {
   themVaoSoSanh,
@@ -1380,6 +1381,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
           )}
         </div>
       </header>
+
+      {/*
+        BB-246 — nút "Bật thông báo". Đặt NGOÀI header sticky (không tranh chỗ
+        với tên bé/bộ lọc) nhưng vẫn ngay đầu trang, đúng chỗ ba mẹ nhìn thấy
+        lúc bộ ảnh chuyển sang "chờ duyệt". Tự ẩn hẳn khi chưa đủ điều kiện
+        (thiếu khoá VAPID, trình duyệt không hỗ trợ, bộ ảnh chưa chốt...) — xem
+        bat-thong-bao.tsx.
+      */}
+      <div className="mx-auto max-w-[1600px] px-3 pt-2 sm:px-6 lg:px-10">
+        <BatThongBao
+          galleryId={gallery.id}
+          status={gallery.status}
+          onMoHuongDanLuuApp={() => setMoHuongDanLuuApp(true)}
+        />
+      </div>
 
       {/* Thông báo trạng thái bộ ảnh — chỉ hiện khi có điều cần nói. */}
       {(gallery.review || isLocked || !gallery.quotaKnown || !duocChon) && (

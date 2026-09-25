@@ -54,6 +54,12 @@ const NGOAI_LE: Record<string, string> = {
     "quyết định cuối của khách có selection.submit ghi lại.",
   "g/buoi-chup":
     "Chỉ chọn buổi chụp để mở trong phiên của khách, không ghi dữ liệu nghiệp vụ.",
+  "g/thong-bao":
+    "BB-246 — bật/tắt đăng ký Web Push của MỘT TRÌNH DUYỆT (bảng push_dang_ky), " +
+    "không phải một quyết định của khách trên bộ ảnh. Không đổi trạng thái bộ " +
+    "ảnh, không đổi tiền, không có gì để tra lại sáu tháng sau ngoài chuyện " +
+    "trình duyệt đó có nhận thông báo hay không — chính bảng push_dang_ky đã " +
+    "là bản ghi đó.",
   "admin/galleries/preview":
     "Chỉ đọc thử một thư mục Drive rồi trả về, không ghi gì.",
   "auth/session":
