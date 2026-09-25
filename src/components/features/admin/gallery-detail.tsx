@@ -23,6 +23,7 @@
 
 "use client";
 import { BiaBoAnhEditor } from "./bia-bo-anh-editor";
+import { YeuCauMuaThemBlock } from "./yeu-cau-mua-them";
 
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -1408,80 +1409,6 @@ function TinhTrangLink({ detail }: { detail: Detail }) {
   );
 }
 
-/**
- * BB-245 — liệt kê yêu cầu mua thêm ba mẹ gửi sau khi đã duyệt ảnh.
- *
- * CHỈ ĐỌC ở lượt này (không có nút đổi trạng thái) — xem ghi chú migration
- * 0072. Bảng có thể chưa tồn tại trên môi trường chưa áp migration; lỗi 404/500
- * từ route thì im lặng ẩn khối này, không phải hỏng cả màn chi tiết.
- */
-function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
-  interface Dong {
-    id: string;
-    productName: string | null;
-    photoFileName: string | null;
-    soLuong: number;
-    ghiChu: string | null;
-    trangThai: string;
-    createdAt: string;
-  }
-
-  const [items, setItems] = React.useState<Dong[] | null>(null);
-
-  React.useEffect(() => {
-    let huy = false;
-    void (async () => {
-      try {
-        const res = await fetch(`/api/admin/galleries/${galleryId}/mua-them`);
-        if (!res.ok) return; // Bảng chưa áp migration hoặc không có quyền — im lặng ẩn khối.
-        const json = await res.json().catch(() => null);
-        if (!huy) setItems(json?.data?.items ?? []);
-      } catch {
-        // Mạng lỗi — không chặn phần còn lại của màn chi tiết.
-      }
-    })();
-    return () => {
-      huy = true;
-    };
-  }, [galleryId]);
-
-  if (!items || items.length === 0) return null;
-
-  const NHAN_TRANG_THAI: Record<string, string> = {
-    moi: "Mới gửi",
-    da_lien_he: "Đã liên hệ",
-    da_chot: "Đã chốt",
-    huy: "Đã huỷ",
-  };
-
-  return (
-    <section className="rounded-lg border border-[var(--bb-border)] p-4">
-      <h2 className="text-base font-medium">Yêu cầu mua thêm ({items.length})</h2>
-      <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
-        Ba mẹ gửi sau khi đã duyệt ảnh. Chưa tính vào hợp đồng — gọi lại chốt giá và thanh toán.
-      </p>
-      <ul className="mt-3 flex flex-col gap-2">
-        {items.map((d) => (
-          <li key={d.id} className="rounded-md border border-[var(--bb-border)] p-3 text-sm">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span>
-                <strong>{d.productName ?? "—"}</strong> ×{d.soLuong}
-                {d.photoFileName ? ` · ${d.photoFileName}` : ""}
-              </span>
-              <span className="rounded-full border px-2 py-0.5 text-xs">
-                {NHAN_TRANG_THAI[d.trangThai] ?? d.trangThai}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-              {new Date(d.createdAt).toLocaleString("vi-VN")}
-            </p>
-            {d.ghiChu && <p className="mt-1 text-xs">{d.ghiChu}</p>}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-
+// BB-245/BB-249 — khối "Yêu cầu mua thêm" tách sang ./yeu-cau-mua-them.tsx
+// (đổi trạng thái thêm ở BB-249). Xem import ở đầu tệp.
 

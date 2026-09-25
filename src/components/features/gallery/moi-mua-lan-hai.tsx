@@ -91,7 +91,11 @@ export function MoiMuaLanHai({
   const [monDangChon, setMonDangChon] = React.useState<MonTrongDanhMuc | null>(null);
   const [dangGui, setDangGui] = React.useState(false);
   const [loi, setLoi] = React.useState<string | null>(null);
-  const [daGui, setDaGui] = React.useState(false);
+  // BB-249 — mỗi dòng "đã gửi" mang trạng thái riêng (moi/da_lien_he/da_chot/
+  // huy) để hiện thông điệp thân thiện đúng tiến độ, không phải một câu
+  // chung chung cho mọi yêu cầu.
+  const [dsDaGui, setDsDaGui] = React.useState<{ id: string; trangThai: string }[]>([]);
+  const daGui = dsDaGui.length > 0;
 
   const duocMoiMua = duocMoiMuaLanHai(status, soVongSua);
 
@@ -104,8 +108,11 @@ export function MoiMuaLanHai({
       try {
         const res = await fetch("/api/g/mua-them", { cache: "no-store" });
         if (!res.ok || huy) return;
-        const json = (await res.json().catch(() => null)) as { data?: { items?: unknown[] } } | null;
-        if (!huy && (json?.data?.items?.length ?? 0) > 0) setDaGui(true);
+        const json = (await res.json().catch(() => null)) as {
+          data?: { items?: { id: string; trangThai: string }[] };
+        } | null;
+        const ds = json?.data?.items ?? [];
+        if (!huy && ds.length > 0) setDsDaGui(ds.map((d) => ({ id: d.id, trangThai: d.trangThai })));
       } catch {
         // Không tải được thì cứ để thẻ mời hiện bình thường — không chặn gì cả.
       }
@@ -145,12 +152,16 @@ export function MoiMuaLanHai({
           items: gio.map((d) => ({ productId: d.productId, photoId: d.photoId, soLuong: d.soLuong })),
         }),
       });
-      const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      const json = (await res.json().catch(() => null)) as {
+        error?: { message?: string };
+        data?: { items?: { id: string; trangThai: string }[] };
+      } | null;
       if (!res.ok) {
         setLoi(json?.error?.message ?? "Gửi không thành công, ba mẹ thử lại giúp em nhé");
         return;
       }
-      setDaGui(true);
+      const moi = json?.data?.items ?? [];
+      setDsDaGui((cu) => [...cu, ...moi.map((d) => ({ id: d.id, trangThai: d.trangThai }))]);
       setMo(false);
       setGio([]);
     } catch {
@@ -160,10 +171,29 @@ export function MoiMuaLanHai({
     }
   }
 
+  // BB-249 — trạng thái thân thiện theo tiến độ CSKH xử lý. KHÔNG có nhánh
+  // nào đọc ghi chú CSKH (metadata nhật ký nội bộ) — route /api/g/mua-them
+  // không trả trường đó nên không có gì để lộ ra đây.
+  const NHAN_THAN_THIEN: Record<string, string> = {
+    moi: "Đã gửi, studio sẽ gọi sớm",
+    da_lien_he: "Studio đã liên hệ",
+    da_chot: "Đã chốt đơn",
+    huy: "Đã huỷ",
+  };
+
   if (daGui) {
     return (
-      <div className="space-y-1.5 rounded-2xl border border-border bg-surface p-5">
-        <p className="font-display text-lg font-light leading-tight">Đã gửi — studio sẽ gọi ba mẹ sớm</p>
+      <div className="space-y-2 rounded-2xl border border-border bg-surface p-5">
+        <p className="font-display text-lg font-light leading-tight">Yêu cầu mua thêm</p>
+        <ul className="space-y-1.5">
+          {dsDaGui.map((d) => (
+            <li key={d.id} className="flex items-center justify-between gap-3 text-xs">
+              <span className="text-muted-foreground">
+                {NHAN_THAN_THIEN[d.trangThai] ?? "Đã gửi, studio sẽ gọi sớm"}
+              </span>
+            </li>
+          ))}
+        </ul>
         <p className="text-xs text-muted-foreground">
           CSKH sẽ liên hệ để báo giá và thanh toán, ba mẹ chưa cần làm gì thêm ạ.
         </p>

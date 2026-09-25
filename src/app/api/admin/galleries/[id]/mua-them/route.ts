@@ -3,8 +3,8 @@
  *
  * OWNER: DEV-BE. Task BB-245.
  *
- * Chỉ ĐỌC. Đổi trạng thái (đã liên hệ, đã chốt, huỷ) chưa dựng ở lượt này —
- * xem ghi chú ở `db/migrations/0072-yeu-cau-mua-them.sql`.
+ * Chỉ ĐỌC. Đổi trạng thái (đã liên hệ, đã chốt, huỷ) nằm ở route con
+ * `PATCH /api/admin/galleries/[id]/mua-them/[yeuCauId]` (BB-249).
  *
  * Không gate quyền riêng: cùng khuôn với GET `/api/admin/galleries/[id]/items`
  * (route anh em) — `requireStaff` + `requireBranch` là đủ, mọi nhân viên xem
