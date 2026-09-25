@@ -173,7 +173,10 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
     await expect(nutMau).toBeVisible();
     await expect(nutMau).toHaveAttribute("aria-pressed", "true");
 
-    // Câu ghi chú "chỉ để tham khảo" phải thấy ngay khi bật Khung.
+    // BB-243: bảng đã gọn lại — câu "chỉ để tham khảo" gấp sau nút "Chi tiết",
+    // không còn hiện ngay khi bật Khung nữa.
+    await expect(manTuong.getByText(/chỉ để tham khảo/)).toHaveCount(0);
+    await manTuong.getByRole("button", { name: "Chi tiết" }).click();
     await expect(manTuong.getByText(/chỉ để tham khảo/)).toBeVisible();
 
     // Khung đang vẽ bằng border-image — đọc border-image-source của khối bọc
@@ -192,5 +195,94 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
     );
     expect(nguonSau).toContain("khung-trang.jpg");
     expect(nguonSau).not.toBe(nguonBanDau);
+  });
+
+  test("BB-242: Ghim & vuốt — ghim tấm không đổi khi vuốt tấm kia sang tấm kế, số x/y đổi", async ({
+    page,
+  }) => {
+    await page.goto(`/g/${maLink}`);
+    const the = page.getByTestId("the-anh");
+    await expect(the).toHaveCount(3);
+
+    // Thả tim cả 3 tấm: chỉ đánh dấu ĐÚNG 2 tấm để so sánh (tối thiểu) làm
+    // "Ghim & vuốt" vuốt trong toàn bộ tấm đã thả tim (3 tấm), không chỉ 2
+    // tấm đang so sánh — xem danhSachVuotGhim trong so-sanh.ts. Đã CHỌN từ
+    // ca thử khác trong cùng tệp này thì bỏ qua (đợi thẻ hiện ra trước khi
+    // đọc trạng thái nút — gọi ngay sau goto dễ hỏi sớm hơn lúc hydrate xong).
+    for (let i = 0; i < 3; i++) {
+      await expect(the.nth(i)).toBeVisible();
+      const nutChonI = the.nth(i).getByRole("button", { name: "Chọn ảnh này" });
+      if ((await nutChonI.count()) > 0) await nutChonI.click();
+      await expect(the.nth(i).getByRole("button", { name: "Bỏ chọn" })).toBeVisible();
+    }
+
+    await page.getByRole("button", { name: "So sánh", exact: true }).click();
+    await the.nth(0).click();
+    await the.nth(1).click();
+    await page.getByRole("button", { name: /Đã chọn 2 tấm để so sánh/ }).click();
+
+    const manSoSanh = page.getByRole("dialog", { name: "So sánh nhiều tấm" });
+    await expect(manSoSanh).toBeVisible();
+
+    await manSoSanh.getByRole("button", { name: "Ghim & vuốt" }).click();
+    // Tấm ghim (đầu danh sách so sánh) mặc định — nút của NÓ có nhãn "Bỏ
+    // ghim". Không dò theo aria-pressed="true" chung chung: nút chuyển chế
+    // độ ở đầu ("Ghim & vuốt") CŨNG có aria-pressed="true" khi đang bật chế
+    // độ này, khớp nhầm phần tử khác trong cùng màn.
+    const nutGhim = manSoSanh.getByRole("button", { name: "Bỏ ghim" });
+    await expect(nutGhim).toBeVisible();
+    const anhGhimTruoc = await nutGhim.locator("xpath=parent::div//img").getAttribute("src");
+
+    const demChu = manSoSanh.getByText(/^\d+ \/ \d+$/);
+    const demTruoc = (await demChu.textContent())?.trim();
+    expect(demTruoc).toBe("2 / 3");
+
+    await manSoSanh.getByRole("button", { name: "Tấm sau" }).click();
+    const demSau = (await demChu.textContent())?.trim();
+    expect(demSau).toBe("3 / 3");
+    expect(demSau).not.toBe(demTruoc);
+
+    // Tấm ghim vẫn đứng yên — cùng đúng một ảnh trước và sau khi vuốt tấm kia.
+    const anhGhimSau = await nutGhim.locator("xpath=parent::div//img").getAttribute("src");
+    expect(anhGhimSau).toBe(anhGhimTruoc);
+  });
+
+  test("BB-243: Ẩn bảng — bảng biến mất, ảnh phòng còn; bấm tấm của bé mở xem lớn, Esc về màn tường", async ({
+    page,
+  }) => {
+    await page.goto(`/g/${maLink}`);
+    const tamDau = page.getByTestId("the-anh").first();
+    await expect(tamDau).toBeVisible();
+    const nutChon = tamDau.getByRole("button", { name: "Chọn ảnh này" });
+    if ((await nutChon.count()) > 0) await nutChon.click();
+    await expect(tamDau.getByRole("button", { name: "Bỏ chọn" })).toBeVisible();
+
+    await tamDau.click();
+    await page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first().click();
+
+    const manTuong = page.getByRole("dialog", { name: "Xem ảnh trên tường" });
+    await expect(manTuong).toBeVisible();
+
+    const anhPhong = manTuong.locator('img[src*="/tuong/"]').first();
+    await expect(anhPhong).toBeVisible();
+    const tieuDeBang = manTuong.getByText("Treo lên tường nhà mình");
+    await expect(tieuDeBang).toBeVisible();
+
+    await manTuong.getByRole("button", { name: "Ẩn bảng" }).click();
+    await expect(tieuDeBang).toBeHidden();
+    await expect(anhPhong).toBeVisible();
+
+    await manTuong.getByRole("button", { name: "Hiện bảng" }).click();
+    await expect(tieuDeBang).toBeVisible();
+
+    // Bấm tấm của bé trong khung — mở hộp thoại xem lớn.
+    await manTuong.getByRole("button", { name: "Xem lớn ảnh của bé" }).click();
+    const xemLon = page.getByRole("dialog", { name: "Xem lớn ảnh của bé" });
+    await expect(xemLon).toBeVisible();
+
+    // Esc chỉ đóng LỚP xem lớn — màn tường bên dưới vẫn mở.
+    await page.keyboard.press("Escape");
+    await expect(xemLon).toBeHidden();
+    await expect(manTuong).toBeVisible();
   });
 });

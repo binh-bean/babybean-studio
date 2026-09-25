@@ -1993,6 +1993,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
           onPhongTo={onPhongToTuSoSanh}
           daChon={soAnhDaChon}
           hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
+          // BB-242: chế độ "Ghim & vuốt" vuốt qua toàn bộ tấm đã thả tim khi
+          // chỉ đánh dấu đúng 2 tấm so sánh — cần danh sách này để vẽ đúng.
+          anhDaThaTim={anhDaChonHopThoai}
         />
       )}
 

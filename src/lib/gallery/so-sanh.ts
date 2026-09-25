@@ -60,3 +60,38 @@ export function boCucSoSanh(soTam: number, manHinhDoc: boolean): BoCucSoSanh {
   if (soTam <= SO_SANH_TOI_THIEU) return manHinhDoc ? "doc" : "ngang";
   return "luoi";
 }
+
+/**
+ * "Ghim & vuốt" (BB-242) — chọn danh sách tấm để VUỐT khi một tấm đã bị ghim.
+ *
+ * Lời đề bài: "danh sách để vuốt là các tấm ĐÃ ĐÁNH DẤU so sánh, hoặc nếu chỉ
+ * đánh dấu 2 tấm thì là toàn bộ tấm đã thả tim." Tức đánh dấu đúng 2 tấm (tối
+ * thiểu để mở màn so sánh) thì vuốt trong 2 tấm đó thôi là vô nghĩa (chỉ có
+ * một tấm kia để đổi sang) — mở rộng ra mọi tấm đã thả tim để so được nhiều
+ * hơn. Đánh dấu 3–4 tấm thì ba mẹ đã CHỌN SẴN đúng nhóm muốn so, vuốt trong
+ * đúng nhóm đó, không lẫn tấm ngoài nhóm.
+ */
+export function danhSachVuotGhim(
+  dsSoSanh: readonly string[],
+  idDaThaTim: readonly string[]
+): string[] {
+  return dsSoSanh.length > SO_SANH_TOI_THIEU ? [...dsSoSanh] : [...idDaThaTim];
+}
+
+/** Chỉ số bắt đầu vuốt — đứng ngay tại tấm đang xem (không ghim) trong danh
+ * sách vuốt; không có trong danh sách (ví dụ tấm đó bị bỏ tim) thì về 0. */
+export function chiSoBanDauVuot(dsVuot: readonly string[], idKhongGhim: string): number {
+  const i = dsVuot.indexOf(idKhongGhim);
+  return i >= 0 ? i : 0;
+}
+
+/** Chỉ số kế tiếp khi vuốt/bấm › — dừng ở cuối danh sách, không vòng lại đầu. */
+export function chiSoVuotKeTiep(tongSo: number, chiSoHienTai: number): number {
+  if (tongSo <= 0) return 0;
+  return chiSoHienTai < tongSo - 1 ? chiSoHienTai + 1 : chiSoHienTai;
+}
+
+/** Chỉ số trước khi vuốt/bấm ‹ — dừng ở đầu danh sách, không vòng lại cuối. */
+export function chiSoVuotTruoc(chiSoHienTai: number): number {
+  return chiSoHienTai > 0 ? chiSoHienTai - 1 : 0;
+}

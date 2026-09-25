@@ -187,6 +187,37 @@ export const vi = {
     downloadThis: "Tải ảnh này về máy",
     quotaInline: "đã chọn",
     messageStudio: "Nhắn cho studio",
+
+    // BB-242 — chế độ "Ghim & vuốt" trong màn so sánh nhiều tấm.
+    soSanh: {
+      cheDoGhimVuot: "Ghim & vuốt",
+      cheDoLuoi: "Xem lưới",
+      ghimTam: "Ghim tấm này",
+      boGhimTam: "Bỏ ghim",
+      tamSoSanhTruoc: "Tấm trước",
+      tamSoSanhSau: "Tấm sau",
+      dem: "{current} / {total}",
+    },
+
+    // BB-243 — màn "treo ảnh lên tường" gọn chữ: bảng mờ đè ảnh, ẩn được, mở
+    // lớn tấm của bé.
+    treoTuong: {
+      anBang: "Ẩn bảng",
+      hienBang: "Hiện bảng",
+      chiTiet: "Chi tiết",
+      anChiTiet: "Ẩn chi tiết",
+      xemLonAnhBe: "Xem lớn ảnh của bé",
+      dongXemLon: "Đóng xem lớn",
+      thamKhaoKhung: "Mẫu khung chỉ để tham khảo — CSKH sẽ tư vấn mẫu thật khi chốt đơn.",
+      moTaChatLieu: {
+        "Gỗ": "In trên nền gỗ tự nhiên, vân gỗ hiện rõ ở viền — ấm và mộc.",
+        "Cavas/Kim tuyến": "In trên vải canvas có vân vải nhẹ — cảm giác như tranh vẽ.",
+        "Tráng gương": "Phủ bóng như gương, màu lên rực và sâu.",
+        "Thủy tinh": "In sau lớp kính cường lực, bề mặt phẳng và sáng.",
+        "Mica HD": "In trên tấm mica trong, nhẹ và giữ màu bền.",
+        UV: "Phủ thêm lớp UV bóng bảo vệ mực in.",
+      },
+    },
   },
   admin: {
     branches: {
