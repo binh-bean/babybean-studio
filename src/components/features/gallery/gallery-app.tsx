@@ -2,6 +2,7 @@
 
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
+import { TheHanhTrinh } from "@/components/features/gallery/the-hanh-trinh";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
@@ -31,7 +32,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
 import { useHangChoTim } from "@/components/features/gallery/use-hang-cho-tim";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, AlertCircle, Info, Lock } from "lucide-react";
+import { AlertTriangle, Info, Lock } from "lucide-react";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -47,6 +48,7 @@ interface GalleryApiResponse {
   title: string;
   welcomeMessage: string | null;
   status: string;
+  giaiDoanTienDo?: number | null;
   /**
    * BB-200 (3/3) — chuỗi tiến độ tính từ trạng thái app + mã Lark
    * (docs/21 "Luồng hiển thị"). `null` = giữ nguyên chữ cũ theo `status`.
@@ -1136,8 +1138,17 @@ export function GalleryApp({ token }: GalleryAppProps) {
   if (error || !gallery) {
     return (
       <div className="mx-auto flex min-h-[80dvh] max-w-md flex-col items-center justify-center bg-background p-6 text-center text-foreground">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-          <AlertCircle className="h-6 w-6" />
+        <div className="relative mb-6 h-[160px] w-[160px] md:h-[200px] md:w-[200px]">
+          <img
+            src="/hanh-trinh/link-het-han-640.webp"
+            srcSet="/hanh-trinh/link-het-han-320.webp 320w, /hanh-trinh/link-het-han-640.webp 640w"
+            sizes="(max-width: 768px) 160px, 200px"
+            alt=""
+            loading="lazy"
+            width={640}
+            height={640}
+            className="absolute inset-0 h-full w-full object-contain animate-in fade-in duration-300 motion-reduce:animate-none"
+          />
         </div>
         <h1 className="font-display text-2xl font-light">
           {error?.code === "LINK_EXPIRED" ? vi.gallery.expiredTitle : vi.gallery.notFoundTitle}
@@ -1380,6 +1391,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
           )}
         </div>
       </header>
+
+      <div className="mx-auto max-w-3xl px-4 pt-5">
+        <TheHanhTrinh
+          status={gallery.status}
+          giaiDoan={gallery.giaiDoanTienDo ?? null}
+          nhanTienDo={gallery.nhanTienDo}
+          photoCount={gallery.photoCount}
+        />
+      </div>
 
       {/* Thông báo trạng thái bộ ảnh — chỉ hiện khi có điều cần nói. */}
       {(gallery.review || isLocked || !gallery.quotaKnown || !duocChon) && (

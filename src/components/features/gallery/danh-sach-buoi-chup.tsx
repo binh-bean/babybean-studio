@@ -120,8 +120,17 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
   if (danhSach.length === 0 && !loi) {
     return (
       <div className="mx-auto flex min-h-[80dvh] max-w-md flex-col items-center justify-center bg-background p-6 text-center text-foreground">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-primary">
-          <Camera className="h-6 w-6" />
+        <div className="relative mb-6 h-[160px] w-[160px] md:h-[200px] md:w-[200px]">
+          <img
+            src="/hanh-trinh/chua-co-anh-640.webp"
+            srcSet="/hanh-trinh/chua-co-anh-320.webp 320w, /hanh-trinh/chua-co-anh-640.webp 640w"
+            sizes="(max-width: 768px) 160px, 200px"
+            alt=""
+            loading="lazy"
+            width={640}
+            height={640}
+            className="absolute inset-0 h-full w-full object-contain animate-in fade-in duration-300 motion-reduce:animate-none"
+          />
         </div>
         <h1 className="font-display text-2xl font-light">Album đang được chuẩn bị</h1>
         <p className="mb-6 mt-2 text-sm text-muted-foreground">
