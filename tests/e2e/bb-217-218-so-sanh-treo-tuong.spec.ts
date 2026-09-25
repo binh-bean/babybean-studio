@@ -205,7 +205,7 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
     await expect(the).toHaveCount(3);
 
     // Thả tim cả 3 tấm: chỉ đánh dấu ĐÚNG 2 tấm để so sánh (tối thiểu) làm
-    // "Ghim & vuốt" vuốt trong toàn bộ tấm đã thả tim (3 tấm), không chỉ 2
+    // "Ghim & vuốt" vuốt trong các tấm đã thả tim (3 tấm, trừ tấm ghim), không chỉ 2
     // tấm đang so sánh — xem danhSachVuotGhim trong so-sanh.ts. Đã CHỌN từ
     // ca thử khác trong cùng tệp này thì bỏ qua (đợi thẻ hiện ra trước khi
     // đọc trạng thái nút — gọi ngay sau goto dễ hỏi sớm hơn lúc hydrate xong).
@@ -235,11 +235,13 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
 
     const demChu = manSoSanh.getByText(/^\d+ \/ \d+$/);
     const demTruoc = (await demChu.textContent())?.trim();
-    expect(demTruoc).toBe("2 / 3");
+    // 3 tấm đã thả tim, TRỪ tấm đang ghim (Opus soát: không vuốt tới chính
+    // tấm ghim) → danh sách vuốt còn 2; đứng ở tấm đánh dấu thứ hai.
+    expect(demTruoc).toBe("1 / 2");
 
     await manSoSanh.getByRole("button", { name: "Tấm sau" }).click();
     const demSau = (await demChu.textContent())?.trim();
-    expect(demSau).toBe("3 / 3");
+    expect(demSau).toBe("2 / 2");
     expect(demSau).not.toBe(demTruoc);
 
     // Tấm ghim vẫn đứng yên — cùng đúng một ảnh trước và sau khi vuốt tấm kia.
