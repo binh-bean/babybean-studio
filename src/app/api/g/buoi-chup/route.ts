@@ -45,7 +45,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import {
   requireGallerySession,
   GallerySessionError,
@@ -194,8 +194,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       return fail("FORBIDDEN", "Link này đã mở sẵn đúng một buổi chụp rồi");
     }
 
-    const parsed = ChonBuoiChupSchema.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) {
+    const body = await readJsonBody(request);
+    const parsed = body.ok ? ChonBuoiChupSchema.safeParse(body.data) : null;
+    if (!parsed || !parsed.success) {
       return fail("INVALID_INPUT", "Ba mẹ chọn giúp một buổi chụp trong danh sách");
     }
 

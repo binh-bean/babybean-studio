@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { fail, failUnexpected } from "@/lib/api-response";
+import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
 import { driveFetch, DriveAccessDeniedError } from "@/lib/drive/client";
@@ -23,14 +23,12 @@ export async function POST(request: Request): Promise<Response> {
     const staff = await requireStaff();
     requirePermission(staff, "galleries:write");
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
+    const jsonBody = await readJsonBody(request);
+    if (!jsonBody.ok) {
       return fail("INVALID_INPUT", "Request body phải là JSON hợp lệ");
     }
 
-    const parsed = PreviewGallerySchema.safeParse(body);
+    const parsed = PreviewGallerySchema.safeParse(jsonBody.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
     }

@@ -8,7 +8,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UpdateBranchSchema } from "../schema";
@@ -30,7 +30,9 @@ export async function PATCH(
     // branch_manager chỉ sửa được chi nhánh mình phụ trách.
     requireBranch(staff, id);
 
-    const parsed = UpdateBranchSchema.safeParse(await request.json());
+    const body = await readJsonBody(request);
+    if (!body.ok) return fail("INVALID_INPUT");
+    const parsed = UpdateBranchSchema.safeParse(body.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", parsed.error.issues[0]?.message, {
         issues: parsed.error.issues,

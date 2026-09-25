@@ -25,7 +25,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
@@ -48,7 +48,8 @@ export async function POST(
     const { id: galleryId } = await context.params;
     if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
 
-    const body = (await request.json().catch(() => null)) as { finalDriveUrl?: string } | null;
+    const jsonBody = await readJsonBody(request);
+    const body = (jsonBody.ok ? jsonBody.data : null) as { finalDriveUrl?: string } | null;
     const url = (body?.finalDriveUrl ?? "").trim();
     if (!/^https?:\/\/\S+$/.test(url)) {
       return fail("INVALID_INPUT", "Cần link thư mục ảnh đã chỉnh để gửi khách");

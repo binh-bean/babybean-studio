@@ -12,7 +12,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateBranchSchema } from "./schema";
@@ -76,7 +76,9 @@ export async function POST(request: Request): Promise<Response> {
     const staff = await requireStaff();
     requirePermission(staff, "branches:manage");
 
-    const parsed = CreateBranchSchema.safeParse(await request.json());
+    const body = await readJsonBody(request);
+    if (!body.ok) return fail("INVALID_INPUT");
+    const parsed = CreateBranchSchema.safeParse(body.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", parsed.error.issues[0]?.message, {
         issues: parsed.error.issues,

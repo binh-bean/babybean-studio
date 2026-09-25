@@ -5,6 +5,7 @@ import {
   readLarkRecord,
   syncSingleRetouchRecord,
 } from "@/lib/lark/sync-retouch";
+import { readJsonBody } from "@/lib/api-response";
 
 export const runtime = "nodejs";
 
@@ -18,13 +19,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body;
-  try {
-    body = await request.json();
-  } catch (err) {
-    console.error("[Lark Hook] Lỗi parse body:", err);
+  const jsonBody = await readJsonBody<{ record_id?: string }>(request);
+  if (!jsonBody.ok) {
+    console.error("[Lark Hook] Lỗi parse body");
     return NextResponse.json({ message: "Invalid JSON body" }, { status: 200 });
   }
+  const body = jsonBody.data;
 
   const recordId = body?.record_id;
   if (!recordId) {

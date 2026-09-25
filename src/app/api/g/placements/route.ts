@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireGallerySession, GallerySessionError, EDITING_ROLES } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ok, fail } from "@/lib/api-response";
+import { ok, fail, readJsonBody } from "@/lib/api-response";
 import { PlacePhotoSchema, RemovePhotoPlacementSchema } from "./schema";
 import { isGalleryLocked } from "@/lib/gallery-status";
 
@@ -32,14 +32,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await requireGallerySession(EDITING_ROLES);
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
+    const jsonBody = await readJsonBody(request);
+    if (!jsonBody.ok) {
       return fail("INVALID_INPUT", "Request body phải là JSON hợp lệ");
     }
 
-    const parsed = PlacePhotoSchema.safeParse(body);
+    const parsed = PlacePhotoSchema.safeParse(jsonBody.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
     }
@@ -271,14 +269,11 @@ export async function DELETE(request: NextRequest) {
 
     // 2. Parse input từ JSON body hoặc query params
     let rawInput: Record<string, unknown> = {};
-    try {
-      const body = await request.json();
-      if (body && typeof body === "object") {
-        rawInput = body as Record<string, unknown>;
-      }
-    } catch {
-      // Body không có hoặc không phải json -> đọc từ URL searchParams
+    const jsonBody = await readJsonBody(request);
+    if (jsonBody.ok && jsonBody.data && typeof jsonBody.data === "object") {
+      rawInput = jsonBody.data as Record<string, unknown>;
     }
+    // Body không có hoặc không phải json -> đọc từ URL searchParams
 
     const url = new URL(request.url);
     if (!rawInput.galleryItemId && url.searchParams.get("galleryItemId")) {

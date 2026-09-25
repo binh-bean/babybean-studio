@@ -6,7 +6,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UpdateCustomerSchema } from "../schema";
@@ -167,7 +167,9 @@ export async function PATCH(
     requirePermission(staff, "customers:write");
 
     const { id } = await context.params;
-    const parsed = UpdateCustomerSchema.safeParse(await request.json());
+    const body = await readJsonBody(request);
+    if (!body.ok) return fail("INVALID_INPUT");
+    const parsed = UpdateCustomerSchema.safeParse(body.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", parsed.error.issues[0]?.message, {
         issues: parsed.error.issues,

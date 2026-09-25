@@ -42,6 +42,35 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   INTERNAL: "Có lỗi xảy ra, vui lòng thử lại",
 };
 
+/**
+ * Đọc thân JSON của yêu cầu mà không để lộ SyntaxError ra ngoài route handler.
+ *
+ * VÌ SAO: `await request.json()` trần ném `SyntaxError` khi thân rỗng hoặc
+ * bị cắt giữa chừng (yêu cầu đứt kết nối). Không route nào bắt riêng lỗi đó,
+ * nên nó rơi xuống `catch` ngoài cùng và biến thành 500 INTERNAL thay vì 400
+ * INVALID_INPUT — thấy thật ở `PATCH /api/g/selection` ngày 24/09/2026.
+ *
+ * Chỉ phân biệt thành công/hỏng ở tầng cú pháp JSON. Việc thân có đúng HÌNH
+ * DẠNG mong đợi hay không (object, mảng, có trường bắt buộc...) vẫn là việc
+ * của Zod schema gọi sau — vì vậy JSON hợp lệ nhưng không phải object (vd
+ * chuỗi, số, mảng, `null`) vẫn được coi là "đọc thành công", để schema tự
+ * quyết định đúng/sai hình dạng và trả `INVALID_INPUT` với `issues` chi tiết.
+ */
+export type JsonBodyResult<T = unknown> =
+  | { ok: true; data: T }
+  | { ok: false };
+
+export async function readJsonBody<T = unknown>(
+  request: Request,
+): Promise<JsonBodyResult<T>> {
+  try {
+    const data = (await request.json()) as T;
+    return { ok: true, data };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export function ok<T>(data: T, meta?: ApiMeta): NextResponse {
   return NextResponse.json(
     meta ? { data, meta } : { data },

@@ -31,7 +31,9 @@ export async function patchSelection(
   const actorLabel = linkResult.data?.label || "Customer";
 
   if (galleryError || !gallery) {
-    return { error: { code: "NOT_FOUND", message: "Gallery not found" } };
+    // BB-223: KHÔNG truyền câu tiếng Anh hay mã lỗi trần vào đây — để trống
+    // thì fail() ở route dùng DEFAULT_MESSAGE tiếng Việt của api-response.ts.
+    return { error: { code: "NOT_FOUND" } };
   }
 
   /*
@@ -47,7 +49,8 @@ export async function patchSelection(
     SQL và bản TypeScript đều đã bỏ 'submitted', còn dòng này thì không.
   */
   if (isGalleryLocked(gallery.status)) {
-    return { error: { code: "GALLERY_LOCKED", message: "Gallery is locked" } };
+    // BB-223: cùng lý do — bỏ câu tiếng Anh, để DEFAULT_MESSAGE lo.
+    return { error: { code: "GALLERY_LOCKED" } };
   }
 
   const quotaKnown = quotaResult.data !== null && quotaResult.data !== undefined;
@@ -159,7 +162,7 @@ export async function patchSelection(
   if (rpcError) {
     if (rpcError.message === "GALLERY_LOCKED") return { error: { code: "GALLERY_LOCKED" } };
     if (rpcError.message === "FORBIDDEN") return { error: { code: "FORBIDDEN" } };
-    if (rpcError.message === "FORBIDDEN_PHOTO") return { error: { code: "FORBIDDEN", message: "Photo does not belong to this gallery" } };
+    if (rpcError.message === "FORBIDDEN_PHOTO") return { error: { code: "FORBIDDEN", message: "Ảnh này không thuộc bộ ảnh đang mở" } };
     if (rpcError.message === "QUOTA_EXCEEDED") return { error: { code: "QUOTA_EXCEEDED" } };
     throw rpcError;
   }
@@ -214,10 +217,21 @@ export async function patchSelection(
       .eq("photo_id", op.photoId);
 
     if (updateError) {
+      // BB-223: KHÔNG đẩy updateError.message (lỗi Postgres/Supabase chưa kiểm
+      // soát) ra khách hàng — log nguyên nhân thật ở đây, còn message trả về
+      // chỉ là câu tiếng Việt chung chung, giống cách failUnexpected() làm.
+      console.error(
+        JSON.stringify({
+          evt: "patch_selection_note_update_failed",
+          selectionId: session.selectionId,
+          photoId: op.photoId,
+          err: { message: updateError.message, details: updateError.details, hint: updateError.hint },
+        }),
+      );
       return {
         error: {
           code: "INTERNAL",
-          message: updateError.message || "Không thể lưu ghi chú chỉnh sửa ảnh",
+          message: "Không thể lưu ghi chú chỉnh sửa ảnh",
         },
       };
     }

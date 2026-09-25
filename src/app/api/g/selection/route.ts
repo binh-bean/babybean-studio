@@ -10,7 +10,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import {
   requireGallerySession,
   GallerySessionError,
@@ -25,7 +25,9 @@ export async function PATCH(request: Request): Promise<Response> {
 
   try {
     // 1. Parse ------------------------------------------------------------
-    const parsed = SelectionPatchSchema.safeParse(await request.json());
+    const body = await readJsonBody(request);
+    if (!body.ok) return fail("INVALID_INPUT");
+    const parsed = SelectionPatchSchema.safeParse(body.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
     }
