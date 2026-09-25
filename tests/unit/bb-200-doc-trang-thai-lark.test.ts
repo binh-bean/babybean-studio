@@ -77,9 +77,12 @@ describe("tinhMocTu", () => {
   it("lần đầu thấy: lấy cột ngày của Lark, KHÔNG lấy bây giờ (không thì nhắc trễ cả chục ngày)", () => {
     expect(tinhMocTu({ lark_trang_thai: null, lark_trang_thai_tu: null }, moi("optl5DyKLx"), bayGio)).toEqual(ngayCot);
   });
-  it("lần đầu thấy, không có cột ngày: lúc bản ghi sửa gần nhất", () => {
+  it("lần đầu thấy, giai đoạn không có cột ngày: NULL — không đoán bằng lúc bản ghi bị sửa", () => {
+    // Chạy thử 25/09: đoán bằng last_modified_time cho ra 92 bộ nhắc sai ngày đầu.
     const m = { ...moi("optmhzW4sL"), ngayVaoGiaiDoan: null };
-    expect(tinhMocTu({ lark_trang_thai: null, lark_trang_thai_tu: null }, m, bayGio)).toEqual(sua);
+    expect(tinhMocTu({ lark_trang_thai: null, lark_trang_thai_tu: null }, m, bayGio)).toBeNull();
+    expect(tinhMocTu({ lark_trang_thai: "optmhzW4sL", lark_trang_thai_tu: null }, m, bayGio)).toBeNull();
+    expect(sua).toBeDefined();
   });
   it("không đổi: giữ mốc cũ", () => {
     const cu = new Date("2026-09-10T00:00:00Z");
