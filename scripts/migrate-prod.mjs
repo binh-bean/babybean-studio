@@ -97,6 +97,7 @@ const DAY = [
   "0066-cskh-mo-lai-bo-anh.sql",
   "0067-trang-thai-hau-ky-tu-lark.sql",
   "0068-admin-galleries-rpc-tra-them-lark.sql",
+  "0069-kieu-chu-bia.sql",
   "0070-giu-ma-link-ma-hoa.sql",
 ];
 

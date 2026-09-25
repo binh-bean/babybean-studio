@@ -53,9 +53,10 @@ export async function GET(
       // vì Supabase suy kiểu từ chuỗi literal.
       // BB-200 (2/3) thêm ba cột lark_trang_thai…: nhãn quản trị + mức cảnh báo
       // + dòng "Lark: … · đọc lúc …". BB-201 thêm lark_hauky_record_id: khôi
-      // phục link cũ từ cột "Link app". Cùng luật viết liền một dòng (BB-150,
-      // BB-215) — Supabase suy kiểu từ chuỗi literal, nối chuỗi là mất kiểu.
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc")
+      // phục link cũ từ cột "Link app". BB-244 thêm cover_layout (kiểu chữ bìa).
+      // Cùng luật viết liền một dòng (BB-150, BB-215) — Supabase suy kiểu từ
+      // chuỗi literal, nối chuỗi là mất kiểu.
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc")
       .eq("id", galleryId)
       .single();
 
@@ -232,6 +233,7 @@ export async function GET(
       coverPhotoId: gallery.cover_photo_id ?? null,
       coverHeadline: gallery.cover_headline ?? null,
       welcomeMessage: gallery.welcome_message ?? null,
+      coverLayout: gallery.cover_layout ?? null,
       babyName: baby?.nickname || baby?.full_name || null,
       branchName: branch?.name ?? null,
       contractCodes: gallery.lark_contract_codes ?? [],
