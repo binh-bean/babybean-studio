@@ -38,9 +38,10 @@ const Body = z
     coverPhotoId: z.string().regex(UUID_REGEX).nullable().optional(),
     coverHeadline: z.string().trim().max(120).nullable().optional(),
     welcomeMessage: z.string().trim().max(400).nullable().optional(),
+    coverLayout: z.enum(["tap-chi", "toi-gian", "ben-canh", "de-cheo"]).nullable().optional(),
   })
   .refine(
-    (b) => b.coverPhotoId !== undefined || b.coverHeadline !== undefined || b.welcomeMessage !== undefined,
+    (b) => b.coverPhotoId !== undefined || b.coverHeadline !== undefined || b.welcomeMessage !== undefined || b.coverLayout !== undefined,
     { message: "Không có gì để lưu" },
   );
 
@@ -71,7 +72,7 @@ export async function PATCH(
 
     const { data: gallery, error: gErr } = await admin
       .from("galleries")
-      .select("id, branch_id, cover_photo_id, cover_headline, welcome_message")
+      .select("id, branch_id, cover_photo_id, cover_headline, welcome_message, cover_layout")
       .eq("id", galleryId)
       .maybeSingle();
 
@@ -80,7 +81,7 @@ export async function PATCH(
 
     requireBranch(staff, gallery.branch_id);
 
-    const { coverPhotoId, coverHeadline, welcomeMessage } = parsed.data;
+    const { coverPhotoId, coverHeadline, welcomeMessage, coverLayout } = parsed.data;
 
     if (coverPhotoId !== undefined && coverPhotoId !== null) {
       const { data: photo, error: photoErr } = await admin
@@ -99,6 +100,7 @@ export async function PATCH(
     if (coverPhotoId !== undefined) capNhat.cover_photo_id = coverPhotoId;
     if (coverHeadline !== undefined) capNhat.cover_headline = coverHeadline || null;
     if (welcomeMessage !== undefined) capNhat.welcome_message = welcomeMessage || null;
+    if (coverLayout !== undefined) capNhat.cover_layout = coverLayout || null;
 
     const { error: upErr } = await admin.from("galleries").update(capNhat).eq("id", galleryId);
     if (upErr) return failUnexpected(upErr, requestId);
@@ -116,6 +118,7 @@ export async function PATCH(
           coverPhotoId: gallery.cover_photo_id,
           coverHeadline: gallery.cover_headline,
           welcomeMessage: gallery.welcome_message,
+          coverLayout: gallery.cover_layout,
         },
         sang: capNhat,
       },
@@ -125,6 +128,7 @@ export async function PATCH(
       coverPhotoId: coverPhotoId !== undefined ? coverPhotoId : gallery.cover_photo_id,
       coverHeadline: coverHeadline !== undefined ? (coverHeadline || null) : gallery.cover_headline,
       welcomeMessage: welcomeMessage !== undefined ? (welcomeMessage || null) : gallery.welcome_message,
+      coverLayout: coverLayout !== undefined ? (coverLayout || null) : gallery.cover_layout,
     });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);

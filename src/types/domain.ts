@@ -72,6 +72,9 @@ export type CustomerSource = (typeof CUSTOMER_SOURCES)[number];
 export const BABY_GENDERS = ["male", "female", "other"] as const;
 export type BabyGender = (typeof BABY_GENDERS)[number];
 
+export const COVER_LAYOUTS = ["tap-chi", "toi-gian", "ben-canh", "de-cheo"] as const;
+export type CoverLayout = (typeof COVER_LAYOUTS)[number];
+
 // ---------------------------------------------------------------------------
 // Entities — mirror Postgres tables
 // ---------------------------------------------------------------------------
@@ -241,6 +244,8 @@ export interface Gallery {
   allowExtra: boolean;
 
   coverPhotoId: string | null;
+  coverHeadline: string | null;
+  coverLayout: CoverLayout | null;
   downloadEnabled: boolean;
   notesEnabled: boolean;
   inviteEnabled: boolean;

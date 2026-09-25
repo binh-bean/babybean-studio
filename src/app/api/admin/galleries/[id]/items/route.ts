@@ -43,7 +43,7 @@ export async function GET(
       // BB-215 thêm ba cột cuối: khối "Bìa bộ ảnh" cần biết bìa đang chọn và
       // baby_id để suy tên bé — cùng luật viết liền một dòng như BB-150 ở trên
       // vì Supabase suy kiểu từ chuỗi literal.
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, baby_id")
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id")
       .eq("id", galleryId)
       .single();
 
@@ -166,6 +166,7 @@ export async function GET(
       coverPhotoId: gallery.cover_photo_id ?? null,
       coverHeadline: gallery.cover_headline ?? null,
       welcomeMessage: gallery.welcome_message ?? null,
+      coverLayout: gallery.cover_layout ?? null,
       babyName: baby?.nickname || baby?.full_name || null,
       branchName: branch?.name ?? null,
       contractCodes: gallery.lark_contract_codes ?? [],
