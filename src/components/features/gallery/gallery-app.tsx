@@ -28,6 +28,7 @@ import { Smartphone, Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
+import { useHangChoTim } from "@/components/features/gallery/use-hang-cho-tim";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, AlertCircle, Info, Lock } from "lucide-react";
 import { vi } from "@/i18n";
@@ -169,6 +170,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [phaiChonBuoiChup, setPhaiChonBuoiChup] = useState(false);
 
   const [gallery, setGallery] = useState<GalleryApiResponse | null>(null);
+
+  // BB-232 — hàng chờ thả tim ngoại tuyến. Toàn bộ logic (gộp/triệt tiêu, tự
+  // gửi lại, localStorage) sống trong hook riêng — xem use-hang-cho-tim.ts.
+  const hangChoTim = useHangChoTim(token);
 
 
   const [tienDoTai, setTienDoTai] = useState<TienDoTai | null>(null);
@@ -439,11 +444,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
         // Hiện dần từng trang thay vì chờ trắng màn hình tới tấm cuối: bộ 1.235
         // tấm mất vài giây, và vài giây nhìn vào trang trống là đủ để ba mẹ
         // tưởng link hỏng.
-        setPhotos([...tatCaAnh]);
+        //
+        // BB-232 — áp hàng chờ ngoại tuyến (nếu còn) lên MỖI trang vừa nhận:
+        // reload lúc còn mất mạng thì tim đã bấm không hiện lại tắt trong lúc
+        // chờ trang cuối tải xong.
+        setPhotos(hangChoTim.apDungLenAnh([...tatCaAnh]));
 
         if (!photosJson.meta?.hasMore || !photosJson.meta?.cursor) break;
         cursor = photosJson.meta.cursor;
       }
+      // Tải xong (hoặc còn mất mạng và dừng giữa chừng) — thử gửi luôn hàng
+      // chờ cũ nếu mạng đã có lại từ lúc reload tới giờ.
+      void hangChoTim.guiNgay();
     } catch {
       setError({
         code: "NETWORK_ERROR",
@@ -453,7 +465,16 @@ export function GalleryApp({ token }: GalleryAppProps) {
       setLoading(false);
       setPhotosLoading(false);
     }
-  }, [token, router]);
+    // BB-232 — phụ thuộc vào TỪNG HÀM ổn định của hangChoTim (apDungLenAnh,
+    // guiNgay), KHÔNG phụ thuộc vào cả object `hangChoTim`. Object đó đổi
+    // định danh mỗi khi soChuaGui đổi (đúng ý — để ThanhChon re-render đúng
+    // số), nhưng đưa cả object vào đây làm loadGallery bị TẠO LẠI mỗi lần một
+    // tấm vào/ra hàng chờ, kéo theo useEffect(loadGallery) chạy lại — tải cả
+    // bộ ảnh lại liên tục trong lúc offline, virtualizer của LuoiAnh không
+    // bao giờ đứng yên đủ để Playwright bấm trúng nút (đã thấy thật: "element
+    // was detached from the DOM, retrying" chạy tới hết 60s không dừng).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, router, hangChoTim.apDungLenAnh, hangChoTim.guiNgay]);
 
   /**
    * Khách duyệt hoặc yêu cầu sửa. Tải lại cả bộ ảnh sau đó — quyết định này
@@ -512,8 +533,34 @@ export function GalleryApp({ token }: GalleryAppProps) {
       setPhotos((prev) =>
         prev.map((p) => (p.id === photo.id ? { ...p, mark: nextMark } : p))
       );
+      // BB-232 — bộ đếm ở ThanhChon (`dem-da-chon`) đọc từ selectionCounts,
+      // không đọc trực tiếp mảng photos. Lúc mất mạng không còn phản hồi máy
+      // chủ để lấy con số chuẩn, nên tự cộng/trừ optimistic — sai lệch (phụ
+      // phí, hạn mức) tự sửa lại khi hàng chờ gửi thành công và loadGallery
+      // chạy lại; đúng đủ cho việc DUY NHẤT ba mẹ cần thấy ngay: "mình vừa
+      // chọn/bỏ, con số đã nhích".
+      const lechDaChon = (nextMark === "selected" ? 1 : 0) - (isCurrentlySelected ? 1 : 0);
+      setSelectionCounts((prev) => ({ ...prev, selectedCount: prev.selectedCount + lechDaChon }));
 
       setMutatingIds((prev) => new Set(prev).add(photo.id));
+
+      // BB-232 — biết chắc đang mất mạng thì khỏi phí một lượt gọi API rồi
+      // chờ nó timeout: xếp hàng NGAY, không hoàn tác (E-6, docs/10-testing-qa
+      // §5). Đây là NHÁNH DUY NHẤT thêm vào giữa optimistic update và fetch —
+      // mọi lỗi mạng phát hiện muộn hơn (fetch tự ném) rơi xuống catch bên
+      // dưới, cùng một xử lý.
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        // BB-232 — hàng chờ chỉ hiểu 'selected' | null (ngữ nghĩa của thả
+        // tim); photo.mark rộng hơn (có thể 'suggested'/'rejected' của vai
+        // suggester) nên chuẩn hoá về đúng hai giá trị trước khi xếp hàng.
+        hangChoTim.xepHangTim(photo.id, nextMark, isCurrentlySelected ? "selected" : null);
+        setMutatingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(photo.id);
+          return next;
+        });
+        return;
+      }
 
       try {
         const res = await fetch("/api/g/selection", {
@@ -527,10 +574,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
         const json = await res.json().catch(() => null);
 
         if (!res.ok) {
-          // Rollback giao diện khi API lỗi
+          // Rollback giao diện khi API lỗi — LỖI NGHIỆP VỤ (GALLERY_LOCKED,
+          // QUOTA_EXCEEDED, ...), không phải mất mạng, nên KHÔNG xếp hàng chờ
+          // (BB-232: chỉ hàng đợi lỗi mạng, lỗi nghiệp vụ báo và hoàn tác như
+          // cũ — xếp hàng một thao tác máy chủ đã từ chối là gửi lại vô ích).
           setPhotos((prev) =>
             prev.map((p) => (p.id === photo.id ? { ...p, mark: photo.mark } : p))
           );
+          setSelectionCounts((prev) => ({ ...prev, selectedCount: prev.selectedCount - lechDaChon }));
 
           const code = json?.error?.code;
           const msg = json?.error?.message;
@@ -560,11 +611,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
           });
         }
       } catch {
-        // Rollback khi mất mạng
-        setPhotos((prev) =>
-          prev.map((p) => (p.id === photo.id ? { ...p, mark: photo.mark } : p))
-        );
-        setStatusMessage("Mất kết nối mạng. Lựa chọn chưa được lưu.");
+        // BB-232 (E-6) — fetch chỉ ném ở đây khi MẤT MẠNG (lỗi máy chủ đã rẽ
+        // vào nhánh `!res.ok` phía trên và return sớm, không rơi xuống đây).
+        // KHÔNG hoàn tác: ba mẹ bấm tim, mạng rớt, tim tắt lại ngay trước mắt
+        // họ và không ai biết tấm nào đã lưu — đúng lỗi mà AGENTS.md §2.3 và
+        // E-6 (docs/10-testing-qa.md §5) đòi sửa. Giữ optimistic update, xếp
+        // vào hàng chờ để tự gửi lại khi có mạng (use-hang-cho-tim.ts).
+        hangChoTim.xepHangTim(photo.id, nextMark, isCurrentlySelected ? "selected" : null);
       } finally {
         setMutatingIds((prev) => {
           const next = new Set(prev);
@@ -573,7 +626,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
         });
       }
     },
-    [isLocked, gallery?.quotaKnown, gallery?.maxSelection],
+    // Cùng lý do ở loadGallery: phụ thuộc vào hàm ổn định `xepHangTim`, không
+    // phụ thuộc cả object `hangChoTim`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isLocked, gallery?.quotaKnown, gallery?.maxSelection, hangChoTim.xepHangTim],
   );
 
   /**
@@ -692,6 +748,25 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
   const handleSubmitSelection = async () => {
     if (isLocked) return;
+
+    // BB-232 việc 5 — còn hàng chờ ngoại tuyến thì KHÔNG cho chốt thẳng.
+    //
+    // Chốt thiếu tấm (vì vài thao tác thả tim còn kẹt trong hàng chờ chưa
+    // gửi) là lỗi nghiêm trọng hơn hẳn bắt ba mẹ chờ thêm vài giây hoặc thấy
+    // một dòng báo — bộ ảnh bị lock ngay khi submit thành công, và "xin sửa
+    // lại" sau đó phải qua CSKH. Chọn đường AN TOÀN: thử gửi hết hàng chờ
+    // trước; còn sót lại (vẫn mất mạng) thì CHẶN, báo rõ lý do, không gọi
+    // /api/g/submit.
+    if (hangChoTim.soChuaGui > 0) {
+      const guiHetChua = await hangChoTim.guiNgay();
+      if (!guiHetChua) {
+        setStatusMessage(
+          "Còn ảnh vừa chọn chưa lưu được vì mất mạng — thử lại khi có mạng rồi chốt danh sách nhé.",
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/g/submit", {
@@ -1511,6 +1586,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               ? { tien: gallery.addons?.totalAmount ?? 0, onClick: () => setMoCuaHang(true) }
               : null
           }
+          soChuaGui={hangChoTim.soChuaGui}
         />
       )}
 
