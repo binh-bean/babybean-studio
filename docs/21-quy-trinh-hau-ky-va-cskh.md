@@ -227,3 +227,36 @@ hiện TRỐNG cả 3.340 bản ghi — khớp với luật "bộ ảnh rỗng t
    rồi thì app không gửi trùng.
 3. **Nhánh B (làm trước ảnh phóng/album):** để mở — "CSKH đang làm việc trên
    Lark, nên sẽ để mở để hoàn thiện sau".
+
+## Chủ studio chốt (25/09/2026) — tin nhắc
+
+Lark **đã tự gửi**: nhắc khách chọn ảnh (giai đoạn 1: 3/5/10/30/+30 ngày, cảnh
+báo 60 ngày) và **tin 17:00** (lead check hình, nhắc in). App **không** gửi lại
+hai loại này.
+
+App gửi phần còn lại, vào nhóm Lark của chi nhánh, KHÔNG ghi cột nào trên Lark:
+
+| GĐ | Mốc | Gửi ai |
+|---|---|---|
+| 2 Đã chọn hình | nhánh C: 10 ngày · nhánh A (Làm ảnh nhanh): 4 ngày | Quản lý (xử lý quá hạn / khủng hoảng) |
+| 3 Đang làm | 2 ngày | Nhóm + thợ chỉnh ảnh |
+| 5 Đã gửi duyệt | 2 · 5 · 10 · 20 · 30 ngày | CSKH |
+| 8 Đã gửi In | 2 ngày | CSKH (làm việc với nhà in) |
+| 9 Hình đã về | 2 · 5 · 10 ngày | CSKH (nhắc khách lấy hình) |
+| 10→11 Đã Giao | 2 ngày | CSKH (cảm ơn, xin phản hồi) |
+
+Mỗi mốc gửi **một lần** cho mỗi bộ ảnh; gom thành một tin tổng hợp mỗi chi
+nhánh mỗi ngày.
+
+## Luồng hiển thị (docs/19 mục 3) — cách app làm
+
+App ĐỌC cột "Trạng Thái" và "Cảnh Báo" của bảng Hậu Kỳ (khớp theo mã lựa
+chọn; tìm cột theo mã lựa chọn nó chứa, nên đổi tên cột/tên trạng thái trên
+Lark không làm lệch). Không bao giờ ghi hai cột đó.
+
+- Khách chốt (`submitted`): màn khách giữ như nay (vẫn chọn thêm được tới khi
+  CSKH xác nhận).
+- CSKH xác nhận (`in_retouch`) mà Lark còn ở "Đã Chọn Hình" hoặc chưa đọc được:
+  quản trị "Đã chọn hình · chờ chỉnh sửa", khách "Bộ ảnh đã được ghi nhận yêu cầu".
+- Lark "Đang làm" / "Leader check hình": cả hai màn "Đang chỉnh sửa".
+- Các giai đoạn sau theo bảng tóm tắt ở trên.
