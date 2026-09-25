@@ -180,6 +180,9 @@ Chủ studio: "tận dụng tối đa banana và gemini 3.1 pro và các sonnet"
 | BB-246 | Sonnet (PW_PORT 3165) | ĐÃ GỘP, 0071 ĐÃ ÁP (chủ studio duyệt). Chờ chủ studio dán 3 khoá VAPID lên Vercel (tệp babybean-backups/KHOA-THONG-BAO-VERCEL.txt). Opus vá: endpoint chỉ nhận máy chủ push thật, ≤20 đăng ký/bộ. Thông báo đẩy cho ba mẹ: "ảnh chỉnh xong, mời duyệt". Migration 0071 CHỈ VIẾT — Opus áp. Cần khoá VAPID trên Vercel (chủ studio nhập) |
 | BB-247 | Banana (chủ studio) | ĐÃ VỀ, `public/san-pham/`. 6 tranh sản phẩm (khung, ảnh in, album, canvas, quà, ông bà). Lời nhắc `babybean-assets/BB-247/LOI-NHAC-GEMINI.txt` |
 | BB-245 | Sonnet (PW_PORT 3166) — chủ studio chọn: gửi yêu cầu cho CSKH | ĐÃ GỘP, 0072 ĐÃ ÁP (chủ studio duyệt). Opus vá: lỗi nháy SQL, ẩn thẻ với người chỉ xem. Mời mua lần hai khi khách duyệt không xin sửa. Vướng: bộ ảnh đã duyệt thì bị khoá, API mua thêm từ chối |
-| BB-248 | Sonnet (PW_PORT 3167) | Gắn tranh sản phẩm vào cửa hàng + thẻ mời mua |
-| BB-249 | Sonnet (PW_PORT 3168) | CSKH đổi trạng thái yêu cầu mua thêm (đã gọi / đã chốt / huỷ) |
+| BB-248 | Sonnet (PW_PORT 3167) | ĐÃ GỘP (Opus sửa: canvas thật ở nhóm ảnh in). Gắn tranh sản phẩm vào cửa hàng + thẻ mời mua |
+| BB-249 | Sonnet (PW_PORT 3168) | ĐÃ GỘP, không migration. CSKH đổi trạng thái yêu cầu mua thêm (đã gọi / đã chốt / huỷ) |
 | BB-250 | Opus | ĐÃ GỘP. Báo đẩy "Sản phẩm của bé đã về" khi Lark vừa sang Hình đã về (không báo lần đầu đọc) |
+| BB-251 | Banana (chủ studio) | 7/10 bản vẽ chuẩn ở `docs/thiet-ke/`; còn thiếu 3 bản quản trị |
+| BB-252 | Opus | ĐÃ GỘP. Báo "Hình đã về" NGAY qua hook Lark; cron 08:00 làm lưới đỡ |
+| BB-253 | Antigravity — Gemini 3.1 Pro | Dựng màn khách theo bản vẽ. Đề bài `docs/briefs/BB-253-man-khach-theo-ban-ve.md` |
