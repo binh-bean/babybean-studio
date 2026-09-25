@@ -136,7 +136,7 @@ export function BiaBoAnhEditor({
                   }`}
                 >
                                     <img
-                    src={`/api/img/${anh.id}?w=300`}
+                    src={`/api/img/${anh.id}?w=400`}
                     className="h-full w-full object-cover"
                     alt=""
                   />
