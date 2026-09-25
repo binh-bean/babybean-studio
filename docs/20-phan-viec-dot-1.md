@@ -152,3 +152,7 @@ Chủ studio: "nhớ giao việc cho sub agent" — mặc định giao Sonnet vi
 | BB-223 | Sonnet (PW_PORT 3165) | **API trả lỗi sạch**: thân yêu cầu hỏng → 400 thay vì 500 (28 tuyến); không để mã trần ("FORBIDDEN") hay thông báo Postgres tới tay người dùng |
 | BB-200 | Opus | Luồng trạng thái + bộ nhắc theo `docs/21` |
 | BB-231 | Antigravity — Giao diện (DEV-FE, PW_PORT 3170) | **Kịch bản thử đợt 3**: E-8 mở lại (CSKH được mở, quyết định 25/09), E-11 bộ 1.000 ảnh. Đề bài `docs/briefs/BB-231-e2e-dot-3.md`. E-4 bỏ (hết PIN), E-5 chờ quyền ông bà, E-6 chờ tính năng hàng chờ khi mất mạng |
+| BB-200 giao diện | Sonnet (PW_PORT 3167) | Nhãn trạng thái Lark + màu cảnh báo ở quản trị, "Bộ ảnh đã được ghi nhận yêu cầu" ở màn khách, giấu form Mở lại với người không có quyền. **Dừng giữa chừng 25/09 15:4x — tài khoản chạm hạn mức chi tiêu tháng**; việc dở còn trong worktree, làm tiếp sau khi hạn mức đặt lại. Có migration 0068 (hàm `get_admin_galleries`) CHƯA áp — Opus soát trước khi áp |
+| BB-232 | Sonnet (PW_PORT 3168) | E-6: giữ lượt thả tim khi mất mạng, "Chưa lưu", tự gửi lại. Dừng cùng lúc, cùng lý do |
+| BB-224 | Chủ studio + Gemini ("banana") | 10 tranh minh hoạ "hành trình bộ ảnh" (mỗi giai đoạn BB-200 một hình, chốt thành công, link hết hạn, chưa có ảnh). Chỉ đồ vật — không người, không trẻ em, không chữ. Lời nhắc: `babybean-assets/BB-224/LOI-NHAC-GEMINI.txt` |
+| BB-225 | Antigravity — Giao diện (sau BB-224 + BB-200 giao diện) | Thẻ "Hành trình bộ ảnh" trên màn khách dùng tranh BB-224 theo `nhanTienDo`. Đề bài soạn khi tranh về |
