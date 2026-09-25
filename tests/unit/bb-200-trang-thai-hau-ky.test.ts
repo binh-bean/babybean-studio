@@ -86,9 +86,14 @@ describe("mocNhacHomNay", () => {
   const homNay = new Date("2026-09-25T01:00:00Z"); // 08:00 VN
   const truoc = (n: number) => new Date(homNay.getTime() - n * 86_400_000);
 
-  it("GĐ5 đã gửi duyệt 25 ngày, chưa gửi gì: MỘT tin mốc 20, các mốc nhỏ ghi bỏ qua", () => {
-    const ra = mocNhacHomNay({ maLark: GUI_DUYET, tu: truoc(25), homNay, nhanhA: false, daGui: new Set() });
+  it("GĐ5 gửi duyệt 21 ngày (cron lỡ 1 ngày): MỘT tin mốc 20, các mốc nhỏ ghi bỏ qua", () => {
+    const ra = mocNhacHomNay({ maLark: GUI_DUYET, tu: truoc(21), homNay, nhanhA: false, daGui: new Set() });
     expect(ra).toEqual([{ maNhac: "cho_khach_duyet", moc: 20, nguoiNhan: "cskh", mocBoQua: [2, 5, 10] }]);
+  });
+
+  it("tồn đọng cũ (mốc 20 đã qua 5 ngày): KHÔNG gửi, ghi hết là bỏ qua — ngày đầu bật không dội tin", () => {
+    const ra = mocNhacHomNay({ maLark: GUI_DUYET, tu: truoc(25), homNay, nhanhA: false, daGui: new Set() });
+    expect(ra).toEqual([{ maNhac: "cho_khach_duyet", moc: null, nguoiNhan: "cskh", mocBoQua: [2, 5, 10, 20] }]);
   });
 
   it("mốc đã gửi thì không gửi lại", () => {

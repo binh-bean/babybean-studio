@@ -177,18 +177,30 @@ export function soNgayLich(tu: Date, den: Date): number {
 
 export interface MocCanGui {
   maNhac: string;
-  moc: number;
+  /** Mốc để GỬI hôm nay; null = không gửi gì, chỉ ghi các mốc bỏ qua. */
+  moc: number | null;
   nguoiNhan: NguoiNhan;
-  /** Mốc nhỏ hơn đã qua mà chưa gửi — ghi là đã gửi luôn, không dội tin. */
+  /** Mốc đã qua mà chưa gửi, KHÔNG gửi — ghi là đã gửi luôn, không dội tin. */
   mocBoQua: number[];
 }
 
 /**
+ * Mốc đã qua quá bấy nhiêu ngày thì coi là tồn đọng cũ: ghi "đã gửi", không nhắn.
+ *
+ * Chạy thử trên dữ liệu thật 25/09/2026: ngày đầu bật lên sẽ gửi 16 thẻ cho 157
+ * bộ ảnh — phần lớn là tồn đọng hàng tháng ("cảm ơn" bộ đã giao từ lâu, "đã gửi
+ * duyệt 30 ngày" cho bộ nằm đó bốn tháng). Dội như vậy thì nhân viên tắt thông
+ * báo nhóm (docs/08 §2) và từ đó mọi tin đều vô dụng. Hai ngày là đủ để cron
+ * lỡ một-hai lượt không mất tin.
+ */
+export const TRE_TOI_DA_NGAY = 2;
+
+/**
  * Hôm nay bộ ảnh này tới mốc nhắc nào.
  *
- * Chỉ trả MỐC LỚN NHẤT đã tới mà chưa gửi. Bộ ảnh vừa được đồng bộ lần đầu đã ở
- * "Đã gửi duyệt" 25 ngày thì nhận MỘT tin "20 ngày", không phải bốn tin 2/5/10/20
- * cùng lúc; cron lỡ một ngày cũng không mất tin.
+ * Chỉ gửi MỐC LỚN NHẤT đã tới trong `TRE_TOI_DA_NGAY` ngày gần đây mà chưa gửi.
+ * Mọi mốc khác đã qua (nhỏ hơn, hoặc quá cũ) vào `mocBoQua`: ghi là đã gửi,
+ * không nhắn — không dội nhiều tin một lúc, không nhắc tồn đọng cũ.
  */
 export function mocNhacHomNay(opts: {
   maLark: string | null | undefined;
@@ -208,12 +220,13 @@ export function mocNhacHomNay(opts: {
     const daToi = luat.moc.filter((m) => soNgay >= m);
     const chuaGui = daToi.filter((m) => !opts.daGui.has(`${luat.maNhac}:${m}`));
     if (chuaGui.length === 0) continue;
-    const lonNhat = Math.max(...chuaGui);
+    const moi = chuaGui.filter((m) => soNgay - m <= TRE_TOI_DA_NGAY);
+    const guiMoc = moi.length > 0 ? Math.max(...moi) : null;
     ra.push({
       maNhac: luat.maNhac,
-      moc: lonNhat,
+      moc: guiMoc,
       nguoiNhan: luat.nguoiNhan,
-      mocBoQua: chuaGui.filter((m) => m !== lonNhat),
+      mocBoQua: chuaGui.filter((m) => m !== guiMoc),
     });
   }
   return ra;

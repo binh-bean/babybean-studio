@@ -121,19 +121,24 @@ export interface DongGallery {
 /**
  * Mốc "ở trạng thái này từ lúc nào" sau lượt đọc.
  *
- * - Trạng thái không đổi → giữ mốc cũ (nếu mốc cũ trống thì ước lượng).
+ * - Trạng thái không đổi → giữ mốc cũ (mốc cũ trống thì thử cột ngày Lark).
  * - Đổi từ một giá trị ĐÃ BIẾT → bây giờ (app vừa thấy nó đổi).
- * - Lần đầu thấy (trước đó trống) → cột ngày của Lark nếu có, không thì lúc bản
- *   ghi sửa gần nhất. Không dùng "bây giờ": một bộ ảnh đã "Đã gửi duyệt" 25
- *   ngày mà ghi là 0 ngày thì các mốc nhắc trễ đúng 25 ngày.
+ * - Lần đầu thấy (trước đó trống) → cột ngày của Lark nếu giai đoạn đó CÓ cột
+ *   ngày (Ngày chọn ảnh, Ngày Gửi In, Ngày ảnh về, Ngày giao ảnh…); không có
+ *   thì NULL — chưa nhắc gì cho lượt này.
+ *
+ * KHÔNG đoán bằng `last_modified_time`: bản đầu làm vậy, và chạy thử trên dữ
+ * liệu thật 25/09/2026 cho ra 92 bộ "tới mốc" ngay ngày đầu — bản ghi Lark bị
+ * sửa vì đủ lý do (ghi link app, đổi Cảnh Báo…), nên một bộ nằm "Đã gửi duyệt"
+ * 40 ngày trông như mới 3 ngày và bị nhắc sai. Không biết thì không nhắc.
  */
 export function tinhMocTu(cu: DongGallery, moi: TrangThaiDoc, bayGio: Date): Date | null {
   if (!moi.maTrangThai) return null;
   if (cu.lark_trang_thai === moi.maTrangThai) {
-    return cu.lark_trang_thai_tu ?? moi.ngayVaoGiaiDoan ?? moi.suaLuc;
+    return cu.lark_trang_thai_tu ?? moi.ngayVaoGiaiDoan;
   }
   if (cu.lark_trang_thai) return bayGio;
-  return moi.ngayVaoGiaiDoan ?? moi.suaLuc;
+  return moi.ngayVaoGiaiDoan;
 }
 
 // ---------------------------------------------------------------------------

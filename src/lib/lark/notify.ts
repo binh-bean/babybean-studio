@@ -74,7 +74,9 @@ export type LarkEvent =
   | "gallery.overdue"
   | "gallery.sync_error"
   | "gallery.reopen_requested"
-  | "delivery.ready";
+  | "delivery.ready"
+  /** BB-200 — tin tổng hợp mốc hậu kỳ (docs/21), một thẻ cho mỗi chi nhánh × loại nhắc. */
+  | "hau_ky.nhac";
 
 export interface LarkNotification {
   /** Chi nhánh của bộ ảnh. `null` = tin của nhóm quản lý chung. */
@@ -127,6 +129,11 @@ export function cheSoDienThoai(so: string | null | undefined): string | null {
  *
  * Chặn theo tên khoá lẫn theo hình dạng giá trị — tên khoá đổi được, còn một
  * chuỗi trỏ vào tệp ảnh thì vẫn là ảnh.
+ *
+ * BẪY khi đặt tên khoá tiếng Việt không dấu: "anh" nằm lẫn trong rất nhiều từ —
+ * `maNhac` (m-ANH-ac), `danhSach` (d-ANH-sach), `thanhTien`, `nhanh`… Khoá như
+ * vậy bị cắt IM LẶNG và thẻ ra rỗng. BB-200 vấp hai lần trong một buổi; phép
+ * thử tests/unit/bb-200-the-nhac-hau-ky.test.ts canh cho khoá của nó.
  */
 export function locBoAnh(payload: Record<string, unknown>): Record<string, unknown> {
   const KHOA_CAM = /(photo|image|anh|thumb|url|src|href|drive)/i;
@@ -183,6 +190,75 @@ export function dungThe(
     is_short: true,
     text: { tag: "lark_md", content: `**${nhan}:**\n${giaTri}` },
   });
+
+  /**
+   * BB-200 — nhắc theo mốc hậu kỳ (docs/21 "Chủ studio chốt 25/09/2026").
+   *
+   * Khoá danh sách là `cacBo` — KHÔNG phải `boAnh` hay `danhSach`: `locBoAnh()` cắt mọi
+   * khoá có chữ "anh" — và d-ANH-sach cũng dính (phép thử BB-200 bắt được).
+   * Trong danh sách không có đường link nào — nút mở bộ
+   * ảnh dựng TẠI ĐÂY từ galleryId, nên không có URL nào đi qua payload.
+   */
+  if (event === "hau_ky.nhac") {
+    const TIEU_DE: Record<string, { tieuDe: string; mau: string; viec: string }> = {
+      qua_han_chon_hinh: {
+        tieuDe: "QUẢN LÝ: bộ ảnh đã chọn hình quá hạn chưa chỉnh",
+        mau: "purple",
+        viec: "Quản lý vào xử lý quá hạn hậu kỳ.",
+      },
+      dang_lam_lau: {
+        tieuDe: "Bộ ảnh 'Đang làm' quá 2 ngày",
+        mau: "orange",
+        viec: "Thợ chỉnh ảnh hoàn thành giúp.",
+      },
+      cho_khach_duyet: {
+        tieuDe: "Đã gửi duyệt, khách chưa phản hồi",
+        mau: "orange",
+        viec: "CSKH gọi điện / nhắn tin nhắc khách duyệt ảnh.",
+      },
+      dang_in_lau: {
+        tieuDe: "Đã gửi in quá 2 ngày",
+        mau: "orange",
+        viec: "CSKH kiểm tra, cập nhật và làm việc với nhà in.",
+      },
+      hinh_ve_chua_lay: {
+        tieuDe: "Hình đã về, khách chưa lấy",
+        mau: "orange",
+        viec: "CSKH nhắc khách qua lấy hình.",
+      },
+      cam_on_sau_giao: {
+        tieuDe: "Gọi cảm ơn khách đã nhận hình",
+        mau: "green",
+        viec: "CSKH gọi điện, nhắn tin cảm ơn, xin phản hồi về ảnh và dịch vụ.",
+      },
+    };
+    const loai = TIEU_DE[chu(p.loai)];
+    const ds = Array.isArray(p.cacBo) ? (p.cacBo as Record<string, unknown>[]) : [];
+    if (!loai || ds.length === 0) return null;
+    const goc = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+    const dong = ds.slice(0, 30).map((b) => {
+      const ten = [chu(b.customerName), typeof b.customerPhone === "string" ? b.customerPhone : null]
+        .filter((x) => x && x !== "—")
+        .join(" · ");
+      const mo =
+        goc && typeof b.galleryId === "string" ? ` — [mở](${goc}/admin/galleries/${b.galleryId})` : "";
+      return `• **${chu(b.galleryTitle)}**${ten ? ` (${ten})` : ""} — ${so(b.soNgay)} ngày${mo}`;
+    });
+    if (ds.length > 30) dong.push(`… và ${ds.length - 30} bộ nữa`);
+    return {
+      msg_type: "interactive",
+      card: {
+        header: {
+          template: loai.mau,
+          title: { tag: "plain_text", content: `${loai.tieuDe} — ${ds.length} bộ` },
+        },
+        elements: [
+          { tag: "div", text: { tag: "lark_md", content: loai.viec } },
+          { tag: "div", text: { tag: "lark_md", content: dong.join("\n") } },
+        ],
+      },
+    };
+  }
 
   if (event === "selection.submitted") {
     const thua = so(p.extraCount);
