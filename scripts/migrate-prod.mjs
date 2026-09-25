@@ -100,6 +100,7 @@ const DAY = [
   "0069-kieu-chu-bia.sql",
   "0070-giu-ma-link-ma-hoa.sql",
   "0071-dang-ky-thong-bao-day.sql",
+  "0072-yeu-cau-mua-them.sql",
 ];
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */

@@ -76,7 +76,12 @@ export type LarkEvent =
   | "gallery.reopen_requested"
   | "delivery.ready"
   /** BB-200 — tin tổng hợp mốc hậu kỳ (docs/21), một thẻ cho mỗi chi nhánh × loại nhắc. */
-  | "hau_ky.nhac";
+  | "hau_ky.nhac"
+  /**
+   * BB-245 — ba mẹ gửi yêu cầu mua thêm sau khi ĐÃ DUYỆT ảnh (bộ ảnh đã khoá,
+   * không có vòng xin sửa nào). App KHÔNG cộng tiền, CSKH gọi lại chốt giá.
+   */
+  | "mua_them.yeu_cau";
 
 export interface LarkNotification {
   /** Chi nhánh của bộ ảnh. `null` = tin của nhóm quản lý chung. */
@@ -389,6 +394,62 @@ ${chu(p.lyDo)}` },
         header: {
           template: "red",
           title: { tag: "plain_text", content: "Khách xin sửa lại bộ ảnh đã chốt" },
+        },
+        elements,
+      },
+    };
+  }
+
+  /**
+   * BB-245 — ba mẹ gửi yêu cầu mua thêm sau khi đã duyệt ảnh. Thẻ chỉ để CSKH
+   * gọi lại chốt giá/thanh toán — app không hề cộng tiền vào hợp đồng, nên
+   * không có con số "thành tiền" nào trong thẻ này.
+   *
+   * Khoá `cacMon` (không phải `danhSach`) và `tenTep` (không phải `tenAnh`
+   * hay id ảnh) — cùng bẫy đã canh ở `hau_ky.nhac`: `locBoAnh()` cắt mọi khoá
+   * khớp chữ "anh".
+   */
+  if (event === "mua_them.yeu_cau") {
+    const mon = Array.isArray(p.cacMon) ? (p.cacMon as Record<string, unknown>[]) : [];
+    if (mon.length === 0) return null;
+
+    const dong = mon.map((m) => {
+      const tep = typeof m.tenTep === "string" && m.tenTep ? ` (${m.tenTep})` : "";
+      const ghi = typeof m.ghiChu === "string" && m.ghiChu ? ` — “${m.ghiChu}”` : "";
+      return `• **${chu(m.ten)}** ×${so(m.soLuong)}${tep}${ghi}`;
+    });
+
+    const elements: Record<string, unknown>[] = [
+      { tag: "div", fields: [o("Bộ ảnh", chu(p.tieuDeBo)), o("Số sản phẩm", `${so(p.tongSoMon)}`)] },
+      { tag: "div", text: { tag: "lark_md", content: dong.join("\n") } },
+      {
+        tag: "div",
+        text: {
+          tag: "lark_md",
+          content: "Ba mẹ chưa thanh toán — CSKH gọi lại chốt giá và cách thanh toán.",
+        },
+      },
+    ];
+    if (diaChiAdmin) {
+      elements.push({
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "Mở bộ ảnh" },
+            type: "primary",
+            url: diaChiAdmin,
+          },
+        ],
+      });
+    }
+
+    return {
+      msg_type: "interactive",
+      card: {
+        header: {
+          template: "purple",
+          title: { tag: "plain_text", content: "Khách gửi yêu cầu mua thêm" },
         },
         elements,
       },
