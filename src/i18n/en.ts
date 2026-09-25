@@ -190,6 +190,34 @@ export const en: Messages = {
       howTo: "See how",
       later: "Later",
     },
+
+    soSanh: {
+      cheDoGhimVuot: "Pin & swipe",
+      cheDoLuoi: "Grid view",
+      ghimTam: "Pin this photo",
+      boGhimTam: "Unpin",
+      tamSoSanhTruoc: "Previous photo",
+      tamSoSanhSau: "Next photo",
+      dem: "{current} / {total}",
+    },
+
+    treoTuong: {
+      anBang: "Hide panel",
+      hienBang: "Show panel",
+      chiTiet: "Details",
+      anChiTiet: "Hide details",
+      xemLonAnhBe: "View baby's photo full-size",
+      dongXemLon: "Close full-size view",
+      thamKhaoKhung: "Frame sample is for reference only — our staff will confirm the real frame when you check out.",
+      moTaChatLieu: {
+        "Gỗ": "Printed on natural wood, grain visible at the edge — warm and rustic.",
+        "Cavas/Kim tuyến": "Printed on canvas with a light weave — looks like a painting.",
+        "Tráng gương": "Mirror-glossy finish, colors come out rich and deep.",
+        "Thủy tinh": "Printed behind tempered glass, flat and bright surface.",
+        "Mica HD": "Printed on clear acrylic, light and color-stable.",
+        UV: "Finished with a glossy UV coat that protects the print.",
+      },
+    },
   },
   admin: {
     branches: {

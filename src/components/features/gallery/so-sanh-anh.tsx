@@ -21,13 +21,19 @@
  * xem một tấm hay nhiều tấm.
  */
 
-import React, { useEffect, useRef, useState } from "react";
-import { X, Heart } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { X, Heart, Pin, PinOff, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { vi } from "@/i18n";
 import type { PhotoPublic } from "@/types/domain";
-import { buildLightboxImageUrl } from "@/lib/utils/lightbox";
-import { boCucSoSanh } from "@/lib/gallery/so-sanh";
+import { buildLightboxImageUrl, calculateSwipeAction } from "@/lib/utils/lightbox";
+import {
+  boCucSoSanh,
+  danhSachVuotGhim,
+  chiSoBanDauVuot,
+  chiSoVuotKeTiep,
+  chiSoVuotTruoc,
+} from "@/lib/gallery/so-sanh";
 
 export interface SoSanhAnhProps {
   /** 2–4 tấm đang so sánh, đúng thứ tự ba mẹ đã chọn. */
@@ -43,6 +49,12 @@ export interface SoSanhAnhProps {
   /** Tổng đã chọn / hạn mức gói — để ba mẹ biết mình đang vượt hay không NGAY tại đây. */
   daChon?: number;
   hanMuc?: number | null;
+  /**
+   * BB-242 — mọi tấm đã thả tim (chọn hoặc yêu thích) trong CẢ bộ ảnh, không
+   * chỉ 2–4 tấm đang so sánh. Chế độ "Ghim & vuốt" dùng danh sách này làm
+   * nguồn vuốt khi chỉ đánh dấu đúng 2 tấm so sánh (xem `danhSachVuotGhim`).
+   */
+  anhDaThaTim?: PhotoPublic[];
 }
 
 export function SoSanhAnh({
@@ -55,6 +67,7 @@ export function SoSanhAnh({
   onPhongTo,
   daChon,
   hanMuc,
+  anhDaThaTim = [],
 }: SoSanhAnhProps) {
   // Hướng màn đo bằng bề ngang/cao thật của cửa sổ — cùng cách LuoiAnh đo,
   // không dùng CSS orientation vì codebase này chọn cột theo bề ngang
@@ -87,9 +100,79 @@ export function SoSanhAnh({
     return () => window.removeEventListener("keydown", onKey);
   }, [onDong]);
 
+  // ---------------------------------------------------------------------
+  // BB-242 — "Ghim & vuốt": một tấm đứng yên (ghim), tấm còn lại vuốt qua
+  // danh sách các tấm đã đánh dấu so sánh (hoặc mọi tấm đã thả tim, xem
+  // `danhSachVuotGhim`). Toán chọn tấm kế/trước nằm ở `so-sanh.ts` (thuần,
+  // có Vitest) — ở đây chỉ nối vào state + cử chỉ.
+  // ---------------------------------------------------------------------
+  const [cheDoGhim, setCheDoGhim] = useState(false);
+  const [idGhim, setIdGhim] = useState<string>(photos[0]?.id ?? "");
+  const [chiSoVuot, setChiSoVuot] = useState(0);
+
+  const dsSoSanhIds = useMemo(() => photos.map((p) => p.id), [photos]);
+  const idDaThaTim = useMemo(() => anhDaThaTim.map((p) => p.id), [anhDaThaTim]);
+  const dsVuot = useMemo(
+    () => danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idGhim),
+    [dsSoSanhIds, idDaThaTim, idGhim],
+  );
+  const banDoAnh = useMemo(() => {
+    const m = new Map<string, PhotoPublic>();
+    for (const p of anhDaThaTim) m.set(p.id, p);
+    for (const p of photos) m.set(p.id, p); // photos đang so sánh ưu tiên (mới nhất)
+    return m;
+  }, [photos, anhDaThaTim]);
+
+  const dsSoSanhKey = dsSoSanhIds.join("|");
+  // Chỉ đặt lại vị trí ghim/vuốt khi BẬT chế độ hoặc đổi hẳn bộ tấm đang so
+  // sánh — không chạy lại mỗi lần ba mẹ tự vuốt/ghim trong lúc đang xem.
+  useEffect(() => {
+    if (!cheDoGhim) return;
+    const idGhimMoi = dsSoSanhIds[0] ?? "";
+    setIdGhim(idGhimMoi);
+    const idKhac = dsSoSanhIds[1] ?? "";
+    setChiSoVuot(chiSoBanDauVuot(danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idGhimMoi), idKhac));
+    // Chỉ tính lại khi BẬT chế độ hoặc đổi hẳn bộ tấm so sánh (dsSoSanhKey) —
+    // dsSoSanhIds/idDaThaTim đã nằm trong dsSoSanhKey/idDaThaTim gốc, cố tình
+    // không liệt kê lại để không chạy mỗi lần mảng props đổi tham chiếu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cheDoGhim, dsSoSanhKey]);
+
+  useEffect(() => {
+    if (!cheDoGhim) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") setChiSoVuot((i) => chiSoVuotKeTiep(dsVuot.length, i));
+      if (e.key === "ArrowLeft") setChiSoVuot((i) => chiSoVuotTruoc(i));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cheDoGhim, dsVuot.length]);
+
+  /** Bấm nút ghim trên tấm KHÔNG PHẢI đang ghim — tấm đó thành tấm ghim mới,
+   * tấm ghim cũ chuyển sang làm tấm vuốt (đứng đúng vị trí của nó nếu còn
+   * trong danh sách vuốt). */
+  const troGhim = (idMoi: string) => {
+    if (idMoi === idGhim) return;
+    const idCu = idGhim;
+    setIdGhim(idMoi);
+    // Danh sách vuốt tính lại khi đổi tấm ghim (loại tấm ghim mới ra) — tìm
+    // vị trí tấm ghim CŨ trong danh sách MỚI, không phải danh sách hiện tại.
+    const viTriCu = danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idMoi).indexOf(idCu);
+    setChiSoVuot(viTriCu >= 0 ? viTriCu : 0);
+  };
+
+  const chamBatDauVuot = useRef<{ x: number; y: number } | null>(null);
+  const vuotSang = (huong: "next" | "prev") => {
+    if (huong === "next") setChiSoVuot((i) => chiSoVuotKeTiep(dsVuot.length, i));
+    else setChiSoVuot((i) => chiSoVuotTruoc(i));
+  };
+
   if (photos.length === 0) return null;
 
   const boCuc = boCucSoSanh(photos.length, manHinhDoc);
+  const ghimPhoto = banDoAnh.get(idGhim) ?? photos[0] ?? null;
+  const idVuotHienTai = dsVuot[chiSoVuot];
+  const vuotPhoto = idVuotHienTai ? (banDoAnh.get(idVuotHienTai) ?? null) : null;
 
   return (
     <div
@@ -99,7 +182,7 @@ export function SoSanhAnh({
       className="fixed inset-0 z-50 flex flex-col bg-bb-viewer-bg text-white select-none"
       data-con-tro="mac-dinh"
     >
-      <header className="relative z-20 flex shrink-0 items-center justify-between px-3 py-2.5 sm:px-4">
+      <header className="relative z-20 flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
         <span className="min-w-0 flex-1 truncate px-2 text-[13px] text-white/75">
           So sánh {photos.length} tấm
           {typeof daChon === "number" && (
@@ -112,6 +195,22 @@ export function SoSanhAnh({
         </span>
         <button
           type="button"
+          onClick={() => setCheDoGhim((v) => !v)}
+          aria-pressed={cheDoGhim}
+          className={cn(
+            "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition active:scale-95",
+            cheDoGhim ? "bg-white text-bb-viewer-bg" : "bg-white/10 text-white/85 hover:bg-white/15",
+          )}
+        >
+          {cheDoGhim ? (
+            <LayoutGrid className="h-3.5 w-3.5" strokeWidth={2} />
+          ) : (
+            <Pin className="h-3.5 w-3.5" strokeWidth={2} />
+          )}
+          {cheDoGhim ? vi.gallery.soSanh.cheDoLuoi : vi.gallery.soSanh.cheDoGhimVuot}
+        </button>
+        <button
+          type="button"
           onClick={onDong}
           aria-label={vi.common.close}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-95 touch-manipulation focus:outline-hidden"
@@ -120,26 +219,184 @@ export function SoSanhAnh({
         </button>
       </header>
 
-      <div
-        className={cn(
-          "grid min-h-0 flex-1 gap-px overflow-hidden bg-white/10",
-          boCuc === "doc" && "grid-rows-2",
-          boCuc === "ngang" && "grid-cols-2",
-          boCuc === "luoi" && "grid-cols-2 grid-rows-2",
-        )}
-      >
-        {photos.map((photo) => (
-          <OTamSoSanh
-            key={photo.id}
-            photo={photo}
-            dangGui={mutatingIds.has(photo.id)}
+      {cheDoGhim && ghimPhoto ? (
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 gap-px overflow-hidden bg-white/10",
+            manHinhDoc ? "flex-col" : "flex-row",
+          )}
+        >
+          <OTamGhimVuot
+            photo={ghimPhoto}
+            ghim
+            dangGui={mutatingIds.has(ghimPhoto.id)}
             khoa={isLocked}
             onToggleHeart={onToggleHeart}
-            onBoKhoi={onBoKhoi}
             onPhongTo={onPhongTo}
+            onGhim={() => troGhim(ghimPhoto.id)}
           />
-        ))}
-      </div>
+          <div
+            className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-bb-viewer-bg"
+            onTouchStart={(e) => {
+              const t = e.touches[0];
+              if (!t) return;
+              chamBatDauVuot.current = { x: t.clientX, y: t.clientY };
+            }}
+            onTouchEnd={(e) => {
+              const bd = chamBatDauVuot.current;
+              const t = e.changedTouches[0];
+              if (!bd || !t) return;
+              const huong = calculateSwipeAction(t.clientX - bd.x, t.clientY - bd.y);
+              if (huong) vuotSang(huong);
+              chamBatDauVuot.current = null;
+            }}
+          >
+            {vuotPhoto ? (
+              <OTamGhimVuot
+                photo={vuotPhoto}
+                ghim={false}
+                dangGui={mutatingIds.has(vuotPhoto.id)}
+                khoa={isLocked}
+                onToggleHeart={onToggleHeart}
+                onPhongTo={onPhongTo}
+                onGhim={() => troGhim(vuotPhoto.id)}
+              />
+            ) : (
+              <p className="px-6 text-center text-sm text-white/60">Chưa có tấm nào để vuốt sang.</p>
+            )}
+
+            {dsVuot.length > 0 && (
+              <span className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-md">
+                {chiSoVuot + 1} / {dsVuot.length}
+              </span>
+            )}
+
+            {dsVuot.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label={vi.gallery.soSanh.tamSoSanhTruoc}
+                  onClick={() => vuotSang("prev")}
+                  disabled={chiSoVuot === 0}
+                  className="absolute left-2 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/55 disabled:opacity-0 sm:flex"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={vi.gallery.soSanh.tamSoSanhSau}
+                  onClick={() => vuotSang("next")}
+                  disabled={chiSoVuot === dsVuot.length - 1}
+                  className="absolute right-2 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/55 disabled:opacity-0 sm:flex"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "grid min-h-0 flex-1 gap-px overflow-hidden bg-white/10",
+            boCuc === "doc" && "grid-rows-2",
+            boCuc === "ngang" && "grid-cols-2",
+            boCuc === "luoi" && "grid-cols-2 grid-rows-2",
+          )}
+        >
+          {photos.map((photo) => (
+            <OTamSoSanh
+              key={photo.id}
+              photo={photo}
+              dangGui={mutatingIds.has(photo.id)}
+              khoa={isLocked}
+              onToggleHeart={onToggleHeart}
+              onBoKhoi={onBoKhoi}
+              onPhongTo={onPhongTo}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface OTamGhimVuotProps {
+  photo: PhotoPublic;
+  /** true = tấm này đang được ghim (đứng yên); false = tấm đang vuốt. */
+  ghim: boolean;
+  dangGui: boolean;
+  khoa: boolean;
+  onToggleHeart: (photo: PhotoPublic) => void;
+  onPhongTo: (photo: PhotoPublic) => void;
+  /** Bấm nút ghim trên CHÍNH tấm này — nếu nó chưa phải tấm ghim thì trở thành tấm ghim mới. */
+  onGhim: () => void;
+}
+
+function OTamGhimVuot({ photo, ghim, dangGui, khoa, onToggleHeart, onPhongTo, onGhim }: OTamGhimVuotProps) {
+  const chamTruocRef = useRef(0);
+  const daChon = photo.mark === "selected";
+
+  const chamTam = () => {
+    const bayGio = Date.now();
+    if (bayGio - chamTruocRef.current < 300) {
+      chamTruocRef.current = 0;
+      onPhongTo(photo);
+    } else {
+      chamTruocRef.current = bayGio;
+    }
+  };
+
+  return (
+    <div className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-bb-viewer-bg p-2">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={buildLightboxImageUrl(photo.id, 1600)}
+        alt={photo.fileName || "Ảnh so sánh"}
+        onClick={chamTam}
+        className="h-auto max-h-full w-auto max-w-full cursor-pointer select-none object-contain"
+      />
+
+      <button
+        type="button"
+        onClick={onGhim}
+        aria-pressed={ghim}
+        aria-label={ghim ? vi.gallery.soSanh.boGhimTam : vi.gallery.soSanh.ghimTam}
+        className={cn(
+          "absolute left-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-md transition active:scale-90",
+          ghim ? "bg-white text-bb-viewer-bg" : "bg-black/55 text-white/90 hover:bg-black/70",
+        )}
+      >
+        {ghim ? (
+          <Pin className="h-4 w-4" fill="currentColor" strokeWidth={1.8} />
+        ) : (
+          <PinOff className="h-4 w-4" strokeWidth={1.8} />
+        )}
+      </button>
+
+      {(!khoa || daChon) && (
+        <button
+          type="button"
+          disabled={khoa || dangGui}
+          onClick={() => onToggleHeart(photo)}
+          aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
+          aria-pressed={daChon}
+          className={cn(
+            "absolute bottom-3 right-3 z-10 grid h-14 w-14 place-items-center rounded-full transition-all active:scale-90 touch-manipulation focus:outline-hidden disabled:opacity-40",
+            daChon
+              ? "bg-[#c4645a] text-white shadow-[0_10px_26px_-6px_rgba(196,100,90,.65)]"
+              : "bg-white/10 text-white ring-1 ring-white/25 hover:bg-white/15",
+          )}
+        >
+          <Heart className="h-6 w-6" fill={daChon ? "currentColor" : "none"} strokeWidth={1.8} />
+        </button>
+      )}
+
+      {photo.fileName && (
+        <p className="pointer-events-none absolute bottom-3 left-3 max-w-[65%] truncate rounded-full bg-black/45 px-2.5 py-1 text-[11px] text-white/85">
+          {photo.fileName}
+        </p>
+      )}
     </div>
   );
 }

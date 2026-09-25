@@ -29,7 +29,9 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Info, EyeOff, Eye, ZoomIn } from "lucide-react";
+import { vi } from "@/i18n";
+import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { calculateSwipeAction, buildLightboxImageUrl } from "@/lib/utils/lightbox";
 import {
@@ -136,6 +138,14 @@ const TEN_CHAT_LIEU: Record<string, string> = {
   UV: "UV bóng",
 };
 
+/**
+ * BB-243 — mô tả chất liệu dài, gấp sau nút "i" (không hiện mặc định). Ép
+ * kiểu `Record<string, string>` (không `as any`) để đọc được bằng khoá động
+ * — nguồn chữ vẫn ở `src/i18n/vi.ts` như đề bài yêu cầu, đây chỉ là một biến
+ * tham chiếu cùng dữ liệu với chỉ số [string] hợp lệ về kiểu.
+ */
+const MO_TA_CHAT_LIEU: Record<string, string> = vi.gallery.treoTuong.moTaChatLieu;
+
 /** Mỗi chất liệu một cách "vẽ" bằng CSS thuần — không ảnh, không thư viện. */
 function lopChatLieu(chatLieu: string | null): React.CSSProperties & { className: string } {
   switch (chatLieu) {
@@ -217,6 +227,12 @@ export function ManTreoTuong({
   const [maMauKhung, setMaMauKhung] = useState(MAU_KHUNG_MAC_DINH.ma);
   const [manRong, setManRong] = useState(false);
 
+  // BB-243 — bảng điều khiển gọn: ẩn được để xem trọn tường; chi tiết (mô tả
+  // chất liệu, câu "chỉ để tham khảo") gấp sau nút "i"; xem lớn tấm của bé.
+  const [banAn, setBanAn] = useState(false);
+  const [chiTietMo, setChiTietMo] = useState(false);
+  const [xemLon, setXemLon] = useState(false);
+
   const mauKhungDaChon = useMemo(
     () => MAU_KHUNG.find((m) => m.ma === maMauKhung) ?? MAU_KHUNG_MAC_DINH,
     [maMauKhung]
@@ -226,9 +242,16 @@ export function ManTreoTuong({
   const [khungRef, setKhungRef] = useState({ w: 0, h: 0 });
   const chamBatDau = useRef<{ x: number; y: number } | null>(null);
 
-  // Reset về ảnh vừa mở mỗi lần bấm "Xem trên tường" từ một tấm khác.
+  // Reset về ảnh vừa mở mỗi lần bấm "Xem trên tường" từ một tấm khác — và gấp
+  // lại chi tiết/xem lớn, hiện lại bảng, để không mang trạng thái ẩn/mở của
+  // lần xem trước sang lần mở mới.
   useEffect(() => {
-    if (mo) setChiSo(chiSoBanDau);
+    if (mo) {
+      setChiSo(chiSoBanDau);
+      setBanAn(false);
+      setChiTietMo(false);
+      setXemLon(false);
+    }
   }, [mo, chiSoBanDau]);
 
   useEffect(() => {
@@ -250,18 +273,25 @@ export function ManTreoTuong({
     return () => ro.disconnect();
   }, [mo]);
 
-  // Esc đóng màn này — bắt ở pha capture và chặn lan, vì màn xem lớn nằm ngay
-  // dưới cũng nghe Esc: không chặn thì một lần bấm đóng luôn cả hai lớp.
+  // Esc đóng ĐÚNG MỘT LỚP — bắt ở pha capture và chặn lan, vì màn xem lớn
+  // (PhotoLightbox) nằm ngay dưới cũng nghe Esc: không chặn thì một lần bấm
+  // đóng luôn cả hai lớp. Lớp "xem lớn tấm của bé" (BB-243) mở TRÊN màn tường
+  // này nên Esc phải đóng nó trước, giống cách photo-lightbox.tsx tự đóng lớp
+  // con (tamMo) trước khi đóng cả màn.
   useEffect(() => {
     if (!mo) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.stopImmediatePropagation();
+      if (xemLon) {
+        setXemLon(false);
+        return;
+      }
       onDong();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [mo, onDong]);
+  }, [mo, onDong, xemLon]);
 
   // Khoá cuộn trang nền — màn này chiếm toàn màn hình.
   useEffect(() => {
@@ -435,12 +465,17 @@ export function ManTreoTuong({
       role="dialog"
       aria-modal="true"
       aria-label="Xem ảnh trên tường"
-      className="fixed inset-0 z-[60] flex flex-col bg-black md:flex-row"
+      className="fixed inset-0 z-[60] overflow-hidden bg-black"
     >
-      {/* ẢNH PHÒNG TRÀN KHUNG */}
+      {/*
+        ẢNH PHÒNG TRÀN MÀN HÌNH (BB-243 — "nhìn từ góc ba mẹ: ảnh phòng + tấm
+        của bé là chính, chữ là phụ"). Bảng điều khiển bên dưới không còn là
+        một cột riêng đẩy ảnh hẹp lại — nó ĐÈ LÊN ảnh bằng absolute + backdrop
+        blur, và ẩn được hẳn để xem trọn tường.
+      */}
       <div
         ref={containerRef}
-        className="relative flex-1 select-none overflow-hidden"
+        className="absolute inset-0 select-none overflow-hidden"
         onTouchStart={(e) => {
           const t = e.touches[0];
           if (!t) return;
@@ -463,11 +498,28 @@ export function ManTreoTuong({
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
           draggable={false}
+          // BB-243: chạm vào ẢNH PHÒNG (không phải khung ảnh của bé) ẩn/hiện
+          // bảng điều khiển — để ba mẹ xem trọn tường. Cố tình không hiện bàn
+          // tay ở đây: phần lớn màn hình là ảnh phòng, hiện bàn tay trên toàn
+          // bộ ảnh sẽ nói sai rằng chạm vào đâu cũng "bấm được một nút".
+          // Xem tests/unit/con-tro-ban-tay.test.ts.
+          data-con-tro="mac-dinh"
+          onClick={() => setBanAn((v) => !v)}
         />
 
         {viTriHienThi && sanPhamAnh && (
           <div
-            className="absolute origin-center transition-all duration-300 ease-out"
+            role="button"
+            tabIndex={0}
+            aria-label={vi.gallery.treoTuong.xemLonAnhBe}
+            onClick={() => setXemLon(true)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setXemLon(true);
+              }
+            }}
+            className="absolute origin-center cursor-pointer transition-all duration-300 ease-out"
             style={{
               left: `${viTriHienThi.leftPct}%`,
               top: `${viTriHienThi.topPct}%`,
@@ -531,11 +583,24 @@ export function ManTreoTuong({
                     />
                   )}
                 </div>
+                {/* Gợi ý bấm được — khung ảnh của bé chiếm phần lớn màn hình,
+                    icon nhỏ này báo cho ba mẹ biết chạm vào để xem lớn. */}
+                <span className="pointer-events-none absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur-sm">
+                  <ZoomIn className="h-3.5 w-3.5" strokeWidth={2} />
+                </span>
               </div>
             </div>
           </div>
         )}
 
+        {/*
+          Mũi tên lướt, nút đóng/ẩn bảng, thẻ chọn phòng — TẤT CẢ đều z-20,
+          CAO HƠN bảng điều khiển (z-10, xem bên dưới). Từ khi bảng chuyển
+          sang ĐÈ LÊN ảnh (BB-243) thay vì đứng cạnh, cột phải của bảng trên
+          máy tính rộng 300px trùng đúng vùng các nút này — thiếu z-20 thì
+          bảng che mất, bấm không trúng (đã tự bắt lỗi này bằng Playwright:
+          "Ẩn bảng" bị `<h2>` của bảng chặn pointer-events).
+        */}
         {/* Mũi tên lướt — chỉ hiện khi có nhiều hơn một tấm đã chọn. */}
         {anh.length > 1 && (
           <>
@@ -544,7 +609,7 @@ export function ManTreoTuong({
               aria-label="Tấm trước"
               onClick={lui}
               disabled={chiSo === 0}
-              className="absolute left-3 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/50 disabled:opacity-0 md:flex"
+              className="absolute left-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/50 disabled:opacity-0 md:flex"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -553,24 +618,37 @@ export function ManTreoTuong({
               aria-label="Tấm sau"
               onClick={toi}
               disabled={chiSo === anh.length - 1}
-              className="absolute right-3 top-1/2 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/50 disabled:opacity-0 md:flex"
+              className="absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/50 disabled:opacity-0 md:flex"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
           </>
         )}
 
-        <button
-          type="button"
-          onClick={onDong}
-          aria-label="Đóng"
-          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/55"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+          {/* BB-243 — "Ẩn bảng": xem trọn tường không bị bảng che. Luôn nổi
+              trên ảnh (kể cả khi bảng đang ẩn) để bấm lại được ngay. */}
+          <button
+            type="button"
+            onClick={() => setBanAn((v) => !v)}
+            aria-pressed={banAn}
+            className="flex h-10 items-center gap-1.5 rounded-full bg-black/40 px-3 text-xs font-medium text-white backdrop-blur-sm transition hover:bg-black/55"
+          >
+            {banAn ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {banAn ? vi.gallery.treoTuong.hienBang : vi.gallery.treoTuong.anBang}
+          </button>
+          <button
+            type="button"
+            onClick={onDong}
+            aria-label="Đóng"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/55"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
         {/* 4 phòng — thẻ nhỏ chọn ảnh nền. */}
-        <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-full bg-black/35 p-1.5 backdrop-blur-sm">
+        <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 gap-2 rounded-full bg-black/35 p-1.5 backdrop-blur-sm">
           {THU_TU_PHONG.map((ma) => (
             <button
               key={ma}
@@ -595,63 +673,87 @@ export function ManTreoTuong({
         </div>
       </div>
 
-      {/* BẢNG ĐIỀU KHIỂN — tấm trượt kính mờ dưới đáy trên điện thoại, cột phải trên máy tính. */}
+      {/*
+        BẢNG ĐIỀU KHIỂN (BB-243) — một thanh gọn ĐÈ LÊN ảnh phòng, không còn
+        chiếm riêng một cột đẩy ảnh hẹp lại. Nền mờ (backdrop-blur) để vẫn đọc
+        được chữ trên mọi ảnh phòng. Chỉ hiện nhãn ngắn (chip chất liệu/cỡ đã
+        sẵn ngắn); mô tả dài + câu "chỉ để tham khảo" gấp sau nút "i".
+        Ẩn hẳn được bằng nút "Ẩn bảng" hoặc chạm vào ảnh phòng.
+      */}
       <div
-        className="giao-dien-khach relative z-10 flex max-h-[62vh] shrink-0 flex-col gap-4 overflow-y-auto rounded-t-3xl border-t border-white/10 bg-bb-bg/95 p-5 backdrop-blur-md md:max-h-none md:w-[380px] md:rounded-none md:border-l md:border-t-0 md:border-border md:bg-bb-bg md:backdrop-blur-0"
-        style={{ boxShadow: "0 -8px 30px rgba(0,0,0,.18)" }}
+        className={cn(
+          "giao-dien-khach absolute z-10 flex flex-col gap-3 overflow-y-auto rounded-t-3xl bg-bb-bg/80 p-4 backdrop-blur-md transition-transform duration-300 ease-out",
+          "inset-x-0 bottom-0 max-h-[52vh]",
+          // md:pt-16: cột phải trên máy tính chừa chỗ cho nút "Ẩn bảng"/"Đóng"
+          // (z-20, top-4 right-4 của ảnh phòng) — thiếu khoảng này, hàng đầu
+          // của bảng (tiêu đề + nút "Chi tiết") nằm ĐÚNG dưới hai nút đó, và
+          // vì hai nút kia z CAO HƠN nên chặn mất cú bấm vào "Chi tiết" (tự bắt
+          // bằng Playwright: click "Chi tiết" bị nút "Đóng" chặn pointer-events).
+          "md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:max-h-none md:w-[300px] md:rounded-none md:pt-16",
+          // "invisible" (không chỉ translate ra ngoài khung nhìn) để Playwright
+          // và trình đọc màn hình đều coi đây là ĐÃ ẨN thật, không phải một
+          // khối vẫn "nhìn thấy được" nhưng trôi ra ngoài rìa màn hình.
+          banAn && "invisible translate-y-full md:translate-x-full md:translate-y-0",
+        )}
+        style={{ boxShadow: "0 -8px 30px rgba(0,0,0,.25)" }}
+        aria-hidden={banAn}
       >
-        <div>
-          <h2 className="font-display text-2xl font-light leading-tight text-bb-fg">
-            Treo lên tường nhà mình
-          </h2>
-          <p className="mt-1 text-xs text-bb-fg-muted">{anhDangXem.fileName}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-lg font-light leading-tight text-bb-fg">
+              Treo lên tường nhà mình
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setChiTietMo((v) => !v)}
+            aria-pressed={chiTietMo}
+            aria-label={chiTietMo ? vi.gallery.treoTuong.anChiTiet : vi.gallery.treoTuong.chiTiet}
+            className={cn(
+              "flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition",
+              chiTietMo ? "bg-bb-fg text-bb-bg" : "bg-bb-surface-2 text-bb-fg-muted hover:bg-bb-border",
+            )}
+          >
+            <Info className="h-3 w-3" strokeWidth={2} />
+            {vi.gallery.treoTuong.chiTiet}
+          </button>
         </div>
 
         {dsChatLieu.length > 0 && (
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-bb-fg-muted">
-              Chất liệu
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {dsChatLieu.map((cl) => (
-                <button
-                  key={cl}
-                  type="button"
-                  onClick={() => setChatLieu(cl)}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-xs font-medium transition",
-                    cl === chatLieu
-                      ? "bg-bb-fg text-bb-bg"
-                      : "bg-bb-surface-2 text-bb-fg hover:bg-bb-border",
-                  ].join(" ")}
-                >
-                  {TEN_CHAT_LIEU[cl] ?? cl}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1.5">
+            {dsChatLieu.map((cl) => (
+              <button
+                key={cl}
+                type="button"
+                onClick={() => setChatLieu(cl)}
+                className={[
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition",
+                  cl === chatLieu
+                    ? "bg-bb-fg text-bb-bg"
+                    : "bg-bb-surface-2 text-bb-fg hover:bg-bb-border",
+                ].join(" ")}
+              >
+                {TEN_CHAT_LIEU[cl] ?? cl}
+              </button>
+            ))}
           </div>
         )}
 
         {coVua.length > 0 && (
-          <div>
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-bb-fg-muted">
-              Kích thước ({huongKhung === "doc" ? "dọc" : "ngang"})
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {coVua.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCo(c)}
-                  className={[
-                    "rounded-full px-3 py-1.5 text-xs font-medium transition",
-                    c === co ? "bg-bb-fg text-bb-bg" : "bg-bb-surface-2 text-bb-fg hover:bg-bb-border",
-                  ].join(" ")}
-                >
-                  {c.replace("x", "×")} cm
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1.5">
+            {coVua.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCo(c)}
+                className={[
+                  "rounded-full px-3 py-1.5 text-xs font-medium transition",
+                  c === co ? "bg-bb-fg text-bb-bg" : "bg-bb-surface-2 text-bb-fg hover:bg-bb-border",
+                ].join(" ")}
+              >
+                {c.replace("x", "×")} cm
+              </button>
+            ))}
           </div>
         )}
 
@@ -663,7 +765,7 @@ export function ManTreoTuong({
 
         {monKhung.length > 0 && (
           <div className="space-y-2">
-            <label className="flex cursor-pointer items-center justify-between rounded-2xl bg-bb-surface-2 px-3.5 py-2.5">
+            <label className="flex cursor-pointer items-center justify-between rounded-2xl bg-bb-surface-2 px-3.5 py-2">
               <span className="text-xs font-medium text-bb-fg">Bọc khung HQ</span>
               <input
                 type="checkbox"
@@ -674,44 +776,45 @@ export function ManTreoTuong({
             </label>
 
             {coKhung && (
-              <div>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-bb-fg-muted">
-                  Mẫu khung
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {MAU_KHUNG.map((m) => (
-                    <button
-                      key={m.ma}
-                      type="button"
-                      aria-pressed={m.ma === maMauKhung}
-                      onClick={() => setMaMauKhung(m.ma)}
-                      className={[
-                        "flex flex-col items-center gap-1 rounded-xl p-1.5 transition",
-                        m.ma === maMauKhung
-                          ? "bg-bb-fg/10 ring-2 ring-bb-fg"
-                          : "ring-1 ring-transparent hover:bg-bb-surface-2",
-                      ].join(" ")}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={m.anh}
-                        alt=""
-                        className="h-10 w-10 rounded-md object-cover"
-                        draggable={false}
-                      />
-                      <span className="text-[10px] font-medium text-bb-fg">{m.ten}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-1.5 text-[11px] text-bb-fg-muted">
-                  Mẫu khung chỉ để tham khảo — CSKH sẽ tư vấn mẫu thật khi chốt đơn.
-                </p>
+              <div className="flex flex-wrap gap-2">
+                {MAU_KHUNG.map((m) => (
+                  <button
+                    key={m.ma}
+                    type="button"
+                    aria-pressed={m.ma === maMauKhung}
+                    onClick={() => setMaMauKhung(m.ma)}
+                    className={[
+                      "flex flex-col items-center gap-1 rounded-xl p-1 transition",
+                      m.ma === maMauKhung
+                        ? "bg-bb-fg/10 ring-2 ring-bb-fg"
+                        : "ring-1 ring-transparent hover:bg-bb-surface-2",
+                    ].join(" ")}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={m.anh}
+                      alt=""
+                      className="h-8 w-8 rounded-md object-cover"
+                      draggable={false}
+                    />
+                    <span className="text-[10px] font-medium text-bb-fg">{m.ten}</span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        <div className="mt-auto space-y-1 border-t border-bb-border pt-3">
+        {/* Chi tiết gấp lại (BB-243): mô tả chất liệu + câu "chỉ để tham khảo"
+            của khung — chỉ hiện khi bấm nút "i" ở trên, không choán chỗ mặc định. */}
+        {chiTietMo && (
+          <div className="space-y-1.5 rounded-2xl bg-bb-surface-2/70 p-3 text-[11px] leading-relaxed text-bb-fg-muted">
+            {chatLieu && MO_TA_CHAT_LIEU[chatLieu] && <p>{MO_TA_CHAT_LIEU[chatLieu]}</p>}
+            {coKhung && <p>{vi.gallery.treoTuong.thamKhaoKhung}</p>}
+          </div>
+        )}
+
+        <div className="mt-auto space-y-1 border-t border-bb-border pt-2.5">
           <div className="flex items-baseline justify-between text-sm">
             <span className="text-bb-fg-muted">
               {sanPhamAnh ? (TEN_CHAT_LIEU[sanPhamAnh.material ?? ""] ?? sanPhamAnh.material) : "—"}
@@ -751,6 +854,35 @@ export function ManTreoTuong({
           <p className="text-center text-xs text-bb-fg-muted">Bộ ảnh đang chỉ xem, chưa đặt được.</p>
         )}
       </div>
+
+      {/* BB-243 — mở lớn tấm của bé: toàn màn, nền tối, đè trên cả màn tường. */}
+      {xemLon && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={vi.gallery.treoTuong.xemLonAnhBe}
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95"
+          onClick={() => setXemLon(false)}
+          data-con-tro="mac-dinh"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={buildLightboxImageUrl(anhDangXem.id, 2048)}
+            alt={anhDangXem.fileName}
+            className="max-h-[92vh] max-w-[92vw] object-contain"
+            draggable={false}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setXemLon(false)}
+            aria-label={vi.gallery.treoTuong.dongXemLon}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/55"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
