@@ -47,8 +47,14 @@ describe("BB-248: tranhCuaSanPham", () => {
       "sp-khung-anh",
     );
   });
+});
 
-  it("canvas ở nhóm anh_in KHÔNG kích hoạt exception (chỉ áp dụng cho nhánh khung)", () => {
-    expect(tranhCuaSanPham("anh_in", "Canvas", "In Canvas 40x60")).toBe("sp-anh-in");
+// Opus soát: canvas thật nằm ở nhóm ảnh in (kind = print).
+describe("BB-248: canvas ở nhóm ảnh in", () => {
+  it("ảnh in chất liệu Canvas → tranh canvas", () => {
+    expect(tranhCuaSanPham("anh_in", "Canvas", "Tranh canvas 40x60")).toBe("sp-tranh-canvas");
+  });
+  it("ảnh in giấy thường vẫn là ảnh in", () => {
+    expect(tranhCuaSanPham("anh_in", "Giấy lụa", "Ảnh 13x18")).toBe("sp-anh-in");
   });
 });

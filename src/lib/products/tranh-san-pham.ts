@@ -50,14 +50,18 @@ export function tranhCuaSanPham(
   material: string | null,
   name: string,
 ): string {
+  // Opus soát: canvas trong dữ liệu thật rơi vào nhóm `anh_in` (in lên canvas,
+  // kind = print) chứ hiếm khi là `khung` — kiểm canvas TRƯỚC nhóm, không thì
+  // tranh canvas gần như không bao giờ hiện.
+  if (nhom !== "album" && boDau(`${material ?? ""} ${name}`).includes("canvas")) {
+    return "sp-tranh-canvas";
+  }
   switch (nhom) {
     case "anh_in":
       return "sp-anh-in";
     case "album":
       return "sp-album";
-    case "khung": {
-      const gopChu = boDau(`${material ?? ""} ${name}`);
-      return gopChu.includes("canvas") ? "sp-tranh-canvas" : "sp-khung-anh";
-    }
+    case "khung":
+      return "sp-khung-anh";
   }
 }
