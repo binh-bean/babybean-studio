@@ -131,4 +131,63 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
     await expect(manTuong).toBeHidden();
     await expect(page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first()).toBeVisible();
   });
+
+  test("treo tường: bật Khung hiện hàng mẫu, chọn mẫu khác đổi border-image, thấy câu tham khảo", async ({
+    page,
+  }) => {
+    test.slow();
+    await page.goto(`/g/${maLink}`);
+    // Tấm THỨ BA — ca "treo tường" trước trong tệp này chỉ đụng tấm đầu
+    // (tấm 0), ca "so sánh" chỉ dùng để mở màn so sánh (không commit trạng
+    // thái "đã chọn"). Dùng tấm 2 để không phụ thuộc việc chọn có lưu chung
+    // theo bộ ảnh (server) hay theo phiên (trình duyệt) giữa các ca.
+    const tamDau = page.getByTestId("the-anh").nth(2);
+    // `.isVisible()` không CHỜ — gọi ngay sau goto dễ hỏi sớm hơn lúc hydrate
+    // xong và luôn trả false. Chờ thẻ hiện ra trước, rồi mới đọc trạng thái nút.
+    // Nút CHỈ có icon (không có chữ) — nhãn nằm ở aria-label, không phải
+    // textContent (từng đọc nhầm textContent, luôn rỗng, nên đã đổi qua đếm
+    // locator theo role trực tiếp).
+    await expect(tamDau).toBeVisible();
+    const nutChon = tamDau.getByRole("button", { name: "Chọn ảnh này" });
+    if ((await nutChon.count()) > 0) {
+      await nutChon.click();
+    }
+    await expect(tamDau.getByRole("button", { name: "Bỏ chọn" })).toBeVisible();
+
+    await tamDau.click();
+    await page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first().click();
+
+    const manTuong = page.getByRole("dialog", { name: "Xem ảnh trên tường" });
+    await expect(manTuong).toBeVisible();
+
+    const bocKhung = manTuong.getByText("Bọc khung HQ");
+    // Không có danh mục "khung" cho ca test này thì bỏ qua — chỉ chạy khi có.
+    if ((await bocKhung.count()) === 0) return;
+
+    await bocKhung.click();
+
+    const nutMau = manTuong.getByRole("button", { name: "Khung đen", exact: true });
+    await expect(nutMau).toBeVisible();
+    await expect(nutMau).toHaveAttribute("aria-pressed", "true");
+
+    // Câu ghi chú "chỉ để tham khảo" phải thấy ngay khi bật Khung.
+    await expect(manTuong.getByText(/chỉ để tham khảo/)).toBeVisible();
+
+    // Khung đang vẽ bằng border-image — đọc border-image-source của khối bọc
+    // ảnh (chính là div cha của thẻ <img> tấm ảnh khách, có border-image).
+    const anhKhach = manTuong.locator('img[src*="/api/img/"]');
+    const khoiBocKhung = anhKhach.locator("xpath=ancestor::div[contains(@style,'border-image')][1]");
+    const nguonBanDau = await khoiBocKhung.evaluate(
+      (el) => getComputedStyle(el).borderImageSource,
+    );
+    expect(nguonBanDau).toContain("khung-den.jpg");
+
+    await manTuong.getByRole("button", { name: "Khung trắng", exact: true }).click();
+    await expect(nutMau).toHaveAttribute("aria-pressed", "false");
+    const nguonSau = await khoiBocKhung.evaluate(
+      (el) => getComputedStyle(el).borderImageSource,
+    );
+    expect(nguonSau).toContain("khung-trang.jpg");
+    expect(nguonSau).not.toBe(nguonBanDau);
+  });
 });
