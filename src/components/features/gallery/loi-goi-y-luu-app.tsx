@@ -145,7 +145,10 @@ export function LoiGoiYLuuApp({ daChon, onXemCachLuu }: LoiGoiYLuuAppProps) {
     <div
       role="status"
       aria-label={vi.gallery.saveAppPrompt.message}
-      className="fixed inset-x-3 bottom-[84px] z-40 mx-auto max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300 sm:bottom-6 sm:right-6 sm:left-auto sm:mx-0"
+      // LUÔN nằm TRÊN thanh đáy (ThanhChon cao 60px + lề 12px + vùng an toàn), ở
+      // MỌI cỡ màn. Bản đầu trên máy tính đặt góc dưới phải và che đúng nút
+      // "Chốt danh sách" — chặn thao tác quan trọng nhất (Opus soát, 25/09).
+      className="fixed inset-x-3 bottom-[calc(84px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300 sm:right-6 sm:left-auto sm:mx-0"
     >
       <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-3.5 pr-3 text-sm shadow-lg">
         <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
@@ -171,7 +174,8 @@ export function LoiGoiYLuuApp({ daChon, onXemCachLuu }: LoiGoiYLuuAppProps) {
         <button
           type="button"
           onClick={dong}
-          aria-label={vi.common.close}
+          // Tên riêng, không "Đóng": trùng tên nút đóng màn xem ảnh lớn.
+          aria-label="Ẩn gợi ý lưu app"
           className="shrink-0 rounded-full p-1 text-muted-foreground transition hover:bg-surface-2"
         >
           <X className="h-3.5 w-3.5" aria-hidden="true" />

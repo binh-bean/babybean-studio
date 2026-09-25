@@ -219,11 +219,34 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await expect(tamDau).toBeVisible();
     await tamDau.getByRole("button", { name: "Chọn ảnh này" }).click();
     await expect(tamDau.getByRole("button", { name: "Bỏ chọn" })).toBeVisible();
+    // Chờ lượt thả tim GHI XONG vào cơ sở dữ liệu trước khi đi tiếp: "Bỏ chọn"
+    // hiện ngay nhờ cập nhật lạc quan, còn PATCH có thể tới máy chủ SAU khi ca
+    // kế đã dọn dữ liệu — ca kế từng thấy sẵn 1 tấm đã chọn (Opus soát 25/09).
+    await expect
+      .poll(async () =>
+        (await pg.query(
+          "select count(*)::int n from selection_items si join selections s on s.id = si.selection_id where s.gallery_id = $1 and si.mark = 'selected'",
+          [galleryId],
+        )).rows[0].n as number, { timeout: 10_000 })
+      .toBe(1);
 
     const goiY = page.getByRole("status", {
       name: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
     });
     await expect(goiY).toBeVisible();
+    // Opus soát (25/09): bản đầu trên máy tính đặt gợi ý góc dưới phải, ĐÈ LÊN
+    // nút "Chốt danh sách" — E-1/E-2/E-8 không bấm được Chốt. Gợi ý và thanh
+    // đáy không được chồng nhau, ở máy tính lẫn điện thoại.
+    const khongChong = async () => {
+      const a = (await goiY.boundingBox())!;
+      const b = (await page.getByRole("button", { name: "Chốt danh sách" }).first().boundingBox())!;
+      const chong = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      expect(chong, `gợi ý ${JSON.stringify(a)} đè nút Chốt ${JSON.stringify(b)}`).toBe(false);
+    };
+    await khongChong();
+    await page.setViewportSize({ width: 375, height: 812 });
+    await khongChong();
+    await page.setViewportSize({ width: 1440, height: 900 });
 
     await goiY.getByRole("button", { name: "Để sau" }).click();
     await expect(goiY).toBeHidden();
@@ -240,6 +263,12 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // Dọn lựa chọn còn sót từ ca thử trước — cùng lý do ghi ở ca "Để sau"
     // phía trên: trạng thái "đã chọn" nằm ở server, dùng chung `maLink`.
     await pg.query("delete from selection_items where selection_id in (select id from selections where gallery_id = $1)", [galleryId]);
+    const soDaChonDb = async () =>
+      (await pg.query(
+        "select count(*)::int n from selection_items si join selections s on s.id = si.selection_id where s.gallery_id = $1 and si.mark = 'selected'",
+        [galleryId],
+      )).rows[0].n as number;
+    await expect.poll(soDaChonDb, { timeout: 10_000 }).toBe(0);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`/g/${maLink}`);
 
