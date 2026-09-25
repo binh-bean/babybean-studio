@@ -65,6 +65,9 @@ const NGOAI_LE: Record<string, string> = {
     "nhìn thấy được ở chính trạng thái bộ ảnh.",
   "cron/flush-notifications": "Như trên — lưới đỡ gửi lại tin, trạng thái nằm ở bảng notifications.",
   "cron/sync-lark": "Như trên — mỗi lượt ghi số bản ghi đã xử vào log máy chủ.",
+  "cron/hau-ky":
+    "BB-200 — chỉ ghi bản sao trạng thái đọc từ Lark (lark_trang_thai…) và sổ " +
+    "lark_nhac_da_gui; mỗi tin nhắc có dòng trong notifications. Số liệu mỗi lượt ghi console.info.",
 };
 
 function quetRoute(thuMuc: string, goc: string): string[] {

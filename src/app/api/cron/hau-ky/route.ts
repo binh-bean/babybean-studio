@@ -67,7 +67,9 @@ async function chay(request: Request) {
             payload: { loai: tin.maNhac, nguoiNhan: tin.nguoiNhan, cacBo: tin.boAnh },
           }),
       });
-      return NextResponse.json({ data: { banGhiLark: doc.size, ...ghi, nhac } });
+      const ketQua = { banGhiLark: doc.size, ...ghi, nhac };
+      console.info(JSON.stringify({ evt: "cron.hau_ky.xong", ...ketQua }));
+      return NextResponse.json({ data: ketQua });
     } finally {
       await client.query("select pg_advisory_unlock($1)", [KHOA]);
     }
