@@ -186,7 +186,9 @@ test.describe("BB-245: mời mua lần hai", () => {
       return;
     }
 
-    await expect(page.getByText("Đã gửi — studio sẽ gọi ba mẹ sớm")).toBeVisible();
+    // BB-249: danh sách "đã gửi" hiện trạng thái thân thiện theo từng dòng
+    // (moi -> "Đã gửi, studio sẽ gọi sớm") thay vì một câu chung chung.
+    await expect(page.getByText("Đã gửi, studio sẽ gọi sớm")).toBeVisible();
 
     const { rows } = await pg.query(
       "select product_id, photo_id, so_luong, trang_thai from yeu_cau_mua_them where gallery_id = $1",
