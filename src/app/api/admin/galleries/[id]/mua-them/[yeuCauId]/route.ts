@@ -51,6 +51,14 @@ const Body = z.object({
 });
 
 /** Chuyển hợp lệ: trạng thái cũ → tập trạng thái được phép đổi tới. */
+/** Chữ cho người đọc — không để mã trần ("da_chot") lọt ra câu báo lỗi (Opus soát). */
+const TEN_TRANG_THAI: Record<string, string> = {
+  moi: "Mới gửi",
+  da_lien_he: "Đã gọi khách",
+  da_chot: "Đã chốt",
+  huy: "Đã huỷ",
+};
+
 const CHUYEN_HOP_LE: Record<string, string[]> = {
   moi: ["da_lien_he", "huy"],
   da_lien_he: ["da_chot", "huy"],
@@ -115,7 +123,7 @@ export async function PATCH(
         "CONFLICT",
         trangThaiCu === "da_chot" || trangThaiCu === "huy"
           ? "Yêu cầu này đã ở trạng thái cuối, không đổi thêm được"
-          : `Không thể chuyển từ "${trangThaiCu}" sang "${trangThaiMoi}"`,
+          : `Không thể chuyển từ "${TEN_TRANG_THAI[trangThaiCu] ?? trangThaiCu}" sang "${TEN_TRANG_THAI[trangThaiMoi]}"`,
       );
     }
 
