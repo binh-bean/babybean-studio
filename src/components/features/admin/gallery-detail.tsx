@@ -78,6 +78,8 @@ interface Detail {
     createdAt: string | null;
     viewCount: number;
     revokedAt: string | null;
+    /** BB-201 — link đầy đủ; null = link tạo trước 25/09/2026 chưa khôi phục, hoặc không có quyền gửi link. */
+    diaChi: string | null;
   } | null;
   items: Item[];
   revisions: Revision[];
@@ -842,8 +844,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               </p>
             )}
             <p className="mt-2 text-sm">
-              Đóng màn hình là <strong>không xem lại được</strong> — hệ thống không lưu link,
-              chỉ lưu bản băm.
+              Link này cũng luôn hiện lại ở đây khi mở bộ ảnh (BB-201).
             </p>
             <textarea
               readOnly
@@ -1502,6 +1503,52 @@ function Stat({ label, value }: { label: string; value: string }) {
  * KHÔNG hiện mã link ở đây. Sau khi bỏ PIN, chuỗi đó là thứ duy nhất che ảnh
  * của một nhà; sáu ký tự đầu đủ để đối chiếu và không mở được gì.
  */
+/**
+ * BB-201 — một dòng link gửi khách + nút sao chép, cùng dáng dòng link Drive.
+ * Sao chép qua Clipboard API; trình duyệt chặn (http, quyền) thì chọn sẵn chữ
+ * để CSKH tự bấm Ctrl+C — không bao giờ để nút bấm mà không có gì xảy ra.
+ */
+function DongLinkApp({ diaChi }: { diaChi: string }) {
+  const [daChep, setDaChep] = React.useState(false);
+  const oRef = React.useRef<HTMLInputElement>(null);
+  async function chep() {
+    try {
+      await navigator.clipboard.writeText(diaChi);
+      setDaChep(true);
+      window.setTimeout(() => setDaChep(false), 2000);
+    } catch {
+      oRef.current?.select();
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        ref={oRef}
+        readOnly
+        value={diaChi}
+        onFocus={(e) => e.currentTarget.select()}
+        aria-label="Link gửi khách"
+        className="min-w-0 flex-1 rounded border border-[var(--bb-border)] px-2 py-1.5 font-mono text-xs"
+      />
+      <button
+        type="button"
+        onClick={() => void chep()}
+        className="rounded-md border border-[var(--bb-border)] px-3 py-1.5 text-xs"
+      >
+        {daChep ? "Đã sao chép" : "Sao chép"}
+      </button>
+      <a
+        href={diaChi}
+        target="_blank"
+        rel="noreferrer"
+        className="text-xs text-[var(--bb-primary)] underline"
+      >
+        Mở thử
+      </a>
+    </div>
+  );
+}
+
 function TinhTrangLink({ detail }: { detail: Detail }) {
   const link = detail.shareLink;
 
@@ -1545,6 +1592,8 @@ function TinhTrangLink({ detail }: { detail: Detail }) {
           mã <span className="font-mono">{link.tokenPrefix ?? "—"}…</span>
         </span>
       </p>
+      {/* BB-201 — link hiện lại được như link Drive (chủ studio 25/09/2026). */}
+      {link.diaChi ? <DongLinkApp diaChi={link.diaChi} /> : null}
       <p className="text-[var(--bb-fg-muted)]">
         Cấp ngày {ngay(link.createdAt)} · hạn {ngay(link.expiresAt)} · khách đã mở {link.viewCount} lần
       </p>

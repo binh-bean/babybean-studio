@@ -38,7 +38,7 @@ describe("BB-148: Cấp lại link không làm mất ảnh khách chọn", () =>
     const { rows: br } = await client.query("select id from branches order by name limit 1");
     branchId = br[0].id;
 
-    const { rows: st } = await client.query("select id from staff_profiles limit 1");
+    const { rows: st } = await client.query("select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1");
     staffId = st[0].id;
 
     const { rows: c } = await client.query(

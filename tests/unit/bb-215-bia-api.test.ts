@@ -40,7 +40,7 @@ describe("BB-215: PATCH bìa bộ ảnh", () => {
     const { rows: br } = await client.query("select id from branches order by name limit 2");
     branchId = br[0].id;
     branchKhacId = br[1]?.id ?? br[0].id;
-    const { rows: st } = await client.query("select id from staff_profiles limit 1");
+    const { rows: st } = await client.query("select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1");
     staffId = st[0].id;
 
     const { rows: kh } = await client.query(
