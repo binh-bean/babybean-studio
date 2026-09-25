@@ -148,12 +148,11 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     if ((await nutNhan.count()) > 0) {
       const boxTen = (await tenChiNhanh.boundingBox())!;
       const boxNut = (await nutNhan.boundingBox())!;
-      // Cùng một hàng: tâm dọc của hai khối lệch nhau không quá nửa chiều
-      // cao dòng chữ tên chi nhánh (tránh so sánh y tuyệt đối bằng nhau,
-      // vốn dễ vỡ vì hai khối cao thấp khác nhau).
-      const tamY1 = boxTen.y + boxTen.height / 2;
-      const tamY2 = boxNut.y + boxNut.height / 2;
-      expect(Math.abs(tamY1 - tamY2)).toBeLessThan(boxTen.height);
+      // Cùng một hàng: nút bắt đầu (top) TRƯỚC KHI khối tên/địa chỉ kết
+      // thúc — nghĩa là chúng chồng lên nhau theo trục dọc (cùng hàng), chứ
+      // không nối đuôi nhau như bố cục xếp dọc (đúng phần bù của điều kiện
+      // "xếp dọc" đo ở 375px bên dưới).
+      expect(boxNut.y).toBeLessThan(boxTen.y + boxTen.height);
       // Và nút nằm bên PHẢI khối tên/địa chỉ, không đè lên nhau.
       expect(boxNut.x).toBeGreaterThan(boxTen.x + boxTen.width / 2);
     }
