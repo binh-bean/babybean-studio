@@ -32,12 +32,22 @@
  * ---------------------------------------------------------------------------
  * Font-display Fraunces, nền kem, nút viên tròn màu mực — đồng bộ với
  * `review-panel.tsx` và `cua-hang.tsx`.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-248 — tranh minh hoạ thay cho khối trống
+ * ---------------------------------------------------------------------------
+ * Tranh `/san-pham/moi-mua-qua-tang-*.webp` giờ có thật (chủ studio vừa vẽ,
+ * xem `src/lib/products/tranh-san-pham.ts`), nên bỏ cơ chế dự phòng `anhLoi`/
+ * `onError` từng ẩn khối ảnh khi tệp chưa tồn tại — mã đó thành mã chết một
+ * khi tệp đã có sẵn. Thẻ ảnh nay luôn hiện, dùng `srcSet` 320w/640w. Các dòng
+ * sản phẩm trong màn chọn dùng `tranhCuaSanPham()` như `cua-hang.tsx`.
  */
 
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { duocMoiMuaLanHai } from "@/lib/gallery/moi-mua-lan-hai-rules";
+import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
 
 export interface MonTrongDanhMuc {
   productId: string;
@@ -82,7 +92,6 @@ export function MoiMuaLanHai({
   const [dangGui, setDangGui] = React.useState(false);
   const [loi, setLoi] = React.useState<string | null>(null);
   const [daGui, setDaGui] = React.useState(false);
-  const [anhLoi, setAnhLoi] = React.useState(false);
 
   const duocMoiMua = duocMoiMuaLanHai(status, soVongSua);
 
@@ -166,15 +175,17 @@ export function MoiMuaLanHai({
     <>
       <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface p-5">
         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-2">
-          {!anhLoi && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src="/san-pham/moi-mua-qua-tang-320.webp"
-              alt=""
-              className="h-full w-full object-cover"
-              onError={() => setAnhLoi(true)}
-            />
-          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/san-pham/moi-mua-qua-tang-320.webp"
+            srcSet="/san-pham/moi-mua-qua-tang-320.webp 320w, /san-pham/moi-mua-qua-tang-640.webp 640w"
+            sizes="56px"
+            alt=""
+            loading="lazy"
+            width={56}
+            height={56}
+            className="h-full w-full object-cover"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-display text-lg font-light leading-tight">
@@ -233,6 +244,14 @@ export function MoiMuaLanHai({
           </nav>
 
           <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-8">
+            {/* Tranh minh hoạ của nhóm đang xem (BB-248), cạnh tiêu đề nhóm. */}
+            <div className="mb-3 flex items-center gap-3">
+              <TranhNho ten={tranhCuaSanPham(nhomDangXem, null, "")} kichThuoc={72} />
+              <h3 className="font-display text-lg font-light leading-tight">
+                {TEN_NHOM[nhomDangXem]}
+              </h3>
+            </div>
+
             {theoNhom.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Nhóm này chưa có sản phẩm nào đang bán. Ba mẹ nhắn CSKH giúp em nhé.
@@ -241,10 +260,14 @@ export function MoiMuaLanHai({
               <ul className="grid gap-3 sm:grid-cols-2">
                 {theoNhom.map((m) => {
                   const so = soLuongDat(m.productId, null);
+                  const tranhSanPham = tranhCuaSanPham(m.nhom, m.material, m.name);
+                  const laCanvas = tranhSanPham === "sp-tranh-canvas";
                   return (
                     <li key={m.productId} className="rounded-2xl border border-border bg-surface p-4">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <div className="flex min-w-0 items-start gap-3">
+                          {laCanvas && <TranhNho ten={tranhSanPham} kichThuoc={56} />}
+                          <div className="min-w-0">
                           <p className="text-sm font-medium">{m.name}</p>
                           <p className="mt-1 text-sm font-semibold">{formatCurrencyVND(m.unitPrice)}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -258,6 +281,7 @@ export function MoiMuaLanHai({
                                 .reduce((n, d) => n + d.soLuong, 0)}
                             </p>
                           )}
+                          </div>
                         </div>
 
                         <button
@@ -348,5 +372,28 @@ export function MoiMuaLanHai({
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * Tranh minh hoạ nhỏ (BB-248) — `srcSet` 320w/640w, `width`/`height` cố định
+ * để không xô layout khi chưa tải xong. `alt=""` vì chỉ trang trí. Giống hệt
+ * `TranhNho` của `cua-hang.tsx` — không tách file dùng chung để tránh thêm
+ * phụ thuộc chéo giữa hai component độc lập.
+ */
+function TranhNho({ ten, kichThuoc }: { ten: string; kichThuoc: number }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/san-pham/${ten}-320.webp`}
+      srcSet={`/san-pham/${ten}-320.webp 320w, /san-pham/${ten}-640.webp 640w`}
+      sizes={`${kichThuoc}px`}
+      alt=""
+      loading="lazy"
+      width={kichThuoc}
+      height={kichThuoc}
+      className="shrink-0 rounded-xl object-cover"
+      style={{ width: kichThuoc, height: kichThuoc }}
+    />
   );
 }
