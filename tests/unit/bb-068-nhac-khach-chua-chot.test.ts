@@ -24,6 +24,11 @@ import { Client } from "pg";
 
 vi.mock("server-only", () => ({}));
 
+// Số giả MỚI mỗi lượt: số cố định '0900000068' va `uq_customers_phone_branch`
+// khi một lượt trước bị ngắt giữa chừng để sót dòng, hoặc hai worktree chạy
+// cùng lúc (25/09/2026, gặp hai lần trong một ngày).
+const SDT_GIA = "0900" + String(Math.floor(Math.random() * 1e6)).padStart(6, "0");
+
 import { quetNhacKhachChuaChot } from "@/lib/gallery/nhac-khach";
 import { dungThe } from "@/lib/lark/notify";
 
@@ -96,8 +101,8 @@ describe("BB-068: nhắc khách chưa chốt", () => {
     branchId = br[0].id;
     const { rows: c } = await client.query(
       `insert into customers (branch_id, full_name, phone)
-       values ($1,'Fixture BB-068 Nhắc','0900000068') returning id`,
-      [branchId],
+       values ($1,'Fixture BB-068 Nhắc',$2) returning id`,
+      [branchId, SDT_GIA],
     );
     customerId = c[0].id;
 
@@ -208,7 +213,7 @@ describe("BB-068: nhắc khách chưa chốt", () => {
         where template='gallery.due_soon' and payload->>'galleryId' = $1`,
       [id],
     );
-    expect(rows[0].sdt).toBe("090***0068");
-    expect(rows[0].sdt).not.toContain("0900000068");
+    expect(rows[0].sdt).toBe(`090***${SDT_GIA.slice(-4)}`);
+    expect(rows[0].sdt).not.toContain(SDT_GIA);
   });
 });
