@@ -83,7 +83,7 @@ test.describe("E-11: Kịch bản ảnh lớn 1.000 ảnh", () => {
     expect(count).toBeLessThan(200);
 
     // Đo bộ nhớ ban đầu
-    const memBanDau = await page.evaluate(() => (performance as any).memory?.usedJSHeapSize || 0);
+    const memBanDau = await page.evaluate(() => (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0);
 
     // Cuộn tới cuối
     let timThayCuoi = false;
@@ -126,7 +126,7 @@ test.describe("E-11: Kịch bản ảnh lớn 1.000 ảnh", () => {
     }
 
     // Đo bộ nhớ lúc sau
-    const memLucSau = await page.evaluate(() => (performance as any).memory?.usedJSHeapSize || 0);
+    const memLucSau = await page.evaluate(() => (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0);
     
     if (memBanDau > 0) {
       // Không tăng quá 2 lần so với lúc tải xong
