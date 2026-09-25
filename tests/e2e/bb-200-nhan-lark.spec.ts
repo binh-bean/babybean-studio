@@ -224,6 +224,12 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
     await page.waitForURL("**/admin**");
 
     await page.goto(`/admin/galleries/${galleryC}`);
+    // Chờ dữ liệu tải xong TRƯỚC khi kiểm phần vắng mặt — GalleryDetail là
+    // component client tự fetch sau khi mount, nên `toHaveCount(0)` hỏi ngay
+    // sau goto() luôn đúng một cách vô nghĩa (dữ liệu chưa kịp tải thì cái gì
+    // cũng "chưa có"). Đợi ô Thống kê "Trạng thái" — thứ luôn xuất hiện sau
+    // khi tải xong — rồi mới kiểm phần đáng lẽ phải vắng mặt.
+    await expect(page.getByText("Trạng thái").first()).toBeVisible({ timeout: CHO_TAI });
     await expect(page.getByText("Mở lại cho khách chọn tiếp")).toHaveCount(0);
 
     // Vai cs — CÓ galleries:reopen, trong một trang riêng (phiên khác).
