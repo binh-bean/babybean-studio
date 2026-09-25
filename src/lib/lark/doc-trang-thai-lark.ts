@@ -206,6 +206,33 @@ export async function docTrangThaiTuLark(opts: {
   return ra;
 }
 
+/**
+ * BB-252 — đọc trạng thái của MỘT bản ghi Hậu Kỳ (đường hook Lark đẩy sang).
+ * Trả hàm đọc dùng lại được cho nhiều bản ghi trong cùng một lượt hook: bảng
+ * mã cột chỉ đọc một lần. Chỉ xin cột trạng thái + ngày, như bản đọc tất cả.
+ */
+export async function taoDocMotBanGhi(opts: {
+  auth: LarkAuthHeader;
+  baseToken: string;
+}): Promise<(recordId: string) => Promise<TrangThaiDoc | null>> {
+  if (dangChayPhepThu()) throw new Error("Đang chạy phép thử — không gọi Lark thật");
+  const tableId = await timBangHauKy(opts.auth, opts.baseToken);
+  const cot = await larkGet<{ items: CotLark[] }>(
+    opts.auth,
+    `/bitable/v1/apps/${opts.baseToken}/tables/${tableId}/fields?page_size=100`,
+  );
+  const bang = dungBangMa(cot.items);
+  return async (recordId) => {
+    const d = await larkGet<{
+      record?: { fields: Record<string, unknown>; last_modified_time?: number };
+    }>(
+      opts.auth,
+      `/bitable/v1/apps/${opts.baseToken}/tables/${tableId}/records/${encodeURIComponent(recordId)}?automatic_fields=true`,
+    );
+    return d.record ? dichBanGhi(d.record.fields, d.record.last_modified_time, bang) : null;
+  };
+}
+
 /** Giai đoạn "Hình đã về" (docs/21) — mốc báo ba mẹ ghé nhận sản phẩm. */
 const GIAI_DOAN_HINH_DA_VE = 9;
 
@@ -237,6 +264,8 @@ export async function ghiTrangThaiVaoGalleries(
   doc: Map<string, TrangThaiDoc>,
   bayGio = new Date(),
 ): Promise<{ doc: number; doi: number; sangHinhDaVe: string[] }> {
+  // Chỉ đọc đúng các bộ có mã bản ghi trong `doc` — đường hook (BB-252) gọi
+  // hàm này cho MỘT bản ghi mỗi lần, không cần quét cả ~500 bộ.
   const { rows } = await client.query<{
     id: string;
     status: string;
@@ -246,7 +275,8 @@ export async function ghiTrangThaiVaoGalleries(
     lark_trang_thai_tu: Date | null;
   }>(
     `select id, status, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_trang_thai_tu
-       from galleries where lark_hauky_record_id is not null and status <> 'archived'`,
+       from galleries where lark_hauky_record_id = any($1::text[]) and status <> 'archived'`,
+    [[...doc.keys()]],
   );
   let soDoc = 0;
   let soDoi = 0;
