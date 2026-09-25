@@ -1136,12 +1136,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
   // BB-212 — màn lỗi / link hết hạn / không tìm thấy, cùng ngôn ngữ mới.
   if (error || !gallery) {
+    const tranhLoi = error?.code === "LINK_EXPIRED" ? "link-het-han" : "chua-co-anh";
     return (
       <div className="mx-auto flex min-h-[80dvh] max-w-md flex-col items-center justify-center bg-background p-6 text-center text-foreground">
         <div className="relative mb-6 h-[160px] w-[160px] md:h-[200px] md:w-[200px]">
+          {/* Đồng hồ cát chỉ cho link HẾT HẠN; link không có thật thì nói
+              "hết hạn" bằng hình là sai (Opus soát BB-225). */}
           <img
-            src="/hanh-trinh/link-het-han-640.webp"
-            srcSet="/hanh-trinh/link-het-han-320.webp 320w, /hanh-trinh/link-het-han-640.webp 640w"
+            src={`/hanh-trinh/${tranhLoi}-640.webp`}
+            srcSet={`/hanh-trinh/${tranhLoi}-320.webp 320w, /hanh-trinh/${tranhLoi}-640.webp 640w`}
             sizes="(max-width: 768px) 160px, 200px"
             alt=""
             loading="lazy"

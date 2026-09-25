@@ -28,6 +28,7 @@ export function tranhHanhTrinh(status: string, giaiDoan: number | null, photoCou
 
   if (status === "submitted") return "chot-thanh-cong";
   if (status === "in_retouch") return "tien-do-chinh-sua";
+  if (status === "approved") return "tien-do-duyet";
   
   if (status === "ready" || status === "in_review") return null;
 
@@ -60,6 +61,8 @@ export function buocHanhTrinh(status: string, giaiDoan: number | null): HanhTrin
     hienTai = 1; 
   } else if (status === "in_retouch") {
     hienTai = 1;
+  } else if (status === "approved") {
+    hienTai = 2;
   } else if (status === "ready" || status === "in_review") {
     hienTai = 0;
   }

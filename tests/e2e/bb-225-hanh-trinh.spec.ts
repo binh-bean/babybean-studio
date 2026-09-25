@@ -91,6 +91,18 @@ test.describe("BB-225 Hanh Trinh", () => {
     const stepChinhSua = page.locator("div[aria-current='step']:has-text('Chỉnh sửa')");
     await expect(stepChinhSua).toBeVisible();
 
+    // Opus soát: 5 nhãn bước căn giữa dưới chấm — nhãn ở hai mép không được
+    // tràn khỏi màn điện thoại (tràn là trang cuộn ngang).
+    await page.screenshot({ path: "test-results/bb-225-390.png", fullPage: false });
+    for (const nhan of ["Chọn ảnh", "Nhận ảnh"]) {
+      const hop = await page.getByText(nhan, { exact: true }).boundingBox();
+      expect(hop, nhan).not.toBeNull();
+      expect(hop!.x, `${nhan} tràn trái`).toBeGreaterThanOrEqual(0);
+      expect(hop!.x + hop!.width, `${nhan} tràn phải`).toBeLessThanOrEqual(390);
+    }
+    const cuonNgang = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(cuonNgang, "trang cuộn ngang").toBe(false);
+
     // Doi trang thai
     await pg.query(`update galleries set lark_trang_thai = 'optxMAdtNX' where id = $1`, [galleryRetouch]);
     
@@ -110,7 +122,10 @@ test.describe("BB-225 Hanh Trinh", () => {
   test("Khong co the o trang thai ready", async ({ page }) => {
     await page.goto(`/g/${maLinkReady}`);
 
-    const the = page.getByRole("heading", { name: "Tiến độ xử lý" });
-    await expect(the).toBeHidden();
+    // Chờ màn khách tải xong rồi mới kiểm VẮNG — không thì kiểm lúc trang còn
+    // trắng là xanh giả (Opus soát: bản đầu kiểm một tiêu đề vốn không bao giờ
+    // có ở trạng thái ready).
+    await expect(page.getByRole("region", { name: "Ảnh bìa" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("img[src*='/hanh-trinh/']")).toHaveCount(0);
   });
 });

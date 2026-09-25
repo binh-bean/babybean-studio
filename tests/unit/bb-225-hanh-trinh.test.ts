@@ -64,3 +64,14 @@ describe("BB-225 Hanh trinh", () => {
     expect(buocHanhTrinh("delivered", 8).hienTai).toBe(4);
   });
 });
+
+// Opus soát BB-225: `approved` (đã duyệt, chờ in/giao) từng không có thẻ.
+describe("BB-225: approved có thẻ", () => {
+  it("approved chưa có giai đoạn Lark → tranh duyệt, bước Duyệt", () => {
+    expect(tranhHanhTrinh("approved", null)).toBe("tien-do-duyet");
+    expect(buocHanhTrinh("approved", null).hienTai).toBe(2);
+  });
+  it("approved + Lark Đã gửi in → tranh in", () => {
+    expect(tranhHanhTrinh("approved", 8)).toBe("tien-do-in");
+  });
+});

@@ -12,7 +12,9 @@ interface TheHanhTrinhProps {
 export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHanhTrinhProps) {
   // Chỉ hiện khi status từ submitted trở đi (hoặc đã giao, awaiting_approval, in_retouch).
   // Tuy nhiên, logic này sẽ được quyết định bên gallery-app, nhưng ta cũng kiểm tra ở đây để chắc chắn.
-  const isPostSubmit = status === "submitted" || status === "in_retouch" || status === "awaiting_approval" || status === "delivered";
+  // `approved` (ba mẹ đã duyệt, chờ in/giao) từng bị bỏ sót ở đây — đúng lúc
+  // ba mẹ hay mở lại app nhất để hỏi "bao giờ có ảnh" (Opus soát BB-225).
+  const isPostSubmit = ["submitted", "in_retouch", "awaiting_approval", "approved", "delivered"].includes(status);
   
   if (!isPostSubmit) return null;
 
