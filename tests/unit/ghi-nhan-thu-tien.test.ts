@@ -46,7 +46,7 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
     branchId = br[0].id;
 
     // Dùng một nhân viên CÓ THẬT: confirmed_by có khoá ngoại sang staff_profiles.
-    const { rows: st } = await client.query("select id from staff_profiles limit 1");
+    const { rows: st } = await client.query("select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1");
     if (st.length === 0) throw new Error("Cần ít nhất một staff_profiles để chạy phép thử này");
     staffId = st[0].id;
 

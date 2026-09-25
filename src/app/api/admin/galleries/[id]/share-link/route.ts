@@ -10,7 +10,7 @@
  * liệu mẫu.
  *
  * ---------------------------------------------------------------------------
- * Link hiện ĐÚNG MỘT LẦN
+ * Link hiện ĐÚNG MỘT LẦN — đã đổi ở BB-201 (25/09/2026), xem cuối đoạn
  * ---------------------------------------------------------------------------
  * Cơ sở dữ liệu chỉ giữ bản băm SHA-256 của mã, không giữ mã. Mất thì tạo link
  * mới chứ không đọc lại được — cùng luật với PIN.
@@ -18,6 +18,10 @@
  * Lý do không lưu mã gốc: ai đọc được bảng là mở được mọi bộ ảnh của mọi khách.
  * Bảng này CTV thời vụ không đọc được, nhưng "không đọc được hôm nay" không
  * phải là thứ nên đem ra đánh cược ảnh của trẻ con.
+ *
+ * BB-201: chủ studio cần link hiện lại như link Drive. Vẫn KHÔNG lưu mã gốc —
+ * lưu bản MÃ HOÁ (AES-256-GCM, khoá ở máy chủ) trong bảng riêng share_link_ma
+ * mà chỉ service_role đọc được (0070). Lộ riêng cơ sở dữ liệu vẫn vô dụng.
  *
  * ---------------------------------------------------------------------------
  * Tạo link mới thì THU HỒI link cũ
@@ -71,6 +75,7 @@ import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiLinkAppVeLark, diaChiDayDu } from "@/lib/lark/ghi-link-app";
+import { maHoaMaLink } from "@/lib/auth/ma-link";
 import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
 
 export const runtime = "nodejs";
@@ -186,6 +191,23 @@ export async function POST(
       .single();
 
     if (error) throw error;
+
+    /*
+      BB-201 — giữ bản MÃ HOÁ của mã để màn quản trị hiện lại link (0070).
+      Hỏng ở đây KHÔNG làm hỏng việc tạo link: link vẫn trả về và vẫn ghi sang
+      Lark như cũ; chỉ là màn quản trị không hiện lại được link này — ghi log
+      để biết, không ném.
+    */
+    {
+      const { error: maErr } = await admin
+        .from("share_link_ma")
+        .insert({ share_link_id: link.id, ma_hoa: maHoaMaLink(ma) });
+      if (maErr) {
+        console.error(
+          JSON.stringify({ evt: "share_link_ma.insert_failed", requestId, shareLinkId: link.id, lyDo: maErr.message }),
+        );
+      }
+    }
 
     /**
      * ĐÂY là lúc bộ ảnh thật sự đến tay khách — nên đây là lúc đặt mốc.

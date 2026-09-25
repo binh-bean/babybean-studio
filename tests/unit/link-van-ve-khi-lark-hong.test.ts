@@ -59,7 +59,7 @@ describe("BB-132: Lark hỏng thì link vẫn về tới tay CSKH", () => {
     await client.connect();
     const { rows: br } = await client.query("select id from branches order by name limit 1");
     branchId = br[0].id;
-    const { rows: st } = await client.query("select id from staff_profiles limit 1");
+    const { rows: st } = await client.query("select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1");
     staffId = st[0].id;
     const { rows: c } = await client.query(
       `insert into customers (branch_id, full_name)

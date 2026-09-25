@@ -5,9 +5,15 @@
  * Hạn mức lấy từ app.gallery_quota(), cây hai tầng (dòng hợp đồng cha và thành phần con).
  */
 
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
+import { giaiMaMaLink, maHoaMaLink } from "@/lib/auth/ma-link";
+import { docMaLinkAppTuLark } from "@/lib/lark/khoi-phuc-link-app";
+
+/** Link đã thử khôi phục từ Lark trong đời tiến trình này — không gọi Lark mỗi lần mở trang. */
+const daThuKhoiPhuc = new Set<string>();
+import { diaChiDayDu } from "@/lib/lark/ghi-link-app";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
@@ -43,7 +49,7 @@ export async function GET(
       // BB-215 thêm ba cột cuối: khối "Bìa bộ ảnh" cần biết bìa đang chọn và
       // baby_id để suy tên bé — cùng luật viết liền một dòng như BB-150 ở trên
       // vì Supabase suy kiểu từ chuỗi literal.
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, baby_id")
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, baby_id, lark_hauky_record_id")
       .eq("id", galleryId)
       .single();
 
@@ -82,11 +88,48 @@ export async function GET(
     // kèm `giuLinkCu`), và link đúng là cái vừa cấp chứ không phải cái đầu tiên.
     const { data: link } = await admin
       .from("share_links")
-      .select("id, status, expires_at, token_prefix, created_at, view_count, revoked_at")
+      .select("id, status, expires_at, token_prefix, token_hash, created_at, view_count, revoked_at")
       .eq("gallery_id", gallery.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    /*
+      BB-201 — link đầy đủ để CSKH thấy lại như link Drive (chủ studio 25/09).
+      Chỉ trả cho người có quyền GỬI link (galleries:share) — xem chi tiết bộ ảnh
+      không đủ. Link đã thu hồi thì không trả (mở ra chỉ thấy báo hết hiệu lực).
+      Giải mã xong ĐỐI CHIẾU với bản băm: bản mã lệch link (lỗi ghi, khôi phục
+      nhầm dòng) thì thà không hiện còn hơn hiện link của nhà khác.
+    */
+    let diaChiLink: string | null = null;
+    if (link && !link.revoked_at && staff.permissions.includes("galleries:share")) {
+      const { data: maRow } = await admin
+        .from("share_link_ma")
+        .select("ma_hoa")
+        .eq("share_link_id", link.id)
+        .maybeSingle();
+      const khop = (m: string | null): m is string =>
+        !!m && createHash("sha256").update(m).digest("hex") === link.token_hash;
+      let ma = giaiMaMaLink(maRow?.ma_hoa);
+      /*
+        Link tạo TRƯỚC BB-201 chưa có bản mã. App đã tự ghi link đó sang cột
+        "Link app" bên Lark (BB-132) — đọc lại một lần, đối chiếu băm, khớp thì
+        mã hoá bằng khoá của CHÍNH máy chủ này rồi lưu. Không khớp / Lark lỗi
+        thì thôi, lần mở sau thử lại.
+      */
+      if (!maRow && gallery.lark_hauky_record_id && !daThuKhoiPhuc.has(link.id)) {
+        daThuKhoiPhuc.add(link.id);
+        const tuLark = await docMaLinkAppTuLark(gallery.lark_hauky_record_id);
+        if (khop(tuLark)) {
+          ma = tuLark;
+          const { error: ghiErr } = await admin
+            .from("share_link_ma")
+            .upsert({ share_link_id: link.id, ma_hoa: maHoaMaLink(tuLark) }, { onConflict: "share_link_id", ignoreDuplicates: true });
+          if (ghiErr) console.error(JSON.stringify({ evt: "share_link_ma.khoi_phuc_failed", shareLinkId: link.id, lyDo: ghiErr.message }));
+        }
+      }
+      if (khop(ma)) diaChiLink = diaChiDayDu(`/g/${ma}`);
+    }
 
     // Lịch sử khách yêu cầu sửa. CSKH phải thấy khách đã đòi gì ở các vòng
     // trước, nếu không người photoshop sẽ sửa lại đúng thứ đã sửa rồi.
@@ -187,6 +230,8 @@ export async function GET(
             createdAt: link.created_at ?? null,
             viewCount: link.view_count ?? 0,
             revokedAt: link.revoked_at ?? null,
+            // null = chưa có bản mã (link tạo trước BB-201) hoặc không có quyền.
+            diaChi: diaChiLink,
           }
         : null,
       items: summary.items,

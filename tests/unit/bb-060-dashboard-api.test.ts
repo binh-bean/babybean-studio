@@ -33,7 +33,7 @@ describe("BB-060 - Bảng điều khiển", () => {
     branchA = br[0].id;
     branchB = br[1].id;
 
-    const { rows: st } = await client.query("select id from staff_profiles limit 1");
+    const { rows: st } = await client.query("select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1");
     staffId = st[0].id;
 
     const { rows: c } = await client.query("select id from customers where branch_id = $1 limit 1", [branchB]);
