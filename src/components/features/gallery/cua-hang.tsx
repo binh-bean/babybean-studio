@@ -31,11 +31,20 @@
  * tròn màu mực, tổng tiền dính đáy). HÀNH VI VÀ PROPS GIỮ NGUYÊN — khái niệm
  * album đúng nghĩa là việc riêng của người điều phối (BB-202), không đụng ở
  * đây.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-248 — tranh minh hoạ màu nước cạnh mỗi nhóm, cạnh thẻ sản phẩm canvas
+ * ---------------------------------------------------------------------------
+ * Chủ studio vừa vẽ 6 tranh cùng phong cách `public/hanh-trinh/`, đặt ở
+ * `public/san-pham/`. `tranhCuaSanPham()` (`src/lib/products/tranh-san-pham.ts`)
+ * chọn đúng tên tranh theo nhóm/chất liệu — không tự suy đoán ở đây. CHỈ thêm
+ * hình, không đổi props/hành vi nào khác.
  */
 
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
+import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
 
 export interface MonTrongCuaHang {
   productId: string;
@@ -136,6 +145,13 @@ export function CuaHang({
       </nav>
 
       <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-8">
+        {/* Tranh minh hoạ của nhóm đang xem (BB-248) — cùng phong cách
+            public/hanh-trinh/, cạnh tiêu đề nhóm. */}
+        <div className="mb-3 flex items-center gap-3">
+          <TranhNho ten={tranhCuaSanPham(nhomDangXem, null, "")} kichThuoc={72} />
+          <h3 className="font-display text-lg font-light leading-tight">{TEN_NHOM[nhomDangXem]}</h3>
+        </div>
+
         {theoNhom.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Nhóm này chưa có sản phẩm nào đang bán. Ba mẹ nhắn CSKH giúp em nhé.
@@ -144,18 +160,23 @@ export function CuaHang({
           <ul className="grid gap-3 sm:grid-cols-2">
             {theoNhom.map((m) => {
               const so = daDat(m.productId);
+              const tranhSanPham = tranhCuaSanPham(m.nhom, m.material, m.name);
+              const laCanvas = tranhSanPham === "sp-tranh-canvas";
               return (
                 <li key={m.productId} className="rounded-2xl border border-border bg-surface p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">{m.name}</p>
-                      <p className="mt-1 text-sm font-semibold">{formatCurrencyVND(m.unitPrice)}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {[m.size, m.material].filter(Boolean).join(" · ")}
-                      </p>
-                      {so > 0 && (
-                        <p className="mt-1.5 text-xs font-medium text-moss">Đang đặt {so}</p>
-                      )}
+                    <div className="flex min-w-0 items-start gap-3">
+                      {laCanvas && <TranhNho ten={tranhSanPham} kichThuoc={56} />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">{m.name}</p>
+                        <p className="mt-1 text-sm font-semibold">{formatCurrencyVND(m.unitPrice)}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {[m.size, m.material].filter(Boolean).join(" · ")}
+                        </p>
+                        {so > 0 && (
+                          <p className="mt-1.5 text-xs font-medium text-moss">Đang đặt {so}</p>
+                        )}
+                      </div>
                     </div>
 
                     <button
@@ -265,5 +286,27 @@ export function CuaHang({
         )}
       </footer>
     </div>
+  );
+}
+
+/**
+ * Tranh minh hoạ nhỏ (BB-248) — `srcSet` 320w/640w, không chiếm layout khi
+ * chưa tải xong nhờ `width`/`height` cố định. `alt=""` vì tranh chỉ trang
+ * trí, tên nhóm/sản phẩm đã có chữ cạnh bên.
+ */
+function TranhNho({ ten, kichThuoc }: { ten: string; kichThuoc: number }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/san-pham/${ten}-320.webp`}
+      srcSet={`/san-pham/${ten}-320.webp 320w, /san-pham/${ten}-640.webp 640w`}
+      sizes={`${kichThuoc}px`}
+      alt=""
+      loading="lazy"
+      width={kichThuoc}
+      height={kichThuoc}
+      className="shrink-0 rounded-xl object-cover"
+      style={{ width: kichThuoc, height: kichThuoc }}
+    />
   );
 }
