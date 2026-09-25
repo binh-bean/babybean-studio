@@ -5,6 +5,29 @@ import { z } from "zod";
  * `PushSubscription.getKey()`. Không giải mã ở đây, chỉ chặn ký tự lạ (dấu
  * `+`/`/` của base64 thường, khoảng trắng...) lọt vào cột `text`.
  */
+/**
+ * Máy chủ push thật của các trình duyệt (Chrome/Edge qua FCM, Firefox, Safari,
+ * Windows). Máy chủ app sẽ POST tới `endpoint` mỗi lần báo tin — nhận mọi địa
+ * chỉ https là để bất kỳ ai cầm link bộ ảnh bắt máy chủ gọi tới địa chỉ họ
+ * chọn (Opus soát BB-246). Trình duyệt mới dùng máy chủ khác thì thêm vào đây.
+ */
+const MAY_CHU_PUSH = [
+  /^fcm\.googleapis\.com$/,
+  /^android\.googleapis\.com$/,
+  /^updates\.push\.services\.mozilla\.com$/,
+  /^web\.push\.apple\.com$/,
+  /\.notify\.windows\.com$/,
+];
+
+export function laMayChuPush(u: string): boolean {
+  try {
+    const url = new URL(u);
+    return url.protocol === "https:" && MAY_CHU_PUSH.some((re) => re.test(url.hostname));
+  } catch {
+    return false;
+  }
+}
+
 const Base64UrlKey = z
   .string()
   .min(1, "Thiếu khoá mã hoá")
@@ -22,7 +45,8 @@ export const DangKyThongBaoSchema = z.object({
   endpoint: z
     .string()
     .url("endpoint phải là URL hợp lệ")
-    .refine((u) => u.startsWith("https://"), "endpoint phải dùng https"),
+    .refine((u) => u.startsWith("https://"), "endpoint phải dùng https")
+    .refine(laMayChuPush, "endpoint không phải máy chủ push của trình duyệt"),
   keys: z.object({
     p256dh: Base64UrlKey,
     auth: Base64UrlKey,

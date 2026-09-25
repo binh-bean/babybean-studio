@@ -23,6 +23,8 @@ import { DangKyThongBaoSchema, HuyThongBaoSchema } from "./schema";
 
 export const runtime = "nodejs";
 
+const TOI_DA_DANG_KY = 20;
+
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
@@ -41,6 +43,20 @@ export async function POST(request: Request): Promise<Response> {
     const input = parsed.data;
 
     const admin = createAdminClient();
+
+    // Một bộ ảnh cả nhà dùng chung vài máy là cùng lắm; không chặn thì một link
+    // bị lộ đăng ký được hàng nghìn dòng, mỗi lần báo tin máy chủ phải gửi
+    // hàng nghìn lượt (Opus soát BB-246). Đăng ký lại đúng endpoint cũ vẫn qua.
+    const { count: soDangKy, error: demErr } = await admin
+      .from("push_dang_ky")
+      .select("id", { count: "exact", head: true })
+      .eq("gallery_id", session.galleryId)
+      .neq("endpoint", input.endpoint);
+    if (demErr) throw demErr;
+    if ((soDangKy ?? 0) >= TOI_DA_DANG_KY) {
+      return fail("RATE_LIMITED", "Bộ ảnh này đã bật thông báo trên quá nhiều máy");
+    }
+
     const { error } = await admin
       .from("push_dang_ky")
       .upsert(

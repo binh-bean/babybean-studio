@@ -114,7 +114,7 @@ afterEach(() => {
 describe("BB-246: guiThongBaoBoAnh — payload đẩy", () => {
   it("chỉ gồm galleryId/tieuDe/noiDung — không token, không tên bé, không link", async () => {
     const { client } = taoAdminGia([
-      { id: "d1", endpoint: "https://fcm.example/d1", p256dh: "p", auth: "a" },
+      { id: "d1", endpoint: "https://fcm.googleapis.com/fcm/send/d1", p256dh: "p", auth: "a" },
     ]);
     webpushGia.sendNotification.mockResolvedValue(undefined);
 
@@ -136,7 +136,7 @@ describe("BB-246: guiThongBaoBoAnh — payload đẩy", () => {
 describe("BB-246: guiThongBaoBoAnh — dọn đăng ký đã chết", () => {
   it("gửi trả 410 -> xoá đúng dòng đó, không cập nhật gui_ok_luc", async () => {
     const { client, ghiNhan } = taoAdminGia([
-      { id: "d1", endpoint: "https://fcm.example/d1", p256dh: "p", auth: "a" },
+      { id: "d1", endpoint: "https://fcm.googleapis.com/fcm/send/d1", p256dh: "p", auth: "a" },
     ]);
     webpushGia.sendNotification.mockRejectedValue(
       Object.assign(new Error("gone"), { statusCode: 410 }),
@@ -150,7 +150,7 @@ describe("BB-246: guiThongBaoBoAnh — dọn đăng ký đã chết", () => {
 
   it("gửi trả 404 -> cũng xoá (endpoint đã bị dịch vụ đẩy bỏ)", async () => {
     const { client, ghiNhan } = taoAdminGia([
-      { id: "d2", endpoint: "https://fcm.example/d2", p256dh: "p", auth: "a" },
+      { id: "d2", endpoint: "https://fcm.googleapis.com/fcm/send/d2", p256dh: "p", auth: "a" },
     ]);
     webpushGia.sendNotification.mockRejectedValue(
       Object.assign(new Error("not found"), { statusCode: 404 }),
@@ -163,7 +163,7 @@ describe("BB-246: guiThongBaoBoAnh — dọn đăng ký đã chết", () => {
 
   it("gửi trả 500 (lỗi tạm của dịch vụ đẩy) -> KHÔNG xoá, chỉ ghi log", async () => {
     const { client, ghiNhan } = taoAdminGia([
-      { id: "d3", endpoint: "https://fcm.example/d3", p256dh: "p", auth: "a" },
+      { id: "d3", endpoint: "https://fcm.googleapis.com/fcm/send/d3", p256dh: "p", auth: "a" },
     ]);
     const banGhiLoi = vi.spyOn(console, "error").mockImplementation(() => {});
     webpushGia.sendNotification.mockRejectedValue(
@@ -182,7 +182,7 @@ describe("BB-246: guiThongBaoBoAnh — thiếu khoá VAPID", () => {
   it("thiếu bất kỳ biến nào trong ba biến VAPID -> không gửi, không ném", async () => {
     vi.stubEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "");
     const { client, ghiNhan } = taoAdminGia([
-      { id: "d1", endpoint: "https://fcm.example/d1", p256dh: "p", auth: "a" },
+      { id: "d1", endpoint: "https://fcm.googleapis.com/fcm/send/d1", p256dh: "p", auth: "a" },
     ]);
 
     await expect(
@@ -251,7 +251,7 @@ describe("BB-246: POST /api/g/thong-bao — Zod chặn đầu vào hỏng", () =
   it("thân JSON hỏng (cắt giữa chừng) -> 400 INVALID_INPUT, không 500", async () => {
     const req = new Request("http://localhost/api/g/thong-bao", {
       method: "POST",
-      body: '{"endpoint": "https://fcm.example/x", "keys": {',
+      body: '{"endpoint": "https://fcm.googleapis.com/fcm/send/x", "keys": {',
     });
 
     const res = await POST(req);
@@ -264,10 +264,37 @@ describe("BB-246: POST /api/g/thong-bao — Zod chặn đầu vào hỏng", () =
   it("thiếu khoá p256dh/auth -> 400 INVALID_INPUT", async () => {
     const req = new Request("http://localhost/api/g/thong-bao", {
       method: "POST",
-      body: JSON.stringify({ endpoint: "https://fcm.example/x", keys: { p256dh: "", auth: "" } }),
+      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/x", keys: { p256dh: "", auth: "" } }),
     });
 
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+});
+
+// Opus soát BB-246: máy chủ POST tới `endpoint` mỗi lần báo tin — chỉ được là
+// máy chủ push thật, không phải địa chỉ https bất kỳ do người cầm link chọn.
+describe("BB-246: endpoint chỉ nhận máy chủ push của trình duyệt", async () => {
+  const { laMayChuPush, DangKyThongBaoSchema } = await import("@/app/api/g/thong-bao/schema");
+  const khoa = { p256dh: "BPabc_-", auth: "xyz" };
+
+  it.each([
+    "https://fcm.googleapis.com/fcm/send/abc",
+    "https://updates.push.services.mozilla.com/wpush/v2/abc",
+    "https://web.push.apple.com/QAbc",
+    "https://wns2-par02p.notify.windows.com/w/?token=abc",
+  ])("nhận %s", (u) => {
+    expect(laMayChuPush(u)).toBe(true);
+    expect(DangKyThongBaoSchema.safeParse({ endpoint: u, keys: khoa }).success).toBe(true);
+  });
+
+  it.each([
+    "https://ke-la.example/thu",
+    "https://fcm.googleapis.com.ke-la.example/x",
+    "https://169.254.169.254/latest",
+    "http://fcm.googleapis.com/fcm/send/abc",
+  ])("từ chối %s", (u) => {
+    expect(laMayChuPush(u)).toBe(false);
+    expect(DangKyThongBaoSchema.safeParse({ endpoint: u, keys: khoa }).success).toBe(false);
   });
 });
