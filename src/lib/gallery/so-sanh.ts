@@ -73,9 +73,13 @@ export function boCucSoSanh(soTam: number, manHinhDoc: boolean): BoCucSoSanh {
  */
 export function danhSachVuotGhim(
   dsSoSanh: readonly string[],
-  idDaThaTim: readonly string[]
+  idDaThaTim: readonly string[],
+  /** Tấm đang ghim — LOẠI khỏi danh sách vuốt: không thì vuốt tới nó là hai
+   * khung hiện cùng một tấm (Opus soát BB-242, 25/09/2026). */
+  idGhim?: string,
 ): string[] {
-  return dsSoSanh.length > SO_SANH_TOI_THIEU ? [...dsSoSanh] : [...idDaThaTim];
+  const ds = dsSoSanh.length > SO_SANH_TOI_THIEU ? [...dsSoSanh] : [...idDaThaTim];
+  return idGhim ? ds.filter((id) => id !== idGhim) : ds;
 }
 
 /** Chỉ số bắt đầu vuốt — đứng ngay tại tấm đang xem (không ghim) trong danh

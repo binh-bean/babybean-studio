@@ -113,8 +113,8 @@ export function SoSanhAnh({
   const dsSoSanhIds = useMemo(() => photos.map((p) => p.id), [photos]);
   const idDaThaTim = useMemo(() => anhDaThaTim.map((p) => p.id), [anhDaThaTim]);
   const dsVuot = useMemo(
-    () => danhSachVuotGhim(dsSoSanhIds, idDaThaTim),
-    [dsSoSanhIds, idDaThaTim],
+    () => danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idGhim),
+    [dsSoSanhIds, idDaThaTim, idGhim],
   );
   const banDoAnh = useMemo(() => {
     const m = new Map<string, PhotoPublic>();
@@ -131,7 +131,7 @@ export function SoSanhAnh({
     const idGhimMoi = dsSoSanhIds[0] ?? "";
     setIdGhim(idGhimMoi);
     const idKhac = dsSoSanhIds[1] ?? "";
-    setChiSoVuot(chiSoBanDauVuot(danhSachVuotGhim(dsSoSanhIds, idDaThaTim), idKhac));
+    setChiSoVuot(chiSoBanDauVuot(danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idGhimMoi), idKhac));
     // Chỉ tính lại khi BẬT chế độ hoặc đổi hẳn bộ tấm so sánh (dsSoSanhKey) —
     // dsSoSanhIds/idDaThaTim đã nằm trong dsSoSanhKey/idDaThaTim gốc, cố tình
     // không liệt kê lại để không chạy mỗi lần mảng props đổi tham chiếu.
@@ -155,7 +155,9 @@ export function SoSanhAnh({
     if (idMoi === idGhim) return;
     const idCu = idGhim;
     setIdGhim(idMoi);
-    const viTriCu = dsVuot.indexOf(idCu);
+    // Danh sách vuốt tính lại khi đổi tấm ghim (loại tấm ghim mới ra) — tìm
+    // vị trí tấm ghim CŨ trong danh sách MỚI, không phải danh sách hiện tại.
+    const viTriCu = danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idMoi).indexOf(idCu);
     setChiSoVuot(viTriCu >= 0 ? viTriCu : 0);
   };
 

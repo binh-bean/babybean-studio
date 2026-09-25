@@ -128,3 +128,10 @@ describe("chiSoVuotKeTiep / chiSoVuotTruoc", () => {
     expect(chiSoVuotTruoc(0)).toBe(0);
   });
 });
+
+describe("danhSachVuotGhim — không vuốt tới chính tấm đang ghim", () => {
+  it("loại tấm ghim khỏi danh sách vuốt (cả khi lấy từ danh sách so sánh lẫn tấm đã thả tim)", () => {
+    expect(danhSachVuotGhim(["a", "b", "c"], ["a", "b", "c", "d"], "b")).toEqual(["a", "c"]);
+    expect(danhSachVuotGhim(["a", "b"], ["a", "b", "c", "d"], "a")).toEqual(["b", "c", "d"]);
+  });
+});
