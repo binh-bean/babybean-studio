@@ -177,6 +177,9 @@ Chủ studio: "tận dụng tối đa banana và gemini 3.1 pro và các sonnet"
 | BB-244 | Antigravity → Opus soát | ĐÃ GỘP (52a97c0). Soát sửa: đo sáng theo vùng chữ, nhãn "Đè chéo", lưới xin `w=300` máy chủ không nhận → 400. Agent tự áp 0069 lên bb-dev dù đề bài cấm (cột vô hại, giữ) |
 | BB-224 | Banana (chủ studio) | ĐÃ VỀ đủ 10 tranh, đạt luật (không người/chữ). WebP 320/640 ở `public/hanh-trinh/` |
 | BB-225 | Antigravity — Gemini 3.1 Pro (DEV-FE, PW_PORT 3170) | ĐÃ GỘP. Soát sửa: thiếu `approved`, tranh 'hết hạn' cho cả link không tồn tại, e2e 'ready' xanh giả; thêm canh tràn nhãn 390px. Lần này agent CÓ commit và không đụng DB. Thẻ "Hành trình bộ ảnh". Đề bài `docs/briefs/BB-225-the-hanh-trinh-bo-anh.md`. API đã trả `giaiDoanTienDo` |
-| BB-246 | Sonnet (PW_PORT 3165) | SOÁT XONG, CHỜ ÁP 0071 (chủ studio: để sau). Opus vá: endpoint chỉ nhận máy chủ push thật, ≤20 đăng ký/bộ. Thông báo đẩy cho ba mẹ: "ảnh chỉnh xong, mời duyệt". Migration 0071 CHỈ VIẾT — Opus áp. Cần khoá VAPID trên Vercel (chủ studio nhập) |
-| BB-247 | Banana (chủ studio) | 6 tranh sản phẩm (khung, ảnh in, album, canvas, quà, ông bà). Lời nhắc `babybean-assets/BB-247/LOI-NHAC-GEMINI.txt` |
-| BB-245 | Sonnet (PW_PORT 3166) — chủ studio chọn: gửi yêu cầu cho CSKH | SOÁT XONG, CHỜ ÁP 0072 (chủ studio: để sau). Opus vá: lỗi nháy SQL, ẩn thẻ với người chỉ xem. Mời mua lần hai khi khách duyệt không xin sửa. Vướng: bộ ảnh đã duyệt thì bị khoá, API mua thêm từ chối |
+| BB-246 | Sonnet (PW_PORT 3165) | ĐÃ GỘP, 0071 ĐÃ ÁP (chủ studio duyệt). Chờ chủ studio dán 3 khoá VAPID lên Vercel (tệp babybean-backups/KHOA-THONG-BAO-VERCEL.txt). Opus vá: endpoint chỉ nhận máy chủ push thật, ≤20 đăng ký/bộ. Thông báo đẩy cho ba mẹ: "ảnh chỉnh xong, mời duyệt". Migration 0071 CHỈ VIẾT — Opus áp. Cần khoá VAPID trên Vercel (chủ studio nhập) |
+| BB-247 | Banana (chủ studio) | ĐÃ VỀ, `public/san-pham/`. 6 tranh sản phẩm (khung, ảnh in, album, canvas, quà, ông bà). Lời nhắc `babybean-assets/BB-247/LOI-NHAC-GEMINI.txt` |
+| BB-245 | Sonnet (PW_PORT 3166) — chủ studio chọn: gửi yêu cầu cho CSKH | ĐÃ GỘP, 0072 ĐÃ ÁP (chủ studio duyệt). Opus vá: lỗi nháy SQL, ẩn thẻ với người chỉ xem. Mời mua lần hai khi khách duyệt không xin sửa. Vướng: bộ ảnh đã duyệt thì bị khoá, API mua thêm từ chối |
+| BB-248 | Sonnet (PW_PORT 3167) | Gắn tranh sản phẩm vào cửa hàng + thẻ mời mua |
+| BB-249 | Sonnet (PW_PORT 3168) | CSKH đổi trạng thái yêu cầu mua thêm (đã gọi / đã chốt / huỷ) |
+| BB-250 | Opus | ĐÃ GỘP. Báo đẩy "Sản phẩm của bé đã về" khi Lark vừa sang Hình đã về (không báo lần đầu đọc) |
