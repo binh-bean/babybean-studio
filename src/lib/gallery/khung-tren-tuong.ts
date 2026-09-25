@@ -88,12 +88,18 @@ export type KetQuaKhungTrenTuong = KhungTrenTuong | KhungKhongVua;
  *   phòng. Đề bài: "ảnh dọc 40×60 = rộng 40 cao 60".
  * @param coKhung Có mua "Khung HQ" bọc ngoài không — cộng thêm viền vào kích
  *   thước thật trước khi kiểm tra có vừa tường không.
+ * @param vienCmMoiCanh Bề rộng nẹp MỖI CẠNH (cm) khi `coKhung = true` — mặc
+ *   định `VIEN_KHUNG_CM_MOI_CANH` (ước lượng cũ, không đổi hành vi ở những
+ *   chỗ gọi không truyền tham số này). Màn chọn mẫu khung (BB-222) truyền
+ *   `vienCm` của đúng mẫu đang chọn (viền vàng 1cm mảnh hơn nên cho phép cỡ
+ *   lớn hơn vừa tường so với viền đen/gỗ/trắng 2.5cm).
  */
 export function tinhKhungTrenTuong(
   phong: AnhPhong,
   co: CoKhungCm,
   huongKhung: "doc" | "ngang",
-  coKhung: boolean
+  coKhung: boolean,
+  vienCmMoiCanh: number = VIEN_KHUNG_CM_MOI_CANH
 ): KetQuaKhungTrenTuong {
   const kichThuoc = tachCoKhung(co);
   if (!kichThuoc) return { vua: false, lyDo: "co_khong_doc_duoc" };
@@ -101,7 +107,7 @@ export function tinhKhungTrenTuong(
   const rongCmTam = huongKhung === "doc" ? canhNgan : canhDai;
   const caoCmTam = huongKhung === "doc" ? canhDai : canhNgan;
 
-  const vienCm = coKhung ? VIEN_KHUNG_CM_MOI_CANH * 2 : 0;
+  const vienCm = coKhung ? vienCmMoiCanh * 2 : 0;
   const rongCm = rongCmTam + vienCm;
   const caoCm = caoCmTam + vienCm;
 

@@ -44,6 +44,7 @@ import {
   cacCoTuDanhMuc,
   type CoKhungCm,
 } from "@/lib/gallery/khung-tren-tuong";
+import { MAU_KHUNG, MAU_KHUNG_MAC_DINH } from "@/lib/gallery/mau-khung";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 
 export interface AnhTreoTuong {
@@ -90,6 +91,17 @@ export interface ManTreoTuongProps {
   onDatMuaThem: (photoId: string, productId: string, soLuong: number) => void;
 }
 
+/**
+ * Tỉ lệ px-ảnh-gốc → px-hiển-thị của phép `object-fit: cover` — CÙNG một số
+ * `scale` phải dùng cho mọi thứ đo bằng px trên ảnh gốc (vị trí khung, và bề
+ * dày viền khung mẫu bên dưới), không thì viền khung sẽ không cùng tỉ lệ với
+ * khung ảnh khi phóng to/thu nhỏ màn hình.
+ */
+function tiLeHienThi(containerW: number, containerH: number, anhW: number, anhH: number): number {
+  if (containerW <= 0 || containerH <= 0 || anhW <= 0 || anhH <= 0) return 0;
+  return Math.max(containerW / anhW, containerH / anhH);
+}
+
 function quyDoiKhungHienThi(
   containerW: number,
   containerH: number,
@@ -100,7 +112,7 @@ function quyDoiKhungHienThi(
   if (containerW <= 0 || containerH <= 0) {
     return { leftPct: 0, topPct: 0, widthPct: 0, heightPct: 0 };
   }
-  const scale = Math.max(containerW / anhW, containerH / anhH);
+  const scale = tiLeHienThi(containerW, containerH, anhW, anhH);
   const disW = anhW * scale;
   const disH = anhH * scale;
   const offsetX = (disW - containerW) / 2;
@@ -202,7 +214,13 @@ export function ManTreoTuong({
   const [chatLieu, setChatLieu] = useState<string | null>(null);
   const [co, setCo] = useState<CoKhungCm>("40x60");
   const [coKhung, setCoKhung] = useState(false);
+  const [maMauKhung, setMaMauKhung] = useState(MAU_KHUNG_MAC_DINH.ma);
   const [manRong, setManRong] = useState(false);
+
+  const mauKhungDaChon = useMemo(
+    () => MAU_KHUNG.find((m) => m.ma === maMauKhung) ?? MAU_KHUNG_MAC_DINH,
+    [maMauKhung]
+  );
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [khungRef, setKhungRef] = useState({ w: 0, h: 0 });
@@ -304,8 +322,10 @@ export function ManTreoTuong({
   );
   const coVua = useMemo(
     () =>
-      coCoBan.filter((c) => tinhKhungTrenTuong(phong, c, huongKhung, coKhung).vua),
-    [coCoBan, phong, huongKhung, coKhung]
+      coCoBan.filter(
+        (c) => tinhKhungTrenTuong(phong, c, huongKhung, coKhung, mauKhungDaChon.vienCm).vua
+      ),
+    [coCoBan, phong, huongKhung, coKhung, mauKhungDaChon]
   );
 
   useEffect(() => {
@@ -314,14 +334,22 @@ export function ManTreoTuong({
   }, [coVua, co]);
 
   const ketQuaKhung = useMemo(
-    () => tinhKhungTrenTuong(phong, co, huongKhung, coKhung),
-    [phong, co, huongKhung, coKhung]
+    () => tinhKhungTrenTuong(phong, co, huongKhung, coKhung, mauKhungDaChon.vienCm),
+    [phong, co, huongKhung, coKhung, mauKhungDaChon]
   );
 
   const viTriHienThi = useMemo(() => {
     if (!ketQuaKhung.vua || khungRef.w === 0) return null;
     return quyDoiKhungHienThi(khungRef.w, khungRef.h, phong.rongAnhPx, phong.caoAnhPx, ketQuaKhung.hinh);
   }, [ketQuaKhung, khungRef, phong]);
+
+  // Bề dày viền khung mẫu QUY ĐỔI ĐÚNG TỈ LỆ hiển thị — cùng `scale` với vị trí
+  // khung ở trên, không thì viền phình to/nhỏ sai khi đổi cỡ màn hình.
+  const vienKhungPx = useMemo(() => {
+    if (khungRef.w === 0) return 0;
+    const scale = tiLeHienThi(khungRef.w, khungRef.h, phong.rongAnhPx, phong.caoAnhPx);
+    return mauKhungDaChon.vienCm * phong.pxMoiCm * scale;
+  }, [khungRef, phong, mauKhungDaChon]);
 
   const sanPhamAnh = useMemo(
     () => monAnhIn.find((m) => m.material === chatLieu && m.size === co) ?? null,
@@ -448,15 +476,24 @@ export function ManTreoTuong({
               boxShadow: BONG_THEO_HUONG[phong.huongSang],
             }}
           >
-            {/* Khung HQ = viền đen mờ mảnh bọc ngoài tấm đã có chất liệu riêng. */}
+            {/*
+              Khung HQ = viền vẽ bằng border-image theo mẫu khung ba mẹ chọn
+              (BB-222, chỉ để tham khảo). border-image-slice lấy từ số đo
+              pixel trong chính ảnh mẫu (`mau-khung.ts`); border width (viền
+              dày bao nhiêu TRÊN MÀN HÌNH) quy đổi từ cm thật theo đúng tỉ lệ
+              hiển thị `object-fit: cover` — không phải một số cố định.
+            */}
             <div
-              className={coKhung ? "h-full w-full p-[3%]" : "h-full w-full"}
+              className="h-full w-full"
               style={
                 coKhung
                   ? {
-                      background: "rgba(18,14,10,.92)",
-                      boxShadow: "inset 0 0 0 1px rgba(255,255,255,.06), inset 0 1px 3px rgba(0,0,0,.6)",
-                      borderRadius: 2,
+                      borderStyle: "solid",
+                      borderWidth: `${vienKhungPx}px`,
+                      borderImageSource: `url(${mauKhungDaChon.anh})`,
+                      borderImageSlice: mauKhungDaChon.slicePx,
+                      borderImageRepeat: "stretch",
+                      boxSizing: "border-box",
                     }
                   : undefined
               }
@@ -625,15 +662,53 @@ export function ManTreoTuong({
         )}
 
         {monKhung.length > 0 && (
-          <label className="flex cursor-pointer items-center justify-between rounded-2xl bg-bb-surface-2 px-3.5 py-2.5">
-            <span className="text-xs font-medium text-bb-fg">Bọc khung HQ</span>
-            <input
-              type="checkbox"
-              checked={coKhung}
-              onChange={(e) => setCoKhung(e.target.checked)}
-              className="h-4 w-4 accent-bb-fg"
-            />
-          </label>
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-center justify-between rounded-2xl bg-bb-surface-2 px-3.5 py-2.5">
+              <span className="text-xs font-medium text-bb-fg">Bọc khung HQ</span>
+              <input
+                type="checkbox"
+                checked={coKhung}
+                onChange={(e) => setCoKhung(e.target.checked)}
+                className="h-4 w-4 accent-bb-fg"
+              />
+            </label>
+
+            {coKhung && (
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-bb-fg-muted">
+                  Mẫu khung
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {MAU_KHUNG.map((m) => (
+                    <button
+                      key={m.ma}
+                      type="button"
+                      aria-pressed={m.ma === maMauKhung}
+                      onClick={() => setMaMauKhung(m.ma)}
+                      className={[
+                        "flex flex-col items-center gap-1 rounded-xl p-1.5 transition",
+                        m.ma === maMauKhung
+                          ? "bg-bb-fg/10 ring-2 ring-bb-fg"
+                          : "ring-1 ring-transparent hover:bg-bb-surface-2",
+                      ].join(" ")}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={m.anh}
+                        alt=""
+                        className="h-10 w-10 rounded-md object-cover"
+                        draggable={false}
+                      />
+                      <span className="text-[10px] font-medium text-bb-fg">{m.ten}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[11px] text-bb-fg-muted">
+                  Mẫu khung chỉ để tham khảo — CSKH sẽ tư vấn mẫu thật khi chốt đơn.
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="mt-auto space-y-1 border-t border-bb-border pt-3">
