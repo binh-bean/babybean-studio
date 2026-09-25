@@ -37,6 +37,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const runId = Math.random().toString(36).slice(2, 10);
+// Số giả MỚI mỗi lượt: số cố định va nhau khi hai worktree chạy cùng tệp
+// (uq_customers_phone_branch) — xảy ra 25/09/2026 khi agent BB-222 chạy song song.
+const soGia = `0900${String(Math.floor(Math.random() * 1e6)).padStart(6, "0")}`;
 const NHAN = `Fixture BB-219 ${runId}`;
 const email = `test_bb219_${runId}@demo.babybean.vn`;
 const password = "Password123!";
@@ -231,8 +234,8 @@ test.describe("BB-219: con trỏ bàn tay trên mọi màn", () => {
     branchId = br[0].id;
 
     const { rows: kh } = await pg.query(
-      `insert into customers (branch_id, full_name, phone) values ($1,$2,'0900000219') returning id`,
-      [branchId, `${NHAN} Khách`],
+      `insert into customers (branch_id, full_name, phone) values ($1,$2,$3) returning id`,
+      [branchId, `${NHAN} Khách`, soGia],
     );
     customerId = kh[0].id;
 
@@ -269,6 +272,8 @@ test.describe("BB-219: con trỏ bàn tay trên mọi màn", () => {
     }
     if (customerId) await pg.query("delete from customers where id = $1", [customerId]);
     if (userId) {
+      // Link do nhân viên thử tạo (nếu có) giữ khoá ngoại tới staff_profiles.
+      await pg.query("delete from share_links where created_by = $1", [userId]);
       await pg.query("delete from staff_profiles where id = $1", [userId]);
       await adminAuth().auth.admin.deleteUser(userId);
     }
@@ -324,7 +329,11 @@ test.describe("BB-219: con trỏ bàn tay trên mọi màn", () => {
       // Best-effort: bấm nút "Thêm..."/"Tạo..." đầu tiên đang hiện, dò tiếp
       // nội dung hộp thoại vừa bật lên, rồi đóng lại bằng Escape.
       const nutMo = page.getByRole("button", { name: /^(Thêm|Tạo)\s/ }).first();
-      if (await nutMo.isVisible().catch(() => false)) {
+      // Trang chi tiết bộ ảnh: "Tạo link mới" TẠO THẬT một link chứ không mở
+      // hộp thoại — lượt 25/09/2026 để lại link do nhân viên thử tạo và làm
+      // phần dọn hỏng (khoá ngoại share_links.created_by). Không bấm ở đó.
+      const laChiTietBoAnh = route.includes("[id]");
+      if (!laChiTietBoAnh && (await nutMo.isVisible().catch(() => false))) {
         await nutMo.click().catch(() => {});
         await page.waitForTimeout(300);
         const moDuocDialog = await page

@@ -19,6 +19,9 @@ import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 
 const runId = Math.random().toString(36).slice(2, 10);
+// Số giả MỚI mỗi lượt: số cố định va nhau khi hai worktree chạy cùng tệp
+// (uq_customers_phone_branch) — xảy ra 25/09/2026 khi agent BB-222 chạy song song.
+const soGia = `0900${String(Math.floor(Math.random() * 1e6)).padStart(6, "0")}`;
 const NHAN = `Fixture BB-217-218 ${runId}`;
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -40,8 +43,8 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
 
     const { rows: br } = await pg.query("select id from branches order by name limit 1");
     const { rows: kh } = await pg.query(
-      `insert into customers (branch_id, full_name, phone) values ($1,$2,'0900000217') returning id`,
-      [br[0].id, `${NHAN} Khách`],
+      `insert into customers (branch_id, full_name, phone) values ($1,$2,$3) returning id`,
+      [br[0].id, `${NHAN} Khách`, soGia],
     );
     customerId = kh[0].id;
     const { rows: g } = await pg.query(
