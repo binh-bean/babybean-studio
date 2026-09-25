@@ -106,7 +106,7 @@ export function BiaBoAnh({
     */
     <section
       aria-label="Ảnh bìa"
-      className="relative isolate flex h-[86svh] min-h-[540px] max-h-[980px] w-full items-end overflow-hidden bg-[#2a2420] text-white lg:grid lg:h-[80vh] lg:min-h-[600px] lg:max-h-[900px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:bg-background lg:text-foreground"
+      className="@container relative isolate flex h-[86svh] min-h-[540px] max-h-[980px] w-full items-end overflow-hidden bg-[#2a2420] text-white lg:grid lg:h-[80vh] lg:min-h-[600px] lg:max-h-[900px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:bg-background lg:text-foreground"
     >
       <div className="absolute inset-0 -z-10 lg:relative lg:inset-auto lg:z-0 lg:order-2 lg:h-full lg:overflow-hidden">
         {anhBia && (

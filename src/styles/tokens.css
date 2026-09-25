@@ -333,7 +333,11 @@ body:has(.giao-dien-khach) {
    Hai lớp dưới đây LẶP LẠI ĐÚNG công thức mép trái của `mx-auto max-w-[1600px]
    px-10` (2.5rem = lg:px-10, khớp giá trị dùng ở gallery-app.tsx) để cột chữ
    bìa canh đúng cùng mép, ở mọi bề rộng máy tính — không chỉ đúng tại một cỡ
-   màn đã đo. Chỉ áp dụng từ 1024px (`lg`): dưới đó bìa dùng bố cục khác hẳn
+   màn đã đo. `100cqw` (khung bìa là container — lớp `@container` ở
+   bia-bo-anh.tsx), KHÔNG `100vw`: 100vw tính cả thanh cuộn (~17px trên
+   Windows), còn `mx-auto` của lưới ảnh canh theo bề rộng KHÔNG có thanh cuộn —
+   dùng 100vw thì trên màn >1600px chữ bìa lệch lưới ~8px (Opus soát 25/09).
+   Chỉ áp dụng từ 1024px (`lg`): dưới đó bìa dùng bố cục khác hẳn
    (ảnh tràn viền, chữ đè lên trên) và không cần canh theo lưới này. */
 @media (min-width: 1024px) {
   /*
@@ -344,9 +348,9 @@ body:has(.giao-dien-khach) {
     ngoài hai lớp này.
   */
   .khach-le-trai-lg {
-    padding-left: calc(max(0px, (100vw - 1600px) / 2) + 2.5rem) !important;
+    padding-left: calc(max(0px, (100cqw - 1600px) / 2) + 2.5rem) !important;
   }
   .khach-le-trai-lg-pos {
-    left: calc(max(0px, (100vw - 1600px) / 2) + 2.5rem) !important;
+    left: calc(max(0px, (100cqw - 1600px) / 2) + 2.5rem) !important;
   }
 }

@@ -36,6 +36,11 @@ const soGia = `0900${String(Math.floor(Math.random() * 1e6)).padStart(6, "0")}`;
 const NHAN = `Fixture BB-240 ${runId}`;
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
+// Playwright chạy Chromium với --hide-scrollbars (thanh cuộn 0px). Cả tệp này
+// chạy KHÔNG có cờ đó — như máy Windows thật của studio — để ca 1920 phân biệt
+// được 100vw (tính cả thanh cuộn) với 100cqw.
+test.use({ launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] } });
+
 test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang, lời gợi ý Lưu app", () => {
   let pg: Client;
   let customerId = "";
@@ -121,6 +126,28 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
 
     expect(Math.abs(xBia - xLuoi)).toBeLessThanOrEqual(1);
     expect(Math.abs(xChanTrang - xLuoi)).toBeLessThanOrEqual(1);
+  });
+
+  /**
+   * Opus soát (25/09/2026): trên màn RỘNG HƠN 1600px công thức canh mép bìa
+   * dùng `100vw` — tính cả thanh cuộn (~15–17px trên Windows), trong khi lưới
+   * ảnh `mx-auto` canh theo bề rộng KHÔNG có thanh cuộn → chữ bìa lệch ~8px.
+   * Ca 1440 không bắt được (dưới 1600px phần dư bằng 0). Nay dùng `100cqw`.
+   */
+  test("1920×1080 (có thanh cuộn): mép trái bìa và lưới ảnh lệch ≤ 1px", async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto(`/g/${maLink}`);
+    const tieuDeBia = page.locator("section[aria-label='Ảnh bìa'] h1");
+    const tamDau = page.getByTestId("the-anh").first();
+    await expect(tieuDeBia).toBeVisible();
+    await expect(tamDau).toBeVisible();
+    const thanhCuon = await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth);
+    expect(thanhCuon).toBeGreaterThan(0);
+    const xBia = (await tieuDeBia.boundingBox())!.x;
+    const xLuoi = (await tamDau.boundingBox())!.x;
+    // eslint-disable-next-line no-console
+    console.log(`[BB-240] 1920 — thanh cuộn=${thanhCuon}px bìa=${xBia} lưới=${xLuoi}`);
+    expect(Math.abs(xBia - xLuoi)).toBeLessThanOrEqual(1);
   });
 
   test("không còn 'Thành phần hợp đồng' hay 'Tổng cộng' trên màn khách", async ({ page }) => {
