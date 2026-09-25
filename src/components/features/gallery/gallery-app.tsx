@@ -7,6 +7,7 @@ import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
 import { ManTreoTuong } from "@/components/features/gallery/man-treo-tuong";
 import { CuaHang } from "@/components/features/gallery/cua-hang";
+import { MoiMuaLanHai } from "@/components/features/gallery/moi-mua-lan-hai";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
 import { TomTatSanPhamIn } from "@/components/features/gallery/tom-tat-san-pham-in";
@@ -1393,6 +1394,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
               onDecide={decideReview}
             />
           )}
+
+          <MoiMuaLanHai
+            status={gallery.status}
+            soVongSua={gallery.review?.rounds.length ?? 0}
+            danhMuc={(gallery.addons?.catalogue ?? []).map((sp) => ({
+              productId: sp.productId,
+              name: sp.name,
+              material: sp.material,
+              size: sp.size,
+              unitPrice: sp.unitPrice,
+              nhom: sp.nhom as NhomSanPham,
+              canGanAnh: sp.canGanAnh,
+            }))}
+            anhDaChon={photos
+              .filter((p) => p.mark === "selected")
+              .map((p) => ({ id: p.id, fileName: p.fileName }))}
+          />
 
           {!duocChon && !isLocked && (
             <div className="rounded-2xl border border-border bg-surface p-4 text-sm">

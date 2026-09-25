@@ -99,6 +99,11 @@ const DAY = [
   "0068-admin-galleries-rpc-tra-them-lark.sql",
   "0069-kieu-chu-bia.sql",
   "0070-giu-ma-link-ma-hoa.sql",
+  // BB-245: 0071 chưa tồn tại trên main tại thời điểm thêm dòng này (kiểm
+  // `ls db/migrations` — mục cuối trước đây là 0070). Thêm thẳng 0072 theo
+  // đúng số task; nếu 0071 xuất hiện từ nhánh khác trước khi áp, người áp
+  // (Opus) cần xác nhận thứ tự DAY này không bị đảo trước khi chạy.
+  "0072-yeu-cau-mua-them.sql",
 ];
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */
