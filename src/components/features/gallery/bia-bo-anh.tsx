@@ -106,7 +106,7 @@ export function BiaBoAnh({
     */
     <section
       aria-label="Ảnh bìa"
-      className="relative isolate flex h-[86svh] min-h-[540px] max-h-[980px] w-full items-end overflow-hidden bg-[#2a2420] text-white lg:grid lg:h-[80vh] lg:min-h-[600px] lg:max-h-[900px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:bg-background lg:text-foreground"
+      className="@container relative isolate flex h-[86svh] min-h-[540px] max-h-[980px] w-full items-end overflow-hidden bg-[#2a2420] text-white lg:grid lg:h-[80vh] lg:min-h-[600px] lg:max-h-[900px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:bg-background lg:text-foreground"
     >
       <div className="absolute inset-0 -z-10 lg:relative lg:inset-auto lg:z-0 lg:order-2 lg:h-full lg:overflow-hidden">
         {anhBia && (
@@ -133,11 +133,18 @@ export function BiaBoAnh({
         />
       </div>
 
-      <p className="absolute inset-x-0 top-5 text-center font-display text-[15px] uppercase tracking-[0.2em] text-white/95 lg:left-16 lg:right-auto lg:top-10 lg:text-left lg:text-foreground">
+      <p className="khach-le-trai-lg-pos absolute inset-x-0 top-5 text-center font-display text-[15px] uppercase tracking-[0.2em] text-white/95 lg:right-auto lg:top-10 lg:text-left lg:text-foreground">
         Baby Bean
       </p>
 
-      <div className="w-full px-6 pb-9 sm:px-10 lg:order-1 lg:flex lg:flex-col lg:justify-center lg:px-16 lg:pb-0">
+      {/*
+        BB-240 (2-1) — `khach-le-trai-lg` thay cho `lg:px-16` cố định: canh
+        đúng mép trái với đầu trang/lưới ảnh/chân trang ở MỌI bề rộng máy
+        tính, không chỉ đúng ở cỡ màn đã đo. `sm:px-10` vẫn lo lề phải của cột
+        chữ (cột chỉ rộng 5/12, không cần canh mép phải theo lưới trang).
+        Xem giải thích công thức ở `src/styles/tokens.css`.
+      */}
+      <div className="khach-le-trai-lg w-full px-6 pb-9 sm:px-10 lg:order-1 lg:flex lg:flex-col lg:justify-center lg:pb-0">
         <div className="max-w-md">
           <p className="text-[12px] uppercase tracking-[0.16em] text-white/85 lg:text-muted-foreground">
             {[ngay, chiNhanh].filter(Boolean).join(" · ")}

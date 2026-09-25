@@ -317,3 +317,40 @@
 body:has(.giao-dien-khach) {
   background: #f7f2eb;
 }
+
+/* ---------------------------------------------------------------------------
+   BB-240 (2-1) — MỘT LƯỚI CỘT cho bìa, đầu trang, lưới ảnh, chân trang.
+   ---------------------------------------------------------------------------
+   Đo 24/09/2026 trên `gallery-app.tsx`: đầu trang + lưới ảnh + chân trang đều
+   dùng `mx-auto max-w-[1600px]` — mép trái ba khối đó tự canh nhau ở MỌI bề
+   rộng vì cùng công thức (padding cố định dưới 1600px, chia đôi phần dư khi
+   màn rộng hơn). Bìa (`bia-bo-anh.tsx`) thì KHÔNG dùng max-width: ảnh bìa
+   phải tràn hết viền màn hình trên máy tính (`lg:grid-cols-[5fr_7fr]`), nên
+   cột chữ bên trái trước đây chỉ có `lg:px-16` — một số cố định, không tự
+   co giãn theo bề rộng màn như ba khối kia. Kết quả: ở 1920×1080 mép chữ bìa
+   lệch khỏi mép lưới ảnh hơn 100px dù cả hai đều "trông có vẻ đã thụt vào".
+
+   Hai lớp dưới đây LẶP LẠI ĐÚNG công thức mép trái của `mx-auto max-w-[1600px]
+   px-10` (2.5rem = lg:px-10, khớp giá trị dùng ở gallery-app.tsx) để cột chữ
+   bìa canh đúng cùng mép, ở mọi bề rộng máy tính — không chỉ đúng tại một cỡ
+   màn đã đo. `100cqw` (khung bìa là container — lớp `@container` ở
+   bia-bo-anh.tsx), KHÔNG `100vw`: 100vw tính cả thanh cuộn (~17px trên
+   Windows), còn `mx-auto` của lưới ảnh canh theo bề rộng KHÔNG có thanh cuộn —
+   dùng 100vw thì trên màn >1600px chữ bìa lệch lưới ~8px (Opus soát 25/09).
+   Chỉ áp dụng từ 1024px (`lg`): dưới đó bìa dùng bố cục khác hẳn
+   (ảnh tràn viền, chữ đè lên trên) và không cần canh theo lưới này. */
+@media (min-width: 1024px) {
+  /*
+    !important có chủ đích: hai lớp này phải thắng các lớp `px-*`/`inset-*`
+    của Tailwind đang cùng đặt `padding-left`/`left` trên chính phần tử đó
+    (`sm:px-10`, `inset-x-0`) — thứ tự lớp CSS đã biên dịch với @media lồng
+    nhau không đảm bảo thắng theo thứ tự nguồn. Không dùng cho việc gì khác
+    ngoài hai lớp này.
+  */
+  .khach-le-trai-lg {
+    padding-left: calc(max(0px, (100cqw - 1600px) / 2) + 2.5rem) !important;
+  }
+  .khach-le-trai-lg-pos {
+    left: calc(max(0px, (100cqw - 1600px) / 2) + 2.5rem) !important;
+  }
+}
