@@ -20,8 +20,7 @@ import pg from "pg";
 import { docTrangThaiTuLark, ghiTrangThaiVaoGalleries } from "@/lib/lark/doc-trang-thai-lark";
 import { chayNhacHauKy } from "@/lib/lark/nhac-hau-ky";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
-import { guiThongBaoBoAnh } from "@/lib/thong-bao/gui-day";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -59,17 +58,9 @@ async function chay(request: Request) {
         baseToken: LARK_BASE_APP_TOKEN,
       });
       const { sangHinhDaVe, ...ghi } = await ghiTrangThaiVaoGalleries(client, doc);
-      // BB-250 — báo đẩy cho ba mẹ khi Lark vừa sang "Hình đã về". Chạy tuần
-      // tự: vài bộ mỗi sáng, không cần song song; guiThongBaoBoAnh không ném.
-      if (sangHinhDaVe.length > 0) {
-        const admin = createAdminClient();
-        for (const id of sangHinhDaVe) {
-          await guiThongBaoBoAnh(admin, id, {
-            tieuDe: "Sản phẩm của bé đã về",
-            noiDung: "Mời ba mẹ ghé studio nhận ảnh nhé.",
-          });
-        }
-      }
+      // BB-250 — lưới đỡ: bộ nào hook (BB-252) đã báo thì ở đây thấy 9 → 9,
+      // không báo lại. Tuần tự: vài bộ mỗi sáng; baoHinhDaVe không ném.
+      for (const id of sangHinhDaVe) await baoHinhDaVe(id);
       const nhac = await chayNhacHauKy({
         client,
         cheSo: cheSoDienThoai,

@@ -6,6 +6,9 @@ import {
   syncSingleRetouchRecord,
 } from "@/lib/lark/sync-retouch";
 import { readJsonBody } from "@/lib/api-response";
+import { taoDocMotBanGhi } from "@/lib/lark/doc-trang-thai-lark";
+import { capNhatTrangThaiTuHook } from "@/lib/lark/cap-nhat-tu-hook";
+import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
 
 export const runtime = "nodejs";
 
@@ -125,9 +128,25 @@ export async function POST(request: Request) {
       }
     }
 
+    // BB-252 — trạng thái hậu kỳ (Trạng Thái / Cảnh Báo) cập nhật NGAY, không
+    // đợi cron 08:00; bộ vừa sang "Hình đã về" thì báo ba mẹ luôn. Lỗi ở đây
+    // không được làm hỏng phần dựng bộ ảnh phía trên — cron sáng mai đỡ lại.
+    let trangThai: Awaited<ReturnType<typeof capNhatTrangThaiTuHook>> | null = null;
+    try {
+      trangThai = await capNhatTrangThaiTuHook({
+        client,
+        recordIds: recordIdsToProcess,
+        docMotBanGhi: await taoDocMotBanGhi({ auth, baseToken }),
+        bao: baoHinhDaVe,
+      });
+    } catch (err) {
+      console.error("[Lark Hook] Lỗi cập nhật trạng thái hậu kỳ:", err);
+    }
+
     return NextResponse.json({
       message: "Success",
-      results: results
+      results: results,
+      trangThai,
     }, { status: 200 });
 
   } catch (error) {
