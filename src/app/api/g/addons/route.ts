@@ -12,7 +12,7 @@
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { fail, failUnexpected } from "@/lib/api-response";
+import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateAddonSchema } from "./schema";
@@ -32,14 +32,12 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // 2. Parse & validate JSON input
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
+    const jsonBody = await readJsonBody(request);
+    if (!jsonBody.ok) {
       return fail("INVALID_INPUT", "Request body phải là JSON hợp lệ");
     }
 
-    const parsed = CreateAddonSchema.safeParse(body);
+    const parsed = CreateAddonSchema.safeParse(jsonBody.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
     }

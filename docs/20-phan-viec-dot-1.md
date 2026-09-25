@@ -152,3 +152,18 @@ Chủ studio: "nhớ giao việc cho sub agent" — mặc định giao Sonnet vi
 | BB-223 | Sonnet (PW_PORT 3165) | **API trả lỗi sạch**: thân yêu cầu hỏng → 400 thay vì 500 (28 tuyến); không để mã trần ("FORBIDDEN") hay thông báo Postgres tới tay người dùng |
 | BB-200 | Opus | Luồng trạng thái + bộ nhắc theo `docs/21` |
 | BB-231 | Antigravity — Giao diện (DEV-FE, PW_PORT 3170) | **Kịch bản thử đợt 3**: E-8 mở lại (CSKH được mở, quyết định 25/09), E-11 bộ 1.000 ảnh. Đề bài `docs/briefs/BB-231-e2e-dot-3.md`. E-4 bỏ (hết PIN), E-5 chờ quyền ông bà, E-6 chờ tính năng hàng chờ khi mất mạng |
+| BB-200 giao diện | Sonnet (PW_PORT 3167) | Nhãn trạng thái Lark + màu cảnh báo ở quản trị, "Bộ ảnh đã được ghi nhận yêu cầu" ở màn khách, giấu form Mở lại với người không có quyền. **Dừng giữa chừng 25/09 15:4x — tài khoản chạm hạn mức chi tiêu tháng**; việc dở còn trong worktree, làm tiếp sau khi hạn mức đặt lại. Có migration 0068 (hàm `get_admin_galleries`) CHƯA áp — Opus soát trước khi áp |
+| BB-232 | Sonnet (PW_PORT 3168) | E-6: giữ lượt thả tim khi mất mạng, "Chưa lưu", tự gửi lại. Dừng cùng lúc, cùng lý do |
+| BB-224 | Chủ studio + Gemini ("banana") | 10 tranh minh hoạ "hành trình bộ ảnh" (mỗi giai đoạn BB-200 một hình, chốt thành công, link hết hạn, chưa có ảnh). Chỉ đồ vật — không người, không trẻ em, không chữ. Lời nhắc: `babybean-assets/BB-224/LOI-NHAC-GEMINI.txt` |
+| BB-225 | Antigravity — Giao diện (sau BB-224 + BB-200 giao diện) | Thẻ "Hành trình bộ ảnh" trên màn khách dùng tranh BB-224 theo `nhanTienDo`. Đề bài soạn khi tranh về |
+
+## Đợt yêu cầu 2 (docs/22) — phân việc 25/09/2026
+
+| Mã | Mục docs/22 | Ai | Việc |
+|---|---|---|---|
+| BB-240 + BB-241 | 2-1 · 2-2 · 2-3 · 2-4 | Sonnet (PW_PORT 3165) | Màn khách trên máy tính: bìa + dàn trang cân lưới, chân trang thông tin studio gọn, **bỏ khối "Thành phần hợp đồng / Tổng cộng 0 ₫"** khỏi màn khách; "Lưu app" thành lời gợi ý đúng lúc |
+| BB-242 + BB-243 | 2-5 · 2-6 | Sonnet (PW_PORT 3166) | So sánh "ghim một tấm, vuốt tấm kia"; màn treo tường gọn chữ, bảng mờ đè ảnh, ẩn được, mở lớn tấm của bé |
+| BB-244 | 2-7 | Antigravity — Giao diện (PW_PORT 3170) | Chọn ảnh bìa quản trị: lớp phủ nổi ngay, xem trước bằng chính bìa khách, 4 kiểu chữ "high fashion". Đề bài `docs/briefs/BB-244-chon-anh-bia-quan-tri.md` |
+
+Sonnet giao lúc hạn mức chi tiêu đặt lại (17:40). Luật mới cho mọi đề bài: agent
+KHÔNG viết/áp migration trừ khi đề bài cho phép, và KHÔNG BAO GIỜ tự áp lên bb-dev.

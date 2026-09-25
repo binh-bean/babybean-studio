@@ -27,7 +27,7 @@
 
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
@@ -71,8 +71,9 @@ export async function PATCH(
   try {
     const { id: galleryId } = await context.params;
 
-    const parsed = Body.safeParse(await request.json().catch(() => null));
-    if (!parsed.success) {
+    const body = await readJsonBody(request);
+    const parsed = body.ok ? Body.safeParse(body.data) : null;
+    if (!parsed || !parsed.success) {
       return fail("INVALID_INPUT", "Thiếu địa chỉ thư mục Drive.");
     }
 

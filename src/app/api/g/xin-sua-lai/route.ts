@@ -27,7 +27,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
@@ -48,7 +48,8 @@ export async function POST(request: Request): Promise<Response> {
       return fail("FORBIDDEN", "Chỉ ba mẹ đứng tên mới xin sửa lại được");
     }
 
-    const body = (await request.json().catch(() => null)) as { lyDo?: string } | null;
+    const jsonBody = await readJsonBody(request);
+    const body = (jsonBody.ok ? jsonBody.data : null) as { lyDo?: string } | null;
     const lyDo = (body?.lyDo ?? "").trim();
     if (lyDo.length === 0) {
       return fail("INVALID_INPUT", "Ba mẹ ghi giúp em muốn sửa gì, để bên mình xem có kịp không");

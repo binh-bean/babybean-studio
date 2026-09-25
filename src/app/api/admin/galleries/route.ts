@@ -9,7 +9,7 @@
 
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import {
   requireStaff,
   requirePermission,
@@ -40,14 +40,12 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     // 1. Parse & validate Zod input ----------------------------------------
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
+    const jsonBody = await readJsonBody(request);
+    if (!jsonBody.ok) {
       return fail("INVALID_INPUT", "Request body phải là JSON hợp lệ");
     }
 
-    const parsed = CreateGallerySchema.safeParse(body);
+    const parsed = CreateGallerySchema.safeParse(jsonBody.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
     }
@@ -182,7 +180,12 @@ export async function POST(request: Request): Promise<Response> {
     );
   } catch (err) {
     if (err instanceof AuthError) {
-      return fail(err.code, err.message);
+      // BB-223: err.message của AuthError mặc định CHÍNH LÀ mã lỗi trần
+      // ("FORBIDDEN"/"UNAUTHENTICATED") khi không ai truyền message riêng —
+      // xem src/lib/auth/staff.ts. Truyền thẳng err.message vào đây là đúng
+      // lỗi đã thấy thật: nhân viên chi nhánh khác mở nhầm bộ ảnh thấy chữ
+      // "FORBIDDEN" trần thay vì câu tiếng Việt.
+      return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);
     }
     return failUnexpected(err, requestId);
   }

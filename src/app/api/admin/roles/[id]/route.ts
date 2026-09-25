@@ -11,7 +11,7 @@
 
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MA_QUYEN_HOP_LE, tenVaiCoVanDeGi } from "@/lib/auth/danh-muc-quyen";
@@ -34,7 +34,9 @@ export async function PATCH(
     requirePermission(staff, "roles:manage");
     const { id } = await params;
 
-    const parsed = SuaVaiSchema.safeParse(await request.json());
+    const body = await readJsonBody(request);
+    if (!body.ok) return fail("INVALID_INPUT");
+    const parsed = SuaVaiSchema.safeParse(body.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
     }

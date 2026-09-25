@@ -1,0 +1,92 @@
+/**
+ * GET/POST /api/cron/hau-ky — BB-200: đọc trạng thái hậu kỳ từ Lark rồi gửi tin nhắc.
+ *
+ * OWNER: PM. Spec: docs/21.
+ *
+ * Chạy 08:00 giờ Việt Nam mỗi ngày (vercel.json, `0 1 * * *` UTC) — gói Hobby
+ * chỉ cho hai cron, mỗi cron một lần một ngày (docs/11 §5). Tin nhắc là việc
+ * đầu giờ của CSKH nên một lượt buổi sáng là đúng nhịp.
+ *
+ * Thứ tự: đọc Lark → ghi trạng thái → tính mốc nhắc. Đọc Lark hỏng thì DỪNG,
+ * không chạy bộ nhắc trên số liệu hôm qua (nhắc sai còn tệ hơn không nhắc) và
+ * trả 500 để lịch chạy báo đỏ, không im lặng báo xanh.
+ *
+ * MỘT CHIỀU: không ghi cột nào lên Lark. Tin nhắc đi vào nhóm chat của chi nhánh
+ * qua webhook (notify.ts), không đụng bảng Hậu Kỳ.
+ */
+
+import { NextResponse } from "next/server";
+import pg from "pg";
+import { docTrangThaiTuLark, ghiTrangThaiVaoGalleries } from "@/lib/lark/doc-trang-thai-lark";
+import { chayNhacHauKy } from "@/lib/lark/nhac-hau-ky";
+import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+/** Khoá tư vấn để hai lượt (Vercel + chạy tay) không chồng nhau. */
+const KHOA = 200_2509;
+
+function duocPhep(request: Request): boolean {
+  const header = request.headers.get("authorization");
+  if (!header) return false;
+  const khoa = [process.env.CRON_SECRET, process.env.SYNC_CRON_SECRET].filter(
+    (k): k is string => typeof k === "string" && k.length > 0,
+  );
+  return khoa.some((k) => header === `Bearer ${k}`);
+}
+
+async function chay(request: Request) {
+  if (!duocPhep(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { LARK_APP_ID, LARK_APP_SECRET, LARK_BASE_APP_TOKEN, SUPABASE_DB_URL } = process.env;
+  if (!LARK_APP_ID || !LARK_APP_SECRET || !LARK_BASE_APP_TOKEN || !SUPABASE_DB_URL) {
+    return NextResponse.json({ error: "Thiếu cấu hình Lark hoặc SUPABASE_DB_URL" }, { status: 500 });
+  }
+
+  const client = new pg.Client({ connectionString: SUPABASE_DB_URL });
+  await client.connect();
+  try {
+    const { rows } = await client.query("select pg_try_advisory_lock($1) as ok", [KHOA]);
+    if (!rows[0]?.ok) return NextResponse.json({ data: { boQua: "Lượt khác đang chạy" } });
+
+    try {
+      const doc = await docTrangThaiTuLark({
+        appId: LARK_APP_ID,
+        appSecret: LARK_APP_SECRET,
+        baseToken: LARK_BASE_APP_TOKEN,
+      });
+      const ghi = await ghiTrangThaiVaoGalleries(client, doc);
+      const nhac = await chayNhacHauKy({
+        client,
+        cheSo: cheSoDienThoai,
+        gui: (tin) =>
+          enqueueLarkNotification({
+            branchId: tin.branchId,
+            event: "hau_ky.nhac",
+            payload: { loai: tin.maNhac, nguoiNhan: tin.nguoiNhan, cacBo: tin.boAnh },
+          }),
+      });
+      const ketQua = { banGhiLark: doc.size, ...ghi, nhac };
+      console.info(JSON.stringify({ evt: "cron.hau_ky.xong", ...ketQua }));
+      return NextResponse.json({ data: ketQua });
+    } finally {
+      await client.query("select pg_advisory_unlock($1)", [KHOA]);
+    }
+  } catch (err) {
+    console.error(
+      JSON.stringify({ evt: "cron.hau_ky.failed", lyDo: err instanceof Error ? err.message : String(err) }),
+    );
+    return NextResponse.json({ error: "HAU_KY_FAILED" }, { status: 500 });
+  } finally {
+    await client.end();
+  }
+}
+
+export async function GET(request: Request) {
+  return chay(request);
+}
+
+export async function POST(request: Request) {
+  return chay(request);
+}
