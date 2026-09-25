@@ -184,7 +184,7 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
    * được áp lên bb-dev — file migration nằm sẵn ở db/migrations/, đợi Opus
    * soát rồi mới áp (xem ghi chú đầu file 0068). Áp xong thì bỏ `.skip` này.
    */
-  test.skip("(b1) danh sách quản trị hiện đúng mức cảnh báo — chờ Opus áp 0068", async ({ page }) => {
+  test("(b1) danh sách quản trị hiện đúng mức cảnh báo (0068 đã áp 25/09)", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("Tên tài khoản hoặc email").fill(emailCs);
     await page.getByLabel("Mật khẩu").fill(password);
