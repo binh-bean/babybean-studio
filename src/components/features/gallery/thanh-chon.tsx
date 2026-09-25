@@ -19,6 +19,7 @@ import React from "react";
 import { ShoppingBag } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import { vi } from "@/i18n";
 
 export interface ThanhChonProps {
   daChon: number;
@@ -30,11 +31,17 @@ export interface ThanhChonProps {
   nutChinh: { nhan: string; onClick: () => void } | null;
   /** Có sản phẩm để mua thêm thì hiện nút túi. */
   muaThem: { tien: number; onClick: () => void } | null;
+  /**
+   * BB-232 — số tấm đang chờ gửi vì mất mạng (`use-hang-cho-tim.ts`). > 0 thì
+   * thay dòng phụ bằng "Chưa lưu" — ưu tiên báo tin này hơn "còn mấy tấm",
+   * vì ba mẹ cần biết NGAY có thao tác chưa tới được máy chủ.
+   */
+  soChuaGui?: number;
 }
 
 const CHU_VI = 2 * Math.PI * 17;
 
-export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem }: ThanhChonProps) {
+export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0 }: ThanhChonProps) {
   const tiLe = hanMuc ? Math.min(daChon / hanMuc, 1) : 0;
   const vuot = soTamThem > 0;
 
@@ -77,7 +84,11 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
             {hanMuc != null ? ` / ${hanMuc} tấm` : " tấm"}
           </p>
           <p className={cn("truncate text-[11.5px]", vuot ? "text-[#e0b25c]" : "text-white/60")}>
-            {dongPhu}
+            {soChuaGui > 0 ? (
+              <span data-testid="chua-luu">{`${vi.common.unsaved} · ${soChuaGui} tấm`}</span>
+            ) : (
+              dongPhu
+            )}
           </p>
         </div>
 
