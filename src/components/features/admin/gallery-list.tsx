@@ -9,6 +9,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
 import { getContractCodesForGalleries } from "@/app/(admin)/admin/galleries/actions";
+import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
+import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
   Calendar,
   User,
@@ -48,6 +50,15 @@ export interface GalleryItem {
   sentAt: string | null;
   submittedAt: string | null;
   createdAt: string;
+  /**
+   * BB-200 (3/3) — nhãn đã tính từ trạng thái app + mã Lark (`nhanHienThi().quanTri`,
+   * xem src/app/api/admin/galleries/route.ts). Thay cho nhãn tĩnh cũ
+   * `GALLERY_STATUS_LABEL[status]` mỗi khi khác nhau — vd `in_retouch` mà Lark
+   * còn "Đã chọn hình" thì nhãn phải nói "chờ chỉnh sửa", không phải "Đang chỉnh ảnh".
+   */
+  statusLabel?: string;
+  /** Mức cảnh báo từ Lark (`mauCanhBao()`); null = chưa đọc được hoặc không áp dụng. */
+  warningColor?: MauCanhBao | null;
 }
 
 export interface GalleryCounts {
@@ -93,6 +104,25 @@ function getStatusBadgeConfig(status: string): {
     default:
       return { label: status, variant: "outline" };
   }
+}
+
+/**
+ * Chấm màu mức cảnh báo từ Lark (BB-200). `title`/`aria-label` bắt buộc: một
+ * chấm màu một mình không đọc được bằng trình đọc màn hình, và xanh/cam/đỏ/tím
+ * khó phân biệt với người mù màu nếu không có chữ đi kèm.
+ */
+function ChamCanhBao({ mau }: { mau: MauCanhBao | null | undefined }) {
+  const ui = canhBaoUi(mau ?? null);
+  if (!ui) return null;
+  return (
+    <span
+      role="img"
+      aria-label={`Mức cảnh báo: ${ui.nhan}`}
+      title={ui.nhan}
+      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/10"
+      style={{ backgroundColor: ui.mauToken }}
+    />
+  );
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -604,7 +634,12 @@ export function GalleryList() {
 
                       {/* 10. Trạng thái */}
                       <td className="px-4 py-3 text-center">
-                        <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+                        <span className="inline-flex items-center gap-1.5">
+                          <ChamCanhBao mau={item.warningColor} />
+                          <Badge variant={statusConfig.variant}>
+                            {item.statusLabel ?? statusConfig.label}
+                          </Badge>
+                        </span>
                       </td>
 
                       {/* Thao tác */}
@@ -672,8 +707,11 @@ export function GalleryList() {
                         {tenBeThe ? ` · bé ${tenBeThe}` : ""}
                       </p>
                     </div>
-                    <span className="shrink-0">
-                      <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <ChamCanhBao mau={item.warningColor} />
+                      <Badge variant={statusConfig.variant}>
+                        {item.statusLabel ?? statusConfig.label}
+                      </Badge>
                     </span>
                   </div>
 

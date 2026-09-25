@@ -34,6 +34,13 @@
   --bb-warning-fg: #2e2211;
   --bb-danger: #c4553f;
   --bb-danger-fg: #ffffff;
+  /*
+   * BB-200 — mức cảnh báo thứ tư từ Lark ("Phải xong trong ngày"), tím để
+   * không lẫn với đỏ (Nguy hiểm) khi hai chấm nằm cạnh nhau trên danh sách.
+   * Tương phản #ffffff trên #6b4e9e ≈ 6,4:1 — đạt AA cho chữ thường.
+   */
+  --bb-urgent: #6b4e9e;
+  --bb-urgent-fg: #ffffff;
 
   /* Chế độ xem ảnh — luôn nền tối để mắt tập trung vào ảnh */
   --bb-viewer-bg: #16130f;
@@ -86,6 +93,8 @@
   --bb-warning-fg: #1a1309;
   --bb-danger: #c4553f;
   --bb-danger-fg: #ffffff;
+  --bb-urgent: #9078c9; /* sáng hơn bản light, giữ tương phản trên nền tối */
+  --bb-urgent-fg: #16130f;
 
   --background: var(--bb-bg);
   --foreground: var(--bb-fg);
@@ -126,6 +135,8 @@
     --bb-warning-fg: #1a1309;
     --bb-danger: #c4553f;
     --bb-danger-fg: #ffffff;
+    --bb-urgent: #9078c9;
+    --bb-urgent-fg: #16130f;
 
     --background: var(--bb-bg);
     --foreground: var(--bb-fg);
@@ -177,6 +188,8 @@
   --color-bb-warning-fg: var(--bb-warning-fg);
   --color-bb-danger: var(--bb-danger);
   --color-bb-danger-fg: var(--bb-danger-fg);
+  --color-bb-urgent: var(--bb-urgent);
+  --color-bb-urgent-fg: var(--bb-urgent-fg);
   --color-bb-viewer-bg: var(--bb-viewer-bg);
   /* Chỉ có giá trị bên trong .giao-dien-khach — xem khối cuối tệp. */
   --color-heart: var(--bb-heart);

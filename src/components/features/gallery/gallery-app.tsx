@@ -45,6 +45,11 @@ interface GalleryApiResponse {
   title: string;
   welcomeMessage: string | null;
   status: string;
+  /**
+   * BB-200 (3/3) — chuỗi tiến độ tính từ trạng thái app + mã Lark
+   * (docs/21 "Luồng hiển thị"). `null` = giữ nguyên chữ cũ theo `status`.
+   */
+  nhanTienDo?: string | null;
   babyName: string | null;
   /** BB-212: tên khách hàng đứng bộ ảnh — điền sẵn ô "người xác nhận" lúc chốt. */
   customerName?: string | null;
@@ -1319,6 +1324,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           {gallery.review && (
             <ReviewPanel
               status={gallery.status}
+              nhanTienDo={gallery.nhanTienDo}
               review={gallery.review}
               hotline={gallery.branch.hotline}
               onDecide={decideReview}

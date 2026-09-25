@@ -48,11 +48,21 @@ export interface ReviewData {
 
 export function ReviewPanel({
   status,
+  nhanTienDo,
   review,
   hotline,
   onDecide,
 }: {
   status: string;
+  /**
+   * BB-200 (3/3) — chuỗi tiến độ tính từ mã Lark (`nhanHienThi().khach`,
+   * docs/21 "Luồng hiển thị"). CSKH xác nhận xong mà Lark còn "Đã chọn hình"
+   * (bộ ảnh XẾP HÀNG, chưa ai chỉnh) thì khách phải thấy "Bộ ảnh đã được ghi
+   * nhận yêu cầu", KHÔNG phải "Studio đang chỉnh ảnh" — nói đang làm trong
+   * khi chưa ai đụng vào là hứa sai. `null`/`undefined` = giữ câu cũ theo
+   * `status` (chưa đọc được Lark, hoặc bộ đã ở giai đoạn không cần Lark).
+   */
+  nhanTienDo?: string | null;
   review: ReviewData;
   hotline: string;
   onDecide: (decision: "approve" | "revise", note?: string) => Promise<void>;
@@ -82,7 +92,7 @@ export function ReviewPanel({
       <div>
         <p className="font-display text-lg font-light leading-tight">
           {status === "in_retouch"
-            ? "Studio đang chỉnh ảnh"
+            ? (nhanTienDo ?? "Studio đang chỉnh ảnh")
             : status === "awaiting_approval"
               ? "Ảnh đã chỉnh xong, mời ba mẹ xem"
               : "Ba mẹ đã duyệt bộ ảnh này"}

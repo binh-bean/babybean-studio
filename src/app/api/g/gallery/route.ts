@@ -1,10 +1,11 @@
-import { isSubmittedOrLater } from "@/lib/gallery-status";
+import { isSubmittedOrLater, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
 import { nhomSanPham, canGanAnh } from "@/lib/products/nhom-san-pham";
+import { nhanHienThi } from "@/lib/lark/trang-thai-hau-ky";
 
 export async function GET(request: Request) {
   try {
@@ -68,7 +69,8 @@ export async function GET(request: Request) {
         id, title, welcome_message, status, baby_id, customer_id, shoot_date:shoots(shoot_date),
         branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
-        cover_photo_id, cover_headline, download_enabled, notes_enabled, invite_enabled
+        cover_photo_id, cover_headline, download_enabled, notes_enabled, invite_enabled,
+        lark_trang_thai
       `)
       .eq("id", session.galleryId)
       .single();
@@ -364,6 +366,15 @@ export async function GET(request: Request) {
       title: gallery.title,
       welcomeMessage: gallery.welcome_message,
       status: gallery.status,
+      // BB-200 (3/3) — chuỗi tiến độ tính từ trạng thái app + mã Lark
+      // (docs/21 "Luồng hiển thị"). KHÔNG trả mã Lark hay mức cảnh báo cho
+      // khách — đó là chuyện nội bộ studio, không phải thứ ba mẹ cần thấy.
+      // `null` = giữ nguyên chữ cũ theo `status` (xem review-panel.tsx).
+      nhanTienDo: nhanHienThi(
+        gallery.status,
+        gallery.lark_trang_thai,
+        (s) => GALLERY_STATUS_LABEL[s] ?? s,
+      ).khach,
       babyName: baby?.nickname || baby?.full_name || null,
       // BB-212 — xem ghi chú ở chỗ truy vấn `customer` phía trên.
       customerName: customer?.full_name || null,

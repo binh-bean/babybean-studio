@@ -11,6 +11,8 @@ import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
+import { nhanHienThi, mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-hau-ky";
+import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 
 export const runtime = "nodejs";
 
@@ -43,7 +45,11 @@ export async function GET(
       // BB-215 thêm ba cột cuối: khối "Bìa bộ ảnh" cần biết bìa đang chọn và
       // baby_id để suy tên bé — cùng luật viết liền một dòng như BB-150 ở trên
       // vì Supabase suy kiểu từ chuỗi literal.
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, baby_id")
+      // BB-200 (2/3) thêm bốn cột cuối: nhãn quản trị + mức cảnh báo + dòng
+      // "Lark: … · đọc lúc …" ở màn chi tiết. Cùng luật viết liền một dòng
+      // như hai lần trước (BB-150, BB-215) — Supabase suy kiểu từ chuỗi
+      // literal, nối chuỗi là mất kiểu.
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, baby_id, lark_trang_thai, lark_canh_bao, lark_doc_luc")
       .eq("id", galleryId)
       .single();
 
@@ -162,6 +168,23 @@ export async function GET(
       syncError: gallery.sync_error ?? null,
       title: gallery.title,
       status: gallery.status,
+      // BB-200 (2/3) — nhãn quản trị + mức cảnh báo, cùng luật với màn khách
+      // và màn danh sách (src/lib/lark/trang-thai-hau-ky.ts). Không trả mã
+      // Lark thô (`lark_trang_thai`/`lark_canh_bao`) — đó là chi tiết triển
+      // khai nội bộ, màn hình chỉ cần nhãn và tên đã dịch.
+      statusLabel: nhanHienThi(
+        gallery.status,
+        gallery.lark_trang_thai,
+        (s) => GALLERY_STATUS_LABEL[s] ?? s,
+      ).quanTri,
+      warningColor: mauCanhBao(gallery.lark_canh_bao),
+      larkTenTrangThai: gallery.lark_trang_thai
+        ? (TRANG_THAI_LARK as Record<string, { ten: string }>)[gallery.lark_trang_thai]?.ten ?? null
+        : null,
+      larkDocLuc: gallery.lark_doc_luc ?? null,
+      // BB-200 (3/3) — form "Mở lại cho khách chọn tiếp" chỉ hiện khi nhân
+      // viên có quyền này (xem src/app/api/admin/galleries/[id]/reopen/route.ts).
+      canReopen: staff.permissions.includes("galleries:reopen"),
       // BB-215: dữ liệu cho khối "Bìa bộ ảnh".
       coverPhotoId: gallery.cover_photo_id ?? null,
       coverHeadline: gallery.cover_headline ?? null,
