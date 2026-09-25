@@ -185,6 +185,15 @@ Vì vậy `flush-notifications` (mỗi 5 phút, đẩy hàng đợi Lark/Zalo) �
 Giờ trong `vercel.json` là **UTC**. `0 18 * * *` UTC = 01:00 giờ Việt Nam. `0 2 * * *` UTC = 09:00 giờ Việt Nam.
 Mọi handler cron kiểm `Authorization: Bearer <CRON_SECRET>` trước khi làm gì.
 
+> **Kiểm 25/09/2026 (`vercel env ls production`): KHÔNG có `CRON_SECRET`, KHÔNG
+> có `SUPABASE_DB_URL`.** Vercel chỉ gắn header `Authorization` khi biến
+> `CRON_SECRET` tồn tại — thiếu nó thì mọi lượt cron bị handler trả 401. Nghĩa là
+> `/api/cron/expire-galleries` (bộ ảnh quá hạn tự đóng, link quá hạn) **chưa từng
+> chạy trên production**, và `/api/cron/hau-ky` (BB-200, 08:00) cũng sẽ 401.
+> `hau-ky` còn cần `SUPABASE_DB_URL` (nối thẳng Postgres).
+> Việc của chủ studio (khoá bí mật — agent không được tự nhập): thêm hai biến
+> ở Vercel → Settings → Environment Variables → Production, rồi Redeploy.
+
 ## 5a. Kéo Lark định kỳ (BB-152) — bốn thứ, thiếu một là im lặng
 
 `POST /api/cron/sync-lark` đọc bảng Hậu Kỳ của Lark rồi dựng bộ ảnh. Nó KHÔNG
