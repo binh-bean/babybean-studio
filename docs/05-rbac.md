@@ -30,7 +30,7 @@ Hai hệ phân quyền tách biệt: **nhân viên** (có tài khoản) và **kh
 | Album — sửa cấu hình | U | U | U | U | — | — | — | — |
 | Album — đồng bộ Drive | U | U | U | U | U | — | — | — |
 | Album — gửi/thu hồi link | U | U | U | U | — | — | — | — |
-| Album — **mở lại sau chốt** | U | U | U | — | — | — | — | — |
+| Album — **mở lại sau chốt** | U | U | U | U | — | — | — | — |
 | Album — xoá/lưu trữ | D | D | D | — | — | — | — | — |
 | Album — xuất danh sách | R | R | R | R | R | R | — | — |
 | Lựa chọn của khách — sửa | — | — | — | — | — | — | — | — |
@@ -122,7 +122,7 @@ không còn `it.todo` nào.
 |---|---|---|---|
 | 1 | `cs` chi nhánh A đọc album chi nhánh B | 0 dòng / 403 | `security/rbac.test.ts` Ca 1 |
 | 2 | `photographer` sửa dữ liệu album | 403 / lỗi RLS | `security/rbac.test.ts` Ca 2 |
-| 3 | `cs` gọi `POST /admin/galleries/:id/reopen` | 403 | `security/rbac.test.ts` Ca 3 |
+| 3 | Vai có sửa album nhưng KHÔNG có `galleries:reopen` gọi `POST /admin/galleries/:id/reopen` (CSKH được mở lại từ 25/09/2026, migration 0066) | 403 | `security/rbac.test.ts` Ca 3 |
 | 4 | Nhân viên bất kỳ `UPDATE selection_items` | lỗi RLS | `security/rbac.test.ts` Ca 4 |
 | 5 | Nhân viên tự `UPDATE` `role` của mình | lỗi RLS | `security/rbac.test.ts` Ca 5 |
 | 6 | `anon` `SELECT` bất kỳ bảng nào | lỗi quyền | `security/rbac.test.ts` Ca 6 |

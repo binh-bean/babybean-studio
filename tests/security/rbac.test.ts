@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
 
-import { requireRole, PERMISSIONS } from "../../src/lib/auth/staff";
+import * as staffAuth from "../../src/lib/auth/staff";
+import { POST as reopenRoute } from "../../src/app/api/admin/galleries/[id]/reopen/route";
 import { Client } from "pg";
 
 describe("Database RLS Policies & Security (BB-020)", () => {
@@ -179,22 +180,39 @@ describe("Database RLS Policies & Security (BB-020)", () => {
     await client.query("ROLLBACK");
   });
 
-  it("Ca 3: cs gọi POST /admin/galleries/:id/reopen (mở lại album) -> 403 ở tầng ứng dụng", () => {
-    // Tránh lập luận vòng tròn bằng cách sử dụng PERMISSIONS export từ src/lib/auth/staff
-    const session = {
-      staffId: "user-cs",
-      role: "cs" as const,
-      permissions: quyenCuaVai("cs"),
-      branchIds: []
-    };
-    let error: unknown;
+  /**
+   * Ca 3 cũ kiểm một HẰNG SỐ (PERMISSIONS.REOPEN_GALLERY) chứ không gọi tuyến,
+   * nên xanh suốt trong khi tuyến thật chỉ đòi galleries:write — mọi vai sửa
+   * được album đều mở lại được. Nay gọi thẳng tuyến. CSKH ĐƯỢC mở lại theo
+   * quyết định của chủ studio 25/09/2026 (0066); thứ phải chặn là vai có sửa
+   * album mà KHÔNG được cấp galleries:reopen.
+   */
+  it("Ca 3: vai sửa được album nhưng không có galleries:reopen gọi POST /admin/galleries/:id/reopen -> 403", async () => {
+    const coSuaKhongCoMoLai = quyenCuaVai("cs").filter((q) => q !== "galleries:reopen");
+    expect(coSuaKhongCoMoLai).toContain("galleries:write");
+    const spy = vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
+      staffId: "00000000-0000-4000-8000-0000000000c3",
+      role: "cs",
+      roleName: "Vai tự tạo không có quyền mở lại",
+      permissions: coSuaKhongCoMoLai,
+      branchIds: [],
+    } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
     try {
-      requireRole(session, PERMISSIONS.REOPEN_GALLERY);
-    } catch (e) {
-      error = e;
+      const res = await reopenRoute(
+        new Request("http://localhost", { method: "POST", body: JSON.stringify({ reason: "thử quyền" }) }),
+        { params: Promise.resolve({ id: "00000000-0000-4000-8000-000000000003" }) },
+      );
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error.code).toBe("FORBIDDEN");
+    } finally {
+      spy.mockRestore();
     }
-    expect(error).toBeDefined();
-    expect((error as { code?: string }).code).toBe("FORBIDDEN");
+  });
+
+  it("Ca 3 đối chứng: vai cs hệ thống CÓ galleries:reopen (0066)", () => {
+    expect(quyenCuaVai("cs")).toContain("galleries:reopen");
+    expect(quyenCuaVai("photographer")).not.toContain("galleries:reopen");
   });
 
   it("Đối chứng dương: cs SỬA được khách hàng của chính chi nhánh mình", async () => {

@@ -49,7 +49,7 @@ const MA_TRAN: Ca[] = [
     tep: "security/rbac.test.ts",
     neo: "Ca 2 (Lỗ hổng 0001)",
   },
-  { so: 3, mo: "cs mở lại album", tep: "security/rbac.test.ts", neo: "Ca 3:" },
+  { so: 3, mo: "vai không có galleries:reopen mở lại album", tep: "security/rbac.test.ts", neo: "Ca 3:" },
   { so: 4, mo: "nhân viên UPDATE selection_items", tep: "security/rbac.test.ts", neo: "Ca 4:" },
   { so: 5, mo: "nhân viên tự đổi vai của mình", tep: "security/rbac.test.ts", neo: "Ca 5:" },
   { so: 6, mo: "anon SELECT bảng bất kỳ", tep: "security/rbac.test.ts", neo: "Ca 6:" },

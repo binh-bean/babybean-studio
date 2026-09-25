@@ -89,6 +89,7 @@ const QUYEN_THEO_VAI: Record<string, string[]> = {
     "galleries:write",
     "galleries:sync",
     "galleries:share",
+    "galleries:reopen", // 0066: chủ studio cho CSKH mở lại (25/09/2026)
     "galleries:export",
     "customers:write",
     "staff:read",

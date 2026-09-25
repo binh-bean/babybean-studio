@@ -55,7 +55,10 @@ export async function POST(
 
   try {
     const staff = await requireStaff();
-    requirePermission(staff, "galleries:write");
+    // Quyền RIÊNG, không phải galleries:write: bản cũ kiểm write nên mọi vai
+    // sửa được album đều mở lại được, dù không ai cấp galleries:reopen cho họ
+    // (0066). CSKH có quyền này theo quyết định của chủ studio 25/09/2026.
+    requirePermission(staff, "galleries:reopen");
 
     const { id: galleryId } = await context.params;
     if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");

@@ -1,11 +1,6 @@
 import { createServerClient } from "../supabase/server";
 import { StaffSession, StaffRole } from "../../types/domain";
 
-export const PERMISSIONS = {
-  REOPEN_GALLERY: ["owner", "admin", "branch_manager"] as StaffRole[],
-  EDIT_GALLERY: ["owner", "admin", "branch_manager", "cs"] as StaffRole[],
-};
-
 export class AuthError extends Error {
   constructor(public code: "UNAUTHENTICATED" | "FORBIDDEN", message?: string) {
     super(message || code);
