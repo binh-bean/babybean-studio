@@ -31,7 +31,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
@@ -60,7 +60,8 @@ export async function POST(
     const { id: galleryId } = await context.params;
     if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
 
-    const body = (await request.json().catch(() => null)) as { reason?: string } | null;
+    const jsonBody = await readJsonBody(request);
+    const body = (jsonBody.ok ? jsonBody.data : null) as { reason?: string } | null;
     const reason = (body?.reason ?? "").trim();
     if (reason.length === 0) {
       return fail("INVALID_INPUT", "Ghi giúp lý do mở lại, để sau này còn tra được");

@@ -9,7 +9,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { passwordProblem } from "@/lib/auth/username";
@@ -37,7 +37,9 @@ export async function PATCH(
     requirePermission(staff, "staff:manage");
 
     const { id } = await context.params;
-    const parsed = UpdateStaffSchema.safeParse(await request.json());
+    const body = await readJsonBody(request);
+    if (!body.ok) return fail("INVALID_INPUT");
+    const parsed = UpdateStaffSchema.safeParse(body.data);
     if (!parsed.success) {
       return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
     }

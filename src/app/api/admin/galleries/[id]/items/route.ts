@@ -6,7 +6,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
@@ -193,7 +193,10 @@ export async function GET(
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      return fail(err.code, err.message);
+      // BB-223: xem giải thích ở src/app/api/admin/galleries/route.ts —
+      // err.message của AuthError mặc định là mã lỗi trần, không phải câu
+      // tiếng Việt cho người dùng.
+      return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);
     }
     return failUnexpected(err, requestId);
   }
@@ -286,7 +289,8 @@ export async function POST(
     if (loaded.error) return loaded.error;
     const { admin, gallery, staff } = loaded;
 
-    const body = (await request.json().catch(() => null)) as {
+    const jsonBody = await readJsonBody(request);
+    const body = (jsonBody.ok ? jsonBody.data : null) as {
       productId?: string;
       quantity?: number;
       unitPrice?: number | null;
@@ -355,7 +359,8 @@ export async function PATCH(
     if (loaded.error) return loaded.error;
     const { admin, gallery, staff } = loaded;
 
-    const body = (await request.json().catch(() => null)) as {
+    const jsonBody = await readJsonBody(request);
+    const body = (jsonBody.ok ? jsonBody.data : null) as {
       itemId?: string;
       quantity?: number;
     } | null;
@@ -414,8 +419,9 @@ export async function DELETE(
     const { admin, gallery, staff } = loaded;
 
     const url = new URL(request.url);
+    const jsonBody = await readJsonBody(request);
     const itemId =
-      ((await request.json().catch(() => null)) as { itemId?: string } | null)?.itemId ??
+      ((jsonBody.ok ? jsonBody.data : null) as { itemId?: string } | null)?.itemId ??
       url.searchParams.get("itemId") ??
       "";
 

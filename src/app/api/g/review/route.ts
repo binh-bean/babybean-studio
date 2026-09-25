@@ -28,7 +28,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
@@ -46,7 +46,8 @@ export async function POST(request: Request): Promise<Response> {
       return fail("FORBIDDEN", "Chỉ người nhận link chính mới duyệt được ảnh");
     }
 
-    const body = (await request.json().catch(() => null)) as {
+    const jsonBody = await readJsonBody(request);
+    const body = (jsonBody.ok ? jsonBody.data : null) as {
       decision?: string;
       note?: string;
     } | null;

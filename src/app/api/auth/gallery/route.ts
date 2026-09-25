@@ -14,7 +14,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signGallerySession, SESSION_COOKIE } from "@/lib/auth/gallery-session";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import type { ShareRole } from "@/types/domain";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
 
@@ -46,7 +46,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const reqId = crypto.randomUUID();
 
   try {
-    const parsed = schema.safeParse(await req.json());
+    const body = await readJsonBody(req);
+    if (!body.ok) return fail("INVALID_INPUT");
+    const parsed = schema.safeParse(body.data);
     if (!parsed.success) return fail("INVALID_INPUT");
 
     const { token } = parsed.data;

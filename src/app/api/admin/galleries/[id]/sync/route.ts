@@ -97,7 +97,12 @@ export async function POST(
       { status: 202 },
     );
   } catch (err) {
-    if (err instanceof AuthError) return fail(err.code, err.message);
+    // BB-223: xem giải thích ở src/app/api/admin/galleries/route.ts —
+    // err.message của AuthError mặc định là mã lỗi trần, không phải câu
+    // tiếng Việt cho người dùng.
+    if (err instanceof AuthError) {
+      return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);
+    }
     return failUnexpected(err, requestId);
   }
 }
