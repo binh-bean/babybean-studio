@@ -20,6 +20,8 @@ import pg from "pg";
 import { docTrangThaiTuLark, ghiTrangThaiVaoGalleries } from "@/lib/lark/doc-trang-thai-lark";
 import { chayNhacHauKy } from "@/lib/lark/nhac-hau-ky";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
+import { guiThongBaoBoAnh } from "@/lib/thong-bao/gui-day";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -56,7 +58,18 @@ async function chay(request: Request) {
         appSecret: LARK_APP_SECRET,
         baseToken: LARK_BASE_APP_TOKEN,
       });
-      const ghi = await ghiTrangThaiVaoGalleries(client, doc);
+      const { sangHinhDaVe, ...ghi } = await ghiTrangThaiVaoGalleries(client, doc);
+      // BB-250 — báo đẩy cho ba mẹ khi Lark vừa sang "Hình đã về". Chạy tuần
+      // tự: vài bộ mỗi sáng, không cần song song; guiThongBaoBoAnh không ném.
+      if (sangHinhDaVe.length > 0) {
+        const admin = createAdminClient();
+        for (const id of sangHinhDaVe) {
+          await guiThongBaoBoAnh(admin, id, {
+            tieuDe: "Sản phẩm của bé đã về",
+            noiDung: "Mời ba mẹ ghé studio nhận ảnh nhé.",
+          });
+        }
+      }
       const nhac = await chayNhacHauKy({
         client,
         cheSo: cheSoDienThoai,
@@ -67,7 +80,7 @@ async function chay(request: Request) {
             payload: { loai: tin.maNhac, nguoiNhan: tin.nguoiNhan, cacBo: tin.boAnh },
           }),
       });
-      const ketQua = { banGhiLark: doc.size, ...ghi, nhac };
+      const ketQua = { banGhiLark: doc.size, ...ghi, baoHinhDaVe: sangHinhDaVe.length, nhac };
       console.info(JSON.stringify({ evt: "cron.hau_ky.xong", ...ketQua }));
       return NextResponse.json({ data: ketQua });
     } finally {

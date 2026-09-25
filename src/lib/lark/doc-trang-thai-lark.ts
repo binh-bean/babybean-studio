@@ -206,6 +206,27 @@ export async function docTrangThaiTuLark(opts: {
   return ra;
 }
 
+/** Giai đoạn "Hình đã về" (docs/21) — mốc báo ba mẹ ghé nhận sản phẩm. */
+const GIAI_DOAN_HINH_DA_VE = 9;
+
+/**
+ * BB-250 — bộ ảnh có VỪA chuyển sang "Hình đã về" trong lượt đọc này không.
+ *
+ * Chỉ tính khi app ĐÃ biết giai đoạn cũ và giai đoạn cũ < 9. `maCu = null` là
+ * lần đầu app đọc bộ đó — có thể nó đã về từ ba tuần trước; báo lúc này là lặp
+ * lại vụ ngày đầu BB-200 nhắc ồ ạt 157 bộ (docs/21). Bộ đã `delivered` thì ba
+ * mẹ đã cầm ảnh rồi, không báo.
+ */
+export function vuaSangHinhDaVe(
+  maCu: string | null,
+  maMoi: string | null,
+  trangThaiApp: string,
+): boolean {
+  if (trangThaiApp === "delivered") return false;
+  const cu = giaiDoanCua(maCu);
+  return cu !== null && cu < GIAI_DOAN_HINH_DA_VE && giaiDoanCua(maMoi) === GIAI_DOAN_HINH_DA_VE;
+}
+
 /**
  * Ghi kết quả đọc vào galleries. Chỉ đụng bộ ảnh có lark_hauky_record_id nằm
  * trong kết quả; bộ không còn trên Lark thì để nguyên (không xoá trạng thái vì
@@ -215,19 +236,21 @@ export async function ghiTrangThaiVaoGalleries(
   client: pg.Client | pg.PoolClient,
   doc: Map<string, TrangThaiDoc>,
   bayGio = new Date(),
-): Promise<{ doc: number; doi: number }> {
+): Promise<{ doc: number; doi: number; sangHinhDaVe: string[] }> {
   const { rows } = await client.query<{
     id: string;
+    status: string;
     lark_hauky_record_id: string;
     lark_trang_thai: string | null;
     lark_canh_bao: string | null;
     lark_trang_thai_tu: Date | null;
   }>(
-    `select id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_trang_thai_tu
+    `select id, status, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_trang_thai_tu
        from galleries where lark_hauky_record_id is not null and status <> 'archived'`,
   );
   let soDoc = 0;
   let soDoi = 0;
+  const sangHinhDaVe: string[] = [];
   for (const g of rows) {
     const moi = doc.get(g.lark_hauky_record_id);
     if (!moi) continue;
@@ -238,6 +261,7 @@ export async function ghiTrangThaiVaoGalleries(
       g.lark_canh_bao !== moi.maCanhBao ||
       (g.lark_trang_thai_tu?.getTime() ?? null) !== (tu?.getTime() ?? null);
     if (doi) soDoi++;
+    if (vuaSangHinhDaVe(g.lark_trang_thai, moi.maTrangThai, g.status)) sangHinhDaVe.push(g.id);
     if (doi) {
       await client.query(
         `update galleries set lark_trang_thai = $2, lark_canh_bao = $3, lark_trang_thai_tu = $4, lark_doc_luc = $5
@@ -248,5 +272,5 @@ export async function ghiTrangThaiVaoGalleries(
       await client.query(`update galleries set lark_doc_luc = $2 where id = $1`, [g.id, bayGio]);
     }
   }
-  return { doc: soDoc, doi: soDoi };
+  return { doc: soDoc, doi: soDoi, sangHinhDaVe };
 }
