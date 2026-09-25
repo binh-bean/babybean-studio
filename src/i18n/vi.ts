@@ -187,6 +187,19 @@ export const vi = {
     downloadThis: "Tải ảnh này về máy",
     quotaInline: "đã chọn",
     messageStudio: "Nhắn cho studio",
+    /**
+     * BB-240 — thay "Thành phần hợp đồng / Tổng cộng 0 ₫" (dữ liệu nội bộ,
+     * dòng "Edit file", tiền hợp đồng) bằng một dòng ba mẹ dùng được: biết
+     * gói của mình gồm bao nhiêu tấm chỉnh, không cần đọc cơ cấu hợp đồng.
+     * Chỉ hiện khi CSKH đã nhập hạn mức (`gallery.quotaKnown`).
+     */
+    packageQuotaLine: "Gói của ba mẹ gồm {n} ảnh chỉnh",
+    /** BB-241 — lời gợi ý "Lưu app", thay cho nút biểu tượng khó hiểu. */
+    saveAppPrompt: {
+      message: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
+      howTo: "Xem cách lưu",
+      later: "Để sau",
+    },
   },
   admin: {
     branches: {

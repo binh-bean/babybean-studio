@@ -184,6 +184,12 @@ export const en: Messages = {
     downloadThis: "Download this photo",
     quotaInline: "selected",
     messageStudio: "Message studio",
+    packageQuotaLine: "Your package includes {n} edited photos",
+    saveAppPrompt: {
+      message: "Save this gallery to your home screen to reopen it in one tap",
+      howTo: "See how",
+      later: "Later",
+    },
   },
   admin: {
     branches: {

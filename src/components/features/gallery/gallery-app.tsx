@@ -15,6 +15,7 @@ import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { HuongDanThemManHinh } from "@/components/features/gallery/huong-dan-them-man-hinh";
+import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
 import { SoSanhAnh } from "@/components/features/gallery/so-sanh-anh";
 import {
   themVaoSoSanh,
@@ -24,7 +25,7 @@ import {
   SO_SANH_TOI_DA,
   SO_SANH_TOI_THIEU,
 } from "@/lib/gallery/so-sanh";
-import { Smartphone, Columns2, X as XIcon } from "lucide-react";
+import { Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
@@ -32,7 +33,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, AlertCircle, Info, Lock } from "lucide-react";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
-import { ContractBreakdown, type ContractItem, formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { Spinner } from "@/components/ui/spinner";
 import type { PhotoPublic } from "@/types/domain";
 
@@ -1019,21 +1020,6 @@ export function GalleryApp({ token }: GalleryAppProps) {
     [loadGallery],
   );
 
-  const contractBreakdownItems = useMemo<ContractItem[]>(() => {
-    if (!gallery?.contract?.items) return [];
-    return gallery.contract.items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      quantity: item.quantity,
-      price: item.totalPrice,
-      children: item.components?.map((comp) => ({
-        id: comp.id,
-        name: comp.name,
-        quantity: comp.quantity,
-      })),
-    }));
-  }, [gallery]);
-
   // BB-212 — màn đang tải, đổi sang ngôn ngữ "cuốn album kỷ niệm": nền kem
   // (`bg-background` bên trong `.giao-dien-khach`), chữ mực, không còn nền
   // trắng lạnh của khung quản trị.
@@ -1182,7 +1168,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         id="dau-luoi-anh"
         className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-md"
       >
-        <div className="mx-auto max-w-[1600px] px-3 sm:px-6">
+        <div className="mx-auto max-w-[1600px] px-3 sm:px-6 lg:px-10">
           <div className="flex items-end justify-between gap-3 pt-3">
             <div className="min-w-0">
               <p className="truncate font-display text-[22px] leading-tight">
@@ -1211,24 +1197,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 </a>
               )}
               {/*
-                BB-213 — "Lưu app": mở tấm hướng dẫn thêm ra màn hình chính,
-                đúng theo máy khách đang dùng (huong-dan-them-man-hinh.tsx).
-                Dưới 640px chỉ còn biểu tượng: soát khi gộp (24/09/2026) trên
-                màn 375px, ba nút có chữ ("Nhắn cho studio", "Lưu app", tải
-                ảnh) đẩy tên bé còn đúng "Minh…". Tên bé là thứ ba mẹ nhìn
-                để biết mình đang ở đúng bộ ảnh — không được là thứ bị cắt.
-                "Nhắn cho studio" giữ chữ vì lý do ghi ngay phía trên.
+                BB-241 — nút biểu tượng "Lưu app" ở đây bỏ hẳn: chủ studio
+                24/09/2026 "nếu không phải người thiết kế thì không biết nó để
+                làm gì". Thay bằng lời gợi ý ĐÚNG LÚC (`LoiGoiYLuuApp`, dựng ở
+                cuối màn) — hiện sau khi ba mẹ thả tim tấm đầu hoặc ở lần mở
+                thứ hai, đúng lúc họ đã thấy giá trị của bộ ảnh thay vì hiện
+                ngay từ đầu như một nút không rõ nghĩa.
               */}
-              <button
-                type="button"
-                onClick={() => setMoHuongDanLuuApp(true)}
-                aria-label="Lưu app ra màn hình chính"
-                title="Lưu app ra màn hình chính"
-                className="inline-flex h-9 w-9 items-center justify-center gap-1.5 rounded-full border border-border text-xs font-medium transition hover:bg-surface-2 sm:w-auto sm:px-3"
-              >
-                <Smartphone className="h-4 w-4 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
-                <span className="hidden sm:inline">Lưu app</span>
-              </button>
               {choPhepTai && photos.length > 0 && (
                 <MenuTaiAnh
                   soAnh={photos.length}
@@ -1385,7 +1360,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       {/* MÀN 2 — LƯỚI ẢNH so le, giữ đúng khung */}
       <section
         aria-label="Ảnh của buổi chụp"
-        className="mx-auto max-w-[1600px] px-1.5 pt-1.5 sm:px-3 sm:pt-3 lg:px-6"
+        className="mx-auto max-w-[1600px] px-1.5 pt-1.5 sm:px-3 sm:pt-3 lg:px-10 lg:pt-6"
       >
         {filteredPhotos.length === 0 ? (
           <div className="mx-auto my-12 max-w-md rounded-2xl border border-dashed border-border p-8 text-center">
@@ -1410,14 +1385,27 @@ export function GalleryApp({ token }: GalleryAppProps) {
       </section>
 
       {/*
-        TRONG GÓI CỦA BA MẸ — thành phần hợp đồng và sản phẩm in trong gói,
-        CHỈ ĐỌC. Nằm sau lưới vì đây là thông tin để đối chiếu, không phải việc
-        phải làm trước; chỗ gán ảnh vào sản phẩm là màn xem ảnh lớn.
+        TRONG GÓI CỦA BA MẸ — CHỈ ĐỌC, chỉ điều ba mẹ dùng được. Nằm sau lưới
+        vì đây là thông tin để đối chiếu, không phải việc phải làm trước; chỗ
+        gán ảnh vào sản phẩm là màn xem ảnh lớn.
+
+        BB-240 (2-3) — chủ studio 22/09/2026: khối "Thành phần hợp đồng /
+        Edit file x15 / Tổng cộng 0 ₫" trước đây nằm ở đây là dữ liệu NỘI BỘ
+        của hợp đồng — khách không dùng được, và "Tổng cộng 0 ₫" còn gây hiểu
+        lầm là ba mẹ nợ tiền. `<ContractBreakdown>` bỏ khỏi màn khách (component
+        vẫn còn trong `src/components/ui/contract-breakdown.tsx`, chưa dùng ở
+        màn quản trị nào — không xoá tệp). Thay bằng đúng hai điều ba mẹ cần:
+        hạn mức ảnh chỉnh (nếu CSKH đã nhập), và danh sách sản phẩm in có sẵn
+        trong gói (đã có ở TomTatSanPhamIn).
       */}
-      {(contractBreakdownItems.length > 0 || hangInTrongGoi.length > 0) && (
+      {(hanMuc != null || hangInTrongGoi.length > 0) && (
         <div className="mx-auto mt-14 max-w-3xl space-y-5 px-4">
           <h2 className="font-display text-[28px] font-light leading-tight">Trong gói của ba mẹ</h2>
-          {contractBreakdownItems.length > 0 && <ContractBreakdown items={contractBreakdownItems} />}
+          {hanMuc != null && (
+            <p className="text-sm text-muted-foreground">
+              {vi.gallery.packageQuotaLine.replace("{n}", String(hanMuc))}
+            </p>
+          )}
           <TomTatSanPhamIn
             dong={hangInTrongGoi.map((sp) => ({
               galleryItemId: sp.galleryItemId,
@@ -1533,37 +1521,48 @@ export function GalleryApp({ token }: GalleryAppProps) {
           chữ dính sát mép trái màn hình trong khi mọi khối khác đều thụt vào —
           nhìn như trang bị vỡ. Viền `border-t` vẫn kéo hết bề ngang (đó là
           đường ngăn, phải chạm mép), còn CHỮ thì vào đúng cột như phần trên.
+
+          BB-240 (2-2) — hai sửa tiếp, 25/09/2026:
+          1) `max-w-4xl` là MỘT max-width riêng khác hẳn bìa/đầu trang/lưới ảnh
+             (đều `max-w-[1600px]`) — bốn khối bốn mép trái khác nhau trên máy
+             tính rộng dù cùng "thụt vào". Đổi chân trang sang cùng
+             `max-w-[1600px]` + cùng bậc lề (`lg:px-10`) như ba khối kia.
+          2) Tên chi nhánh / địa chỉ / nút "Nhắn cho studio" trước xếp DỌC ở
+             mọi bề rộng — trên máy tính rộng nhìn rời rạc, lệch hẳn sang trái
+             trong khi phần bên phải màn hình trống trơn. `sm:flex-row` xếp
+             chúng thành MỘT dải ngang (chi nhánh trái, nút phải); điện thoại
+             (`flex-col` mặc định) giữ nguyên xếp dọc.
       */}
       <footer className="mt-16 border-t border-border text-sm">
-        <div className="mx-auto max-w-4xl px-4 pt-6 pb-10">
+        <div className="mx-auto max-w-[1600px] px-4 pt-6 pb-10 sm:px-6 lg:px-10 lg:py-8">
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {vi.gallery.studioInfo}
           </h2>
-          <p className="mt-2 font-display text-xl text-foreground">{gallery.branch.name}</p>
-          <div className="mt-1 space-y-1 text-muted-foreground">
-            {gallery.branch.address && <p>{gallery.branch.address}</p>}
-            {gallery.branch.hotline && (
-              <p>
-                <a
-                  href={`tel:${gallery.branch.hotline.replace(/[^+\d]/g, "")}`}
-                  className="font-medium text-foreground hover:underline"
-                >
-                  {gallery.branch.hotline}
-                </a>
-                <span className="ml-1.5 opacity-70">— {vi.gallery.callUs}</span>
-              </p>
-            )}
+          <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+            <div className="space-y-1">
+              <p className="font-display text-xl text-foreground">{gallery.branch.name}</p>
+              {gallery.branch.address && <p className="text-muted-foreground">{gallery.branch.address}</p>}
+              {gallery.branch.hotline && (
+                <p>
+                  <a
+                    href={`tel:${gallery.branch.hotline.replace(/[^+\d]/g, "")}`}
+                    className="font-medium text-foreground hover:underline"
+                  >
+                    {gallery.branch.hotline}
+                  </a>
+                  <span className="ml-1.5 text-muted-foreground opacity-70">— {vi.gallery.callUs}</span>
+                </p>
+              )}
+            </div>
             {gallery.branch.chatUrl && (
-              <p>
-                <a
-                  href={gallery.branch.chatUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-primary hover:underline"
-                >
-                  {vi.gallery.messageStudio}
-                </a>
-              </p>
+              <a
+                href={gallery.branch.chatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 shrink-0 items-center justify-center rounded-full border border-border px-5 font-medium text-foreground transition hover:bg-surface-2 sm:h-10"
+              >
+                {vi.gallery.messageStudio}
+              </a>
             )}
           </div>
         </div>
@@ -2042,8 +2041,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
         />
       )}
 
-      {/* BB-213 — tấm hướng dẫn "Lưu app", mở từ nút ở đầu trang. */}
+      {/* BB-213 — tấm hướng dẫn "Lưu app", mở từ lời gợi ý BB-241 bên dưới. */}
       <HuongDanThemManHinh mo={moHuongDanLuuApp} onDong={() => setMoHuongDanLuuApp(false)} />
+
+      {/* BB-241 — lời gợi ý "Lưu app" đúng lúc, thay cho nút biểu tượng cũ. */}
+      <LoiGoiYLuuApp
+        daChon={selectionCounts.selectedCount}
+        onXemCachLuu={() => setMoHuongDanLuuApp(true)}
+      />
     </div>
   );
 }
