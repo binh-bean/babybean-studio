@@ -132,3 +132,22 @@ Nano Banana — ảnh tạo bằng ứng dụng Gemini (chủ studio tự dán l
 Luật thêm cho đợt 2: phép thử trình duyệt chạy với `PW_PORT` riêng (Sonnet
 3160–3169, Antigravity 3170) — KHÔNG dùng 3099/3100. Lệnh bị môi trường chặn
 thì DỪNG và báo, không lách (vụ BB-215 đợt 1).
+
+### Kết quả đợt 2 (24–25/09/2026)
+
+BB-217/218/219 gộp sau khi soát (cỡ khung lấy từ danh mục thật, màn so sánh
+không tự bật lại, phép thử con trỏ không xanh khi dò rỗng). BB-230 báo xong
+nhưng 2/7 đỏ — một ca lộ ra lỗi thật: **ghi chú cho thợ chỉnh ảnh chưa từng lưu
+được** (thiếu clientOpId; chữ "đã lưu" bị xoá; ghi chú tới trước lượt thả tim
+thì mất trắng mà vẫn báo lưu). Đã sửa. BB-221: ảnh sảnh mới, chủ studio chọn
+khung treo cao né bó hoa.
+
+## Đợt 3 (25/09/2026)
+
+Chủ studio: "nhớ giao việc cho sub agent" — mặc định giao Sonnet việc đề bài chặt.
+
+| Mã | Ai | Việc |
+|---|---|---|
+| BB-222 | Sonnet (PW_PORT 3166) | **Khung thật trên màn treo tường** từ 4 ảnh góc khung, danh sách mẫu trong MỘT tệp dữ liệu. Chủ studio: mẫu khung đổi liên tục nên **chỉ để tham khảo**, không ghi vào đơn; bảng mẫu gửi sau |
+| BB-223 | Sonnet (PW_PORT 3165) | **API trả lỗi sạch**: thân yêu cầu hỏng → 400 thay vì 500 (28 tuyến); không để mã trần ("FORBIDDEN") hay thông báo Postgres tới tay người dùng |
+| BB-200 | Opus | Luồng trạng thái + bộ nhắc theo `docs/21` |
