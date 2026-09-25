@@ -1395,6 +1395,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
             />
           )}
 
+          {/* Người chỉ xem (link mời ông bà) không gửi được yêu cầu — route trả
+              403 — nên không hiện thẻ mời cho họ (Opus soát BB-245). */}
+          {duocChon && (
           <MoiMuaLanHai
             status={gallery.status}
             soVongSua={gallery.review?.rounds.length ?? 0}
@@ -1411,6 +1414,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               .filter((p) => p.mark === "selected")
               .map((p) => ({ id: p.id, fileName: p.fileName }))}
           />
+          )}
 
           {!duocChon && !isLocked && (
             <div className="rounded-2xl border border-border bg-surface p-4 text-sm">

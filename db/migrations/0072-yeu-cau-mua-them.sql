@@ -48,5 +48,5 @@ comment on table yeu_cau_mua_them is
   '/api/admin/galleries/[id]/mua-them.';
 
 comment on column yeu_cau_mua_them.trang_thai is
-  ''''moi'' = vừa gửi; ''da_lien_he''/''da_chot''/''huy'' dành cho CSKH cập '
+  '''moi'' = vừa gửi; ''da_lien_he''/''da_chot''/''huy'' dành cho CSKH cập '
   'nhật tay về sau (BB-245 chưa dựng route đổi trạng thái).';
