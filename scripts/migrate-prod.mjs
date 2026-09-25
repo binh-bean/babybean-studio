@@ -99,6 +99,7 @@ const DAY = [
   "0068-admin-galleries-rpc-tra-them-lark.sql",
   "0069-kieu-chu-bia.sql",
   "0070-giu-ma-link-ma-hoa.sql",
+  "0071-dang-ky-thong-bao-day.sql",
 ];
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */
