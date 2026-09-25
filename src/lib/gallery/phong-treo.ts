@@ -133,14 +133,14 @@ export const PHONG_TREO: Record<MaPhong, PhongTreo> = {
       tep: "hanh-lang-doc.jpg",
       rongAnhPx: 1600,
       caoAnhPx: 2000,
-      tuong: { x: 295, y: 160, rong: 1055, cao: 425 },
-      pxMoiCm: 6.96,
-      mauTuong: "#EEEBE6",
+      // Ảnh Gemini đợt 2 (24/09/2026) — ảnh đợt 1 bàn quá cao, tường trống chỉ
+      // ~61cm. Đo tay: bàn rộng 634px = 100cm, cao 478px = 75cm -> 6.35px/cm.
+      // Mảng tường căn giữa trên bàn, nằm trên ngọn cành khô (~143cm cao).
+      tuong: { x: 300, y: 110, rong: 1000, cao: 910 },
+      pxMoiCm: 6.35,
+      mauTuong: "#D0CAC0",
       huongSang: "phai",
-      // _loi trong tuong-do-lai.json: mảng tường trên bàn console chỉ cao
-      // ~61cm — không đủ cho 50x75 hay 60x90. Giao diện phải tự ẩn hai cỡ đó
-      // cho đúng ảnh này (khung-tren-tuong.ts tính ra "không vừa" cho cả hai).
-      coLonNhatThamKhao: "40x60",
+      coLonNhatThamKhao: "80x120",
     },
     ngang: {
       tep: "hanh-lang-ngang.jpg",

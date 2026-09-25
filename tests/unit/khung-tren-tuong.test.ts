@@ -3,8 +3,8 @@
  *
  * Ba điều phải luôn đúng: tỷ lệ cm→px đúng theo pxMoiCm đo tay, khung không
  * bao giờ vẽ tràn ra ngoài mảng tường trống, và ảnh `hanh-lang-doc` (mảng
- * tường chỉ ~61cm — xem `_loi` trong tuong-do-lai.json) từ chối đúng cỡ quá
- * to.
+ * tường ~157×143cm, đo tay 24/09/2026) từ chối đúng cỡ quá to, co khoảng cách
+ * 20cm khi tường vừa đủ.
  *
  * KIỂM NGƯỢC: đã tự đổi `khoangCachToiDaPx` thành `khoangCachMucTieuPx` cứng
  * (bỏ luật 3 — co khoảng cách lại khi tường chật) trong `khung-tren-tuong.ts`
@@ -13,7 +13,7 @@
  * đỉnh tường, `y < tuong.y`). Trả lại bản đúng, phép thử xanh lại.
  */
 import { describe, it, expect } from "vitest";
-import { tinhKhungTrenTuong, cacCoTuDanhMuc, tachCoKhung, type CoKhungCm } from "@/lib/gallery/khung-tren-tuong";
+import { tinhKhungTrenTuong, cacCoTuDanhMuc, tachCoKhung } from "@/lib/gallery/khung-tren-tuong";
 
 /** Đủ 13 cỡ đang có trong bảng products (đọc 24/09/2026), cố ý xáo thứ tự. */
 const CO_DANH_MUC = ["60x90", "15x21", "100x150", "20x30", "30x45", "35x50", "40x60", "50x75",
@@ -53,16 +53,29 @@ describe("tinhKhungTrenTuong", () => {
     }
   });
 
-  it("hanh-lang-doc từ chối 60x90 (mảng tường trên bàn console chỉ ~61cm)", () => {
-    const phong = PHONG_TREO["hanh-lang"].doc;
-    const kq: ReturnType<typeof tinhKhungTrenTuong> = tinhKhungTrenTuong(phong, "60x90", "doc", false);
-    expect(kq.vua).toBe(false);
+  it("hanh-lang-doc từ chối 100x150 dọc (150cm > ~143cm tường trống)", () => {
+    const kq = tinhKhungTrenTuong(PHONG_TREO["hanh-lang"].doc, "100x150", "doc", false);
+    expect(kq).toEqual({ vua: false, lyDo: "cao_qua_kho" });
   });
 
-  it("hanh-lang-doc vẫn nhận 40x60 (đúng ghi chú coLonNhatThamKhao trong dữ liệu)", () => {
+  it("hanh-lang-doc treo 60x90 dọc cách mặt bàn đủ 20cm", () => {
     const phong = PHONG_TREO["hanh-lang"].doc;
-    const kq = tinhKhungTrenTuong(phong, "40x60" as CoKhungCm, "doc", false);
+    const kq = tinhKhungTrenTuong(phong, "60x90", "doc", false);
     expect(kq.vua).toBe(true);
+    if (!kq.vua) return;
+    const khoangCach = phong.tuong.y + phong.tuong.cao - (kq.hinh.y + kq.hinh.cao);
+    expect(khoangCach).toBeCloseTo(20 * phong.pxMoiCm, 1);
+  });
+
+  it("hanh-lang-doc 80x120 có khung: co khoảng cách dưới 20cm, không tràn đỉnh tường", () => {
+    const phong = PHONG_TREO["hanh-lang"].doc;
+    const kq = tinhKhungTrenTuong(phong, "80x120", "doc", true);
+    expect(kq.vua).toBe(true);
+    if (!kq.vua) return;
+    const khoangCach = phong.tuong.y + phong.tuong.cao - (kq.hinh.y + kq.hinh.cao);
+    expect(khoangCach).toBeLessThan(20 * phong.pxMoiCm);
+    expect(khoangCach).toBeGreaterThan(0);
+    expect(kq.hinh.y).toBeCloseTo(phong.tuong.y, 1);
   });
 
   it("cỡ nhỏ trong gói (30x45, 20x30) vẫn treo được — không khoá cứng ba cỡ", () => {

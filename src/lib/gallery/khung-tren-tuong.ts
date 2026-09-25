@@ -14,10 +14,9 @@
  * 2. Mép dưới khung cách đỉnh đồ vật (đáy mảng tường trống) khoảng 20cm —
  *    khoảng cách treo tranh thật ba mẹ quen mắt.
  * 3. Nếu 20cm làm khung tràn lên khỏi đỉnh mảng tường, CO khoảng cách đó lại
- *    (không co khung) — vẫn ưu tiên luật 1. Ca thật: `hanh-lang-doc` chỉ có
- *    61cm tường trống phía trên bàn console, khung 40×60 gần như chạm đỉnh
- *    tường (dư đúng ~1cm) chứ không lùi đủ 20cm. Xem `_loi` trong
- *    `tuong-do-lai.json`.
+ *    (không co khung) — vẫn ưu tiên luật 1. Ca thật: `hanh-lang-doc` có
+ *    ~143cm tường trống trên bàn console; 80×120 dọc CÓ khung (125cm) thì
+ *    chỉ còn ~18cm, khung sát đỉnh mảng tường chứ không lùi đủ 20cm.
  *
  * Khung KHÔNG vừa (kể cả co hết khoảng cách xuống 0 vẫn tràn, hoặc bề ngang
  * rộng hơn mảng tường) thì trả `{ vua: false }` — giao diện ẩn cỡ đó cho
