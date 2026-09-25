@@ -156,3 +156,14 @@ Chủ studio: "nhớ giao việc cho sub agent" — mặc định giao Sonnet vi
 | BB-232 | Sonnet (PW_PORT 3168) | E-6: giữ lượt thả tim khi mất mạng, "Chưa lưu", tự gửi lại. Dừng cùng lúc, cùng lý do |
 | BB-224 | Chủ studio + Gemini ("banana") | 10 tranh minh hoạ "hành trình bộ ảnh" (mỗi giai đoạn BB-200 một hình, chốt thành công, link hết hạn, chưa có ảnh). Chỉ đồ vật — không người, không trẻ em, không chữ. Lời nhắc: `babybean-assets/BB-224/LOI-NHAC-GEMINI.txt` |
 | BB-225 | Antigravity — Giao diện (sau BB-224 + BB-200 giao diện) | Thẻ "Hành trình bộ ảnh" trên màn khách dùng tranh BB-224 theo `nhanTienDo`. Đề bài soạn khi tranh về |
+
+## Đợt yêu cầu 2 (docs/22) — phân việc 25/09/2026
+
+| Mã | Mục docs/22 | Ai | Việc |
+|---|---|---|---|
+| BB-240 + BB-241 | 2-1 · 2-2 · 2-3 · 2-4 | Sonnet (PW_PORT 3165) | Màn khách trên máy tính: bìa + dàn trang cân lưới, chân trang thông tin studio gọn, **bỏ khối "Thành phần hợp đồng / Tổng cộng 0 ₫"** khỏi màn khách; "Lưu app" thành lời gợi ý đúng lúc |
+| BB-242 + BB-243 | 2-5 · 2-6 | Sonnet (PW_PORT 3166) | So sánh "ghim một tấm, vuốt tấm kia"; màn treo tường gọn chữ, bảng mờ đè ảnh, ẩn được, mở lớn tấm của bé |
+| BB-244 | 2-7 | Antigravity — Giao diện (PW_PORT 3170) | Chọn ảnh bìa quản trị: lớp phủ nổi ngay, xem trước bằng chính bìa khách, 4 kiểu chữ "high fashion". Đề bài `docs/briefs/BB-244-chon-anh-bia-quan-tri.md` |
+
+Sonnet giao lúc hạn mức chi tiêu đặt lại (17:40). Luật mới cho mọi đề bài: agent
+KHÔNG viết/áp migration trừ khi đề bài cho phép, và KHÔNG BAO GIỜ tự áp lên bb-dev.
