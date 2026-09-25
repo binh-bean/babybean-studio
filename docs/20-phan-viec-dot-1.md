@@ -151,3 +151,4 @@ Chủ studio: "nhớ giao việc cho sub agent" — mặc định giao Sonnet vi
 | BB-222 | Sonnet (PW_PORT 3166) | **Khung thật trên màn treo tường** từ 4 ảnh góc khung, danh sách mẫu trong MỘT tệp dữ liệu. Chủ studio: mẫu khung đổi liên tục nên **chỉ để tham khảo**, không ghi vào đơn; bảng mẫu gửi sau |
 | BB-223 | Sonnet (PW_PORT 3165) | **API trả lỗi sạch**: thân yêu cầu hỏng → 400 thay vì 500 (28 tuyến); không để mã trần ("FORBIDDEN") hay thông báo Postgres tới tay người dùng |
 | BB-200 | Opus | Luồng trạng thái + bộ nhắc theo `docs/21` |
+| BB-231 | Antigravity — Giao diện (DEV-FE, PW_PORT 3170) | **Kịch bản thử đợt 3**: E-8 mở lại (CSKH được mở, quyết định 25/09), E-11 bộ 1.000 ảnh. Đề bài `docs/briefs/BB-231-e2e-dot-3.md`. E-4 bỏ (hết PIN), E-5 chờ quyền ông bà, E-6 chờ tính năng hàng chờ khi mất mạng |
