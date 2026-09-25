@@ -361,6 +361,11 @@ export async function GET(request: Request) {
       0,
     );
 
+    const tienDo = nhanHienThi(
+      gallery.status,
+      gallery.lark_trang_thai,
+      (s) => GALLERY_STATUS_LABEL[s] ?? s,
+    );
     const responseData = {
       id: gallery.id,
       title: gallery.title,
@@ -370,11 +375,10 @@ export async function GET(request: Request) {
       // (docs/21 "Luồng hiển thị"). KHÔNG trả mã Lark hay mức cảnh báo cho
       // khách — đó là chuyện nội bộ studio, không phải thứ ba mẹ cần thấy.
       // `null` = giữ nguyên chữ cũ theo `status` (xem review-panel.tsx).
-      nhanTienDo: nhanHienThi(
-        gallery.status,
-        gallery.lark_trang_thai,
-        (s) => GALLERY_STATUS_LABEL[s] ?? s,
-      ).khach,
+      nhanTienDo: tienDo.khach,
+      // BB-225 — số giai đoạn (2–11, docs/21) để màn khách chọn tranh "hành
+      // trình bộ ảnh". Chỉ là con số giai đoạn, không phải mã Lark.
+      giaiDoanTienDo: tienDo.giaiDoan,
       babyName: baby?.nickname || baby?.full_name || null,
       // BB-212 — xem ghi chú ở chỗ truy vấn `customer` phía trên.
       customerName: customer?.full_name || null,
