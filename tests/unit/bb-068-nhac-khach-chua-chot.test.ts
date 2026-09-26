@@ -21,6 +21,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Client } from "pg";
+import { khoaCaiDat, moKhoaCaiDat, type KhoaCaiDat } from "../helpers/khoa-cai-dat";
 
 vi.mock("server-only", () => ({}));
 
@@ -38,6 +39,12 @@ describe("BB-068: nhắc khách chưa chốt", () => {
   let customerId: string;
   const galleries: string[] = [];
   let mocGoc: unknown = null;
+  /**
+   * Khoá riêng cho khoá cài đặt `gallery.reminder_days` — chặn hai agent chạy
+   * song song ghi đè lẫn nhau lên cùng một dòng `settings` toàn cục. Xem
+   * tests/helpers/khoa-cai-dat.ts.
+   */
+  let khoa: KhoaCaiDat;
 
   /*
     Lùi thêm HAI GIỜ, đừng dựng đúng mốc chẵn.
@@ -95,6 +102,7 @@ describe("BB-068: nhắc khách chưa chốt", () => {
   }
 
   beforeAll(async () => {
+    khoa = await khoaCaiDat("gallery.reminder_days");
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
     const { rows: br } = await client.query("select id from branches order by name limit 1");
@@ -128,6 +136,7 @@ describe("BB-068: nhắc khách chưa chốt", () => {
     }
     await client.query("delete from customers where id = $1", [customerId]);
     await client.end();
+    await moKhoaCaiDat(khoa);
   });
 
   it("1. Chỉ nhắc bộ ảnh rơi đúng mốc, không nhắc bộ ngày khác", async () => {

@@ -68,8 +68,8 @@ test.describe("BB-245: mời mua lần hai", () => {
   test.beforeAll(async () => {
     pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await pg.connect();
-    await pg.query(`delete from galleries where title like 'Fixture BB-245%' and created_at < now() - interval '1 hour'`);
-    await pg.query(`delete from customers where full_name like 'Fixture BB-245%' and created_at < now() - interval '1 hour'`);
+    await pg.query(`delete from galleries where title like 'Fixture BB-245%' and created_at < now() - interval '6 hours'`);
+    await pg.query(`delete from customers where full_name like 'Fixture BB-245%' and created_at < now() - interval '6 hours'`);
 
     const { rows: bangKiem } = await pg.query(`select to_regclass('public.yeu_cau_mua_them') as bang`);
     coBang = bangKiem[0]?.bang !== null;

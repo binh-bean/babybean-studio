@@ -29,24 +29,32 @@ const admin = createAdminClient();
 const runId = randomUUID().slice(0, 8);
 const tao: string[] = [];
 
-/** Dựng một link trỏ vào một bộ ảnh có thật, với hạn dùng cho trước. */
+/**
+ * Bộ ảnh RIÊNG của tệp này.
+ *
+ * Trước đây `dungLink` mượn "bộ ảnh đầu tiên" bằng `.limit(1)` — cùng một bộ
+ * ảnh mà các tệp khác gọi `POST /api/auth/gallery` cũng mượn. Với link KHÔNG
+ * gắn khách (`theoKhach=false`), route tạo dòng `selections` đầu tiên cho bộ
+ * ảnh và giữ cờ `is_primary` theo `gallery_id` — hai tệp cùng mở link trỏ vào
+ * CÙNG một bộ ảnh mượn, chạy ở hai tiến trình vitest song song, đôi khi đụng
+ * nhau trên chính cờ đó và ném 500. Dựng bộ ảnh riêng của tệp này (và một
+ * khách riêng cho ca `theoKhach`) thì không còn ai để đụng. Xem
+ * tests/unit/bb-214a-dem-luot-mo-link.test.ts — cùng bệnh, cùng cách vá.
+ */
+let galleryId: string;
+let customerId: string;
+
 async function dungLink(
   nhan: string,
   hetHan: Date | null,
   theoKhach: boolean,
 ): Promise<string> {
-  const { data: g } = await admin
-    .from("galleries")
-    .select("id, customer_id")
-    .limit(1)
-    .single();
-
   const ma = `bb183-${nhan}-${runId}`;
   const { data, error } = await admin
     .from("share_links")
     .insert({
-      gallery_id: theoKhach ? null : g!.id,
-      customer_id: theoKhach ? (g as { customer_id: string }).customer_id : null,
+      gallery_id: theoKhach ? null : galleryId,
+      customer_id: theoKhach ? customerId : null,
       token_hash: createHash("sha256").update(ma).digest("hex"),
       token_prefix: ma.slice(0, 6),
       role: "owner",
@@ -81,11 +89,39 @@ describe("BB-183 · link hết hạn", () => {
       .is("branch_id", null)
       .maybeSingle();
     ttlGoc = data?.value ?? null;
+
+    const { data: branch } = await admin.from("branches").select("id").limit(1).single();
+    const branchId = (branch as { id: string }).id;
+
+    const { data: cust, error: custErr } = await admin
+      .from("customers")
+      .insert({ branch_id: branchId, full_name: `Fixture BB-183 ${runId}` } as never)
+      .select("id")
+      .single();
+    if (custErr) throw custErr;
+    customerId = (cust as { id: string }).id;
+
+    const { data: gal, error: galErr } = await admin
+      .from("galleries")
+      .insert({
+        branch_id: branchId,
+        customer_id: customerId,
+        title: `Fixture BB-183 ${runId}`,
+        status: "ready",
+        drive_folder_id: `FIXTURE_BB183_${runId}`,
+        drive_folder_url: "https://example.com/fixture-bb183",
+      } as never)
+      .select("id")
+      .single();
+    if (galErr) throw galErr;
+    galleryId = (gal as { id: string }).id;
   });
 
   // Dọn sạch sau khi xong — bb-dev là cơ sở dữ liệu thật của studio.
   afterAll(async () => {
     if (tao.length) await admin.from("share_links").delete().in("id", tao);
+    if (galleryId) await admin.from("galleries").delete().eq("id", galleryId);
+    if (customerId) await admin.from("customers").delete().eq("id", customerId);
     if (ttlGoc !== null) {
       await admin
         .from("settings")

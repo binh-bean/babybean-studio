@@ -9,10 +9,11 @@
  *    một hôm nào đó màn khách 500 vì `reminder_days` bỗng là chuỗi.
  * 3. **Bí mật không rời máy chủ.** `lark.webhook_url` đọc ra phải bị che.
  */
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import * as staffAuth from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { khoaCaiDat, moKhoaCaiDat, type KhoaCaiDat } from "../helpers/khoa-cai-dat";
 
 vi.mock("server-only", () => ({}));
 
@@ -40,7 +41,19 @@ const patch = (than: unknown) =>
 /** Giá trị thật trước khi phép thử đụng vào, để trả lại nguyên trạng. */
 let hanCu: unknown = null;
 
+/**
+ * Khoá chung với `bb-068-han-chot-that.test.ts` trên cùng khoá cài đặt
+ * `gallery.default_due_days` — hai tệp cùng ghi vào một dòng `settings` toàn
+ * cục của bb-dev, nên hai agent chạy song song phải chờ nhau ở đây thay vì
+ * ghi đè lẫn nhau. Xem tests/helpers/khoa-cai-dat.ts.
+ */
+let khoa: KhoaCaiDat;
+
 describe("BB-197: đường API cài đặt", () => {
+  beforeAll(async () => {
+    khoa = await khoaCaiDat("gallery.default_due_days");
+  });
+
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -53,6 +66,7 @@ describe("BB-197: đường API cài đặt", () => {
         .eq("key", "gallery.default_due_days")
         .is("branch_id", null);
     }
+    await moKhoaCaiDat(khoa);
   });
 
   it("CSKH không đọc và không sửa được cài đặt", async () => {

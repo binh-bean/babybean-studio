@@ -21,6 +21,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Client } from "pg";
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
+import { khoaCaiDat, moKhoaCaiDat, type KhoaCaiDat } from "../helpers/khoa-cai-dat";
 
 vi.mock("server-only", () => ({}));
 
@@ -37,6 +38,15 @@ describe("BB-068: hạn chốt có thật", () => {
   const galleries: string[] = [];
   /** Giá trị cài đặt lúc bắt đầu, để trả lại đúng như cũ. */
   let hanChotGoc: number | null = null;
+  /**
+   * Khoá tư vấn Postgres riêng cho khoá cài đặt `gallery.default_due_days`.
+   *
+   * Tệp này và `bb-197-cai-dat.test.ts` cùng đọc-ghi-trả một dòng `settings`
+   * toàn cục. Không có khoá, hai agent chạy `vitest` song song trên bb-dev sẽ
+   * ghi đè lẫn nhau — đo được 26/09/2026: "expected 11 to be 7". Xem
+   * tests/helpers/khoa-cai-dat.ts.
+   */
+  let khoa: KhoaCaiDat;
 
   function asRole(role: string) {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
@@ -84,6 +94,7 @@ describe("BB-068: hạn chốt có thật", () => {
   }
 
   beforeAll(async () => {
+    khoa = await khoaCaiDat("gallery.default_due_days");
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
     const { rows: br } = await client.query("select id from branches order by name limit 1");
@@ -112,6 +123,7 @@ describe("BB-068: hạn chốt có thật", () => {
     }
     await client.query("delete from customers where id = $1", [customerId]);
     await client.end();
+    await moKhoaCaiDat(khoa);
   });
 
   it("0. Cài đặt gốc phải là một con số — nếu không, phép thử sau vô nghĩa", () => {

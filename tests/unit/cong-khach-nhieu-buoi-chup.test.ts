@@ -171,17 +171,17 @@ describe("BB-130: cổng khách, một link nhiều buổi chụp", () => {
   async function donDepRacCu(c: Client): Promise<void> {
     await c.query(
       `delete from share_links where customer_id in
-         (select id from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '1 hour')`,
+         (select id from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '6 hours')`,
     );
     await c.query(
-      `delete from galleries where title like 'Fixture BB-130%' and created_at < now() - interval '1 hour'`,
+      `delete from galleries where title like 'Fixture BB-130%' and created_at < now() - interval '6 hours'`,
     );
     await c.query(
       `delete from shoots where customer_id in
-         (select id from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '1 hour')`,
+         (select id from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '6 hours')`,
     );
     await c.query(
-      `delete from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '1 hour'`,
+      `delete from customers where full_name like 'Fixture BB-130%' and created_at < now() - interval '6 hours'`,
     );
   }
 

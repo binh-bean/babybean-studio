@@ -25,8 +25,8 @@ test.describe("E-2: Vượt hạn mức", () => {
     await client.connect();
 
     // Dọn rác nếu có
-    await client.query(`delete from galleries where title like 'Fixture BB-230%' and created_at < now() - interval '1 hour'`);
-    await client.query(`delete from customers where full_name like 'Fixture BB-230%' and created_at < now() - interval '1 hour'`);
+    await client.query(`delete from galleries where title like 'Fixture BB-230%' and created_at < now() - interval '6 hours'`);
+    await client.query(`delete from customers where full_name like 'Fixture BB-230%' and created_at < now() - interval '6 hours'`);
 
     // Tạo chi nhánh
     const { rows: br } = await client.query("select id from branches order by name limit 1");

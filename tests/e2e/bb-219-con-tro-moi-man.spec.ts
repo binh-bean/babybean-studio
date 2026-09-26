@@ -211,9 +211,9 @@ test.describe("BB-219: con trỏ bàn tay trên mọi màn", () => {
     await pg.connect();
 
     // Rác của lần chạy cũ hơn một giờ.
-    await pg.query(`delete from galleries where title like 'Fixture BB-219%' and created_at < now() - interval '1 hour'`);
+    await pg.query(`delete from galleries where title like 'Fixture BB-219%' and created_at < now() - interval '6 hours'`);
     await pg.query(
-      `delete from customers where full_name like 'Fixture BB-219%' and created_at < now() - interval '1 hour'`,
+      `delete from customers where full_name like 'Fixture BB-219%' and created_at < now() - interval '6 hours'`,
     );
 
     // --- nhân viên quyền cao nhất (owner) — cần dò MỌI trang, kể cả /admin/staff, /admin/roles ---

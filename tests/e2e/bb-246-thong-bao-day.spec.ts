@@ -50,10 +50,10 @@ test.describe("BB-246: nút Bật thông báo", () => {
     pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await pg.connect();
     await pg.query(
-      `delete from galleries where title like 'Fixture BB-246%' and created_at < now() - interval '1 hour'`,
+      `delete from galleries where title like 'Fixture BB-246%' and created_at < now() - interval '6 hours'`,
     );
     await pg.query(
-      `delete from customers where full_name like 'Fixture BB-246%' and created_at < now() - interval '1 hour'`,
+      `delete from customers where full_name like 'Fixture BB-246%' and created_at < now() - interval '6 hours'`,
     );
 
     const { rows: br } = await pg.query("select id from branches order by name limit 1");

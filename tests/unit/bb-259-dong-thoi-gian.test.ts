@@ -252,11 +252,14 @@ describe("GET /api/admin/galleries/[id]/dong-thoi-gian (BB-259, dùng Fixture th
     );
     customerId = custs[0].id;
 
+    // `drive_folder_id` cố định va chạm `uq_galleries_drive_folder` khi hai
+    // agent chạy vitest song song trên bb-dev — mỗi lượt cần một giá trị riêng.
+    const driveFolderId = `FIXTURE_BB259_FOLDER_${randomUUID()}`;
     const { rows: gal } = await client.query(
       `INSERT INTO galleries (branch_id, customer_id, title, drive_folder_id, drive_folder_url, status)
-       VALUES ($1, $2, 'Fixture BB-259 Dòng thời gian', 'FIXTURE_BB259_FOLDER', 'https://drive.google.com/fixture-bb259', 'submitted')
+       VALUES ($1, $2, 'Fixture BB-259 Dòng thời gian', $3, 'https://drive.google.com/fixture-bb259', 'submitted')
        RETURNING id`,
-      [branchAId, customerId],
+      [branchAId, customerId, driveFolderId],
     );
     galleryId = gal[0].id;
 

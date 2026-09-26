@@ -69,10 +69,10 @@ test.describe("E-1: vòng đời hạnh phúc", () => {
 
     // Rác của lần chạy cũ hơn một giờ — không đụng fixture đang chạy song song.
     await client.query(
-      `delete from galleries where title like 'Fixture E-1%' and created_at < now() - interval '1 hour'`,
+      `delete from galleries where title like 'Fixture E-1%' and created_at < now() - interval '6 hours'`,
     );
     await client.query(
-      `delete from customers where full_name like 'Fixture E-1%' and created_at < now() - interval '1 hour'`,
+      `delete from customers where full_name like 'Fixture E-1%' and created_at < now() - interval '6 hours'`,
     );
 
     // --- nhân viên thật, đăng nhập được ------------------------------------

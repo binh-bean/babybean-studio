@@ -26,7 +26,7 @@ test.describe("E-10: Đa chi nhánh", () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
 
-    await client.query(`delete from galleries where title like 'Fixture BB-230%' and created_at < now() - interval '1 hour'`);
+    await client.query(`delete from galleries where title like 'Fixture BB-230%' and created_at < now() - interval '6 hours'`);
 
     // Lấy 2 chi nhánh
     const { rows: br } = await client.query("select id from branches order by name limit 2");

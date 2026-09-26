@@ -34,8 +34,8 @@ test.describe("E-6: Ngắt mạng giữa lúc chọn ảnh", () => {
     await client.connect();
 
     // Dọn rác của những lần chạy hỏng dở trước đó.
-    await client.query(`delete from galleries where title like 'Fixture BB-232%' and created_at < now() - interval '1 hour'`);
-    await client.query(`delete from customers where full_name like 'Fixture BB-232%' and created_at < now() - interval '1 hour'`);
+    await client.query(`delete from galleries where title like 'Fixture BB-232%' and created_at < now() - interval '6 hours'`);
+    await client.query(`delete from customers where full_name like 'Fixture BB-232%' and created_at < now() - interval '6 hours'`);
 
     const { rows: br } = await client.query("select id from branches order by name limit 1");
     branchId = br[0].id;

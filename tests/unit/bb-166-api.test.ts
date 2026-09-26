@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { GET } from "@/app/api/g/gallery/route";
 import * as authSession from "@/lib/auth/gallery-session";
 import { createClient } from "@supabase/supabase-js";
+import { khoaCaiDat, moKhoaCaiDat, type KhoaCaiDat } from "../helpers/khoa-cai-dat";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -24,8 +25,15 @@ describe("BB-166 API Route", () => {
   // va nut nhan tin BIEN MAT khoi app that cho toi khi co nguoi phat hien.
   // Da do that ngay 16/09/2026 truoc khi vá.
   let goc: unknown = null;
+  /**
+   * Khoá riêng cho khoá cài đặt `chat.page_url` — chặn hai agent chạy song
+   * song ghi đè lẫn nhau lên dòng `settings` toàn cục này. Xem
+   * tests/helpers/khoa-cai-dat.ts.
+   */
+  let khoa: KhoaCaiDat;
 
   beforeAll(async () => {
+    khoa = await khoaCaiDat("chat.page_url");
     const { data } = await supabase
       .from("settings").select("value").eq("key", "chat.page_url").is("branch_id", null).maybeSingle();
     goc = data?.value ?? null;
@@ -34,6 +42,7 @@ describe("BB-166 API Route", () => {
   afterAll(async () => {
     await supabase
       .from("settings").update({ value: goc } as never).eq("key", "chat.page_url").is("branch_id", null);
+    await moKhoaCaiDat(khoa);
   });
 
   it("GET /api/g/gallery trả về chatUrl hợp lệ và không rò rỉ settings khác", async () => {

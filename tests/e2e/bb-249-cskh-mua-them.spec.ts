@@ -41,8 +41,8 @@ test.describe("BB-249: CSKH đổi trạng thái yêu cầu mua thêm", () => {
     await client.connect();
 
     // Dọn rác của lượt chạy cũ (>1h, bỏ sót do phép thử bị ngắt giữa chừng).
-    await client.query(`delete from galleries where title like 'Fixture BB-249%' and created_at < now() - interval '1 hour'`);
-    await client.query(`delete from customers where full_name like 'Fixture BB-249%' and created_at < now() - interval '1 hour'`);
+    await client.query(`delete from galleries where title like 'Fixture BB-249%' and created_at < now() - interval '6 hours'`);
+    await client.query(`delete from customers where full_name like 'Fixture BB-249%' and created_at < now() - interval '6 hours'`);
 
     const { rows: bangKiem } = await client.query(`select to_regclass('public.yeu_cau_mua_them') as bang`);
     coBang = bangKiem[0]?.bang !== null;

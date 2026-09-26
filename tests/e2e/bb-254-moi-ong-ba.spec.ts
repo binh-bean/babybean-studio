@@ -37,10 +37,10 @@ test.describe("BB-254: mời ông bà cùng xem", () => {
     pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await pg.connect();
     await pg.query(
-      `delete from galleries where title like 'Fixture BB-254%' and created_at < now() - interval '1 hour'`,
+      `delete from galleries where title like 'Fixture BB-254%' and created_at < now() - interval '6 hours'`,
     );
     await pg.query(
-      `delete from customers where full_name like 'Fixture BB-254%' and created_at < now() - interval '1 hour'`,
+      `delete from customers where full_name like 'Fixture BB-254%' and created_at < now() - interval '6 hours'`,
     );
 
     const { rows: bangKiem } = await pg.query(`select to_regclass('public.yeu_cau_mua_them') as bang`);

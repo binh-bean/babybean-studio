@@ -19,9 +19,21 @@ import { GET as CHI_TIET, PATCH } from "@/app/api/admin/customers/[id]/route";
 import { POST as THEM_BE } from "@/app/api/admin/customers/[id]/babies/route";
 import { DELETE as XOA_BE } from "@/app/api/admin/customers/[id]/babies/[babyId]/route";
 
-/** Số thật trong bảng không dùng dải này, nên fixture không đụng khách thật. */
-const SO_CHUNG = "0900000061";
-const SO_RIENG_A = "0900000062";
+/**
+ * Số giả MỚI mỗi lượt chạy, không phải hai số cố định.
+ *
+ * Trước đây hai số `0900000061`/`0900000062` cố định va nhau khi hai agent
+ * chạy `vitest` song song trên cùng bb-dev (mỗi agent một worktree): cả hai
+ * cùng dựng khách với đúng hai số đó, `beforeAll` của bên chạy sau dọn ("delete
+ * ... where phone_normalized = any($1)") mất đúng lúc bên kia đang ở giữa các
+ * ca thử — vỡ khoá ngoại `babies_customer_id_fkey` khi route đọc/patch một
+ * `customerId` vừa bị xoá. Số ngẫu nhiên theo lượt chạy thì hai agent không
+ * còn đụng cùng một hàng, nên bước dọn trước khi dựng ở dưới cũng không còn
+ * cần thiết (mỗi lượt có số riêng, không ai để lại rác cho ai).
+ */
+const soGia = () => String(Math.floor(Math.random() * 1e8)).padStart(8, "0");
+const SO_CHUNG = `09${soGia()}`;
+const SO_RIENG_A = `08${soGia()}`;
 
 describe("BB-061: khách hàng", () => {
   let client: Client;
@@ -81,12 +93,13 @@ describe("BB-061: khách hàng", () => {
     branchB = rows[1].id;
 
     /**
-     * Dọn trước khi dựng.
+     * Dọn phòng hờ trước khi dựng — nay gần như luôn là no-op.
      *
-     * Một lần chạy bị cắt giữa chừng là `afterAll` không chạy, và lần sau câu
-     * chèn đầu tiên chết vì `uq_customers_phone_branch`. Khi đó CẢ tệp bị báo
-     * đỏ vì lý do không liên quan gì tới thứ đang kiểm — mất luôn giá trị của
-     * phép thử. Dọn theo đúng hai số của fixture nên không đụng khách thật.
+     * `SO_CHUNG`/`SO_RIENG_A` giờ ngẫu nhiên mỗi lượt chạy nên không còn đụng
+     * hàng của lượt trước hay của agent khác đang chạy song song. Giữ lại
+     * bước này chỉ để phòng đúng ca một lượt bị cắt giữa chừng RỒI trùng số
+     * ngẫu nhiên ở lượt kế — xác suất cực nhỏ nhưng dọn theo đúng số của
+     * chính lượt này thì không đụng khách thật.
      */
     await client.query(
       `delete from galleries where customer_id in
@@ -144,7 +157,14 @@ describe("BB-061: khách hàng", () => {
 
   it("2. Tìm được dù người ta gõ số có dấu cách, dấu ngoặc hay +84", async () => {
     asStaff("cs", [branchA]);
-    for (const go of ["0900 000 061", "(+84) 900000061", "900000061"]) {
+    // Ba cách gõ khác nhau của CÙNG một số — dựng từ SO_CHUNG (ngẫu nhiên mỗi
+    // lượt chạy) thay vì chuỗi cứng, vì số đã không còn cố định.
+    const bienThe = [
+      `${SO_CHUNG.slice(0, 4)} ${SO_CHUNG.slice(4, 7)} ${SO_CHUNG.slice(7, 10)}`, // "0900 000 061"
+      `(+84) ${SO_CHUNG.slice(1)}`, // "(+84) 900000061"
+      SO_CHUNG.slice(1), // "900000061"
+    ];
+    for (const go of bienThe) {
       const body = await (await goiList(go)).json();
       const ids = body.data.items.map((i: { id: string }) => i.id);
       expect(ids, `gõ "${go}"`).toContain(khachA);

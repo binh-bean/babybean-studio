@@ -18,7 +18,7 @@ let adminUserId: string;
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
 async function donRacCu(c: Client): Promise<void> {
-  const cutoff = "now() - interval '1 hour'";
+  const cutoff = "now() - interval '6 hours'";
   await c.query(`DELETE FROM share_links WHERE gallery_id IN (SELECT id FROM galleries WHERE title LIKE 'Fixture BB-160%' AND created_at < ${cutoff})`);
   await c.query(`DELETE FROM photos WHERE gallery_id IN (SELECT id FROM galleries WHERE title LIKE 'Fixture BB-160%' AND created_at < ${cutoff})`);
   await c.query(`DELETE FROM galleries WHERE title LIKE 'Fixture BB-160%' AND created_at < ${cutoff}`);

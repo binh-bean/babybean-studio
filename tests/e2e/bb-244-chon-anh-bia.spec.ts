@@ -24,8 +24,8 @@ test.describe("BB-244: Chọn ảnh bìa popup full màn hình", () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
 
-    await client.query(`delete from galleries where title like 'Fixture BB-244%' and created_at < now() - interval '1 hour'`);
-    await client.query(`delete from customers where full_name like 'Fixture BB-244%' and created_at < now() - interval '1 hour'`);
+    await client.query(`delete from galleries where title like 'Fixture BB-244%' and created_at < now() - interval '6 hours'`);
+    await client.query(`delete from customers where full_name like 'Fixture BB-244%' and created_at < now() - interval '6 hours'`);
 
     const { rows: br } = await client.query("select id from branches order by name limit 1");
     branchId = br[0].id;

@@ -12,7 +12,7 @@
  * thay vì tăng theo số lần mở.
  */
 
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/auth/gallery/route";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,18 +22,60 @@ const admin = createAdminClient();
 const runId = randomUUID().slice(0, 8);
 const tao: string[] = [];
 
-async function dungLink(nhan: string): Promise<{ ma: string; id: string }> {
-  const { data: g } = await admin
-    .from("galleries")
-    .select("id")
-    .limit(1)
-    .single();
+/**
+ * Bộ ảnh RIÊNG của tệp này, không mượn "bộ ảnh đầu tiên tìm thấy" trong bảng.
+ *
+ * Trước đây `dungLink` chọn bừa MỘT bộ ảnh có thật bằng
+ * `.from("galleries").select("id").limit(1).single()` — cùng bộ ảnh mà
+ * `bb-183-link-het-han.test.ts` cũng mượn. `POST /api/auth/gallery` tạo dòng
+ * `selections` đầu tiên cho bộ ảnh lúc mở link (khoá
+ * `uq_selections_share_link_gallery`); hai tệp cùng mở link trỏ vào CÙNG một
+ * bộ ảnh, chạy ở hai tiến trình vitest song song (hai agent, mỗi agent một
+ * worktree), đôi khi đụng đúng lúc nhau và một bên nhận 500 — đo được
+ * 26/09/2026. Dựng bộ ảnh riêng của tệp này thì không còn ai để đụng.
+ */
+let galleryId: string;
+let customerId: string;
 
+beforeAll(async () => {
+  const { data: branch } = await admin.from("branches").select("id").limit(1).single();
+  const branchId = (branch as { id: string }).id;
+
+  const { data: cust, error: custErr } = await admin
+    .from("customers")
+    .insert({ branch_id: branchId, full_name: `Fixture BB-214a ${runId}` } as never)
+    .select("id")
+    .single();
+  if (custErr) throw custErr;
+  customerId = (cust as { id: string }).id;
+
+  const { data: gal, error: galErr } = await admin
+    .from("galleries")
+    .insert({
+      branch_id: branchId,
+      customer_id: customerId,
+      title: `Fixture BB-214a ${runId}`,
+      status: "ready",
+      drive_folder_id: `FIXTURE_BB214A_${runId}`,
+      drive_folder_url: "https://example.com/fixture-bb214a",
+    } as never)
+    .select("id")
+    .single();
+  if (galErr) throw galErr;
+  galleryId = (gal as { id: string }).id;
+});
+
+afterAll(async () => {
+  if (customerId) await admin.from("customers").delete().eq("id", customerId);
+  if (galleryId) await admin.from("galleries").delete().eq("id", galleryId);
+});
+
+async function dungLink(nhan: string): Promise<{ ma: string; id: string }> {
   const ma = `bb214a-${nhan}-${runId}`;
   const { data, error } = await admin
     .from("share_links")
     .insert({
-      gallery_id: (g as { id: string }).id,
+      gallery_id: galleryId,
       token_hash: createHash("sha256").update(ma).digest("hex"),
       token_prefix: ma.slice(0, 6),
       role: "owner",

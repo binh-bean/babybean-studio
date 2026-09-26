@@ -39,7 +39,7 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
  * trình song song (bài học BB-136).
  */
 async function donRacCu(c: Client): Promise<void> {
-  const cutoff = "now() - interval '1 hour'";
+  const cutoff = "now() - interval '6 hours'";
 
   // selection_items → selections → share_links → photos → galleries → shoots → customers
   await c.query(

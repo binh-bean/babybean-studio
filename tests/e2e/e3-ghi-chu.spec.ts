@@ -34,7 +34,7 @@ test.describe("E-3: Ghi chú", () => {
     await client.connect();
 
     // Dọn rác
-    await client.query(`delete from galleries where title like 'Fixture BB-230%' and created_at < now() - interval '1 hour'`);
+    await client.query(`delete from galleries where title like 'Fixture BB-230%' and created_at < now() - interval '6 hours'`);
 
     // Nhân viên
     const { data, error } = await suKienAdmin().auth.admin.createUser({

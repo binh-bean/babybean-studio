@@ -17,6 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
+import { khoaCaiDat, moKhoaCaiDat, type KhoaCaiDat } from "../helpers/khoa-cai-dat";
 
 const admin = createAdminClient();
 const runId = randomUUID().slice(0, 8);
@@ -59,8 +60,15 @@ async function ghiSettings(v: number): Promise<void> {
 describe("BB-214c · giá ảnh chọn thêm mặc định cấu hình được", () => {
   let branchId: string;
   let goc: unknown;
+  /**
+   * Khoá riêng cho `gallery.extra_photo_price_default` — chặn hai agent chạy
+   * song song ghi đè lẫn nhau lên dòng `settings` toàn cục này. Xem
+   * tests/helpers/khoa-cai-dat.ts.
+   */
+  let khoa: KhoaCaiDat;
 
   beforeAll(async () => {
+    khoa = await khoaCaiDat(KHOA);
     const { data: branch } = await admin.from("branches").select("id").limit(1).single();
     if (!branch) throw new Error("Cần ít nhất một chi nhánh");
     branchId = (branch as { id: string }).id;
@@ -73,6 +81,7 @@ describe("BB-214c · giá ảnh chọn thêm mặc định cấu hình được"
     if (customerIds.length) await admin.from("customers").delete().in("id", customerIds);
     // Trả settings về đúng giá trị cũ — bb-dev là cơ sở dữ liệu thật.
     if (goc !== null) await ghiSettings(goc as number);
+    await moKhoaCaiDat(khoa);
   });
 
   it("1. Bộ ảnh mới, không truyền giá riêng, lấy giá từ settings — KHÔNG lấy giá của gói", async () => {
