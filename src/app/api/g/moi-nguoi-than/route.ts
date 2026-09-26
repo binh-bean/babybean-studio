@@ -69,13 +69,20 @@ function taoMa(): string {
 
 const bam = (s: string) => createHash("sha256").update(s).digest("hex");
 
+/**
+ * Chỉ ba mẹ (chủ bộ ảnh, người cùng chọn) được mời/xem/thu hồi lời mời. Chặn
+ * theo DANH SÁCH ĐƯỢC PHÉP, không chặn riêng "viewer" — vai "gợi ý" hay vai mới
+ * về sau cũng không tự nhiên có quyền mời (Opus soát BB-254).
+ */
+const DUOC_MOI: readonly string[] = ["owner", "co_editor"];
+
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
     const session = await requireGallerySession();
 
-    if (session.role === "viewer") {
+    if (!DUOC_MOI.includes(session.role)) {
       return fail("FORBIDDEN", "Người được mời không mời tiếp được người khác");
     }
 
@@ -201,7 +208,7 @@ export async function GET(): Promise<Response> {
   try {
     const session = await requireGallerySession();
 
-    if (session.role === "viewer") {
+    if (!DUOC_MOI.includes(session.role)) {
       return fail("FORBIDDEN", "Người được mời không xem được danh sách này");
     }
 
@@ -243,7 +250,7 @@ export async function DELETE(request: Request): Promise<Response> {
   try {
     const session = await requireGallerySession();
 
-    if (session.role === "viewer") {
+    if (!DUOC_MOI.includes(session.role)) {
       return fail("FORBIDDEN", "Người được mời không thu hồi được lời mời");
     }
 
