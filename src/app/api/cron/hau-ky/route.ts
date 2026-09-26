@@ -19,6 +19,7 @@ import { NextResponse } from "next/server";
 import pg from "pg";
 import { docTrangThaiTuLark, ghiTrangThaiVaoGalleries } from "@/lib/lark/doc-trang-thai-lark";
 import { chayNhacHauKy } from "@/lib/lark/nhac-hau-ky";
+import { dongBoBoAnhTuLark, type KetQuaDongBo } from "@/lib/lark/dong-bo-bo-anh";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
 
@@ -52,6 +53,23 @@ async function chay(request: Request) {
     if (!rows[0]?.ok) return NextResponse.json({ data: { boQua: "Lượt khác đang chạy" } });
 
     try {
+      // BB-256 — lưới đỡ cho hook: dựng bộ ảnh Lark bắn hụt. Hỏng thì ghi log và
+      // chạy tiếp phần trạng thái/nhắc — hai việc độc lập, không để cái này kéo
+      // cái kia chết theo.
+      let dongBo: KetQuaDongBo | { loi: string };
+      try {
+        dongBo = await dongBoBoAnhTuLark({
+          client,
+          appId: LARK_APP_ID,
+          appSecret: LARK_APP_SECRET,
+          baseToken: LARK_BASE_APP_TOKEN,
+          dbUrl: SUPABASE_DB_URL,
+        });
+      } catch (err) {
+        dongBo = { loi: err instanceof Error ? err.message : String(err) };
+        console.error(JSON.stringify({ evt: "cron.hau_ky.dong_bo_loi", lyDo: dongBo.loi }));
+      }
+
       const doc = await docTrangThaiTuLark({
         appId: LARK_APP_ID,
         appSecret: LARK_APP_SECRET,
@@ -71,7 +89,7 @@ async function chay(request: Request) {
             payload: { loai: tin.maNhac, nguoiNhan: tin.nguoiNhan, cacBo: tin.boAnh },
           }),
       });
-      const ketQua = { banGhiLark: doc.size, ...ghi, baoHinhDaVe: sangHinhDaVe.length, nhac };
+      const ketQua = { banGhiLark: doc.size, ...ghi, baoHinhDaVe: sangHinhDaVe.length, nhac, dongBo };
       console.info(JSON.stringify({ evt: "cron.hau_ky.xong", ...ketQua }));
       return NextResponse.json({ data: ketQua });
     } finally {
