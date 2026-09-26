@@ -24,10 +24,12 @@
 "use client";
 import { BiaBoAnhEditor } from "./bia-bo-anh-editor";
 import { YeuCauMuaThemBlock } from "./yeu-cau-mua-them";
+import { getStatusBadgeConfig } from "./gallery-list";
 
 import React from "react";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
-import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { isGalleryLocked } from "@/lib/gallery-status";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
@@ -483,10 +485,36 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     ? Math.max(0, detail.selectedCount - detail.includedQuota)
     : null;
 
+  const statusBadge = getStatusBadgeConfig(detail.status);
+
   return (
     <div className="flex flex-col gap-5">
+      {/* Bản vẽ quan-tri-chi-tiet.webp: tiêu đề serif lớn kèm nhãn trạng thái
+          viên tròn ngay cạnh — trước đây trạng thái chỉ nằm lẫn trong lưới chỉ
+          số bên dưới, phải đọc thêm mới biết bộ ảnh đang ở đâu. */}
       <header>
-        <h1 className="text-xl font-semibold">{detail.title}</h1>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="font-display text-2xl font-bold text-[var(--bb-fg)] sm:text-3xl">
+            {detail.title}
+          </h1>
+          <span className="inline-flex items-center gap-1.5">
+            {/* Chữ "Trạng thái" giữ lại làm nhãn — tests/e2e/bb-200-nhan-lark.spec.ts
+                đợi đúng chữ này làm mốc "đã tải xong dữ liệu" trước khi kiểm
+                phần hiện/ẩn theo quyền. Bỏ chữ là phép thử chờ mãi không thấy,
+                không phải vì mã sai mà vì mốc chờ biến mất — AGENTS.md §5a. */}
+            <span className="text-xs text-[var(--bb-fg-muted)]">Trạng thái</span>
+            {detail.warningColor && canhBaoUi(detail.warningColor) && (
+              <span
+                role="img"
+                aria-label={`Mức cảnh báo: ${canhBaoUi(detail.warningColor)!.nhan}`}
+                title={canhBaoUi(detail.warningColor)!.nhan}
+                className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/10"
+                style={{ backgroundColor: canhBaoUi(detail.warningColor)!.mauToken }}
+              />
+            )}
+            <Badge variant={statusBadge.variant}>{detail.statusLabel ?? statusBadge.label}</Badge>
+          </span>
+        </div>
         {detail.contractCodes.length > 0 && (
           <p className="mt-1 select-all font-mono text-xs text-[var(--bb-fg-muted)]">
             {detail.contractCodes.join(" + ")}
@@ -506,12 +534,8 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         <p className="rounded-md border border-[var(--bb-border)] p-3 text-sm">{notice}</p>
       )}
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat
-          label="Trạng thái"
-          value={detail.statusLabel ?? GALLERY_STATUS_LABEL[detail.status] ?? detail.status}
-          canhBao={detail.warningColor}
-        />
+      {/* Bản vẽ: một thẻ trắng duy nhất, số lớn — thay cho bốn ô nhỏ rời rạc. */}
+      <section className="grid grid-cols-2 gap-4 rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] p-5 shadow-[var(--bb-shadow)] sm:grid-cols-4 sm:gap-6">
         <Stat
           label="Hạn mức"
           value={detail.quotaKnown ? String(detail.includedQuota) : "chưa biết"}
@@ -519,23 +543,236 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         <Stat label="Khách đã chọn" value={String(detail.selectedCount)} />
         <Stat
           label="Vượt hạn mức"
-          value={
-            overCount === null
-              ? "—"
-              : overCount === 0
-                ? "0"
-                : `${overCount} ảnh · ${formatCurrencyVND(overCount * detail.extraPhotoPrice)}`
+          value={overCount === null ? "—" : String(overCount)}
+          hint={
+            overCount !== null && overCount > 0
+              ? formatCurrencyVND(overCount * detail.extraPhotoPrice)
+              : undefined
           }
+        />
+        <Stat
+          label="Còn phải thu"
+          value={formatCurrencyVND(Math.max(0, detail.outstanding))}
         />
       </section>
 
-      <BiaBoAnhEditor
-        galleryId={galleryId}
-        detail={detail}
-        busy={busy}
-        onSave={(thayDoi) => void saveCover(thayDoi)}
-      />
+      {/*
+        Bản vẽ quan-tri-chi-tiet.webp: cột phải mảnh gồm bìa bộ ảnh, link gửi
+        khách và thư mục ảnh gốc; cột trái rộng hơn giữ phần nghiệp vụ chính.
+        Chỉ đổi BỐ CỤC bằng lưới — mọi khối bên trong giữ nguyên props/hành vi.
+      */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 lg:items-start">
+        <div className="flex flex-col gap-5 lg:col-span-2 lg:order-1">
+          <KhoiChinh
+            detail={detail}
+            busy={busy}
+            locked={locked}
+            changeItem={changeItem}
+            addItem={addItem}
+            recordPayment={recordPayment}
+            confirmSubmission={confirmSubmission}
+            sendRetouched={sendRetouched}
+            reopen={reopen}
+            galleryId={galleryId}
+          />
+        </div>
+        <div className="flex flex-col gap-5 lg:order-2">
+          <BiaBoAnhEditor
+            galleryId={galleryId}
+            detail={detail}
+            busy={busy}
+            onSave={(thayDoi) => void saveCover(thayDoi)}
+          />
 
+          {/* BB-150 — Thư mục ảnh GỐC. */}
+          <section className="rounded-lg border border-[var(--bb-border)] p-4">
+            <h2 className="text-base font-medium">Thư mục ảnh gốc</h2>
+
+            {detail.syncError && (
+              <p className="mt-2 rounded-md border border-[var(--bb-danger)] p-3 text-sm">
+                <strong>Lần kéo ảnh gần nhất hỏng.</strong> {detail.syncError}
+              </p>
+            )}
+
+            <div className="mt-2 text-sm">
+              {detail.driveFolderUrl ? (
+                <a
+                  href={detail.driveFolderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all font-mono text-xs underline"
+                >
+                  {detail.driveFolderUrl}
+                </a>
+              ) : (
+                <span className="text-[var(--bb-fg-muted)]">Chưa gắn thư mục nào.</span>
+              )}
+            </div>
+
+            <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
+              {detail.photoCount} ảnh đã kéo về ·{" "}
+              {detail.lastSyncedAt
+                ? `đồng bộ lần cuối ${new Date(detail.lastSyncedAt).toLocaleString("vi-VN")}`
+                : "chưa đồng bộ lần nào"}
+            </p>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy || !detail.driveFolderUrl}
+                onClick={() => void dongBoLai()}
+                className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+              >
+                Đồng bộ lại
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setThuMucMoi(detail.driveFolderUrl ?? "");
+                  setDangSuaThuMuc((v) => !v);
+                }}
+                className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+              >
+                {dangSuaThuMuc ? "Thôi" : "Đổi thư mục"}
+              </button>
+            </div>
+
+            {dangSuaThuMuc && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  type="url"
+                  name="driveFolderUrl"
+                  value={thuMucMoi}
+                  disabled={busy}
+                  onChange={(e) => setThuMucMoi(e.target.value)}
+                  placeholder="Dán địa chỉ thư mục ảnh trên Google Drive"
+                  aria-label="Địa chỉ thư mục ảnh gốc"
+                  className="min-w-64 flex-1 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  disabled={busy || thuMucMoi.trim().length < 12}
+                  onClick={() => void doiThuMuc(thuMucMoi.trim())}
+                  className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+                >
+                  Lưu thư mục
+                </button>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-lg border border-[var(--bb-border)] p-4">
+            <h2 className="text-base font-medium">Link gửi khách</h2>
+
+            {linkMoi ? (
+              <div className="mt-3">
+                {/* BB-132: nói rõ CSKH còn phải làm gì. Trước đây câu chữ luôn là
+                    "sao link này dán vào cột link app bên Lark" — nay máy đã dán
+                    hộ, nên để nguyên câu đó là bắt người làm lại một việc đã xong,
+                    và tệ hơn: dán tay đè lên thì lại mở ra đúng nguy cơ dán nhầm
+                    dòng mà BB-132 sinh ra để bỏ. */}
+                {daGhiLark ? (
+                  <p className="rounded-md border border-[var(--bb-success)] p-3 text-sm">
+                    <strong>Đã ghi sang Lark.</strong> Link nằm sẵn ở cột <em>Link app</em> đúng
+                    dòng Hậu Kỳ của khách này — <strong>không cần dán tay</strong>. Dưới đây là
+                    đúng chuỗi đã ghi, để đối chiếu hoặc gửi thẳng cho khách.
+                  </p>
+                ) : (
+                  <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
+                    <strong>Chưa ghi được sang Lark — dán tay giúp.</strong> Sao link dưới đây
+                    dán vào cột <em>Link app</em> đúng dòng Hậu Kỳ của khách này.
+                    {lyDoKhongGhiLark ? (
+                      <>
+                        <br />
+                        <span className="text-[var(--bb-fg-muted)]">Lý do: {lyDoKhongGhiLark}</span>
+                      </>
+                    ) : null}
+                  </p>
+                )}
+                <p className="mt-2 text-sm">
+                  Link này cũng luôn hiện lại ở đây khi mở bộ ảnh (BB-201).
+                </p>
+                <textarea
+                  readOnly
+                  rows={2}
+                  value={linkMoi}
+                  onFocus={(e) => e.currentTarget.select()}
+                  aria-label="Link gửi khách"
+                  className="mt-2 w-full select-all rounded border border-[var(--bb-border)] p-2 font-mono text-xs"
+                />
+              </div>
+            ) : (
+              <TinhTrangLink detail={detail} />
+            )}
+
+            {/* BB-188: hai nút, hai việc KHÁC HẲN NHAU.
+                — Mở khoá: giữ nguyên địa chỉ, biểu tượng ba mẹ đã ghim vẫn chạy.
+                — Tạo mới: đổi địa chỉ, mọi biểu tượng đã ghim đều chết.
+                Khi link cũ chỉ hết hạn thì việc ĐÚNG là mở khoá, nên nó là nút chính
+                và Tạo mới lui về nút phụ. Hai nút cùng màu là ngày nào đó bấm nhầm. */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {detail.shareLink && detail.shareLink.status !== "active" && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void moLaiLink()}
+                  className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+                >
+                  Mở khoá link cũ (giữ nguyên địa chỉ)
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={busy || detail.photoCount === 0}
+                onClick={() => void taoLink()}
+                className={
+                  detail.shareLink && detail.shareLink.status !== "active"
+                    ? "rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+                    : "rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+                }
+              >
+                {detail.shareLink ? "Tạo link mới (ĐỔI địa chỉ)" : "Tạo link gửi khách"}
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Khối nghiệp vụ chính (cột trái, BB-255) — xuất/thành phần hợp đồng/tiền/vòng
+ * duyệt/mua thêm/mở lại/xác nhận. Tách khỏi `GalleryDetail` CHỈ để lưới 2 cột ở
+ * trên gọn hơn; không đổi props, hành vi hay chữ của bất cứ khối con nào.
+ */
+function KhoiChinh({
+  detail,
+  busy,
+  locked,
+  changeItem,
+  addItem,
+  recordPayment,
+  confirmSubmission,
+  sendRetouched,
+  reopen,
+  galleryId,
+}: {
+  detail: Detail;
+  busy: boolean;
+  locked: boolean;
+  changeItem: (method: "PATCH" | "DELETE", body: Record<string, unknown>) => Promise<void>;
+  addItem: (productId: string, quantity: number) => Promise<void>;
+  recordPayment: (amount: number, method: string, note: string) => Promise<void>;
+  confirmSubmission: () => Promise<void>;
+  sendRetouched: (url: string) => Promise<void>;
+  reopen: (reason: string) => Promise<void>;
+  galleryId: string;
+}) {
+  return (
+    <>
       {/*
         Xuất danh sách ảnh đã chọn (BB-067).
 
@@ -768,162 +1005,9 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         </section>
       )}
 
-      {/* BB-150 — Thư mục ảnh GỐC.
-          Đặt trên khối "Link gửi khách" vì thứ tự việc là: có ảnh trước, rồi mới
-          gửi link cho khách. KHÔNG gộp với ô "Link thư mục ảnh đã chỉnh" ở phần
-          retouch: gộp là có ngày ai đó ghi đè nguồn ảnh gốc bằng ảnh đã chỉnh. */}
-      <section className="rounded-lg border border-[var(--bb-border)] p-4">
-        <h2 className="text-base font-medium">Thư mục ảnh gốc</h2>
-
-        {detail.syncError && (
-          <p className="mt-2 rounded-md border border-[var(--bb-danger)] p-3 text-sm">
-            <strong>Lần kéo ảnh gần nhất hỏng.</strong> {detail.syncError}
-          </p>
-        )}
-
-        <div className="mt-2 text-sm">
-          {detail.driveFolderUrl ? (
-            <a
-              href={detail.driveFolderUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="break-all font-mono text-xs underline"
-            >
-              {detail.driveFolderUrl}
-            </a>
-          ) : (
-            <span className="text-[var(--bb-fg-muted)]">Chưa gắn thư mục nào.</span>
-          )}
-        </div>
-
-        <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-          {detail.photoCount} ảnh đã kéo về ·{" "}
-          {detail.lastSyncedAt
-            ? `đồng bộ lần cuối ${new Date(detail.lastSyncedAt).toLocaleString("vi-VN")}`
-            : "chưa đồng bộ lần nào"}
-        </p>
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy || !detail.driveFolderUrl}
-            onClick={() => void dongBoLai()}
-            className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
-          >
-            Đồng bộ lại
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              setThuMucMoi(detail.driveFolderUrl ?? "");
-              setDangSuaThuMuc((v) => !v);
-            }}
-            className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
-          >
-            {dangSuaThuMuc ? "Thôi" : "Đổi thư mục"}
-          </button>
-        </div>
-
-        {dangSuaThuMuc && (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <input
-              type="url"
-              name="driveFolderUrl"
-              value={thuMucMoi}
-              disabled={busy}
-              onChange={(e) => setThuMucMoi(e.target.value)}
-              placeholder="Dán địa chỉ thư mục ảnh trên Google Drive"
-              aria-label="Địa chỉ thư mục ảnh gốc"
-              className="min-w-64 flex-1 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
-            />
-            <button
-              type="button"
-              disabled={busy || thuMucMoi.trim().length < 12}
-              onClick={() => void doiThuMuc(thuMucMoi.trim())}
-              className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
-            >
-              Lưu thư mục
-            </button>
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-lg border border-[var(--bb-border)] p-4">
-        <h2 className="text-base font-medium">Link gửi khách</h2>
-
-        {linkMoi ? (
-          <div className="mt-3">
-            {/* BB-132: nói rõ CSKH còn phải làm gì. Trước đây câu chữ luôn là
-                "sao link này dán vào cột link app bên Lark" — nay máy đã dán
-                hộ, nên để nguyên câu đó là bắt người làm lại một việc đã xong,
-                và tệ hơn: dán tay đè lên thì lại mở ra đúng nguy cơ dán nhầm
-                dòng mà BB-132 sinh ra để bỏ. */}
-            {daGhiLark ? (
-              <p className="rounded-md border border-[var(--bb-success)] p-3 text-sm">
-                <strong>Đã ghi sang Lark.</strong> Link nằm sẵn ở cột <em>Link app</em> đúng
-                dòng Hậu Kỳ của khách này — <strong>không cần dán tay</strong>. Dưới đây là
-                đúng chuỗi đã ghi, để đối chiếu hoặc gửi thẳng cho khách.
-              </p>
-            ) : (
-              <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
-                <strong>Chưa ghi được sang Lark — dán tay giúp.</strong> Sao link dưới đây
-                dán vào cột <em>Link app</em> đúng dòng Hậu Kỳ của khách này.
-                {lyDoKhongGhiLark ? (
-                  <>
-                    <br />
-                    <span className="text-[var(--bb-fg-muted)]">Lý do: {lyDoKhongGhiLark}</span>
-                  </>
-                ) : null}
-              </p>
-            )}
-            <p className="mt-2 text-sm">
-              Link này cũng luôn hiện lại ở đây khi mở bộ ảnh (BB-201).
-            </p>
-            <textarea
-              readOnly
-              rows={2}
-              value={linkMoi}
-              onFocus={(e) => e.currentTarget.select()}
-              aria-label="Link gửi khách"
-              className="mt-2 w-full select-all rounded border border-[var(--bb-border)] p-2 font-mono text-xs"
-            />
-          </div>
-        ) : (
-          <TinhTrangLink detail={detail} />
-        )}
-
-        {/* BB-188: hai nút, hai việc KHÁC HẲN NHAU.
-            — Mở khoá: giữ nguyên địa chỉ, biểu tượng ba mẹ đã ghim vẫn chạy.
-            — Tạo mới: đổi địa chỉ, mọi biểu tượng đã ghim đều chết.
-            Khi link cũ chỉ hết hạn thì việc ĐÚNG là mở khoá, nên nó là nút chính
-            và Tạo mới lui về nút phụ. Hai nút cùng màu là ngày nào đó bấm nhầm. */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {detail.shareLink && detail.shareLink.status !== "active" && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void moLaiLink()}
-              className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
-            >
-              Mở khoá link cũ (giữ nguyên địa chỉ)
-            </button>
-          )}
-
-          <button
-            type="button"
-            disabled={busy || detail.photoCount === 0}
-            onClick={() => void taoLink()}
-            className={
-              detail.shareLink && detail.shareLink.status !== "active"
-                ? "rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
-                : "rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
-            }
-          >
-            {detail.shareLink ? "Tạo link mới (ĐỔI địa chỉ)" : "Tạo link gửi khách"}
-          </button>
-        </div>
-      </section>
+      {/* BB-255: "Thư mục ảnh gốc" và "Link gửi khách" chuyển sang cột phải
+          của `GalleryDetail` (thẻ trắng cạnh bìa bộ ảnh) theo bản vẽ
+          quan-tri-chi-tiet.webp — xem hàm `GalleryDetail` phía trên. */}
 
       <section className="flex flex-wrap gap-3">
 
@@ -950,7 +1034,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           </div>
         )}
       </section>
-    </div>
+    </>
   );
 }
 
@@ -1267,17 +1351,20 @@ function Stat({
   label,
   value,
   canhBao,
+  hint,
 }: {
   label: string;
   value: string;
   /** BB-200 — chấm màu mức cảnh báo từ Lark, chỉ hiện ở ô Trạng thái. */
   canhBao?: MauCanhBao | null;
+  /** Bản vẽ quan-tri-chi-tiet.webp: dòng phụ nhỏ dưới số lớn (vd. số tiền vượt
+   * hạn mức) — chỉ hiện khi có, không chiếm chỗ khi không cần. */
+  hint?: string;
 }) {
   const ui = canhBao ? canhBaoUi(canhBao) : null;
   return (
-    <div className="rounded-lg border border-[var(--bb-border)] p-3">
-      <div className="text-xs text-[var(--bb-fg-muted)]">{label}</div>
-      <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
+    <div>
+      <div className="flex items-center gap-1.5 font-display text-3xl font-bold leading-none text-[var(--bb-fg)] sm:text-4xl">
         {ui && (
           <span
             role="img"
@@ -1289,6 +1376,8 @@ function Stat({
         )}
         {value}
       </div>
+      <div className="mt-1.5 text-xs text-[var(--bb-fg-muted)]">{label}</div>
+      {hint && <div className="mt-0.5 text-xs text-[var(--bb-warning)]">{hint}</div>}
     </div>
   );
 }

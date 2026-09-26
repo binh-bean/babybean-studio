@@ -76,7 +76,9 @@ export interface GalleryCounts {
   [key: string]: number;
 }
 
-function getStatusBadgeConfig(status: string): {
+/** Xuất ra để `gallery-detail.tsx` dùng chung một luật màu nhãn trạng thái
+ * (BB-255) — tránh hai màn hình vẽ hai màu khác nhau cho cùng một trạng thái. */
+export function getStatusBadgeConfig(status: string): {
   label: string;
   variant: NonNullable<BadgeProps["variant"]>;
 } {

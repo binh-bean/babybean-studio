@@ -50,7 +50,9 @@ export default async function GalleryDetailPage({
   }
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
+    // BB-255: bản vẽ quan-tri-chi-tiet.webp dùng bố cục hai cột (nội dung
+    // chính + cột phải mảnh cho bìa/link) — max-w-4xl cũ chỉ đủ cho một cột.
+    <main className="mx-auto max-w-6xl p-6">
       {/* `key` KHÔNG phải trang trí — nó là lớp chặn thứ nhất của một lỗi
           nghiêm trọng (BB-184).
 

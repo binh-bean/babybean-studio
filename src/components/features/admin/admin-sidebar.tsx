@@ -134,8 +134,11 @@ export function NavLinks({
             onClick={onClick}
             className={cn(
               "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              // Bản vẽ quan-tri-danh-sach.webp: mục đang chọn trong thanh bên là
+              // viên sage nhạt (--bb-accent), không phải hồng đất — hồng để dành
+              // cho nút hành động chính.
               isActive
-                ? "bg-[var(--bb-primary)] text-[var(--bb-primary-fg)]"
+                ? "bg-[var(--bb-accent)] text-[var(--bb-accent-fg)]"
                 : "text-[var(--bb-fg)] hover:bg-[var(--bb-surface-2)]"
             )}
             title={isCollapsed ? item.name : undefined}
