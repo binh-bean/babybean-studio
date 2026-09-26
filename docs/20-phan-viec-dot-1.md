@@ -190,3 +190,8 @@ Chủ studio: "tận dụng tối đa banana và gemini 3.1 pro và các sonnet"
 | BB-255 | Sonnet (PW_PORT 3166) | ĐÃ GỘP. Quản trị chi tiết 2 cột + đăng nhập theo bản vẽ; bỏ "dòng thời gian" (chưa có dữ liệu thật) |
 | BB-256 | Opus | ĐÃ GỘP. Cron hậu kỳ 08:00 chạy luôn lượt dựng bộ ảnh từ Lark (lưới đỡ cho hook) |
 | BB-257 | Sonnet (PW_PORT 3167) | ĐÃ GỘP. Khối "Cần xử lý trước khi gửi khách" ở danh sách bộ ảnh: Drive chưa chia sẻ (73), chưa có ảnh (44), nút Kiểm lại |
+| BB-265 | Sonnet | ĐÃ GỘP. `npm run db:xoa-thu` — xoá dữ liệu thử (mặc định chỉ đọc; --thuc-thi cần sao lưu <24h + gõ lại host). Chờ chủ studio báo "thử xong" |
+| BB-266/267 | Sonnet | ĐÃ GỘP. Phép thử chạy song song không va nhau; e2e đăng nhập tự chờ khi Supabase Auth 429 |
+| BB-268 | Banana (Antigravity DESIGNER) | 4 bản vẽ quản trị + 2 tranh album |
+| BB-269 | Sonnet | ĐÃ GỘP. Bảng điều khiển, khách hàng, nhân sự, cài đặt theo bản vẽ |
+| BB-202 | Sonnet → Opus soát | ĐÃ GỘP, 0075 ĐÃ ÁP (chủ studio duyệt). Bìa album trong gói bắt buộc (chọn trong ảnh đã thả tim); album mua thêm chỉ đặt mua. Opus sửa: đẩy hàng chờ tim trước khi lưu bìa |
