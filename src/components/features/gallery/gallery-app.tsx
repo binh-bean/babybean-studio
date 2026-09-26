@@ -1,29 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import { TheHanhTrinh } from "@/components/features/gallery/the-hanh-trinh";
 import { tranhHanhTrinh, anhHanhTrinh } from "@/components/features/gallery/hanh-trinh";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
-import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
-import { ManTreoTuong } from "@/components/features/gallery/man-treo-tuong";
-import { CuaHang } from "@/components/features/gallery/cua-hang";
-import { MoiMuaLanHai } from "@/components/features/gallery/moi-mua-lan-hai";
-import { MoiNguoiThan } from "@/components/features/gallery/moi-nguoi-than";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
-import { TomTatSanPhamIn } from "@/components/features/gallery/tom-tat-san-pham-in";
-import { ChonBiaAlbum } from "@/components/features/gallery/chon-bia-album";
 import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { ChuongThongBao } from "@/components/features/gallery/chuong-thong-bao";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
-import { HuongDanThemManHinh } from "@/components/features/gallery/huong-dan-them-man-hinh";
+import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
-import { SoSanhAnh } from "@/components/features/gallery/so-sanh-anh";
 import {
   themVaoSoSanh,
   boKhoiSoSanh,
@@ -32,6 +25,60 @@ import {
   SO_SANH_TOI_DA,
   SO_SANH_TOI_THIEU,
 } from "@/lib/gallery/so-sanh";
+
+/**
+ * BB-272 — tách tải chậm cho những khối KHÔNG cần ngay lúc vào trang.
+ *
+ * Đo trước (dev, CPU chậm 4×, 390×844): JS tải về cho `/g/[token]` ≈ 11,7MB,
+ * phần lớn là các màn hình modal/dưới-cuộn này bị gộp thẳng vào bundle chính
+ * dù phần lớn khách chưa bao giờ mở tới (cửa hàng, so sánh, treo tường, xem
+ * lớn, hướng dẫn lưu app…). Tất cả các component dưới đây đã tự trả `null`
+ * khi chưa cần hiện (xem `if (!mo) return null` / tương tự trong từng tệp)
+ * NÊN tách tải chậm không đổi một pixel nào lúc đóng — chỉ đổi lúc JS của nó
+ * được tải, không đổi lúc nó được VẼ.
+ *
+ * `ChuongThongBao` (chuông góc phải) KHÔNG tách: nó hiện NGAY trong thanh
+ * công cụ từ giây đầu (không có nhánh `return null` khi đóng), nên tách tải
+ * chậm ở đây sẽ gây nháy layout — đổi giao diện nhìn thấy, luật cấm của task.
+ *
+ * `PhotoLightbox` GIỮ TĨNH (không tách): đo thử cho thấy tách nó làm màn xem
+ * lớn không mở được trong `e11-bo-anh-lon.spec.ts` (bộ 1.000 ảnh, cuộn liên
+ * tục trước khi bấm mở) — nghi do đúng lúc bấm mở thì trình duyệt còn đang
+ * bận xử lý cuộn/long-task nên chunk lazy-load không kịp trong 15s của phép
+ * thử cũ. Đây là màn hình khách bấm vào NGAY LẦN ĐẦU chạm ảnh (không phải
+ * một modal hiếm dùng), nên rủi ro làm chậm/màn hình trắng lúc mở không đáng
+ * đổi lấy vài trăm KB — khác các modal hiếm dùng bên dưới.
+ */
+const ManTreoTuong = dynamic(
+  () => import("@/components/features/gallery/man-treo-tuong").then((m) => m.ManTreoTuong),
+  { ssr: false },
+);
+const CuaHang = dynamic(() => import("@/components/features/gallery/cua-hang").then((m) => m.CuaHang), {
+  ssr: false,
+});
+const MoiMuaLanHai = dynamic(
+  () => import("@/components/features/gallery/moi-mua-lan-hai").then((m) => m.MoiMuaLanHai),
+  { ssr: false },
+);
+const MoiNguoiThan = dynamic(
+  () => import("@/components/features/gallery/moi-nguoi-than").then((m) => m.MoiNguoiThan),
+  { ssr: false },
+);
+const TomTatSanPhamIn = dynamic(
+  () => import("@/components/features/gallery/tom-tat-san-pham-in").then((m) => m.TomTatSanPhamIn),
+  { ssr: false },
+);
+const ChonBiaAlbum = dynamic(
+  () => import("@/components/features/gallery/chon-bia-album").then((m) => m.ChonBiaAlbum),
+  { ssr: false },
+);
+const HuongDanThemManHinh = dynamic(
+  () => import("@/components/features/gallery/huong-dan-them-man-hinh").then((m) => m.HuongDanThemManHinh),
+  { ssr: false },
+);
+const SoSanhAnh = dynamic(() => import("@/components/features/gallery/so-sanh-anh").then((m) => m.SoSanhAnh), {
+  ssr: false,
+});
 import { Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
