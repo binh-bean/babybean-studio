@@ -498,6 +498,11 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             {detail.title}
           </h1>
           <span className="inline-flex items-center gap-1.5">
+            {/* Chữ "Trạng thái" giữ lại làm nhãn — tests/e2e/bb-200-nhan-lark.spec.ts
+                đợi đúng chữ này làm mốc "đã tải xong dữ liệu" trước khi kiểm
+                phần hiện/ẩn theo quyền. Bỏ chữ là phép thử chờ mãi không thấy,
+                không phải vì mã sai mà vì mốc chờ biến mất — AGENTS.md §5a. */}
+            <span className="text-xs text-[var(--bb-fg-muted)]">Trạng thái</span>
             {detail.warningColor && canhBaoUi(detail.warningColor) && (
               <span
                 role="img"
