@@ -3,13 +3,15 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { 
-  AlertCircle, 
-  CheckCircle2, 
-  Clock, 
-  Inbox, 
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Inbox,
   LayoutDashboard,
-  ArrowRight
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/data-table";
 import { cn } from "@/components/ui/utils";
+import { bienDongLaTot } from "@/lib/utils/bang-dieu-khien";
 
 type DashboardStats = {
   waitingForSelection: number;
@@ -32,6 +35,20 @@ type DashboardStats = {
   waitingForRetouch: number;
   deliveredThisMonth: number;
   totalGalleries: number;
+};
+
+/** So kỳ trước cho một thẻ số — chỉ thẻ "trong kỳ" mới có mục ở đây (BB-270). */
+type SoSanhKy = {
+  kyTruoc: number;
+  chenhLechPhanTram: number | null;
+};
+
+type TienDoChiNhanh = {
+  branchId: string;
+  branchName: string;
+  dangHoatDong: number;
+  daChot: number;
+  tyLeChot: number | null;
 };
 
 type ActionRequiredItem = {
@@ -53,6 +70,8 @@ type ChartData = {
 
 type DashboardData = {
   stats: DashboardStats;
+  soSanhKy: Partial<Record<keyof DashboardStats, SoSanhKy>>;
+  tienDoChiNhanh: TienDoChiNhanh[];
   actionRequired: ActionRequiredItem[];
   chartData: ChartData[];
 };
@@ -134,36 +153,67 @@ export function Dashboard() {
 
   const maxChartValue = Math.max(1, ...data.chartData.map(d => d.count));
 
-  const stats = [
-    { label: "Chờ khách chọn", value: data.stats.waitingForSelection, icon: Inbox, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Sắp hết hạn", value: data.stats.dueSoon, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Quá hạn", value: data.stats.overdue, icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10" },
-    { label: "Chờ retouch", value: data.stats.waitingForRetouch, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Đã giao tháng này", value: data.stats.deliveredThisMonth, icon: LayoutDashboard, color: "text-purple-500", bg: "bg-purple-500/10" },
+  // `key`: tên trong `data.stats`/`data.soSanhKy` để tra chip so kỳ trước.
+  // `huongTangLaTot`: chỉ đọc khi có chip — thẻ "trong kỳ" mới có mục trong
+  // `soSanhKy` (API không trả cho thẻ số dồn hiện tại, xem route.ts).
+  const stats: {
+    key: keyof DashboardStats;
+    label: string;
+    value: number;
+    icon: typeof Inbox;
+    color: string;
+    bg: string;
+    huongTangLaTot: boolean;
+  }[] = [
+    { key: "waitingForSelection", label: "Chờ khách chọn", value: data.stats.waitingForSelection, icon: Inbox, color: "text-blue-500", bg: "bg-blue-500/10", huongTangLaTot: false },
+    { key: "dueSoon", label: "Sắp hết hạn", value: data.stats.dueSoon, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", huongTangLaTot: false },
+    { key: "overdue", label: "Quá hạn", value: data.stats.overdue, icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10", huongTangLaTot: false },
+    { key: "waitingForRetouch", label: "Chờ retouch", value: data.stats.waitingForRetouch, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", huongTangLaTot: false },
+    { key: "deliveredThisMonth", label: "Đã giao tháng này", value: data.stats.deliveredThisMonth, icon: LayoutDashboard, color: "text-purple-500", bg: "bg-purple-500/10", huongTangLaTot: true },
   ];
 
   return (
     <div className="space-y-8">
       {/* 1. Hàng thẻ số — bản vẽ quan-tri-bang-dieu-khien.webp: nhãn nhỏ trên
-          cùng, số lớn bên dưới, chấm màu nhỏ ở góc thay cho khối màu to.
-          Không vẽ chip phần trăm tăng/giảm: API bảng điều khiển hiện không
-          trả số kỳ trước để so sánh, và verify:wired cấm số liệu bịa. */}
+          cùng, số lớn bên dưới, chip % so kỳ trước ở góc phải (BB-270). Thẻ
+          không có mục trong `soSanhKy` (số dồn hiện tại, không phải "trong
+          kỳ") thì không hiện chip — xem định nghĩa ở route.ts. */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {stats.map((stat, i) => (
-          <Card key={i}>
-            <CardContent className="p-5 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-[var(--bb-fg-muted)]">
-                  {stat.label}
-                </span>
-                <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", stat.bg, stat.color)}>
-                  <stat.icon className="w-3.5 h-3.5" />
+        {stats.map((stat, i) => {
+          const soSanh = data.soSanhKy[stat.key];
+          const laTot = soSanh ? bienDongLaTot(soSanh.chenhLechPhanTram, stat.huongTangLaTot) : null;
+          return (
+            <Card key={i}>
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wide text-[var(--bb-fg-muted)]">
+                    {stat.label}
+                  </span>
+                  <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", stat.bg, stat.color)}>
+                    <stat.icon className="w-3.5 h-3.5" />
+                  </div>
                 </div>
-              </div>
-              <div className="font-display text-3xl font-bold text-[var(--bb-fg)]">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="flex items-end justify-between gap-2">
+                  <div className="font-display text-3xl font-bold text-[var(--bb-fg)]">{stat.value}</div>
+                  {soSanh && soSanh.chenhLechPhanTram !== null && (
+                    <Badge
+                      variant={laTot === true ? "accent" : laTot === false ? "default" : "secondary"}
+                      className="gap-0.5 px-1.5 py-0.5"
+                      title={`Kỳ trước: ${soSanh.kyTruoc}`}
+                    >
+                      {soSanh.chenhLechPhanTram >= 0 ? (
+                        <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                      ) : (
+                        <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
+                      )}
+                      {Math.abs(Math.round(soSanh.chenhLechPhanTram))}%
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/*
@@ -172,7 +222,7 @@ export function Dashboard() {
         nên nó đẩy cả cột rộng 653px trên màn 375px — đo thật ngày 21/09/2026:
         bảng điều khiển phải kéo ngang mới đọc được trên điện thoại.
       */}
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="grid lg:grid-cols-4 gap-8">
         {/* 2. Bảng cần xử lý ngay */}
         <Card className="lg:col-span-2 flex flex-col overflow-hidden min-w-0">
           <CardHeader>
@@ -289,6 +339,54 @@ export function Dashboard() {
               })}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/*
+          4. Tiến độ theo chi nhánh — bản vẽ quan-tri-bang-dieu-khien.webp:
+          tên chi nhánh + thanh ngang mảnh. Thanh thể hiện TỈ LỆ ĐÃ CHỐT trong
+          số bộ ảnh đang hoạt động của chi nhánh đó (định nghĩa đầy đủ ở
+          `src/lib/utils/bang-dieu-khien.ts`) — không phải % trên tổng số bộ
+          ảnh mọi thời, để một chi nhánh cũ nhiều bộ ảnh đã xong không luôn
+          hiện thanh gần đầy so với chi nhánh mới còn ít việc.
+        */}
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle className="font-display">Tiến độ theo chi nhánh</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {data.tienDoChiNhanh.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Không có chi nhánh nào để hiện.</p>
+            ) : (
+              data.tienDoChiNhanh.map((cn) => (
+                <div key={cn.branchId} className="space-y-1.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-medium text-[var(--bb-fg)] truncate">{cn.branchName}</span>
+                    <span className="text-xs text-[var(--bb-fg-muted)] shrink-0">
+                      {cn.tyLeChot === null ? "—" : `${Math.round(cn.tyLeChot * 100)}%`}
+                    </span>
+                  </div>
+                  <div
+                    className="h-1.5 w-full rounded-full bg-[var(--bb-fg)]/10 overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={cn.tyLeChot === null ? 0 : Math.round(cn.tyLeChot * 100)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Tiến độ ${cn.branchName}: ${cn.daChot}/${cn.dangHoatDong} bộ ảnh đã chốt`}
+                  >
+                    <div
+                      className="h-full rounded-full bg-[var(--bb-accent)] transition-[width]"
+                      style={{ width: `${cn.tyLeChot === null ? 0 : Math.round(cn.tyLeChot * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--bb-fg-muted)]">
+                    {cn.dangHoatDong === 0
+                      ? "Không có bộ ảnh nào đang hoạt động"
+                      : `${cn.daChot}/${cn.dangHoatDong} bộ đã chốt`}
+                  </p>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
