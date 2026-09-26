@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { vi } from "@/i18n";
 import { GalleryList } from "@/components/features/admin/gallery-list";
+import { CanXuLy } from "@/components/features/admin/can-xu-ly";
 
 export const metadata: Metadata = {
   title: `${vi.admin.galleries.title} | BabyBean Studio`,
@@ -20,6 +21,9 @@ export default function AdminGalleriesPage() {
           {vi.admin.galleries.title}
         </h1>
       </div>
+
+      {/* BB-257: khối cảnh báo "cần xử lý trước khi gửi khách" — tự ẩn khi rỗng. */}
+      <CanXuLy />
 
       <GalleryList />
     </div>
