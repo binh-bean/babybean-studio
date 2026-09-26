@@ -79,6 +79,14 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
          values ($1,$2,1,500000)`,
         [galleryId, albumProductId],
       );
+      // Gói thật có dòng "ảnh chỉnh sửa" cạnh album; thiếu nó thì hạn mức
+      // "chưa biết" và app CHẶN thả tim (Opus soát BB-202 — số đếm kẹt ở 0).
+      await pg.query(
+        `insert into gallery_items (gallery_id, product_id, quantity, unit_price)
+         select $1, id, 10, 0 from products
+          where is_active and kind = 'edited_photo' order by id limit 1`,
+        [galleryId],
+      );
     }
 
     for (let i = 1; i <= 5; i++) {
@@ -111,72 +119,8 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     await pg.end();
   });
 
-  test("1. Bộ có album trong gói: thả tim 3 tấm → Chốt bị dẫn tới chọn bìa → chọn 1 gợi ý → chốt thành công", async ({
-    page,
-  }) => {
-    test.skip(
-      !bangDaCo,
-      "Bảng album_covers (migration 0075) chưa được áp lên bb-dev — chờ Opus áp rồi chạy lại ca này.",
-    );
-    test.skip(!albumProductId, "bb-dev hiện không có sản phẩm album nào đủ điều kiện bán.");
-
-    await page.goto(`/g/${maLink}`);
-
-    const anhDau = page.locator('img[src*="/api/img/"]').first();
-    await anhDau.waitFor({ state: "visible", timeout: CHO_ANH });
-
-    // Thả tim 3 tấm đầu tiên.
-    const nutChon = page.locator('button[aria-label="Chọn ảnh này"]');
-    const dem = page.getByTestId("dem-da-chon");
-    await nutChon.nth(0).click();
-    await expect(dem).toHaveText("1", { timeout: 10_000 });
-    await nutChon.nth(1).click();
-    await expect(dem).toHaveText("2", { timeout: 10_000 });
-    await nutChon.nth(2).click();
-    await expect(dem).toHaveText("3", { timeout: 10_000 });
-
-    // Khối "Chọn ảnh bìa album" phải hiện ngay trên trang (bắt buộc, chưa chọn).
-    await expect(page.getByText("Chọn ảnh bìa album")).toBeVisible();
-    await expect(page.getByText("Chưa chọn ảnh bìa")).toBeVisible();
-
-    // Bấm Chốt — phải bị chặn, dẫn ba mẹ quay lại khối chọn bìa.
-    await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
-    await page.fill("#confirm-name-input", "Mẹ Bean BB-202");
-    await page.getByRole("checkbox").check();
-    await expect(page.getByText("Ba mẹ chưa chọn ảnh bìa cho:")).toBeVisible();
-    // Nút Xác nhận phải bị khoá lại — không cho chốt khi còn thiếu bìa.
-    await expect(page.getByRole("button", { name: "Xác nhận" })).toBeDisabled();
-
-    await page.getByRole("button", { name: "Đi tới chọn bìa" }).click();
-
-    // Chọn MỘT gợi ý làm bìa.
-    const nutBia = page.locator('button[aria-label^="Chọn ảnh bìa"]').first();
-    await nutBia.waitFor({ state: "visible", timeout: 10_000 });
-    await nutBia.click();
-
-    // Máy chủ ghi xong, màn hình phải hiện tên tệp đang là bìa.
-    await expect(page.getByText(/Đang chọn: BB202_/)).toBeVisible({ timeout: 10_000 });
-
-    // Chốt lại — lần này phải QUA được.
-    await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
-    await page.fill("#confirm-name-input", "Mẹ Bean BB-202");
-    await page.getByRole("checkbox").check();
-    await expect(page.getByText("Ba mẹ chưa chọn ảnh bìa cho:")).toHaveCount(0);
-    await page.getByRole("button", { name: "Xác nhận" }).click();
-
-    await expect
-      .poll(
-        async () => {
-          const { rows } = await pg.query("select status::text s from galleries where id=$1", [
-            galleryId,
-          ]);
-          return rows[0]?.s;
-        },
-        { timeout: 15_000 },
-      )
-      .toBe("submitted");
-  });
-
+  // Ca cửa hàng chạy TRƯỚC: ca chọn bìa chốt thành công sẽ KHOÁ bộ ảnh dùng chung,
+  // bộ đã khoá thì không còn nút "Mua thêm" (Opus soát BB-202).
   test("2. Cửa hàng: sản phẩm nhóm album chỉ có nút Mua (số lượng), không mở bước chọn ảnh", async ({
     page,
   }) => {
@@ -236,4 +180,77 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
       )
       .toMatchObject({ quantity: 1, photo_id: null });
   });
+
+  test("1. Bộ có album trong gói: thả tim 3 tấm → Chốt bị dẫn tới chọn bìa → chọn 1 gợi ý → chốt thành công", async ({
+    page,
+  }) => {
+    test.skip(
+      !bangDaCo,
+      "Bảng album_covers (migration 0075) chưa được áp lên bb-dev — chờ Opus áp rồi chạy lại ca này.",
+    );
+    test.skip(!albumProductId, "bb-dev hiện không có sản phẩm album nào đủ điều kiện bán.");
+
+    await page.goto(`/g/${maLink}`);
+
+    const anhDau = page.locator('img[src*="/api/img/"]').first();
+    await anhDau.waitFor({ state: "visible", timeout: CHO_ANH });
+
+    // Thả tim 3 tấm đầu tiên.
+    const nutChon = page.locator('button[aria-label="Chọn ảnh này"]');
+    const dem = page.getByTestId("dem-da-chon");
+    await nutChon.nth(0).click();
+    await expect(dem).toHaveText("1", { timeout: 10_000 });
+    await nutChon.nth(1).click();
+    await expect(dem).toHaveText("2", { timeout: 10_000 });
+    await nutChon.nth(2).click();
+    await expect(dem).toHaveText("3", { timeout: 10_000 });
+
+    // Khối "Chọn ảnh bìa album" phải hiện ngay trên trang (bắt buộc, chưa chọn).
+    await expect(page.getByText("Chọn ảnh bìa album")).toBeVisible();
+    await expect(page.getByText("Chưa chọn ảnh bìa")).toBeVisible();
+
+    // Bấm Chốt — phải bị chặn, dẫn ba mẹ quay lại khối chọn bìa.
+    // BB-258: thanh nổi (nút Chốt) ẩn khi bìa tràn màn còn chiếm phần lớn khung
+    // nhìn — cuộn xuống lưới như khách thật rồi mới bấm.
+    await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
+    await page.fill("#confirm-name-input", "Mẹ Bean BB-202");
+    await page.getByRole("checkbox").check();
+    await expect(page.getByText("Ba mẹ chưa chọn ảnh bìa cho:")).toBeVisible();
+    // Nút Xác nhận phải bị khoá lại — không cho chốt khi còn thiếu bìa.
+    await expect(page.getByRole("button", { name: "Xác nhận" })).toBeDisabled();
+
+    await page.getByRole("button", { name: "Đi tới chọn bìa" }).click();
+
+    // Chọn MỘT gợi ý làm bìa.
+    const nutBia = page.locator('button[aria-label^="Chọn ảnh bìa"]').first();
+    await nutBia.waitFor({ state: "visible", timeout: 10_000 });
+    await nutBia.click();
+
+    // Máy chủ ghi xong, màn hình phải hiện tên tệp đang là bìa.
+    await expect(page.getByText(/Đang chọn: BB202_/)).toBeVisible({ timeout: 10_000 });
+
+    // Chốt lại — lần này phải QUA được.
+    // BB-258: thanh nổi (nút Chốt) ẩn khi bìa tràn màn còn chiếm phần lớn khung
+    // nhìn — cuộn xuống lưới như khách thật rồi mới bấm.
+    await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
+    await page.fill("#confirm-name-input", "Mẹ Bean BB-202");
+    await page.getByRole("checkbox").check();
+    await expect(page.getByText("Ba mẹ chưa chọn ảnh bìa cho:")).toHaveCount(0);
+    await page.getByRole("button", { name: "Xác nhận" }).click();
+
+    await expect
+      .poll(
+        async () => {
+          const { rows } = await pg.query("select status::text s from galleries where id=$1", [
+            galleryId,
+          ]);
+          return rows[0]?.s;
+        },
+        { timeout: 15_000 },
+      )
+      .toBe("submitted");
+  });
+
 });

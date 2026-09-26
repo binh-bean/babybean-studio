@@ -1234,6 +1234,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
     async (galleryItemId: string, photoId: string) => {
       setPlacing(true);
       try {
+        // Tim được GOM rồi gửi sau một nhịp (hàng chờ BB-232). Ba mẹ thả tim
+        // xong chọn NGAY tấm đó làm bìa thì máy chủ chưa có tim → "Ảnh không
+        // thuộc lượt chọn này". Đẩy hàng chờ lên trước (Opus soát BB-202 —
+        // e2e bắt được sau khi áp 0075).
+        await hangChoTim.guiNgay();
         const res = await fetch("/api/g/album-cover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1251,7 +1256,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         setPlacing(false);
       }
     },
-    [loadGallery],
+    [loadGallery, hangChoTim.guiNgay],
   );
 
   // BB-212 — màn đang tải, đổi sang ngôn ngữ "cuốn album kỷ niệm": nền kem
