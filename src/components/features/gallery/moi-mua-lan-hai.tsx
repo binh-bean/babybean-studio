@@ -41,6 +41,20 @@
  * `onError` từng ẩn khối ảnh khi tệp chưa tồn tại — mã đó thành mã chết một
  * khi tệp đã có sẵn. Thẻ ảnh nay luôn hiện, dùng `srcSet` 320w/640w. Các dòng
  * sản phẩm trong màn chọn dùng `tranhCuaSanPham()` như `cua-hang.tsx`.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-254 — TÁI DÙNG cho ông bà/người thân (link vai 'viewer')
+ * ---------------------------------------------------------------------------
+ * Chủ studio chốt: ông bà XEM và MUA — gửi yêu cầu mua thêm y hệt cơ chế này,
+ * nhưng KHÔNG theo luật "đã duyệt, không vòng sửa" của ba mẹ (họ có thể gửi
+ * bất cứ lúc nào bộ ảnh còn mở cho khách xem). Hai prop tuỳ chọn bật chế độ
+ * này mà KHÔNG tách file thứ hai (tránh trôi hai bản UI chọn sản phẩm):
+ *
+ *   - `moGate`: có mặt thì THAY cho `duocMoiMuaLanHai(status, soVongSua)` —
+ *     `gallery-app.tsx` truyền `dangMoChoKhachXem(status)` cho viewer.
+ *   - `batBuocNguoiMua`: bật ô nhập tên + SĐT bắt buộc trước khi gửi — route
+ *     `/api/g/mua-them` đòi hai trường này khi phiên là viewer, xem đó mới là
+ *     chỗ chặn thật; ở đây chỉ để form không cho bấm gửi lúc thiếu.
  */
 
 import React from "react";
@@ -78,12 +92,22 @@ export function MoiMuaLanHai({
   soVongSua,
   danhMuc,
   anhDaChon,
+  moGate,
+  batBuocNguoiMua = false,
+  tieuDe,
+  moTa,
 }: {
   status: string;
-  /** `review.rounds.length` — khác 0 thì KHÔNG mời mua lần hai. */
+  /** `review.rounds.length` — khác 0 thì KHÔNG mời mua lần hai (bỏ qua khi có `moGate`). */
   soVongSua: number;
   danhMuc: MonTrongDanhMuc[];
   anhDaChon: AnhChonDuoc[];
+  /** BB-254 — có mặt thì thay cho `duocMoiMuaLanHai`. Dùng cho viewer (ông bà). */
+  moGate?: boolean;
+  /** BB-254 — bắt tên + SĐT người gửi trước khi cho bấm "Gửi yêu cầu". */
+  batBuocNguoiMua?: boolean;
+  tieuDe?: string;
+  moTa?: string;
 }) {
   const [mo, setMo] = React.useState(false);
   const [gio, setGio] = React.useState<DongGioHang[]>([]);
@@ -91,13 +115,18 @@ export function MoiMuaLanHai({
   const [monDangChon, setMonDangChon] = React.useState<MonTrongDanhMuc | null>(null);
   const [dangGui, setDangGui] = React.useState(false);
   const [loi, setLoi] = React.useState<string | null>(null);
+  const [tenNguoiMua, setTenNguoiMua] = React.useState("");
+  const [sdtNguoiMua, setSdtNguoiMua] = React.useState("");
   // BB-249 — mỗi dòng "đã gửi" mang trạng thái riêng (moi/da_lien_he/da_chot/
   // huy) để hiện thông điệp thân thiện đúng tiến độ, không phải một câu
   // chung chung cho mọi yêu cầu.
   const [dsDaGui, setDsDaGui] = React.useState<{ id: string; trangThai: string }[]>([]);
   const daGui = dsDaGui.length > 0;
 
-  const duocMoiMua = duocMoiMuaLanHai(status, soVongSua);
+  const duocMoiMua = moGate ?? duocMoiMuaLanHai(status, soVongSua);
+  const SDT_VN_RE = /^0[0-9]{9}$/;
+  const thieuThongTinNguoiMua =
+    batBuocNguoiMua && (tenNguoiMua.trim().length === 0 || !SDT_VN_RE.test(sdtNguoiMua.trim()));
 
   // Bộ ảnh đã có ai gửi yêu cầu chưa (kể cả trước khi mở lại trang) — chỉ hỏi
   // MỘT LẦN lúc thẻ có cơ hội hiện, không hỏi khi chắc chắn không cần.
@@ -142,6 +171,10 @@ export function MoiMuaLanHai({
 
   async function guiYeuCau() {
     if (gio.length === 0) return;
+    if (thieuThongTinNguoiMua) {
+      setLoi("Ba mẹ cho em xin tên và số điện thoại (10 số) để studio gọi lại giúp em nhé");
+      return;
+    }
     setDangGui(true);
     setLoi(null);
     try {
@@ -150,6 +183,9 @@ export function MoiMuaLanHai({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           items: gio.map((d) => ({ productId: d.productId, photoId: d.photoId, soLuong: d.soLuong })),
+          ...(batBuocNguoiMua
+            ? { tenNguoiMua: tenNguoiMua.trim(), sdtNguoiMua: sdtNguoiMua.trim() }
+            : {}),
         }),
       });
       const json = (await res.json().catch(() => null)) as {
@@ -219,10 +255,10 @@ export function MoiMuaLanHai({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-display text-lg font-light leading-tight">
-            Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?
+            {tieuDe ?? "Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?"}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Khung, ảnh in, album — studio gọi lại báo giá, chưa tính tiền.
+            {moTa ?? "Khung, ảnh in, album — studio gọi lại báo giá, chưa tính tiền."}
           </p>
         </div>
         <button
@@ -238,9 +274,11 @@ export function MoiMuaLanHai({
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
           <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-8">
             <div>
-              <h2 className="font-display text-2xl font-light leading-tight">Mua thêm sau khi duyệt</h2>
+              <h2 className="font-display text-2xl font-light leading-tight">
+                {tieuDe ?? "Mua thêm sau khi duyệt"}
+              </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Chọn sản phẩm, studio sẽ gọi xác nhận. Chưa tính tiền lúc này.
+                {moTa ?? "Chọn sản phẩm, studio sẽ gọi xác nhận. Chưa tính tiền lúc này."}
               </p>
             </div>
             <button
@@ -381,6 +419,36 @@ export function MoiMuaLanHai({
 
           <footer className="border-t border-border bg-surface px-5 py-4 sm:px-8">
             {loi && <p className="mb-2 text-xs text-heart">{loi}</p>}
+
+            {/*
+              BB-254 — bắt buộc với viewer (ông bà/người thân): CSKH cần gọi
+              ĐÚNG người vừa gửi, không phải ba mẹ đứng hợp đồng.
+            */}
+            {batBuocNguoiMua && (
+              <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                <input
+                  type="text"
+                  name="tenNguoiMua"
+                  value={tenNguoiMua}
+                  onChange={(e) => setTenNguoiMua(e.target.value)}
+                  maxLength={100}
+                  placeholder="Tên người mua"
+                  disabled={dangGui}
+                  className="h-10 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-foreground"
+                />
+                <input
+                  type="tel"
+                  name="sdtNguoiMua"
+                  value={sdtNguoiMua}
+                  onChange={(e) => setSdtNguoiMua(e.target.value)}
+                  maxLength={10}
+                  placeholder="Số điện thoại (10 số)"
+                  disabled={dangGui}
+                  className="h-10 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-foreground"
+                />
+              </div>
+            )}
+
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs text-muted-foreground">Giá tham khảo</p>
@@ -391,7 +459,7 @@ export function MoiMuaLanHai({
               </div>
               <button
                 type="button"
-                disabled={gio.length === 0 || dangGui}
+                disabled={gio.length === 0 || dangGui || thieuThongTinNguoiMua}
                 onClick={() => void guiYeuCau()}
                 className="h-11 shrink-0 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
               >
