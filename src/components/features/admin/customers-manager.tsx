@@ -28,7 +28,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Input, Card, Spinner, Badge } from "@/components/ui";
+import { Button, Input, Card, Spinner, Badge, Avatar, AvatarFallback } from "@/components/ui";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { vi } from "@/i18n/vi";
 
@@ -191,24 +191,31 @@ export function CustomersManager({
                   onClick={() => setDangMo(k.id)}
                   className="w-full rounded-lg border border-[var(--bb-border)] p-3 text-left text-sm hover:bg-[var(--bb-surface-2)]"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="min-w-0 break-words font-medium">{k.fullName}</span>
-                    <span className="shrink-0 text-xs text-[var(--bb-fg-muted)]">
-                      {k.branchName}
-                    </span>
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-9 w-9 shrink-0">
+                      <AvatarFallback>{chuCaiDau(k.fullName)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="min-w-0 break-words font-medium">{k.fullName}</span>
+                        <span className="shrink-0 text-xs text-[var(--bb-fg-muted)]">
+                          {k.branchName}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--bb-fg-muted)]">
+                        <span className="select-all font-mono">{k.phone ?? t.chuaCoSdt}</span>
+                        <span>
+                          {k.soBoAnh} {t.cot.soBo.toLowerCase()}
+                        </span>
+                        {k.boAnhMoiNhat && <span>{ngay(k.boAnhMoiNhat)}</span>}
+                      </div>
+                      {k.trungSdtChiNhanhKhac && (
+                        <Badge variant="warning" className="mt-2">
+                          {t.trungChiNhanhKhac}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--bb-fg-muted)]">
-                    <span className="select-all font-mono">{k.phone ?? t.chuaCoSdt}</span>
-                    <span>
-                      {k.soBoAnh} {t.cot.soBo.toLowerCase()}
-                    </span>
-                    {k.boAnhMoiNhat && <span>{ngay(k.boAnhMoiNhat)}</span>}
-                  </div>
-                  {k.trungSdtChiNhanhKhac && (
-                    <Badge variant="warning" className="mt-2">
-                      {t.trungChiNhanhKhac}
-                    </Badge>
-                  )}
                 </button>
               </li>
             ))}
@@ -233,14 +240,19 @@ export function CustomersManager({
                     onClick={() => setDangMo(k.id)}
                   >
                     <td className="py-2 pr-3">
-                      <button type="button" className="text-left font-medium hover:underline">
-                        {k.fullName}
-                      </button>
-                      {k.trungSdtChiNhanhKhac && (
-                        <Badge variant="warning" className="ml-2 align-middle">
-                          {t.trungChiNhanhKhac}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2.5">
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarFallback>{chuCaiDau(k.fullName)}</AvatarFallback>
+                        </Avatar>
+                        <button type="button" className="text-left font-medium hover:underline">
+                          {k.fullName}
+                        </button>
+                        {k.trungSdtChiNhanhKhac && (
+                          <Badge variant="warning" className="align-middle">
+                            {t.trungChiNhanhKhac}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     {/* select-all để bôi một phát rồi dán sang Zalo hoặc Lark */}
                     <td className="select-all py-2 pr-3 font-mono text-xs">
@@ -404,7 +416,7 @@ function HoSoKhach({
   return (
     <Card className="min-w-0 space-y-5 p-4 md:p-6">
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-lg font-semibold">{t.hoSo}</h2>
+        <h2 className="font-display text-lg font-semibold">{t.hoSo}</h2>
         <Button variant="ghost" size="sm" onClick={onDong}>
           {t.dong}
         </Button>
@@ -614,6 +626,17 @@ function Dong({ nhan, giaTri, chon }: { nhan: string; giaTri: string | null; cho
       </dd>
     </>
   );
+}
+
+/** Chữ cái đầu để làm avatar — bản vẽ quan-tri-khach-hang.webp dùng chữ cái
+ * đầu tên thay vì ảnh, đúng luật §6: không có ảnh chân dung khách trong hệ
+ * thống này. */
+function chuCaiDau(hoTen: string): string {
+  const tu = hoTen.trim().split(/\s+/).filter(Boolean);
+  if (tu.length === 0) return "?";
+  const dau = tu[0]!.charAt(0);
+  const cuoi = tu.length > 1 ? tu[tu.length - 1]!.charAt(0) : "";
+  return (dau + cuoi).toUpperCase();
 }
 
 function ngay(value: string): string {

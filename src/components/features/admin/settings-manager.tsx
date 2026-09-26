@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button, Input, Card, Spinner } from "@/components/ui";
+import { cn } from "@/components/ui/utils";
 import { Field } from "./field";
 import { vi } from "@/i18n/vi";
 
@@ -58,6 +59,10 @@ export function SettingsManager() {
   const [dangLuu, setDangLuu] = useState(false);
   const [loi, setLoi] = useState<string | null>(null);
   const [xong, setXong] = useState<string | null>(null);
+  // Bản vẽ quan-tri-cai-dat.webp: danh mục bên trái, một thẻ bên phải — thay
+  // vì xếp cả bốn nhóm chồng lên nhau. `nhomChon` mặc định để `null` rồi gán
+  // khi tải xong, vì tới lúc đó mới biết nhóm nào thật sự có mục để hiện.
+  const [nhomChon, setNhomChon] = useState<CaiDat["nhom"] | null>(null);
 
   const tai = useCallback(async () => {
     setDangTai(true);
@@ -73,6 +78,10 @@ export function SettingsManager() {
           ds.map((c) => [c.key, typeof c.value === "boolean" ? c.value : doiSangChu(c.value)]),
         ),
       );
+      setNhomChon((hienTai) => {
+        if (hienTai && ds.some((c) => c.nhom === hienTai)) return hienTai;
+        return NHOM.find((n) => ds.some((c) => c.nhom === n.id))?.id ?? null;
+      });
     } catch (e) {
       setLoi(e instanceof Error ? e.message : t.loiTai);
     } finally {
@@ -142,8 +151,15 @@ export function SettingsManager() {
     );
   }
 
+  // Bản vẽ chỉ vẽ MỘT nhóm mỗi lần (danh mục trái + thẻ phải) — nhóm nào
+  // không có mục nào (chưa cấu hình đủ ở máy chủ) thì không cho chọn.
+  const nhomCoMuc = NHOM.filter((n) => items.some((c) => c.nhom === n.id));
+  const nhomDangHien = nhomCoMuc.find((n) => n.id === nhomChon) ?? nhomCoMuc[0] ?? null;
+  const cuaNhomHien = nhomDangHien ? items.filter((c) => c.nhom === nhomDangHien.id) : [];
+
   return (
-    <div className="space-y-6">
+    // Đệm dưới cùng để thanh lưu dính đáy không đè lên ô nhập cuối cùng.
+    <div className="space-y-6 pb-20">
       <p className="text-sm text-[var(--bb-fg-muted)]">{t.subtitle}</p>
 
       {loi && (
@@ -163,14 +179,31 @@ export function SettingsManager() {
         </div>
       )}
 
-      {NHOM.map((nhomHienTai) => {
-        const cua = items.filter((c) => c.nhom === nhomHienTai.id);
-        if (cua.length === 0) return null;
-        return (
-          <Card key={nhomHienTai.id} className="p-4 md:p-6">
-            <h2 className="mb-4 text-lg font-semibold">{nhomHienTai.ten}</h2>
+      <div className="grid gap-6 md:grid-cols-[200px_1fr]">
+        <nav aria-label={t.title} className="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
+          {nhomCoMuc.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => setNhomChon(n.id)}
+              aria-current={nhomDangHien?.id === n.id ? "true" : undefined}
+              className={cn(
+                "shrink-0 rounded-full px-4 py-2 text-left text-sm font-medium transition-colors md:rounded-[var(--bb-radius-sm)]",
+                nhomDangHien?.id === n.id
+                  ? "bg-[var(--bb-surface)] text-[var(--bb-fg)] shadow-[var(--bb-shadow)] border border-[var(--bb-border)]"
+                  : "text-[var(--bb-fg-muted)] hover:bg-[var(--bb-surface-2)]",
+              )}
+            >
+              {n.ten}
+            </button>
+          ))}
+        </nav>
+
+        {nhomDangHien && (
+          <Card className="p-4 md:p-6">
+            <h2 className="mb-4 font-display text-lg font-semibold">{nhomDangHien.ten}</h2>
             <div className="grid gap-4 md:grid-cols-2">
-              {cua.map((c) => (
+              {cuaNhomHien.map((c) => (
                 <Field key={c.key} label={nhan(c.key)} hint={moTa(c.key)}>
                   {typeof c.value === "boolean" ? (
                     <label className="flex items-center gap-2 text-sm">
@@ -192,14 +225,28 @@ export function SettingsManager() {
               ))}
             </div>
           </Card>
-        );
-      })}
+        )}
+      </div>
 
-      <div className="flex items-center gap-3">
-        <Button onClick={() => void luu()} disabled={dangLuu}>
-          {dangLuu ? t.dangLuu : t.luu}
-        </Button>
-        <span className="text-xs text-[var(--bb-fg-muted)]">{t.ghiChuBiMat}</span>
+      {/*
+        Thanh lưu dính đáy theo bản vẽ quan-tri-cai-dat.webp. "Huỷ" gọi lại
+        đúng hàm tải `tai()` — nạp lại giá trị đang lưu ở máy chủ, bỏ mọi ô
+        đang gõ dở, không phải nút trang trí.
+      */}
+      <div className="sticky -bottom-4 z-10 -mx-4 border-t border-[var(--bb-border)] bg-[var(--bb-surface)] sm:-bottom-6 sm:-mx-6 lg:-bottom-8 lg:-mx-8">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 md:px-6">
+          <span className="hidden text-xs text-[var(--bb-fg-muted)] sm:inline">
+            {t.ghiChuBiMat}
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button variant="outline" type="button" onClick={() => void tai()} disabled={dangLuu}>
+              {t.huy}
+            </Button>
+            <Button onClick={() => void luu()} disabled={dangLuu}>
+              {dangLuu ? t.dangLuu : t.luu}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -16,10 +16,20 @@
  * thẻ, vì trên điện thoại người ta đọc theo chiều dọc chứ không kéo ngang.
  */
 
-import { Fragment, useCallback, useEffect, useState } from "react";
-import { Button, Input, Select, Badge, Card, Spinner, EmptyState } from "@/components/ui";
+import { useCallback, useEffect, useState } from "react";
+import { Button, Input, Select, Badge, Card, Spinner, EmptyState, Avatar, AvatarFallback, Switch } from "@/components/ui";
 import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
+
+/** Chữ cái đầu để làm avatar — bản vẽ quan-tri-nhan-su.webp dùng chữ cái đầu
+ * tên, không dùng ảnh chân dung. */
+function chuCaiDau(hoTen: string): string {
+  const tu = hoTen.trim().split(/\s+/).filter(Boolean);
+  if (tu.length === 0) return "?";
+  const dau = tu[0]!.charAt(0);
+  const cuoi = tu.length > 1 ? tu[tu.length - 1]!.charAt(0) : "";
+  return (dau + cuoi).toUpperCase();
+}
 
 const t = vi.admin.staff;
 
@@ -206,14 +216,6 @@ export function StaffManager() {
       >
         {t.resetPassword}
       </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busyId === row.id}
-        onClick={() => toggleActive(row)}
-      >
-        {row.isActive ? t.deactivate : t.reactivate}
-      </Button>
       {!row.deleteReason ? (
         <Button
           variant="danger"
@@ -255,7 +257,7 @@ export function StaffManager() {
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--bb-fg)]">{t.title}</h1>
+          <h1 className="font-display text-2xl font-semibold text-[var(--bb-fg)]">{t.title}</h1>
           <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">{t.subtitle}</p>
         </div>
         <Button onClick={() => setShowForm((v) => !v)}>{t.addButton}</Button>
@@ -294,112 +296,67 @@ export function StaffManager() {
       {rows.length === 0 ? (
         <EmptyState title={t.emptyTitle} description={t.emptyBody} />
       ) : (
-        <>
-          {/* Màn rộng: bảng */}
-          <Card className="hidden overflow-x-auto p-0 lg:block">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-[var(--bb-border)] text-left text-[var(--bb-fg-muted)]">
-                  <th className="px-4 py-3 font-medium">{t.colName}</th>
-                  <th className="px-4 py-3 font-medium">{t.colAccount}</th>
-                  <th className="w-[190px] px-4 py-3 font-medium">{t.colRole}</th>
-                  <th className="px-4 py-3 font-medium">{t.colBranches}</th>
-                  <th className="px-4 py-3 font-medium">{t.colLastLogin}</th>
-                  <th className="px-4 py-3 font-medium">{t.colStatus}</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <Fragment key={row.id}>
-                    <tr
-                      className={`border-b border-[var(--bb-border)] last:border-0 ${
-                        row.isActive ? "" : "opacity-60"
-                      }`}
-                    >
-                      <td className="px-4 py-3 font-medium text-[var(--bb-fg)]">{row.fullName}</td>
-                      <td className="px-4 py-3">
-                        <code className="break-all text-[var(--bb-fg)]">{row.identifier}</code>
-                      </td>
-                      <td className="px-4 py-3">{roleSelect(row, "w-full")}</td>
-                      <td className="max-w-[220px] px-4 py-3 text-[var(--bb-fg-muted)]">
-                        {branchSummary(row, branches)}
-                      </td>
-                      <td className="px-4 py-3 text-[var(--bb-fg-muted)]">{lastLogin(row)}</td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          variant={row.isActive ? "default" : "secondary"}
-                          className="whitespace-nowrap"
-                        >
-                          {row.isActive ? t.active : t.inactive}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap justify-end gap-2">{rowActions(row)}</div>
-                      </td>
-                    </tr>
-
-                    {editingId === row.id && (
-                      <tr className="border-b border-[var(--bb-border)] bg-[var(--bb-surface-2)]">
-                        <td colSpan={7} className="px-4 py-4">
-                          <EditStaffRow
-                            row={row}
-                            branches={branches}
-                            saving={busyId === row.id}
-                            onSave={async (payload) => {
-                              await patch(row.id, payload, t.updated);
-                              setEditingId(null);
-                            }}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-
-          {/* Màn hẹp: mỗi người một thẻ */}
-          <div className="space-y-3 lg:hidden">
+        <div className="grid gap-6 xl:grid-cols-[1fr_240px]">
+          {/*
+            Bản vẽ quan-tri-nhan-su.webp: lưới thẻ, không phải bảng — mỗi
+            nhân viên một thẻ trắng viền mảnh, avatar chữ cái đầu, vai trò và
+            chi nhánh ở dưới, công tắc Active Status thay cho nút bấm
+            "Vô hiệu hoá/Kích hoạt" cũ (cùng một hàm `toggleActive`, chỉ đổi
+            kiểu điều khiển). Một lưới duy nhất cho mọi cỡ màn hình — bỏ bản
+            bảng riêng + bản thẻ riêng cũ vì giờ cả hai đều là thẻ.
+          */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:col-start-1 2xl:grid-cols-3">
             {rows.map((row) => (
-              <Card key={row.id} className={`p-4 ${row.isActive ? "" : "opacity-60"}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-[var(--bb-fg)]">{row.fullName}</p>
+              <Card
+                key={row.id}
+                className={`flex flex-col gap-4 p-5 ${row.isActive ? "" : "opacity-60"}`}
+              >
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-11 w-11 shrink-0">
+                    <AvatarFallback>{chuCaiDau(row.fullName)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-[var(--bb-fg)]">{row.fullName}</p>
                     <code className="block break-all text-xs text-[var(--bb-fg-muted)]">
                       {row.identifier}
                     </code>
                   </div>
-                  <Badge
-                    variant={row.isActive ? "default" : "secondary"}
-                    className="shrink-0 whitespace-nowrap"
-                  >
-                    {row.isActive ? t.active : t.inactive}
-                  </Badge>
                 </div>
 
-                <dl className="mt-3 space-y-2 text-sm">
-                  <div>
-                    <dt className="mb-1 text-xs text-[var(--bb-fg-muted)]">{t.colRole}</dt>
-                    <dd>{roleSelect(row, "w-full")}</dd>
-                  </div>
-                  <div className="flex flex-wrap justify-between gap-2">
-                    <dt className="text-xs text-[var(--bb-fg-muted)]">{t.colBranches}</dt>
-                    <dd className="text-right text-[var(--bb-fg)]">
-                      {branchSummary(row, branches)}
-                    </dd>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <dt className="text-xs text-[var(--bb-fg-muted)]">{t.colLastLogin}</dt>
-                    <dd className="text-[var(--bb-fg-muted)]">{lastLogin(row)}</dd>
-                  </div>
-                </dl>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-[var(--bb-fg-muted)]">{t.colRole}</p>
+                  {roleSelect(row, "w-full")}
+                </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">{rowActions(row)}</div>
+                <div>
+                  <p className="mb-1 text-xs font-medium text-[var(--bb-fg-muted)]">
+                    {t.colBranches}
+                  </p>
+                  <p className="text-sm text-[var(--bb-fg)]">{branchSummary(row, branches)}</p>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 border-t border-[var(--bb-border)] pt-3 text-sm text-[var(--bb-fg-muted)]">
+                  <span>{t.colLastLogin}</span>
+                  {lastLogin(row)}
+                </div>
+
+                {/* Không lồng trong <label>: Switch đã tự có <label> bên
+                    trong nó (switch.tsx) — lồng thêm một lớp ngoài là hai
+                    <label> chồng nhau, trình duyệt xử lý sai lệch. */}
+                <div className="flex items-center justify-between gap-2 border-t border-[var(--bb-border)] pt-3 text-sm text-[var(--bb-fg)]">
+                  <span>{t.colStatus}</span>
+                  <Switch
+                    checked={row.isActive}
+                    disabled={busyId === row.id}
+                    onCheckedChange={() => toggleActive(row)}
+                    aria-label={row.isActive ? t.deactivate : t.reactivate}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2">{rowActions(row)}</div>
 
                 {editingId === row.id && (
-                  <div className="mt-4 border-t border-[var(--bb-border)] pt-4">
+                  <div className="border-t border-[var(--bb-border)] pt-4">
                     <EditStaffRow
                       row={row}
                       branches={branches}
@@ -414,7 +371,29 @@ export function StaffManager() {
               </Card>
             ))}
           </div>
-        </>
+
+          {/*
+            Thẻ số lượng theo vai trò ở bên phải bản vẽ — số thật, đếm từ
+            chính `rows` đang có trên màn, không phải số bịa.
+          */}
+          <Card className="h-fit p-5 xl:col-start-2">
+            <h2 className="mb-3 text-sm font-semibold text-[var(--bb-fg)]">{t.colRole}</h2>
+            <ul className="space-y-2.5 text-sm">
+              {Object.entries(
+                rows.reduce<Record<string, number>>((acc, row) => {
+                  const nhan = row.vaiTuTao ? row.roleName : roleLabel(row.role);
+                  acc[nhan] = (acc[nhan] ?? 0) + 1;
+                  return acc;
+                }, {}),
+              ).map(([nhan, soLuong]) => (
+                <li key={nhan} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate text-[var(--bb-fg)]">{nhan}</span>
+                  <Badge variant="secondary">{soLuong}</Badge>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
       )}
     </div>
   );

@@ -375,6 +375,7 @@ export const en: Messages = {
       },
       dangBat: "On",
       dangTat: "Off",
+      huy: "Cancel",
       luu: "Save changes",
       dangLuu: "Saving…",
       daLuu: "Saved {n} change(s).",

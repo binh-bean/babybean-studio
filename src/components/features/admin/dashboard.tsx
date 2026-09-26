@@ -144,16 +144,23 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* 1. Hàng thẻ số */}
+      {/* 1. Hàng thẻ số — bản vẽ quan-tri-bang-dieu-khien.webp: nhãn nhỏ trên
+          cùng, số lớn bên dưới, chấm màu nhỏ ở góc thay cho khối màu to.
+          Không vẽ chip phần trăm tăng/giảm: API bảng điều khiển hiện không
+          trả số kỳ trước để so sánh, và verify:wired cấm số liệu bịa. */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {stats.map((stat, i) => (
           <Card key={i}>
-            <CardContent className="p-6 flex flex-col items-center justify-center text-center space-y-2">
-              <div className={cn("p-3 rounded-full", stat.bg, stat.color)}>
-                <stat.icon className="w-6 h-6" />
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-[var(--bb-fg-muted)]">
+                  {stat.label}
+                </span>
+                <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", stat.bg, stat.color)}>
+                  <stat.icon className="w-3.5 h-3.5" />
+                </div>
               </div>
-              <div className="text-3xl font-bold">{stat.value}</div>
-              <div className="text-xs text-muted-foreground uppercase font-medium">{stat.label}</div>
+              <div className="font-display text-3xl font-bold text-[var(--bb-fg)]">{stat.value}</div>
             </CardContent>
           </Card>
         ))}
@@ -169,7 +176,7 @@ export function Dashboard() {
         {/* 2. Bảng cần xử lý ngay */}
         <Card className="lg:col-span-2 flex flex-col overflow-hidden min-w-0">
           <CardHeader>
-            <CardTitle>Cần xử lý ngay</CardTitle>
+            <CardTitle className="font-display">Cần xử lý ngay</CardTitle>
           </CardHeader>
           <CardContent className="flex-1 p-0">
             {data.actionRequired.length === 0 ? (
@@ -190,11 +197,26 @@ export function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.actionRequired.map((item) => (
+                    {data.actionRequired.map((item) => {
+                      // Chấm màu nhỏ trước tên album — cùng ngôn ngữ với danh
+                      // sách "needs attention today" trong bản vẽ, tái dùng
+                      // đúng mức cảnh báo `urgency` đã tính ở máy chủ.
+                      const chamMau =
+                        item.urgency === "overdue"
+                          ? "bg-[var(--bb-danger)]"
+                          : item.urgency === "due_soon"
+                            ? "bg-[var(--bb-warning)]"
+                            : item.status === "submitted"
+                              ? "bg-[var(--bb-success)]"
+                              : "bg-[var(--bb-fg-muted)]";
+                      return (
                       <TableRow key={item.id}>
                         <TableCell className="pl-6">
-                          <div className="font-medium">{item.title}</div>
-                          <div className="text-xs text-muted-foreground">{item.branch_name}</div>
+                          <div className="flex items-center gap-2 font-medium">
+                            <span aria-hidden="true" className={cn("h-2 w-2 shrink-0 rounded-full", chamMau)} />
+                            {item.title}
+                          </div>
+                          <div className="pl-4 text-xs text-muted-foreground">{item.branch_name}</div>
                         </TableCell>
                         <TableCell>{item.customer_name}</TableCell>
                         <TableCell>
@@ -225,7 +247,8 @@ export function Dashboard() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -236,7 +259,7 @@ export function Dashboard() {
         {/* 3. Biểu đồ cột */}
         <Card className="min-w-0">
           <CardHeader>
-            <CardTitle>Album tạo mới (14 ngày)</CardTitle>
+            <CardTitle className="font-display">Album tạo mới (14 ngày)</CardTitle>
           </CardHeader>
           <CardContent>
             {/*
@@ -250,8 +273,8 @@ export function Dashboard() {
                 const heightPercent = (d.count / maxChartValue) * 100;
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                    <div 
-                      className="w-full bg-primary/20 rounded-t-sm group-hover:bg-primary transition-colors relative"
+                    <div
+                      className="w-full bg-[var(--bb-fg)]/15 rounded-t-sm group-hover:bg-[var(--bb-fg)] transition-colors relative"
                       style={{ height: `${Math.max(heightPercent, 2)}%` }}
                     >
                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold bg-background shadow-sm border px-1.5 py-0.5 rounded">
