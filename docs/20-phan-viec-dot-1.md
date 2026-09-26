@@ -186,3 +186,5 @@ Chủ studio: "tận dụng tối đa banana và gemini 3.1 pro và các sonnet"
 | BB-251 | Banana (chủ studio) | 7/10 bản vẽ chuẩn ở `docs/thiet-ke/`; còn thiếu 3 bản quản trị |
 | BB-252 | Opus | ĐÃ GỘP. Báo "Hình đã về" NGAY qua hook Lark; cron 08:00 làm lưới đỡ |
 | BB-253 | Antigravity — Gemini 3.1 Pro | Dựng màn khách theo bản vẽ. Đề bài `docs/briefs/BB-253-man-khach-theo-ban-ve.md` |
+| BB-254 | Sonnet (PW_PORT 3165) | ĐÃ GỘP, 0073 ĐÃ ÁP (chủ studio duyệt). Mời ông bà: ba mẹ tự mời (≤5), ông bà xem + gửi yêu cầu mua kèm tên/SĐT. Opus siết: chỉ owner/co_editor được mời |
+| BB-255 | Sonnet (PW_PORT 3166) | ĐÃ GỘP. Quản trị chi tiết 2 cột + đăng nhập theo bản vẽ; bỏ "dòng thời gian" (chưa có dữ liệu thật) |
