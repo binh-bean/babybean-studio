@@ -50,7 +50,14 @@ gia đình đang chọn không sang theo.
 2. ✅ Bộ ảnh mới tự vào app + lưới đỡ 08:00 (BB-256).
 3. ✅ CSKH thấy bộ lỗi để sửa (BB-257). **Việc tay:** CSKH chia sẻ 73 thư mục Drive.
 4. ⬜ Chốt mục 2 (A hay B) rồi làm phần việc tương ứng.
-5. ⬜ Sao lưu hằng tuần (`docs/11 §7`) — trên cơ sở dữ liệu chính thức đã chọn.
+5. ⬜ Sao lưu tự động. **Chủ studio chốt 26/09: "sau khi hoàn thành tôi muốn sao lưu
+   tự động không phụ thuộc máy này"** — nên KHÔNG dùng Task Scheduler trên máy
+   studio (`scripts/sao-luu-hang-tuan.cmd`). Hướng: chạy `scripts/backup.mjs` trên
+   máy chủ (GitHub Actions theo lịch hoặc tương đương), MÃ HOÁ tệp trước khi lưu
+   (repo công khai — tệp chứa tên/SĐT khách thật; artifact của repo công khai ai
+   đăng nhập GitHub cũng tải được), đích lưu riêng tư (Google Drive của studio
+   qua tài khoản dịch vụ đã có, hoặc gói Supabase trả phí có sao lưu hằng ngày).
+   Chốt phương án khi làm; bản gần nhất hiện là 21/09 (thủ công).
 6. ⬜ Một lượt đi trọn đường như khách thật — chủ studio, điện thoại thật, 4G.
 7. ⬜ BB-253/258 (giao diện màn khách theo bản vẽ) lên app — đang soát.
 

@@ -48,18 +48,36 @@ interface DongPushDangKy {
 }
 
 /**
- * `client` giả — chỉ đủ hình dạng `push_dang_ky` mà `guiThongBaoBoAnh` chạm
- * tới: `.select().eq("gallery_id", …)`, `.update(…).eq("id", …)`,
- * `.delete().eq("id", …)`. Ghi lại mọi lượt update/delete để test đọc ngược.
+ * `client` giả — đủ hình dạng `push_dang_ky` VÀ `thong_bao_khach` (BB-261) mà
+ * `guiThongBaoBoAnh` chạm tới: `push_dang_ky.select().eq("gallery_id", …)`,
+ * `.update(…).eq("id", …)`, `.delete().eq("id", …)`, và
+ * `thong_bao_khach.insert(…).select("id").single()`. Ghi lại mọi lượt
+ * update/delete/insert để test đọc ngược.
  */
 function taoAdminGia(dsDangKy: DongPushDangKy[]) {
   const ghiNhan = {
     update: [] as { id: string; patch: Record<string, unknown> }[],
     delete: [] as string[],
+    hopThu: [] as Record<string, unknown>[],
   };
 
   const client = {
     from(bang: string) {
+      if (bang === "thong_bao_khach") {
+        let ban: Record<string, unknown> = {};
+        const builder = {
+          insert: (dong: Record<string, unknown>) => {
+            ban = dong;
+            ghiNhan.hopThu.push(dong);
+            return builder;
+          },
+          select: () => builder,
+          single: () => Promise.resolve({ data: { id: `hop-thu-${ghiNhan.hopThu.length}` }, error: null }),
+        };
+        void ban;
+        return builder;
+      }
+
       if (bang !== "push_dang_ky") throw new Error(`bảng không mong đợi: ${bang}`);
 
       let mode: "select" | "update" | "delete" = "select";
@@ -121,14 +139,18 @@ describe("BB-246: guiThongBaoBoAnh — payload đẩy", () => {
     await guiThongBaoBoAnh(client, "gallery-123", {
       tieuDe: "Ảnh của bé đã chỉnh xong",
       noiDung: "Mời ba mẹ xem và duyệt bộ ảnh.",
+      loai: "anh_chinh_xong",
     });
 
     expect(webpushGia.sendNotification).toHaveBeenCalledTimes(1);
     const [, payloadThoi] = webpushGia.sendNotification.mock.calls[0] as [unknown, string];
     const payload = JSON.parse(payloadThoi) as Record<string, unknown>;
 
-    expect(Object.keys(payload).sort()).toEqual(["galleryId", "noiDung", "tieuDe"]);
+    // BB-261: thongBaoId (id của dòng hộp thư) không phải bí mật — chỉ ba
+    // trường còn lại là thứ payload đẩy KHÔNG được vượt quá.
+    expect(Object.keys(payload).sort()).toEqual(["galleryId", "noiDung", "thongBaoId", "tieuDe"]);
     expect(payload.galleryId).toBe("gallery-123");
+    expect(payload.thongBaoId).toBe("hop-thu-1");
     expect(payloadThoi).not.toMatch(/token|link|tenBe|babyName|shareLink/i);
   });
 });
@@ -142,7 +164,7 @@ describe("BB-246: guiThongBaoBoAnh — dọn đăng ký đã chết", () => {
       Object.assign(new Error("gone"), { statusCode: 410 }),
     );
 
-    await guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n" });
+    await guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n", loai: "test" });
 
     expect(ghiNhan.delete).toEqual(["d1"]);
     expect(ghiNhan.update).toEqual([]);
@@ -156,7 +178,7 @@ describe("BB-246: guiThongBaoBoAnh — dọn đăng ký đã chết", () => {
       Object.assign(new Error("not found"), { statusCode: 404 }),
     );
 
-    await guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n" });
+    await guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n", loai: "test" });
 
     expect(ghiNhan.delete).toEqual(["d2"]);
   });
@@ -170,7 +192,7 @@ describe("BB-246: guiThongBaoBoAnh — dọn đăng ký đã chết", () => {
       Object.assign(new Error("server error"), { statusCode: 500 }),
     );
 
-    await guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n" });
+    await guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n", loai: "test" });
 
     expect(ghiNhan.delete).toEqual([]);
     expect(banGhiLoi).toHaveBeenCalled();
@@ -186,7 +208,7 @@ describe("BB-246: guiThongBaoBoAnh — thiếu khoá VAPID", () => {
     ]);
 
     await expect(
-      guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n" }),
+      guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n", loai: "test" }),
     ).resolves.toBeUndefined();
 
     expect(webpushGia.sendNotification).not.toHaveBeenCalled();
@@ -203,7 +225,7 @@ describe("BB-246: guiThongBaoBoAnh — thiếu khoá VAPID", () => {
     const banGhiLoi = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(
-      guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n" }),
+      guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n", loai: "test" }),
     ).resolves.toBeUndefined();
 
     expect(banGhiLoi).toHaveBeenCalled();

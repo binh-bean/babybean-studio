@@ -1,5 +1,5 @@
 import React from "react";
-import { tranhHanhTrinh, buocHanhTrinh } from "./hanh-trinh";
+import { tranhHanhTrinh, buocHanhTrinh, anhHanhTrinh } from "./hanh-trinh";
 import { cn } from "@/components/ui/utils";
 
 interface TheHanhTrinhProps {
@@ -23,32 +23,43 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
 
   const { buoc, hienTai } = buocHanhTrinh(status, giaiDoan);
   const nhanText = nhanTienDo || (status === "submitted" ? "Studio đã nhận danh sách chọn" : "Tiến độ xử lý");
+  const anh = anhHanhTrinh(tenTranh);
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-[#f5efe6] p-6 text-center shadow-sm">
-      <div className="relative mb-6 h-[160px] w-[160px] md:h-[200px] md:w-[200px]">
+    <div className="flex flex-col items-center justify-center overflow-hidden rounded-[24px] bg-white text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+      {/*
+        BB-258 — chủ studio 26/09/2026: tranh cũ nhét vuông giữa thẻ
+        (`object-contain`, nền thẻ trắng lộ quanh tranh) nhìn như một ô vuông
+        nổi lên — "viền lộ, thiếu thẩm mỹ". Nay tranh TRÀN ĐẦY phần trên của
+        thẻ: rộng bằng thẻ, `object-cover`, bo góc trên THEO thẻ (bo bằng
+        `overflow-hidden` ở khung ngoài, không tự bo lại ở <img>). Nền
+        `#FBF7F2` phía sau phòng khi ảnh còn đang tải hoặc lỗi — trùng màu nền
+        tranh gốc nên không lộ viền dù `object-cover` gần như luôn phủ kín.
+      */}
+      <div className="relative h-[160px] w-full bg-[#FBF7F2] sm:h-[180px] md:h-[200px]">
         <img
-          src={`/hanh-trinh/${tenTranh}-640.webp`}
-          srcSet={`/hanh-trinh/${tenTranh}-320.webp 320w, /hanh-trinh/${tenTranh}-640.webp 640w`}
-          sizes="(max-width: 768px) 160px, 200px"
+          src={anh.src}
+          srcSet={anh.srcSet}
+          sizes="100vw"
           alt=""
           loading="lazy"
-          width={640}
-          height={640}
-          className="absolute inset-0 h-full w-full object-contain animate-in fade-in duration-300 motion-reduce:animate-none"
+          width={anh.ngang ? 1280 : 640}
+          height={anh.ngang ? 720 : 640}
+          className="absolute inset-0 h-full w-full object-cover object-center animate-in fade-in duration-300 motion-reduce:animate-none"
         />
       </div>
 
-      <h3 className="mb-6 font-display text-xl font-medium text-foreground md:text-2xl">
+      <div className="flex w-full flex-col items-center px-6 pb-10 pt-6">
+      <h3 className="font-display text-[24px] font-medium leading-[1.2] text-[#2E2A27] md:text-[28px] max-w-[280px]">
         {nhanText}
       </h3>
 
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-between relative">
+      <div className="mt-12 w-full max-w-[300px]">
+        <div className="relative flex items-center justify-between">
           {/* Đường nối */}
-          <div className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-surface-2" />
+          <div className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-[#E5DED6]" />
           <div 
-            className="absolute left-0 top-1/2 h-[2px] -translate-y-1/2 bg-primary transition-all duration-500"
+            className="absolute left-0 top-1/2 h-[2px] -translate-y-1/2 bg-[#2E2A27] transition-all duration-500"
             style={{ width: `${(hienTai / (buoc.length - 1)) * 100}%` }}
           />
 
@@ -64,16 +75,16 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
               >
                 <div 
                   className={cn(
-                    "flex h-4 w-4 items-center justify-center rounded-full border-2 transition-colors",
-                    daQua ? "border-primary bg-primary" : 
-                    dangHienTai ? "border-primary bg-background ring-4 ring-primary/20" : 
-                    "border-surface-2 bg-background"
+                    "flex h-[14px] w-[14px] items-center justify-center rounded-full transition-colors",
+                    daQua ? "bg-[#2E2A27]" : 
+                    dangHienTai ? "bg-[#2E2A27] ring-[5px] ring-[#E5DED6] ring-offset-[3px] ring-offset-white" : 
+                    "bg-[#E5DED6]"
                   )}
                 />
                 <span 
                   className={cn(
-                    "absolute top-6 w-max text-[10px] font-medium sm:text-xs transition-colors",
-                    daQua || dangHienTai ? "text-foreground" : "text-muted-foreground"
+                    "absolute top-6 w-max text-[10px] font-medium sm:text-[11px] transition-colors",
+                    daQua || dangHienTai ? "text-[#2E2A27]" : "text-[#2E2A27]/50"
                   )}
                 >
                   {b}
@@ -82,7 +93,8 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
             );
           })}
         </div>
-        <div className="h-8" aria-hidden="true" />
+        <div className="h-4" aria-hidden="true" />
+      </div>
       </div>
     </div>
   );

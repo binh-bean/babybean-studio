@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/components/ui/utils";
 import React, { useEffect, useState } from "react";
 import { Clock, Heart, Lock, ArrowDown } from "lucide-react";
 import { tinhDoSang, chonMauChu } from "@/lib/utils/do-sang";
@@ -14,6 +15,7 @@ const VUNG_CHU_THEO_KIEU: Record<string, readonly [number, number]> = {
 };
 
 export interface BiaBoAnhProps {
+  className?: string;
   anhBia: { id: string } | null;
   coverHeadline: string | null;
   coverLayout?: string | null;
@@ -46,6 +48,7 @@ function conMayNgay(hanChot: string | null): number | null {
 
 export function BiaBoAnh(props: BiaBoAnhProps) {
   const {
+    className,
     anhBia,
     coverHeadline,
     coverLayout,
@@ -212,60 +215,66 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     );
   }
 
-  // ben-canh (default)
+  // ben-canh (default) - cập nhật theo màn bìa chuẩn
+  //
+  // BB-258 — chủ studio 26/09/2026: bìa máy tính KHÔNG được chia đôi (chữ
+  // trái nền kem, ảnh phải) như BB-253 đã dựng. Ảnh phải TRÀN TOÀN MÀN
+  // (`object-cover`, ~100dvh) ở mọi bề rộng; máy tính thì chữ nằm trong một
+  // mảng phủ mờ ĐÈ LÊN bên trái ảnh — không cắt đôi ảnh, ảnh vẫn chạy hết bề
+  // rộng phía sau lớp mờ. Điện thoại/máy tính bảng giữ nguyên chữ đè đáy ảnh
+  // như trước.
   return (
     <section
       aria-label="Ảnh bìa"
-      className="@container relative isolate flex h-[86svh] min-h-[540px] max-h-[980px] w-full items-end overflow-hidden bg-[#2a2420] text-white lg:grid lg:h-[80vh] lg:min-h-[600px] lg:max-h-[900px] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-stretch lg:bg-background lg:text-foreground"
+      className={cn("@container relative isolate h-[86svh] min-h-[540px] max-h-[980px] w-full overflow-hidden bg-[#2a2420] text-white lg:h-[100dvh] lg:max-h-none lg:min-h-[600px]", className)}
     >
-      <div className="absolute inset-0 -z-10 lg:relative lg:inset-auto lg:z-0 lg:order-2 lg:h-full lg:overflow-hidden">
+      <div className="absolute inset-0 -z-10">
         {imgEl}
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,16,12,.38)_0%,rgba(20,16,12,0)_20%,rgba(20,16,12,0)_42%,rgba(20,16,12,.82)_100%)] lg:hidden"
+          className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent lg:hidden"
         />
       </div>
 
-      <p className="khach-le-trai-lg-pos absolute inset-x-0 top-5 text-center font-display text-[15px] uppercase tracking-[0.2em] text-white/95 lg:right-auto lg:top-10 lg:text-left lg:text-foreground">
-        Baby Bean
-      </p>
-
       {/*
-        BB-240 (2-1) — `khach-le-trai-lg` thay cho `lg:px-16` cố định: canh
-        đúng mép trái với đầu trang/lưới ảnh/chân trang ở MỌI bề rộng máy
-        tính, không chỉ đúng ở cỡ màn đã đo. `sm:px-10` vẫn lo lề phải của cột
-        chữ (cột chỉ rộng 5/12, không cần canh mép phải theo lưới trang).
-        Xem giải thích công thức ở `src/styles/tokens.css`.
+        Mảng phủ mờ bên trái, chỉ máy tính (≥1024px): thay cho cột 50vw nền
+        kem của BB-253. `pointer-events-none` để không chặn thao tác trên
+        phần ảnh còn lại (không có nút nào cần bấm ở đây ngoài nút bên dưới).
       */}
-      <div className="khach-le-trai-lg w-full px-6 pb-9 sm:px-10 lg:order-1 lg:flex lg:flex-col lg:justify-center lg:pb-0">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 hidden w-[min(46%,720px)] bg-black/40 backdrop-blur-md lg:block"
+      />
+
+      <div className="khach-le-trai-lg absolute inset-x-0 bottom-0 z-10 px-6 pb-9 sm:px-10 lg:inset-x-auto lg:inset-y-0 lg:left-0 lg:flex lg:w-[min(46%,720px)] lg:flex-col lg:justify-center lg:pb-0 lg:pr-10">
         <div className="max-w-md">
-          <p className="text-[12px] uppercase tracking-[0.16em] text-white/85 lg:text-muted-foreground">
-            {[ngay, chiNhanh].filter(Boolean).join(" · ")}
+          <p className="text-[12px] uppercase tracking-[0.16em] text-white/90">
+            BABY BEAN · {[ngay, chiNhanh].filter(Boolean).join(" · ")}
           </p>
 
-          <h1 className="mt-2 font-display text-[54px] font-light leading-[0.98] tracking-[-0.02em] sm:text-[68px] lg:mt-4 lg:text-[84px]">
+          <h1 className="mt-2 font-display text-[54px] font-light leading-[0.98] tracking-[-0.02em] sm:text-[68px] lg:mt-4 lg:text-[76px]">
             {tieuDeBia}
           </h1>
 
-          <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-white/90 lg:mt-5 lg:text-base lg:text-muted-foreground">
+          <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-white/90 lg:mt-5 lg:text-base">
             {loiChaoBia}
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-white/90 lg:text-foreground/80">
+          <div className="mt-6 flex flex-wrap gap-x-2 gap-y-2 text-[14px] text-white/90">
             {hanMuc != null && (
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30">
                 <Heart className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 {hanMuc} tấm trong gói
               </span>
             )}
             {conNgay != null && (
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30">
                 <Clock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 Còn {conNgay} ngày để chọn
               </span>
             )}
             {khoa && (
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30">
                 <Lock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 Đã chốt danh sách
               </span>
@@ -275,10 +284,9 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           <button
             type="button"
             onClick={onBatDau}
-            className="mt-6 inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#fffdf9] px-7 text-[15px] font-medium text-[#2a2420] shadow-lg transition hover:bg-white active:scale-[0.98] sm:w-auto lg:mt-8 lg:bg-foreground lg:text-background lg:shadow-none lg:hover:bg-foreground/90"
+            className="mt-8 inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#fbf7f2] px-7 text-[15px] font-medium text-[#2e2a27] transition hover:bg-white active:scale-[0.98] sm:w-auto"
           >
             {nhanNut}
-            <ArrowDown className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>

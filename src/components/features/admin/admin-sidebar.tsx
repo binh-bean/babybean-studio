@@ -18,7 +18,8 @@ import {
   ChevronLeft,
   ChevronRight,
   History,
-  ShieldCheck
+  ShieldCheck,
+  BarChart3
 } from "lucide-react";
 
 /**
@@ -44,6 +45,17 @@ const navItems: {
 }[] = [
   { name: "Bảng điều khiển", href: "/admin", icon: LayoutDashboard, ready: true },
   { name: "Quản lý bộ ảnh", href: "/admin/galleries", icon: Images, ready: true },
+  {
+    // BB-260: trung tâm báo cáo điều hành — khung để cắm thêm báo cáo mới.
+    // Bốn mục "Ảnh vượt hạn mức" .. "Nhật ký thao tác" bên dưới VẪN giữ
+    // nguyên (trang cũ, không đụng), và cũng xuất hiện như mục trong danh
+    // sách của trang này để không phải nhớ hai chỗ.
+    name: "Báo cáo",
+    href: "/admin/bao-cao",
+    icon: BarChart3,
+    ready: true,
+    hiddenForRoles: ["photoshop_ctv"],
+  },
   {
     name: "Ảnh vượt hạn mức",
     href: "/admin/reports/over-quota",

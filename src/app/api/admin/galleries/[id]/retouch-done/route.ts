@@ -136,6 +136,7 @@ export async function POST(
     await guiThongBaoBoAnh(admin, galleryId, {
       tieuDe: "Ảnh của bé đã chỉnh xong",
       noiDung: "Mời ba mẹ xem và duyệt bộ ảnh.",
+      loai: "anh_chinh_xong",
     });
 
     return ok({ status: "awaiting_approval", finalDriveUrl: url });

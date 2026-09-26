@@ -22,6 +22,8 @@ import { chayNhacHauKy } from "@/lib/lark/nhac-hau-ky";
 import { dongBoBoAnhTuLark, type KetQuaDongBo } from "@/lib/lark/dong-bo-bo-anh";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
+import { nhacThongBaoChuaDoc } from "@/lib/thong-bao/nhac-chua-doc";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -89,7 +91,30 @@ async function chay(request: Request) {
             payload: { loai: tin.maNhac, nguoiNhan: tin.nguoiNhan, cacBo: tin.boAnh },
           }),
       });
-      const ketQua = { banGhiLark: doc.size, ...ghi, baoHinhDaVe: sangHinhDaVe.length, nhac, dongBo };
+      // BB-261 — nhắc lại thông báo khách CHƯA ĐỌC. Sau phần nhắc hậu kỳ:
+      // độc lập với Lark, dùng client supabase-js (service_role) chứ không
+      // phải client `pg` ở trên. Hàm này tự không bao giờ ném; bọc thêm một
+      // lớp try/catch ở đây để chắc chắn lỗi bất ngờ không kéo sập cron.
+      let nhacChuaDoc = 0;
+      try {
+        nhacChuaDoc = await nhacThongBaoChuaDoc(createAdminClient());
+      } catch (err) {
+        console.error(
+          JSON.stringify({
+            evt: "cron.hau_ky.nhac_chua_doc_loi",
+            lyDo: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
+
+      const ketQua = {
+        banGhiLark: doc.size,
+        ...ghi,
+        baoHinhDaVe: sangHinhDaVe.length,
+        nhac,
+        nhacChuaDoc,
+        dongBo,
+      };
       console.info(JSON.stringify({ evt: "cron.hau_ky.xong", ...ketQua }));
       return NextResponse.json({ data: ketQua });
     } finally {

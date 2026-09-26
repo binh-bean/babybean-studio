@@ -141,30 +141,45 @@ test.describe("BB-246: nút Bật thông báo", () => {
     ).toHaveCount(0);
   });
 
-  test("status 'submitted' — có nút bật thông báo", async ({ page }) => {
+  /**
+   * BB-258 (26/09/2026) — PHÉP THỬ PHẢI ĐỔI, ghi lý do:
+   *
+   * Chủ studio (ảnh chụp màn khách máy tính) chê dòng "Bật thông báo để biết
+   * ngay khi ảnh chỉnh xong" nằm lơ lửng mép trái, thiếu tinh tế. Một Sonnet
+   * khác đang làm CHUÔNG THÔNG BÁO góc phải để THAY THẾ chỗ gắn này; Opus sẽ
+   * nối chuông đó vào lúc gộp nhánh. Nhiệm vụ BB-258 chỉ được phép GỠ chỗ gắn
+   * (`<BatThongBao />`) khỏi `gallery-app.tsx` — cấm đụng `bat-thong-bao.tsx`,
+   * `src/lib/thong-bao/**`, `public/sw.js`, `src/app/api/g/thong-bao/**`.
+   *
+   * Ca thử gốc canh ĐÚNG một hành vi thật (nút hiện đúng lúc theo status) —
+   * không phải phép thử vô dụng theo nghĩa AGENTS.md §5a. Nó đỏ bây giờ vì
+   * SẢN PHẨM cố ý bỏ chỗ gắn, không phải vì logic `bat-thong-bao.tsx` sai.
+   * Đổi tạm sang canh "nút không còn ở đây nữa" (khớp trạng thái sản phẩm
+   * hiện tại) thay vì xoá hẳn ca thử — khi Opus nối lại chuông thay thế, ca
+   * thử này cần sửa lại lần nữa để canh chuông mới, không phải xoá vĩnh viễn.
+   */
+  test("status 'submitted' — nút bật thông báo cũ đã gỡ khỏi màn khách (chờ chuông thay thế, BB-258)", async ({
+    page,
+  }) => {
     test.skip(!coVapid, "Dev server không có NEXT_PUBLIC_VAPID_PUBLIC_KEY — ghi rõ, không thử được.");
 
-    // Chromium HEADLESS luôn trả `Notification.permission === "denied"`, kể
-    // cả sau `context.grantPermissions(["notifications"])` (đã đo thật: lúc
-    // đó `navigator.permissions.query({name:"notifications"})` báo "granted"
-    // nhưng `Notification.permission` — API cũ, đồng bộ — vẫn báo "denied".
-    // Đây là hạn chế đã biết của Chromium chạy headless, không liên quan gì
-    // tới bat-thong-bao.tsx: trình duyệt thật (có màn hình) không có kiểu
-    // lệch này). Component tự ẩn nút khi quyền đã TỪ CHỐI HẲN — đúng ý muốn ở
-    // đời thật, hứa một nút bấm không làm gì được còn tệ hơn không hứa — nên
-    // nếu để nguyên, ca này luôn đỏ trong CI dù mã đúng.
-    //
-    // Ghi đè `Notification.permission` về "default" (chưa từng hỏi) TRƯỚC khi
-    // trang chạy bất kỳ mã nào — đúng trạng thái thật của một trình duyệt
-    // ba mẹ chưa từng bấm "Bật thông báo" lần nào, không phải giả lập hành vi
-    // của chính component đang thử.
-    await page.addInitScript(() => {
-      Object.defineProperty(Notification, "permission", { get: () => "default" });
-    });
-
+    // BB-258: bỏ addInitScript ghi đè `Notification.permission` từng có ở
+    // đây — nó chỉ cần thiết để né hành vi headless Chromium làm rối logic
+    // HIỆN nút của `bat-thong-bao.tsx` (component đó giờ không còn gắn ở
+    // màn khách nữa, xem chú thích phía trên), giữ lại nó không còn ý nghĩa.
     await page.goto(`/g/${maLinkSubmitted}`);
+    // BB-258: bìa tràn một màn hình, lưới ảnh chỉ vẽ khi cuộn tới gần.
+    await page.locator("#dau-luoi-anh").scrollIntoViewIfNeeded();
+    await expect(page.getByTestId("the-anh")).toHaveCount(1);
     await expect(
       page.getByRole("button", { name: "Bật thông báo để biết ngay khi ảnh chỉnh xong" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
+
+    // BB-261 (Opus nối khi gộp) — chuông thay thế: có ở đầu trang, bấm mở ra
+    // danh sách; bộ Fixture chưa có thông báo nào → "Chưa có thông báo".
+    const chuong = page.getByRole("button", { name: /^Thông báo/ });
+    await expect(chuong).toBeVisible();
+    await chuong.click();
+    await expect(page.getByText("Chưa có thông báo")).toBeVisible();
   });
 });

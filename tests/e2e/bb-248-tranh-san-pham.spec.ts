@@ -96,6 +96,9 @@ test.describe("BB-248: tranh minh hoạ sản phẩm trong cửa hàng", () => {
     }
 
     await page.goto(`/g/${maLink}`);
+    // BB-258: thanh nổi (chứa "Mua thêm") ẨN khi bìa tràn màn còn hiện — cuộn
+    // xuống lưới ảnh như khách thật rồi mới tìm nút.
+    await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
 
     const nutMuaThem = page.getByRole("button", { name: "Mua thêm" });
     await expect(nutMuaThem).toBeVisible();
@@ -126,6 +129,24 @@ test.describe("BB-248: tranh minh hoạ sản phẩm trong cửa hàng", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/g/${maLink}`);
+
+    // Opus soát BB-258/261: ở 390px tiêu đề đầu trang từng ĐÈ lên "Nhắn cho
+    // studio" (tiêu đề căn giữa kiểu absolute + 3 nút bên phải).
+    const tieuDe = page.locator("#dau-luoi-anh p.font-display").first();
+    // Đo nhóm nút BÊN PHẢI đầu trang (Nhắn cho studio / tải / chuông) — luôn
+    // có ít nhất chuông, nên phép đo không bao giờ tự bỏ qua.
+    const nhomNut = page.locator("#dau-luoi-anh").getByRole("button", { name: /^Thông báo/ });
+    await expect(nhomNut).toBeVisible();
+    const nhanStudio = page.locator("#dau-luoi-anh").getByText("Nhắn cho studio");
+    for (const nut of [nhomNut, ...(await nhanStudio.count() ? [nhanStudio.first()] : [])]) {
+      const a = (await tieuDe.boundingBox())!;
+      const b = (await nut.boundingBox())!;
+      const giao = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      expect(giao, "tiêu đề đè lên nút ở đầu trang").toBe(false);
+    }
+    // BB-258: thanh nổi (chứa "Mua thêm") ẨN khi bìa tràn màn còn hiện — cuộn
+    // xuống lưới ảnh như khách thật rồi mới tìm nút.
+    await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
 
     await page.getByRole("button", { name: "Mua thêm" }).click();
     await expect(page.getByRole("heading", { name: "Mua thêm sản phẩm" })).toBeVisible();

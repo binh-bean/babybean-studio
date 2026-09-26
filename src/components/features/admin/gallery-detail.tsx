@@ -23,6 +23,7 @@
 
 "use client";
 import { BiaBoAnhEditor } from "./bia-bo-anh-editor";
+import { DongThoiGianHoatDong } from "./dong-thoi-gian";
 import { YeuCauMuaThemBlock } from "./yeu-cau-mua-them";
 import { getStatusBadgeConfig } from "./gallery-list";
 
@@ -737,6 +738,9 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               </button>
             </div>
           </section>
+
+          {/* BB-259 — bản vẽ quan-tri-chi-tiet.webp: khối cuối cột phải. */}
+          <DongThoiGianHoatDong galleryId={galleryId} />
         </div>
       </div>
     </div>

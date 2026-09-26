@@ -49,6 +49,7 @@ export interface ReviewData {
 export function ReviewPanel({
   status,
   nhanTienDo,
+  coTheHanhTrinh = false,
   review,
   hotline,
   onDecide,
@@ -63,6 +64,15 @@ export function ReviewPanel({
    * `status` (chưa đọc được Lark, hoặc bộ đã ở giai đoạn không cần Lark).
    */
   nhanTienDo?: string | null;
+  /**
+   * BB-258 — chủ studio 26/09/2026: câu trạng thái ("Bộ ảnh đã được ghi nhận
+   * yêu cầu") hiện HAI LẦN liền nhau — tiêu đề thẻ hành trình
+   * (`the-hanh-trinh.tsx`) và khung này, cả hai cùng đọc `nhanTienDo`. Khi thẻ
+   * hành trình đang hiện (gallery-app tính, truyền vào đây) thì khung này BỎ
+   * câu trạng thái của riêng nó cho trường hợp `in_retouch` — đúng cái đã lặp
+   * — nhưng GIỮ nguyên lịch sử sửa và nút duyệt/xin sửa bên dưới.
+   */
+  coTheHanhTrinh?: boolean;
   review: ReviewData;
   hotline: string;
   onDecide: (decision: "approve" | "revise", note?: string) => Promise<void>;
@@ -87,22 +97,30 @@ export function ReviewPanel({
     }
   }
 
+  // BB-258 — chỉ bỏ câu trạng thái ở NHÁNH `in_retouch`: đó là nhánh đọc
+  // cùng `nhanTienDo` với tiêu đề thẻ hành trình nên mới thật sự lặp lại
+  // nguyên văn. Nhánh `awaiting_approval`/đã duyệt dùng câu RIÊNG của khung
+  // này (không đọc `nhanTienDo`), không lặp, nên vẫn hiện như cũ.
+  const anCauTrangThai = coTheHanhTrinh && status === "in_retouch";
+
   return (
     <div className="space-y-3.5 rounded-2xl border border-border bg-surface p-5">
-      <div>
-        <p className="font-display text-lg font-light leading-tight">
-          {status === "in_retouch"
-            ? (nhanTienDo ?? "Studio đang chỉnh ảnh")
-            : status === "awaiting_approval"
-              ? "Ảnh đã chỉnh xong, mời ba mẹ xem"
-              : "Ba mẹ đã duyệt bộ ảnh này"}
-        </p>
-        {status === "in_retouch" && review.rounds.some((r) => !r.resolved) && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            Studio đang sửa theo yêu cầu của ba mẹ, xong sẽ gửi lại link mới.
+      {!anCauTrangThai && (
+        <div>
+          <p className="font-display text-lg font-light leading-tight">
+            {status === "in_retouch"
+              ? (nhanTienDo ?? "Studio đang chỉnh ảnh")
+              : status === "awaiting_approval"
+                ? "Ảnh đã chỉnh xong, mời ba mẹ xem"
+                : "Ba mẹ đã duyệt bộ ảnh này"}
           </p>
-        )}
-      </div>
+          {status === "in_retouch" && review.rounds.some((r) => !r.resolved) && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Studio đang sửa theo yêu cầu của ba mẹ, xong sẽ gửi lại link mới.
+            </p>
+          )}
+        </div>
+      )}
 
       {review.finalDriveUrl && (
         <a

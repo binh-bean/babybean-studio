@@ -3,6 +3,7 @@
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import { TheHanhTrinh } from "@/components/features/gallery/the-hanh-trinh";
+import { tranhHanhTrinh, anhHanhTrinh } from "@/components/features/gallery/hanh-trinh";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
@@ -17,10 +18,10 @@ import { TomTatSanPhamIn } from "@/components/features/gallery/tom-tat-san-pham-
 import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
+import { ChuongThongBao } from "@/components/features/gallery/chuong-thong-bao";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { HuongDanThemManHinh } from "@/components/features/gallery/huong-dan-them-man-hinh";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
-import { BatThongBao } from "@/components/features/gallery/bat-thong-bao";
 import { SoSanhAnh } from "@/components/features/gallery/so-sanh-anh";
 import {
   themVaoSoSanh,
@@ -32,7 +33,7 @@ import {
 } from "@/lib/gallery/so-sanh";
 import { Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
 import { useHangChoTim } from "@/components/features/gallery/use-hang-cho-tim";
 import { useRouter } from "next/navigation";
@@ -331,6 +332,73 @@ export function GalleryApp({ token }: GalleryAppProps) {
    * trước đó, không nhảy về tấm đầu.
    */
   const [manTreoTuongTuAnh, setManTreoTuongTuAnh] = useState<string | null>(null);
+
+  /*
+    BB-258 — thanh nổi (ThanhChon) từng nằm cố định giữa đáy màn và CHE tên
+    mục/thanh lọc khi bìa còn cao (chủ studio 26/09/2026). Ba quy tắc hiện/ẩn:
+      1) Bìa còn trong khung nhìn (kể cả một phần) → ẩn hẳn, vì lúc đó chưa
+         có gì để "chốt" và bìa cần sạch chữ, không có thanh đè lên.
+      2) Đang cuộn XUỐNG → ẩn/thu nhỏ, nhường tầm nhìn cho ảnh đang lướt qua.
+      3) Dừng cuộn hoặc cuộn LÊN (dù chỉ một chút) → hiện lại ngay — ba mẹ
+         luôn lấy lại được nút chính bằng một cú vuốt lên nhỏ.
+    Dùng IntersectionObserver cho (1) — không đọc `getBoundingClientRect` mỗi
+    lần cuộn (tốn), và một trình lắng nghe cuộn nhẹ (chỉ so sánh chiều) cho
+    (2)/(3), có bộ đếm giờ ngắn để coi "vừa dừng cuộn" là một dạng "cuộn lên".
+    Khai báo Ở ĐẦU hàm (trước mọi `return` sớm của trạng thái loading/lỗi bên
+    dưới) — đặt sau một `if` sớm là vi phạm rules-of-hooks (ESLint bắt được).
+    Phụ thuộc theo `loading`/`phaiChonBuoiChup`/`error`/`gallery`: đây là các
+    điều kiện quyết định lúc nào cây DOM chứa `biaRef` mới thật sự dựng lên
+    (trước đó `elBia` luôn `null` vì màn đang tải/lỗi không có bìa) — không
+    chạy lại theo các điều kiện này thì observer gắn vào `null` một lần rồi
+    thôi, không bao giờ thấy bìa thật khi tải xong.
+  */
+  const biaRef = useRef<HTMLDivElement>(null);
+  const [thanhNoiAn, setThanhNoiAn] = useState(true);
+  useEffect(() => {
+    const elBia = biaRef.current;
+    if (!elBia) return;
+
+    let biaConHien = true;
+    let dangCuonXuong = false;
+    let yTruoc = typeof window !== "undefined" ? window.scrollY : 0;
+    let hetGioDung: ReturnType<typeof setTimeout> | null = null;
+
+    const capNhat = () => setThanhNoiAn(biaConHien || dangCuonXuong);
+
+    const quanSat = new IntersectionObserver(
+      ([entry]) => {
+        // "Bìa còn hiện" = bìa còn chiếm PHẦN LỚN màn (>40% chiều cao), không
+        // phải chỉ lộ một mép: đã cuộn tới lưới + thanh lọc mà thanh nổi (nút
+        // chốt, Mua thêm) vẫn giấu là quá tay (Opus soát BB-258).
+        biaConHien = entry
+          ? entry.isIntersecting && entry.intersectionRect.height > window.innerHeight * 0.4
+          : true;
+        capNhat();
+      },
+      { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] },
+    );
+    quanSat.observe(elBia);
+
+    const khiCuon = () => {
+      const y = window.scrollY;
+      dangCuonXuong = y > yTruoc;
+      yTruoc = y;
+      capNhat();
+      if (hetGioDung) clearTimeout(hetGioDung);
+      // Dừng cuộn ~150ms thì coi như "không còn cuộn xuống nữa" → hiện lại.
+      hetGioDung = setTimeout(() => {
+        dangCuonXuong = false;
+        capNhat();
+      }, 150);
+    };
+    window.addEventListener("scroll", khiCuon, { passive: true });
+
+    return () => {
+      quanSat.disconnect();
+      window.removeEventListener("scroll", khiCuon);
+      if (hetGioDung) clearTimeout(hetGioDung);
+    };
+  }, [loading, phaiChonBuoiChup, error, gallery]);
 
   const daChotChoXacNhan = gallery?.status === "submitted" && !moKhoaChon;
 
@@ -1140,21 +1208,30 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
   // BB-212 — màn lỗi / link hết hạn / không tìm thấy, cùng ngôn ngữ mới.
   if (error || !gallery) {
-    const tranhLoi = error?.code === "LINK_EXPIRED" ? "link-het-han" : "chua-co-anh";
+    // BB-258 — chủ studio 26/09/2026: link KHÔNG TỒN TẠI (khác LINK_EXPIRED)
+    // trước dùng tạm tranh "chua-co-anh" (hành trình xử lý ảnh — sai ngữ
+    // cảnh, gallery còn chưa từng tồn tại thì không có "hành trình" nào cả).
+    // Nay có tranh riêng "khung ảnh trống" (`public/minh-hoa/khong-tim-thay`,
+    // ngang 16:9) đúng nghĩa hơn. LINK_EXPIRED giữ nguyên tranh đồng hồ cát
+    // "link-het-han" — nay cũng đã có bản ngang trong `CO_BAN_NGANG`.
+    const laHetHan = error?.code === "LINK_EXPIRED";
+    const anhLoi = laHetHan
+      ? anhHanhTrinh("link-het-han")
+      : { src: "/minh-hoa/khong-tim-thay-1280.webp", srcSet: "/minh-hoa/khong-tim-thay-640.webp 640w, /minh-hoa/khong-tim-thay-1280.webp 1280w" };
     return (
       <div className="mx-auto flex min-h-[80dvh] max-w-md flex-col items-center justify-center bg-background p-6 text-center text-foreground">
-        <div className="relative mb-6 h-[160px] w-[160px] md:h-[200px] md:w-[200px]">
+        <div className="relative mb-6 h-[120px] w-full max-w-[280px] overflow-hidden rounded-[16px] bg-[#FBF7F2] md:h-[150px]">
           {/* Đồng hồ cát chỉ cho link HẾT HẠN; link không có thật thì nói
               "hết hạn" bằng hình là sai (Opus soát BB-225). */}
           <img
-            src={`/hanh-trinh/${tranhLoi}-640.webp`}
-            srcSet={`/hanh-trinh/${tranhLoi}-320.webp 320w, /hanh-trinh/${tranhLoi}-640.webp 640w`}
-            sizes="(max-width: 768px) 160px, 200px"
+            src={anhLoi.src}
+            srcSet={anhLoi.srcSet}
+            sizes="280px"
             alt=""
             loading="lazy"
-            width={640}
-            height={640}
-            className="absolute inset-0 h-full w-full object-contain animate-in fade-in duration-300 motion-reduce:animate-none"
+            width={1280}
+            height={720}
+            className="absolute inset-0 h-full w-full object-cover object-center animate-in fade-in duration-300 motion-reduce:animate-none"
           />
         </div>
         <h1 className="font-display text-2xl font-light">
@@ -1217,20 +1294,33 @@ export function GalleryApp({ token }: GalleryAppProps) {
       : // Đã khoá thật: không sửa thẳng được, nhưng phải có ĐƯỜNG NÓI.
         { nhan: "Yêu cầu sửa lại", onClick: () => setXinSuaLai(true) };
 
+  /*
+    BB-258 — chủ studio 26/09/2026: "Bộ ảnh đã được ghi nhận yêu cầu" hiện HAI
+    LẦN liền nhau — tiêu đề thẻ hành trình (`the-hanh-trinh.tsx`) và khung
+    trạng thái bên dưới (`review-panel.tsx`), cả hai cùng đọc `nhanTienDo`.
+    Tính đúng LOGIC HIỆN/ẨN của thẻ hành trình ở đây (cùng điều kiện với bên
+    trong `TheHanhTrinh`: trạng thái hậu-submit VÀ có tranh để vẽ) rồi truyền
+    xuống `ReviewPanel` — khung đó bỏ câu trạng thái của riêng nó khi thẻ đã
+    nói rồi, không cần đoán lại từ `gallery-app`.
+  */
+  const theHanhTrinhDangHien =
+    ["submitted", "in_retouch", "awaiting_approval", "approved", "delivered"].includes(gallery.status) &&
+    tranhHanhTrinh(gallery.status, gallery.giaiDoanTienDo ?? null, gallery.photoCount) != null;
+
   const nutLoc = (loai: "all" | "selected" | "unselected", nhan: string, so: number) => (
     <button
       type="button"
       onClick={() => setFilter(loai)}
       aria-pressed={filter === loai}
       className={cn(
-        "shrink-0 whitespace-nowrap pb-2.5 text-[13.5px] transition-colors",
+        "shrink-0 whitespace-nowrap rounded-full border border-[#2e2a27] px-4 py-1.5 text-[14px] transition-colors",
         filter === loai
-          ? "font-medium text-foreground shadow-[inset_0_-2px_0_currentColor]"
-          : "text-muted-foreground hover:text-foreground",
+          ? "bg-[#2e2a27] text-[#fbf7f2]"
+          : "bg-[#fbf7f2] text-[#2e2a27] hover:bg-[#2e2a27]/5",
       )}
     >
       {nhan}
-      <span className="ml-1 opacity-60">{so.toLocaleString("vi-VN")}</span>
+      <span className="ml-1 opacity-70">{so.toLocaleString("vi-VN")}</span>
     </button>
   );
 
@@ -1254,21 +1344,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
         </div>
       )}
 
-      {/* MÀN 1 — ẢNH BÌA */}
-      <BiaBoAnh
-        anhBia={anhBia}
-        coverHeadline={gallery.coverHeadline ?? null}
-        tenBe={gallery.babyName}
-        ngayChup={gallery.shootDate}
-        chiNhanh={gallery.branch.name}
-        loiChao={gallery.welcomeMessage}
-        soAnh={photos.length || gallery.photoCount}
-        hanMuc={hanMuc}
-        daChon={selectionCounts.selectedCount}
-        hanChot={gallery.dueAt}
-        khoa={isLocked}
-        onBatDau={cuonToiLuoi}
-      />
+      {/* MÀN 1 — ẢNH BÌA (tràn toàn màn, xem BB-258) */}
+      <div ref={biaRef}>
+        <BiaBoAnh
+          anhBia={anhBia}
+          coverHeadline={gallery.coverHeadline ?? null}
+          tenBe={gallery.babyName}
+          ngayChup={gallery.shootDate}
+          chiNhanh={gallery.branch.name}
+          loiChao={gallery.welcomeMessage}
+          soAnh={photos.length || gallery.photoCount}
+          hanMuc={hanMuc}
+          daChon={selectionCounts.selectedCount}
+          hanChot={gallery.dueAt}
+          khoa={isLocked}
+          onBatDau={cuonToiLuoi}
+        />
+      </div>
 
       {/*
         ĐẦU TRANG DÍNH — gọn còn tên, bộ lọc, và hai việc phụ (nhắn studio,
@@ -1280,17 +1372,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
         className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-md"
       >
         <div className="mx-auto max-w-[1600px] px-3 sm:px-6 lg:px-10">
-          <div className="flex items-end justify-between gap-3 pt-3">
-            <div className="min-w-0">
-              <p className="truncate font-display text-[22px] leading-tight">
+          <div className="relative flex items-center justify-between gap-3 pt-4 pb-4 border-b border-[#e5dcd2]">
+            {/* Dưới lg: tiêu đề nằm TRÁI, tự cắt gọn, nhường chỗ nhóm nút phải
+                (Nhắn cho studio + tải + chuông). Bản căn giữa kiểu `absolute`
+                đè lên "Nhắn cho studio" ở 390px khi thêm chuông (Opus soát
+                BB-258/261). Từ lg mới căn giữa như bản vẽ. */}
+            <div className="min-w-0 flex-1 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:flex lg:flex-col lg:items-center lg:justify-center">
+              <p className="truncate font-display text-[20px] leading-tight text-[#2e2a27] sm:text-[24px] lg:pointer-events-auto">
                 {gallery.babyName || "Khoảnh khắc của con"}
               </p>
-              <p className="truncate text-xs text-muted-foreground">
+              <p className="mt-0.5 truncate text-xs text-[#6b6057] lg:pointer-events-auto">
                 {gallery.branch.name}
               </p>
             </div>
 
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="relative z-10 flex shrink-0 items-center gap-1.5">
               {/*
                 "Nhắn cho studio" giữ nguyên CHỮ, không thu thành biểu tượng:
                 đây là đường duy nhất ba mẹ liên lạc với studio ngay trên màn
@@ -1302,16 +1398,16 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   href={gallery.branch.chatUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-9 items-center rounded-full border border-border px-3 text-xs font-medium transition hover:bg-surface-2"
+                  className="inline-flex h-[36px] items-center rounded-full border border-[#2e2a27] px-4 text-xs font-medium transition hover:bg-[#2e2a27]/5"
                 >
                   {vi.gallery.messageStudio}
                 </a>
               )}
               {/*
-                BB-241 — nút biểu tượng "Lưu app" ở đây bỏ hẳn: chủ studio
+                BB-241 - nút biểu tượng "Lưu app" ở đây bị ẩn: chủ studio
                 24/09/2026 "nếu không phải người thiết kế thì không biết nó để
-                làm gì". Thay bằng lời gợi ý ĐÚNG LÚC (`LoiGoiYLuuApp`, dựng ở
-                cuối màn) — hiện sau khi ba mẹ thả tim tấm đầu hoặc ở lần mở
+                làm gì". Thay bằng lời gợi ý ĐÚNG LÚC (`LoiGoiYLuuApp`, đứng ở
+                cuối màn) - hiện sau khi ba mẹ thả tim tấm đầu hoặc ở lần mở
                 thứ hai, đúng lúc họ đã thấy giá trị của bộ ảnh thay vì hiện
                 ngay từ đầu như một nút không rõ nghĩa.
               */}
@@ -1324,10 +1420,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   onTaiCaBo={taiCaBo}
                 />
               )}
+              {/* BB-261 — chuông thông báo, NGOÀI CÙNG bên phải (chủ studio 26/09:
+                  "biểu tượng là cái chuông ở góc phải thôi"). Tự hỏi quyền ở cú
+                  chạm đầu tiên; thay dòng "Bật thông báo" cũ đã gỡ ở BB-258. */}
+              <ChuongThongBao galleryId={gallery.id} status={gallery.status} />
             </div>
           </div>
 
-          <nav aria-label="Lọc ảnh" className="mt-3 flex items-center gap-5 overflow-x-auto">
+          <nav aria-label="Lọc ảnh" className="mt-4 flex items-center gap-3 overflow-x-auto pb-4">
             {nutLoc("all", vi.gallery.filterAll, photos.length)}
             {nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
             {nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
@@ -1409,19 +1509,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
       </div>
 
       {/*
-        BB-246 — nút "Bật thông báo". Đặt NGOÀI header sticky (không tranh chỗ
-        với tên bé/bộ lọc) nhưng vẫn ngay đầu trang, đúng chỗ ba mẹ nhìn thấy
-        lúc bộ ảnh chuyển sang "chờ duyệt". Tự ẩn hẳn khi chưa đủ điều kiện
-        (thiếu khoá VAPID, trình duyệt không hỗ trợ, bộ ảnh chưa chốt...) — xem
-        bat-thong-bao.tsx.
+        BB-258 — chủ studio 26/09/2026: bỏ dòng "Bật thông báo để biết ngay
+        khi ảnh chỉnh xong" đang lơ lửng mép trái. CHỈ gỡ chỗ GẮN ở đây — một
+        Sonnet khác đang làm chuông thông báo góc phải thay thế, Opus sẽ gắn
+        lúc gộp. Component `bat-thong-bao.tsx` và `src/lib/thong-bao/**`,
+        `public/sw.js`, `src/app/api/g/thong-bao/**` GIỮ NGUYÊN, không đụng.
       */}
-      <div className="mx-auto max-w-[1600px] px-3 pt-2 sm:px-6 lg:px-10">
-        <BatThongBao
-          galleryId={gallery.id}
-          status={gallery.status}
-          onMoHuongDanLuuApp={() => setMoHuongDanLuuApp(true)}
-        />
-      </div>
 
       {/* Thông báo trạng thái bộ ảnh — chỉ hiện khi có điều cần nói. */}
       {(gallery.review || isLocked || !gallery.quotaKnown || !duocChon) && (
@@ -1430,6 +1523,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             <ReviewPanel
               status={gallery.status}
               nhanTienDo={gallery.nhanTienDo}
+              coTheHanhTrinh={theHanhTrinhDangHien}
               review={gallery.review}
               hotline={gallery.branch.hotline}
               onDecide={decideReview}
@@ -1690,6 +1784,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         */
         duocChon && (
         <ThanhChon
+          an={thanhNoiAn}
           daChon={selectionCounts.selectedCount}
           hanMuc={hanMuc}
           soTamThem={gallery.quotaKnown ? selectionCounts.extraCount : 0}

@@ -141,12 +141,19 @@ export default function LoginPage() {
     <main className="flex min-h-screen w-full bg-[var(--bb-bg)]">
       <div
         aria-hidden="true"
-        className="hidden w-1/2 items-center justify-center bg-[var(--bb-surface-2)] p-10 md:flex"
+        className="relative hidden w-1/2 overflow-hidden bg-[#fbf7f2] md:block"
       >
+        {/* Tranh dọc vẽ riêng cho trang này (banana BB-262) — TRÀN cả nửa trái,
+            không đặt một ô tranh nhỏ giữa nền khác màu (chủ studio 26/09: lộ
+            viền là "không tinh tế"). */}
         <img
-          src="/san-pham/sp-album-640.webp"
+          src="/minh-hoa/dang-nhap-doc-960.webp"
+          srcSet="/minh-hoa/dang-nhap-doc-480.webp 480w, /minh-hoa/dang-nhap-doc-960.webp 960w"
+          sizes="50vw"
           alt=""
-          className="w-full max-w-sm drop-shadow-[0_8px_24px_rgb(46_42_39_/_12%)]"
+          width={960}
+          height={1285}
+          className="absolute inset-0 h-full w-full object-cover object-center"
         />
       </div>
 

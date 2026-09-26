@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Columns2 } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Heart, Minimize2 } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { vi } from "@/i18n";
 import type { PhotoPublic } from "@/types/domain";
@@ -85,13 +85,13 @@ export function PhotoLightbox({
   onTaiAnh,
   mutatingIds,
   isLocked,
-  daChon,
-  hanMuc,
+  
+  
   onLuuGhiChu,
   bangSanPham,
   banner,
   dungCho,
-  onSoSanh,
+  
 }: PhotoLightboxProps) {
   /**
    * Tấm trượt từ dưới lên trên điện thoại: bảng sản phẩm hoặc ô ghi chú.
@@ -559,15 +559,44 @@ export function PhotoLightbox({
           danh sách mà CSKH tải về ảnh khách chọn chỉnh sửa" — chữ nhỏ, cắt
           gọn nếu dài, không tranh chỗ với số thứ tự.
       */}
-      <header className="relative z-20 flex shrink-0 items-center justify-between px-3 py-2.5 sm:px-4">
-        <span className="min-w-0 flex-1 truncate px-2 text-[13px] text-white/75">
-          <span className="tabular-nums">{currentIndex + 1} / {total}</span>
-          {currentPhoto.fileName && (
-            <span className="text-white/50"> · {currentPhoto.fileName}</span>
-          )}
-        </span>
+      <header className="relative z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-start px-4 py-4">
+        <div className="flex justify-start">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            aria-label={vi.common.close}
+            title={vi.common.close}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus:outline-hidden"
+          >
+            <X className="h-[22px] w-[22px]" strokeWidth={1.5} />
+          </button>
+        </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex min-w-0 flex-col items-center pt-1">
+          <div className="flex h-[28px] items-center justify-center rounded-full bg-white/10 px-4 text-[13px] text-white">
+            {/*
+              BB-258 kiểm ngược — BB-253 tách "1 / 2" thành ba <span> không có
+              khoảng trắng thật giữa các chữ số (chỉ cách nhau bằng CSS
+              `mx-1`), nên `getByText(/1 \/ 2/)` của `e12-dien-thoai.spec.ts`
+              không khớp `textContent` nữa ("1/2" không dấu cách). Giữ dấu
+              cách THẬT trong span giữa để chữ vẫn đọc được bằng screen reader
+              lẫn bằng phép thử tìm chữ.
+            */}
+            <span className="tabular-nums font-medium">{currentIndex + 1}</span>
+            <span className="mx-1 text-white/50"> / </span>
+            <span className="text-white/50">{total}</span>
+          </div>
+          {currentPhoto.fileName && (
+            <p className="mt-3 truncate px-2 text-[11px] text-white/40 max-w-[200px]">
+              {currentPhoto.fileName}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end">
           {onTaiAnh && (
             <button
               type="button"
@@ -579,49 +608,13 @@ export function PhotoLightbox({
               title={vi.gallery.downloadThis}
               className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus:outline-hidden"
             >
-              <svg
-                width="19"
-                height="19"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M12 3v12" />
-                <path d="M7 11l5 5 5-5" />
-                <path d="M4 20h16" />
+              <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
             </button>
           )}
-
-          {/* BB-218 — "So sánh với tấm khác": đưa tấm này vào danh sách so
-              sánh rồi quay về lưới ở chế độ chọn. */}
-          {onSoSanh && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onSoSanh(currentPhoto);
-              }}
-              aria-label="So sánh với tấm khác"
-              title="So sánh với tấm khác"
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus:outline-hidden"
-            >
-              <Columns2 className="h-[19px] w-[19px]" strokeWidth={1.8} aria-hidden="true" />
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={vi.common.close}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-95 touch-manipulation focus:outline-hidden"
-          >
-            <X className="h-6 w-6" strokeWidth={1.8} />
-          </button>
         </div>
       </header>
 
@@ -828,29 +821,14 @@ export function PhotoLightbox({
                 key={n}
                 className="rounded-full border border-[#9db08b]/50 bg-[#6c7a5f]/30 px-3 py-1 text-[12px] text-white/90"
               >
-                ✓ {n}
+                — {n}
               </span>
             ))}
           </div>
         )}
 
-        <div className="mx-auto grid max-w-md grid-cols-[1fr_auto_1fr] items-center">
-          <div className="flex justify-center lg:invisible">
-            {onLuuGhiChu && (
-              <button
-                type="button"
-                onClick={() => setTamMo("ghi-chu")}
-                className="flex flex-col items-center gap-1 px-3 py-1 text-[11.5px] text-white/75 transition hover:text-white"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                  <path d="M4 5h16v11H8l-4 4z" />
-                </svg>
-                {currentPhoto.retouchNote ? "Đã ghi chú" : "Ghi chú"}
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-col items-center gap-1.5">
+        <div className="mx-auto max-w-md rounded-[24px] bg-[#2E2A27]/80 backdrop-blur-md p-4 shadow-lg lg:bg-transparent lg:p-0">
+          <div className="flex items-center justify-between px-2">
             <button
               type="button"
               disabled={isLocked || isMutating}
@@ -858,45 +836,74 @@ export function PhotoLightbox({
               aria-label={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
               aria-pressed={isCurrentSelected}
               className={cn(
-                "grid h-16 w-16 place-items-center rounded-full transition-all active:scale-90 touch-manipulation focus:outline-hidden disabled:opacity-40",
+                "flex h-[48px] w-[88px] items-center justify-center rounded-full transition-all active:scale-90 touch-manipulation focus:outline-hidden disabled:opacity-40",
                 isCurrentSelected
-                  ? "bg-[#c4645a] text-white shadow-[0_10px_26px_-6px_rgba(196,100,90,.65)]"
-                  : "bg-white/10 text-white ring-1 ring-white/25 hover:bg-white/15",
+                  ? "bg-[#C4645A] text-[#2E2A27]"
+                  : "bg-white/10 text-white hover:bg-white/15",
               )}
             >
               <Heart
-                className="h-7 w-7"
+                className="h-6 w-6"
                 fill={isCurrentSelected ? "currentColor" : "none"}
-                strokeWidth={1.8}
+                strokeWidth={isCurrentSelected ? 0 : 2}
               />
             </button>
-            {typeof daChon === "number" && (
-              <span
-                className={cn(
-                  "text-[11.5px] tabular-nums",
-                  hanMuc != null && daChon > hanMuc ? "text-[#e0b25c]" : "text-white/60",
-                )}
-                title={vi.gallery.quotaInline}
-              >
-                {daChon}
-                {hanMuc != null ? ` / ${hanMuc}` : ""} tấm
-              </span>
-            )}
+
+            <div className="flex lg:invisible gap-8 pr-4">
+              {onLuuGhiChu && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (tamMo === "ghi-chu") {
+                      void luuGhiChu();
+                      setTamMo(null);
+                    } else {
+                      setTamMo("ghi-chu");
+                    }
+                  }}
+                  className={cn("p-2 transition active:scale-90", tamMo === "ghi-chu" || currentPhoto.retouchNote ? "text-[#C4645A]" : "text-white hover:text-[#C4645A]")}
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                  </svg>
+                </button>
+              )}
+
+              {bangSanPham && (
+                <button
+                  type="button"
+                  onClick={() => setTamMo("san-pham")}
+                  className="p-2 text-white transition hover:text-white/80 active:scale-90"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                    <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                    <rect x="9" y="9" width="11" height="11" rx="2" ry="2" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex justify-center lg:invisible">
-            {bangSanPham && (
-              <button
-                type="button"
-                onClick={() => setTamMo("san-pham")}
-                className="flex flex-col items-center gap-1 px-3 py-1 text-[11.5px] text-white/75 transition hover:text-white"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                  <rect x="4" y="3" width="16" height="18" rx="1.5" />
-                  <rect x="7.5" y="6.5" width="9" height="8" />
-                </svg>
-                In ảnh này
-              </button>
+          <div className={cn("overflow-hidden transition-all duration-300 lg:hidden", tamMo === "ghi-chu" ? "mt-4 max-h-[150px] opacity-100" : "max-h-0 opacity-0")}>
+            {onLuuGhiChu && (
+              <input
+                id="ghi-chu-anh"
+                type="text"
+                value={ghiChu}
+                onChange={(e) => setGhiChu(e.target.value)}
+                onBlur={luuGhiChu}
+                disabled={isLocked || dangLuuGhiChu || !isCurrentSelected || isMutating}
+                maxLength={500}
+                placeholder={
+                  isLocked
+                    ? vi.gallery.noteLocked
+                    : !isCurrentSelected
+                      ? vi.gallery.noteNeedsSelect
+                      : "Ghi chú cho thợ chỉnh ảnh"
+                }
+                className="w-full rounded-[12px] border border-white/20 bg-transparent px-4 py-3 text-[14px] text-white placeholder-white/50 focus:border-white/50 focus:outline-hidden disabled:opacity-50"
+              />
             )}
           </div>
         </div>
@@ -909,69 +916,23 @@ export function PhotoLightbox({
           ảnh không làm trang nhảy. Tấm trượt cần cuộn được, nên mở lại cử chỉ
           cuộn dọc riêng cho nó (`touch-pan-y`).
       */}
-      {tamMo && (
+      {tamMo === "san-pham" && (
         <div
-          // Bấm nền tối là đóng tấm trượt → bàn tay ở nền. Tấm trượt bên
-          // trong trả về con trỏ thường (cursor-auto), không thì cả ô ghi chú
-          // cũng hiện bàn tay vì con trỏ được kế thừa.
           className="fixed inset-0 z-40 flex flex-col justify-end bg-black/55 lg:hidden cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             if (e.target === e.currentTarget) {
-              if (tamMo === "ghi-chu") void luuGhiChu();
               setTamMo(null);
             }
           }}
         >
           <div
             role="dialog"
-            aria-label={tamMo === "san-pham" ? "In ảnh này" : "Ghi chú cho thợ chỉnh ảnh"}
+            aria-label="In ảnh này"
             className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#231e1a] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-white shadow-2xl animate-in slide-in-from-bottom-8"
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/25" aria-hidden="true" />
-
-            {tamMo === "san-pham" && bangSanPham?.(currentPhoto)}
-
-            {tamMo === "ghi-chu" && onLuuGhiChu && (
-              <div>
-                <label htmlFor="ghi-chu-anh" className="mb-2 block font-display text-lg">
-                  Ghi chú cho thợ chỉnh ảnh
-                </label>
-                <textarea
-                  id="ghi-chu-anh"
-                  value={ghiChu}
-                  onChange={(e) => setGhiChu(e.target.value)}
-                  onBlur={luuGhiChu}
-                  disabled={isLocked || dangLuuGhiChu || !isCurrentSelected || isMutating}
-                  rows={4}
-                  maxLength={500}
-                  placeholder={
-                    isLocked
-                      ? vi.gallery.noteLocked
-                      : !isCurrentSelected
-                        ? vi.gallery.noteNeedsSelect
-                        : vi.gallery.noteHint
-                  }
-                  className="w-full resize-none rounded-2xl bg-white/10 px-4 py-3 text-[15px] text-white outline-hidden ring-1 ring-white/15 placeholder:text-white/45 focus:ring-white/40 disabled:opacity-50"
-                />
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <span className="text-xs" aria-live="polite">
-                    {ketQuaLuu === "ok" && <span className="text-emerald-300">{vi.gallery.noteSaved}</span>}
-                    {ketQuaLuu === "loi" && <span className="text-amber-300">{vi.gallery.noteSaveFailed}</span>}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await luuGhiChu();
-                      setTamMo(null);
-                    }}
-                    className="h-11 rounded-full bg-[#fffdf9] px-6 text-sm font-medium text-[#2a2420]"
-                  >
-                    Xong
-                  </button>
-                </div>
-              </div>
-            )}
+            {bangSanPham?.(currentPhoto)}
           </div>
         </div>
       )}

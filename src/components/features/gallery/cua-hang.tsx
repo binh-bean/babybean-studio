@@ -41,6 +41,7 @@
  * hình, không đổi props/hành vi nào khác.
  */
 
+import { cn } from "@/components/ui/utils";
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
@@ -123,58 +124,59 @@ export function CuaHang({
       </header>
 
       {/* Ba nhóm, mỗi nhóm một thẻ — chủ studio gọi tên đúng ba nhóm này. */}
-      <nav className="flex gap-2 overflow-x-auto border-b border-border px-5 py-3 sm:px-8">
-        {THU_TU_NHOM.map((nhom) => (
-          <button
-            key={nhom}
-            type="button"
-            onClick={() => {
-              setNhomDangXem(nhom);
-              setMonDangChon(null);
-            }}
-            className={[
-              "shrink-0 rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
-              nhom === nhomDangXem
-                ? "bg-primary text-primary-foreground"
-                : "border border-border text-muted-foreground hover:bg-surface-2",
-            ].join(" ")}
-          >
-            {TEN_NHOM[nhom]}
-          </button>
-        ))}
-      </nav>
+      <div className="px-5 sm:px-8 flex justify-center mb-6">
+        <nav className="inline-flex w-full max-w-[400px] gap-1 rounded-full bg-[#E5DED6] p-1">
+          {THU_TU_NHOM.map((nhom) => (
+            <button
+              key={nhom}
+              type="button"
+              onClick={() => {
+                setNhomDangXem(nhom);
+                setMonDangChon(null);
+              }}
+              className={[
+                "flex-1 rounded-full py-2.5 text-[14px] font-medium transition-all",
+                nhom === nhomDangXem
+                  ? "bg-white text-[#2E2A27] shadow-sm"
+                  : "text-[#2E2A27]/60 hover:text-[#2E2A27]",
+              ].join(" ")}
+            >
+              {TEN_NHOM[nhom]}
+            </button>
+          ))}
+        </nav>
+      </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-8">
         {/* Tranh minh hoạ của nhóm đang xem (BB-248) — cùng phong cách
             public/hanh-trinh/, cạnh tiêu đề nhóm. */}
-        <div className="mb-3 flex items-center gap-3">
-          <TranhNho ten={tranhCuaSanPham(nhomDangXem, null, "")} kichThuoc={72} />
-          <h3 className="font-display text-lg font-light leading-tight">{TEN_NHOM[nhomDangXem]}</h3>
-        </div>
+        
 
         {theoNhom.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Nhóm này chưa có sản phẩm nào đang bán. Ba mẹ nhắn CSKH giúp em nhé.
           </p>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className="grid sm:grid-cols-2 divide-y divide-[#E5DED6] sm:divide-y-0 sm:gap-4">
             {theoNhom.map((m) => {
               const so = daDat(m.productId);
               const tranhSanPham = tranhCuaSanPham(m.nhom, m.material, m.name);
-              const laCanvas = tranhSanPham === "sp-tranh-canvas";
-              return (
-                <li key={m.productId} className="rounded-2xl border border-border bg-surface p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-start gap-3">
-                      {laCanvas && <TranhNho ten={tranhSanPham} kichThuoc={56} />}
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{m.name}</p>
-                        <p className="mt-1 text-sm font-semibold">{formatCurrencyVND(m.unitPrice)}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {[m.size, m.material].filter(Boolean).join(" · ")}
+                            return (
+                <li key={m.productId} className="py-4 relative">
+                  {/* Subtle divider except for the last item - wait, grid gap-3 might already handle spacing. We use border-b */}
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex min-w-0 flex-1 items-center gap-4">
+                      <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl bg-[#E5DED6] flex items-center justify-center p-2">
+                         <TranhNho ten={tranhSanPham} kichThuoc={64} />
+                      </div>
+                      <div className="min-w-0 flex-col justify-center">
+                        <p className="font-display text-[18px] font-medium leading-tight text-[#2E2A27]">{m.name}</p>
+                        <p className="mt-1 truncate text-[12px] text-[#2E2A27]/60">
+                          {[m.size, m.material].filter(Boolean).join(" — ")}
                         </p>
+                        <p className="mt-1 font-bold text-[#2E2A27]">{formatCurrencyVND(m.unitPrice)}</p>
                         {so > 0 && (
-                          <p className="mt-1.5 text-xs font-medium text-moss">Đang đặt {so}</p>
+                          <p className="mt-0.5 text-[11px] font-medium text-[#C4645A]">Đang đặt {so}</p>
                         )}
                       </div>
                     </div>
@@ -185,10 +187,14 @@ export function CuaHang({
                       onClick={() =>
                         m.canGanAnh
                           ? setMonDangChon(monDangChon?.productId === m.productId ? null : m)
-                          : // Album: mua luôn, ảnh đưa vào sau ở màn xem ảnh lớn.
-                            onMua(m.productId, so + 1, null)
+                          : onMua(m.productId, so + 1, null)
                       }
-                      className="h-9 shrink-0 rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                      className={cn(
+                        "flex h-9 shrink-0 items-center justify-center rounded-full px-4 text-[13px] font-medium transition-colors disabled:opacity-40",
+                        so > 0
+                          ? "bg-[#C4645A] text-white"
+                          : "bg-[#E5DED6] text-[#2E2A27] hover:bg-[#E5DED6]/80"
+                      )}
                     >
                       {m.canGanAnh ? "Chọn ảnh" : "Mua"}
                     </button>
@@ -267,7 +273,7 @@ export function CuaHang({
           <button
             type="button"
             onClick={onDong}
-            className="h-11 shrink-0 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+            className="h-[56px] shrink-0 rounded-full bg-[#2E2A27] px-8 text-[15px] font-medium text-[#FBF7F2] transition hover:opacity-90"
           >
             Xong
           </button>

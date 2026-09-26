@@ -60,6 +60,11 @@ const NGOAI_LE: Record<string, string> = {
     "ảnh, không đổi tiền, không có gì để tra lại sáu tháng sau ngoài chuyện " +
     "trình duyệt đó có nhận thông báo hay không — chính bảng push_dang_ky đã " +
     "là bản ghi đó.",
+  "g/thong-bao-khach":
+    "BB-261 — PATCH chỉ đánh dấu ĐÃ ĐỌC một dòng thong_bao_khach (hoặc tất cả " +
+    "của bộ ảnh). Không đổi trạng thái bộ ảnh, không đổi tiền, không có gì để " +
+    "tra lại sáu tháng sau ngoài việc khách đã mở chuông hay chưa — chính cột " +
+    "da_doc_luc đã là bản ghi đó, cùng lý lẽ với g/thong-bao ở trên.",
   "admin/galleries/preview":
     "Chỉ đọc thử một thư mục Drive rồi trả về, không ghi gì.",
   "auth/session":

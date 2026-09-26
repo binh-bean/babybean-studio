@@ -37,12 +37,20 @@ export interface ThanhChonProps {
    * vì ba mẹ cần biết NGAY có thao tác chưa tới được máy chủ.
    */
   soChuaGui?: number;
+  /**
+   * BB-258 — chủ studio 26/09/2026: thanh này đang che tên mục/thanh lọc khi
+   * bìa còn cao. `GalleryApp` tính lúc nào nên ẩn (bìa còn trong khung nhìn,
+   * hoặc đang cuộn xuống) và truyền vào đây; component chỉ lo HIỂN THỊ việc
+   * ẩn/hiện đó (trượt xuống + mờ dần), không đổi chữ/aria/data-testid/hành vi
+   * bấm — DOM vẫn còn đó, chỉ ẩn bằng CSS, để một cú cuộn lên nhỏ luôn lấy
+   * lại được nút chính ngay lập tức, không phải chờ mount lại.
+   */
+  an?: boolean;
 }
 
-const CHU_VI = 2 * Math.PI * 17;
 
-export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0 }: ThanhChonProps) {
-  const tiLe = hanMuc ? Math.min(daChon / hanMuc, 1) : 0;
+export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0, an = false }: ThanhChonProps) {
+
   const vuot = soTamThem > 0;
 
   // Ngắn, vì trên điện thoại 375px dòng này chỉ còn chừng 95px sau hai nút.
@@ -57,35 +65,37 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
           : "Đủ trong gói";
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-      <div className="pointer-events-auto mx-auto flex h-[60px] max-w-xl items-center gap-2.5 rounded-full bg-[#2a2420] pl-2.5 pr-2 text-[#fffdf9] shadow-[0_14px_32px_-10px_rgba(27,23,20,.55)]">
-        <svg viewBox="0 0 42 42" className="h-9 w-9 shrink-0" aria-hidden="true">
-          <circle cx="21" cy="21" r="17" fill="none" stroke="rgba(255,253,249,.18)" strokeWidth="3" />
-          {hanMuc != null && (
-            <circle
-              cx="21"
-              cy="21"
-              r="17"
-              fill="none"
-              stroke={vuot ? "#e0b25c" : "#e8a79e"}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={CHU_VI}
-              strokeDashoffset={CHU_VI * (1 - tiLe)}
-              transform="rotate(-90 21 21)"
-              className="transition-[stroke-dashoffset] duration-300"
-            />
-          )}
-        </svg>
-
+    <div
+      data-testid="thanh-noi"
+      className={cn(
+        "pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(12px,env(safe-area-inset-bottom))] transition-all duration-300 ease-out",
+        // Máy tính: gọn vào góc phải dưới, không còn choán giữa màn — đó là
+        // đúng vùng chủ studio chỉ ra đang che tên mục/thanh lọc. GIỮ NGUYÊN
+        // `bottom-0` (không thêm `lg:bottom-6`): `loi-goi-y-luu-app.tsx` định
+        // vị chính nó bằng một khoảng cách CỐ ĐỊNH tính từ đáy màn hình lên
+        // trên thanh này (`bottom-[calc(84px+...)]`) — nâng thanh này lên
+        // thêm sẽ ăn mất khoảng hở đó và đè lên nút "Chốt danh sách"
+        // (bb-240 bắt được: hộp gợi ý {y:694.5-816} đè nút {y:796-852}).
+        "lg:inset-x-auto lg:right-6 lg:px-0",
+        an
+          ? "translate-y-[calc(100%+env(safe-area-inset-bottom)+16px)] opacity-0"
+          : "translate-y-0 opacity-100",
+      )}
+      aria-hidden={an}
+    >
+      <div
+        className={cn(
+          "mx-auto flex h-[80px] max-w-[400px] items-center gap-3 rounded-full bg-[#2E2A27] pl-8 pr-3 shadow-2xl lg:mx-0",
+          an ? "pointer-events-none" : "pointer-events-auto",
+        )}>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-[15px] font-medium">
+          <p className="truncate font-display text-[26px] font-light text-[#FBF7F2]">
             <span data-testid="dem-da-chon">{daChon}</span>
-            {hanMuc != null ? ` / ${hanMuc} tấm` : " tấm"}
+            {hanMuc != null ? ` / ${hanMuc}` : ""}
           </p>
-          <p className={cn("truncate text-[11.5px]", vuot ? "text-[#e0b25c]" : "text-white/60")}>
+          <p className={cn("truncate text-[12px] mt-0.5", vuot ? "text-[#C4645A]" : "text-white/70")}>
             {soChuaGui > 0 ? (
-              <span data-testid="chua-luu">{`${vi.common.unsaved} · ${soChuaGui} tấm`}</span>
+              <span data-testid="chua-luu">{`${vi.common.unsaved} — ${soChuaGui} tấm`}</span>
             ) : (
               dongPhu
             )}
@@ -97,12 +107,12 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
             type="button"
             onClick={muaThem.onClick}
             aria-label="Mua thêm"
-            title={muaThem.tien > 0 ? `Mua thêm · ${formatCurrencyVND(muaThem.tien)}` : "Mua thêm"}
-            className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/90 transition hover:bg-white/10"
+            title={muaThem.tien > 0 ? `Mua thêm — ${formatCurrencyVND(muaThem.tien)}` : "Mua thêm"}
+            className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full text-white/90 transition hover:bg-white/10"
           >
-            <ShoppingBag className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
+            <ShoppingBag className="h-[22px] w-[22px]" strokeWidth={1.8} aria-hidden="true" />
             {muaThem.tien > 0 && (
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#e8a79e]" aria-hidden="true" />
+              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#C4645A]" aria-hidden="true" />
             )}
           </button>
         )}
@@ -111,7 +121,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
           <button
             type="button"
             onClick={nutChinh.onClick}
-            className="h-11 shrink-0 rounded-full bg-[#fffdf9] px-4 text-[14px] font-medium text-[#2a2420] transition hover:bg-white active:scale-[0.97] sm:px-5"
+            className="h-[56px] shrink-0 rounded-full bg-[#FBF7F2] px-6 text-[15px] font-medium text-[#2E2A27] transition hover:bg-white active:scale-[0.97]"
           >
             {nutChinh.nhan}
           </button>

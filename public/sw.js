@@ -1,11 +1,13 @@
 /**
- * Service worker của màn khách — BB-246: thông báo đẩy (Web Push).
+ * Service worker của màn khách — BB-246: thông báo đẩy (Web Push). BB-261
+ * thêm: báo cho tab đang mở khi có push mới, để chuông tự tải lại số chưa
+ * đọc (xem `postMessage("BB_PUSH_NHAN")` trong `push`).
  *
- * OWNER: Sonnet (BB-246). Chưa có service worker nào trước đây (soát lúc làm
- * BB-246: BB-213 chỉ dựng `beforeinstallprompt` + tấm hướng dẫn, không đăng ký
- * SW). Tệp này chỉ làm ĐÚNG hai việc thông báo đẩy cần — không cache tài
- * nguyên, không làm app "offline-first": thêm việc đó sau này thì sửa ở đây,
- * không cần tệp riêng.
+ * OWNER: Sonnet (BB-246, BB-261). Chưa có service worker nào trước đây (soát
+ * lúc làm BB-246: BB-213 chỉ dựng `beforeinstallprompt` + tấm hướng dẫn,
+ * không đăng ký SW). Tệp này chỉ làm ĐÚNG những việc thông báo đẩy cần —
+ * không cache tài nguyên, không làm app "offline-first": thêm việc đó sau này
+ * thì sửa ở đây, không cần tệp riêng.
  *
  * ---------------------------------------------------------------------------
  * Vì sao KHÔNG gửi link khách qua payload đẩy
@@ -89,14 +91,26 @@ self.addEventListener("push", (event) => {
   const tieuDe = payload.tieuDe || "BabyBean Studio";
   const noiDung = payload.noiDung || "";
   const galleryId = payload.galleryId || "";
+  const thongBaoId = payload.thongBaoId || null;
 
   event.waitUntil(
-    self.registration.showNotification(tieuDe, {
-      body: noiDung,
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
-      data: { galleryId },
-    }),
+    (async () => {
+      await self.registration.showNotification(tieuDe, {
+        body: noiDung,
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        data: { galleryId, thongBaoId },
+      });
+
+      // BB-261: báo cho mọi tab đang mở để chuông tự tải lại số chưa đọc
+      // (xem chuong-thong-bao.tsx, lắng nghe "message"). Không gọi API đánh
+      // dấu đã đọc TỪ ĐÂY — khách có thể thấy thông báo (icon hệ điều hành)
+      // mà chưa hề mở app; đánh dấu đã đọc ở đây là nói dối. Cách đơn giản
+      // hơn: để TRANG tự đánh dấu khi khách thật sự MỞ chuông
+      // (chuong-thong-bao.tsx gọi PATCH lúc mở bảng).
+      const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of allClients) client.postMessage({ type: "BB_PUSH_NHAN", galleryId, thongBaoId });
+    })(),
   );
 });
 

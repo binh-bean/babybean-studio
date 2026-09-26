@@ -244,15 +244,15 @@
 
    Tương phản đã đo: chữ phụ #6b6057 trên nền #f7f2eb = 5,6:1 (đạt AA). */
 .giao-dien-khach {
-  --bb-bg: #f7f2eb;
-  --bb-surface: #fffdf9;
-  --bb-surface-2: #efe8df;
-  --bb-border: #e4dace;
-  --bb-fg: #2a2420;
+  --bb-bg: #fbf7f2;
+  --bb-surface: #ffffff;
+  --bb-surface-2: #f2ebe1;
+  --bb-border: #e5dcd2;
+  --bb-fg: #2e2a27;
   --bb-fg-muted: #6b6057;
-  --bb-primary: #2a2420;
-  --bb-primary-fg: #fffdf9;
-  --bb-accent: #6c7a5f;
+  --bb-primary: #2e2a27;
+  --bb-primary-fg: #fbf7f2;
+  --bb-accent: #7fa99b;
   --bb-accent-fg: #ffffff;
   --bb-heart: #c4645a;
   --bb-moss: #4f5b45;
@@ -328,7 +328,7 @@
 
 /* Nền của cả trang (phần kéo quá đà trên iPhone) cũng phải kem, không đen. */
 body:has(.giao-dien-khach) {
-  background: #f7f2eb;
+  background: #fbf7f2;
 }
 
 /* ---------------------------------------------------------------------------

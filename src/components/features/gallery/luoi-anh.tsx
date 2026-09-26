@@ -138,7 +138,7 @@ const TheAnh = memo(function TheAnh({
         />
 
         {daChon && (
-          <span className="pointer-events-none absolute inset-0 rounded-[4px] ring-2 ring-inset ring-heart" />
+          <span className="pointer-events-none absolute inset-0 rounded-[4px] ring-1 ring-inset ring-[#2e2a27]" />
         )}
 
         {/*

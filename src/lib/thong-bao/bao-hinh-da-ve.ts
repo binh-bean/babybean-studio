@@ -11,5 +11,6 @@ export async function baoHinhDaVe(galleryId: string): Promise<void> {
   await guiThongBaoBoAnh(createAdminClient(), galleryId, {
     tieuDe: "Sản phẩm của bé đã về",
     noiDung: "Mời ba mẹ ghé studio nhận ảnh nhé.",
+    loai: "hinh_da_ve",
   });
 }

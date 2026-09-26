@@ -239,35 +239,35 @@ export function MoiMuaLanHai({
 
   return (
     <>
-      <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface p-5">
-        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-2">
+      <div className="flex flex-row items-center gap-5 rounded-[24px] bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:items-start sm:gap-6">
+        <div className="relative h-[100px] w-[100px] shrink-0 sm:h-[120px] sm:w-[120px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/san-pham/moi-mua-qua-tang-320.webp"
             srcSet="/san-pham/moi-mua-qua-tang-320.webp 320w, /san-pham/moi-mua-qua-tang-640.webp 640w"
-            sizes="56px"
+            sizes="(max-width: 640px) 100px, 120px"
             alt=""
             loading="lazy"
-            width={56}
-            height={56}
-            className="h-full w-full object-cover"
+            width={120}
+            height={120}
+            className="h-full w-full object-contain"
           />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-lg font-light leading-tight">
+        <div className="flex min-w-0 flex-1 flex-col items-start justify-center text-left">
+          <p className="font-display text-[22px] font-medium leading-[1.2] text-[#2E2A27]">
             {tieuDe ?? "Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?"}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-[13px] text-[#2E2A27]/60">
             {moTa ?? "Khung, ảnh in, album — studio gọi lại báo giá, chưa tính tiền."}
           </p>
+          <button
+            type="button"
+            onClick={() => setMo(true)}
+            className="mt-4 flex h-[44px] items-center justify-center rounded-full bg-[#2E2A27] px-6 text-[14px] font-medium text-white transition hover:bg-[#2E2A27]/90 active:scale-95"
+          >
+            Xem thêm
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setMo(true)}
-          className="h-10 shrink-0 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-        >
-          Xem thêm
-        </button>
       </div>
 
       {mo && (

@@ -124,6 +124,10 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // eslint-disable-next-line no-console
     console.log(`[BB-240] mép trái 1440×900 — bìa=${xBia} lưới=${xLuoi} chân trang=${xChanTrang}`);
 
+    // BB-258 — hoàn lại khẳng định chặt như trước BB-253: bìa tràn toàn màn,
+    // bố cục quay về XẾP DỌC (không còn cột trái/phải), nên mép trái bìa/lưới
+    // ảnh/chân trang lại phải lệch nhau ≤ 1px như công thức `khach-le-trai-lg`
+    // gốc (xem `src/styles/tokens.css`).
     expect(Math.abs(xBia - xLuoi)).toBeLessThanOrEqual(1);
     expect(Math.abs(xChanTrang - xLuoi)).toBeLessThanOrEqual(1);
   });
@@ -147,6 +151,8 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     const xLuoi = (await tamDau.boundingBox())!.x;
     // eslint-disable-next-line no-console
     console.log(`[BB-240] 1920 — thanh cuộn=${thanhCuon}px bìa=${xBia} lưới=${xLuoi}`);
+    // BB-258 — hoàn lại khẳng định chặt như trước BB-253 (xem giải thích ở ca
+    // 1440×900 phía trên).
     expect(Math.abs(xBia - xLuoi)).toBeLessThanOrEqual(1);
   });
 
