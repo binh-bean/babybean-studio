@@ -17,7 +17,19 @@ cập nhật theo tình hình thật hôm nay.
 | Migration trên bb-dev | tới 0073 |
 | bb-prod | có 457 bộ ảnh cũ, chậm hơn bb-dev nhiều migration (đo 21/09: thiếu 4; từ đó thêm 0065–0073) |
 
-## 2. Quyết định cần chốt: chạy thật trên đâu?
+## 2. CHỦ STUDIO CHỐT 26/09: toàn bộ link/lựa chọn hiện có là chủ studio TỰ THỬ
+
+"tất cả đều là bản tôi tự làm để tự test. mở một phần để khi test xong toàn bộ
+tôi sẽ báo xóa toàn bộ dữ liệu để cập nhật chạy thật trên khách."
+
+Nghĩa là: chưa có khách thật cầm link → không có gì mất khi cắt. Khi chủ studio
+báo "thử xong", làm một lượt: **xoá dữ liệu thử** (link, lựa chọn, ghi chú, yêu
+cầu mua, đăng ký thông báo — giữ nguyên danh mục, nhân sự, chi nhánh, bộ ảnh
+dựng từ Lark), chốt cơ sở dữ liệu chạy thật (A/B bên dưới, không còn ràng buộc
+link sống), rồi mở cho khách. Kịch bản xoá phải CHỈ ĐỌC trước (đếm từng bảng),
+chủ studio duyệt số đếm, rồi mới xoá trong một giao dịch.
+
+## 2b. (Tham khảo) hai hướng khi cắt
 
 Khi `docs/18` được viết, app chưa có khách thật nên "cắt sang bb-prod" chỉ là
 đổi ba biến. **Bây giờ đã có khách cầm link trên bb-dev** — cắt sang bb-prod là
