@@ -389,6 +389,7 @@ export const vi = {
       },
       dangBat: "Đang bật",
       dangTat: "Đang tắt",
+      huy: "Huỷ",
       luu: "Lưu thay đổi",
       dangLuu: "Đang lưu…",
       daLuu: "Đã lưu {n} thay đổi.",

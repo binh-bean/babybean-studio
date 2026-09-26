@@ -36,7 +36,9 @@ export default async function StaffPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl p-6">
+    // Không thêm padding ở đây: khung cuộn của layout đã có `p-4 sm:p-6
+    // lg:p-8` (admin-layout-shell.tsx) — cùng quy ước với Khách hàng, Bộ ảnh.
+    <main className="mx-auto min-w-0 max-w-6xl">
       <StaffManager />
     </main>
   );

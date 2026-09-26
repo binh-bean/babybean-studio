@@ -14,7 +14,7 @@ export default function AdminDashboardPage() {
   return (
     <main className="mx-auto min-w-0 max-w-7xl">
       {/* Thanh trên cùng đã ghi tên màn — xem ghi chú ở màn Khách hàng. */}
-      <h1 className="mb-6 hidden text-2xl font-bold tracking-tight lg:block">Bảng điều khiển</h1>
+      <h1 className="mb-6 hidden font-display text-2xl font-bold tracking-tight lg:block">Bảng điều khiển</h1>
       <Dashboard />
     </main>
   );
