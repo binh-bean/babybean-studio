@@ -2,6 +2,7 @@ import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const NHAN = `Fixture BB-231 E8 ${runId}`;
@@ -161,12 +162,7 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
 
     // 2. NV CSKH đăng nhập
     const nvPage = await context.newPage();
-    await nvPage.goto("/login");
-    await nvPage.waitForURL("**/login**");
-    await nvPage.getByLabel("Tên tài khoản hoặc email").fill(email);
-    await nvPage.getByLabel("Mật khẩu").fill(password);
-    await nvPage.getByRole("button", { name: /Đăng nhập/i }).click();
-    await nvPage.waitForURL("**/admin**");
+    await dangNhapNhanVien(nvPage, email, password);
 
     // Mở bộ ảnh A
     await nvPage.goto(`/admin/galleries/${galleryA}`);

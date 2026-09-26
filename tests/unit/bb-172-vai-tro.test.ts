@@ -15,9 +15,14 @@ vi.mock("server-only", () => ({}));
 
 import { GET, POST } from "@/app/api/admin/roles/route";
 import { PATCH, DELETE } from "@/app/api/admin/roles/[id]/route";
+import { randomUUID } from "node:crypto";
 
 const admin = createAdminClient();
-const TEN_THU = "Phép thử BB-172";
+// runId để hai lượt vitest chạy song song không cùng tạo một `name` vai trò
+// và va vào ràng buộc duy nhất trên bảng `roles`. Tên vai trò tối đa 40 ký tự
+// (xem tenVaiCoVanDeGi trong src/lib/auth/danh-muc-quyen.ts) nên chỉ lấy 8 ký
+// tự đầu của UUID, không dùng cả chuỗi.
+const TEN_THU = `Phép thử BB-172 ${randomUUID().slice(0, 8)}`;
 
 function nhuVai(role: string) {
   vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({

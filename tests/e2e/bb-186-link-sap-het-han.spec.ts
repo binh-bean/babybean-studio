@@ -10,6 +10,7 @@ import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const email = `test_bb186_${runId}@demo.babybean.vn`;
@@ -84,11 +85,7 @@ test.describe("BB-186: bảng link sắp hết hạn", () => {
   });
 
   test("có mục trong menu, mở ra thấy nhà sắp mất link", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="text"], input:not([type="password"])', email);
-    await page.fill('input[type="password"]', password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, email, password);
 
     await page.goto("/admin/galleries");
 

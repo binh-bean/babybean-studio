@@ -10,6 +10,7 @@
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const NHAN = `Fixture BB-260 ${runId}`;
@@ -61,11 +62,7 @@ test.describe("BB-260: Trung tâm báo cáo điều hành", () => {
   });
 
   test("mở /admin/bao-cao, chọn báo cáo, đổi kỳ đổi URL, xuất CSV tải được", async ({ page }) => {
-    await page.goto("/login");
-    await page.getByLabel("Tên tài khoản hoặc email").fill(email);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, email, password);
 
     await page.goto("/admin/bao-cao");
 
@@ -119,11 +116,7 @@ test.describe("BB-260: Trung tâm báo cáo điều hành", () => {
         [ctvId, branchId],
       );
 
-      await page.goto("/login");
-      await page.getByLabel("Tên tài khoản hoặc email").fill(emailCtv);
-      await page.getByLabel("Mật khẩu").fill(password);
-      await page.getByRole("button", { name: /Đăng nhập/i }).click();
-      await page.waitForURL("**/admin**");
+      await dangNhapNhanVien(page, emailCtv, password);
 
       await expect(page.getByRole("link", { name: "Báo cáo" })).toHaveCount(0);
     } finally {

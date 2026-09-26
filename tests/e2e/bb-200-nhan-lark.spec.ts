@@ -21,6 +21,7 @@ import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const NHAN = `Fixture BB-200 ${runId}`;
@@ -187,11 +188,7 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
    * soát rồi mới áp (xem ghi chú đầu file 0068). Áp xong thì bỏ `.skip` này.
    */
   test("(b1) danh sách quản trị hiện đúng mức cảnh báo (0068 đã áp 25/09)", async ({ page }) => {
-    await page.goto("/login");
-    await page.getByLabel("Tên tài khoản hoặc email").fill(emailCs);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, emailCs, password);
 
     await page.goto("/admin/galleries");
     await page.locator('input[name="search"]:visible').first().fill(`${NHAN} Bộ B`);
@@ -206,11 +203,7 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
    * được ngay cả khi 0068 chưa áp.
    */
   test("(b2) chi tiết bộ ảnh hiện đúng mức cảnh báo và dòng 'Lark: …'", async ({ page }) => {
-    await page.goto("/login");
-    await page.getByLabel("Tên tài khoản hoặc email").fill(emailCs);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, emailCs, password);
 
     await page.goto(`/admin/galleries/${galleryB}`);
     await expect(page.getByLabel("Mức cảnh báo: Phải xong trong ngày").first()).toBeVisible({ timeout: CHO_TAI });
@@ -219,11 +212,7 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
 
   test("(c) form 'Mở lại cho khách chọn tiếp': ẩn với vai không có quyền, hiện với vai có quyền", async ({ page, context }) => {
     // Vai photographer — KHÔNG có galleries:reopen.
-    await page.goto("/login");
-    await page.getByLabel("Tên tài khoản hoặc email").fill(emailPhotographer);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, emailPhotographer, password);
 
     await page.goto(`/admin/galleries/${galleryC}`);
     // Chờ dữ liệu tải xong TRƯỚC khi kiểm phần vắng mặt — GalleryDetail là
@@ -236,11 +225,7 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
 
     // Vai cs — CÓ galleries:reopen, trong một trang riêng (phiên khác).
     const csPage = await context.newPage();
-    await csPage.goto("/login");
-    await csPage.getByLabel("Tên tài khoản hoặc email").fill(emailCs);
-    await csPage.getByLabel("Mật khẩu").fill(password);
-    await csPage.getByRole("button", { name: /Đăng nhập/i }).click();
-    await csPage.waitForURL("**/admin**");
+    await dangNhapNhanVien(csPage, emailCs, password);
 
     await csPage.goto(`/admin/galleries/${galleryC}`);
     await expect(csPage.getByText("Mở lại cho khách chọn tiếp")).toBeVisible();

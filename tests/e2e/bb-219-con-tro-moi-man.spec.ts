@@ -35,6 +35,7 @@ import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 // Số giả MỚI mỗi lượt: số cố định va nhau khi hai worktree chạy cùng tệp
@@ -307,11 +308,7 @@ test.describe("BB-219: con trỏ bàn tay trên mọi màn", () => {
     trangDaDo.push("/g/[token] (màn khách bộ ảnh thử)");
 
     // ── 3. Đăng nhập thật ────────────────────────────────────────────────────
-    await page.goto("/login");
-    await page.getByLabel("Tên tài khoản hoặc email").fill(email);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, email, password);
 
     // ── 4. Mọi trang quản trị — liệt kê tự động từ hệ thống tệp ────────────
     const trangQuanTri = lietKeTrangQuanTri();

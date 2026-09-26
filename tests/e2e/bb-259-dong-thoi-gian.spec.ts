@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { randomUUID } from "node:crypto";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 /**
  * BB-259 — khối "Dòng thời gian hoạt động" ở màn chi tiết bộ ảnh quản trị.
@@ -119,12 +120,7 @@ test.describe("BB-259: Dòng thời gian hoạt động", () => {
   });
 
   test("nhân viên cs thấy khối, đúng thứ tự mới nhất trước, câu tiếng Việt đúng", async ({ page }) => {
-    await page.goto("/login");
-    await page.waitForURL("**/login**");
-    await page.getByLabel("Tên tài khoản hoặc email").fill(email);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, email, password);
 
     await page.goto(`/admin/galleries/${galleryId}`);
 

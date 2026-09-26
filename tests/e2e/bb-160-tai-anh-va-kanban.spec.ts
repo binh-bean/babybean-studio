@@ -8,6 +8,7 @@ import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { Client } from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { createHash, randomUUID } from "node:crypto";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const NHAN = `Fixture BB-160 ${runId}`;
@@ -223,11 +224,7 @@ test.describe("BB-160: Tải ảnh và Kanban", () => {
 
   test("4. Kanban: có cột Lỗi tải ảnh và số lượng chuẩn", async ({ page }) => {
     // Đăng nhập admin
-    await page.goto("/login");
-    await page.fill('input[type="text"], input:not([type="password"])', adminEmail);
-    await page.fill('input[type="password"]', adminPass);
-    await page.click('button[type="submit"]');
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, adminEmail, adminPass);
 
     // Vào Kanban
     await page.goto("/admin/galleries");

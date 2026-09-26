@@ -14,6 +14,7 @@ import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const NHAN = `Fixture BB-249 ${runId}`;
@@ -129,12 +130,7 @@ test.describe("BB-249: CSKH đổi trạng thái yêu cầu mua thêm", () => {
     test.skip(!coBang, "Bảng yeu_cau_mua_them (migration 0072) chưa áp lên môi trường chạy thử này.");
 
     // 1. CSKH đăng nhập, mở chi tiết bộ ảnh.
-    await page.goto("/login");
-    await page.waitForURL("**/login**");
-    await page.getByLabel("Tên tài khoản hoặc email").fill(email);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, email, password);
 
     await page.goto(`/admin/galleries/${galleryId}`);
     await expect(page.getByText("Yêu cầu mua thêm (1)")).toBeVisible({ timeout: 15_000 });

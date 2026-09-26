@@ -1,6 +1,7 @@
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const NHAN = `Fixture BB-230 E10 ${runId}`;
@@ -101,12 +102,7 @@ test.describe("E-10: Đa chi nhánh", () => {
   });
 
   test("Nhân viên chi nhánh A không thấy bộ ảnh chi nhánh B", async ({ page }) => {
-    await page.goto("/login");
-    await page.waitForURL("**/login**");
-    await page.getByLabel("Tên tài khoản hoặc email").fill(email);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, email, password);
 
     // Đến danh sách bộ ảnh
     await page.goto("/admin/galleries");

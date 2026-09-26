@@ -15,6 +15,7 @@ import { GET } from "@/app/api/g/gallery/route";
 import * as authSession from "@/lib/auth/gallery-session";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
 import { createClient } from "@supabase/supabase-js";
+import { randomBytes } from "node:crypto";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/admin", () => ({
@@ -30,8 +31,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-const MA_A = "Fixture-BB187-token-cua-nha-A";
-const MA_B = "Fixture-BB187-token-cua-nha-B";
+// randomBytes để hai lượt vitest chạy song song không cùng băm ra một
+// token_hash và va vào ràng buộc duy nhất `share_links_token_hash_key`.
+const MA_A = `Fixture-BB187-token-cua-nha-A-${randomBytes(32).toString("base64url")}`;
+const MA_B = `Fixture-BB187-token-cua-nha-B-${randomBytes(32).toString("base64url")}`;
 
 function duong(ma?: string) {
   return new Request(

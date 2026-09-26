@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const email = `test_admin_${runId}@demo.babybean.vn`;
@@ -51,14 +52,8 @@ test.describe("BB-141: Màn quản lý admin", () => {
   });
 
   test("Màn danh sách album phải tải được, không xoay mãi", async ({ page }) => {
-    await page.goto("/login");
-    await page.fill('input[type="text"], input:not([type="password"])', email);
-    await page.fill('input[type="password"]', password);
-    await page.click('button[type="submit"]');
+    await dangNhapNhanVien(page, email, password);
 
-    // 2. Chuyển hướng thành công và vào dashboard hoặc phải tự bấm sang galleries
-    await page.waitForURL("**/admin**");
-    
     // Vào /admin/galleries
     await page.goto("/admin/galleries");
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import { Client } from "pg";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { POST as taoLink } from "@/app/api/admin/galleries/[id]/share-link/route";
 import { POST as authGallery } from "@/app/api/auth/gallery/route";
 import { NextRequest } from "next/server";
@@ -53,7 +53,7 @@ describe("BB-148: Cấp lại link không làm mất ảnh khách chọn", () =>
                               drive_folder_url, photo_count)
        values ($1,$2,'Fixture BB-148 Gallery','ready',$3,'https://example.com/x', 3)
        returning id`,
-      [branchId, customerId, `fixture-bb148-${Date.now()}`],
+      [branchId, customerId, `fixture-bb148-${randomUUID()}`],
     );
     galleryId = g[0].id;
 
@@ -164,7 +164,7 @@ describe("BB-148: Cấp lại link không làm mất ảnh khách chọn", () =>
 
     // Dựng tay một link owner thứ hai, CÒN hiệu lực — không qua đường cấp lại
     // link, vì đường đó luôn thu hồi link cũ trước.
-    const maLinkHai = `bb148-song-song-${Date.now()}`;
+    const maLinkHai = `bb148-song-song-${randomUUID()}`;
     const bamMaHai = createHash("sha256").update(maLinkHai).digest("hex");
     await client.query(
       `insert into share_links (gallery_id, token_hash, token_prefix, role, status)

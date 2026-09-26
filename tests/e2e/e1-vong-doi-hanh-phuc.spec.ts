@@ -33,6 +33,7 @@ import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
+import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
 
 const runId = Math.random().toString(36).slice(2, 10);
 const NHAN = `Fixture E-1 ${runId}`;
@@ -186,14 +187,7 @@ test.describe("E-1: vòng đời hạnh phúc", () => {
       .toBe("submitted");
 
     // ── 4. Nhân viên đăng nhập bằng tài khoản thật ─────────────────────────
-    await page.goto("/login");
-    await page.waitForURL("**/login**");
-    // Chọn theo NHÃN, không theo thuộc tính `type`: ô tên tài khoản không khai
-    // `type` nên mọi bộ chọn dựa vào nó đều mong manh.
-    await page.getByLabel("Tên tài khoản hoặc email").fill(email);
-    await page.getByLabel("Mật khẩu").fill(password);
-    await page.getByRole("button", { name: /Đăng nhập/i }).click();
-    await page.waitForURL("**/admin**");
+    await dangNhapNhanVien(page, email, password);
 
     // ── 5. Tải danh sách ảnh đã chọn ───────────────────────────────────────
     const res = await page.request.get(`/api/admin/galleries/${galleryId}/export`);

@@ -28,6 +28,7 @@
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { Client } from 'pg';
+import { dangNhapNhanVien } from './helpers/dang-nhap-thu-lai';
 
 const runId = Math.random().toString(36).slice(2, 10);
 const email = `test_bb060_${runId}@demo.babybean.vn`;
@@ -75,18 +76,13 @@ test.describe('BB-060: chụp màn hình Bảng điều khiển', () => {
       const context = await browser.newContext({ viewport });
       const page = await context.newPage();
 
-      await page.goto('/login');
-      await page.fill('input[type="text"], input:not([type="password"])', email);
-      await page.fill('input[type="password"]', password);
-      await page.click('button[type="submit"]');
-
       // Đăng nhập xong rơi thẳng vào /admin/galleries, không phải /admin —
       // xem chú thích trong src/app/(auth)/login/page.tsx ("Về thẳng Quản lý
       // bộ ảnh, KHÔNG về /admin ... Đổi lại thành /admin khi BB-060 làm xong
       // Bảng điều khiển"). Đích đăng nhập là quyết định sản phẩm, phép thử
       // này không đổi nó — chỉ xác nhận đăng nhập thành công rồi TỰ điều
       // hướng sang đúng màn cần chụp.
-      await page.waitForURL('**/admin/galleries');
+      await dangNhapNhanVien(page, email, password, { sauKhiVao: '**/admin/galleries' });
       await page.goto('/admin');
 
       // `toBeAttached`, không `toBeVisible`: cái h1 này mang `hidden lg:block`
