@@ -176,7 +176,7 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
 
     await page.reload();
     await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: CHO_TAI });
-    await expect(page.getByText("Đang chỉnh sửa")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Đang chỉnh sửa" })).toBeVisible();
     await expect(page.getByText("Bộ ảnh đã được ghi nhận yêu cầu")).toHaveCount(0);
   });
 
