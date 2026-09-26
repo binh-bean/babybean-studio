@@ -26,6 +26,27 @@
  * Chống spam: tối đa 10 dòng 'moi' cho một bộ ảnh
  * ---------------------------------------------------------------------------
  * Không có ràng buộc gì chặn khách gửi liên tục — kiểm đếm ở đây trước khi ghi.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-254 — ông bà/người thân (link vai 'viewer') giờ GỬI ĐƯỢC yêu cầu này
+ * ---------------------------------------------------------------------------
+ * Chủ studio chốt 26/09/2026: ông bà XEM và MUA, gửi yêu cầu cho CSKH gọi lại
+ * CHÍNH ÔNG BÀ (không phải ba mẹ đứng hợp đồng). Hai điểm khác ba mẹ:
+ *
+ *   1. CỬA SỔ MỞ KHÁC HẲN: `duocMoiMuaLanHai` (đã duyệt, không vòng sửa) là
+ *      luật RIÊNG của ba mẹ — không áp cho ông bà. Ông bà chỉ cần bộ ảnh còn
+ *      MỞ CHO KHÁCH XEM (`dangMoChoKhachXem` — chưa hết hạn/lưu trữ), bất kể
+ *      đã duyệt hay chưa. Dùng nhầm luật của ba mẹ sẽ khoá cửa ông bà suốt từ
+ *      lúc gửi ảnh cho tới khi ba mẹ duyệt xong — sai với điều chủ studio nói.
+ *   2. BẮT BUỘC tên + SĐT người gửi: route TỰ KIỂM (không tin schema optional)
+ *      để CSKH biết gọi cho ai, không lẫn với số điện thoại của ba mẹ trong
+ *      hợp đồng.
+ *
+ * Ba cột mới (`ten_nguoi_mua`, `sdt_nguoi_mua`, `share_link_id`) nằm trong
+ * migration 0073 — CHƯA ÁP lên bb-dev lúc viết route này. `ghiDongMoiMua()`
+ * bên dưới TỰ RÚT các cột đó khỏi câu insert nếu PostgREST báo "column không
+ * tồn tại" (PGRST204/42703), để route không 500 trên môi trường chưa áp
+ * migration — cùng cách phòng thủ ADR đã dùng ở BB-245/`notify.ts`.
  */
 
 import { randomUUID } from "node:crypto";
@@ -35,23 +56,81 @@ import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateYeuCauMuaThemSchema } from "./schema";
 import { nhomSanPham, canGanAnh } from "@/lib/products/nhom-san-pham";
-import { enqueueLarkNotification } from "@/lib/lark/notify";
+import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { duocMoiMuaLanHai } from "@/lib/gallery/moi-mua-lan-hai-rules";
+import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
 /** Chống spam: quá con số này thì từ chối, không ghi thêm. */
 const TOI_DA_DONG_MOI = 10;
 
+/** Báo "cột chưa tồn tại" từ PostgREST (schema cache) hoặc Postgres thẳng. */
+function laLoiThieuCot(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false;
+  if (err.code === "PGRST204" || err.code === "42703") return true;
+  return /column .* (does not exist|not found)/i.test(err.message ?? "");
+}
+
+interface DongDeGhi {
+  productId: string;
+  photoId: string | null;
+  soLuong: number;
+  ghiChu: string | null;
+}
+
+/**
+ * Ghi các dòng yêu cầu — thử kèm ba cột BB-254 trước, rớt về bản không có ba
+ * cột đó nếu môi trường chưa áp migration 0073. Trả lại đúng các dòng đã ghi
+ * để phần còn lại của route không cần biết đường nào vừa chạy.
+ */
+async function ghiDongMoiMua(
+  admin: SupabaseClient,
+  galleryId: string,
+  dongDeGhi: DongDeGhi[],
+  nguoiMua: { ten: string; sdt: string; shareLinkId: string } | null,
+) {
+  const coBan = dongDeGhi.map((d) => ({
+    gallery_id: galleryId,
+    product_id: d.productId,
+    photo_id: d.photoId,
+    so_luong: d.soLuong,
+    ghi_chu: d.ghiChu,
+  }));
+
+  if (nguoiMua) {
+    const day = coBan.map((d) => ({
+      ...d,
+      ten_nguoi_mua: nguoiMua.ten,
+      sdt_nguoi_mua: nguoiMua.sdt,
+      share_link_id: nguoiMua.shareLinkId,
+    }));
+    const thu = await admin
+      .from("yeu_cau_mua_them")
+      .insert(day)
+      .select("id, product_id, photo_id, so_luong, ghi_chu, trang_thai, created_at");
+    if (!thu.error) return thu;
+    if (!laLoiThieuCot(thu.error)) return thu;
+    console.error(
+      "[mua-them] Migration 0073 chưa áp — ghi tạm KHÔNG kèm tên/SĐT người mua:",
+      thu.error.message,
+    );
+  }
+
+  return admin
+    .from("yeu_cau_mua_them")
+    .insert(coBan)
+    .select("id, product_id, photo_id, so_luong, ghi_chu, trang_thai, created_at");
+}
+
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
     const session = await requireGallerySession();
-
-    if (session.role === "viewer") {
-      return fail("FORBIDDEN", "Người xem không có quyền gửi yêu cầu mua thêm");
-    }
+    // BB-254: ông bà (viewer) GỬI ĐƯỢC yêu cầu này — không còn chặn 403 cho
+    // mọi viewer như trước. Điều kiện của họ kiểm ở bước 2b bên dưới.
 
     const jsonBody = await readJsonBody(request);
     if (!jsonBody.ok) {
@@ -62,12 +141,23 @@ export async function POST(request: Request): Promise<Response> {
     if (!parsed.success) {
       return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
     }
-    const { items } = parsed.data;
+    const { items, tenNguoiMua, sdtNguoiMua } = parsed.data;
+
+    // BB-254 — viewer BẮT BUỘC tên + SĐT để CSKH gọi lại đúng người. Kiểm ở
+    // đây (không tin schema `nullish`) vì trường này chỉ bắt buộc CÓ ĐIỀU
+    // KIỆN theo vai trong phiên, Zod không tự biết `session.role`.
+    if (session.role === "viewer") {
+      if (!tenNguoiMua || !sdtNguoiMua) {
+        return fail(
+          "INVALID_INPUT",
+          "Vui lòng cho studio xin tên và số điện thoại để gọi lại giúp em",
+        );
+      }
+    }
 
     const admin = createAdminClient();
 
-    // 1. Bộ ảnh phải tồn tại và đã DUYỆT (không phải chỉ "khoá" — submitted,
-    // in_retouch, awaiting_approval cũng khoá nhưng chưa phải lúc mời mua).
+    // 1. Bộ ảnh phải tồn tại.
     const { data: gallery, error: galleryError } = await admin
       .from("galleries")
       .select("id, branch_id, status, title")
@@ -78,20 +168,31 @@ export async function POST(request: Request): Promise<Response> {
       return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
-    // 2. Chỉ mở đúng cửa sổ chủ studio chốt: đã DUYỆT và không có vòng xin sửa
-    // nào. Dùng chung `duocMoiMuaLanHai` với màn khách — không tin giao diện.
-    const { count: soVongSua, error: roundsError } = await admin
-      .from("revision_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("gallery_id", session.galleryId);
+    if (session.role === "viewer") {
+      // 2a. Cửa sổ của ÔNG BÀ: bộ ảnh còn mở cho khách xem — KHÔNG đòi hỏi
+      // "đã duyệt, không vòng sửa" như ba mẹ (xem ghi chú đầu tệp).
+      if (!dangMoChoKhachXem(gallery.status)) {
+        return fail(
+          "CONFLICT",
+          "Bộ ảnh này không còn mở để gửi yêu cầu mua thêm",
+        );
+      }
+    } else {
+      // 2b. Cửa sổ của BA MẸ — giữ NGUYÊN luật BB-245: đã DUYỆT và không có
+      // vòng xin sửa nào. Dùng chung `duocMoiMuaLanHai` với màn khách.
+      const { count: soVongSua, error: roundsError } = await admin
+        .from("revision_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("gallery_id", session.galleryId);
 
-    if (roundsError) throw roundsError;
+      if (roundsError) throw roundsError;
 
-    if (!duocMoiMuaLanHai(gallery.status, soVongSua ?? 0)) {
-      return fail(
-        "CONFLICT",
-        "Chỉ gửi được yêu cầu mua thêm khi bộ ảnh đã duyệt và không có yêu cầu sửa nào",
-      );
+      if (!duocMoiMuaLanHai(gallery.status, soVongSua ?? 0)) {
+        return fail(
+          "CONFLICT",
+          "Chỉ gửi được yêu cầu mua thêm khi bộ ảnh đã duyệt và không có yêu cầu sửa nào",
+        );
+      }
     }
 
     // 3. Sản phẩm phải thuộc danh mục bộ ảnh đang được bán — cùng ba luật tiền
@@ -177,18 +278,18 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     // 5. Ghi — một dòng cho mỗi sản phẩm, KHÔNG gộp, KHÔNG cộng vào hợp đồng.
-    const { data: daGhi, error: insertError } = await admin
-      .from("yeu_cau_mua_them")
-      .insert(
-        dongDeGhi.map((d) => ({
-          gallery_id: session.galleryId,
-          product_id: d.productId,
-          photo_id: d.photoId,
-          so_luong: d.soLuong,
-          ghi_chu: d.ghiChu,
-        })),
-      )
-      .select("id, product_id, photo_id, so_luong, ghi_chu, trang_thai, created_at");
+    // BB-254: viewer kèm tên/SĐT/link — `ghiDongMoiMua` tự rớt về bản không
+    // có ba cột đó nếu migration 0073 chưa áp (xem hàm ở đầu tệp).
+    const nguoiMuaDeGhi =
+      session.role === "viewer" && tenNguoiMua && sdtNguoiMua
+        ? { ten: tenNguoiMua, sdt: sdtNguoiMua, shareLinkId: session.shareLinkId }
+        : null;
+    const { data: daGhi, error: insertError } = await ghiDongMoiMua(
+      admin,
+      session.galleryId,
+      dongDeGhi,
+      nguoiMuaDeGhi,
+    );
 
     if (insertError) throw insertError;
 
@@ -196,13 +297,32 @@ export async function POST(request: Request): Promise<Response> {
     const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "customer",
       actor_id: session.selectionId,
-      actor_label: "Customer",
+      actor_label: session.role === "viewer" ? "Viewer" : "Customer",
       action: "mua_them.yeu_cau",
       entity_type: "gallery",
       entity_id: session.galleryId,
-      metadata: { soDong: dongDeGhi.length, sanPham: dongDeGhi.map((d) => d.productId) },
+      metadata: {
+        soDong: dongDeGhi.length,
+        sanPham: dongDeGhi.map((d) => d.productId),
+        // Không ghi cả SĐT trần vào nhật ký nội bộ — che giữa cùng luật Lark.
+        nguoiMua: nguoiMuaDeGhi
+          ? { ten: nguoiMuaDeGhi.ten, sdtChe: cheSoDienThoai(nguoiMuaDeGhi.sdt) }
+          : null,
+      },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
+
+    // 6b. Nhãn của link viewer ("Bà nội"…) — chỉ để CSKH biết ai đã gửi qua
+    // Lark. Đọc hụt thì bỏ qua, không chặn phản hồi.
+    let nhanLinkNguoiMua: string | null = null;
+    if (nguoiMuaDeGhi) {
+      const { data: linkRow } = await admin
+        .from("share_links")
+        .select("label")
+        .eq("id", nguoiMuaDeGhi.shareLinkId)
+        .maybeSingle();
+      nhanLinkNguoiMua = (linkRow?.label as string | null) ?? null;
+    }
 
     // 7. Báo CSKH qua Lark — SAU khi ghi DB thành công. Không bao giờ để lỗi
     // báo tin làm hỏng phản hồi đã thành công với khách (xem lib/lark/notify).
@@ -232,6 +352,13 @@ export async function POST(request: Request): Promise<Response> {
             ghiChu: d.ghiChu,
           };
         }),
+        // BB-254 — chỉ có khi gửi từ link ông bà/người thân. Khoá đặt tên
+        // tránh mọi chữ khớp `/(photo|image|anh|thumb|url|src|href|drive)/i`
+        // (locBoAnh() cắt theo TÊN KHOÁ, không phải theo giá trị) — "nguoiMua"
+        // và "soLienHe" đều không dính bẫy "anh" như `danhSach`/`thanhTien`.
+        nhanNguoiMua: nguoiMuaDeGhi ? nhanLinkNguoiMua : null,
+        nguoiMuaTen: nguoiMuaDeGhi?.ten ?? null,
+        soLienHeNguoiMua: nguoiMuaDeGhi ? cheSoDienThoai(nguoiMuaDeGhi.sdt) : null,
       },
     });
 

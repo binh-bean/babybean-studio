@@ -31,6 +31,10 @@ interface Dong {
   ghiChu: string | null;
   trangThai: string;
   createdAt: string;
+  /** BB-254 — chỉ có khi yêu cầu tới từ link ông bà/người thân (vai viewer). */
+  nguoiMuaTen?: string | null;
+  nguoiMuaSdt?: string | null;
+  nguoiMuaNhanLink?: string | null;
 }
 
 const NHAN_TRANG_THAI: Record<string, string> = {
@@ -158,6 +162,18 @@ export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
               <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
                 {new Date(d.createdAt).toLocaleString("vi-VN")}
               </p>
+              {/*
+                BB-254 — yêu cầu gửi từ link ông bà/người thân, không phải ba
+                mẹ đứng hợp đồng. SĐT hiện NGUYÊN (không che) — đây là màn nội
+                bộ CSKH dùng để gọi lại, khác thẻ Lark (rộng hơn, che giữa).
+              */}
+              {d.nguoiMuaTen && (
+                <p className="mt-1 text-xs font-medium">
+                  Người mua: {[d.nguoiMuaNhanLink, d.nguoiMuaTen, d.nguoiMuaSdt]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
               {d.ghiChu && <p className="mt-1 text-xs">{d.ghiChu}</p>}
 
               {nuts.length > 0 && (

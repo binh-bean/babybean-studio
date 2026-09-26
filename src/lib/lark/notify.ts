@@ -419,17 +419,37 @@ ${chu(p.lyDo)}` },
       return `• **${chu(m.ten)}** ×${so(m.soLuong)}${tep}${ghi}`;
     });
 
+    /**
+     * BB-254 — có khi yêu cầu đến từ link ông bà/người thân (vai 'viewer'),
+     * không phải ba mẹ đứng hợp đồng. CSKH phải gọi lại ĐÚNG người vừa gửi,
+     * nên thẻ ghi rõ "Người mua: <nhãn link> · <tên> · <SĐT che>" thay vì im
+     * lặng coi mọi yêu cầu đều từ ba mẹ.
+     */
+    const coNguoiMua = typeof p.nguoiMuaTen === "string" && p.nguoiMuaTen.trim().length > 0;
     const elements: Record<string, unknown>[] = [
       { tag: "div", fields: [o("Bộ ảnh", chu(p.tieuDeBo)), o("Số sản phẩm", `${so(p.tongSoMon)}`)] },
+    ];
+    if (coNguoiMua) {
+      const nhanLink = typeof p.nhanNguoiMua === "string" && p.nhanNguoiMua ? p.nhanNguoiMua : null;
+      const soLienHe = typeof p.soLienHeNguoiMua === "string" ? p.soLienHeNguoiMua : null;
+      const phanTu = [nhanLink, chu(p.nguoiMuaTen), soLienHe].filter((x): x is string => Boolean(x));
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: `**Người mua:** ${phanTu.join(" · ")}` },
+      });
+    }
+    elements.push(
       { tag: "div", text: { tag: "lark_md", content: dong.join("\n") } },
       {
         tag: "div",
         text: {
           tag: "lark_md",
-          content: "Ba mẹ chưa thanh toán — CSKH gọi lại chốt giá và cách thanh toán.",
+          content: coNguoiMua
+            ? "Chưa thanh toán — CSKH gọi lại ĐÚNG người mua ở trên để chốt giá và cách thanh toán."
+            : "Ba mẹ chưa thanh toán — CSKH gọi lại chốt giá và cách thanh toán.",
         },
       },
-    ];
+    );
     if (diaChiAdmin) {
       elements.push({
         tag: "action",

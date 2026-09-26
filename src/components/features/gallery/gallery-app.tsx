@@ -9,6 +9,8 @@ import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-c
 import { ManTreoTuong } from "@/components/features/gallery/man-treo-tuong";
 import { CuaHang } from "@/components/features/gallery/cua-hang";
 import { MoiMuaLanHai } from "@/components/features/gallery/moi-mua-lan-hai";
+import { MoiNguoiThan } from "@/components/features/gallery/moi-nguoi-than";
+import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
 import { TomTatSanPhamIn } from "@/components/features/gallery/tom-tat-san-pham-in";
@@ -1434,8 +1436,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
             />
           )}
 
-          {/* Người chỉ xem (link mời ông bà) không gửi được yêu cầu — route trả
-              403 — nên không hiện thẻ mời cho họ (Opus soát BB-245). */}
+          {/* Người chỉ xem (link mời ông bà) không gửi được yêu cầu theo luật
+              BB-245 (đã duyệt, không vòng sửa) — route trả 403/409 nếu bấm
+              thẳng bằng luật ba mẹ, nên không hiện thẻ NÀY cho họ (Opus soát
+              BB-245). Ông bà có thẻ mua thêm RIÊNG ở nhánh !duocChon dưới. */}
           {duocChon && (
           <MoiMuaLanHai
             status={gallery.status}
@@ -1455,12 +1459,46 @@ export function GalleryApp({ token }: GalleryAppProps) {
           />
           )}
 
-          {!duocChon && !isLocked && (
-            <div className="rounded-2xl border border-border bg-surface p-4 text-sm">
-              <p className="font-medium">Link này để xem ảnh cùng gia đình</p>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">
-                Việc chọn ảnh do ba mẹ đứng tên hợp đồng. Thích tấm nào, nhắn ba mẹ nhé.
-              </p>
+          {/*
+            BB-254 — "Mời ông bà cùng xem". Gate GIỐNG hệt route
+            (`/api/g/moi-nguoi-than` chặn 403 nếu phiên là viewer): `duocChon`
+            đúng bằng "vaiTro !== 'viewer'" (owner/co_editor/suggester).
+          */}
+          {duocChon && <MoiNguoiThan />}
+
+          {!duocChon && (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-border bg-surface p-4 text-sm">
+                <p className="font-medium">Link này để xem ảnh cùng gia đình</p>
+                <p className="mt-0.5 text-[13px] text-muted-foreground">
+                  Việc chọn ảnh do ba mẹ đứng tên hợp đồng. Thích tấm nào, nhắn ba mẹ nhé.
+                </p>
+              </div>
+
+              {/*
+                BB-254 — ông bà XEM và MUA: gửi yêu cầu mua thêm không cần chờ
+                ba mẹ duyệt xong (`moGate` thay cho luật `duocMoiMuaLanHai` chỉ
+                dành cho ba mẹ). Route `/api/g/mua-them` tự kiểm lại đúng luật
+                này theo `session.role === "viewer"` — không tin giao diện.
+              */}
+              <MoiMuaLanHai
+                status={gallery.status}
+                soVongSua={0}
+                moGate={dangMoChoKhachXem(gallery.status)}
+                batBuocNguoiMua
+                tieuDe="Đặt in ảnh này / Mua thêm"
+                moTa="Chọn sản phẩm và để lại tên, số điện thoại — studio gọi lại báo giá."
+                danhMuc={(gallery.addons?.catalogue ?? []).map((sp) => ({
+                  productId: sp.productId,
+                  name: sp.name,
+                  material: sp.material,
+                  size: sp.size,
+                  unitPrice: sp.unitPrice,
+                  nhom: sp.nhom as NhomSanPham,
+                  canGanAnh: sp.canGanAnh,
+                }))}
+                anhDaChon={photos.map((p) => ({ id: p.id, fileName: p.fileName }))}
+              />
             </div>
           )}
 
@@ -1643,6 +1681,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
           </div>
         </div>
       ) : (
+        /*
+          BB-254 — ẩn HẲN thanh này với ông bà/người thân (viewer): nó hiện số
+          tấm ba mẹ đã chọn và tiền phụ thu (`tienThem`) — đúng thứ chủ studio
+          chốt "ông bà không thấy tiền hợp đồng/tiền phát sinh của ba mẹ".
+          Tim của ông bà vốn đã không cộng vào `selectionCounts` (route chặn ở
+          `EDITING_ROLES`), nhưng bản thân thanh này vẫn là CỦA BA MẸ.
+        */
+        duocChon && (
         <ThanhChon
           daChon={selectionCounts.selectedCount}
           hanMuc={hanMuc}
@@ -1656,6 +1702,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           }
           soChuaGui={hangChoTim.soChuaGui}
         />
+        )
       )}
 
       {/* HỘP THOẠI XÁC NHẬN CHỐT BỘ ẢNH */}
