@@ -162,7 +162,9 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
     await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: CHO_TAI });
 
     // Giai đoạn 2 ("Đã chọn hình" — xếp hàng, chưa ai chỉnh).
-    await expect(page.getByText("Bộ ảnh đã được ghi nhận yêu cầu")).toBeVisible();
+    // Từ BB-225 câu này hiện HAI chỗ: tiêu đề thẻ hành trình và dòng trong khung
+    // duyệt ảnh — cùng đọc nhanHienThi().khach. Bám tiêu đề thẻ cho khỏi mơ hồ.
+    await expect(page.getByRole("heading", { name: "Bộ ảnh đã được ghi nhận yêu cầu" })).toBeVisible();
     await expect(page.getByText("Đang chỉnh sửa")).toHaveCount(0);
 
     // Chuyển Lark sang giai đoạn 3 ("Đang làm") — mô phỏng lượt đồng bộ tiếp
