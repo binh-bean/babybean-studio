@@ -700,7 +700,14 @@ export function ManTreoTuong({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="truncate font-display text-lg font-light leading-tight text-bb-fg">
+            {/*
+              BB-275 kiểm ngược — trên máy tính (`md:w-[300px]`) cột chữ chỉ còn
+              ~184px cạnh nút "Chi tiết", và `truncate` cắt tiêu đề còn "Treo
+              lên tư…". Bỏ `truncate`, cho xuống dòng: cột có chiều cao tự do
+              (`md:max-h-none`, cuộn được), không như thanh ngang hẹp cần cắt
+              một dòng.
+            */}
+            <h2 className="font-display text-lg font-light leading-tight text-bb-fg">
               Treo lên tường nhà mình
             </h2>
           </div>

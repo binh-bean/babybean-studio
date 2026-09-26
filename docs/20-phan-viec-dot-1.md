@@ -195,3 +195,7 @@ Chủ studio: "tận dụng tối đa banana và gemini 3.1 pro và các sonnet"
 | BB-268 | Banana (Antigravity DESIGNER) | 4 bản vẽ quản trị + 2 tranh album |
 | BB-269 | Sonnet | ĐÃ GỘP. Bảng điều khiển, khách hàng, nhân sự, cài đặt theo bản vẽ |
 | BB-202 | Sonnet → Opus soát | ĐÃ GỘP, 0075 ĐÃ ÁP (chủ studio duyệt). Bìa album trong gói bắt buộc (chọn trong ảnh đã thả tim); album mua thêm chỉ đặt mua. Opus sửa: đẩy hàng chờ tim trước khi lưu bìa |
+| BB-272 | Sonnet | ĐÃ GỘP. Màn khách tải chậm 8 phần ít dùng: JS trang 45,8→32,1 kB |
+| BB-273 | Sonnet → Opus soát | ĐÃ GỘP. Sao lưu hằng ngày trên GitHub Actions, mã hoá AES-256-GCM; NGỦ tới khi chủ studio thêm 2 secret (docs/24) |
+| BB-274 | Sonnet → Opus soát | ĐÃ GỘP. Soát bố cục 390/1440 mọi màn; Opus sửa gốc: tên màn là uuid → "Chi tiết bộ ảnh". Chưa soát: cửa hàng, lightbox, so sánh, người thân, chọn bìa album |
+| BB-275 | Sonnet → Opus soát | ĐÃ GỘP. Soát 6 màn phụ: tiêu đề treo tường không cắt chữ; chuông khoá cuộn nền + lớp phủ trên điện thoại |

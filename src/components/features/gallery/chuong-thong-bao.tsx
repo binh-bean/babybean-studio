@@ -161,6 +161,21 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
     return () => document.removeEventListener("mousedown", khiBamNgoai);
   }, [mo]);
 
+  // BB-275 kiểm ngược — bảng chuông là `fixed inset-x-0 bottom-0` trên điện
+  // thoại (chỉ chiếm tới 70vh), nhưng trang NỀN vẫn cuộn được phía sau nó
+  // (khác `photo-lightbox.tsx`/`so-sanh-anh.tsx`, hai màn kia đã khoá cuộn
+  // nền). Ba mẹ mở chuông rồi cuộn nền thì một chip lọc ("Tất cả"…) có thể
+  // trôi ra đúng chỗ bảng đang che — khoá cuộn nền khi bảng mở, như hai màn
+  // xem lớn kia đã làm.
+  useEffect(() => {
+    if (!mo) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [mo]);
+
   const moBang = useCallback(async () => {
     const dangMo = !mo;
     setMo(dangMo);
@@ -204,57 +219,73 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
       </button>
 
       {mo && (
-        <div
-          role="dialog"
-          aria-label="Danh sách thông báo"
-          className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-[20px] border-t border-[var(--bb-border)] bg-[var(--bb-surface)] p-4 shadow-lg sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-96 sm:w-80 sm:rounded-2xl sm:border sm:p-3"
-        >
-          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--bb-border)] sm:hidden" />
+        <>
+          {/*
+            BB-275 kiểm ngược — trên điện thoại bảng chuông là một tấm trượt từ
+            đáy cao tới 70vh, đủ để đè lên chip lọc ("Tất cả"…) nếu nó rơi vào
+            nửa dưới màn hình (bộ ảnh ngắn, đầu trang cao). Không có lớp phủ
+            nền thì phần bị che trông như vẫn "còn đó" — dễ hiểu lầm là bấm
+            được. Thêm lớp phủ mờ CHỈ trên điện thoại (`sm:hidden`, bảng máy
+            tính là dropdown neo cạnh nút chuông, không cần phủ nền) để rõ:
+            nền đã tạm khoá, mọi chú ý dồn vào bảng.
+          */}
+          <div
+            aria-hidden="true"
+            onClick={() => setMo(false)}
+            className="fixed inset-0 z-40 cursor-pointer bg-black/30 sm:hidden"
+          />
+          <div
+            role="dialog"
+            aria-label="Danh sách thông báo"
+            className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-[20px] border-t border-[var(--bb-border)] bg-[var(--bb-surface)] p-4 shadow-lg sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-96 sm:w-80 sm:rounded-2xl sm:border sm:p-3"
+          >
+            <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--bb-border)] sm:hidden" />
 
-          {goiIosThemManHinh && (
-            <p className="mb-3 rounded-lg bg-[var(--bb-surface-2)] p-2 text-xs text-muted-foreground">
-              Thêm app ra màn hình chính để nhận thông báo ngay khi có tin mới.
-            </p>
-          )}
-
-          {dsThongBao.length === 0 ? (
-            <div className="flex flex-col items-center py-4">
-              {/* Tranh banana BB-262 "chuông trống" — hộp rỗng có tranh đỡ trơ
-                  hơn một dòng chữ xám. */}
-              {!dangTai && (
-                <img
-                  src="/minh-hoa/chuong-trong-320.webp"
-                  srcSet="/minh-hoa/chuong-trong-320.webp 320w, /minh-hoa/chuong-trong-640.webp 640w"
-                  sizes="128px"
-                  alt=""
-                  width={128}
-                  height={128}
-                  className="h-32 w-32 rounded-lg object-cover"
-                />
-              )}
-              <p className="mt-2 text-center text-sm text-muted-foreground">
-                {dangTai ? "Đang tải…" : "Chưa có thông báo"}
+            {goiIosThemManHinh && (
+              <p className="mb-3 rounded-lg bg-[var(--bb-surface-2)] p-2 text-xs text-muted-foreground">
+                Thêm app ra màn hình chính để nhận thông báo ngay khi có tin mới.
               </p>
-            </div>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {dsThongBao.map((tb) => (
-                <li
-                  key={tb.id}
-                  className="rounded-lg px-2 py-2 hover:bg-[var(--bb-surface-2)]"
-                >
-                  <p className={`text-sm ${tb.daDoc ? "font-normal" : "font-semibold"} text-[var(--bb-fg)]`}>
-                    {tb.tieuDe}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{tb.noiDung}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    {thoiGianTuongDoi(tb.createdAt)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+            )}
+
+            {dsThongBao.length === 0 ? (
+              <div className="flex flex-col items-center py-4">
+                {/* Tranh banana BB-262 "chuông trống" — hộp rỗng có tranh đỡ trơ
+                    hơn một dòng chữ xám. */}
+                {!dangTai && (
+                  <img
+                    src="/minh-hoa/chuong-trong-320.webp"
+                    srcSet="/minh-hoa/chuong-trong-320.webp 320w, /minh-hoa/chuong-trong-640.webp 640w"
+                    sizes="128px"
+                    alt=""
+                    width={128}
+                    height={128}
+                    className="h-32 w-32 rounded-lg object-cover"
+                  />
+                )}
+                <p className="mt-2 text-center text-sm text-muted-foreground">
+                  {dangTai ? "Đang tải…" : "Chưa có thông báo"}
+                </p>
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {dsThongBao.map((tb) => (
+                  <li
+                    key={tb.id}
+                    className="rounded-lg px-2 py-2 hover:bg-[var(--bb-surface-2)]"
+                  >
+                    <p className={`text-sm ${tb.daDoc ? "font-normal" : "font-semibold"} text-[var(--bb-fg)]`}>
+                      {tb.tieuDe}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{tb.noiDung}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {thoiGianTuongDoi(tb.createdAt)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
