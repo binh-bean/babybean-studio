@@ -188,3 +188,5 @@ Chủ studio: "tận dụng tối đa banana và gemini 3.1 pro và các sonnet"
 | BB-253 | Antigravity — Gemini 3.1 Pro | Dựng màn khách theo bản vẽ. Đề bài `docs/briefs/BB-253-man-khach-theo-ban-ve.md` |
 | BB-254 | Sonnet (PW_PORT 3165) | ĐÃ GỘP, 0073 ĐÃ ÁP (chủ studio duyệt). Mời ông bà: ba mẹ tự mời (≤5), ông bà xem + gửi yêu cầu mua kèm tên/SĐT. Opus siết: chỉ owner/co_editor được mời |
 | BB-255 | Sonnet (PW_PORT 3166) | ĐÃ GỘP. Quản trị chi tiết 2 cột + đăng nhập theo bản vẽ; bỏ "dòng thời gian" (chưa có dữ liệu thật) |
+| BB-256 | Opus | ĐÃ GỘP. Cron hậu kỳ 08:00 chạy luôn lượt dựng bộ ảnh từ Lark (lưới đỡ cho hook) |
+| BB-257 | Sonnet (PW_PORT 3167) | ĐÃ GỘP. Khối "Cần xử lý trước khi gửi khách" ở danh sách bộ ảnh: Drive chưa chia sẻ (73), chưa có ảnh (44), nút Kiểm lại |
