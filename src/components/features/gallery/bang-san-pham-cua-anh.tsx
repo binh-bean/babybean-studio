@@ -123,7 +123,10 @@ export function BangSanPhamCuaAnh({
   khoa,
   dangLuu,
   onDatVaoGoi,
-  onDatVaoAlbum,
+  // BB-202: không còn dùng ở đây (xem ghi chú tại chỗ hiện albumDaMua bên
+  // dưới) — giữ lại trong interface để không phải sửa mọi nơi gọi component
+  // này, đổi tên có gạch dưới để qua luật no-unused-vars của dự án.
+  onDatVaoAlbum: _onDatVaoAlbum,
   onDatMuaThem,
   onMuaAlbum,
   onXemTuong,
@@ -267,30 +270,25 @@ export function BangSanPhamCuaAnh({
               </li>
             ))}
 
+            {/*
+              BB-202 — chủ studio 26/09/2026: "mua thêm album trong cửa hàng =
+              CHỈ ĐẶT MUA, CSKH trao đổi ảnh/bìa sau — KHÔNG bắt đưa ảnh vào
+              album." Trước đây dòng này là một NÚT bấm để tự đưa/gỡ ảnh
+              (`onDatVaoAlbum`), giờ chỉ còn hiện TRẠNG THÁI đã mua, không còn
+              bấm được — route `/api/g/placements` cũng đã từ chối luồng này
+              (409) nếu có nơi nào còn gọi tới.
+            */}
             {albumDaMua.map((al) => (
-              <li key={al.addonId}>
-                <button
-                  type="button"
-                  disabled={khoa || dangLuu}
-                  onClick={() => onDatVaoAlbum(al.addonId, !al.coAnhNay)}
-                  className={[
-                    "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors",
-                    al.coAnhNay
-                      ? "bg-emerald-500/20 ring-1 ring-emerald-300/50"
-                      : "bg-white/10 hover:bg-white/15",
-                    khoa || dangLuu ? "opacity-60" : "",
-                  ].join(" ")}
-                >
-                  <span className="min-w-0">
-                    <span className="block font-medium">{al.name}</span>
-                    <span className="block text-white/55">
-                      {al.coAnhNay ? "Đã có tấm này" : `Đang có ${al.soAnh} tấm`}
-                    </span>
+              <li
+                key={al.addonId}
+                className="flex items-center justify-between gap-2 rounded-xl bg-white/10 px-3 py-2 text-left text-xs"
+              >
+                <span className="min-w-0">
+                  <span className="block font-medium">{al.name}</span>
+                  <span className="block text-white/55">
+                    Đã đặt mua — studio sẽ trao đổi với ba mẹ về ảnh và bìa
                   </span>
-                  <span className="shrink-0 text-base leading-none">
-                    {al.coAnhNay ? "✓" : "+"}
-                  </span>
-                </button>
+                </span>
               </li>
             ))}
           </ul>

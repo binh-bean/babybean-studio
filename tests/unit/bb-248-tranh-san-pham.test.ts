@@ -14,8 +14,8 @@ describe("BB-248: tranhCuaSanPham", () => {
     expect(tranhCuaSanPham("anh_in", null, "Ảnh phóng")).toBe("sp-anh-in");
   });
 
-  it("nhóm album → sp-album", () => {
-    expect(tranhCuaSanPham("album", "Album (Ultra HD)", "Album 15x21")).toBe("sp-album");
+  it("nhóm album → sp-album-dat-mua (BB-202: album mua thêm chỉ đặt mua)", () => {
+    expect(tranhCuaSanPham("album", "Album (Ultra HD)", "Album 15x21")).toBe("sp-album-dat-mua");
   });
 
   it("nhóm khung, chất liệu thường → sp-khung-anh", () => {

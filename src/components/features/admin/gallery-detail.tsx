@@ -116,6 +116,8 @@ interface Detail {
   larkDocLuc?: string | null;
   /** Nhân viên đang đăng nhập có quyền `galleries:reopen` không. */
   canReopen?: boolean;
+  /** BB-202 — bìa của mỗi album TRONG GÓI, `fileName: null` = chưa chọn. */
+  albumCovers?: Array<{ galleryItemId: string; name: string; fileName: string | null }>;
 }
 
 export function GalleryDetail({ galleryId }: { galleryId: string }) {
@@ -872,6 +874,17 @@ function KhoiChinh({
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-medium">
                     {item.name} <span className="text-[var(--bb-fg-muted)]">×{item.quantity}</span>
+                    {/* BB-202 — "Bìa album: <tên tệp>" ngay cạnh dòng hàng, để
+                        CSKH không phải mở riêng một chỗ khác mới biết. */}
+                    {(() => {
+                      const bia = (detail.albumCovers ?? []).find((a) => a.galleryItemId === item.id);
+                      if (!bia) return null;
+                      return (
+                        <span className="ml-2 text-xs text-[var(--bb-fg-muted)]">
+                          — Bìa album: {bia.fileName ?? "(chưa chọn)"}
+                        </span>
+                      );
+                    })()}
                   </span>
                   <span className="flex items-center gap-3">
                     {item.totalPrice !== null && (
@@ -901,6 +914,18 @@ function KhoiChinh({
                               (đây là hạn mức ảnh)
                             </span>
                           )}
+                          {/* BB-202 — album có thể nằm ở tầng thành phần (một
+                              album trong gói chụp), không chỉ ở tầng dòng
+                              hàng — cùng lookup như ở trên. */}
+                          {(() => {
+                            const bia = (detail.albumCovers ?? []).find((a) => a.galleryItemId === c.id);
+                            if (!bia) return null;
+                            return (
+                              <span className="ml-2 text-xs text-[var(--bb-fg-muted)]">
+                                — Bìa album: {bia.fileName ?? "(chưa chọn)"}
+                              </span>
+                            );
+                          })()}
                         </span>
                         {!locked && c.kind === "edited_photo" && (
                           <QuantityEditor

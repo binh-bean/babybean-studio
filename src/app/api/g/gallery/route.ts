@@ -5,6 +5,7 @@ import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
 import { nhomSanPham, canGanAnh } from "@/lib/products/nhom-san-pham";
+import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { nhanHienThi } from "@/lib/lark/trang-thai-hau-ky";
 
 export async function GET(request: Request) {
@@ -153,6 +154,65 @@ export async function GET(request: Request) {
       ? Math.max(0, selected - includedQuota)
       : 0;
     const extraAmount = extraCount * gallery.extra_photo_price;
+
+    /*
+      BB-202 — "Bìa album": mỗi album TRONG GÓI (`nhomSanPham === 'album'`)
+      hiện đang có bìa nào (nếu có), để màn khách vẽ khối "Chọn ảnh bìa album".
+
+      Bảng `album_covers` có thể CHƯA TỒN TẠI (migration 0075 chưa áp) — bắt
+      lỗi "bảng không tồn tại" (42P01) và trả danh sách rỗng thay vì làm sập cả
+      màn hình khách vì một tính năng chưa triển khai.
+    */
+    const albumRowsTrongGoi = locHangInTrongGoi(contractSummary.items).filter(
+      (h) => h.nhom === "album",
+    );
+    let albumBia: Array<{
+      galleryItemId: string;
+      name: string;
+      coverPhotoId: string | null;
+      coverFileName: string | null;
+    }> = albumRowsTrongGoi.map((a) => ({
+      galleryItemId: a.galleryItemId,
+      name: a.name,
+      coverPhotoId: null,
+      coverFileName: null,
+    }));
+
+    if (albumRowsTrongGoi.length > 0) {
+      const { data: covers, error: coversErr } = await supabase
+        .from("album_covers")
+        .select("gallery_item_id, selection_item_id")
+        .in(
+          "gallery_item_id",
+          albumRowsTrongGoi.map((a) => a.galleryItemId),
+        );
+
+      if (!coversErr && covers && covers.length > 0) {
+        const selItemIds = covers.map((c) => c.selection_item_id);
+        const { data: sis } = await supabase
+          .from("selection_items")
+          .select("id, photo_id")
+          .in("id", selItemIds);
+        const photoIdBySelItem = new Map((sis ?? []).map((s) => [s.id, s.photo_id as string]));
+
+        const photoIds = Array.from(new Set(Array.from(photoIdBySelItem.values())));
+        const { data: anhs } = photoIds.length
+          ? await supabase.from("photos").select("id, file_name").in("id", photoIds)
+          : { data: [] as { id: string; file_name: string }[] };
+        const fileNameByPhoto = new Map((anhs ?? []).map((a) => [a.id, a.file_name as string]));
+
+        const coverByGalleryItem = new Map(covers.map((c) => [c.gallery_item_id, c.selection_item_id]));
+        albumBia = albumRowsTrongGoi.map((a) => {
+          const selItemId = coverByGalleryItem.get(a.galleryItemId) ?? null;
+          const photoId = selItemId ? photoIdBySelItem.get(selItemId) ?? null : null;
+          const fileName = photoId ? fileNameByPhoto.get(photoId) ?? null : null;
+          return { galleryItemId: a.galleryItemId, name: a.name, coverPhotoId: photoId, coverFileName: fileName };
+        });
+      }
+      // `coversErr` (kể cả 42P01 bảng chưa có) thì giữ nguyên danh sách chưa
+      // có bìa đã dựng sẵn ở trên — màn khách vẫn thấy tên album, chỉ chưa
+      // biết bìa đang là tấm nào.
+    }
 
     // Lấy danh sách sản phẩm mua thêm (addons) của phiên chọn ảnh
     const { data: rawAddons } = await supabase
@@ -440,6 +500,8 @@ export async function GET(request: Request) {
       placements: placementsList,
       /** Ảnh nào nằm trong album mua thêm nào. */
       albumPlacements,
+      /** BB-202 — bìa của mỗi album TRONG GÓI (rỗng = gói không có album nào). */
+      albumBia,
       review,
     };
 

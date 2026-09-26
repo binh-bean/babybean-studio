@@ -52,6 +52,12 @@ const NGOAI_LE: Record<string, string> = {
     "Một bộ in mười khung là mười lượt đặt ảnh; ghi hết thì nhật ký ngập dòng " +
     "không ai đọc. Bản thân việc đặt đã nằm trong selection_placements, còn " +
     "quyết định cuối của khách có selection.submit ghi lại.",
+  "g/album-cover":
+    "BB-202 — cùng lý lẽ với g/placements ngay trên: ba mẹ có thể đổi ý bìa " +
+    "vài lần trước khi ưng, mỗi lần là một lượt upsert vào album_covers — bản " +
+    "thân bảng đó đã là bản ghi (một dòng mỗi album, luôn phản ánh lựa chọn " +
+    "MỚI NHẤT). Quyết định cuối cùng vẫn được `selection.submit` chụp lại " +
+    "(nó từ chối chốt nếu album chưa có bìa hợp lệ), nên không mất dấu.",
   "g/buoi-chup":
     "Chỉ chọn buổi chụp để mở trong phiên của khách, không ghi dữ liệu nghiệp vụ.",
   "g/thong-bao":

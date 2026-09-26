@@ -19,6 +19,7 @@ import { ghiNhatKy } from "@/lib/nhat-ky";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { nhanHienThi, mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-hau-ky";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 
 export const runtime = "nodejs";
 
@@ -68,6 +69,51 @@ export async function GET(
 
     // 4. Retrieve 2-tier contract components and quota
     const summary = await getGalleryContractSummary(gallery.id, admin);
+
+    /*
+      BB-202 — "Bìa album: <tên tệp>" cho CSKH ở màn chi tiết bộ ảnh.
+
+      Bảng `album_covers` có thể CHƯA TỒN TẠI (migration 0075 chưa áp) — bắt
+      lỗi 42P01 và trả mảng rỗng, không làm sập cả màn chi tiết vì một tính
+      năng chưa triển khai.
+    */
+    const albumRowsTrongGoi = locHangInTrongGoi(summary.items).filter((h) => h.nhom === "album");
+    let albumCovers: Array<{ galleryItemId: string; name: string; fileName: string | null }> = [];
+    if (albumRowsTrongGoi.length > 0) {
+      const { data: covers, error: coversErr } = await admin
+        .from("album_covers")
+        .select("gallery_item_id, selection_item_id")
+        .in(
+          "gallery_item_id",
+          albumRowsTrongGoi.map((a) => a.galleryItemId),
+        );
+      if (!coversErr && covers) {
+        const selItemIds = covers.map((c) => c.selection_item_id);
+        const { data: sis } = selItemIds.length
+          ? await admin.from("selection_items").select("id, photo_id").in("id", selItemIds)
+          : { data: [] as { id: string; photo_id: string }[] };
+        const photoIdBySelItem = new Map((sis ?? []).map((s) => [s.id, s.photo_id]));
+        const photoIds = Array.from(new Set(Array.from(photoIdBySelItem.values())));
+        const { data: anhs } = photoIds.length
+          ? await admin.from("photos").select("id, file_name").in("id", photoIds)
+          : { data: [] as { id: string; file_name: string }[] };
+        const fileNameByPhoto = new Map((anhs ?? []).map((a) => [a.id, a.file_name]));
+        const coverByItem = new Map(covers.map((c) => [c.gallery_item_id, c.selection_item_id]));
+
+        albumCovers = albumRowsTrongGoi.map((a) => {
+          const selItemId = coverByItem.get(a.galleryItemId) ?? null;
+          const photoId = selItemId ? photoIdBySelItem.get(selItemId) ?? null : null;
+          const fileName = photoId ? fileNameByPhoto.get(photoId) ?? null : null;
+          return { galleryItemId: a.galleryItemId, name: a.name, fileName };
+        });
+      } else {
+        albumCovers = albumRowsTrongGoi.map((a) => ({
+          galleryItemId: a.galleryItemId,
+          name: a.name,
+          fileName: null,
+        }));
+      }
+    }
 
     // 5. Respond
     // Số ảnh khách đã chọn, đếm MỖI ẢNH MỘT LẦN.
@@ -260,6 +306,8 @@ export async function GET(
           }
         : null,
       items: summary.items,
+      // BB-202 — khối "Bìa album" ở màn chi tiết.
+      albumCovers,
     });
   } catch (err) {
     if (err instanceof AuthError) {

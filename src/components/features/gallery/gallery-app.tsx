@@ -15,6 +15,7 @@ import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
 import { TomTatSanPhamIn } from "@/components/features/gallery/tom-tat-san-pham-in";
+import { ChonBiaAlbum } from "@/components/features/gallery/chon-bia-album";
 import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
@@ -127,6 +128,13 @@ interface GalleryApiResponse {
   placements?: Array<{ photoId: string; galleryItemId: string }>;
   /** Ảnh nào nằm trong album mua thêm nào (migration 0062). */
   albumPlacements?: Array<{ addonId: string; photoId: string }>;
+  /** BB-202 — bìa của mỗi album TRONG GÓI. Rỗng = gói không có album nào. */
+  albumBia?: Array<{
+    galleryItemId: string;
+    name: string;
+    coverPhotoId: string | null;
+    coverFileName: string | null;
+  }>;
   // Vòng duyệt ảnh đã chỉnh. null khi bộ ảnh chưa tới bước đó.
   review?: ReviewData | null;
   /**
@@ -980,6 +988,34 @@ export function GalleryApp({ token }: GalleryAppProps) {
   );
 
   /**
+   * BB-202 — mọi ảnh ĐÃ THẢ TIM, hình dạng mà `goiYBiaAlbum` cần.
+   *
+   * "Thả tim" ở màn khách nghĩa là `mark === 'selected'` — cùng định nghĩa
+   * `handleToggleHeart` đang dùng, không phải enum `mark === 'favorite'`
+   * (một tầng khác, không lộ ra ở nút trái tim).
+   */
+  const anhDaThaTimChoBia = useMemo(
+    () =>
+      photos
+        .filter((p) => p.mark === "selected")
+        .map((p) => ({
+          selectionItemId: "", // không cần ở màn khách — API tự tra lại theo photoId
+          photoId: p.id,
+          fileName: p.fileName,
+          retouchNote: p.retouchNote,
+          orderIndex: p.orderIndex,
+          sortIndex: p.sortIndex,
+        })),
+    [photos],
+  );
+
+  /** BB-202 — album trong gói chưa có bìa (hoặc bìa đã mất hiệu lực). */
+  const albumThieuBia = useMemo(
+    () => (gallery?.albumBia ?? []).filter((a) => !a.coverPhotoId),
+    [gallery?.albumBia],
+  );
+
+  /**
    * BB-180 — đếm số ảnh của từng nhóm (thư mục con trong Drive).
    *
    * Đo trên bb-dev ngày 17/09: 148.881/152.637 ảnh đã mang tên thư mục, 184
@@ -1175,6 +1211,37 @@ export function GalleryApp({ token }: GalleryAppProps) {
         if (!res.ok) {
           const json = await res.json().catch(() => null);
           setStatusMessage(json?.error?.message ?? "Không lưu được, ba mẹ thử lại giúp.");
+          return;
+        }
+        await loadGallery();
+      } catch {
+        setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
+      } finally {
+        setPlacing(false);
+      }
+    },
+    [loadGallery],
+  );
+
+  /**
+   * BB-202 — chọn (hoặc đổi) ảnh bìa cho một album TRONG GÓI.
+   *
+   * Khác `datAnhVaoAlbum` ở trên (album MUA THÊM, nay đã khoá): đây là bìa của
+   * album ĐÃ CÓ SẴN trong hợp đồng, gọi `/api/g/album-cover`, và chỉ có ĐÚNG
+   * một ảnh mỗi lần (không cộng dồn).
+   */
+  const chonBiaAlbum = useCallback(
+    async (galleryItemId: string, photoId: string) => {
+      setPlacing(true);
+      try {
+        const res = await fetch("/api/g/album-cover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ galleryItemId, photoId }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          setStatusMessage(json?.error?.message ?? "Không lưu được ảnh bìa, ba mẹ thử lại giúp.");
           return;
         }
         await loadGallery();
@@ -1685,6 +1752,28 @@ export function GalleryApp({ token }: GalleryAppProps) {
         hạn mức ảnh chỉnh (nếu CSKH đã nhập), và danh sách sản phẩm in có sẵn
         trong gói (đã có ở TomTatSanPhamIn).
       */}
+      {/*
+        BB-202 — "Chọn ảnh bìa album". Đặt TRƯỚC khối "Trong gói của ba mẹ":
+        chọn bìa là việc BẮT BUỘC trước khi chốt, còn khối dưới chỉ là tra cứu.
+      */}
+      {albumTrongGoi.length > 0 && (
+        <div className="mx-auto mt-14 max-w-3xl px-4">
+          <ChonBiaAlbum
+            albums={gallery.albumBia ?? albumTrongGoi.map((a) => ({
+              galleryItemId: a.galleryItemId,
+              name: a.name,
+              coverPhotoId: null,
+              coverFileName: null,
+            }))}
+            anhDaThaTim={anhDaThaTimChoBia}
+            coverPhotoIdBoAnh={gallery.coverPhotoId ?? null}
+            khoa={isLocked}
+            dangLuu={placing}
+            onChonBia={chonBiaAlbum}
+          />
+        </div>
+      )}
+
       {(hanMuc != null || hangInTrongGoi.length > 0) && (
         <div className="mx-auto mt-14 max-w-3xl space-y-5 px-4">
           <h2 className="font-display text-[28px] font-light leading-tight">Trong gói của ba mẹ</h2>
@@ -2006,6 +2095,39 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   con; chặn là họ bỏ dở giữa chừng. Chỉ nói rõ cái được nếu chọn
                   luôn, rồi để họ tự quyết.
               */}
+              {/*
+                BB-202 — khác khối "nhắc, không chặn" ngay dưới đây: thiếu bìa
+                album là CHẶN THẬT (chủ studio 26/09: "BẮT BUỘC chọn trước khi
+                chốt"). Máy chủ cũng từ chối (409 CONFLICT) nếu lỡ bấm được,
+                nhưng chặn ở đây trước để ba mẹ không mất công gõ tên rồi mới
+                biết chưa xong.
+              */}
+              {albumThieuBia.length > 0 && (
+                <div className="mt-3 rounded-2xl border border-heart/40 bg-heart/[0.08] p-3.5 text-xs">
+                  <p className="font-semibold text-heart">Ba mẹ chưa chọn ảnh bìa cho:</p>
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[#2a2420]/80">
+                    {albumThieuBia.map((al) => (
+                      <li key={al.galleryItemId}>{al.name}</li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSubmitModal(false);
+                      const dauTien = albumThieuBia[0];
+                      if (dauTien) {
+                        document
+                          .getElementById(`chon-bia-album-${dauTien.galleryItemId}`)
+                          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }
+                    }}
+                    className="mt-2.5 rounded-full bg-heart px-3 py-1.5 font-medium text-white transition hover:opacity-90"
+                  >
+                    Đi tới chọn bìa
+                  </button>
+                </div>
+              )}
+
               {sanPhamThieuAnh.length > 0 && (
                 <div className="mt-3 rounded-2xl border border-heart/25 bg-heart/[0.06] p-3.5 text-xs">
                   <p className="font-semibold text-heart">Ba mẹ chưa chọn ảnh cho:</p>
@@ -2078,7 +2200,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   onClick={handleSubmitSelection}
                   // Khoá nút khi chưa đủ hai ô: bấm rồi nhận "Dữ liệu không hợp
                   // lệ" thì ba mẹ không biết thiếu gì, và câu đó không nói ra.
-                  disabled={submitting || tenXacNhan.trim().length === 0 || !dongY}
+                  // BB-202: thêm điều kiện thiếu bìa album — chặn THẬT, không
+                  // chỉ nhắc (khác `sanPhamThieuAnh`).
+                  disabled={
+                    submitting || tenXacNhan.trim().length === 0 || !dongY || albumThieuBia.length > 0
+                  }
                   className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
                 >
                   {submitting && <Spinner className="h-4 w-4" />}

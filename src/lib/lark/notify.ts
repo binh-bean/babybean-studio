@@ -279,6 +279,21 @@ export function dungThe(
     if (p.customerPhone) truong.push(o("Điện thoại", chu(p.customerPhone)));
 
     const elements: Record<string, unknown>[] = [{ tag: "div", fields: truong }];
+
+    /*
+      BB-202 — dòng "Bìa album": tên tệp (không đuôi, xem submit/route.ts).
+      Mảng rỗng (gói không có album, hoặc bảng album_covers chưa áp) thì
+      không thêm dòng nào — không bịa ra thông tin cho gói không mua album.
+    */
+    const biaAlbum = Array.isArray(p.biaAlbumTen) ? (p.biaAlbumTen as unknown[]) : [];
+    const tenBia = biaAlbum.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+    if (tenBia.length > 0) {
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: `**Bìa album:** ${tenBia.join(", ")}` },
+      });
+    }
+
     if (diaChiAdmin) {
       elements.push({
         tag: "action",

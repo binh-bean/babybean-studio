@@ -160,14 +160,17 @@ describe("BB-067: xuất danh sách ảnh đã chọn", () => {
     asRole("cs", [branchA]);
     const than = await (await goi("csv")).text();
 
-    expect(than.split("\r\n")[0]).toBe("ten_file,thu_muc_con,ghi_chu_chinh_sua,yeu_thich");
-    expect(than).toContain('"IMG_0003.jpg","Concept 2","Xoá mụn sữa, chỉnh sáng","x"');
+    // BB-202: thêm cột cuối "bia_album" (tên album mà ảnh đang làm bìa, rỗng
+    // nếu không phải bìa của album nào) — phép thử này canh HÌNH DẠNG cột, đổi
+    // theo yêu cầu mới.
+    expect(than.split("\r\n")[0]).toBe("ten_file,thu_muc_con,ghi_chu_chinh_sua,yeu_thich,bia_album");
+    expect(than).toContain('"IMG_0003.jpg","Concept 2","Xoá mụn sữa, chỉnh sáng","x",""');
     expect(than).toContain("Cả bộ làm tông sáng giúp em");
 
     // Dấu phẩy trong ghi chú phải nằm TRONG ô, không đẩy lệch cột: dòng của
-    // IMG_0003 vẫn đúng bốn ô.
+    // IMG_0003 vẫn đúng NĂM ô (bốn dấu phân cách ",").
     const dong = than.split("\r\n").find((d) => d.startsWith('"IMG_0003'))!;
-    expect(dong.match(/","/g)?.length).toBe(3);
+    expect(dong.match(/","/g)?.length).toBe(4);
   });
 
   it("3. Vai không có quyền xuất thì bị chặn", async () => {

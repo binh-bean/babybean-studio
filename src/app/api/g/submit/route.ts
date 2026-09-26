@@ -4,11 +4,13 @@
  * OWNER: DEV-BE. Task BB-114.
  * Spec: docs/16-quy-trinh-dau-cuoi.md §4, docs/04-api-spec.md §3.7
  *
- * Bốn luật:
+ * Năm luật:
  * 1. Chốt xong là KHOÁ (lần hai ném GALLERY_LOCKED).
  * 2. CHỈ CSKH mới chuyển được giai đoạn tiếp theo (khách không thể tự chuyển sang in_retouch).
  * 3. Lúc chốt phải CHỤP LẠI con số: số ảnh đã chọn, hạn mức, số thừa, tiền thừa ghi vào album và selection.
  * 4. Hạn mức chưa biết (app.gallery_quota trả null) thì KHÔNG cho chốt (trả QUOTA_UNKNOWN).
+ * 5. BB-202 — gói CÓ album mà album nào CHƯA CÓ BÌA (hoặc bìa đã mất hiệu lực
+ *    vì ba mẹ bỏ tim tấm đang làm bìa) thì KHÔNG cho chốt.
  */
 
 import { isGalleryLocked } from "@/lib/gallery-status";
@@ -18,8 +20,76 @@ import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SubmitSelectionSchema } from "./schema";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
+import { getGalleryContractSummary } from "@/lib/selection/contract";
+import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 
 export const runtime = "nodejs";
+
+/**
+ * BB-202, luật 5 — kiểm mọi album TRONG GÓI của bộ ảnh này đã có bìa HỢP LỆ
+ * chưa. "Hợp lệ" nghĩa là: có dòng trong `album_covers`, VÀ ảnh nó trỏ tới vẫn
+ * đang `mark = 'selected'` (còn được thả tim) của ĐÚNG lượt chọn đang chốt.
+ *
+ * Trả về tên các album còn thiếu/hỏng bìa — rỗng nghĩa là mọi album đều ổn (kể
+ * cả khi gói không có album nào, `albumRows` rỗng thì vòng lặp không chạy).
+ *
+ * Bảng `album_covers` có thể CHƯA TỒN TẠI trên môi trường chưa áp migration
+ * 0075 (Opus chưa áp). Gặp lỗi "bảng không tồn tại" (Postgres 42P01) thì KHÔNG
+ * chặn chốt — một tính năng chưa triển khai không được phép khoá luôn nút Chốt
+ * của mọi khách hàng khác.
+ */
+async function timAlbumThieuBia(
+  admin: ReturnType<typeof createAdminClient>,
+  galleryId: string,
+  selectionId: string,
+): Promise<{ tenConThieu: string[]; galleryItemIdConThieu: string[] }> {
+  const contractSummary = await getGalleryContractSummary(galleryId, admin);
+  const albumRows = locHangInTrongGoi(contractSummary.items).filter((h) => h.nhom === "album");
+
+  if (albumRows.length === 0) return { tenConThieu: [], galleryItemIdConThieu: [] };
+
+  const { data: covers, error: coversError } = await admin
+    .from("album_covers")
+    .select("gallery_item_id, selection_item_id")
+    .in(
+      "gallery_item_id",
+      albumRows.map((a) => a.galleryItemId),
+    );
+
+  if (coversError) {
+    // Xem chú thích ở đầu hàm: bảng chưa có (0075 chưa áp) không được chặn.
+    if ((coversError as { code?: string }).code === "42P01") {
+      return { tenConThieu: [], galleryItemIdConThieu: [] };
+    }
+    throw coversError;
+  }
+
+  const coverByItem = new Map((covers ?? []).map((c) => [c.gallery_item_id, c.selection_item_id]));
+
+  const selectionItemIds = Array.from(new Set((covers ?? []).map((c) => c.selection_item_id)));
+  const { data: selItems } = selectionItemIds.length
+    ? await admin
+        .from("selection_items")
+        .select("id, mark, selection_id")
+        .in("id", selectionItemIds)
+    : { data: [] as { id: string; mark: string; selection_id: string }[] };
+
+  const hopLe = new Set(
+    (selItems ?? [])
+      .filter((s) => s.mark === "selected" && s.selection_id === selectionId)
+      .map((s) => s.id),
+  );
+
+  const thieu = albumRows.filter((a) => {
+    const selItemId = coverByItem.get(a.galleryItemId);
+    return !selItemId || !hopLe.has(selItemId);
+  });
+
+  return {
+    tenConThieu: thieu.map((a) => a.name),
+    galleryItemIdConThieu: thieu.map((a) => a.galleryItemId),
+  };
+}
 
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
@@ -83,6 +153,21 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const includedQuota = Number(quotaVal);
+
+    // 4b. Luật 5 (BB-202) — gói có album mà chưa chọn bìa (hoặc bìa vừa mất
+    // hiệu lực vì bỏ tim) thì KHÔNG cho chốt.
+    const { tenConThieu: albumThieuBia } = await timAlbumThieuBia(
+      admin,
+      session.galleryId,
+      session.selectionId,
+    );
+    if (albumThieuBia.length > 0) {
+      return fail(
+        "CONFLICT",
+        `Ba mẹ chưa chọn ảnh bìa cho: ${albumThieuBia.join(", ")}. Vui lòng chọn bìa rồi chốt lại.`,
+        { albumThieuBia },
+      );
+    }
 
     // 5. Đếm số ảnh đã chọn lúc này
     const { count: selectedCount, error: countError } = await admin
@@ -167,6 +252,41 @@ export async function POST(request: Request): Promise<Response> {
       .eq("id", gallery.customer_id)
       .maybeSingle();
 
+    /*
+      BB-202 — thẻ Lark báo có dòng bìa album (tên tệp, KHÔNG kèm đuôi).
+
+      Đuôi tệp (".jpg", ".png"...) khớp đúng `GIA_TRI_CAM` trong `locBoAnh()` —
+      chặn đúng luật "không ảnh của bé sang Lark" (docs/08 §5), vì một chuỗi
+      kết thúc bằng đuôi ảnh CŨNG LÀ một chuỗi trỏ tới ảnh. Gửi tên KHÔNG đuôi
+      thì vẫn đủ để CSKH đối chiếu, mà không lọt qua tấm lưới an toàn đó.
+
+      Bảng `album_covers` có thể chưa tồn tại (0075 chưa áp) — không ném, chỉ
+      bỏ qua dòng này khỏi thẻ.
+      Bọc TOÀN BỘ khối trong try/catch: đây là dữ liệu TRANG TRÍ cho thẻ Lark,
+      đứng sau giao dịch đã commit — không được phép làm hỏng nút Chốt.
+    */
+    let biaAlbumTen: string[] = [];
+    try {
+      const { data: covers } = await admin
+        .from("album_covers")
+        .select("selection_item_id")
+        .eq("gallery_id", session.galleryId);
+      const selItemIds = (covers ?? []).map((c) => c.selection_item_id);
+      if (selItemIds.length > 0) {
+        const { data: sis } = await admin
+          .from("selection_items")
+          .select("photo_id")
+          .in("id", selItemIds);
+        const photoIds = (sis ?? []).map((s) => s.photo_id);
+        if (photoIds.length > 0) {
+          const { data: anhs } = await admin.from("photos").select("file_name").in("id", photoIds);
+          biaAlbumTen = (anhs ?? []).map((a) => String(a.file_name).replace(/\.[^./\\]+$/, ""));
+        }
+      }
+    } catch {
+      biaAlbumTen = [];
+    }
+
     await enqueueLarkNotification({
       branchId: gallery.branch_id,
       event: "selection.submitted",
@@ -183,6 +303,9 @@ export async function POST(request: Request): Promise<Response> {
         customerPhone: cheSoDienThoai(khach?.phone),
         customerName: khach?.full_name ?? null,
         submittedAt,
+        // Khoá KHÔNG được chứa chữ "anh" — `locBoAnh()` cắt mọi khoá khớp
+        // chữ đó (bẫy đã canh ở BB-200/BB-245, xem lark/notify.ts).
+        biaAlbumTen,
       },
     });
 

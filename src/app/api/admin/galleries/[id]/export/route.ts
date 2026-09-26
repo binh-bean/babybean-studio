@@ -97,9 +97,11 @@ async function xuatChiTiet(
     gallery: { id: string; title: string | null; customer_id: string | null; baby_id: string | null };
     luotChon: { id: string; general_note: string | null; submitted_at: string | null; submitted_by_name: string | null };
     dong: DongAnh[];
+    /** BB-202 — tên (các) album mà mỗi ảnh (theo photo_id) đang làm bìa. */
+    tenAlbumBiaTheoAnh: Map<string, string[]>;
   },
 ): Promise<string> {
-  const { gallery, luotChon, dong } = ctx;
+  const { gallery, luotChon, dong, tenAlbumBiaTheoAnh } = ctx;
   const itemIds = dong.map((d) => d.selection_item_id).filter((v): v is string => Boolean(v));
   const photoIds = dong.map((d) => d.photo_id).filter((v): v is string => Boolean(v));
 
@@ -187,6 +189,9 @@ async function xuatChiTiet(
     const dungCho = [
       ...(d.selection_item_id ? tenSanPhamTheoItem.get(d.selection_item_id) ?? [] : []),
       ...(d.photo_id ? tenSanPhamTheoAnh.get(d.photo_id) ?? [] : []),
+      // BB-202: liệt kê riêng "bìa" — CSKH/thợ chỉnh ảnh phải biết đây là ảnh
+      // ĐẠI DIỆN cả cuốn, không chỉ là một tấm ruột thường.
+      ...(d.photo_id ? (tenAlbumBiaTheoAnh.get(d.photo_id) ?? []).map((t) => `${t} (BÌA)`) : []),
     ];
     dongViet.push(`  Dùng cho: ${dungCho.length ? dungCho.join(", ") : "(chưa gắn sản phẩm nào)"}`);
     dongViet.push("");
@@ -246,6 +251,41 @@ export async function GET(
      * Thợ chỉnh ảnh mở thư mục Drive ra và đi từ trên xuống. Danh sách sắp
      * theo thứ tự bấm thì họ phải nhảy tới nhảy lui giữa 300 tấm.
      */
+    /*
+      BB-202 — "bìa album" cho mỗi ảnh: tên (các) album mà tấm này đang làm
+      bìa, nếu có. Bảng `album_covers` có thể CHƯA TỒN TẠI (migration 0075
+      chưa áp) — bắt lỗi 42P01 và coi như không có bìa nào, không làm hỏng cả
+      lượt xuất tệp.
+    */
+    const tenAlbumBiaTheoAnh = new Map<string, string[]>();
+    try {
+      const { data: covers, error: coversErr } = await admin
+        .from("album_covers")
+        .select("selection_item_id, gallery_items(products(name))")
+        .eq("gallery_id", galleryId);
+      if (!coversErr && covers && covers.length > 0) {
+        const selItemIds = covers.map((c) => c.selection_item_id);
+        const { data: sis } = await admin
+          .from("selection_items")
+          .select("id, photo_id")
+          .in("id", selItemIds);
+        const photoIdBySelItem = new Map((sis ?? []).map((s) => [s.id, s.photo_id as string]));
+        for (const c of covers as unknown as {
+          selection_item_id: string;
+          gallery_items?: { products?: { name?: string } | null } | null;
+        }[]) {
+          const photoId = photoIdBySelItem.get(c.selection_item_id);
+          const ten = c.gallery_items?.products?.name;
+          if (!photoId || !ten) continue;
+          const ds = tenAlbumBiaTheoAnh.get(photoId) ?? [];
+          ds.push(ten);
+          tenAlbumBiaTheoAnh.set(photoId, ds);
+        }
+      }
+    } catch {
+      // Bảng chưa áp — coi như không có bìa nào, không chặn xuất tệp.
+    }
+
     const dong: DongAnh[] = (data ?? [])
       .map((d) => {
         const p = (d as { photos?: unknown }).photos as
@@ -276,16 +316,19 @@ export async function GET(
     let than: string;
 
     if (dinhDang === "chi-tiet") {
-      than = await xuatChiTiet(admin, { gallery, luotChon, dong });
+      than = await xuatChiTiet(admin, { gallery, luotChon, dong, tenAlbumBiaTheoAnh });
     } else if (dinhDang === "csv") {
       than = [
-        ["ten_file", "thu_muc_con", "ghi_chu_chinh_sua", "yeu_thich"].join(","),
+        // BB-202: cột "bia_album" — tên (các) album mà ảnh này đang làm bìa,
+        // rỗng nếu ảnh không phải bìa của album nào.
+        ["ten_file", "thu_muc_con", "ghi_chu_chinh_sua", "yeu_thich", "bia_album"].join(","),
         ...dong.map((d) =>
           [
             oCsv(d.file_name),
             oCsv(d.subfolder),
             oCsv(d.retouch_note),
             oCsv(d.is_favorite ? "x" : ""),
+            oCsv((d.photo_id && tenAlbumBiaTheoAnh.get(d.photo_id)?.join(" + ")) || ""),
           ].join(","),
         ),
         // Ghi chú chung của khách đi kèm, nếu có: nó là lời dặn cho CẢ bộ,

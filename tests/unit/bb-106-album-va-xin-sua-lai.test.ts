@@ -143,8 +143,15 @@ describe("Album mua thêm và yêu cầu sửa lại", () => {
     expect(rows[0].photo_id).toBeNull();
   });
 
-  it("2. Đưa HAI tấm vào cùng một album, rồi lấy ra một tấm", async () => {
-    // Đây là điều album khác mọi thứ khác: một sản phẩm nhận nhiều ảnh.
+  /*
+    BB-202 — chốt của chủ studio 26/09/2026: "mua thêm album trong cửa hàng =
+    CHỈ ĐẶT MUA, CSKH trao đổi ảnh/bìa sau". Hai ca "2" và "3" cũ ở đây từng
+    canh đúng việc ngược lại (ba mẹ tự đưa ảnh vào album mua thêm thành công).
+    Đó là PHÉP THỬ PHẢI ĐỔI: giữ nguyên bộ dữ liệu Fixture, đổi kỳ vọng sang
+    "route từ chối, dữ liệu KHÔNG bị ghi" — bảng `selection_addon_photos` và
+    route vẫn còn nguyên (không xoá), chỉ khoá luồng ghi từ màn khách.
+  */
+  it("2. Đưa ảnh vào album MUA THÊM nay bị khoá (BB-202) — route từ chối, không ghi dữ liệu", async () => {
     const { rows } = await client.query(
       "select id from selection_addons where selection_id = $1",
       [selectionId],
@@ -152,24 +159,20 @@ describe("Album mua thêm và yêu cầu sửa lại", () => {
     const addonId = rows[0].id;
 
     phien();
-    expect((await goiDatAnh({ addonId, photoId: anh[0] })).status).toBe(200);
-    phien();
-    expect((await goiDatAnh({ addonId, photoId: anh[1] })).status).toBe(200);
-    expect(await demAnhTrongAlbum(addonId)).toBe(2);
-
-    // Đặt lại tấm cũ: không sinh dòng thứ hai.
-    phien();
-    expect((await goiDatAnh({ addonId, photoId: anh[0] })).status).toBe(200);
-    expect(await demAnhTrongAlbum(addonId)).toBe(2);
+    const resDat = await goiDatAnh({ addonId, photoId: anh[0] });
+    expect(resDat.status).toBe(409);
+    expect((await resDat.json()).error.code).toBe("CONFLICT");
+    expect(await demAnhTrongAlbum(addonId)).toBe(0);
 
     phien();
-    expect((await goiDatAnh({ addonId, photoId: anh[1] }, true)).status).toBe(200);
-    expect(await demAnhTrongAlbum(addonId)).toBe(1);
+    const resXoa = await goiDatAnh({ addonId, photoId: anh[0] }, true);
+    expect(resXoa.status).toBe(409);
   });
 
-  it("3. Không nhét được ảnh vào album của lượt chọn khác", async () => {
-    // Đoán một mã dòng mua thêm bất kỳ thì phải trượt, nếu không là nhét ảnh
-    // vào album nhà người ta.
+  it("3. Khoá áp dụng bất kể album của ai — không còn phân biệt lượt chọn khác", async () => {
+    // Trước BB-202, mã dòng mua thêm của lượt chọn khác bị từ chối bằng 404
+    // (không tìm thấy album). Từ BB-202, addonId bị chặn NGAY TỪ ĐẦU bằng 409
+    // — chặn sớm hơn, nhưng vẫn không có cách nào nhét ảnh vào album nhà khác.
     const { rows: lk2 } = await client.query(
       `insert into share_links (gallery_id, token_hash, token_prefix, role, status)
        values ($1, md5(random()::text), 'bb106b', 'owner', 'active') returning id`,
@@ -187,7 +190,7 @@ describe("Album mua thêm và yêu cầu sửa lại", () => {
 
     phien();
     const res = await goiDatAnh({ addonId: ad2[0].id, photoId: anh[0] });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(409);
     expect(await demAnhTrongAlbum(ad2[0].id)).toBe(0);
   });
 

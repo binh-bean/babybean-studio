@@ -43,6 +43,24 @@ export async function POST(request: NextRequest) {
     }
     const input = parsed.data;
 
+    /*
+      BB-202 — chủ studio 26/09/2026: "mua thêm album trong cửa hàng = CHỈ ĐẶT
+      MUA (loại + số lượng), CSKH trao đổi ảnh/bìa sau — KHÔNG bắt đưa ảnh vào
+      album."
+
+      `addonId` chỉ tồn tại cho MỘT việc: đưa ảnh vào một album MUA THÊM
+      (`selection_addon_photos`, migration 0062). Luồng đó nay tắt hẳn ở màn
+      khách; chặn lại đây là lớp phòng thủ thứ hai — phòng khi có nơi nào còn
+      gọi thẳng route này (ứng dụng cũ trên máy khách chưa tải lại, gọi tay).
+      KHÔNG xoá bảng/route — dữ liệu cũ (nếu có) vẫn đọc được ở CSKH.
+    */
+    if (input.addonId) {
+      return fail(
+        "CONFLICT",
+        "Album mua thêm không tự đưa ảnh vào — CSKH sẽ trao đổi với ba mẹ về ảnh và bìa sau khi đặt mua",
+      );
+    }
+
     const admin = createAdminClient();
 
     // 1. Kiểm tra trạng thái bộ ảnh
@@ -238,9 +256,51 @@ export async function DELETE(request: NextRequest) {
   try {
     const session = await requireGallerySession(EDITING_ROLES);
 
+    // 1. Parse input từ JSON body hoặc query params (đọc TRƯỚC mọi truy vấn
+    //    cơ sở dữ liệu — xem lý do ở khối chặn addonId ngay dưới đây).
+    let rawInput: Record<string, unknown> = {};
+    const jsonBody = await readJsonBody(request);
+    if (jsonBody.ok && jsonBody.data && typeof jsonBody.data === "object") {
+      rawInput = jsonBody.data as Record<string, unknown>;
+    }
+    // Body không có hoặc không phải json -> đọc từ URL searchParams
+
+    const url = new URL(request.url);
+    if (!rawInput.galleryItemId && url.searchParams.get("galleryItemId")) {
+      rawInput.galleryItemId = url.searchParams.get("galleryItemId");
+    }
+    if (!rawInput.addonId && url.searchParams.get("addonId")) {
+      rawInput.addonId = url.searchParams.get("addonId");
+    }
+    if (!rawInput.photoId && url.searchParams.get("photoId")) {
+      rawInput.photoId = url.searchParams.get("photoId");
+    }
+    if (!rawInput.selectionItemId && url.searchParams.get("selectionItemId")) {
+      rawInput.selectionItemId = url.searchParams.get("selectionItemId");
+    }
+
+    const parsed = RemovePhotoPlacementSchema.safeParse(rawInput);
+    if (!parsed.success) {
+      return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
+    }
+    const input = parsed.data;
+
+    /*
+      BB-202 — cùng luật chặn với POST ở trên: album mua thêm không tự gỡ ảnh
+      nữa. Đặt TRƯỚC bất kỳ truy vấn cơ sở dữ liệu nào (kể cả tra trạng thái bộ
+      ảnh) — đúng cùng vị trí với POST, để hai đầu nhất quán và để một bộ ảnh
+      không tồn tại/đã xoá không che mất lý do thật (đường này đã tắt hẳn).
+    */
+    if (input.addonId) {
+      return fail(
+        "CONFLICT",
+        "Album mua thêm không tự gỡ ảnh vào — CSKH sẽ trao đổi với ba mẹ về ảnh và bìa sau khi đặt mua",
+      );
+    }
+
     const admin = createAdminClient();
 
-    // 1. Kiểm tra trạng thái bộ ảnh
+    // 2. Kiểm tra trạng thái bộ ảnh
     const { data: gallery, error: galleryError } = await admin
       .from("galleries")
       .select("id, status")
@@ -266,31 +326,6 @@ export async function DELETE(request: NextRequest) {
     if (isGalleryLocked(gallery.status)) {
       return fail("GALLERY_LOCKED", "Bộ ảnh đã được chốt, không thể thay đổi ảnh in");
     }
-
-    // 2. Parse input từ JSON body hoặc query params
-    let rawInput: Record<string, unknown> = {};
-    const jsonBody = await readJsonBody(request);
-    if (jsonBody.ok && jsonBody.data && typeof jsonBody.data === "object") {
-      rawInput = jsonBody.data as Record<string, unknown>;
-    }
-    // Body không có hoặc không phải json -> đọc từ URL searchParams
-
-    const url = new URL(request.url);
-    if (!rawInput.galleryItemId && url.searchParams.get("galleryItemId")) {
-      rawInput.galleryItemId = url.searchParams.get("galleryItemId");
-    }
-    if (!rawInput.photoId && url.searchParams.get("photoId")) {
-      rawInput.photoId = url.searchParams.get("photoId");
-    }
-    if (!rawInput.selectionItemId && url.searchParams.get("selectionItemId")) {
-      rawInput.selectionItemId = url.searchParams.get("selectionItemId");
-    }
-
-    const parsed = RemovePhotoPlacementSchema.safeParse(rawInput);
-    if (!parsed.success) {
-      return fail("INVALID_INPUT", undefined, { issues: parsed.error.issues });
-    }
-    const input = parsed.data;
 
     // 3. Xác định selection_item_id
     let targetSelectionItemId = input.selectionItemId;

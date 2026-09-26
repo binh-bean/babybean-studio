@@ -41,7 +41,9 @@ function boDau(s: string): string {
  * Tên tệp tranh (không kèm hậu tố `-320`/`-640.webp`) cho một sản phẩm.
  *
  * - `anh_in` → `sp-anh-in`
- * - `album` → `sp-album`
+ * - `album` → `sp-album-dat-mua` (BB-202: album mua thêm giờ CHỈ ĐẶT MUA,
+ *   không còn bước đưa ảnh — tranh riêng "đặt mua" khác tranh "sp-album" cũ,
+ *   để không gợi ý nhầm là còn thao tác chọn ảnh sau khi mua)
  * - `khung` → `sp-khung-anh`, TRỪ khi material hoặc name chứa "canvas" (không
  *   phân biệt hoa/thường, bỏ dấu) → `sp-tranh-canvas`.
  */
@@ -60,7 +62,7 @@ export function tranhCuaSanPham(
     case "anh_in":
       return "sp-anh-in";
     case "album":
-      return "sp-album";
+      return "sp-album-dat-mua";
     case "khung":
       return "sp-khung-anh";
   }
