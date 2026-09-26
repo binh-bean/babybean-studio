@@ -13,7 +13,7 @@ export function AdminHeader({ role, hoTen }: { role?: string; hoTen?: string | n
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 w-full items-center justify-between border-b border-[var(--bb-border)] bg-[var(--bb-surface)]/80 backdrop-blur-md px-4 sm:px-6">
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
         {/* Mobile Menu Trigger */}
         <div className="md:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

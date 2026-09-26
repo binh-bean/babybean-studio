@@ -23,6 +23,7 @@
     "db:migrate:prod": "node --env-file=.env.prod.local scripts/migrate-prod.mjs",
     "db:backup": "node --env-file-if-exists=.env.local scripts/backup.mjs",
     "db:backup:prod": "node --env-file=.env.prod.local scripts/backup.mjs",
+    "db:giai-ma": "node scripts/ma-hoa-sao-luu.mjs giai-ma",
     "db:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-test-galleries.mjs",
     "verify:db": "node --env-file-if-exists=.env.local scripts/verify-db.mjs",
     "verify:db:seed": "node --env-file-if-exists=.env.local scripts/verify-db.mjs --seed",

@@ -1,0 +1,103 @@
+name: Sao lưu tự động
+
+# BB-273. Chạy trên máy chủ GitHub, không phụ thuộc máy studio.
+#
+# "Ngủ" cho tới khi chủ studio thêm 2 secret (BACKUP_DATABASE_URL,
+# BACKUP_PASSPHRASE) ở Settings -> Secrets and variables -> Actions. Thiếu một
+# trong hai thì job kết thúc XANH sau một dòng ::notice:: — không báo lỗi, vì
+# chưa bật KHÔNG phải là hỏng. Xem docs/24-sao-luu-tu-dong.md.
+
+on:
+  schedule:
+    # 02:00 giờ Việt Nam (UTC+7) = 19:00 UTC ngày hôm trước.
+    - cron: "0 19 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sao-luu
+  cancel-in-progress: false
+
+jobs:
+  sao-luu:
+    # Repo này có thể bị fork — fork không có secret của studio, và không nên
+    # tự chạy lịch sao lưu nhắm vào database thật của studio.
+    if: github.repository == 'binh-bean/babybean-studio'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kiểm đã bật chưa
+        id: kiem
+        env:
+          CO_DB_URL: ${{ secrets.BACKUP_DATABASE_URL != '' }}
+          CO_MAT_KHAU: ${{ secrets.BACKUP_PASSPHRASE != '' }}
+        run: |
+          if [ "$CO_DB_URL" != "true" ] || [ "$CO_MAT_KHAU" != "true" ]; then
+            echo "::notice::Sao lưu tự động chưa bật — thiếu BACKUP_DATABASE_URL hoặc BACKUP_PASSPHRASE trong GitHub Secrets. Xem docs/24-sao-luu-tu-dong.md để bật. (trạng thái: ngủ)"
+            echo "bat=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bat=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.kiem.outputs.bat == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.kiem.outputs.bat == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+        if: steps.kiem.outputs.bat == 'true'
+
+      - name: Kết xuất dữ liệu (ra thư mục tạm NGOÀI workspace)
+        if: steps.kiem.outputs.bat == 'true'
+        env:
+          SUPABASE_DB_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/sao-luu-ro"
+          node scripts/backup.mjs --out "$RUNNER_TEMP/sao-luu-ro"
+
+      - name: Mã hoá rồi xoá bản rõ ngay
+        if: steps.kiem.outputs.bat == 'true'
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          TEP_RO=$(ls "$RUNNER_TEMP"/sao-luu-ro/*.sql | head -n1)
+          if [ -z "${TEP_RO:-}" ]; then
+            echo "::error::backup.mjs không tạo ra tệp .sql nào."
+            exit 1
+          fi
+          TEN=$(basename "$TEP_RO")
+          mkdir -p "$RUNNER_TEMP/sao-luu-ma-hoa"
+          node scripts/ma-hoa-sao-luu.mjs ma-hoa "$TEP_RO" "$RUNNER_TEMP/sao-luu-ma-hoa/${TEN}.enc"
+          # Xoá bản rõ ngay lập tức — không để nó tồn tại lâu hơn cần thiết,
+          # kể cả trong $RUNNER_TEMP (runner dùng chung theo lượt, nhưng không
+          # tin cậy hơn cần thiết).
+          rm -f "$TEP_RO"
+          echo "TEP_MA_HOA=$RUNNER_TEMP/sao-luu-ma-hoa/${TEN}.enc" >> "$GITHUB_ENV"
+          echo "TEN_NGAY=$(date -u +%F)" >> "$GITHUB_ENV"
+
+      - name: Kiểm tệp mã hoá mở được (không in nội dung)
+        if: steps.kiem.outputs.bat == 'true'
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          node scripts/ma-hoa-sao-luu.mjs giai-ma "$TEP_MA_HOA" "$RUNNER_TEMP/kiem-thu.sql"
+          SO_BYTE=$(wc -c < "$RUNNER_TEMP/kiem-thu.sql")
+          echo "Giải mã thử OK — $SO_BYTE byte (không in nội dung)."
+          rm -f "$RUNNER_TEMP/kiem-thu.sql"
+
+      - name: Đăng tệp đã mã hoá lên artifact
+        if: steps.kiem.outputs.bat == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sao-luu-${{ env.TEN_NGAY }}-${{ github.run_id }}
+          path: ${{ env.TEP_MA_HOA }}
+          retention-days: 90
+          if-no-files-found: error
