@@ -16,7 +16,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
-import { Button, Input, Card, Spinner } from "@/components/ui";
+import { Button, Input, Spinner } from "@/components/ui";
 import { toAuthEmail } from "@/lib/auth/username";
 import { vi } from "@/i18n/vi";
 
@@ -116,7 +116,13 @@ function LoginForm() {
         />
       </label>
 
-      <Button type="submit" disabled={busy} className="w-full">
+      {/* Bản vẽ dang-nhap.webp: nút chính viên tròn màu mực (#2E2A27 = --bb-fg),
+          không phải hồng đất mặc định của <Button variant="default">. */}
+      <Button
+        type="submit"
+        disabled={busy}
+        className="w-full rounded-full bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90"
+      >
         {busy ? vi.admin.login.loggingIn : vi.admin.login.submit}
       </Button>
 
@@ -129,20 +135,40 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md items-center px-4">
-      <Card className="w-full p-6">
-        <h1 className="text-xl font-semibold text-[var(--bb-fg)]">BabyBean Studio</h1>
-        <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">Đăng nhập dành cho nhân viên</p>
-        <Suspense
-          fallback={
-            <div className="mt-6 flex justify-center">
-              <Spinner />
-            </div>
-          }
-        >
-          <LoginForm />
-        </Suspense>
-      </Card>
+    // Bản vẽ dang-nhap.webp: nửa trái tranh tĩnh vật trên nền kem, nửa phải
+    // form hẹp giữa trang. Dưới 768px chỉ còn form — không đủ chỗ cho tranh,
+    // và tranh chỉ minh hoạ, không mang thông tin cần đọc.
+    <main className="flex min-h-screen w-full bg-[var(--bb-bg)]">
+      <div
+        aria-hidden="true"
+        className="hidden w-1/2 items-center justify-center bg-[var(--bb-surface-2)] p-10 md:flex"
+      >
+        <img
+          src="/san-pham/sp-album-640.webp"
+          alt=""
+          className="w-full max-w-sm drop-shadow-[0_8px_24px_rgb(46_42_39_/_12%)]"
+        />
+      </div>
+
+      <div className="flex w-full flex-col items-center justify-center px-4 py-12 md:w-1/2">
+        <div className="w-full max-w-sm">
+          <h1 className="text-center font-display text-2xl font-bold text-[var(--bb-fg)]">
+            BabyBean Studio
+          </h1>
+          <p className="mt-1 text-center text-sm text-[var(--bb-fg-muted)]">
+            Đăng nhập dành cho nhân viên
+          </p>
+          <Suspense
+            fallback={
+              <div className="mt-6 flex justify-center">
+                <Spinner />
+              </div>
+            }
+          >
+            <LoginForm />
+          </Suspense>
+        </div>
+      </div>
     </main>
   );
 }
