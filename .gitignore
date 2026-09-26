@@ -36,3 +36,7 @@ db/*.local.sql
 
 # Worktree của agent (Claude Code tạo khi giao việc song song) — không bao giờ commit.
 .claude/worktrees/
+
+# Ảnh chụp màn hình từ phép thử (bb-060…) và từ agent — chụp trên bb-dev có thể
+# chứa TÊN KHÁCH THẬT; repo công khai. BB-253 từng lỡ commit 3 ảnh ở đây.
+public/screenshots/
