@@ -215,11 +215,17 @@ describe("BB-202 D. Cơ sở dữ liệu thật — bìa album (bb-dev)", () => 
 
     const { data: branch } = await supabase.from("branches").select("id").limit(1).single();
     branchId = branch!.id;
-    const { data: customer } = await supabase
+    // Khách THỬ riêng (Opus soát): không gắn bộ ảnh thử vào một khách thật.
+    const { data: customer, error: cErr } = await supabase
       .from("customers")
+      .insert({
+        branch_id: branchId,
+        full_name: "Fixture BB-202 Khách",
+        phone: "0900" + String(Math.floor(Math.random() * 1e6)).padStart(6, "0"),
+      })
       .select("id")
-      .limit(1)
       .single();
+    if (cErr) throw cErr;
     customerId = customer!.id;
 
     // Album THẬT đang có trong bảng giá (chỉ đọc, không sửa — luật của brief).
@@ -240,7 +246,7 @@ describe("BB-202 D. Cơ sở dữ liệu thật — bìa album (bb-dev)", () => 
       customer_id: customerId,
       title: "Fixture BB-202",
       status: "in_review",
-      drive_folder_id: `fixture-bb202-${Date.now()}`,
+      drive_folder_id: `fixture-bb202-${randomUUID()}`,
       drive_folder_url: "https://example.com/fixture-bb202",
       photo_count: 3,
       included_quota: 10,
@@ -254,6 +260,23 @@ describe("BB-202 D. Cơ sở dữ liệu thật — bìa album (bb-dev)", () => 
       .select("id")
       .single();
     albumGalleryItemId = gi!.id;
+
+    // Gói THẬT luôn có dòng "ảnh chỉnh sửa" cạnh album; app.gallery_quota() chỉ
+    // đọc cột included_quota khi bộ KHÔNG có dòng hợp đồng nào — thiếu dòng này
+    // thì hạn mức "chưa biết" và submit dừng ở QUOTA_UNKNOWN trước khi tới
+    // bước kiểm bìa album (Opus soát, sau khi áp 0075 mới lộ).
+    const { data: spChinh } = await supabase
+      .from("products")
+      .select("id")
+      .eq("is_active", true)
+      .eq("kind", "edited_photo")
+      .limit(1)
+      .maybeSingle();
+    if (!spChinh) throw new Error("Cần ít nhất một sản phẩm 'edited_photo' đang active");
+    const { error: giErr } = await supabase
+      .from("gallery_items")
+      .insert({ gallery_id: galleryId, product_id: spChinh.id, quantity: 10, unit_price: 0 });
+    if (giErr) throw giErr;
 
     shareLinkId = randomUUID();
     const { error: lkErr } = await supabase.from("share_links").insert({
@@ -301,6 +324,7 @@ describe("BB-202 D. Cơ sở dữ liệu thật — bìa album (bb-dev)", () => 
       await supabase.from("album_covers").delete().eq("gallery_id", galleryId);
       await supabase.from("galleries").delete().eq("id", galleryId);
     }
+    if (customerId) await supabase.from("customers").delete().eq("id", customerId);
     for (const id of createdProductIds) {
       await supabase.from("products").delete().eq("id", id);
     }
