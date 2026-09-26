@@ -10,7 +10,7 @@ cập nhật theo tình hình thật hôm nay.
 |---|---|
 | App trên `hauky.babybeanstudio.vn` đang chạy trên | **bb-dev** (không phải bb-prod) |
 | Bộ ảnh thật trong bb-dev | 488 (nhập hàng loạt 12/09 và 16/09) |
-| Link khách tạo trong 14 ngày | 25 — khách thật đang cầm các link này |
+| Link khách tạo trong 14 ngày | 25 — đều do chủ studio tự thử (xem mục 2) |
 | Gia đình chọn ảnh trong 7 ngày | ~4; bộ chốt trong 14 ngày: 1 |
 | Bộ lỗi Drive (thư mục chưa chia sẻ) | 73 — CSKH sửa qua khối "Cần xử lý" (BB-257) |
 | Buổi chụp mới trên Lark | ~345/tháng |
@@ -32,7 +32,7 @@ chủ studio duyệt số đếm, rồi mới xoá trong một giao dịch.
 ## 2b. (Tham khảo) hai hướng khi cắt
 
 Khi `docs/18` được viết, app chưa có khách thật nên "cắt sang bb-prod" chỉ là
-đổi ba biến. **Bây giờ đã có khách cầm link trên bb-dev** — cắt sang bb-prod là
+đổi ba biến. Nếu lúc đó đã có khách thật cầm link trên bb-dev thì cắt sang bb-prod là
 các link đó chết (mã link chỉ có trong bb-dev), lựa chọn tim/ghi chú của các
 gia đình đang chọn không sang theo.
 
