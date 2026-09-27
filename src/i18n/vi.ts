@@ -209,7 +209,7 @@ export const vi = {
       // BB-287 mục 5 — báo cáo chấm #16: "Ghim & vuốt" là thuật ngữ khó hiểu
       // với ba mẹ (đọc như một thao tác kỹ thuật). Đổi thành câu ngắn, đúng
       // nghĩa (tấm này đứng yên, tấm kia mới vuốt qua).
-      cheDoGhimVuot: "Giữ tấm này",
+      cheDoGhimVuot: "Ghim để vuốt",
       cheDoLuoi: "Xem lưới",
       ghimTam: "Ghim tấm này",
       boGhimTam: "Bỏ ghim",

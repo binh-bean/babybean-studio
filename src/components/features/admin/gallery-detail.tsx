@@ -30,13 +30,27 @@ import { PAGE_TITLE_CLASS } from "./page-header";
 
 import React from "react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+/**
+ * "27/09" — ngày/tháng KHÔNG kèm năm, dùng riêng cho thẻ "Chốt lúc" (hàng số
+ * liệu đầu trang chi tiết bộ ảnh) để khớp bản vẽ quan-tri-chi-tiet.html và
+ * không tràn thẻ hẹp trên điện thoại (BB-294 #18). `formatNgayVN` dùng chung
+ * toàn app in đủ năm — không đổi hàm đó vì nơi khác vẫn cần đủ năm.
+ */
+function formatNgayNgan(input: string): string {
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return "";
+  const ngay = String(d.getDate()).padStart(2, "0");
+  const thang = String(d.getMonth() + 1).padStart(2, "0");
+  return `${ngay}/${thang}`;
+}
 
 interface Component {
   id: string;
@@ -102,6 +116,8 @@ interface Detail {
   /** BB-290 lượt 2 — "Chốt lúc" trong hàng 4 số liệu; null = khách chưa chốt. */
   submittedAt: string | null;
   dueAmount: number;
+  /** BB-294 (#2) — tổng sản phẩm mua thêm (`selection_addons`) của lần chốt chính; khác `dueAmount` (tiền vượt hạn mức ảnh). */
+  addonsAmount: number;
   paidAmount: number;
   outstanding: number;
   /** BB-215 — khối "Bìa bộ ảnh". */
@@ -628,6 +644,19 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             </button>
           </div>
         )}
+        {/* BB-294 (mục cũ #36) — lối tắt tới khối "Xuất danh sách": trên
+            điện thoại khối đó nằm ở cột phải, sau nhiều khối khác, nên rơi
+            khỏi màn hình đầu. Một liên kết neo nhỏ ở đây (luôn trong màn
+            hình đầu, cùng hàng tiêu đề) đưa CSKH tới thẳng đó bằng cuộn mượt,
+            không phải dựng lại bố cục toàn trang. */}
+        {detail.selectedCount > 0 && (
+          <a
+            href="#xuat-danh-sach"
+            className="shrink-0 self-start rounded-full border border-[var(--bb-border)] px-3 py-1.5 text-xs text-[var(--bb-fg-muted)] hover:bg-[var(--bb-surface-2)] hover:text-[var(--bb-fg)]"
+          >
+            {vi.admin.export.title} ↓
+          </a>
+        )}
       </header>
 
       {notice && (
@@ -648,13 +677,20 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           canhBao={overCount !== null && overCount > 0}
         />
         <TheSoLieu
+          // BB-294 (#2, mục cũ #36): "₫" giờ nằm NGAY TRONG `value`, cùng cỡ
+          // cùng dòng với số — theo đúng quan-tri-chi-tiet.html (`.so`
+          // "450.000 ₫" không tách <small>). Giá trị lấy từ `addonsAmount`
+          // (tổng sản phẩm mua thêm của lần chốt), không phải `dueAmount`
+          // (tiền vượt hạn mức ảnh — hai số khác nhau, xem items/route.ts).
           label="Mua thêm"
-          value={new Intl.NumberFormat("vi-VN").format(Math.max(0, detail.dueAmount))}
-          phu="₫"
+          value={`${new Intl.NumberFormat("vi-VN").format(Math.max(0, detail.addonsAmount))} ₫`}
         />
         <TheSoLieu
+          // BB-294 (#18, mục cũ #36): ngày KHÔNG kèm năm ("27/09" như bản vẽ)
+          // — bản cũ in cả năm ("27/09/2026") khiến thẻ hẹp trên điện thoại bị
+          // tràn giờ ra ngoài mép. Giờ:phút vẫn ở `phu`, như bản vẽ.
           label="Chốt lúc"
-          value={detail.submittedAt ? formatNgayVN(detail.submittedAt) : "—"}
+          value={detail.submittedAt ? formatNgayNgan(detail.submittedAt) : "—"}
           phu={
             detail.submittedAt
               ? new Date(detail.submittedAt).toLocaleTimeString("vi-VN", {
@@ -889,7 +925,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               ghi chú đầy đủ chuyển vào `title`/dòng nhỏ bên dưới thay vì
               chiếm chỗ ngang hàng như trước (từng dài tới 5 dòng ở 390px). */}
           {detail.selectedCount > 0 && (
-            <section className="rounded-lg border border-[var(--bb-border)] p-4">
+            <section id="xuat-danh-sach" className="scroll-mt-6 rounded-lg border border-[var(--bb-border)] p-4">
               <h2 className="text-base font-medium">{vi.admin.export.title}</h2>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 <a
@@ -1225,14 +1261,15 @@ function QuantityEditor({
 
   return (
     <span className="flex items-center gap-2">
-      <input
+      {/* BB-294 (#19) — ô số hệ thiết kế, không phải mặc định trình duyệt. */}
+      <Input
         type="number"
         min={1}
         name="quantity"
         value={draft}
         disabled={disabled}
         onChange={(e) => setDraft(e.target.value)}
-        className="w-16 rounded border border-[var(--bb-border)] px-2 py-1 text-sm"
+        className="h-9 w-16 min-h-0 px-2 py-1 text-sm"
         aria-label="Số ảnh trong gói"
       />
       <button
@@ -1365,36 +1402,37 @@ function PaymentForm({
 
   return (
     <div className="mt-3 flex flex-wrap items-end gap-2">
+      {/* BB-294 (#19) — ô số, select, ô nhập hệ thiết kế, không phải mặc định trình duyệt. */}
       <label className="flex flex-col gap-1 text-xs">
         Số tiền
-        <input
+        <Input
           type="number"
           name="amount"
           value={amount}
           disabled={disabled}
           onChange={(e) => setAmount(e.target.value)}
-          className="w-36 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+          className="h-9 w-36 min-h-0 px-2 py-2 text-sm"
         />
       </label>
       <label className="flex flex-col gap-1 text-xs">
         Hình thức
-        <select
+        <Select
           name="method"
           value={method}
           disabled={disabled}
           onChange={(e) => setMethod(e.target.value)}
-          className="rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+          className="h-9 min-h-0 px-2 py-2 text-sm"
         >
           {PAYMENT_METHODS.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs">
         Ghi chú
-        <input
+        <Input
           type="text"
           name="note"
           maxLength={500}
@@ -1402,7 +1440,7 @@ function PaymentForm({
           disabled={disabled}
           onChange={(e) => setNote(e.target.value)}
           placeholder={parsed < 0 ? "Bắt buộc: lý do trừ tiền" : "Mã giao dịch, ghi chú…"}
-          className="rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+          className="h-9 min-h-0 px-2 py-2 text-sm"
         />
       </label>
       <button
@@ -1470,14 +1508,15 @@ function AddItemForm({
 
   return (
     <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-[var(--bb-border)] pt-3">
+      {/* BB-294 (#19) — select, ô số hệ thiết kế, không phải mặc định trình duyệt. */}
       <label className="flex min-w-56 flex-1 flex-col gap-1 text-xs">
         Thêm dòng hàng
-        <select
+        <Select
           name="productId"
           value={productId}
           disabled={disabled}
           onChange={(e) => setProductId(e.target.value)}
-          className="rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+          className="h-9 min-h-0 px-2 py-2 text-sm"
         >
           {theoLoai.map(([kind, items]) => (
             <optgroup key={kind} label={KIND_LABEL[kind] ?? kind}>
@@ -1488,18 +1527,18 @@ function AddItemForm({
               ))}
             </optgroup>
           ))}
-        </select>
+        </Select>
       </label>
       <label className="flex flex-col gap-1 text-xs">
         Số lượng
-        <input
+        <Input
           type="number"
           min={1}
           name="quantity"
           value={qty}
           disabled={disabled}
           onChange={(e) => setQty(e.target.value)}
-          className="w-20 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
+          className="h-9 w-20 min-h-0 px-2 py-2 text-sm"
         />
       </label>
       <button
@@ -1533,13 +1572,18 @@ function TheSoLieu({
   canhBao?: boolean;
 }) {
   return (
-    <div className="rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] px-4 py-3.5">
+    <div className="min-w-0 rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] px-4 py-3.5">
       <div className="text-xs text-[var(--bb-fg-muted)]">{label}</div>
       {/* BB-290 lượt 2 (#36): "₫" cùng dòng cơ sở + số kiểu lining-nums —
           Playfair Display mặc định vẽ số kiểu oldstyle (lệch chân), khiến số
           tiền trông "trồi lên trụt xuống" cạnh nhau. `font-variant-numeric`
-          ép về lining + tabular, đều chân, đều bề ngang từng chữ số. */}
-      <div className="mt-1 flex items-baseline gap-1.5 font-display text-[26px] font-normal leading-none text-[var(--bb-fg)] [font-variant-numeric:lining-nums_tabular-nums] sm:text-[28px]">
+          ép về lining + tabular, đều chân, đều bề ngang từng chữ số.
+          BB-294 (#18): `flex-wrap` — thẻ ở `grid-cols-2` trên điện thoại rất
+          hẹp; giá trị dài ("27/09/2026 23:00" trước đây) từng bị cắt khỏi mép
+          thẻ. Cho phép `phu` (giờ, đơn vị) rớt xuống dòng dưới thay vì tràn
+          ra ngoài — `items-baseline` vẫn giữ hai dòng thẳng theo baseline khi
+          đủ chỗ nằm chung một dòng. */}
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0 font-display text-[26px] font-normal leading-tight text-[var(--bb-fg)] [font-variant-numeric:lining-nums_tabular-nums] sm:text-[28px]">
         {canhBao && (
           <span
             role="img"

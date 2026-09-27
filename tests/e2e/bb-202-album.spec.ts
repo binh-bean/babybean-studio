@@ -222,20 +222,34 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Mẹ Bean BB-202");
-    await page.getByRole("checkbox").check();
-    await expect(page.getByText("Ba mẹ chưa chọn ảnh bìa cho:")).toBeVisible();
-    // Nút Xác nhận phải bị khoá lại — không cho chốt khi còn thiếu bìa.
+    // BB-295 mục #6 — ô tích đổi từ `<input>` thô sang `Checkbox` dùng chung
+    // (input thật `sr-only`, ô vuông hiển thị là `<span>` anh em cùng trong
+    // `<label>`). `.check()` bấm thẳng vào toạ độ input ẩn nên bị `<span>`
+    // che, treo tới hết timeout (bắt được khi chạy lại phép thử này sau khi
+    // đổi component — xem bàn giao). Chuột thật bấm vào `<label>`/`<span>`
+    // vẫn kích hoạt input qua ngữ nghĩa `<label>` chuẩn của trình duyệt —
+    // đây chỉ là cách Playwright định vị theo role, dùng `force` để bấm
+    // thẳng vào input thay vì đợi nó "nhận được sự kiện chuột".
+    await page.getByRole("checkbox").setChecked(true, { force: true });
+    // BB-295 mục #6 — báo cáo chấm độc lập: hai hộp đỏ trùng ý gộp thành
+    // một lời nhắc dịu ("Còn thiếu ảnh bìa album") với một nút "Chọn bìa
+    // ngay" (trước là "Ba mẹ chưa chọn ảnh bìa cho:" + "Đi tới chọn bìa").
+    await expect(page.getByText("Còn thiếu ảnh bìa album")).toBeVisible();
+    // Nút Xác nhận phải bị khoá lại — không cho chốt khi còn thiếu bìa — và
+    // lý do khoá phải hiện ngay dưới nút (BB-295 mục #6).
     await expect(page.getByRole("button", { name: "Xác nhận" })).toBeDisabled();
+    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText("Chọn bìa album để xác nhận");
 
-    await page.getByRole("button", { name: "Đi tới chọn bìa" }).click();
+    await page.getByTestId("nut-chon-bia-ngay").click();
 
     // Chọn MỘT gợi ý làm bìa.
     const nutBia = page.locator('button[aria-label^="Chọn ảnh bìa"]').first();
     await nutBia.waitFor({ state: "visible", timeout: 10_000 });
     await nutBia.click();
 
-    // Máy chủ ghi xong, màn hình phải hiện tên tệp đang là bìa.
-    await expect(page.getByText(/Đang chọn: BB202_/)).toBeVisible({ timeout: 10_000 });
+    // BB-295 mục #25 — phản hồi lạc quan ngay khi bấm (không chờ máy chủ ghi
+    // xong): trước là "Đang chọn: <tên tệp>", nay "✓ Đã chọn làm bìa".
+    await expect(page.getByText("Đã chọn làm bìa")).toBeVisible();
 
     // Chốt lại — lần này phải QUA được.
     // BB-258: thanh nổi (nút Chốt) ẩn khi bìa tràn màn còn chiếm phần lớn khung
@@ -243,8 +257,8 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Mẹ Bean BB-202");
-    await page.getByRole("checkbox").check();
-    await expect(page.getByText("Ba mẹ chưa chọn ảnh bìa cho:")).toHaveCount(0);
+    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await expect(page.getByText("Còn thiếu ảnh bìa album")).toHaveCount(0);
     await page.getByRole("button", { name: "Xác nhận" }).click();
 
     await expect

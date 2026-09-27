@@ -150,7 +150,7 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
     // Chốt
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Mẹ Bean A");
-    await page.getByRole("checkbox").check();
+    await page.getByRole("checkbox").setChecked(true, { force: true });
     await page.getByRole("button", { name: "Xác nhận" }).click();
 
     await expect
@@ -209,7 +209,7 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
     const tenInput = page.locator("#confirm-name-input");
     if (await tenInput.isVisible()) {
       await tenInput.fill("Mẹ Bean A sửa");
-      await page.getByRole("checkbox").check();
+      await page.getByRole("checkbox").setChecked(true, { force: true });
     }
     await page.getByRole("button", { name: "Xác nhận" }).click();
     

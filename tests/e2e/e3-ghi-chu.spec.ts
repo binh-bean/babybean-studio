@@ -138,7 +138,7 @@ test.describe("E-3: Ghi chú", () => {
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
 
     await page.fill("#confirm-name-input", "Mẹ Bean");
-    await page.getByRole("checkbox").check();
+    await page.getByRole("checkbox").setChecked(true, { force: true });
     await page.fill("#customer-note-input", "Làm màu vintage giúp em nhé");
     await page.getByRole("button", { name: "Xác nhận" }).click();
 

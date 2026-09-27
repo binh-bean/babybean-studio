@@ -139,8 +139,11 @@ export function ViecCanXuLy({ role }: { role?: string }) {
             <TabsTrigger key={tab.value} value={tab.value} data-testid={`tab-${tab.value}`}>
               <span className="flex items-center gap-1.5">
                 {tab.label}
+                {/* BB-294 (mục cũ #39) — số huy hiệu sans tabular, không xô lệch khi đổi số. */}
                 {typeof demSo[tab.value] === "number" && demSo[tab.value]! > 0 && (
-                  <Badge variant="outline">{demSo[tab.value]}</Badge>
+                  <Badge variant="outline" className="tabular-nums">
+                    {demSo[tab.value]}
+                  </Badge>
                 )}
               </span>
             </TabsTrigger>

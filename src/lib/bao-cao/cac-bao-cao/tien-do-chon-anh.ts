@@ -138,7 +138,9 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
       chenhLechPhanTram: chotKyTruoc ? chenhLechPhanTram(chotChiTiet.length, chotKyTruoc.length) : undefined,
     },
     {
-      nhan: "Trung vị gửi → chốt",
+      // BB-294 (mục cũ #41): "Trung vị gửi → chốt" là thuật ngữ thống kê,
+      // người chấm độc lập không đọc quen — đổi thành câu tả thẳng ý nghĩa.
+      nhan: "Thời gian gửi đến chốt (thường gặp)",
       giaTri: trungViNgay === null ? "—" : Math.round(trungViNgay * 10) / 10,
       donVi: trungViNgay === null ? undefined : "ngày",
     },

@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Input, Select, Badge, Card, Spinner, EmptyState, Avatar, AvatarFallback, Switch } from "@/components/ui";
+import { Button, Input, Select, Badge, Card, Spinner, EmptyState, Avatar, AvatarFallback, Switch, Checkbox } from "@/components/ui";
 import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
 
@@ -456,12 +456,12 @@ function EditStaffRow({
           <div className="flex flex-wrap gap-3 pt-2">
             {branches.map((b) => (
               <label key={b.id} className="flex items-center gap-2 text-sm text-[var(--bb-fg)]">
-                <input
-                  type="checkbox"
+                {/* BB-294 (#19) — ô tick hệ thiết kế, không phải mặc định trình duyệt. */}
+                <Checkbox
                   checked={branchIds.includes(b.id)}
-                  onChange={(e) =>
+                  onCheckedChange={(checked) =>
                     setBranchIds((prev) =>
-                      e.target.checked ? [...prev, b.id] : prev.filter((x) => x !== b.id),
+                      checked ? [...prev, b.id] : prev.filter((x) => x !== b.id),
                     )
                   }
                 />
@@ -573,12 +573,12 @@ function CreateStaffForm({
           <div className="flex flex-wrap gap-3 pt-2">
             {branches.map((b) => (
               <label key={b.id} className="flex items-center gap-2 text-sm text-[var(--bb-fg)]">
-                <input
-                  type="checkbox"
+                {/* BB-294 (#19) — ô tick hệ thiết kế, không phải mặc định trình duyệt. */}
+                <Checkbox
                   checked={branchIds.includes(b.id)}
-                  onChange={(e) =>
+                  onCheckedChange={(checked) =>
                     setBranchIds((prev) =>
-                      e.target.checked ? [...prev, b.id] : prev.filter((x) => x !== b.id),
+                      checked ? [...prev, b.id] : prev.filter((x) => x !== b.id),
                     )
                   }
                 />

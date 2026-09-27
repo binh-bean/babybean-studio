@@ -132,7 +132,7 @@ test.describe("E-12: Điện thoại", () => {
     // Chốt
     await page.getByRole("button", { name: "Chốt danh sách" }).first().tap();
     await page.fill("#confirm-name-input", "Mẹ Bean");
-    await page.getByRole("checkbox").tap();
+    await page.getByRole("checkbox").setChecked(true, { force: true });
     await page.getByRole("button", { name: "Xác nhận" }).tap();
 
     await expect

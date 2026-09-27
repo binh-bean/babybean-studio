@@ -169,7 +169,12 @@ test.describe("E-1: vòng đời hạnh phúc", () => {
     // Hai ô bắt buộc — máy chủ đòi `confirmedByName` và `agreed` từ đầu, còn
     // màn hình thì tới 22/09/2026 mới có. Chính phép thử này làm lộ ra.
     await page.fill("#confirm-name-input", "Mẹ Bean");
-    await page.getByRole("checkbox").check();
+    // BB-295 mục #6 — ô tích đổi sang `Checkbox` dùng chung (input thật
+    // `sr-only`, hình vuông hiển thị là `<span>` che nó): Playwright định vị
+    // theo role rồi bấm thẳng vào input nên bị `<span>` chặn — cần `force`.
+    // Dùng `setChecked` (không phải `click`) để giữ đúng tính chất KHÔNG ĐỔI
+    // của `.check()` cũ: bấm lại khi đã tích rồi không được bỏ tích.
+    await page.getByRole("checkbox").setChecked(true, { force: true });
     await page.fill("#customer-note-input", "Cả bộ làm tông sáng giúp em");
     await page.getByRole("button", { name: "Xác nhận" }).click();
 

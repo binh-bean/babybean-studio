@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { getDictionary } from "@/i18n";
+import { Select } from "@/components/ui";
 
 interface LogItem {
   id: string;
@@ -68,24 +69,26 @@ export function NhatKyReport() {
       <div className="flex flex-wrap items-center gap-4 rounded-md border border-[var(--bb-border)] bg-[var(--bb-bg-muted)] p-4 text-sm">
         <div className="flex flex-col gap-1">
           <label className="font-medium">{t.filterActor}</label>
-          <select 
-            value={actorType} 
+          {/* BB-294 (#19) — select hệ thiết kế, không phải mặc định trình duyệt. */}
+          <Select
+            value={actorType}
             onChange={(e) => setActorType(e.target.value)}
-            className="rounded border border-[var(--bb-border)] px-2 py-1"
+            className="h-9 min-h-0 py-1"
           >
             <option value="staff">{t.actorStaff}</option>
             <option value="customer">{t.actorCustomer}</option>
             <option value="system">{t.actorSystem}</option>
             <option value="all">{t.actorAll}</option>
-          </select>
+          </Select>
         </div>
         
         <div className="flex flex-col gap-1">
           <label className="font-medium">{t.filterAction}</label>
-          <select 
-            value={action} 
+          {/* BB-294 (#19) — select hệ thiết kế, không phải mặc định trình duyệt. */}
+          <Select
+            value={action}
             onChange={(e) => setAction(e.target.value)}
-            className="rounded border border-[var(--bb-border)] px-2 py-1"
+            className="h-9 min-h-0 py-1"
           >
             <option value="">{t.actionAll}</option>
             <option value="gallery.create">{t.actionGalleryCreate}</option>
@@ -95,7 +98,7 @@ export function NhatKyReport() {
             <option value="selection.patch">{t.actionSelectionPatch}</option>
             <option value="selection.submit">{t.actionSelectionSubmit}</option>
             <option value="staff.role_updated">{t.actionStaffRoleUpdated}</option>
-          </select>
+          </Select>
         </div>
 
         <div className="flex flex-col gap-1">

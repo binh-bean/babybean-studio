@@ -439,3 +439,34 @@ body:has(.giao-dien-khach) {
     left: calc(max(0px, (100cqw - 1600px) / 2) + 2.5rem) !important;
   }
 }
+
+/*
+ * BB-294 (#19) — MỘT nút chính màu mực (#2E2A27) trong toàn bộ quản trị.
+ *
+ * `Button` dùng chung (src/components/ui/button.tsx, `variant="default"`) tô
+ * hồng đất (--bb-primary) — đúng cho nút "Chốt" của MÀN KHÁCH, nhưng bản vẽ
+ * quan-tri-*.png chỉ có nút mực. Không sửa button.tsx dùng chung: đổi ở đó
+ * kéo theo cả màn khách (ngoài phạm vi BB-294, đang có việc khác ở BB-293/295
+ * trên chính hai lớp màu đó). Thay vào đó ghi đè đúng HAI lớp Tailwind mà
+ * `variant="default"` phát ra (`bg-[var(--bb-primary)]` và
+ * `text-[var(--bb-primary-fg)]`), CHỈ trong phạm vi `.giao-dien-quan-tri`
+ * (bọc toàn bộ khung quản trị, xem admin-layout-shell.tsx) — không đụng các
+ * chỗ khác vẫn cố tình dùng `--bb-primary` làm màu chữ/hover/biểu đồ (link,
+ * viền khi hover, dải màu biểu đồ) vì các lớp đó có tên khác, không khớp.
+ * !important vì đây là lớp Tailwind cùng tầng utilities — thứ tự biên dịch
+ * không đảm bảo tệp này thắng theo nguồn.
+ *
+ * Chỉ định thêm thẻ `button` (không phải `.bg-...`/`.text-...` trần): `Badge`
+ * (src/components/ui/badge.tsx) dùng CHUNG hai lớp Tailwind y hệt cho
+ * `variant="default"` nhưng render ra `<div>`, không phải `<button>` —
+ * `Button` (dù `asChild`) luôn render ra `<button>` thật (xem button.tsx:
+ * prop `asChild` bị bỏ qua). Không chỉ định thẻ thì luật này đè luôn màu chip
+ * "biến động xấu" trong bảng điều khiển (dashboard.tsx, `variant="default"`
+ * CỐ Ý dùng hồng đất để nổi bật, khác nghĩa với nút chính).
+ */
+.giao-dien-quan-tri button.bg-\[var\(--bb-primary\)\] {
+  background-color: var(--bb-fg) !important;
+}
+.giao-dien-quan-tri button.text-\[var\(--bb-primary-fg\)\] {
+  color: var(--bb-bg) !important;
+}

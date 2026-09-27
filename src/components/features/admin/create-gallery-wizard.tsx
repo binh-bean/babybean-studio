@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Input, Select, Card, Spinner } from "@/components/ui";
+import { Button, Input, Select, Card, Spinner, Checkbox } from "@/components/ui";
 import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
 
@@ -447,11 +447,8 @@ export function CreateGalleryWizard() {
 
             <div className="space-y-3 pt-6">
               <label className="flex items-center gap-2 text-sm text-[var(--bb-fg)]">
-                <input
-                  type="checkbox"
-                  checked={download}
-                  onChange={(e) => setDownload(e.target.checked)}
-                />
+                {/* BB-294 (#19) — ô tick hệ thiết kế, không phải mặc định trình duyệt. */}
+                <Checkbox checked={download} onCheckedChange={setDownload} />
                 {w.allowDownload}
               </label>
             </div>

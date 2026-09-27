@@ -42,8 +42,13 @@ export interface PhotoLightboxProps {
    *
    * Nhận HÀM chứ không nhận phần tử dựng sẵn: bảng phụ thuộc vào tấm ĐANG XEM,
    * mà lightbox mới là chỗ biết tấm nào đang xem.
+   *
+   * BB-293 vòng 2 mục #3 — tham số thứ hai `tong` cho biết bảng đang được vẽ
+   * trên nền gì: `"sang"` ở cột phải máy tính (nền kính sáng), `"toi"` ở tấm
+   * trượt tối trên điện thoại — chỗ gọi (`gallery-app.tsx`) truyền lại đúng
+   * tông xuống `BangSanPhamCuaAnh`.
    */
-  bangSanPham?: (photo: PhotoPublic) => React.ReactNode;
+  bangSanPham?: (photo: PhotoPublic, tong?: "sang" | "toi") => React.ReactNode;
   /** Ô quảng cáo của studio, chỉ hiện ở màn rộng. */
   banner?: React.ReactNode;
   /**
@@ -799,19 +804,33 @@ export function PhotoLightbox({
         )}
       </main>
 
-        {/* Bảng "tấm này in ra cái gì" — cột phải trên máy tính. */}
+        {/*
+          Bảng "tấm này in ra cái gì" — cột phải trên máy tính.
+
+          BB-293 vòng 2 mục #3 — giám đốc: LÀM LẠI. Nền tối đặc (vòng 1) trái
+          với quyết định của admin trên bản vẽ BB-285 ("không phải nền tối mà
+          là nền trong nhìn được bên dưới"). Đúng bản vẽ
+          `xem-lon-dat-in-dien-thoai.png`: nền KÍNH SÁNG
+          `rgba(251,247,242,.92)` + `backdrop-blur`, chữ mực #2E2A27, chữ phụ
+          #6b6057, viền trái 1px #e5dcd2 — cùng công thức với tấm trượt sản
+          phẩm trên điện thoại (`.kinh` toàn màn), không phải nền đặc như
+          `#2E2A27` nữa. `BangSanPhamCuaAnh` nhận `tong="sang"` để đổi chữ
+          trắng cũ (dựng cho tấm trượt TỐI trên điện thoại) sang tông sáng —
+          tấm trượt điện thoại bên dưới gọi lại đúng như cũ (không truyền
+          `tong`, mặc định `"toi"`), không đổi gì ở đó.
+        */}
         {(bangSanPham || onLuuGhiChu) && currentPhoto && (
           <aside
-            className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-white/10 bg-black/30 p-4 lg:block"
+            className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-[#e5dcd2] bg-[rgba(251,247,242,0.92)] p-4 text-[#2E2A27] backdrop-blur-md lg:block"
             onClick={(e) => e.stopPropagation()}
           >
-            {bangSanPham?.(currentPhoto)}
+            {bangSanPham?.(currentPhoto, "sang")}
 
             {onLuuGhiChu && (
               <div>
                 <label
                   htmlFor="ghi-chu-anh-ben-phai"
-                  className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-white/50"
+                  className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-[#6b6057]"
                 >
                   Ghi chú cho thợ chỉnh ảnh
                 </label>
@@ -830,16 +849,17 @@ export function PhotoLightbox({
                         ? vi.gallery.noteNeedsSelect
                         : vi.gallery.noteHint
                   }
-                  className="w-full resize-none rounded-xl bg-white/10 px-3 py-2 text-xs text-white outline-hidden ring-1 ring-white/15 placeholder:text-white/45 focus:ring-white/40 disabled:opacity-50"
+                  className="w-full resize-none rounded-xl border border-[#e5dcd2] bg-white px-3 py-2 text-xs text-[#2E2A27] outline-hidden placeholder:text-[#8a8078] focus:border-[#2E2A27]/40 disabled:opacity-50"
                 />
                 <div className="mt-1 h-4 text-[11px]" aria-live="polite">
                   {/*
-                    BB-287 mục #12 — xanh lá neon (~#22C55E) không nằm trong
-                    bảng màu. Sage (`--bb-accent`) là màu trạng thái thành
-                    công dùng chung cho màn khách, kèm dấu ✓ nhỏ.
+                    BB-293 vòng 2 mục #3 — giám đốc chốt màu "Đã lưu ghi chú"
+                    trên nền sáng là sage ĐẬM #4F5B45 (không phải
+                    `--bb-accent` #7fa99b — quá nhạt trên nền kem, dưới
+                    4.5:1). #4F5B45 trên #FBF7F2 đạt ~5.2:1.
                   */}
                   {ketQuaLuu === "ok" && (
-                    <span className="inline-flex items-center gap-1 text-[var(--bb-accent)]">
+                    <span className="inline-flex items-center gap-1 text-[#4F5B45]">
                       <span aria-hidden="true">✓</span>
                       {vi.gallery.noteSaved}
                     </span>

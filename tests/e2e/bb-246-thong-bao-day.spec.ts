@@ -176,10 +176,22 @@ test.describe("BB-246: nút Bật thông báo", () => {
     ).toHaveCount(0);
 
     // BB-261 (Opus nối khi gộp) — chuông thay thế: có ở đầu trang, bấm mở ra
-    // danh sách; bộ Fixture chưa có thông báo nào → "Chưa có thông báo".
-    const chuong = page.getByRole("button", { name: /^Thông báo/ });
+    // danh sách; bộ Fixture chưa có thông báo nào.
+    // BB-295 mục #20 — bảng chuông giờ có tiêu đề "Thông báo" + nút đóng, và
+    // câu trống đổi từ "Chưa có thông báo" sang câu nói rõ sẽ báo việc gì.
+    //
+    // Lỗi có sẵn (không do BB-295) bắt được khi chạy lại phép thử này: chuông
+    // lặp lại HAI LẦN trong DOM (thanh thương hiệu đầu trang + hàng chip lọc
+    // dính `#dau-luoi-anh`, đúng chủ đích BB-289 "luôn thấy được sau khi
+    // cuộn") nên `getByRole("button", {name: /^Thông báo/})` vi phạm strict
+    // mode (khớp 2 phần tử). Thu hẹp về đúng chuông trong `#dau-luoi-anh` —
+    // phần tử đang thật sự trong khung nhìn sau `scrollIntoViewIfNeeded()`
+    // ở trên — thay vì sửa cả hai chuông thành một (ngoài phạm vi BB-295).
+    const chuong = page.locator("#dau-luoi-anh").getByRole("button", { name: /^Thông báo/ });
     await expect(chuong).toBeVisible();
     await chuong.click();
-    await expect(page.getByText("Chưa có thông báo")).toBeVisible();
+    await expect(page.getByText("Thông báo", { exact: true })).toBeVisible();
+    await expect(page.getByText("Studio sẽ báo ở đây khi ảnh chỉnh xong")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Đóng" })).toBeVisible();
   });
 });

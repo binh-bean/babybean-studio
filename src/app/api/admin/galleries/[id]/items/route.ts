@@ -219,7 +219,7 @@ export async function GET(
     const [{ data: primarySel }, { data: payRows }] = await Promise.all([
       admin
         .from("selections")
-        .select("snapshot_extra_amount")
+        .select("id, snapshot_extra_amount")
         .eq("gallery_id", gallery.id)
         .eq("is_primary", true)
         .maybeSingle(),
@@ -228,6 +228,27 @@ export async function GET(
 
     const dueAmount = Number(primarySel?.snapshot_extra_amount ?? 0);
     const paidAmount = (payRows ?? []).reduce((t, r) => t + Number(r.amount), 0);
+
+    // BB-294 (#2) — thẻ "Mua thêm" ở hàng số liệu đầu trang trước đây hiện
+    // `dueAmount` (snapshot_extra_amount = tiền VƯỢT HẠN MỨC ảnh, không phải
+    // sản phẩm mua thêm), nên khi khách chốt kèm "Mua thêm 3 món · 60.000 ₫"
+    // ở màn khách (cửa hàng, bảng `selection_addons`) thì thẻ này vẫn ghi 0 ₫
+    // nếu khách không vượt hạn mức ảnh. Hai con số khác nhau: `dueAmount` vẫn
+    // dùng cho "Phải thu"/"Còn thiếu" ở khối Tiền phát sinh bên dưới (không
+    // đổi), còn `addonsAmount` dưới đây là tổng đúng của sản phẩm mua thêm,
+    // lấy trực tiếp từ `selection_addons` của lượt chọn CHÍNH — không có cột
+    // snapshot riêng (xem comment bảng trong db/schema.sql), nên đọc trực
+    // tiếp từ bảng là nguồn đúng duy nhất.
+    const { data: addonRows } = primarySel?.id
+      ? await admin
+          .from("selection_addons")
+          .select("quantity, unit_price")
+          .eq("selection_id", primarySel.id)
+      : { data: null };
+    const addonsAmount = (addonRows ?? []).reduce(
+      (t, r) => t + Number(r.unit_price) * Number(r.quantity),
+      0,
+    );
 
     // BB-215: tên bé cho khối "Bìa bộ ảnh" — cùng cách lấy với /api/g/gallery
     // (nickname ưu tiên hơn họ tên đầy đủ), để chip mẫu chữ và ô xem trước
@@ -249,6 +270,7 @@ export async function GET(
       // vào SELECT/response, không đổi schema.
       submittedAt: gallery.submitted_at ?? null,
       dueAmount,
+      addonsAmount,
       paidAmount,
       outstanding: dueAmount - paidAmount,
       revisions: revisions ?? [],

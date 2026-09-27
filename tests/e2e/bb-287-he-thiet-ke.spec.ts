@@ -220,8 +220,13 @@ test.describe("BB-287: hệ thiết kế màn khách", () => {
     const daLuu = page.getByText("Đã lưu ghi chú");
     await expect(daLuu).toBeVisible({ timeout: 10_000 });
     const mau = await daLuu.evaluate((el) => getComputedStyle(el).color);
-    // sage (--bb-accent trong .giao-dien-khach) = rgb(127, 169, 155).
-    expect(mau).toContain("127, 169, 155");
+    // BB-293 vòng 2 mục #3 — giám đốc: cột phải đổi từ nền tối sang nền
+    // KÍNH SÁNG (đúng bản vẽ BB-285) — `--bb-accent` #7fa99b (rgb(127,169,155))
+    // dựng cho chữ TRẮNG trên nền tối, không đủ 4.5:1 trên nền kem mới. Màu
+    // "Đã lưu ghi chú" đổi sang sage ĐẬM #4F5B45 = rgb(79, 91, 69) (~5.2:1
+    // trên #FBF7F2), theo đúng chỉ đạo màu của giám đốc — không phải
+    // `--bb-accent` nữa. Vẫn không phải xanh neon cũ.
+    expect(mau).toContain("79, 91, 69");
     expect(mau).not.toContain("34, 197, 94"); // #22C55E cũ
   });
 
@@ -293,9 +298,11 @@ test.describe("BB-287: hệ thiết kế màn khách", () => {
     // spinner cũ (nếu hoàn nguyên) xuất hiện ngay khi state đổi.
     await expect(page.getByText("Đang tải…", { exact: true })).toHaveCount(0);
 
-    // Máy chủ ghi xong, tên tệp đang là bìa phải hiện ra — vẫn trên CÙNG một
-    // trang (không remount), và vị trí cuộn không đổi.
-    await expect(page.getByText(/Đang chọn: BB287_/)).toBeVisible({ timeout: 10_000 });
+    // Máy chủ ghi xong, khối bìa phải chuyển sang "Đã chọn làm bìa" (kèm ảnh
+    // thu nhỏ — BB-293 mục cũ #5 thay tên tệp "BB287_...jpg" bằng thumbnail,
+    // xem chon-bia-album.tsx) — vẫn trên CÙNG một trang (không remount), và
+    // vị trí cuộn không đổi.
+    await expect(page.getByText("Đã chọn làm bìa")).toBeVisible({ timeout: 10_000 });
     const cuonSau = await page.evaluate(() => window.scrollY);
     expect(Math.abs(cuonSau - cuonTruoc)).toBeLessThan(30);
 

@@ -296,7 +296,10 @@ export function BiaBoAnhEditor({
               `scale()` toàn bộ khung đó vừa khít chiều ngang của khung xem
               trước bằng đơn vị container-query (`cqw`), nên không còn phép
               tính tay dễ lệch. */}
-          <div className="relative flex-1 bg-gray-100 dark:bg-gray-900 md:w-1/2 flex flex-col items-center justify-center gap-3 overflow-hidden p-4">
+          {/* BB-294 (#9) — nền khung xem trước trước đây `bg-gray-100`
+              (#F3F4F6, xám lạnh Tailwind mặc định) lệch hẳn tông kem của
+              thương hiệu (#FBF7F2 / `--bb-bg`, xem LUAT-DOT-8.md). */}
+          <div className="relative flex-1 bg-[var(--bb-bg)] dark:bg-gray-900 md:w-1/2 flex flex-col items-center justify-center gap-3 overflow-hidden p-4">
             <div className="flex items-center gap-1 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-white/70 backdrop-blur p-0.5 text-xs">
               <button
                 type="button"

@@ -387,7 +387,8 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
     }
 
     // Chưa chọn bìa → hộp nhắc "chưa chọn ảnh bìa" hiện, đi tới chọn bìa.
-    const diToiBia = page.getByRole("button", { name: "Đi tới chọn bìa" });
+    // BB-295 mục #6 — nút đổi tên "Đi tới chọn bìa" → "Chọn bìa ngay".
+    const diToiBia = page.getByTestId("nut-chon-bia-ngay");
     if (await diToiBia.count()) {
       await diToiBia.click();
       await page.waitForTimeout(400);
@@ -404,7 +405,7 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
     }
     const oDongY = page.locator('input[type="checkbox"]').first();
     if ((await oDongY.count()) && !(await oDongY.isChecked())) {
-      await oDongY.check();
+      await oDongY.setChecked(true, { force: true });
     }
 
     const nutXacNhan = page.getByRole("button", { name: "Xác nhận" });

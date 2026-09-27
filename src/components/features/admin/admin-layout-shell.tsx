@@ -68,7 +68,10 @@ export function AdminLayoutShell({
   }, []);
 
   return (
-    <div className="flex h-[100dvh] w-full bg-[var(--bb-bg)]">
+    // BB-294 (#19) — `giao-dien-quan-tri` khoanh vùng CSS cho nút chính màu
+    // mực toàn quản trị; xem khối chú thích cạnh `.giao-dien-quan-tri` trong
+    // src/styles/tokens.css.
+    <div className="giao-dien-quan-tri flex h-[100dvh] w-full bg-[var(--bb-bg)]">
       <AdminSidebar
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}

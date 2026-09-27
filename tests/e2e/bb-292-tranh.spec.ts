@@ -273,7 +273,8 @@ test.describe("BB-292: gắn 5 tranh mới + trả nợ BB-289/290", () => {
     const nutChot = page.getByRole("button", { name: /Chốt danh sách|chốt/i }).first();
     await nutChot.click();
 
-    const diToiBia = page.getByRole("button", { name: "Đi tới chọn bìa" });
+    // BB-295 mục #6 — nút đổi tên "Đi tới chọn bìa" → "Chọn bìa ngay".
+    const diToiBia = page.getByTestId("nut-chon-bia-ngay");
     if (await diToiBia.count()) {
       // Bộ dữ liệu ca này cố ý không có album trong gói — không nên tới đây.
       throw new Error("Bộ ảnh fixture BB-292 không có album nhưng vẫn hỏi chọn bìa — kiểm lại fixture.");
@@ -285,7 +286,7 @@ test.describe("BB-292: gắn 5 tranh mới + trả nợ BB-289/290", () => {
     }
     const oDongY = page.locator('input[type="checkbox"]').first();
     if ((await oDongY.count()) && !(await oDongY.isChecked())) {
-      await oDongY.check();
+      await oDongY.setChecked(true, { force: true });
     }
 
     await page.getByRole("button", { name: "Xác nhận" }).click();

@@ -183,15 +183,33 @@ export function SoSanhAnh({
       data-con-tro="mac-dinh"
     >
       <header className="relative z-20 flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+        {/*
+          BB-293 mục #11 — báo cáo chấm độc lập: tiêu đề dài "So sánh 2 tấm ·
+          5 / 10 tấm đã chọn" bị cắt "…" trên điện thoại hẹp. Điện thoại dùng
+          bản NGẮN "2 tấm · 5/10"; máy tính (đủ chỗ hơn, `sm:` trở lên) giữ
+          câu đầy đủ như cũ.
+        */}
         <span className="min-w-0 flex-1 truncate px-2 text-[13px] text-white/75">
-          So sánh {photos.length} tấm
-          {typeof daChon === "number" && (
-            <span className="text-white/50">
-              {" "}
-              · {daChon}
-              {hanMuc != null ? ` / ${hanMuc}` : ""} tấm đã chọn
-            </span>
-          )}
+          <span className="sm:hidden">
+            {photos.length} tấm
+            {typeof daChon === "number" && (
+              <span className="text-white/50">
+                {" "}
+                · {daChon}
+                {hanMuc != null ? `/${hanMuc}` : ""}
+              </span>
+            )}
+          </span>
+          <span className="hidden sm:inline">
+            So sánh {photos.length} tấm
+            {typeof daChon === "number" && (
+              <span className="text-white/50">
+                {" "}
+                · {daChon}
+                {hanMuc != null ? ` / ${hanMuc}` : ""} tấm đã chọn
+              </span>
+            )}
+          </span>
         </span>
         <button
           type="button"
@@ -412,9 +430,14 @@ interface OTamSoSanhProps {
  * BB-289 lượt 3 — Opus, đối chiếu `so-sanh-hai-tam-dien-thoai.html`: dải
  * điều khiển KHÔNG còn đè lên ảnh (nút "Bỏ khỏi so sánh" + tim to nổi góc
  * trước đây là `absolute`) — nay là một HÀNG 44px riêng, đứng NGAY DƯỚI mỗi
- * khung ảnh: tim (trái) · pill "Giữ tấm này"/"✓ Đang giữ tấm này" (giữa) · ×
- * bỏ khỏi so sánh (phải). Số thứ tự ("Tấm N") đứng góc trên-trái khung ảnh,
- * đúng bản vẽ (`.khung .so`).
+ * khung ảnh. Số thứ tự ("Tấm N") đứng ở một dải riêng phía TRÊN khung ảnh
+ * (không đè lên ảnh — BB-293 vòng 1 mục #11).
+ *
+ * BB-293 vòng 2 mục #11 — giám đốc: dải điều khiển hiện đúng trạng thái
+ * CHỌN, không còn khái niệm "giữ": đã chọn = chip "✓ Đã chọn" + nút viền
+ * "Bỏ chọn"; chưa chọn = nút chính mực "Chọn tấm này" (không chip). Nút tim
+ * đứng riêng đầu dải (trùng chức năng) đã bỏ. "Bỏ khỏi so sánh" (×, phải)
+ * vẫn là việc KHÁC — gỡ tấm khỏi màn so sánh, không đụng trạng thái chọn.
  */
 function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPhongTo }: OTamSoSanhProps) {
   /** Chạm hai lần trong 300ms — cùng ngưỡng với photo-lightbox.tsx. */
@@ -433,10 +456,16 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      {/*
+        BB-293 mục #11 — báo cáo chấm độc lập: nhãn "TẤM n" từng `absolute`
+        ĐÈ LÊN góc ảnh, bị ảnh che một phần trên máy tính. Đưa ra một dải
+        riêng NGOÀI khung ảnh (giống dải điều khiển bên dưới) — luôn đọc
+        được trọn vẹn, không phụ thuộc nội dung ảnh bên dưới nó.
+      */}
+      <div className="flex h-6 shrink-0 items-center bg-[#231e1a] px-3 text-[11px] uppercase tracking-[0.1em] text-white/60">
+        Tấm {thuTu}
+      </div>
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-bb-viewer-bg p-2">
-        <span className="absolute left-3 top-2.5 z-10 text-[11px] uppercase tracking-[0.1em] text-white/60">
-          Tấm {thuTu}
-        </span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={buildLightboxImageUrl(photo.id, 1600)}
@@ -449,48 +478,62 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
         />
       </div>
 
+      {/*
+        BB-293 vòng 2 mục #11 — giám đốc quyết: nhãn phải phản ánh ĐÚNG trạng
+        thái chọn, không bịa khái niệm "đang giữ trong phiên so sánh". Trước
+        đây tim (trái) và pill "Giữ tấm này"/"✓ Đang giữ tấm này" (giữa) CÙNG
+        gọi `onToggleHeart` — hai nút trùng chức năng khiến "giữ" nghe như
+        một trạng thái riêng, trong khi nó chỉ là tim/thả tim thường. Bỏ nút
+        tim đứng riêng ở ĐẦU dải (trùng chức năng với nút chính giữa), thay
+        bằng: đã chọn thì hiện CHIP "✓ Đã chọn" (sage, không bấm được) + nút
+        PHỤ viền "Bỏ chọn"; chưa chọn thì không có chip, chỉ một nút CHÍNH
+        màu mực "Chọn tấm này". Hai tấm cùng đã chọn giờ cùng ghi "Đã chọn" —
+        đúng sự thật, không còn mơ hồ.
+      */}
       <div
         data-testid="dai-dieu-khien-so-sanh"
         className="flex h-11 shrink-0 items-center gap-2 border-t border-white/10 bg-[#231e1a] px-3"
       >
-        {(!khoa || daChon) ? (
-          <button
-            type="button"
-            disabled={khoa || dangGui}
-            onClick={() => onToggleHeart(photo)}
-            aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
-            aria-pressed={daChon}
-            className="shrink-0 rounded-full p-1.5 text-white/80 transition active:scale-90 disabled:opacity-40"
-          >
-            <Heart
-              className="h-5 w-5"
-              fill={daChon ? "currentColor" : "none"}
-              style={daChon ? { color: "#C4645A" } : undefined}
-              strokeWidth={1.7}
-            />
-          </button>
-        ) : (
-          <span className="h-5 w-5 shrink-0" aria-hidden="true" />
-        )}
-
-        <button
-          type="button"
-          disabled={khoa || dangGui}
-          onClick={() => onToggleHeart(photo)}
-          className={cn(
-            "mx-auto flex h-8 items-center justify-center rounded-full px-4 text-[13px] font-medium transition disabled:opacity-40",
-            daChon ? "bg-white text-[#231e1a]" : "border border-white/40 text-white",
+        <div className="mx-auto flex min-w-0 items-center gap-2">
+          {(!khoa || daChon) ? (
+            daChon ? (
+              <>
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#7FA99B]/25 px-2.5 py-1 text-[12px] font-medium text-[#cfe6dd]">
+                  <span aria-hidden="true">✓</span>
+                  Đã chọn
+                </span>
+                <button
+                  type="button"
+                  disabled={khoa || dangGui}
+                  onClick={() => onToggleHeart(photo)}
+                  aria-pressed={daChon}
+                  className="flex h-8 shrink-0 items-center justify-center rounded-full border border-white/40 px-4 text-[13px] font-medium text-white transition hover:bg-white/10 disabled:opacity-40"
+                >
+                  Bỏ chọn
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={khoa || dangGui}
+                onClick={() => onToggleHeart(photo)}
+                aria-pressed={daChon}
+                className="flex h-8 shrink-0 items-center justify-center rounded-full bg-[#2E2A27] px-4 text-[13px] font-medium text-white ring-1 ring-white/15 transition hover:opacity-90 disabled:opacity-40"
+              >
+                Chọn tấm này
+              </button>
+            )
+          ) : (
+            <span className="h-8 shrink-0" aria-hidden="true" />
           )}
-        >
-          {daChon ? "✓ Đang giữ tấm này" : "Giữ tấm này"}
-        </button>
+        </div>
 
         <button
           type="button"
           onClick={() => onBoKhoi(photo)}
           aria-label="Bỏ khỏi so sánh"
           title="Bỏ khỏi so sánh"
-          className="shrink-0 rounded-full p-1.5 text-white/70 transition hover:bg-white/10 active:scale-90"
+          className="ml-auto shrink-0 rounded-full p-1.5 text-white/70 transition hover:bg-white/10 active:scale-90"
         >
           <X className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
         </button>

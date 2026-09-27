@@ -38,7 +38,14 @@ describe("BB-108: Canh lựa chọn mặc định của màn tạo bộ ảnh (c
     // Checkbox hiển thị nhãn w.allowDownload gắn với checked={download}
     expect(wizardSource).toContain("w.allowDownload");
     expect(wizardSource).toMatch(/checked=\{download\}/);
-    expect(wizardSource).toMatch(/onChange=\{\(e\)\s*=>\s*setDownload\(e\.target\.checked\)\}/);
+    // BB-294 (#19): ô tick trần <input type="checkbox" onChange={(e) =>
+    // setDownload(e.target.checked)}> đổi sang <Checkbox onCheckedChange=
+    // {setDownload}> (component hệ thiết kế, xem src/components/ui/checkbox.tsx)
+    // — cùng hành vi (bấm đổi `download`), khác chữ ký sự kiện. Khớp CẢ HAI
+    // dạng để không canh chữ mà canh đúng việc "bấm phải đổi được state".
+    expect(wizardSource).toMatch(
+      /onChange=\{\(e\)\s*=>\s*setDownload\(e\.target\.checked\)\}|onCheckedChange=\{setDownload\}/,
+    );
   });
 
   it("3. Payload options gửi lên API phải dùng state download, không ghi cứng hay gửi watermark", () => {

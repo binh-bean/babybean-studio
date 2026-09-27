@@ -152,48 +152,16 @@ export function Dashboard() {
 
   if (!data) return null;
 
-  if (data.stats.totalGalleries === 0) {
-    // BB-292: tranh trạng thái trống dùng chung cho các màn quản trị
-    // (`ngang-quan-tri-trong`) thay vòng tròn icon `Inbox` trơn — cùng ngôn
-    // ngữ hình ảnh với `bao-cao-trong` ở màn Báo cáo.
-    //
-    // BB-292 vòng 2 — giám đốc chấm hai lỗi:
-    //  1. `object-cover` tràn hết bề ngang kéo giãn tranh bàn, cắt mất đỉnh
-    //     lọ hoa — đổi `object-contain` + `max-w-[360px]`, không cắt vật nào.
-    //  2. Bỏ khối nền riêng quanh tranh (`overflow-hidden` full-bleed cũ) —
-    //     tranh nay nằm thẳng trên nền thẻ, kèm `layerMoNgang` (multiply +
-    //     mặt nạ mờ mép) để tan vào nền thay vì nổi thành khối kem.
-    return (
-      <div className="flex flex-col items-center rounded-xl border border-dashed bg-muted/20 p-8 text-center">
-        <img
-          src="/minh-hoa/ngang-quan-tri-trong-1280.webp"
-          srcSet="/minh-hoa/ngang-quan-tri-trong-640.webp 640w, /minh-hoa/ngang-quan-tri-trong-1280.webp 1280w"
-          sizes="360px"
-          alt=""
-          width={1280}
-          height={714}
-          className="mb-4 w-full max-w-[360px] object-contain"
-          style={layerMoNgang}
-        />
-        <h3 className="text-xl font-bold mb-2">Chưa có bộ ảnh nào</h3>
-        <p className="text-muted-foreground max-w-md mb-6">
-          Chi nhánh này hiện chưa có bộ ảnh nào. Hãy bắt đầu bằng việc đồng bộ ảnh chụp cho khách hàng.
-        </p>
-        <Button asChild>
-          <Link href="/admin/galleries">Đi tới Quản lý bộ ảnh</Link>
-        </Button>
-      </div>
-    );
-  }
-
-  const maxChartValue = Math.max(1, ...data.chartData.map(d => d.count));
-
   // `key`: tên trong `data.stats`/`data.soSanhKy` để tra chip so kỳ trước.
   // `huongTangLaTot`: chỉ đọc khi có chip — thẻ "trong kỳ" mới có mục trong
   // `soSanhKy` (API không trả cho thẻ số dồn hiện tại, xem route.ts).
   //
   // BB-283 (soát 27/09/2026): bỏ icon tròn nhiều màu ở góc thẻ — bản vẽ
   // quan-tri-menu-nhom.png không có, chỉ nhãn hoa + số serif + chip %.
+  //
+  // BB-294 (mục cũ #32): khai báo TRƯỚC nhánh trống — hàng thẻ số vẫn phải
+  // hiện khi `totalGalleries === 0` (mọi giá trị đúng là 0, không phải ẩn
+  // hẳn khối số liệu như trước, xem báo cáo độc lập #32).
   const stats: {
     key: keyof DashboardStats;
     label: string;
@@ -206,6 +174,93 @@ export function Dashboard() {
     { key: "waitingForRetouch", label: "Chờ chỉnh ảnh", value: data.stats.waitingForRetouch, huongTangLaTot: false },
     { key: "deliveredThisMonth", label: "Đã giao tháng này", value: data.stats.deliveredThisMonth, huongTangLaTot: true },
   ];
+
+  // BB-294 (mục cũ #32): render một lần, dùng lại ở CẢ nhánh trống lẫn nhánh
+  // thường — tránh chép tay hai bản dễ lệch nhau.
+  const hangTheSo = (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {stats.map((stat, i) => {
+        const soSanh = data.soSanhKy[stat.key];
+        const laTot = soSanh ? bienDongLaTot(soSanh.chenhLechPhanTram, stat.huongTangLaTot) : null;
+        return (
+          <Card key={i}>
+            <CardContent className="p-5 space-y-3">
+              <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--bb-fg-muted)]">
+                {stat.label}
+              </span>
+              <div className="flex items-end justify-between gap-2">
+                <div className="font-display text-[32px] font-normal text-[var(--bb-fg)]">{stat.value}</div>
+                {soSanh && soSanh.chenhLechPhanTram !== null && (
+                  <Badge
+                    // Bản vẽ: chip "so kỳ trước" nền sage NHẠT — chỉ đúng khi biến động
+                    // là TỐT (laTot === true). Biến động xấu vẫn phải nổi bật khác màu
+                    // (variant="default", hồng đất) để CSKH nhận ra ngay — đó là dữ liệu
+                    // thật từ BB-270, không phải trang trí, nên KHÔNG gộp về một màu.
+                    variant={laTot === true ? "soft-accent" : laTot === false ? "default" : "secondary"}
+                    className="gap-0.5 px-1.5 py-0.5"
+                    title={`Kỳ trước: ${soSanh.kyTruoc}`}
+                  >
+                    {soSanh.chenhLechPhanTram >= 0 ? (
+                      <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                    ) : (
+                      <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
+                    )}
+                    {Math.abs(Math.round(soSanh.chenhLechPhanTram))}%
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+
+  if (data.stats.totalGalleries === 0) {
+    // BB-292: tranh trạng thái trống dùng chung cho các màn quản trị
+    // (`ngang-quan-tri-trong`) thay vòng tròn icon `Inbox` trơn — cùng ngôn
+    // ngữ hình ảnh với `bao-cao-trong` ở màn Báo cáo.
+    //
+    // BB-292 vòng 2 — giám đốc chấm hai lỗi:
+    //  1. `object-cover` tràn hết bề ngang kéo giãn tranh bàn, cắt mất đỉnh
+    //     lọ hoa — đổi `object-contain` + `max-w-[360px]`, không cắt vật nào.
+    //  2. Bỏ khối nền riêng quanh tranh (`overflow-hidden` full-bleed cũ) —
+    //     tranh nay nằm thẳng trên nền thẻ, kèm `layerMoNgang` (multiply +
+    //     mặt nạ mờ mép) để tan vào nền thay vì nổi thành khối kem.
+    return (
+      <div className="space-y-8">
+        {/* BB-294 (mục cũ #32): hàng thẻ số vẫn hiện khi trống — 0 có NGHĨA
+            (chưa có gì cần chọn/sắp hết hạn/quá hạn…), không phải một khối
+            biến mất khiến trang trông như hỏng. Không bịa số: đây vẫn là
+            `data.stats` thật từ API, chỉ là toàn 0 vì `totalGalleries === 0`. */}
+        {hangTheSo}
+        <div className="flex flex-col items-center rounded-xl border border-dashed bg-muted/20 p-8 text-center">
+          <img
+            src="/minh-hoa/ngang-quan-tri-trong-1280.webp"
+            srcSet="/minh-hoa/ngang-quan-tri-trong-640.webp 640w, /minh-hoa/ngang-quan-tri-trong-1280.webp 1280w"
+            sizes="360px"
+            alt=""
+            width={1280}
+            height={714}
+            className="mb-4 w-full max-w-[360px] object-contain"
+            style={layerMoNgang}
+          />
+          <h3 className="text-xl font-bold mb-2">Chưa có bộ ảnh nào</h3>
+          <p className="text-muted-foreground max-w-md mb-6">
+            Chi nhánh này hiện chưa có bộ ảnh nào. Hãy bắt đầu bằng việc đồng bộ ảnh chụp cho khách hàng.
+          </p>
+          {/* BB-294 (#19, mục cũ #32) — nút chính màu mực: `variant="default"`
+              được ghi đè mực trong toàn quản trị, xem `.giao-dien-quan-tri`
+              trong src/styles/tokens.css. */}
+          <Button asChild>
+            <Link href="/admin/galleries">Đi tới Quản lý bộ ảnh</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const maxChartValue = Math.max(1, ...data.chartData.map(d => d.count));
 
   return (
     <div className="space-y-8">
@@ -270,43 +325,9 @@ export function Dashboard() {
       {/* Hàng thẻ số — bản vẽ quan-tri-bang-dieu-khien.webp: nhãn nhỏ trên
           cùng, số lớn bên dưới, chip % so kỳ trước ở góc phải (BB-270). Thẻ
           không có mục trong `soSanhKy` (số dồn hiện tại, không phải "trong
-          kỳ") thì không hiện chip — xem định nghĩa ở route.ts. */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {stats.map((stat, i) => {
-          const soSanh = data.soSanhKy[stat.key];
-          const laTot = soSanh ? bienDongLaTot(soSanh.chenhLechPhanTram, stat.huongTangLaTot) : null;
-          return (
-            <Card key={i}>
-              <CardContent className="p-5 space-y-3">
-                <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--bb-fg-muted)]">
-                  {stat.label}
-                </span>
-                <div className="flex items-end justify-between gap-2">
-                  <div className="font-display text-[32px] font-normal text-[var(--bb-fg)]">{stat.value}</div>
-                  {soSanh && soSanh.chenhLechPhanTram !== null && (
-                    <Badge
-                      // Bản vẽ: chip "so kỳ trước" nền sage NHẠT — chỉ đúng khi biến động
-                      // là TỐT (laTot === true). Biến động xấu vẫn phải nổi bật khác màu
-                      // (variant="default", hồng đất) để CSKH nhận ra ngay — đó là dữ liệu
-                      // thật từ BB-270, không phải trang trí, nên KHÔNG gộp về một màu.
-                      variant={laTot === true ? "soft-accent" : laTot === false ? "default" : "secondary"}
-                      className="gap-0.5 px-1.5 py-0.5"
-                      title={`Kỳ trước: ${soSanh.kyTruoc}`}
-                    >
-                      {soSanh.chenhLechPhanTram >= 0 ? (
-                        <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-                      ) : (
-                        <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
-                      )}
-                      {Math.abs(Math.round(soSanh.chenhLechPhanTram))}%
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+          kỳ") thì không hiện chip — xem định nghĩa ở route.ts.
+          BB-294 (mục cũ #32): `hangTheSo` dùng chung với nhánh trống ở trên. */}
+      {hangTheSo}
 
       {/*
         `min-w-0` trên hai thẻ con: ô lưới mặc định rộng tối thiểu bằng nội

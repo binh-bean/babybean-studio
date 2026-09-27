@@ -21,6 +21,7 @@
  */
 
 import React from "react";
+import { Check } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { goiYBiaAlbum, type UngVienBiaAlbum } from "@/lib/products/goi-y-bia-album";
 
@@ -64,23 +65,39 @@ function KhoiMotAlbum({
 }) {
   const [xemTatCa, setXemTatCa] = React.useState(false);
 
+  /*
+   * BB-295 mục #25 — báo cáo chấm độc lập: bấm chọn ảnh bìa xong, 1–1,2 giây
+   * sau tấm vẫn ghi "Chưa chọn ảnh bìa" (chỉ mờ đi trong lúc đang lưu) — vì
+   * trạng thái "đang là bìa" trước đây đọc THẲNG từ `album.coverPhotoId`,
+   * một prop chỉ đổi SAU khi `loadGallery({silent:true})` ở gallery-app.tsx
+   * tải xong. Thêm lớp phản hồi LẠC QUAN tại chỗ: bấm là đổi ngay, không chờ
+   * mạng — đồng bộ lại với prop thật khi nó tới (hoặc khi đổi album).
+   */
+  const [biaLacQuan, setBiaLacQuan] = React.useState<{ photoId: string; fileName: string } | null>(null);
+  React.useEffect(() => {
+    setBiaLacQuan(null);
+  }, [album.coverPhotoId, album.galleryItemId]);
+
+  const coverPhotoIdHienThi = biaLacQuan?.photoId ?? album.coverPhotoId;
+  const coverFileNameHienThi = biaLacQuan?.fileName ?? album.coverFileName;
+
   const goiY = React.useMemo(
     () => goiYBiaAlbum(anhDaThaTim, coverPhotoIdBoAnh),
     [anhDaThaTim, coverPhotoIdBoAnh],
   );
 
   const daChonBiaChuaCoTrongGoiY =
-    album.coverPhotoId !== null && !goiY.some((u) => u.photoId === album.coverPhotoId);
+    coverPhotoIdHienThi !== null && !goiY.some((u) => u.photoId === coverPhotoIdHienThi);
 
   // Ảnh đang là bìa (nếu có) nhưng không nằm trong bốn gợi ý — vẫn phải hiện
   // để ba mẹ thấy đang chọn tấm nào, không phải im lặng bỏ nó khỏi lưới.
   const anhHienThi = daChonBiaChuaCoTrongGoiY
     ? [
         ...goiY,
-        anhDaThaTim.find((u) => u.photoId === album.coverPhotoId) ?? {
+        anhDaThaTim.find((u) => u.photoId === coverPhotoIdHienThi) ?? {
           selectionItemId: "",
-          photoId: album.coverPhotoId as string,
-          fileName: album.coverFileName ?? "",
+          photoId: coverPhotoIdHienThi as string,
+          fileName: coverFileNameHienThi ?? "",
           retouchNote: null,
           orderIndex: null,
           sortIndex: 0,
@@ -94,20 +111,44 @@ function KhoiMotAlbum({
     <div
       id={`chon-bia-album-${album.galleryItemId}`}
       className={cn(
-        "rounded-2xl border p-4",
-        album.coverPhotoId ? "border-border bg-surface" : "border-heart/40 bg-heart/[0.04]",
+        "rounded-2xl border p-4 transition-colors",
+        coverPhotoIdHienThi ? "border-border bg-surface" : "border-heart/40 bg-heart/[0.04]",
       )}
     >
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold">{album.name}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {album.coverPhotoId
-              ? `Đang chọn: ${album.coverFileName ?? "(không rõ tên tệp)"}`
-              : "Chưa chọn ảnh bìa"}
-          </p>
+        <div className="flex min-w-0 items-center gap-2.5">
+          {/*
+            BB-293 mục cũ #5: bỏ tên tệp "BBS_0005.jpg", thay bằng ảnh thu nhỏ đang là bìa.
+            BB-295 mục #25: chọn xong hiện ngay "✓ Đã chọn làm bìa" (lạc quan).
+          */}
+          {coverPhotoIdHienThi && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/img/${coverPhotoIdHienThi}?w=200`}
+              alt=""
+              className="h-10 w-10 shrink-0 rounded-lg object-cover"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{album.name}</p>
+            <p
+              className={cn(
+                "mt-0.5 flex items-center gap-1 text-xs",
+                coverPhotoIdHienThi ? "font-medium text-moss" : "text-muted-foreground",
+              )}
+            >
+              {coverPhotoIdHienThi ? (
+                <>
+                  <Check className="h-3.5 w-3.5" strokeWidth={2.4} aria-hidden="true" />
+                  Đã chọn làm bìa
+                </>
+              ) : (
+                "Chưa chọn ảnh bìa"
+              )}
+            </p>
+          </div>
         </div>
-        {!album.coverPhotoId && (
+        {!coverPhotoIdHienThi && (
           <span className="shrink-0 rounded-full bg-heart/15 px-2.5 py-1 text-[11px] font-medium text-heart">
             Bắt buộc chọn
           </span>
@@ -122,13 +163,18 @@ function KhoiMotAlbum({
         <>
           <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
             {danhSachXem.map((u) => {
-              const dangLaBia = album.coverPhotoId === u.photoId;
+              const dangLaBia = coverPhotoIdHienThi === u.photoId;
               return (
                 <button
                   key={u.photoId}
                   type="button"
                   disabled={khoa || dangLuu}
-                  onClick={() => onChonBia(album.galleryItemId, u.photoId)}
+                  onClick={() => {
+                    // Phản hồi lạc quan: đổi ngay tại chỗ, không chờ
+                    // `loadGallery({silent:true})` tải lại xong.
+                    setBiaLacQuan({ photoId: u.photoId, fileName: u.fileName });
+                    onChonBia(album.galleryItemId, u.photoId);
+                  }}
                   title={u.fileName}
                   aria-label={`Chọn ảnh bìa ${u.fileName}`}
                   className={cn(
@@ -144,7 +190,8 @@ function KhoiMotAlbum({
                     className="aspect-square w-full object-cover"
                   />
                   {dangLaBia && (
-                    <span className="absolute right-1 top-1 rounded-full bg-moss px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    <span className="absolute right-1 top-1 flex items-center gap-0.5 rounded-full bg-moss px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />
                       Bìa
                     </span>
                   )}

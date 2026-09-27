@@ -105,7 +105,7 @@ test.describe("E-2: Vượt hạn mức", () => {
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
 
     await page.fill("#confirm-name-input", "Mẹ Bean");
-    await page.getByRole("checkbox").check();
+    await page.getByRole("checkbox").setChecked(true, { force: true });
     await page.getByRole("button", { name: "Xác nhận" }).click();
 
     // Kiểm tra DB lưu 2 ảnh phụ

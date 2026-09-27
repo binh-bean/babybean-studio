@@ -85,14 +85,24 @@ export function CamOnSauChot({
         ngang 16:9 trong `CO_BAN_NGANG`) vì cắt vào khung tròn 1:1 đúng hơn.
         Huy hiệu tích trắng viền, màu sage, đè góc dưới-phải như bản vẽ.
       */}
-      <div className="relative h-[140px] w-[140px] shrink-0 overflow-hidden rounded-full sm:h-[180px] sm:w-[180px]">
-        <img
-          src="/minh-hoa/cam-on-phong-thu-640.webp"
-          srcSet="/minh-hoa/cam-on-phong-thu-320.webp 320w, /minh-hoa/cam-on-phong-thu-640.webp 640w"
-          sizes="180px"
-          alt=""
-          className="h-full w-full object-cover"
-        />
+      {/*
+        BB-295 mục #13 — báo cáo chấm độc lập: huy hiệu ✓ hiện đủ vòng tròn
+        trên điện thoại nhưng bị cắt còn nửa hình tròn trên máy tính. Gốc lỗi:
+        huy hiệu từng là CON của khối `overflow-hidden rounded-full` bọc ảnh —
+        khối đó tự cắt mọi con nằm ngoài đường tròn, kể cả huy hiệu đặt ở góc.
+        Nay huy hiệu là ANH EM (sibling) của khối ảnh, không còn nằm trong
+        vùng bị cắt tròn — không phụ thuộc bề rộng màn hình.
+      */}
+      <div className="relative h-[140px] w-[140px] shrink-0 sm:h-[180px] sm:w-[180px]">
+        <div className="h-full w-full overflow-hidden rounded-full">
+          <img
+            src="/minh-hoa/cam-on-phong-thu-640.webp"
+            srcSet="/minh-hoa/cam-on-phong-thu-320.webp 320w, /minh-hoa/cam-on-phong-thu-640.webp 640w"
+            sizes="180px"
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        </div>
         <span className="absolute bottom-1 right-1 grid h-9 w-9 place-items-center rounded-full border border-[#e5dcd2] bg-white text-[var(--bb-accent-sage,#7a9482)] shadow-sm">
           <Check className="h-4 w-4" strokeWidth={2.4} aria-hidden="true" />
         </span>

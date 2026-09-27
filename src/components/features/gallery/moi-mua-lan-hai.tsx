@@ -239,8 +239,15 @@ export function MoiMuaLanHai({
 
   return (
     <>
-      <div className="flex flex-row items-center gap-5 rounded-[24px] bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:items-start sm:gap-6">
-        <div className="relative h-[100px] w-[100px] shrink-0 sm:h-[120px] sm:w-[120px]">
+      {/*
+        BB-295 mục cũ #27 — báo cáo chấm độc lập: hàng ngang cố định
+        (`flex-row`) ép cột chữ xuống còn ~220px trên điện thoại 390px — tiêu
+        đề + mô tả gãy tới 4 dòng chồng lên ảnh. Xếp DỌC dưới `sm` (ảnh nhỏ
+        trên, chữ full-width dưới) thì text-wrap tự nhiên còn 1–2 dòng; từ
+        `sm` giữ nguyên hàng ngang như trước.
+      */}
+      <div className="flex flex-col items-start gap-4 rounded-[24px] bg-white p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:flex-row sm:items-start sm:gap-6">
+        <div className="relative h-20 w-20 shrink-0 sm:h-[120px] sm:w-[120px]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/san-pham/moi-mua-qua-tang-320.webp"

@@ -158,10 +158,17 @@ export function LoiGoiYLuuApp({ onXemCachLuu }: LoiGoiYLuuAppProps) {
           aria-hidden="true"
         />
       </span>
+      {/*
+        BB-295 mục cũ #9 — báo cáo chấm: chữ serif (`font-display`, Fraunces)
+        trên một chip trạng thái nhỏ đọc lạc điệu — serif dành cho tiêu đề
+        cảm xúc, không phải nhãn tiện ích một dòng. Bản vẽ `goi-y-luu-app.png`
+        không có trong kho bản vẽ hiện có, nên chỉ làm đúng yêu cầu: đổi
+        sang chữ sans mặc định (theo `body`), không sáng tác thêm chi tiết.
+      */}
       <button
         type="button"
         onClick={xemCachLuu}
-        className="truncate font-display hover:underline"
+        className="truncate font-medium hover:underline"
       >
         {vi.gallery.saveAppPrompt.shortLabel}
       </button>

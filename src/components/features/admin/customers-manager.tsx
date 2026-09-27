@@ -31,6 +31,7 @@ import Link from "next/link";
 import { Button, Input, Card, Spinner, Badge, Avatar, AvatarFallback } from "@/components/ui";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { mauAvatarStyle } from "@/lib/utils/mau-avatar";
 import { vi } from "@/i18n/vi";
 
 const t = vi.admin.khachHang;
@@ -194,15 +195,18 @@ export function CustomersManager({
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-9 w-9 shrink-0">
-                      <AvatarFallback>{chuCaiDau(k.fullName)}</AvatarFallback>
+                      <AvatarFallback style={mauAvatarStyle(k.id || k.fullName)}>
+                        {chuCaiDau(k.fullName)}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="min-w-0 break-words font-medium">{k.fullName}</span>
-                        <span className="shrink-0 text-xs text-[var(--bb-fg-muted)]">
-                          {k.branchName}
-                        </span>
-                      </div>
+                      {/* BB-294 (#17): tên KHÔNG còn chia hàng ngang với chi
+                          nhánh (`justify-between` ép tên vào cột ~70px khi
+                          chi nhánh dài — báo cáo độc lập #17). Tên chiếm
+                          trọn bề rộng thẻ, tối đa 2 dòng (`line-clamp-2`);
+                          chi nhánh chuyển xuống HÀNG DƯỚI, cùng hàng với
+                          SĐT/số bộ/ngày. */}
+                      <div className="line-clamp-2 break-words font-medium">{k.fullName}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--bb-fg-muted)]">
                         {/* BB-290 (#40): SĐT sans 14px tabular-nums, không
                             còn font-mono — chữ số monospace đọc rời rạc hơn
@@ -211,6 +215,7 @@ export function CustomersManager({
                         <span>
                           {k.soBoAnh} {t.cot.soBo.toLowerCase()}
                         </span>
+                        {k.branchName && <span>{k.branchName}</span>}
                         {k.boAnhMoiNhat && <span>{ngay(k.boAnhMoiNhat)}</span>}
                       </div>
                       {k.trungSdtChiNhanhKhac && (
@@ -246,7 +251,9 @@ export function CustomersManager({
                     <td className="py-2 pr-3">
                       <div className="flex items-center gap-2.5">
                         <Avatar className="h-8 w-8 shrink-0">
-                          <AvatarFallback>{chuCaiDau(k.fullName)}</AvatarFallback>
+                          <AvatarFallback style={mauAvatarStyle(k.id || k.fullName)}>
+                            {chuCaiDau(k.fullName)}
+                          </AvatarFallback>
                         </Avatar>
                         <button type="button" className="text-left font-medium hover:underline">
                           {k.fullName}
@@ -644,6 +651,7 @@ function chuCaiDau(hoTen: string): string {
   const cuoi = tu.length > 1 ? tu[tu.length - 1]!.charAt(0) : "";
   return (dau + cuoi).toUpperCase();
 }
+
 
 /**
  * BB-290 (#40): `toLocaleDateString("vi-VN")` in "27/9/2026" (KHÔNG đệm số

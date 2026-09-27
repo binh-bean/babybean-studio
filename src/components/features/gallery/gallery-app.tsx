@@ -14,6 +14,7 @@ import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { ChuongThongBao } from "@/components/features/gallery/chuong-thong-bao";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
@@ -518,6 +519,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
     const khoaTheoMayChu = gallery.khoaChonTheoLark ?? isGalleryLocked(gallery.status);
     return khoaTheoMayChu || daChotChoXacNhan;
   }, [gallery, daChotChoXacNhan]);
+
+  // BB-295 mục #15 — hai nút lọc "Đã chọn/Chưa chọn" ẩn khi đã khoá (xem nhánh
+  // `nutLoc` trong JSX); nếu ba mẹ đang đứng ở một trong hai bộ lọc đó lúc bộ
+  // ảnh chuyển sang khoá (vừa chốt xong), đưa về "Tất cả" — không để lưới kẹt
+  // ở một bộ lọc không còn nút nào bấm lại được.
+  useEffect(() => {
+    if (isLocked) setFilter((f) => (f === "all" ? f : "all"));
+  }, [isLocked]);
 
 
   /**
@@ -1272,7 +1281,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
           setStatusMessage(json?.error?.message ?? "Không lưu được, ba mẹ thử lại giúp.");
           return;
         }
-        await loadGallery();
+        // BB-293 mục #1 — báo cáo chấm độc lập: thêm vào giỏ rồi đổi tab trong
+        // cửa hàng xoá cả trang thành "Đang tải…", hộp cửa hàng biến mất, trang
+        // cuộn về đầu. Cùng lỗi `loadGallery()` không truyền `silent` đã vá ở
+        // mục #24 (chọn ảnh bìa, xem ghi chú ngay trên) — chỉ khác nơi gọi.
+        await loadGallery({ silent: true });
       } catch {
         setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
       } finally {
@@ -1302,7 +1315,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
           setStatusMessage(json?.error?.message ?? "Không lưu được, ba mẹ thử lại giúp.");
           return;
         }
-        await loadGallery();
+        // BB-293 mục #1 — xem chú thích ở `datSoLuongMuaThem` bên trên: đổi
+        // tab cửa hàng sau khi mua không được xoá cả trang.
+        await loadGallery({ silent: true });
       } catch {
         setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
       } finally {
@@ -1441,7 +1456,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
   // trắng lạnh của khung quản trị.
   if (loading) {
     return (
-      <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-3 bg-background p-6 text-foreground">
+      // BB-293 — `data-testid` riêng cho ĐÚNG màn "Đang tải…" TOÀN TRANG này
+      // (khác các chữ "Đang tải…" cục bộ khác trong app — chuông thông báo,
+      // báo cáo quản trị…) để e2e đo chính xác, không lẫn.
+      <div
+        data-testid="man-dang-tai-toan-trang"
+        className="flex min-h-[80dvh] flex-col items-center justify-center gap-3 bg-background p-6 text-foreground"
+      >
         <Spinner className="h-8 w-8 text-primary" />
         <p className="text-sm text-muted-foreground">{vi.common.loading}</p>
       </div>
@@ -1780,10 +1801,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
         )}
         <div className="mx-auto max-w-[1600px] px-3 sm:px-6 lg:px-10">
           <nav aria-label="Lọc ảnh" className="flex items-center gap-3 overflow-x-auto pt-3 pb-4">
-            {nutLoc("all", vi.gallery.filterAll, photos.length)}
-            {nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
-            {nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
-            {photosLoading && <Spinner className="mb-2.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+            {/*
+              BB-293 mục #12: chế độ "chọn để so sánh" ẩn hàng chip lọc (ba mẹ đang CHỌN, không LỌC).
+              BB-295 mục #15: bộ ảnh đã khoá thì ẩn "Đã chọn/Chưa chọn", giữ "Tất cả".
+            */}
+            {!soSanhBat && (
+              <>
+                {nutLoc("all", vi.gallery.filterAll, photos.length)}
+                {!isLocked && nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
+                {!isLocked && nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
+                {photosLoading && <Spinner className="mb-2.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+              </>
+            )}
 
             {/*
               BB-218 — bật/tắt chế độ "chọn để so sánh". Đặt cuối hàng bộ lọc
@@ -1833,15 +1862,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
           </nav>
 
           {/*
-            Gợi ý đúng lúc chủ studio đã nói (24/09/2026): "Ví dụ chọn quá
-            nhiều cần bỏ bớt" — chỗ dễ dùng nhất là đang lọc "Đã chọn". Chỉ
-            hiện khi ba mẹ đang ở chế độ so sánh nhưng CHƯA lọc theo Đã chọn.
+            BB-293 mục #12 — báo cáo chấm độc lập: bỏ câu "Chọn quá nhiều
+            ảnh…" — cùng với hàng chip lọc đã ẩn ở trên, câu gợi ý lọc theo
+            "Đã chọn" không còn chỗ đứng hợp lý (chip lọc nó trỏ tới đang bị
+            ẩn), và ba dòng chỉ dẫn chồng nhau là đúng thứ report chê rối.
           */}
-          {soSanhBat && filter !== "selected" && (
-            <p className="pb-2.5 text-[12px] text-muted-foreground">
-              Chọn quá nhiều ảnh, cần bỏ bớt? Lọc theo &ldquo;{vi.gallery.filterSelected}&rdquo; rồi so sánh cho dễ.
-            </p>
-          )}
 
           {/*
             BB-180 — nhóm ảnh (thư mục con trong Drive), thành thẻ bấm được.
@@ -1905,6 +1930,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
               review={gallery.review}
               hotline={gallery.branch.hotline}
               onDecide={decideReview}
+              choPhepTai={choPhepTai}
+              onTaiCaBo={taiCaBo}
             />
           )}
 
@@ -2072,8 +2099,17 @@ export function GalleryApp({ token }: GalleryAppProps) {
         BB-202 — "Chọn ảnh bìa album". Đặt TRƯỚC khối "Trong gói của ba mẹ":
         chọn bìa là việc BẮT BUỘC trước khi chốt, còn khối dưới chỉ là tra cứu.
       */}
+      {/*
+        BB-295 mục #22 — báo cáo chấm độc lập: khối này dùng `max-w-3xl`
+        (768px, còn 736px sau padding) trong khi lưới ảnh/đầu trang dùng
+        `max-w-[1600px]` — trên máy tính rộng khối trôi thành một cột hẹp
+        căn giữa, lệch hẳn mép trái với mọi khối khác trên trang. Đổi về
+        cùng bề rộng lưới trang; nội dung bên trong (thẻ, chữ) vẫn giữ được
+        độ rộng đọc dễ vì `ChonBiaAlbum`/`TomTatSanPhamIn` tự xếp lưới ảnh
+        nhiều cột, không phải một khối chữ dài tràn hết 1600px.
+      */}
       {albumTrongGoi.length > 0 && (
-        <div className="mx-auto mt-14 max-w-3xl px-4">
+        <div className="mx-auto mt-14 max-w-[1600px] px-4 sm:px-6 lg:px-10">
           <ChonBiaAlbum
             albums={gallery.albumBia ?? albumTrongGoi.map((a) => ({
               galleryItemId: a.galleryItemId,
@@ -2091,7 +2127,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       )}
 
       {(hanMuc != null || hangInTrongGoi.length > 0) && (
-        <div className="mx-auto mt-14 max-w-3xl space-y-5 px-4">
+        <div className="mx-auto mt-14 max-w-[1600px] space-y-5 px-4 sm:px-6 lg:px-10">
           <h2 className="kh-h2">Trong gói của ba mẹ</h2>
           {hanMuc != null && (
             <p className="text-sm text-muted-foreground">
@@ -2263,6 +2299,36 @@ export function GalleryApp({ token }: GalleryAppProps) {
                     {gallery.branch.hotline}
                   </a>
                   <span className="ml-1.5 text-muted-foreground opacity-70">— {vi.gallery.callUs}</span>
+                </p>
+              )}
+              {/*
+                BB-295 mục #24 — báo cáo chấm độc lập: "Thông tin studio" chỉ
+                có tên chi nhánh + nút nhắn tin. Thêm Zalo OA — cột
+                `branches.zalo_oa` ĐÃ có trong máy chủ (`route.ts` đã trả về
+                `zaloOa`, chỉ chưa ai vẽ ra màn khách). Không bịa đường dẫn
+                zalo.me: chuỗi lưu trong cột có thể là handle hoặc link tuỳ
+                cách CSKH nhập, nên chỉ biến thành link khi RÕ RÀNG là URL.
+                Trường trống thì ẩn hẳn dòng này.
+
+                "Giờ mở cửa" và "địa chỉ ngắn" KHÔNG thêm được: `branches`
+                không có cột giờ mở cửa, và không có cột địa chỉ rút gọn
+                riêng — bịa số/chuỗi này là đúng điều đề bài cấm. Ghi vào bàn
+                giao BB-295 để CSKH/ARCH quyết có mở cột mới không.
+              */}
+              {gallery.branch.zaloOa && (
+                <p>
+                  {/^https?:\/\//i.test(gallery.branch.zaloOa) ? (
+                    <a
+                      href={gallery.branch.zaloOa}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-foreground hover:underline"
+                    >
+                      Zalo: {gallery.branch.zaloOa}
+                    </a>
+                  ) : (
+                    <span className="text-muted-foreground">Zalo: {gallery.branch.zaloOa}</span>
+                  )}
                 </p>
               )}
             </div>
@@ -2570,51 +2636,50 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 nhưng chặn ở đây trước để ba mẹ không mất công gõ tên rồi mới
                 biết chưa xong.
               */}
-              {albumThieuBia.length > 0 && (
-                <div className="mt-3 rounded-2xl border border-heart/40 bg-heart/[0.08] p-3.5 text-xs">
-                  <p className="font-semibold text-heart">Ba mẹ chưa chọn ảnh bìa cho:</p>
-                  <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[#2a2420]/80">
-                    {albumThieuBia.map((al) => (
-                      <li key={al.galleryItemId}>{al.name}</li>
-                    ))}
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSubmitModal(false);
-                      const dauTien = albumThieuBia[0];
-                      if (dauTien) {
-                        document
-                          .getElementById(`chon-bia-album-${dauTien.galleryItemId}`)
-                          ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                      }
-                    }}
-                    className="mt-2.5 rounded-full bg-heart px-3 py-1.5 font-medium text-white transition hover:opacity-90"
-                  >
-                    Đi tới chọn bìa
-                  </button>
-                </div>
-              )}
-
-              {sanPhamThieuAnh.length > 0 && (
-                <div className="mt-3 rounded-2xl border border-heart/25 bg-heart/[0.06] p-3.5 text-xs">
-                  <p className="font-semibold text-heart">Ba mẹ chưa chọn ảnh cho:</p>
-                  <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-[#2a2420]/80">
-                    {sanPhamThieuAnh.map((sp) => (
-                      <li key={sp.galleryItemId}>{sp.name}</li>
-                    ))}
-                  </ul>
-                  <p className="mt-2 leading-relaxed text-muted-foreground">
-                    Chọn luôn thì bên mình làm nhanh hơn — để sau cũng được, CSKH sẽ
-                    hỏi lại.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowSubmitModal(false)}
-                    className="mt-2.5 rounded-full border border-heart/40 px-3 py-1.5 font-medium text-heart transition hover:bg-heart/10"
-                  >
-                    Để tôi chọn thêm
-                  </button>
+              {/*
+                BB-295 mục #6 — báo cáo chấm độc lập: hai hộp đỏ (chặn thiếu
+                bìa + nhắc thiếu ảnh sản phẩm) cho cùng một album trông như
+                hai lỗi khác nhau, đỏ gắt lấn át toàn hộp chốt. Gộp thành MỘT
+                lời nhắc dịu màu kem (#F3E6DC theo `hop-chot-dien-thoai.png`)
+                — chỉ một nút hành động "Chọn bìa ngay" cho việc THẬT SỰ chặn
+                (thiếu bìa album); việc chỉ nhắc (thiếu ảnh sản phẩm) đứng
+                chung khối nhưng không có nút riêng, không tô đỏ.
+              */}
+              {(albumThieuBia.length > 0 || sanPhamThieuAnh.length > 0) && (
+                <div
+                  data-testid="loi-nhac-hop-chot"
+                  className="mt-3 rounded-2xl bg-[#F3E6DC] p-3.5 text-xs text-[#2a2420]"
+                >
+                  {albumThieuBia.length > 0 && (
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">
+                        Còn thiếu ảnh bìa album
+                        {albumThieuBia.length > 1 ? ` (${albumThieuBia.length})` : ""}
+                      </p>
+                      <button
+                        type="button"
+                        data-testid="nut-chon-bia-ngay"
+                        onClick={() => {
+                          setShowSubmitModal(false);
+                          const dauTien = albumThieuBia[0];
+                          if (dauTien) {
+                            document
+                              .getElementById(`chon-bia-album-${dauTien.galleryItemId}`)
+                              ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          }
+                        }}
+                        className="shrink-0 font-semibold underline underline-offset-4"
+                      >
+                        Chọn bìa ngay
+                      </button>
+                    </div>
+                  )}
+                  {sanPhamThieuAnh.length > 0 && (
+                    <p className={cn("leading-relaxed text-[#4a423b]", albumThieuBia.length > 0 && "mt-2")}>
+                      Còn {sanPhamThieuAnh.length} sản phẩm chưa đủ ảnh — chọn luôn thì bên mình
+                      làm nhanh hơn, để sau cũng được, CSKH sẽ hỏi lại.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -2643,41 +2708,70 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 </div>
               )}
 
-              {/* Ô tích — đặt SAU tóm tắt, để ba mẹ đọc lại rồi mới xác nhận. */}
+              {/*
+                Ô tích — đặt SAU tóm tắt, để ba mẹ đọc lại rồi mới xác nhận.
+                BB-295 mục #6 — báo cáo chấm: ô tích mặc định của trình duyệt
+                (vuông xanh dương) lạc tông với hệ thiết kế; đổi sang
+                `Checkbox` dùng chung (vuông bo góc, tích khi chọn là màu mực
+                theo token `--bb-primary`).
+              */}
               <label className="mt-5 flex items-start gap-2.5 text-sm leading-relaxed">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={dongY}
-                  onChange={(e) => setDongY(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-primary"
+                  onCheckedChange={setDongY}
+                  className="mt-0.5"
                 />
                 <span>{vi.gallery.submitAgree}</span>
               </label>
 
-              <div className="mt-6 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowSubmitModal(false)}
-                  disabled={submitting}
-                  className="h-11 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-50"
-                >
-                  {vi.common.cancel}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmitSelection}
-                  // Khoá nút khi chưa đủ hai ô: bấm rồi nhận "Dữ liệu không hợp
-                  // lệ" thì ba mẹ không biết thiếu gì, và câu đó không nói ra.
-                  // BB-202: thêm điều kiện thiếu bìa album — chặn THẬT, không
-                  // chỉ nhắc (khác `sanPhamThieuAnh`).
-                  disabled={
-                    submitting || tenXacNhan.trim().length === 0 || !dongY || albumThieuBia.length > 0
-                  }
-                  className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
-                >
-                  {submitting && <Spinner className="h-4 w-4" />}
-                  {vi.common.confirm}
-                </button>
+              <div className="mt-6 flex flex-col items-end gap-2">
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSubmitModal(false)}
+                    disabled={submitting}
+                    className="h-11 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    {vi.common.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitSelection}
+                    // Khoá nút khi chưa đủ hai ô: bấm rồi nhận "Dữ liệu không hợp
+                    // lệ" thì ba mẹ không biết thiếu gì, và câu đó không nói ra.
+                    // BB-202: thêm điều kiện thiếu bìa album — chặn THẬT, không
+                    // chỉ nhắc (khác `sanPhamThieuAnh`).
+                    disabled={
+                      submitting || tenXacNhan.trim().length === 0 || !dongY || albumThieuBia.length > 0
+                    }
+                    className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                  >
+                    {submitting && <Spinner className="h-4 w-4" />}
+                    {vi.common.confirm}
+                  </button>
+                </div>
+                {/*
+                  BB-295 mục #6 — bản vẽ `hop-chot-dien-thoai.png`: khi nút bị
+                  khoá, lý do đứng NGAY DƯỚI nút thay vì im lặng. Chỉ một lý do
+                  ưu tiên nhất (thiếu bìa album chặn thật; hai ô bắt buộc còn
+                  lại chỉ hiện khi KHÔNG có lý do bìa, để không đọc hai câu
+                  cùng lúc).
+                */}
+                {!submitting && albumThieuBia.length > 0 && (
+                  <p data-testid="ly-do-khoa-nut-chot" className="text-xs text-muted-foreground">
+                    Chọn bìa album để xác nhận
+                  </p>
+                )}
+                {!submitting && albumThieuBia.length === 0 && tenXacNhan.trim().length === 0 && (
+                  <p data-testid="ly-do-khoa-nut-chot" className="text-xs text-muted-foreground">
+                    Điền tên người xác nhận để tiếp tục
+                  </p>
+                )}
+                {!submitting && albumThieuBia.length === 0 && tenXacNhan.trim().length > 0 && !dongY && (
+                  <p data-testid="ly-do-khoa-nut-chot" className="text-xs text-muted-foreground">
+                    Tích &ldquo;đã xem kỹ và đồng ý&rdquo; để xác nhận
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -2788,8 +2882,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
               )
             ) : null
           }
-          bangSanPham={(anh) => (
+          bangSanPham={(anh, tong) => (
             <BangSanPhamCuaAnh
+              tong={tong}
               anhDaChon={anh.mark === "selected"}
               khoa={isLocked}
               dangLuu={placing}

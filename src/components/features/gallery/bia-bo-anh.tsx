@@ -43,7 +43,9 @@ function ngayDep(iso: string | null): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   const hai = (n: number) => String(n).padStart(2, "0");
-  return `${hai(d.getDate())}.${hai(d.getMonth() + 1)}.${d.getFullYear()}`;
+  // BB-295 mục #7 — báo cáo chấm độc lập: dòng phụ bìa phải là ngày chụp
+  // dd/mm/yyyy (gạch chéo), không phải dấu chấm cũ.
+  return `${hai(d.getDate())}/${hai(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
 function conMayNgay(hanChot: string | null): number | null {
@@ -118,11 +120,14 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
   // BB-287 mục 5 — câu chào MẶC ĐỊNH (không ghi đè khi studio đã tự soạn
   // `loiChao`) phải nói đúng việc ba mẹ cần biết ở TRẠNG THÁI hiện tại, không
   // mời "thong thả chọn nhé" khi đã hết việc để chọn.
+  // BB-295 mục #14 — báo cáo chấm độc lập: câu chào khi đã khoá chờ chỉnh
+  // đổi thành đúng câu người chấm yêu cầu ("Studio đang chỉnh ảnh của bé"),
+  // gắn tên bé thật khi có thay vì chữ "con" chung chung.
   const loiChaoMacDinh =
     trangThai === "delivered"
       ? "Ảnh của bé đã hoàn thiện."
       : khoa
-        ? "Cảm ơn ba mẹ — studio đang chỉnh ảnh."
+        ? `Studio đang chỉnh ảnh của ${tenBe?.trim() || "bé"}.`
         : `${soAnh.toLocaleString("vi-VN")} khoảnh khắc của con đã sẵn sàng. Ba mẹ thong thả chọn nhé.`;
   const loiChaoBia = loiChao?.trim() || loiChaoMacDinh;
 
@@ -323,11 +328,26 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
         )}
       >
         <div className="max-w-md lg:max-w-2xl">
-          <p className="text-[12px] uppercase tracking-[0.16em] text-[#6b6057]">
-            {[ngay, chiNhanh].filter(Boolean).join(" · ")}
-          </p>
+          {/*
+            BB-295 mục #7 — báo cáo chấm độc lập: dòng phụ trên bìa từng là
+            "ngày · TÊN CHI NHÁNH", đọc như một nhãn vận hành hơn là lời chào
+            cảm xúc. Chi nhánh đã chuyển hẳn xuống chân trang (`gallery-app.tsx`
+            footer) — dòng này chỉ còn ngày chụp.
+          */}
+          {ngay && (
+            <p className="text-[12px] uppercase tracking-[0.16em] text-[#6b6057]">{ngay}</p>
+          )}
 
-          <h1 className="mt-2 font-display text-[40px] font-light leading-[1.02] tracking-[-0.02em] sm:text-[48px] lg:mt-3 lg:text-[44px] xl:text-[52px]">
+          {/*
+            `text-wrap: balance` — bản vẽ và báo cáo chấm: khi không có tên bé
+            thật, câu mặc định "Khoảnh khắc của con" xuống dòng 2 để mồ côi
+            một chữ ("con"). `balance` chia đều số chữ mỗi dòng thay vì tràn
+            hết dòng 1 rồi rớt một chữ xuống dòng 2.
+          */}
+          <h1
+            className="mt-2 font-display text-[40px] font-light leading-[1.02] tracking-[-0.02em] sm:text-[48px] lg:mt-3 lg:text-[44px] xl:text-[52px]"
+            style={{ textWrap: "balance" }}
+          >
             {tieuDeBia}
           </h1>
 

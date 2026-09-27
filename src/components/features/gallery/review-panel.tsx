@@ -47,6 +47,26 @@ export interface ReviewData {
   rounds: ReviewRound[];
 }
 
+/**
+ * BB-295 mục #14 — báo cáo chấm độc lập: khi thẻ hành trình đã nói trạng
+ * thái (`anCauTrangThai`) VÀ chưa có link ảnh đã chỉnh VÀ chưa tới lúc duyệt
+ * VÀ chưa có lịch sử vòng sửa nào, `ReviewPanel` không còn gì để nói — nhưng
+ * trước bản vá vẫn vẽ ra một thẻ viền + nền TRẮNG RỖNG (chỉ padding, không
+ * chữ) giữa dòng thời gian và thẻ "Mời ông bà xem ảnh".
+ *
+ * Tách hàm thuần để phép thử đơn vị canh được đúng LUẬT, không phải canh
+ * chuỗi HTML render ra (AGENTS.md §5a mục 4) — cùng cách `trangThaiSoTam`
+ * ở `cam-on-sau-chot.tsx` đã làm.
+ */
+export function coNoiDungDeVe(
+  anCauTrangThai: boolean,
+  finalDriveUrl: string | null,
+  showDecide: boolean,
+  soVongSua: number,
+): boolean {
+  return !anCauTrangThai || finalDriveUrl !== null || showDecide || soVongSua > 0;
+}
+
 export function ReviewPanel({
   status,
   nhanTienDo,
@@ -54,6 +74,8 @@ export function ReviewPanel({
   review,
   hotline,
   onDecide,
+  choPhepTai = false,
+  onTaiCaBo,
 }: {
   status: string;
   /**
@@ -77,6 +99,15 @@ export function ReviewPanel({
   review: ReviewData;
   hotline: string;
   onDecide: (decision: "approve" | "revise", note?: string) => Promise<void>;
+  /**
+   * BB-295 mục #15 — báo cáo chấm độc lập: trạng thái "đã giao" cần một khối
+   * "Ảnh đã hoàn thiện" có nút "Tải cả bộ" rõ ràng, không chỉ một dòng tiêu
+   * đề. Chỉ hiện nút khi app THẬT SỰ có đường tải cả bộ cho bộ ảnh này
+   * (`choPhepTai` — `gallery.options.download === true`, đã có sẵn từ
+   * BB-156) — không tự thêm nút cho một khả năng không tồn tại.
+   */
+  choPhepTai?: boolean;
+  onTaiCaBo?: () => void;
 }) {
   const [writing, setWriting] = React.useState(false);
   const [note, setNote] = React.useState("");
@@ -104,6 +135,12 @@ export function ReviewPanel({
   // này (không đọc `nhanTienDo`), không lặp, nên vẫn hiện như cũ.
   const anCauTrangThai = coTheHanhTrinh && status === "in_retouch";
 
+  // BB-295 mục #14 — không vẽ thẻ khi không có nội dung (xem hàm thuần
+  // `coNoiDungDeVe` ở trên và phép thử `tests/unit/bb-295-review-panel.test.ts`).
+  if (!coNoiDungDeVe(anCauTrangThai, review.finalDriveUrl, showDecide, review.rounds.length)) {
+    return null;
+  }
+
   return (
     <div className="space-y-3.5 rounded-2xl border border-border bg-surface p-5">
       {!anCauTrangThai && (
@@ -113,7 +150,13 @@ export function ReviewPanel({
               ? (nhanTienDo ?? "Studio đang chỉnh ảnh")
               : status === "awaiting_approval"
                 ? "Ảnh đã chỉnh xong, mời ba mẹ xem"
-                : "Ba mẹ đã duyệt bộ ảnh này"}
+                : // BB-295 mục #15 — báo cáo chấm: "đã giao" (khách đã nhận đủ ảnh
+                  // hoàn thiện) trước đây dùng chung câu "Ba mẹ đã duyệt bộ ảnh
+                  // này" với "approved" (đã duyệt nhưng chưa chắc đã giao) — gộp
+                  // thành khối riêng "Ảnh đã hoàn thiện" cho đúng trạng thái.
+                  status === "delivered"
+                  ? "Ảnh đã hoàn thiện"
+                  : "Ba mẹ đã duyệt bộ ảnh này"}
           </p>
           {status === "in_retouch" && review.rounds.some((r) => !r.resolved) && (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -132,6 +175,22 @@ export function ReviewPanel({
         >
           Mở thư mục ảnh đã chỉnh
         </a>
+      )}
+
+      {/*
+        BB-295 mục #15 — nút "Tải cả bộ" chỉ hiện khi bộ ảnh đã giao VÀ app
+        thật sự có đường tải cả bộ (`choPhepTai`, đã nối với `onTaiCaBo` sẵn có
+        từ BB-156 — không phải nút mới không nối vào đâu).
+      */}
+      {status === "delivered" && choPhepTai && onTaiCaBo && (
+        <button
+          type="button"
+          onClick={onTaiCaBo}
+          data-testid="nut-tai-ca-bo-da-giao"
+          className="h-11 rounded-full bg-[#2e2a27] px-5 text-sm font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
+        >
+          Tải cả bộ
+        </button>
       )}
 
       {canDecide && !review.finalDriveUrl && (

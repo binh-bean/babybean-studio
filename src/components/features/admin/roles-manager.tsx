@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Input, Card, Spinner, Badge } from "@/components/ui";
+import { Button, Input, Card, Spinner, Badge, Checkbox } from "@/components/ui";
 import {
   Dialog,
   DialogContent,
@@ -304,15 +304,15 @@ export function RolesManager() {
                           .filter((q) => q.nhom === nhom)
                           .map((q) => (
                             <label key={q.ma} className="flex items-start gap-2 text-sm">
-                              <input
-                                type="checkbox"
+                              {/* BB-294 (#19) — ô tick hệ thiết kế, không phải mặc định trình duyệt. */}
+                              <Checkbox
                                 className="mt-1"
                                 disabled={chiDoc}
                                 checked={quyenNhap.has(q.ma)}
-                                onChange={(e) =>
+                                onCheckedChange={(checked) =>
                                   setQuyenNhap((s) => {
                                     const moi = new Set(s);
-                                    if (e.target.checked) moi.add(q.ma);
+                                    if (checked) moi.add(q.ma);
                                     else moi.delete(q.ma);
                                     return moi;
                                   })

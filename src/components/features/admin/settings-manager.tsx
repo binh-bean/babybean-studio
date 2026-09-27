@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Input, Card, Spinner } from "@/components/ui";
+import { Button, Input, Card, Spinner, Checkbox } from "@/components/ui";
 import { cn } from "@/components/ui/utils";
 import { Field } from "./field";
 import { vi } from "@/i18n/vi";
@@ -207,10 +207,10 @@ export function SettingsManager() {
                 <Field key={c.key} label={nhan(c.key)} hint={moTa(c.key)}>
                   {typeof c.value === "boolean" ? (
                     <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
+                      {/* BB-294 (#19) — ô tick hệ thiết kế, không phải mặc định trình duyệt. */}
+                      <Checkbox
                         checked={Boolean(nhap[c.key])}
-                        onChange={(e) => setNhap((s) => ({ ...s, [c.key]: e.target.checked }))}
+                        onCheckedChange={(checked) => setNhap((s) => ({ ...s, [c.key]: checked }))}
                       />
                       {nhap[c.key] ? t.dangBat : t.dangTat}
                     </label>
@@ -237,7 +237,15 @@ export function SettingsManager() {
           thẻ cài đặt phía trên (thẻ đó rộng theo khung trang, không phải một
           giới hạn 5xl riêng). Bỏ giới hạn riêng, để dải chân bám ĐÚNG bề rộng
           nội dung như phần còn lại của trang. */}
-      <div className="sticky -bottom-4 z-10 -mx-4 border-t border-[var(--bb-border)] bg-[var(--bb-surface)] sm:-bottom-6 sm:-mx-6 lg:-bottom-8 lg:-mx-8">
+      {/* BB-294 (#23): `bottom` ÂM (`-bottom-4`…) cùng `-mx-4`… trước đây kéo
+          dải chân TRÀN RA khỏi lề của `<main>` (để bám mép viewport) — nhưng
+          `bottom` âm nghĩa là mép dưới của thanh nằm THẤP HƠN mép dưới vùng
+          cuộn, nên nó không ghim ở đáy khung nhìn thật (trôi giữa trang, có
+          khoảng trống dưới nó — báo cáo #23), và bề ngang tràn khỏi `main` thì
+          lệch khỏi bề rộng thẻ Cài đặt phía trên. Đổi về `bottom-0` (ghim
+          đúng đáy) và bỏ margin âm (bám cùng bề rộng nội dung — tức cùng bề
+          rộng thẻ — thay vì tràn hết `main`). */}
+      <div className="sticky bottom-0 z-10 border-t border-[var(--bb-border)] bg-[var(--bb-surface)]">
         <div className="mx-auto flex items-center justify-between gap-3 px-4 py-3 md:px-6">
           <span className="hidden text-xs text-[var(--bb-fg-muted)] sm:inline">
             {t.ghiChuBiMat}

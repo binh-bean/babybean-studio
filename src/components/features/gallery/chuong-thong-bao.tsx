@@ -43,7 +43,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
 import { isSubmittedOrLater } from "@/lib/gallery-status";
 import {
   VAPID_PUBLIC_KEY,
@@ -252,6 +252,24 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
           >
             <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-[var(--bb-border)] sm:hidden" />
 
+            {/*
+              BB-295 mục #20 — báo cáo chấm độc lập: tấm thông báo mở ra không
+              có tiêu đề lẫn nút đóng — ba mẹ chỉ đóng được bằng cách bấm ra
+              ngoài hoặc Esc, không thấy chỗ nào để bấm. Thêm hàng đầu "Thông
+              báo" + nút × (giữ song song với `moBang`/Esc/bấm-ngoài đã có).
+            */}
+            <div className="mb-3 flex items-center justify-between">
+              <p className="kh-h3 text-[15px]">Thông báo</p>
+              <button
+                type="button"
+                onClick={() => setMo(false)}
+                aria-label="Đóng"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-[var(--bb-surface-2)] hover:text-[var(--bb-fg)]"
+              >
+                <X className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
+              </button>
+            </div>
+
             {goiIosThemManHinh && (
               <p className="mb-3 rounded-lg bg-[var(--bb-surface-2)] p-2 text-xs text-muted-foreground">
                 Thêm app ra màn hình chính để nhận thông báo ngay khi có tin mới.
@@ -273,8 +291,12 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
                     className="h-32 w-32 rounded-lg object-cover"
                   />
                 )}
+                {/*
+                  BB-295 mục #20 — câu trống cũ "Chưa có thông báo" cụt và vô
+                  cảm; đổi thành câu nói rõ ba mẹ sẽ được báo việc gì, ở đâu.
+                */}
                 <p className="mt-2 text-center text-sm text-muted-foreground">
-                  {dangTai ? "Đang tải…" : "Chưa có thông báo"}
+                  {dangTai ? "Đang tải…" : "Studio sẽ báo ở đây khi ảnh chỉnh xong"}
                 </p>
               </div>
             ) : (

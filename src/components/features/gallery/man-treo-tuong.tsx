@@ -45,6 +45,7 @@ import {
 import {
   tinhKhungTrenTuong,
   cacCoTuDanhMuc,
+  tachCoKhung,
   type CoKhungCm,
 } from "@/lib/gallery/khung-tren-tuong";
 import { MAU_KHUNG, MAU_KHUNG_MAC_DINH } from "@/lib/gallery/mau-khung";
@@ -223,7 +224,13 @@ export function ManTreoTuong({
   const [chiSo, setChiSo] = useState(chiSoBanDau);
   const [maPhong, setMaPhong] = useState<MaPhong>("phong-khach");
   const [chatLieu, setChatLieu] = useState<string | null>(null);
-  const [co, setCo] = useState<CoKhungCm>("40x60");
+  // BB-293 mục #4 — báo cáo chấm độc lập: khởi tạo cứng "40x60" từng khiến
+  // hiệu ứng chọn mặc định-lớn-nhất bên dưới KHÔNG chạy nếu "40x60" TÌNH CỜ
+  // đã là một cỡ hợp lệ (`coVua.includes(co)` đúng ngay từ đầu) — dù danh
+  // mục có cỡ lớn hơn 40×60 cũng vừa tường. Bắt đầu từ rỗng để hiệu ứng mặc
+  // định (ưu tiên gói đã mua, rồi tới cỡ lớn nhất đang bán) luôn tự chạy lúc
+  // mở màn.
+  const [co, setCo] = useState<CoKhungCm>("");
   const [coKhung, setCoKhung] = useState(false);
   const [maMauKhung, setMaMauKhung] = useState(MAU_KHUNG_MAC_DINH.ma);
   const [manRong, setManRong] = useState(false);
@@ -325,17 +332,6 @@ export function ManTreoTuong({
     [monAnhIn, suatTrongGoi]
   );
 
-  useEffect(() => {
-    if (chatLieu !== null) return;
-    if (monTrongGoi?.material && monTrongGoi.size) {
-      setChatLieu(monTrongGoi.material);
-      setCo(monTrongGoi.size);
-      return;
-    }
-    const dau = dsChatLieu[0];
-    if (dau) setChatLieu(dau);
-  }, [chatLieu, dsChatLieu, monTrongGoi]);
-
   const kho: KhoAnhPhong = manRong ? "ngang" : "doc";
   const phong = PHONG_TREO[maPhong][kho];
 
@@ -343,6 +339,52 @@ export function ManTreoTuong({
   // đúng đề bài "ảnh dọc 40×60 = rộng 40 cao 60".
   const huongKhung: "doc" | "ngang" =
     anhDangXem?.width && anhDangXem?.height && anhDangXem.height >= anhDangXem.width ? "doc" : "ngang";
+
+  /**
+   * BB-293 vòng 2 mục #4/#10 — vòng 1 chỉ chọn CỠ lớn nhất trong đúng CHẤT
+   * LIỆU đã lỡ chọn sẵn (chất liệu đầu tiên theo thứ tự danh mục). Ca thật
+   * bắt được lỗi: "UV" đứng đầu danh mục nhưng chỉ bán tới 20×30, trong khi
+   * "Gỗ" cùng bộ ảnh có tới 60×90 — mặc định vẫn ra khung nhỏ, gần như vô
+   * hình trên tường (`test-results/bb-293/4-treo-tuong-dt.png`, chụp trước
+   * khi vá). Nay gộp CHẤT LIỆU + CỠ vào MỘT phép chọn: xét mọi tổ hợp
+   * (material, size) của TOÀN BỘ ảnh in đang bán, chỉ giữ tổ hợp vừa tường,
+   * ưu tiên diện tích ≥ 40×60, chọn tổ hợp lớn nhất — không phụ thuộc nó
+   * thuộc chất liệu nào.
+   */
+  const macDinhTuToanDanhMuc = useMemo(() => {
+    const NGUONG_DIEN_TICH = 40 * 60;
+    const ungVien: Array<{ material: string; size: string; dienTich: number }> = [];
+    for (const m of monAnhIn) {
+      if (!m.material || !m.size) continue;
+      const k = tachCoKhung(m.size);
+      if (!k) continue;
+      const fit = tinhKhungTrenTuong(phong, m.size, huongKhung, coKhung, mauKhungDaChon.vienCm);
+      if (!fit.vua) continue;
+      ungVien.push({ material: m.material, size: m.size, dienTich: k.canhNgan * k.canhDai });
+    }
+    if (ungVien.length === 0) return null;
+    const duLon = ungVien.filter((u) => u.dienTich >= NGUONG_DIEN_TICH);
+    const nguon = duLon.length > 0 ? duLon : ungVien;
+    let lonNhat = nguon[0]!;
+    for (const u of nguon) if (u.dienTich > lonNhat.dienTich) lonNhat = u;
+    return lonNhat;
+  }, [monAnhIn, phong, huongKhung, coKhung, mauKhungDaChon]);
+
+  useEffect(() => {
+    if (chatLieu !== null) return;
+    if (monTrongGoi?.material && monTrongGoi.size) {
+      setChatLieu(monTrongGoi.material);
+      setCo(monTrongGoi.size);
+      return;
+    }
+    if (macDinhTuToanDanhMuc) {
+      setChatLieu(macDinhTuToanDanhMuc.material);
+      setCo(macDinhTuToanDanhMuc.size);
+      return;
+    }
+    const dau = dsChatLieu[0];
+    if (dau) setChatLieu(dau);
+  }, [chatLieu, dsChatLieu, monTrongGoi, macDinhTuToanDanhMuc]);
 
   // Chỉ hiện cỡ nào THẬT SỰ có bán VÀ vừa mảng tường của đúng phòng+khổ đang
   // xem — quét lại mỗi khi đổi phòng/khổ màn hình, không chỉ lúc mở màn.
@@ -359,10 +401,31 @@ export function ManTreoTuong({
     [coCoBan, phong, huongKhung, coKhung, mauKhungDaChon]
   );
 
+  /**
+   * BB-293 mục #4/#10 — báo cáo chấm độc lập: mặc định là cỡ NHỎ NHẤT vừa
+   * tường (`coVua[0]`, danh sách sắp xếp nhỏ→lớn) — điện thoại đầu tiên gặp
+   * 10×15, gần như không thấy khung trên tường. LUAT-DOT-8: mặc định phải là
+   * cỡ LỚN NHẤT hợp lý CÓ TRONG DANH MỤC ĐANG BÁN (không bịa cỡ), ưu tiên
+   * ≥ 40×60; không có cỡ nào ≥ 40×60 thì lấy cỡ lớn nhất đang bán và vừa
+   * tường. Không đổi luật "vừa tường" (vẫn chỉ chọn trong `coVua`) — chỉ đổi
+   * PHẦN TỬ NÀO trong đó được chọn làm mặc định.
+   */
+  const coMacDinhTuDanhMuc = useMemo(() => {
+    if (coVua.length === 0) return null;
+    const dienTich = (c: CoKhungCm) => {
+      const k = tachCoKhung(c);
+      return k ? k.canhNgan * k.canhDai : 0;
+    };
+    const NGUONG_DIEN_TICH = 40 * 60;
+    const duLon = coVua.filter((c) => dienTich(c) >= NGUONG_DIEN_TICH);
+    const nguon = duLon.length > 0 ? duLon : coVua;
+    // `coVua` đã sắp nhỏ→lớn (kế thừa từ `cacCoTuDanhMuc`) — lớn nhất là phần tử cuối.
+    return nguon[nguon.length - 1] ?? null;
+  }, [coVua]);
+
   useEffect(() => {
-    const dau = coVua[0];
-    if (dau && !coVua.includes(co)) setCo(dau);
-  }, [coVua, co]);
+    if (coMacDinhTuDanhMuc && !coVua.includes(co)) setCo(coMacDinhTuDanhMuc);
+  }, [coVua, co, coMacDinhTuDanhMuc]);
 
   const ketQuaKhung = useMemo(
     () => tinhKhungTrenTuong(phong, co, huongKhung, coKhung, mauKhungDaChon.vienCm),
@@ -619,7 +682,14 @@ export function ManTreoTuong({
               aria-label="Tấm sau"
               onClick={toi}
               disabled={chiSo === anh.length - 1}
-              className="absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/50 disabled:opacity-0 md:flex"
+              className={cn(
+                "absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/50 disabled:opacity-0 md:flex",
+                // BB-293 mục #10 — báo cáo chấm độc lập: nút › đứng cố định ở
+                // right-3 (từ mép màn hình) đè lên mép trái của bảng 360px
+                // trên máy tính. Bảng đang mở (chưa ẩn) thì lùi nút ra khỏi
+                // vùng bảng; bảng ẩn thì trả về right-3 như cũ.
+                !banAn && "md:right-[376px]",
+              )}
             >
               <ChevronRight className="h-5 w-5" />
             </button>
@@ -648,8 +718,16 @@ export function ManTreoTuong({
           </button>
         </div>
 
-        {/* 4 phòng — thẻ nhỏ chọn ảnh nền. */}
-        <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 gap-2 rounded-full bg-black/35 p-1.5 backdrop-blur-sm">
+        {/*
+          4 phòng — thẻ nhỏ chọn ảnh nền.
+
+          BB-293 mục #4 — báo cáo chấm độc lập: trên điện thoại (390px), cụm
+          phòng căn giữa (~180px) và nút "Ẩn bảng" + "Đóng" bên phải (từ
+          right-4, ~158px) CHỒNG NHAU ở top-4 — 390 không đủ chỗ cho cả hai ở
+          cùng một hàng. Máy tính đủ rộng nên giữ nguyên top-4; điện thoại đẩy
+          cụm phòng xuống một hàng riêng (top-16), dưới hàng "Ẩn bảng"/"Đóng".
+        */}
+        <div className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 gap-2 rounded-full bg-black/35 p-1.5 backdrop-blur-sm sm:top-4">
           {THU_TU_PHONG.map((ma) => (
             <button
               key={ma}
@@ -684,13 +762,19 @@ export function ManTreoTuong({
       <div
         className={cn(
           "giao-dien-khach absolute z-10 flex flex-col gap-3 overflow-y-auto rounded-t-3xl bg-bb-bg/80 p-4 backdrop-blur-md transition-transform duration-300 ease-out",
-          "inset-x-0 bottom-0 max-h-[52vh]",
+          // BB-293 mục #4 — báo cáo chấm độc lập: 52vh chiếm hơn nửa màn hình
+          // điện thoại, đè gần hết ảnh tường. LUAT-DOT-8: bảng thu gọn ≤30%
+          // chiều cao trên điện thoại — nội dung vẫn cuộn được bên trong.
+          "inset-x-0 bottom-0 max-h-[30vh]",
           // md:pt-16: cột phải trên máy tính chừa chỗ cho nút "Ẩn bảng"/"Đóng"
           // (z-20, top-4 right-4 của ảnh phòng) — thiếu khoảng này, hàng đầu
           // của bảng (tiêu đề + nút "Chi tiết") nằm ĐÚNG dưới hai nút đó, và
           // vì hai nút kia z CAO HƠN nên chặn mất cú bấm vào "Chi tiết" (tự bắt
           // bằng Playwright: click "Chi tiết" bị nút "Đóng" chặn pointer-events).
-          "md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:max-h-none md:w-[300px] md:rounded-none md:pt-16",
+          // BB-293 mục #10 — báo cáo chấm độc lập: 300px ép tiêu đề "Treo lên
+          // tường nhà mình" + nút "Chi tiết" gãy hai dòng. Rộng ra 360px —
+          // đủ một dòng, đúng LUAT-DOT-8 ("bảng 360px tiêu đề một dòng").
+          "md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:max-h-none md:w-[360px] md:rounded-none md:pt-16",
           // "invisible" (không chỉ translate ra ngoài khung nhìn) để Playwright
           // và trình đọc màn hình đều coi đây là ĐÃ ẨN thật, không phải một
           // khối vẫn "nhìn thấy được" nhưng trôi ra ngoài rìa màn hình.

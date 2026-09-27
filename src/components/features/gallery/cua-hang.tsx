@@ -144,10 +144,18 @@ const TIEN_TO_NHOM: Record<NhomSanPham, string> = {
   khung: "Khung",
 };
 
-function tenThanThienSanPham(nhom: NhomSanPham, sp: SanPhamCuaHang | null): string {
+/**
+ * BB-293 mục #16 — báo cáo chấm độc lập: nhóm "khung" ghép với chất liệu
+ * "Khung HQ" (đặt tên từ Lark, đã có sẵn chữ "Khung") ra "Khung Khung HQ" —
+ * lặp chữ. Chất liệu đã tự nói tên nhóm thì bỏ tiền tố, chỉ còn lại tên chất
+ * liệu; không thì ghép như cũ.
+ */
+export function tenThanThienSanPham(nhom: NhomSanPham, sp: SanPhamCuaHang | null): string {
   const tienTo = TIEN_TO_NHOM[nhom];
   if (!sp?.material) return tienTo;
-  return `${tienTo} ${sp.material}`;
+  const chatLieu = sp.material.trim();
+  if (chatLieu.toLowerCase().startsWith(tienTo.toLowerCase())) return chatLieu;
+  return `${tienTo} ${chatLieu}`;
 }
 
 export function CuaHang({
@@ -277,7 +285,12 @@ export function CuaHang({
       type="button"
       disabled={khoa || dangLuu}
       onClick={() => setMoLuoiChon(true)}
-      className="h-11 shrink-0 rounded-full bg-[var(--bb-surface-2)] px-6 text-sm font-medium text-[var(--bb-fg)] transition hover:opacity-80 disabled:opacity-40"
+      // BB-295 mục #8 — báo cáo chấm độc lập: nút này là hành động CHÍNH của
+      // dòng sản phẩm (chọn ảnh cho sản phẩm), nhưng màu be nhạt cũ trông như
+      // nút phụ bên cạnh "Thêm vào giỏ" mực đậm. Đổi về cùng nền mực #2E2A27
+      // như mọi nút chính khác trên màn khách (bìa, "Chốt danh sách", "Thêm
+      // vào giỏ") — chỉ đổi lớp màu, không đụng logic cửa hàng.
+      className="h-11 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
     >
       Chọn ảnh
     </button>
