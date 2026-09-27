@@ -12,7 +12,7 @@
 
 import React from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Link2, History, CloudOff, AlertTriangle } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -36,18 +36,6 @@ interface ChiNhanh {
   id: string;
   name: string;
 }
-
-/**
- * Bốn báo cáo lẻ đã có trước BB-260 — giữ nguyên logic, chỉ gắn vào đây như
- * mục danh sách. BB-280 gộp ba cái đầu vào ba tab của MỘT trang
- * (/admin/viec-can-xu-ly); "Nhật ký thao tác" vẫn là trang riêng.
- */
-const BAO_CAO_CU: { ten: string; href: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { ten: "Ảnh vượt hạn mức", href: "/admin/viec-can-xu-ly?tab=over-quota", icon: AlertTriangle },
-  { ten: "Bộ ảnh lỗi tải", href: "/admin/viec-can-xu-ly?tab=loi-dong-bo", icon: CloudOff },
-  { ten: "Link sắp hết hạn", href: "/admin/viec-can-xu-ly?tab=link-sap-het-han", icon: Link2 },
-  { ten: "Nhật ký thao tác", href: "/admin/reports/nhat-ky", icon: History },
-];
 
 const TEN_NHOM: Record<string, string> = {
   "van-hanh": "Vận hành",
@@ -203,24 +191,10 @@ export function BaoCaoExplorer() {
             </div>
           ))}
 
-          <div>
-            <div className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">
-              Báo cáo khác
-            </div>
-            <ul className="mt-1 flex flex-col gap-0.5">
-              {BAO_CAO_CU.map((b) => (
-                <li key={b.href}>
-                  <a
-                    href={b.href}
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-[var(--bb-fg-muted)] hover:bg-[var(--bb-surface-2)]"
-                  >
-                    <b.icon className="h-4 w-4 shrink-0" />
-                    {b.ten}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* BB-290 (#41): trước đây có thêm mục "Báo cáo khác" lặp lại đúng
+              các trang đã có trong thanh bên chính ("Việc cần xử lý", "Nhật
+              ký thao tác") — một menu con nói lại đúng chuyện thanh bên đã
+              nói. Bỏ hẳn, không lặp thêm một đường dẫn tới cùng một trang. */}
         </nav>
       </aside>
 
@@ -384,7 +358,7 @@ function NoiDungBaoCao({
             </>
           )}
 
-          <Field label="Gom theo" htmlFor="bao-cao-nhom">
+          <Field label="Xem theo" htmlFor="bao-cao-nhom">
             <Select
               id="bao-cao-nhom"
               value={nhom}
@@ -403,7 +377,7 @@ function NoiDungBaoCao({
                 id="bao-cao-chi-nhanh"
                 value={chiNhanhChon}
                 onChange={(e) => onDoiFilter({ chiNhanh: e.target.value || null })}
-                className="w-44"
+                className="w-56"
               >
                 <option value="">Mọi chi nhánh được xem</option>
                 {chiNhanhs.map((c) => (
@@ -456,7 +430,10 @@ function NoiDungBaoCao({
 
       {!dangTai && !loi && ketQua && (
         <>
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {/* BB-290 (#41): lưới 5 cột từ `xl` để năm thẻ số liệu (kỳ có so
+              sánh) căn đều một hàng, thay vì bốn cột để thẻ thứ năm rơi lẻ
+              xuống hàng hai. */}
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
             {ketQua.theSo.map((t) => (
               <TheSoCard key={t.nhan} theSo={t} />
             ))}

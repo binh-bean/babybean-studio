@@ -33,6 +33,7 @@ import { X, ChevronLeft, ChevronRight, Info, EyeOff, Eye, ZoomIn } from "lucide-
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import { formatKichThuoc } from "@/lib/utils/dinh-dang";
 import { calculateSwipeAction, buildLightboxImageUrl } from "@/lib/utils/lightbox";
 import {
   PHONG_TREO,
@@ -84,7 +85,7 @@ export interface ManTreoTuongProps {
   suatTrongGoi: SuatTreoTuong[];
   /** Suất nào đã gắn vào ảnh nào — để biết còn trống và tấm nào đang dùng suất gì. */
   placements: Array<{ photoId: string; galleryItemId: string }>;
-  /** Sản phẩm mua thêm đã đặt cho ảnh nào, để nút "Thêm vào đơn" cộng dồn đúng. */
+  /** Sản phẩm mua thêm đã đặt cho ảnh nào, để nút "Thêm vào giỏ" cộng dồn đúng. */
   addonsDaDat: Array<{ productId: string; photoId: string | null; quantity: number }>;
   khoa: boolean;
   duocChon: boolean;
@@ -707,7 +708,7 @@ export function ManTreoTuong({
               (`md:max-h-none`, cuộn được), không như thanh ngang hẹp cần cắt
               một dòng.
             */}
-            <h2 className="font-display text-lg font-light leading-tight text-bb-fg">
+            <h2 className="kh-h3 text-bb-fg">
               Treo lên tường nhà mình
             </h2>
           </div>
@@ -758,7 +759,7 @@ export function ManTreoTuong({
                   c === co ? "bg-bb-fg text-bb-bg" : "bg-bb-surface-2 text-bb-fg hover:bg-bb-border",
                 ].join(" ")}
               >
-                {c.replace("x", "×")} cm
+                {formatKichThuoc(c)} cm
               </button>
             ))}
           </div>
@@ -825,7 +826,7 @@ export function ManTreoTuong({
           <div className="flex items-baseline justify-between text-sm">
             <span className="text-bb-fg-muted">
               {sanPhamAnh ? (TEN_CHAT_LIEU[sanPhamAnh.material ?? ""] ?? sanPhamAnh.material) : "—"}
-              {sanPhamAnh?.size ? ` · ${sanPhamAnh.size}` : ""}
+              {sanPhamAnh?.size ? ` · ${formatKichThuoc(sanPhamAnh.size)}` : ""}
             </span>
             <span className="font-medium text-bb-fg">
               {suatAnhVua ? "Trong gói · 0 ₫" : formatCurrencyVND(giaAnh)}
@@ -854,7 +855,7 @@ export function ManTreoTuong({
             onClick={themVaoDon}
             className="h-12 shrink-0 rounded-full bg-bb-fg text-sm font-medium text-bb-bg transition hover:opacity-90 disabled:opacity-40"
           >
-            {dangLuu ? "Đang lưu…" : "Thêm vào đơn"}
+            {dangLuu ? "Đang lưu…" : "Thêm vào giỏ"}
           </button>
         )}
         {xemDuocThoi && (

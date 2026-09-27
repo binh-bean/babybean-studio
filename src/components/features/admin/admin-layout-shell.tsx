@@ -50,8 +50,10 @@ export function AdminLayoutShell({
       const merged: CanXuLyTongHop = {
         driveChuaChiaSe: canXuLy.ok ? canXuLy.json?.data?.driveChuaChiaSe : undefined,
         chuaCoAnh: canXuLy.ok ? canXuLy.json?.data?.chuaCoAnh : undefined,
+        chuaCoHanMuc: canXuLy.ok ? canXuLy.json?.data?.chuaCoHanMuc : undefined,
         dueSoon: dashboard.ok ? dashboard.json?.data?.stats?.dueSoon : undefined,
         overdue: dashboard.ok ? dashboard.json?.data?.stats?.overdue : undefined,
+        canhBaoLark: canXuLy.ok ? canXuLy.json?.data?.canhBaoLark : undefined,
       };
       setCanXuLyCount(demSoCanXuLy(merged));
     }

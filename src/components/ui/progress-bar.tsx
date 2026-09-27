@@ -44,6 +44,12 @@ export interface ProgressBarProps
   max?: number;
   label?: string;
   showValue?: boolean;
+  /**
+   * BB-290 — tên đọc được cho trình đọc màn hình khi KHÔNG muốn hiện chữ
+   * `label` trực quan (ví dụ một thanh tiến độ nhỏ trong bảng, đã có số n/m
+   * hiện riêng cạnh nó). Không set thì rơi về `label` như cũ.
+   */
+  ariaLabel?: string;
 }
 
 const ProgressBar = React.forwardRef<HTMLDivElement, ProgressBarProps>(
@@ -56,6 +62,7 @@ const ProgressBar = React.forwardRef<HTMLDivElement, ProgressBarProps>(
       variant,
       label,
       showValue = false,
+      ariaLabel,
       ...props
     },
     ref
@@ -76,7 +83,7 @@ const ProgressBar = React.forwardRef<HTMLDivElement, ProgressBarProps>(
           aria-valuenow={value}
           aria-valuemin={0}
           aria-valuemax={max}
-          aria-label={label}
+          aria-label={ariaLabel ?? label}
           className={cn(progressBarVariants({ size, className }))}
           {...props}
         >

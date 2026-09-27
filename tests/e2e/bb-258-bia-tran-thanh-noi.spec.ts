@@ -97,7 +97,7 @@ test.describe("BB-258: bìa tràn toàn màn + thanh nổi không che tên mục
     { w: 1440, h: 900 },
     { w: 1920, h: 1080 },
   ]) {
-    test(`${vp.w}×${vp.h}: ảnh bìa tràn khung nhìn, tiêu đề KHÔNG đè lên ảnh (BB-278)`, async ({ page }) => {
+    test(`${vp.w}×${vp.h}: ảnh bìa tràn khung nhìn, tiêu đề KHÔNG đè lên ảnh (BB-278/BB-289)`, async ({ page }) => {
       await page.setViewportSize({ width: vp.w, height: vp.h });
       await page.goto(`/g/${maLink}`);
 
@@ -123,11 +123,12 @@ test.describe("BB-258: bìa tràn toàn màn + thanh nổi không che tên mục
       // Rộng bằng khung nhìn, trừ thanh cuộn thật (±2px).
       expect(Math.abs(boxBia.width - (vp.w - thanhCuon))).toBeLessThanOrEqual(2);
 
-      // BB-278 (27/09/2026, chủ studio): "phần thông tin ảnh bìa trên pc màn
-      // ngang rất dễ đè lấp mất hình" — đảo NGƯỢC khẳng định cũ của BB-258
-      // ("chữ đè lên ảnh"). Nay tiêu đề phải nằm HẲN DƯỚI khối ảnh, không
-      // giao nhau theo trục dọc.
-      expect(boxTieuDe.y).toBeGreaterThanOrEqual(boxKhoiAnh.y + boxKhoiAnh.height - 1);
+      // BB-289 — BB-285 (đã duyệt) đổi bìa máy tính sang CHIA ĐÔI THẬT (cột
+      // ảnh trái/cột chữ phải, xem `bia-bo-anh.tsx`), không còn xếp DỌC như
+      // bản BB-278 (chữ dưới ảnh). Bất kỳ giao nhau nào giữa hai khối vẫn là
+      // lỗi — chỉ đổi TRỤC kiểm: giờ đo KHÔNG GIAO theo trục ngang (tiêu đề ở
+      // BÊN PHẢI khối ảnh), không phải trục dọc.
+      expect(boxTieuDe.x).toBeGreaterThanOrEqual(boxKhoiAnh.x + boxKhoiAnh.width - 1);
     });
   }
 

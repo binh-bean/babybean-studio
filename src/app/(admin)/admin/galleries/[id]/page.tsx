@@ -52,7 +52,10 @@ export default async function GalleryDetailPage({
   return (
     // BB-255: bản vẽ quan-tri-chi-tiet.webp dùng bố cục hai cột (nội dung
     // chính + cột phải mảnh cho bìa/link) — max-w-4xl cũ chỉ đủ cho một cột.
-    <main className="mx-auto max-w-6xl p-6">
+    // BB-290 (#31): bỏ `p-6` riêng — khung cuộn của layout đã tự đệm, thêm
+    // lớp nữa ở đây là lý do H1 của trang chi tiết lệch x so với các trang
+    // khác (cùng lỗi đã sửa ở viec-can-xu-ly/bao-cao/branches).
+    <main className="mx-auto max-w-6xl">
       {/* `key` KHÔNG phải trang trí — nó là lớp chặn thứ nhất của một lỗi
           nghiêm trọng (BB-184).
 

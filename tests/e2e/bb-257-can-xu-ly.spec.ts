@@ -1,9 +1,22 @@
 /**
- * BB-257 — Khối "Cần xử lý trước khi gửi khách" trên màn danh sách bộ ảnh.
+ * BB-257 — Dải cảnh báo "N bộ cần xử lý trước khi gửi khách" trên màn danh
+ * sách bộ ảnh, và luồng "Thử lại" thật sự ở /admin/viec-can-xu-ly.
+ *
+ * BB-290 lượt 2: khối chi tiết (mở sẵn 134 dòng, trùng hẳn nội dung của
+ * /admin/viec-can-xu-ly) đã thu gọn còn MỘT DÒNG cảnh báo + nút "Xem" dẫn
+ * sang trang chi tiết. Phép thử này vì vậy tách hai việc:
+ *  1. Trên /admin/galleries: dải cảnh báo hiện đúng số, bấm "Xem" điều hướng
+ *     đúng trang.
+ *  2. Trên /admin/viec-can-xu-ly (tab "Bộ ảnh lỗi tải", BB-280): bộ Fixture
+ *     `sync_error` hiện ra, nút "Thử lại" chạy được. Nhóm "chuaCoAnh" (draft +
+ *     0 ảnh) KHÔNG hiện ở tab này — trang đó chỉ lọc theo `sync_error`, một
+ *     khoảng lệch còn ghi lại ở `can-xu-ly.tsx`; phép thử chỉ canh bộ đó vẫn
+ *     được ĐẾM đúng ở dải cảnh báo, không đòi nó xuất hiện trong bảng chi
+ *     tiết của trang kia.
  *
  * Dữ liệu do chính tệp này chèn và xoá — hai bộ Fixture BB-257 dùng
  * `drive_folder_id` GIẢ (`SEED_FOLDER_ID_BB257-…`, xem AGENTS.md §6). KHÔNG
- * bấm "Kiểm lại" trên bộ ảnh THẬT.
+ * bấm "Thử lại" trên bộ ảnh THẬT.
  *
  * ---------------------------------------------------------------------------
  * Vì sao bấm "Kiểm lại" ở đây vẫn được coi là an toàn dù không giả `fetch`
@@ -121,47 +134,55 @@ test.describe("BB-257: Cần xử lý trước khi gửi khách", () => {
     if (userId) await suKienAdmin().auth.admin.deleteUser(userId);
   });
 
-  test("CSKH thấy khối cảnh báo với bộ Fixture, bấm Kiểm lại hiện lý do lỗi tiếng Việt", async ({
-    page,
-  }) => {
+  test("Danh sách bộ ảnh: dải cảnh báo hiện đúng số, bấm Xem sang đúng trang", async ({ page }) => {
     await dangNhapNhanVien(page, email, password);
-
     await page.goto("/admin/galleries");
 
-    // Khối hiện ra, không tự ẩn — vì có ít nhất hai bộ Fixture đang lỗi.
-    // Phạm vi mọi kiểm tra sau đây CHỈ trong khối này: bộ ảnh Fixture (thật,
-    // chèn thẳng bằng SQL) cũng lọt vào danh sách kanban đầy đủ phía dưới —
-    // không giới hạn phạm vi thì `getByText` khớp cả hai nơi.
-    const khoiCanXuLy = page.getByTestId("can-xu-ly");
-    await expect(khoiCanXuLy).toBeVisible({ timeout: 15_000 });
-    await expect(khoiCanXuLy.getByText("Cần xử lý trước khi gửi khách")).toBeVisible();
+    // Dải hiện ra, không tự ẩn — vì có ít nhất hai bộ Fixture đang cần xử lý.
+    const dai = page.getByTestId("can-xu-ly");
+    await expect(dai).toBeVisible({ timeout: 15_000 });
+    await expect(dai).toContainText("bộ cần xử lý trước khi gửi khách");
+    await expect(dai.getByText("Xem")).toBeVisible();
 
-    // Cả hai bộ Fixture đều thấy được (đúng tên, không lẫn với 73 bộ thật khác
-    // đang có trên bb-dev — phân biệt bằng tên riêng mang runId).
-    const dongDrive = khoiCanXuLy.getByText(`${NHAN} Bộ lỗi Drive`);
-    const dongRong = khoiCanXuLy.getByText(`${NHAN} Bộ chưa có ảnh`);
-    await expect(dongDrive).toBeVisible();
-    await expect(dongRong).toBeVisible();
+    // Dải KHÔNG còn liệt kê tên từng bộ hay nút "Thử lại" riêng — đó là nội
+    // dung của /admin/viec-can-xu-ly (BB-290 lượt 2, tránh trùng lặp).
+    await expect(dai.getByText(`${NHAN} Bộ lỗi Drive`)).toHaveCount(0);
 
-    // Nút "Mở thư mục Drive" có mặt cho bộ lỗi Drive.
-    await expect(khoiCanXuLy.getByRole("link", { name: "Mở thư mục Drive" }).first()).toBeVisible();
+    await dai.click();
+    await page.waitForURL("**/admin/viec-can-xu-ly**");
+  });
 
-    // Bấm "Kiểm lại" trên ĐÚNG bộ Fixture (không phải bộ thật nào khác).
-    const nutKiemLai = khoiCanXuLy.getByTestId(`kiem-lai-${galDrive}`);
-    await expect(nutKiemLai).toBeEnabled();
-    await nutKiemLai.click();
+  test("Việc cần xử lý (tab Bộ ảnh lỗi tải): bộ Fixture hiện ra, Thử lại vẫn báo đúng lý do", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await dangNhapNhanVien(page, email, password);
+    await page.goto("/admin/viec-can-xu-ly?tab=loi-dong-bo");
 
-    // Khoá nút ngay khi đang chạy — chặn bấm liên tục.
-    await expect(nutKiemLai).toBeDisabled();
+    // Lý do lỗi là TIÊU ĐỀ NHÓM (nhóm theo lý do, BB-129), không lặp lại
+    // trong từng dòng — nhóm chứa cả tiêu đề lẫn dòng của bộ Fixture (bảng ở
+    // `lg`+, KHÔNG dùng "tr, li" chung chung vì trang còn một bản thẻ điện
+    // thoại `lg:hidden` cùng khớp text mà `.first()` có thể chọn nhầm bản ẩn).
+    const nhom = page.locator("section", { hasText: LY_DO_CHUA_CHIA_SE }).first();
+    await expect(nhom).toBeVisible({ timeout: 15_000 });
+    await expect(nhom.getByText(LY_DO_CHUA_CHIA_SE)).toBeVisible();
 
-    // Chờ lượt kiểm lại chạy xong (gọi Drive thật với thư mục GIẢ + 3s chờ chủ
-    // động của UI trước khi tải lại), rồi đọc lý do lỗi tiếng Việt hiện ra.
-    // Thư mục giả không tồn tại nên vẫn lỗi — đúng luồng "vẫn lỗi thì hiện lý
-    // do" của brief, không phải luồng "đồng bộ thành công".
-    const dongFixture = khoiCanXuLy.locator("li", { hasText: `${NHAN} Bộ lỗi Drive` });
-    await expect(dongFixture.getByText(LY_DO_CHUA_CHIA_SE)).toBeVisible({ timeout: 30_000 });
+    const dongFixture = nhom.locator("table tbody tr", { hasText: `${NHAN} Bộ lỗi Drive` }).first();
+    await expect(dongFixture).toBeVisible();
 
-    // Nút mở khoá lại sau khi chạy xong — không bị kẹt mãi ở trạng thái khoá.
-    await expect(nutKiemLai).toBeEnabled({ timeout: 20_000 });
+    const nutThuLai = dongFixture.getByRole("button", { name: "Thử lại" });
+    await expect(nutThuLai).toBeEnabled();
+    await nutThuLai.click();
+
+    // Chờ lượt thử lại chạy xong (gọi Drive thật với thư mục GIẢ + 5s chờ chủ
+    // động của UI trước khi tải lại), rồi đọc lại đúng lý do lỗi tiếng Việt —
+    // thư mục giả không tồn tại nên vẫn lỗi, đúng luồng "vẫn lỗi thì hiện lý
+    // do lỗi mới nhất" chứ không phải luồng "đồng bộ thành công". Bộ Fixture
+    // vẫn còn trong ĐÚNG nhóm lý do cũ sau khi danh sách tải lại.
+    const nhomSauKhiTai = page.locator("section", { hasText: LY_DO_CHUA_CHIA_SE }).first();
+    await expect(nhomSauKhiTai).toBeVisible({ timeout: 30_000 });
+    await expect(
+      nhomSauKhiTai.locator("table tbody tr", { hasText: `${NHAN} Bộ lỗi Drive` }).first(),
+    ).toBeVisible();
   });
 });

@@ -15,7 +15,7 @@ export async function patchSelection(
   const [galleryResult, linkResult, quotaResult] = await Promise.all([
     supabase
       .from("galleries")
-      .select("status, included_quota, extra_photo_price, max_selection, allow_extra")
+      .select("status, included_quota, extra_photo_price, max_selection, allow_extra, lark_trang_thai")
       .eq("id", session.galleryId)
       .single(),
     supabase
@@ -48,7 +48,9 @@ export async function patchSelection(
     ("chốt xong vẫn sửa được cho tới khi CSKH xác nhận", migration 0060): hàm
     SQL và bản TypeScript đều đã bỏ 'submitted', còn dòng này thì không.
   */
-  if (isGalleryLocked(gallery.status)) {
+  // BB-285: Lark đã sang "Đã chọn hình" trở lên thì khoá luôn, dù app còn ghi
+  // ready/in_review/submitted — xem gallery-status.ts.
+  if (isGalleryLocked(gallery.status, gallery.lark_trang_thai)) {
     // BB-223: cùng lý do — bỏ câu tiếng Anh, để DEFAULT_MESSAGE lo.
     return { error: { code: "GALLERY_LOCKED" } };
   }

@@ -374,6 +374,56 @@ body:has(.giao-dien-khach) {
    dùng 100vw thì trên màn >1600px chữ bìa lệch lưới ~8px (Opus soát 25/09).
    Chỉ áp dụng từ 1024px (`lg`): dưới đó bìa dùng bố cục khác hẳn
    (ảnh tràn viền, chữ đè lên trên) và không cần canh theo lưới này. */
+/* ---------------------------------------------------------------------------
+   BB-287 — THANG CHỮ 6 BẬC cho màn khách. Chốt 22/09→27/09/2026 sau khi báo
+   cáo chấm "khách khó tính" đo được tiêu đề khối cùng cấp dùng lẫn lộn 18,
+   22, 26, 30px (mục #22, #27). Từ nay MỌI tiêu đề khối (h2/h3) trên màn
+   khách phải dùng một trong sáu lớp dưới đây — không tự viết `text-[NNpx]`
+   cho tiêu đề nữa. Cỡ chữ hero của bìa album (`bia-bo-anh.tsx`, thẻ <h1>) là
+   ảnh nghệ thuật, KHÔNG nằm trong thang này.
+
+   H1 40/32 · H2 28 · H3 20 · thân 15 · chú thích 13 · nhãn 11 (hoa, giãn
+   .12em, weight 500). Tiêu đề dùng font-display (Fraunces) NÉT THƯỜNG —
+   không đậm, không nhạt kiểu "light" mảnh như bìa. */
+.giao-dien-khach .kh-h1 {
+  font-family: var(--bb-font-display);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1.15;
+}
+@media (min-width: 640px) {
+  .giao-dien-khach .kh-h1 {
+    font-size: 40px;
+  }
+}
+.giao-dien-khach .kh-h2 {
+  font-family: var(--bb-font-display);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.2;
+}
+.giao-dien-khach .kh-h3 {
+  font-family: var(--bb-font-display);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.25;
+}
+.giao-dien-khach .kh-body {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.giao-dien-khach .kh-caption {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.giao-dien-khach .kh-eyebrow {
+  font-size: 11px;
+  line-height: 1.3;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 500;
+}
+
 @media (min-width: 1024px) {
   /*
     !important có chủ đích: hai lớp này phải thắng các lớp `px-*`/`inset-*`

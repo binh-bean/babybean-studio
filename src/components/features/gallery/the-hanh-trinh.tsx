@@ -50,7 +50,13 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
       </div>
 
       <div className="flex w-full flex-col items-center px-6 pb-10 pt-6">
-      <h3 className="font-display text-[24px] font-medium leading-[1.2] text-[#2E2A27] md:text-[28px] max-w-[280px]">
+      {/*
+        BB-287 mục 1/#27 — báo cáo chấm: ba thẻ liền nhau trong "hành trình"
+        (thẻ này, `ReviewPanel`, `MoiMuaLanHai`/`MoiNguoiThan` teaser) từng
+        dùng ba cỡ chữ khác nhau (18/22 đậm/24→28). Cả bốn nay dùng chung
+        `kh-h3` — CÙNG một bậc trong thang chữ 6 bậc.
+      */}
+      <h3 className="kh-h3 max-w-[280px] text-[#2E2A27]">
         {nhanText}
       </h3>
 

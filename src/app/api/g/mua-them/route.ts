@@ -55,7 +55,7 @@ import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateYeuCauMuaThemSchema } from "./schema";
-import { nhomSanPham, canGanAnh } from "@/lib/products/nhom-san-pham";
+import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { duocMoiMuaLanHai } from "@/lib/gallery/moi-mua-lan-hai-rules";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
@@ -231,10 +231,13 @@ export async function POST(request: Request): Promise<Response> {
         );
       }
 
-      const nhom = nhomSanPham(product.kind, product.material);
-      if (nhom === null) {
+      // BB-288: cùng luật với /api/g/addons và catalogue của /api/g/gallery —
+      // chỉ 3 nhóm ảnh in/album/khung đang bán, loại thêm canvas. Trước đây
+      // chỗ này chỉ kiểm `nhom === null` nên canvas (nhom = "anh_in") lọt qua.
+      if (!sanPhamBanChoKhach({ isActive: product.is_active, kind: product.kind, material: product.material })) {
         return fail("INVALID_INPUT", "Sản phẩm này không bán trong màn mua thêm");
       }
+      const nhom = nhomSanPham(product.kind, product.material);
 
       const photoId = item.photoId ?? null;
       if (canGanAnh(nhom) && !photoId) {

@@ -42,15 +42,35 @@ describe("nhanHienThi — luồng docs/19 mục 3", () => {
     expect(n.quanTri).toBe("Đang chỉnh sửa");
   });
 
-  it("trước khi CSKH xác nhận: nhãn của app, Lark không đè", () => {
+  /*
+    BB-285 (27/09/2026, chủ studio chốt): số đo 183 bộ app còn
+    'ready'/'in_review'/'submitted' ("mời chọn") trong khi Lark đã đi xa hơn
+    hẳn — bản thân đây LÀ cái lỗi BB-285 phải sửa, nên câu khẳng định cũ
+    "Lark không đè" cho ba trạng thái này không còn đúng nữa. Ca dưới đây thay
+    thế ca cũ cùng tên: trước BB-285 hàm trả `{ quanTri: 'APP:ready', khach:
+    null, giaiDoan: null }` cho input y hệt — hoàn nguyên BB-285 (bỏ điều kiện
+    `laKhoaTheoLark` khỏi `theoLark`) sẽ làm ca này đỏ.
+  */
+  it("BB-285: ready/in_review/submitted mà Lark đã 'Đang làm' (giai đoạn ≥2) → Lark ĐÈ, không còn 'mời chọn'", () => {
     for (const s of ["ready", "in_review", "submitted"]) {
       const n = nhanHienThi(s, DANG_LAM, nhanApp);
+      expect(n.giaiDoan).toBe(3);
+      expect(n.khach).toBe("Đang chỉnh sửa");
+      expect(n.quanTri).not.toBe(`APP:${s}`);
+    }
+  });
+
+  it("ready/in_review/submitted mà Lark còn giai đoạn 1 (đã gửi file gốc): CHƯA có gì để theo, giữ nhãn app", () => {
+    for (const s of ["ready", "in_review", "submitted"]) {
+      const n = nhanHienThi(s, "optDAI9nFV", nhanApp);
       expect(n).toEqual({ quanTri: `APP:${s}`, khach: null, giaiDoan: null });
     }
   });
 
-  it("chờ khách duyệt trong app: giữ nhãn app (màn khách có nút duyệt của app)", () => {
-    expect(nhanHienThi("awaiting_approval", GUI_DUYET, nhanApp).khach).toBeNull();
+  it("chờ khách duyệt trong app: giữ nhãn app dù Lark đã đi xa (màn khách có nút duyệt SỐNG của app, BB-285 cố ý không đè)", () => {
+    const n = nhanHienThi("awaiting_approval", GUI_DUYET, nhanApp);
+    expect(n.khach).toBeNull();
+    expect(n.quanTri).toBe("APP:awaiting_approval");
   });
 
   it("app đã giao mà Lark còn chậm: tin app", () => {

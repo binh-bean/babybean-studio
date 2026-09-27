@@ -20,6 +20,7 @@
  */
 
 import React from "react";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 
 interface NguoiDaMoi {
   id: string;
@@ -165,7 +166,7 @@ export function MoiNguoiThan() {
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-lg font-light leading-tight">Mời ông bà cùng xem</p>
+          <p className="kh-h3">Mời ông bà cùng xem</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {dangHoatDong.length > 0
               ? `Đã mời ${dangHoatDong.length} người — ông bà chỉ xem và mua thêm, không chọn ảnh.`
@@ -189,7 +190,7 @@ export function MoiNguoiThan() {
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
           <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-8">
             <div>
-              <h2 className="font-display text-2xl font-light leading-tight">Mời ông bà cùng xem</h2>
+              <h2 className="kh-h2">Mời ông bà cùng xem</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Ông bà xem được ảnh và gửi yêu cầu mua thêm — không chọn ảnh, không thấy tiền của ba mẹ.
               </p>
@@ -265,7 +266,9 @@ export function MoiNguoiThan() {
               </button>
             </div>
 
-            <h3 className="mb-2 text-sm font-medium">Đã mời ({(ds ?? []).length})</h3>
+            <h3 className="kh-caption mb-2 font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              Đã mời ({(ds ?? []).length})
+            </h3>
             {!ds || ds.length === 0 ? (
               <p className="text-xs text-muted-foreground">Chưa mời ai. Tạo link đầu tiên ở trên nhé.</p>
             ) : (
@@ -279,7 +282,7 @@ export function MoiNguoiThan() {
                       <p className="truncate text-sm font-medium">{d.nhan}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {NHAN_TRANG_THAI[d.trangThai] ?? d.trangThai} ·{" "}
-                        {new Date(d.createdAt).toLocaleDateString("vi-VN")}
+                        {formatNgayVN(d.createdAt)}
                       </p>
                     </div>
                     {d.trangThai === "active" && (

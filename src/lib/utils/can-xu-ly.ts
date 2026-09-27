@@ -33,10 +33,23 @@ export interface CanXuLyTongHop {
   driveChuaChiaSe?: unknown[];
   /** `GET /api/admin/can-xu-ly` → data.chuaCoAnh */
   chuaCoAnh?: unknown[];
+  /**
+   * BB-285 — `GET /api/admin/can-xu-ly` → data.chuaCoHanMuc: bộ ảnh
+   * `app.gallery_quota()` trả null (58 bộ đo 27/09/2026). Cùng lý do với
+   * `chuaCoAnh`: khách mở link ra không chọn được ảnh nào, chỉ gọi điện hỏi.
+   */
+  chuaCoHanMuc?: unknown[];
   /** `GET /api/admin/dashboard` → data.stats.dueSoon */
   dueSoon?: number;
   /** `GET /api/admin/dashboard` → data.stats.overdue */
   overdue?: number;
+  /**
+   * BB-285 — `GET /api/admin/can-xu-ly` → data.canhBaoLark: số bộ Lark cột
+   * "Cảnh Báo" đang đỏ hoặc tím (docs/21). `due_at` chỉ có ở 2/491 bộ nên
+   * `dueSoon`/`overdue` gần như luôn 0 — cột Cảnh Báo của Lark là tín hiệu
+   * thật CSKH đang dùng để biết việc gấp.
+   */
+  canhBaoLark?: number;
 }
 
 /**
@@ -50,8 +63,10 @@ export function demSoCanXuLy(d: CanXuLyTongHop | null | undefined): number {
   return (
     (d.driveChuaChiaSe?.length ?? 0) +
     (d.chuaCoAnh?.length ?? 0) +
+    (d.chuaCoHanMuc?.length ?? 0) +
     (d.dueSoon ?? 0) +
-    (d.overdue ?? 0)
+    (d.overdue ?? 0) +
+    (d.canhBaoLark ?? 0)
   );
 }
 
@@ -97,6 +112,20 @@ export function dongCanXuLy(d: CanXuLyTongHop | null | undefined): DongCanXuLy[]
       mauCham: "var(--bb-warning)",
       // Chưa có bộ lọc urgency riêng ở /admin/galleries — trỏ về danh sách
       // chung, gần nhất với nơi CSKH sửa được (mở từng bộ, đổi hạn).
+      href: "/admin/galleries",
+    },
+    {
+      key: "chua-co-han-muc",
+      nhan: "Chưa có hạn mức",
+      soLuong: d.chuaCoHanMuc?.length ?? 0,
+      mauCham: "var(--bb-urgent)",
+      href: "/admin/galleries",
+    },
+    {
+      key: "canh-bao-lark",
+      nhan: "Lark báo đỏ/tím",
+      soLuong: d.canhBaoLark ?? 0,
+      mauCham: "var(--bb-danger)",
       href: "/admin/galleries",
     },
   ];

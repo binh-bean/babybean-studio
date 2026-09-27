@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Heart, Minimize2 } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Printer, PenLine } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { vi } from "@/i18n";
 import type { PhotoPublic } from "@/types/domain";
@@ -68,7 +68,16 @@ export interface PhotoLightboxProps {
  *
  * Đáp ứng các yêu cầu từ buổi dùng thật của chủ studio:
  * 1. Mở ảnh chất lượng cao w=1600 (/api/img/<id>?w=1600).
- * 2. Nền tối đặc trưng (--bb-viewer-bg = #16130f).
+ * 2. BB-289 lượt 2 — nền KÍNH TRONG (không còn đặc `--bb-viewer-bg`), đúng
+ *    bản vẽ `babybean-assets/BB-285/xem-lon-dien-thoai.html` (`.kinh`):
+ *    `rgba(251,247,242,.66)` + `backdrop-filter: blur(8px)` — thấy lưới ảnh
+ *    bên dưới mờ qua lớp kính, không phải nền tối đặc như trước. Các chip
+ *    điều khiển ngồi TRÊN lớp kính (số thứ tự, nút đóng/tải) đổi sang chữ
+ *    mực + nền sáng hơn (khớp `.so{background:rgba(255,255,255,.7)}` của
+ *    bản vẽ) vì chữ trắng cũ không còn đủ tương phản trên nền sáng. Các chip
+ *    vốn đã có nền riêng đủ đậm (thanh dưới, mũi tên máy tính, tấm trượt sản
+ *    phẩm — toàn nền tối `#2E2A27`/`#231e1a` hoặc `bg-black/*` riêng) GIỮ
+ *    NGUYÊN, không đổi, vì chúng không phụ thuộc màu nền gốc.
  * 3. Tự xoay và thích ứng theo thiết bị: ảnh vừa khít màn hình, không tràn, không cắt.
  *    Điện thoại xoay ngang thì ảnh ngang chiếm trọn bề ngang màn hình.
  * 4. Thao tác điều hướng: Touch Swipe trên điện thoại, phím mũi tên và Esc trên máy tính.
@@ -524,6 +533,15 @@ export function PhotoLightbox({
     try {
       const xong = await onLuuGhiChu(currentPhoto, ghiChu);
       setKetQuaLuu(xong ? "ok" : "loi");
+      // BB-287 mục #12 — chữ "Đã lưu ghi chú" đứng mãi tới khi ba mẹ gõ tiếp;
+      // chủ studio muốn nó tự mờ sau 2 giây thay vì phải tự xoá bằng mắt.
+      // Chỉ tự ẩn khi lưu THÀNH CÔNG — báo lỗi (`"loi"`) phải đứng yên cho
+      // đến khi ba mẹ thử lại, ẩn tự động ở đó sẽ giấu mất lỗi.
+      if (xong) {
+        window.setTimeout(() => {
+          setKetQuaLuu((hienTai) => (hienTai === "ok" ? null : hienTai));
+        }, 2000);
+      }
     } catch {
       setKetQuaLuu("loi");
     } finally {
@@ -549,7 +567,7 @@ export function PhotoLightbox({
       role="dialog"
       aria-modal="true"
       aria-label={vi.common.view || "Xem ảnh"}
-      className="fixed inset-0 z-50 flex flex-col justify-between bg-bb-viewer-bg text-white select-none overflow-hidden touch-none"
+      className="fixed inset-0 z-50 flex flex-col justify-between bg-[rgba(251,247,242,0.66)] backdrop-blur-lg text-[#2e2a27] select-none overflow-hidden touch-none"
       // Cố ý KHÔNG hiện bàn tay trên nền: con trỏ kế thừa xuống mọi thứ bên
       // trong (tấm ảnh, ô ghi chú), và nền trống chỉ là một dải mỏng quanh
       // ảnh. Xem tests/unit/con-tro-ban-tay.test.ts.
@@ -561,17 +579,19 @@ export function PhotoLightbox({
         }
       }}
     >
-      {/* THANH TRÊN — thứ tự ảnh + tên tệp, tải về, đóng. */}
+      {/* THANH TRÊN — thứ tự ảnh, tải về, đóng. */}
       {/* ------------------------------------------------------------------
           Tim đã rời góc trên xuống ĐÁY màn hình (chủ studio duyệt 23/09/2026).
 
           Góc trên bên phải là chỗ xa ngón cái nhất khi cầm điện thoại một tay —
           mà thả tim là việc ba mẹ làm nhiều nhất ở màn này.
 
-          Tên tệp TRỞ LẠI đây (BB-210, lời chủ studio 24/09/2026): "hiện tên
-          file để khách dễ kiểm soát và đối chiếu với file tải về cũng như
-          danh sách mà CSKH tải về ảnh khách chọn chỉnh sửa" — chữ nhỏ, cắt
-          gọn nếu dài, không tranh chỗ với số thứ tự.
+          Tên tệp — BB-210 (24/09/2026) từng đưa vào ("khách dễ kiểm soát và
+          đối chiếu file tải về"), BB-289 lượt 3 (Opus, đối chiếu bản vẽ
+          `xem-lon-dien-thoai.html`) BỎ LẠI: bản vẽ không có tên tệp ở đây,
+          và BB-287 đã bỏ tên tệp khỏi lưới ảnh cùng lý do — khách không cần
+          biết `BB289A_0001.jpg` nghĩa là gì, CSKH đối chiếu bằng số thứ tự
+          hoặc công cụ nội bộ, không qua màn khách.
       */}
       <header className="relative z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-start px-4 py-4">
         <div className="flex justify-start">
@@ -583,14 +603,20 @@ export function PhotoLightbox({
             }}
             aria-label={vi.common.close}
             title={vi.common.close}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[#2e2a27]/85 transition-colors hover:bg-black/5 active:scale-90 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
           >
             <X className="h-[22px] w-[22px]" strokeWidth={1.5} />
           </button>
         </div>
 
         <div className="flex min-w-0 flex-col items-center pt-1">
-          <div className="flex h-[28px] items-center justify-center rounded-full bg-white/10 px-4 text-[13px] text-white">
+          {/* BB-289 lượt 2 — chip số thứ tự đúng bản vẽ (`.so`): nền trắng
+              70% + viền mảnh + chữ mực, không còn `bg-white/10 text-white`
+              (gần vô hình trên nền kính sáng mới). */}
+          <div
+            data-testid="chi-so-anh"
+            className="flex h-[28px] items-center justify-center rounded-full border border-[#e5dcd2] bg-white/70 px-4 text-[13px] text-[#2e2a27]"
+          >
             {/*
               BB-258 kiểm ngược — BB-253 tách "1 / 2" thành ba <span> không có
               khoảng trắng thật giữa các chữ số (chỉ cách nhau bằng CSS
@@ -600,14 +626,9 @@ export function PhotoLightbox({
               lẫn bằng phép thử tìm chữ.
             */}
             <span className="tabular-nums font-medium">{currentIndex + 1}</span>
-            <span className="mx-1 text-white/50"> / </span>
-            <span className="text-white/50">{total}</span>
+            <span className="mx-1 text-[#6b6057]"> / </span>
+            <span className="text-[#6b6057]">{total}</span>
           </div>
-          {currentPhoto.fileName && (
-            <p className="mt-3 truncate px-2 text-[11px] text-white/60 max-w-[200px]">
-              {currentPhoto.fileName}
-            </p>
-          )}
         </div>
 
         <div className="flex justify-end">
@@ -620,7 +641,7 @@ export function PhotoLightbox({
               }}
               aria-label={vi.gallery.downloadThis}
               title={vi.gallery.downloadThis}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-[#2e2a27]/85 transition-colors hover:bg-black/5 active:scale-90 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
             >
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -701,7 +722,19 @@ export function PhotoLightbox({
                 // Kính lúp thay cho bàn tay: nhấp đúp vào ảnh là PHÓNG TO
                 // (BB-210), nên con trỏ nói đúng việc đó. Đang phóng thì
                 // handleImgMouseDown kéo ảnh — con trỏ đổi sang "nắm".
-                className="max-h-full max-w-full w-auto h-auto object-contain select-none shadow-2xl pointer-events-auto cursor-zoom-in"
+                // BB-289 lượt 3 — Opus chấm ảnh chụp: `w-auto h-auto` để
+                // trình duyệt tự đo theo KÍCH THƯỚC GỐC của ảnh; máy chủ ảnh
+                // môi trường thử (`playwright.config.ts`) trả một ảnh giả cỡ
+                // rất nhỏ, nên ảnh chính hiện thành một CHẤM ~4px giữa màn —
+                // bắt được đúng lỗi ẩn: cách cũ vốn cũng khiến một ảnh gốc độ
+                // phân giải thấp (ảnh cũ quét lại, ảnh chụp màn hình…) hiện bé
+                // tương tự trên PRODUCTION, không chỉ trong môi trường thử.
+                // `w-full h-full` buộc khung ảnh LUÔN lấp đầy vùng dành cho
+                // nó (viền `main`/`p-2 sm:p-4`), `object-contain` vẫn giữ
+                // đúng tỉ lệ ảnh gốc bên trong khung đó — không cắt, không
+                // méo, chỉ khác chỗ khung không còn phụ thuộc độ phân giải
+                // ảnh gốc nữa. Đo bằng `tests/e2e/bb-289-theo-ban-ve.spec.ts`.
+                className="w-full h-full object-contain select-none shadow-2xl pointer-events-auto cursor-zoom-in"
                 style={
                   isCurrent
                     ? {
@@ -800,11 +833,19 @@ export function PhotoLightbox({
                   className="w-full resize-none rounded-xl bg-white/10 px-3 py-2 text-xs text-white outline-hidden ring-1 ring-white/15 placeholder:text-white/45 focus:ring-white/40 disabled:opacity-50"
                 />
                 <div className="mt-1 h-4 text-[11px]" aria-live="polite">
+                  {/*
+                    BB-287 mục #12 — xanh lá neon (~#22C55E) không nằm trong
+                    bảng màu. Sage (`--bb-accent`) là màu trạng thái thành
+                    công dùng chung cho màn khách, kèm dấu ✓ nhỏ.
+                  */}
                   {ketQuaLuu === "ok" && (
-                    <span className="text-emerald-300">{vi.gallery.noteSaved}</span>
+                    <span className="inline-flex items-center gap-1 text-[var(--bb-accent)]">
+                      <span aria-hidden="true">✓</span>
+                      {vi.gallery.noteSaved}
+                    </span>
                   )}
                   {ketQuaLuu === "loi" && (
-                    <span className="text-amber-300">{vi.gallery.noteSaveFailed}</span>
+                    <span className="text-[var(--bb-heart,#C4645A)]">{vi.gallery.noteSaveFailed}</span>
                   )}
                 </div>
               </div>
@@ -814,26 +855,31 @@ export function PhotoLightbox({
       </div>
 
       {/* ------------------------------------------------------------------
-          THANH ĐÁY — nút tim to, ngay dưới ngón cái.
+          THANH ĐÁY.
           ------------------------------------------------------------------
-          Chủ studio duyệt 23/09/2026. Hàng nhãn phía trên nói tấm này đang
-          dùng cho sản phẩm nào; hai nút hai bên mở tấm trượt (chỉ trên điện
-          thoại — máy tính đã có cột phải).
+          BB-289 lượt 3 — Opus chấm ảnh chụp: viên tối kiểu cũ không khớp bản
+          vẽ `xem-lon-dien-thoai.html` (`.thanh`): dải KEM KÍNH TRONG
+          (`rgba(251,247,242,.6)` + blur), BA CỘT ĐỀU Tim · Ghi chú · Đặt in
+          — mỗi cột icon 22px + nhãn chữ 11px NGAY DƯỚI, chữ mực; tim đã chọn
+          tô hồng đất (`#C4645A`). Khác điện thoại, MÁY TÍNH (`lg`) đã có cột
+          phải riêng cho ghi chú/sản phẩm (`bangSanPham` render thẳng trong
+          `<aside>` ở trên) nên dải đáy ở `lg` chỉ còn đúng nút tim — giữ
+          nguyên cách làm cũ cho `lg`, chỉ đổi bản ĐIỆN THOẠI.
 
           Thanh này KHÔNG phủ lên ảnh: nó là một hàng riêng dưới tấm ảnh, nên
           chân ảnh (thường là chân bé) không bị che — đúng điều chủ studio đã
           chốt ngày 17/09 khi bỏ hai nút to đè lên đáy ảnh.
       */}
       <footer
-        className="relative z-20 shrink-0 px-4 pb-[max(14px,env(safe-area-inset-bottom))] pt-2"
+        className="relative z-20 shrink-0 border-t border-[#e5dcd2] bg-[rgba(251,247,242,0.6)] backdrop-blur-md pb-[max(10px,env(safe-area-inset-bottom))] lg:border-0 lg:bg-transparent lg:backdrop-blur-none lg:px-4 lg:pt-2"
         onClick={(e) => e.stopPropagation()}
       >
         {nhanDungCho.length > 0 && (
-          <div className="mx-auto mb-2.5 flex max-w-md flex-wrap justify-center gap-1.5">
+          <div className="mx-auto flex max-w-md flex-wrap justify-center gap-1.5 pt-2.5 lg:mb-2.5 lg:pt-0">
             {nhanDungCho.map((n) => (
               <span
                 key={n}
-                className="rounded-full border border-[#9db08b]/50 bg-[#6c7a5f]/30 px-3 py-1 text-[12px] text-white/90"
+                className="rounded-full border border-[#9db08b]/60 bg-[#6c7a5f]/15 px-3 py-1 text-[12px] text-[#4a5a41]"
               >
                 — {n}
               </span>
@@ -841,8 +887,93 @@ export function PhotoLightbox({
           </div>
         )}
 
-        <div className="mx-auto max-w-md rounded-[24px] bg-[#2E2A27]/80 backdrop-blur-md p-4 shadow-lg lg:bg-transparent lg:p-0">
-          <div className="flex items-center justify-between px-2">
+        {/* ĐIỆN THOẠI/BẢNG — ba cột đều, đúng bản vẽ. */}
+        <div
+          data-testid="thanh-day-3-cot"
+          className={cn(
+            "mx-auto grid max-w-md py-2.5 lg:hidden",
+            onLuuGhiChu && bangSanPham ? "grid-cols-3" : onLuuGhiChu || bangSanPham ? "grid-cols-2" : "grid-cols-1",
+          )}
+        >
+          <button
+            type="button"
+            disabled={isLocked || isMutating}
+            onClick={() => onToggleHeart(currentPhoto)}
+            aria-label={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
+            aria-pressed={isCurrentSelected}
+            className="flex flex-col items-center gap-1.5 py-1 text-[11px] tracking-wide text-[#2e2a27] transition active:scale-95 disabled:opacity-40 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
+          >
+            <Heart
+              className="h-[22px] w-[22px]"
+              style={isCurrentSelected ? { color: "#C4645A" } : undefined}
+              fill={isCurrentSelected ? "currentColor" : "none"}
+              strokeWidth={isCurrentSelected ? 0 : 1.6}
+            />
+            Tim
+          </button>
+
+          {onLuuGhiChu && (
+            <button
+              type="button"
+              onClick={() => {
+                if (tamMo === "ghi-chu") {
+                  void luuGhiChu();
+                  setTamMo(null);
+                } else {
+                  setTamMo("ghi-chu");
+                }
+              }}
+              aria-label="Ghi chú cho thợ chỉnh ảnh"
+              aria-expanded={tamMo === "ghi-chu"}
+              className={cn(
+                "flex flex-col items-center gap-1.5 py-1 text-[11px] tracking-wide transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2",
+                tamMo === "ghi-chu" || currentPhoto.retouchNote ? "text-[#C4645A]" : "text-[#2e2a27]",
+              )}
+            >
+              <PenLine className="h-[22px] w-[22px]" strokeWidth={1.6} />
+              Ghi chú
+            </button>
+          )}
+
+          {bangSanPham && (
+            <button
+              type="button"
+              onClick={() => setTamMo("san-pham")}
+              aria-label="Sản phẩm cho tấm ảnh này"
+              aria-expanded={tamMo === "san-pham"}
+              className="flex flex-col items-center gap-1.5 py-1 text-[11px] tracking-wide text-[#2e2a27] transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
+            >
+              <Printer className="h-[22px] w-[22px]" strokeWidth={1.6} />
+              Đặt in
+            </button>
+          )}
+        </div>
+
+        <div className={cn("mx-auto max-w-md overflow-hidden px-4 transition-all duration-300 lg:hidden", tamMo === "ghi-chu" ? "max-h-[150px] pb-3 opacity-100" : "max-h-0 opacity-0")}>
+          {onLuuGhiChu && (
+            <input
+              id="ghi-chu-anh"
+              type="text"
+              value={ghiChu}
+              onChange={(e) => setGhiChu(e.target.value)}
+              onBlur={luuGhiChu}
+              disabled={isLocked || dangLuuGhiChu || !isCurrentSelected || isMutating}
+              maxLength={500}
+              placeholder={
+                isLocked
+                  ? vi.gallery.noteLocked
+                  : !isCurrentSelected
+                    ? vi.gallery.noteNeedsSelect
+                    : "Ghi chú cho thợ chỉnh ảnh"
+              }
+              className="w-full rounded-[12px] border border-[#2e2a27]/20 bg-white/70 px-4 py-3 text-[14px] text-[#2e2a27] placeholder-[#6b6057] focus:border-[#2e2a27]/50 focus:outline-hidden disabled:opacity-50"
+            />
+          )}
+        </div>
+
+        {/* MÁY TÍNH (`lg`) — chỉ nút tim, ghi chú/sản phẩm đã có cột phải riêng. */}
+        <div className="mx-auto hidden max-w-md lg:block">
+          <div className="flex items-center justify-center">
             <button
               type="button"
               disabled={isLocked || isMutating}
@@ -851,10 +982,8 @@ export function PhotoLightbox({
               aria-pressed={isCurrentSelected}
               className={cn(
                 "flex h-[48px] w-[88px] items-center justify-center rounded-full transition-all active:scale-90 touch-manipulation disabled:opacity-40",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg",
-                isCurrentSelected
-                  ? "bg-[#C4645A] text-[#2E2A27]"
-                  : "bg-white/10 text-white hover:bg-white/15",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2",
+                isCurrentSelected ? "bg-[#C4645A] text-[#2E2A27]" : "bg-[#2e2a27]/85 text-white hover:bg-[#2e2a27]",
               )}
             >
               <Heart
@@ -863,70 +992,6 @@ export function PhotoLightbox({
                 strokeWidth={isCurrentSelected ? 0 : 2}
               />
             </button>
-
-            <div className="flex lg:invisible gap-8 pr-4">
-              {onLuuGhiChu && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (tamMo === "ghi-chu") {
-                      void luuGhiChu();
-                      setTamMo(null);
-                    } else {
-                      setTamMo("ghi-chu");
-                    }
-                  }}
-                  aria-label="Ghi chú cho thợ chỉnh ảnh"
-                  aria-expanded={tamMo === "ghi-chu"}
-                  className={cn(
-                    "p-2 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg rounded-full",
-                    tamMo === "ghi-chu" || currentPhoto.retouchNote ? "text-[#C4645A]" : "text-white hover:text-[#C4645A]",
-                  )}
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                  </svg>
-                </button>
-              )}
-
-              {bangSanPham && (
-                <button
-                  type="button"
-                  onClick={() => setTamMo("san-pham")}
-                  aria-label="Sản phẩm cho tấm ảnh này"
-                  aria-expanded={tamMo === "san-pham"}
-                  className="p-2 text-white transition hover:text-white/80 active:scale-90 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg"
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                    <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
-                    <rect x="9" y="9" width="11" height="11" rx="2" ry="2" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className={cn("overflow-hidden transition-all duration-300 lg:hidden", tamMo === "ghi-chu" ? "mt-4 max-h-[150px] opacity-100" : "max-h-0 opacity-0")}>
-            {onLuuGhiChu && (
-              <input
-                id="ghi-chu-anh"
-                type="text"
-                value={ghiChu}
-                onChange={(e) => setGhiChu(e.target.value)}
-                onBlur={luuGhiChu}
-                disabled={isLocked || dangLuuGhiChu || !isCurrentSelected || isMutating}
-                maxLength={500}
-                placeholder={
-                  isLocked
-                    ? vi.gallery.noteLocked
-                    : !isCurrentSelected
-                      ? vi.gallery.noteNeedsSelect
-                      : "Ghi chú cho thợ chỉnh ảnh"
-                }
-                className="w-full rounded-[12px] border border-white/20 bg-transparent px-4 py-3 text-[14px] text-white placeholder-white/50 focus:border-white/50 focus:outline-hidden disabled:opacity-50"
-              />
-            )}
           </div>
         </div>
       </footer>
@@ -950,10 +1015,41 @@ export function PhotoLightbox({
         >
           <div
             role="dialog"
+            // BB-289 lượt 3 — kiểm ngược bắt được: đổi aria-label này thành
+            // "Tấm này dùng cho…" ở lượt 2 làm ĐỎ test có sẵn
+            // `bb-277-ban-phim.spec.ts` ("Bù độ phủ BB-275…" đợi
+            // `getByRole("dialog", {name: "In ảnh này"})`). Tên TRUY CẬP
+            // (aria-label) và TIÊU ĐỀ NHÌN THẤY (h2 "Tấm này dùng cho…" ngay
+            // dưới) không bắt buộc trùng nhau — giữ nguyên tên truy cập cũ,
+            // chỉ đổi chữ hiển thị theo bản vẽ.
             aria-label="In ảnh này"
+            data-testid="tam-truot-dung-cho"
             className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#231e1a] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-white shadow-2xl animate-in slide-in-from-bottom-8"
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/25" aria-hidden="true" />
+            {/*
+              BB-289 lượt 2 — tiêu đề đúng bản vẽ `xem-lon-dat-in-dien-thoai.png`:
+              "Tấm này dùng cho…" + phụ đề số thứ tự, nút × đóng cùng hàng.
+              Trước đây tấm trượt không có tiêu đề riêng, mở thẳng vào hai
+              khối "Trong gói"/"Mua thêm" — ba mẹ không rõ đang cấu hình cho
+              tấm nào nếu đã cuộn qua vài lần.
+            */}
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-2xl font-normal">Tấm này dùng cho…</h2>
+                <p className="mt-1 text-[13px] text-white/60">
+                  Tấm {currentIndex + 1} · chọn được nhiều mục
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTamMo(null)}
+                aria-label={vi.common.close}
+                className="shrink-0 rounded-full p-1.5 text-white/70 transition hover:bg-white/10"
+              >
+                <X className="h-5 w-5" strokeWidth={1.6} aria-hidden="true" />
+              </button>
+            </div>
             {bangSanPham?.(currentPhoto)}
           </div>
         </div>

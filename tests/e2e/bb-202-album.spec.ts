@@ -172,10 +172,14 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
       .poll(
         async () => {
           const { rows } = await pg.query(
-            `select quantity, photo_id from selection_addons sa
+            // Cửa hàng chọn sẵn cỡ album đầu tiên của nó — không nhất thiết trùng
+            // `albumProductId` (lấy "một album bất kỳ" chỉ để biết có hàng bán).
+            // Canh đúng điều cần canh: có MỘT dòng mua thêm là album, không ảnh.
+            `select sa.quantity, sa.photo_id from selection_addons sa
                join selections s on s.id = sa.selection_id
-              where s.gallery_id = $1 and sa.product_id = $2`,
-            [galleryId, albumProductId],
+               join products p on p.id = sa.product_id
+              where s.gallery_id = $1 and p.material ilike '%album%'`,
+            [galleryId],
           );
           return rows[0] ?? null;
         },

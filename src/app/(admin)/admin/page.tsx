@@ -12,8 +12,10 @@ import { Dashboard } from "@/components/features/admin/dashboard";
 import { PageHeader } from "@/components/features/admin/page-header";
 
 export default function AdminDashboardPage() {
+  // BB-290 (#31): bề rộng tối đa DÙNG CHUNG cho mọi trang quản trị —
+  // max-w-6xl, xem ghi chú ở /admin/settings/page.tsx.
   return (
-    <main className="mx-auto min-w-0 max-w-7xl space-y-4 lg:space-y-6">
+    <main className="mx-auto min-w-0 max-w-6xl space-y-4 lg:space-y-6">
       {/* Thanh trên cùng đã ghi tên màn — xem ghi chú ở màn Khách hàng. */}
       <PageHeader title="Bảng điều khiển" hideOnMobile className="mb-0" />
       <Dashboard />

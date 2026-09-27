@@ -1,12 +1,12 @@
-import { isSubmittedOrLater, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { isSubmittedOrLater, isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
-import { nhomSanPham, canGanAnh } from "@/lib/products/nhom-san-pham";
+import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
-import { nhanHienThi } from "@/lib/lark/trang-thai-hau-ky";
+import { nhanHienThi, qua60NgayFileGoc } from "@/lib/lark/trang-thai-hau-ky";
 
 export async function GET(request: Request) {
   try {
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
         branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
         cover_photo_id, cover_headline, cover_layout, download_enabled, notes_enabled, invite_enabled,
-        lark_trang_thai
+        lark_trang_thai, lark_trang_thai_tu
       `)
       .eq("id", session.galleryId)
       .single();
@@ -317,7 +317,12 @@ export async function GET(request: Request) {
       ? { imageUrl: bannerAnh, linkUrl: layCaiDat("gallery.banner_link_url") }
       : null;
 
+    // BB-288: chỉ 3 nhóm ảnh in/album/khung ĐANG BÁN — `sanPhamBanChoKhach()`
+    // loại thêm canvas so với lọc `nhom !== null` cũ (xem lib/products/nhom-san-pham.ts).
+    // Lọc TRƯỚC `.map` để `p.is_active` không cần mang qua object đã ánh xạ —
+    // truy vấn phía trên đã `.eq("is_active", true)` nên luôn `true` ở đây.
     const catalogue = (rawCatalogue ?? [])
+      .filter((p) => sanPhamBanChoKhach({ isActive: true, kind: p.kind, material: p.material }))
       .map((p) => ({
         productId: p.id,
         name: p.name,
@@ -327,8 +332,7 @@ export async function GET(request: Request) {
         unitPrice: Number(p.list_price),
         nhom: nhomSanPham(p.kind, p.material),
         canGanAnh: canGanAnh(nhomSanPham(p.kind, p.material)),
-      }))
-      .filter((p) => p.nhom !== null);
+      }));
 
     // Lấy danh sách ảnh đã đặt vào sản phẩm in (selection_placements)
     const { data: userSelectionItems } = await supabase
@@ -426,6 +430,19 @@ export async function GET(request: Request) {
       gallery.lark_trang_thai,
       (s) => GALLERY_STATUS_LABEL[s] ?? s,
     );
+    // BB-285 — luật 60 ngày (docs/21 GĐ1): Lark còn "Đã gửi file gốc" quá 60
+    // ngày thì coi là đóng theo quy định — khoá chọn, câu nhẹ nhàng thay vì
+    // trang lỗi.
+    const quaHan60Ngay = qua60NgayFileGoc(
+      gallery.lark_trang_thai,
+      gallery.lark_trang_thai_tu ? new Date(gallery.lark_trang_thai_tu) : null,
+      new Date(),
+    );
+    // BB-285 — khoá chọn dùng CHUNG với `patch_selection_batch`/mutate.ts:
+    // Lark đã sang "Đã chọn hình" trở lên, hoặc quá hạn 60 ngày, thì khoá dù
+    // app còn ghi ready/in_review/submitted. Không trả mã Lark thô cho khách
+    // (xem chú thích cũ dưới đây) — chỉ trả boolean đã tính sẵn.
+    const khoaChonTheoLark = isGalleryLocked(gallery.status, gallery.lark_trang_thai) || quaHan60Ngay;
     const responseData = {
       id: gallery.id,
       title: gallery.title,
@@ -435,10 +452,16 @@ export async function GET(request: Request) {
       // (docs/21 "Luồng hiển thị"). KHÔNG trả mã Lark hay mức cảnh báo cho
       // khách — đó là chuyện nội bộ studio, không phải thứ ba mẹ cần thấy.
       // `null` = giữ nguyên chữ cũ theo `status` (xem review-panel.tsx).
-      nhanTienDo: tienDo.khach,
+      nhanTienDo: quaHan60Ngay
+        ? "Bộ ảnh đã quá hạn chọn — nhắn studio để được hỗ trợ"
+        : tienDo.khach,
       // BB-225 — số giai đoạn (2–11, docs/21) để màn khách chọn tranh "hành
       // trình bộ ảnh". Chỉ là con số giai đoạn, không phải mã Lark.
       giaiDoanTienDo: tienDo.giaiDoan,
+      // BB-285 — boolean đã tính sẵn ở máy chủ; màn khách dùng field này thay
+      // vì tự suy ra từ `status` (thiếu thông tin Lark).
+      khoaChonTheoLark,
+      quaHan60Ngay,
       babyName: baby?.nickname || baby?.full_name || null,
       // BB-212 — xem ghi chú ở chỗ truy vấn `customer` phía trên.
       customerName: customer?.full_name || null,

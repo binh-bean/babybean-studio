@@ -30,6 +30,8 @@
  *
  * Có phép thử so danh sách này với enum thật trong cơ sở dữ liệu.
  */
+import { laKhoaTheoLark } from "@/lib/lark/trang-thai-hau-ky";
+
 export const GALLERY_STATUSES = [
   "draft",
   "syncing",
@@ -72,8 +74,20 @@ export const LOCKED_STATUSES = [
   "expired",
 ] as const;
 
-export function isGalleryLocked(status: string): boolean {
-  return (LOCKED_STATUSES as readonly string[]).includes(status);
+/**
+ * BB-285 — tham số `larkMa` (mã trạng thái Lark, `galleries.lark_trang_thai`)
+ * là TUỲ CHỌN và chỉ THÊM lý do khoá, không bao giờ MỞ khoá một trạng thái đã
+ * khoá theo `LOCKED_STATUSES`. Khi Lark đã sang "Đã chọn hình" trở lên (giai
+ * đoạn ≥ 2) thì khoá chọn ảnh dù app còn ghi `ready`/`in_review`/`submitted`
+ * — xem `laKhoaTheoLark` ở `trang-thai-hau-ky.ts` và docs/21.
+ *
+ * Không đổi `LOCKED_STATUSES`/chữ ký gọi không truyền `larkMa`: mọi chỗ gọi
+ * cũ (kể cả phép thử so khớp `app.gallery_is_locked()`) vẫn chạy y nguyên.
+ */
+export function isGalleryLocked(status: string, larkMa?: string | null): boolean {
+  if ((LOCKED_STATUSES as readonly string[]).includes(status)) return true;
+  if (larkMa && laKhoaTheoLark(larkMa)) return true;
+  return false;
 }
 
 /**

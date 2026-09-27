@@ -276,7 +276,19 @@ export function CreateGalleryWizard() {
                   placeholder="https://drive.google.com/drive/folders/…"
                   spellCheck={false}
                 />
-                <Button onClick={checkDrive} disabled={checking || driveUrl.trim() === ""}>
+                {/* BB-290 (#44): khi khoá, màu mặc định (hồng đất ở
+                    opacity-50) nhạt thành #F2C9C0 — đọc như trạng thái LỖI,
+                    không phải "chưa đủ điều kiện bấm". Ép màu trung tính khi
+                    khoá, không đổi `button.tsx` dùng chung toàn hệ. */}
+                <Button
+                  onClick={checkDrive}
+                  disabled={checking || driveUrl.trim() === ""}
+                  className={
+                    driveUrl.trim() === "" && !checking
+                      ? "disabled:!bg-[var(--bb-border)] disabled:!text-[var(--bb-fg-muted)] disabled:!opacity-100"
+                      : undefined
+                  }
+                >
                   {checking ? w.checkingDrive : w.checkDriveLink}
                 </Button>
               </div>
@@ -456,9 +468,12 @@ export function CreateGalleryWizard() {
           </Button>
 
           {step < 3 ? (
+            // BB-290 (#44): cùng lý do với nút "Kiểm tra thư mục" — màu
+            // trung tính khi khoá, không phải hồng nhạt trông như lỗi.
             <Button
               onClick={() => setStep(step + 1)}
               disabled={step === 1 ? !canLeaveStep1 : !canLeaveStep2}
+              className="disabled:!bg-[var(--bb-border)] disabled:!text-[var(--bb-fg-muted)] disabled:!opacity-100"
             >
               {w.next}
             </Button>

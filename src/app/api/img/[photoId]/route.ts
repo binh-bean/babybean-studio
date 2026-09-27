@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { fail, failUnexpected } from "@/lib/api-response";
 import { THUMBNAIL_WIDTHS, type ThumbnailWidth } from "@/types/domain";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -7,6 +8,12 @@ import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-s
 import { driveFetch } from "@/lib/drive/client";
 
 export const runtime = "nodejs";
+// BB-286: ghi bộ đệm chạy nền (after()) tính vào cùng thời lượng hàm như
+// phần phản hồi. GIẢ ĐỊNH HẠ TẦNG: gói Hobby — 60 giây là mức TỐI ĐA Hobby
+// cho phép (mặc định chỉ 10s), đặt kịch trần vì một lượt kéo Drive + ghi
+// Storage cho MỘT tấm ảnh hiếm khi cần tới, nhưng vẫn có thể chậm khi Drive
+// đang bị giới hạn tốc độ và `driveFetch` đang lùi (backoff).
+export const maxDuration = 60;
 
 function parseWidth(value: string | null): ThumbnailWidth | null {
   const n = Number(value ?? 800);
@@ -194,21 +201,68 @@ export async function GET(
     }
 
     if (buffer) {
-      // 3. Ghi vào bộ nhớ đệm
-      const upRes = taiVe
-        ? { error: null }
-        : await storage.upload(cachePath, buffer, {
-        contentType,
-        upsert: true,
-      });
+      // 3. Ghi vào bộ nhớ đệm — CHẠY NỀN, không chặn phản hồi (BB-286).
+      //
+      // Trước đây route `await storage.upload(...)` TRƯỚC KHI trả ảnh: khách
+      // mở một bộ mới toanh (chưa có gì trong đệm) phải đợi cả lượt kéo Drive
+      // LẪN lượt ghi Storage mới thấy ảnh — đúng lúc lần đầu mở link, đúng lúc
+      // quan trọng nhất (xem §4.2 báo cáo vận hành 27/09/2026).
+      //
+      // `after()` (Next 15, ổn định) chạy đúng đoạn ghi đệm SAU KHI phản hồi
+      // đã rời máy chủ. Ảnh gốc (`taiVe`) không qua đây — đã chặn ở bước đọc
+      // đệm phía trên, ảnh gốc không bao giờ được ghi vào đệm (660 GB nếu ghi
+      // hết, xem chú thích §BB-161 bên trên).
+      if (!taiVe) {
+        const bufferGhiDem = buffer;
+        const contentTypeGhiDem = contentType;
+        const ghiVaoDem = async () => {
+          try {
+            const upRes = await storage.upload(cachePath, bufferGhiDem, {
+              contentType: contentTypeGhiDem,
+              upsert: true,
+            });
 
-      // Bucket chưa tồn tại? Tạo private bucket rồi ghi lại
-      if (upRes.error && (upRes.error as { code?: string }).code === "NoSuchBucket") {
-        await supabase.storage.createBucket("thumbnails", { public: false });
-        await storage.upload(cachePath, buffer, {
-          contentType,
-          upsert: true,
-        });
+            // Bucket chưa tồn tại? Tạo private bucket rồi ghi lại.
+            if (upRes.error && (upRes.error as { code?: string }).code === "NoSuchBucket") {
+              await supabase.storage.createBucket("thumbnails", { public: false });
+              const retry = await storage.upload(cachePath, bufferGhiDem, {
+                contentType: contentTypeGhiDem,
+                upsert: true,
+              });
+              if (retry.error) throw retry.error;
+            } else if (upRes.error) {
+              throw upRes.error;
+            }
+          } catch (err) {
+            // Lỗi ghi đệm CHỈ log — khách đã nhận ảnh rồi, không có phản hồi
+            // nào để làm hỏng nữa. Lượt xem kế tiếp sẽ lại kéo Drive, chậm
+            // như hôm nay chứ không mất ảnh.
+            console.error(
+              JSON.stringify({
+                evt: "img_cache_write_failed",
+                requestId,
+                photoId,
+                width,
+                loi: err instanceof Error ? err.message : String(err),
+              }),
+            );
+          }
+        };
+
+        try {
+          // `after()` chỉ chạy được TRONG một yêu cầu thật của Next.js — nơi
+          // có ngữ cảnh yêu cầu (request scope) để hoãn việc tới. Gọi thẳng
+          // route handler NGOÀI ngữ cảnh đó (ví dụ phép thử gọi trực tiếp
+          // hàm GET, không qua máy chủ Next.js) làm nó NÉM lỗi ngay tại đây —
+          // xem https://nextjs.org/docs/messages/next-dynamic-api-wrong-context.
+          after(ghiVaoDem);
+        } catch {
+          // Không có ngữ cảnh để hoãn tới thì không hoãn được — ghi luôn,
+          // đồng bộ, như hành vi TRƯỚC BB-286. Chỉ ảnh hưởng lúc gọi route
+          // handler trực tiếp (phép thử); trên máy chủ Next.js thật, nhánh
+          // `after()` ở trên luôn chạy.
+          await ghiVaoDem();
+        }
       }
 
       return new Response(buffer, {

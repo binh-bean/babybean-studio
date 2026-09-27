@@ -134,16 +134,39 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     );
     anhBoKhac = pk[0].id;
 
+    /*
+      BB-288: giới hạn `kind in ('print', 'edited_photo')` và loại canvas —
+      không thì có thể vớ phải sản phẩm `addon` (Phát Sinh) rẻ hơn, sản phẩm
+      NGOÀI danh mục bán nhưng vẫn đủ giá, và `/api/g/addons` giờ từ chối nó
+      404 (ngoài danh mục) khiến ca này (kỳ vọng 200, mua ĐƯỢC) đỏ nhầm chỗ.
+    */
     const { rows: sp } = await client.query(
       `select id, list_price from products
         where is_active and list_price is not null and price_confidence >= 0.8 and price_samples >= 5
+          and kind in ('print', 'edited_photo')
+          and coalesce(material, '') not ilike '%cavas%'
+          and coalesce(material, '') not ilike '%canvas%'
         order by list_price limit 1`,
     );
     spBanDuoc = sp[0].id;
     giaNiemYet = Number(sp[0].list_price);
 
+    /*
+      BB-288: chỉ chọn trong đúng nhóm ĐANG BÁN (ảnh in/album/khung, không
+      canvas) — nếu không, ca này có thể ngẫu nhiên vớ phải một sản phẩm
+      NGOÀI danh mục bán (canvas, hoặc kind dịch vụ kèm buổi chụp), và route
+      sẽ trả 404 (ngoài danh mục) thay vì 400 (giá chưa đủ tin cậy) — hai lý
+      do từ chối KHÁC NHAU. Ca này chỉ canh đúng luật giá (BB-105), nên phải
+      loại trừ lý do kia trước.
+    */
     const { rows: sp2 } = await client.query(
-      `select id from products where is_active and (price_confidence < 0.8 or price_samples < 5 or list_price is null) limit 1`,
+      `select id from products
+        where is_active
+          and (price_confidence < 0.8 or price_samples < 5 or list_price is null)
+          and kind in ('print', 'edited_photo')
+          and coalesce(material, '') not ilike '%cavas%'
+          and coalesce(material, '') not ilike '%canvas%'
+        limit 1`,
     );
     spKhongBan = sp2[0]?.id ?? "";
   });

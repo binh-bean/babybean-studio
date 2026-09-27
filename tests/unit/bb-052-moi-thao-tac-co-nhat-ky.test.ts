@@ -85,6 +85,11 @@ const NGOAI_LE: Record<string, string> = {
   "cron/hau-ky":
     "BB-200 — chỉ ghi bản sao trạng thái đọc từ Lark (lark_trang_thai…) và sổ " +
     "lark_nhac_da_gui; mỗi tin nhắc có dòng trong notifications. Số liệu mỗi lượt ghi console.info.",
+  "admin/galleries/[id]/lam-nong-anh":
+    "BB-286 — chỉ kéo trước ảnh từ Drive và ghi vào bộ đệm Storage (bucket " +
+    "thumbnails), không đổi bất cứ hàng nào trong cơ sở dữ liệu nghiệp vụ. " +
+    "Không có gì để tra lại sáu tháng sau ngoài việc một tấm ảnh đã có bản " +
+    "thu nhỏ trong đệm hay chưa — chính sự tồn tại của tệp đó đã là bản ghi.",
 };
 
 function quetRoute(thuMuc: string, goc: string): string[] {

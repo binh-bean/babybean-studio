@@ -23,7 +23,9 @@ export default async function BranchesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl p-6">
+    // BB-290 (#31): bỏ `p-6` riêng — cùng lý do đã sửa ở /admin/viec-can-xu-ly
+    // và /admin/bao-cao (khung cuộn của layout đã tự đệm p-4/p-6/p-8).
+    <main className="mx-auto max-w-6xl">
       <BranchManager />
     </main>
   );

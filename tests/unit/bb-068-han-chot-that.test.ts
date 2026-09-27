@@ -61,8 +61,8 @@ describe("BB-068: hạn chốt có thật", () => {
   async function taoBoAnh(status = "ready") {
     const { rows } = await client.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
-                              drive_folder_url, photo_count)
-       values ($1,$2,'Fixture BB-068',$3,$4,'https://example.com/x', 12)
+                              drive_folder_url, photo_count, included_quota)
+       values ($1,$2,'Fixture BB-068',$3,$4,'https://example.com/x', 12, 20)
        returning id`,
       [branchId, customerId, status, `fixture-bb068-${Date.now()}-${Math.random()}`],
     );

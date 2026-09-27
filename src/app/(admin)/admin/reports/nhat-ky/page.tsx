@@ -15,7 +15,9 @@ export default async function NhatKyPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-6">
+    // BB-290 (#31): bỏ `p-6` riêng — cùng lỗi đã sửa ở các trang khác (khung
+    // cuộn của layout đã tự đệm).
+    <main className="mx-auto max-w-6xl space-y-6">
       <PageHeader title={vi.admin.nhatKy.title} description={vi.admin.nhatKy.subtitle} />
       <NhatKyReport />
     </main>

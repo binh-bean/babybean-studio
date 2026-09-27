@@ -224,7 +224,7 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
     const manSoSanh = page.getByRole("dialog", { name: "So sánh nhiều tấm" });
     await expect(manSoSanh).toBeVisible();
 
-    await manSoSanh.getByRole("button", { name: "Ghim & vuốt" }).click();
+    await manSoSanh.getByRole("button", { name: "Giữ tấm này", exact: true }).click();
     // Tấm ghim (đầu danh sách so sánh) mặc định — nút của NÓ có nhãn "Bỏ
     // ghim". Không dò theo aria-pressed="true" chung chung: nút chuyển chế
     // độ ở đầu ("Ghim & vuốt") CŨNG có aria-pressed="true" khi đang bật chế

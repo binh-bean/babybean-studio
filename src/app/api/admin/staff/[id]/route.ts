@@ -63,7 +63,7 @@ export async function PATCH(
 
     // Chỉ owner mới đụng được vào một owner khác.
     if (target.role === "owner" && staff.role !== "owner") {
-      return fail("FORBIDDEN", "Chỉ chủ studio mới sửa được tài khoản chủ studio");
+      return fail("FORBIDDEN", "Chỉ admin mới sửa được tài khoản admin");
     }
 
     if (input.role !== undefined && !assignableBy(staff.role).includes(input.role)) {
@@ -78,7 +78,7 @@ export async function PATCH(
         .eq("role", "owner")
         .eq("is_active", true);
       if ((count ?? 0) <= 1) {
-        return fail("FORBIDDEN", "Đây là tài khoản chủ studio đang hoạt động duy nhất, không tắt được");
+        return fail("FORBIDDEN", "Đây là tài khoản admin đang hoạt động duy nhất, không tắt được");
       }
     }
 
@@ -172,7 +172,7 @@ export async function DELETE(
   try {
     const staff = await requireStaff();
     if (staff.role !== "owner") {
-      return fail("FORBIDDEN", "Chỉ chủ studio mới có quyền xoá tài khoản");
+      return fail("FORBIDDEN", "Chỉ admin mới có quyền xoá tài khoản");
     }
 
     const { id } = await context.params;

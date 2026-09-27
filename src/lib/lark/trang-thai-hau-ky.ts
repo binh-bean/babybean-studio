@@ -115,15 +115,43 @@ const QUAN_TRI_THEO_GIAI_DOAN: Record<number, string> = {
  * Lark ở giai đoạn 1 (file gốc) trong khi app đã xác nhận: Lark chưa được cập
  * nhật — coi như giai đoạn 2, không lùi nhãn về "chờ chọn ảnh".
  */
+/**
+ * BB-285 — Lark là nguồn cho MỌI trạng thái app một khi đã sang "Đã chọn
+ * hình" (giai đoạn ≥ 2), không chỉ ba trạng thái của `APP_THEO_LARK`.
+ *
+ * Trước BB-285: một bộ vẫn nằm `ready`/`in_review` trên app (CSKH chưa bấm
+ * "xác nhận") mà Lark đã "Đã gửi duyệt"/"Đã giao" thì màn khách vẫn hiện "mời
+ * ba mẹ chọn ảnh" — đo 27/09/2026 có 183 bộ như vậy. Hàm này là điều kiện
+ * dùng chung cho cả nhãn hiển thị (`nhanHienThi`) lẫn khoá chọn ảnh
+ * (`isGalleryLocked` ở `gallery-status.ts`).
+ */
+export function laKhoaTheoLark(maLark: string | null | undefined): boolean {
+  const gd = giaiDoanCua(maLark);
+  return gd !== null && gd >= 2;
+}
+
+/**
+ * `awaiting_approval` giữ NGOÀI diện "theo Lark mở rộng" của BB-285, đúng lý
+ * do ghi ở `APP_THEO_LARK`: màn khách lúc đó có nút duyệt/xin sửa SỐNG của
+ * chính app; đè nhãn Lark lên là nói một đằng, nút làm một nẻo. BB-285 sửa
+ * chỗ app THIẾU thông tin (ready/in_review/submitted "mời chọn" trong khi Lark
+ * đã đi xa) — không sửa chỗ app ĐANG đúng.
+ */
+const KHONG_DE_LARK_MO_RONG = new Set(["awaiting_approval"]);
+
 export function nhanHienThi(
   trangThaiApp: string,
   maLark: string | null | undefined,
   nhanApp: (s: string) => string,
 ): NhanHienThi {
-  if (!APP_THEO_LARK.has(trangThaiApp)) {
+  const gdLark = giaiDoanCua(maLark);
+  const theoLark =
+    !KHONG_DE_LARK_MO_RONG.has(trangThaiApp) &&
+    (APP_THEO_LARK.has(trangThaiApp) || laKhoaTheoLark(maLark));
+  if (!theoLark) {
     return { quanTri: nhanApp(trangThaiApp), khach: null, giaiDoan: null };
   }
-  let gd = giaiDoanCua(maLark);
+  let gd = gdLark;
   if (gd === null || gd < 2) gd = 2;
   // App đã ghi "đã giao" mà Lark còn chậm: tin app, không lùi nhãn.
   if (trangThaiApp === "delivered" && gd < 10) {
@@ -173,6 +201,30 @@ export function soNgayLich(tu: Date, den: Date): number {
   const VN = 7 * 3600 * 1000;
   const ngay = (d: Date) => Math.floor((d.getTime() + VN) / 86_400_000);
   return ngay(den) - ngay(tu);
+}
+
+/**
+ * Luật 60 ngày (docs/21, giai đoạn 1): bộ ảnh còn ở "Đã gửi file gốc" quá 60
+ * ngày kể từ lúc vào giai đoạn thì "đóng theo quy định" — file gốc coi như đã
+ * bị xoá, không tính vào "chờ khách chọn", không cho tạo link mới.
+ *
+ * Chỉ áp cho ĐÚNG giai đoạn 1. Giai đoạn khác (đã chọn, đang làm…) không bị
+ * luật này — 60 ngày chỉ tính từ lúc gửi file gốc tới lúc khách CHỌN, không
+ * phải toàn bộ vòng đời.
+ *
+ * `tu = null` (app chưa biết mốc vào giai đoạn) → coi là CHƯA quá hạn: không
+ * đủ dữ liệu để đóng một dịch vụ đang chờ khách, thà chậm còn hơn đóng nhầm.
+ */
+export const SO_NGAY_DONG_FILE_GOC = 60;
+
+export function qua60NgayFileGoc(
+  maLark: string | null | undefined,
+  tu: Date | null | undefined,
+  homNay: Date,
+): boolean {
+  if (giaiDoanCua(maLark) !== 1) return false;
+  if (!tu) return false;
+  return soNgayLich(tu, homNay) > SO_NGAY_DONG_FILE_GOC;
 }
 
 export interface MocCanGui {

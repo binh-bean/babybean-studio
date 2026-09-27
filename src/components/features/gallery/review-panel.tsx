@@ -33,6 +33,7 @@
 
 import React from "react";
 import { canApprove, canRequestRevision } from "@/lib/selection/review-rules";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 
 export interface ReviewRound {
   round: number;
@@ -107,7 +108,7 @@ export function ReviewPanel({
     <div className="space-y-3.5 rounded-2xl border border-border bg-surface p-5">
       {!anCauTrangThai && (
         <div>
-          <p className="font-display text-lg font-light leading-tight">
+          <p className="kh-h3">
             {status === "in_retouch"
               ? (nhanTienDo ?? "Studio đang chỉnh ảnh")
               : status === "awaiting_approval"
@@ -201,7 +202,7 @@ export function ReviewPanel({
           {review.rounds.map((r) => (
             <li key={r.round} className="text-xs">
               <span className="text-muted-foreground">
-                Lần {r.round} · {new Date(r.createdAt).toLocaleDateString("vi-VN")}
+                Lần {r.round} · {formatNgayVN(r.createdAt)}
                 {r.resolved ? " · studio đã sửa" : " · studio đang sửa"}
               </span>
               <br />

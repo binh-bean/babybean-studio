@@ -69,8 +69,8 @@ describe("BB-132: Lark hỏng thì link vẫn về tới tay CSKH", () => {
     customerId = c[0].id;
     const { rows: g } = await client.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
-                              drive_folder_url, photo_count, lark_hauky_record_id)
-       values ($1,$2,'Fixture BB-132','ready',$3,'https://example.com/x', 9, $4)
+                              drive_folder_url, photo_count, lark_hauky_record_id, included_quota)
+       values ($1,$2,'Fixture BB-132','ready',$3,'https://example.com/x', 9, $4, 20)
        returning id`,
       [branchId, customerId, `fixture-bb132-${Date.now()}`, `recBB132${Date.now()}`],
     );

@@ -30,6 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Input, Card, Spinner, Badge, Avatar, AvatarFallback } from "@/components/ui";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 import { vi } from "@/i18n/vi";
 
 const t = vi.admin.khachHang;
@@ -203,7 +204,10 @@ export function CustomersManager({
                         </span>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--bb-fg-muted)]">
-                        <span className="select-all font-mono">{k.phone ?? t.chuaCoSdt}</span>
+                        {/* BB-290 (#40): SĐT sans 14px tabular-nums, không
+                            còn font-mono — chữ số monospace đọc rời rạc hơn
+                            là cần trên một thẻ danh sách. */}
+                        <span className="select-all text-sm tabular-nums">{k.phone ?? t.chuaCoSdt}</span>
                         <span>
                           {k.soBoAnh} {t.cot.soBo.toLowerCase()}
                         </span>
@@ -254,8 +258,10 @@ export function CustomersManager({
                         )}
                       </div>
                     </td>
-                    {/* select-all để bôi một phát rồi dán sang Zalo hoặc Lark */}
-                    <td className="select-all py-2 pr-3 font-mono text-xs">
+                    {/* select-all để bôi một phát rồi dán sang Zalo hoặc Lark.
+                        BB-290 (#40): sans 14px tabular-nums thay cho font-mono
+                        text-xs — nhỏ hơn hẳn tên (15px) và khó đọc hơn cần. */}
+                    <td className="select-all py-2 pr-3 text-sm tabular-nums">
                       {k.phone ?? t.chuaCoSdt}
                     </td>
                     <td className="py-2 pr-3">{k.branchName}</td>
@@ -639,7 +645,12 @@ function chuCaiDau(hoTen: string): string {
   return (dau + cuoi).toUpperCase();
 }
 
+/**
+ * BB-290 (#40): `toLocaleDateString("vi-VN")` in "27/9/2026" (KHÔNG đệm số
+ * 0) trong khi quản trị và mọi nơi khác dùng "27/09/2026" — dùng chung
+ * `formatNgayVN` (BB-287) thay vì tự gọi `toLocaleDateString` ở đây.
+ */
 function ngay(value: string): string {
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("vi-VN");
+  const ket = formatNgayVN(value);
+  return ket || "—";
 }

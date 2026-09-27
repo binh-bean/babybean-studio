@@ -12,6 +12,7 @@
 import { redirect } from "next/navigation";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { NhanSuVaiTro } from "@/components/features/admin/nhan-su-vai-tro";
+import { KhongCoQuyen } from "@/components/features/admin/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +26,7 @@ export default async function StaffPage() {
   }
 
   if (role !== "owner" && role !== "admin") {
-    return (
-      <main className="mx-auto max-w-2xl p-6">
-        <h1 className="text-xl font-semibold text-[var(--bb-fg)]">Không có quyền</h1>
-        <p className="mt-2 text-sm text-[var(--bb-fg-muted)]">
-          Chỉ chủ studio và quản trị hệ thống mới xem được mục nhân sự.
-        </p>
-      </main>
-    );
+    return <KhongCoQuyen mota="Chỉ admin và quản trị hệ thống mới xem được mục nhân sự." />;
   }
 
   return (

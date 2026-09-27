@@ -28,6 +28,13 @@ export interface BiaBoAnhProps {
   daChon: number;
   hanChot: string | null;
   khoa: boolean;
+  /**
+   * BB-287 mục 5 — báo cáo chấm #4: bìa vẫn ghi "Ba mẹ thong thả chọn nhé"
+   * kể cả sau khi đã chốt hoặc đã giao ảnh — câu không khớp trạng thái.
+   * `gallery.status` cho câu chào MẶC ĐỊNH biết nên nói gì; bỏ trống thì coi
+   * như đang mở (giữ nguyên câu cũ).
+   */
+  trangThai?: string | null;
   onBatDau: () => void;
 }
 
@@ -61,6 +68,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     daChon,
     hanChot,
     khoa,
+    trangThai,
     onBatDau,
   } = props;
 
@@ -106,7 +114,17 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
       : "Bắt đầu chọn ảnh";
 
   const tieuDeBia = coverHeadline?.trim() || tenBe || "Khoảnh khắc của con";
-  const loiChaoBia = loiChao?.trim() || `${soAnh.toLocaleString("vi-VN")} khoảnh khắc của con đã sẵn sàng. Ba mẹ thong thả chọn nhé.`;
+
+  // BB-287 mục 5 — câu chào MẶC ĐỊNH (không ghi đè khi studio đã tự soạn
+  // `loiChao`) phải nói đúng việc ba mẹ cần biết ở TRẠNG THÁI hiện tại, không
+  // mời "thong thả chọn nhé" khi đã hết việc để chọn.
+  const loiChaoMacDinh =
+    trangThai === "delivered"
+      ? "Ảnh của bé đã hoàn thiện."
+      : khoa
+        ? "Cảm ơn ba mẹ — studio đang chỉnh ảnh."
+        : `${soAnh.toLocaleString("vi-VN")} khoảnh khắc của con đã sẵn sàng. Ba mẹ thong thả chọn nhé.`;
+  const loiChaoBia = loiChao?.trim() || loiChaoMacDinh;
 
   const MetaInfo = () => (
     <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] opacity-90">
@@ -219,88 +237,119 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
 
   // ben-canh (default) - cập nhật theo màn bìa chuẩn
   //
-  // BB-258 — chủ studio 26/09/2026: bìa máy tính KHÔNG được chia đôi (chữ
-  // trái nền kem, ảnh phải) như BB-253 đã dựng. Điện thoại/máy tính bảng vẫn
-  // ảnh TRÀN TOÀN MÀN với chữ đè đáy như BB-258 đã dựng.
+  // BB-289 — admin báo hai lỗi thật trên máy khách, đúng lúc BB-285 (bản vẽ
+  // đã duyệt) đổi hướng NGƯỢC LẠI với BB-258 (26/09/2026: "không chia đôi"):
   //
-  // BB-278 — chủ studio 27/09/2026: "phần thông tin ảnh bìa trên pc màn
-  // ngang rất dễ đè lấp mất hình". Mảng phủ mờ của BB-258 (đè chữ lên bên
-  // trái ảnh) vẫn CHE MỘT PHẦN ảnh trên máy tính — đúng thứ chủ studio vừa
-  // chỉ ra. Từ lg: bỏ hẳn lớp phủ đè lên ảnh; ảnh là MỘT KHỐI riêng (cao giới
-  // hạn, không phải nền tuyệt đối phủ hết section), chữ là MỘT DẢI CHÚ THÍCH
-  // riêng ngay dưới ảnh (nền kem, chữ mực) — hai khối không bao giờ giao
-  // nhau, đo bằng `tests/e2e/bb-278-dau-trang-bia.spec.ts`.
+  //   (3) Máy tính màn ngang: bìa TRÀN TOÀN SECTION rồi cắt theo `object-cover`
+  //       — ảnh chân dung dọc bị cắt đầu/chân trên màn ngang. Bản vẽ
+  //       `babybean-assets/BB-285/bia-may-tinh-chia-doi.png` (+ HTML gốc
+  //       cùng thư mục) chốt CHIA ĐÔI thật: cột trái 42% là khối ảnh hiện
+  //       TRỌN (`object-contain`, nền kem `#e7d3c6` lấp viền thừa — không
+  //       còn cắt), cột phải là khối chữ.
+  //   (4) Điện thoại: khối chữ `absolute inset-x-0 bottom-0` ĐÈ LÊN ảnh —
+  //       ảnh chụp máy thật chủ studio gửi cho thấy chữ trùm lên mặt bé.
+  //       Bản vẽ `dang-chinh-da-giao-dien-thoai.png` dùng đúng kiểu THẺ:
+  //       khối ảnh cao GIỚI HẠN đứng trong dòng chảy, khối chữ nền kem NẰM
+  //       DƯỚI — không bao giờ chồng nhau vì không còn `absolute`.
+  //
+  // Hệ quả: từ nay khối chữ KHÔNG BAO GIỜ đè lên ảnh ở bất kỳ bề rộng nào (kể
+  // cả điện thoại) — bỏ luôn lớp gradient tối và logic đo độ sáng ảnh
+  // (`mauChu`/`tcClass`/`bgOverlay`) cho layout này, vì chữ không còn nằm
+  // trên ảnh để cần đổi màu theo độ sáng — nền kem/chữ mực cố định như bản
+  // vẽ. `mauChu` vẫn tính ở trên vì ba layout kia (tap-chi/toi-gian/de-cheo)
+  // còn đè chữ lên ảnh và cần nó.
+  //
+  // Đo bằng `tests/e2e/bb-289-theo-ban-ve.spec.ts`:
+  //  - (3) tỉ lệ khối hiển thị ảnh ở lg khớp tỉ lệ ảnh gốc ±2% (object-contain
+  //    đảm bảo luôn đúng, không phụ thuộc ảnh dọc/ngang) ở 1440×900, 1280×720.
+  //  - (4) bounding box khối ảnh và khối chữ KHÔNG giao nhau ở 390×844.
+  //
+  // `tests/e2e/bb-240-man-khach-may-tinh.spec.ts` (mép trái h1 bìa = mép trái
+  // lưới ảnh) được VIẾT LẠI cho hướng chia đôi mới — xem ghi chú trong tệp
+  // đó; hai bản đo cũ (BB-253 chia đôi cũ, rồi BB-258 xoá chia đôi) đã đổi
+  // hướng hai lần trong cùng một task này theo đúng chỉ đạo studio.
   return (
     <section
       aria-label="Ảnh bìa"
       data-testid="bia-bo-anh"
       className={cn(
-        "@container relative isolate w-full overflow-hidden bg-[#2a2420] text-white",
-        "h-[86svh] min-h-[540px] max-h-[980px]",
-        "lg:flex lg:h-auto lg:max-h-none lg:min-h-0 lg:flex-col lg:bg-[#fbf7f2] lg:text-[#2e2a27]",
+        "@container relative isolate flex w-full flex-col overflow-hidden bg-[#fbf7f2] text-[#2e2a27]",
+        "lg:grid lg:grid-cols-[42%_minmax(0,1fr)] lg:items-stretch",
         className,
       )}
     >
       {/*
-        Khối ảnh — nền tuyệt đối tràn toàn section dưới lg (như BB-258). Từ
-        lg là một khối THẬT trong dòng chảy (không còn `absolute inset-0`),
-        cao giới hạn, để dải chữ bên dưới không cần đè lên nó.
+        Khối ảnh — điện thoại/bảng: khối cao GIỚI HẠN trong dòng chảy bình
+        thường (KHÔNG `absolute` — đó là gốc lỗi (4)), object-cover vì đây là
+        một ô ảnh nhỏ như thẻ, cắt nhẹ chấp nhận được. Máy tính (lg): cột
+        trái 42%, cao BẰNG cột chữ bên cạnh (`lg:h-full` trong hàng grid
+        `items-stretch`), `object-contain` trên nền kem đậm hơn để không cắt
+        đầu/chân ảnh dọc — đúng lỗi (3).
       */}
       <div
         data-testid="bia-khoi-anh"
-        className="absolute inset-0 -z-10 lg:static lg:z-auto lg:h-[64vh] lg:max-h-[760px] lg:min-h-[420px]"
+        className="relative h-[42svh] max-h-[440px] min-h-[260px] w-full shrink-0 bg-[#e7d3c6] lg:h-auto lg:max-h-none lg:min-h-[480px]"
       >
-        {imgEl}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent lg:hidden"
-        />
+        {anhBia && (
+          <img
+            src={`/api/img/${anhBia.id}?w=1600`}
+            srcSet={`/api/img/${anhBia.id}?w=800 800w, /api/img/${anhBia.id}?w=1600 1600w`}
+            sizes="(min-width: 1024px) 42vw, 100vw"
+            alt=""
+            fetchPriority="high"
+            decoding="async"
+            className="h-full w-full object-cover object-[50%_30%] lg:object-contain motion-safe:animate-[bia-hien_1.2s_ease-out]"
+          />
+        )}
       </div>
 
       {/*
-        BB-278 — MỘT khối chữ duy nhất (không phải hai bản sao ẩn/hiện bằng
-        CSS): tự đổi vị trí + màu theo bề rộng, thay vì đè lên ảnh dưới lg và
-        tách dải riêng từ lg. Từng thử dựng HAI khối riêng (một cho di động,
-        một cho lg) rồi ẩn bằng `hidden`/`lg:hidden` — cả hai vẫn nằm trong
-        DOM cùng lúc nên `h1` (và mọi phần tử con) bị NHÂN ĐÔI, làm hỏng mọi
-        chỗ dò `section[aria-label='Ảnh bìa'] h1` (bb-240, bb-274, bb-258 đều
-        có chỗ dò kiểu này — soát bằng cách chạy lại bộ đó phát hiện ra).
+        Khối chữ — LUÔN trong dòng chảy bình thường, ngay dưới ảnh trên điện
+        thoại, cột phải trên máy tính. Không `absolute`/`inset-x-0 bottom-0`
+        nữa nên không thể chồng lên khối ảnh ở bất kỳ bề rộng nào.
       */}
       <div
         data-testid="bia-khoi-chu"
         className={cn(
-          "khach-le-trai-lg absolute inset-x-0 bottom-0 z-10 px-6 pb-9 sm:px-10",
-          "lg:static lg:z-auto lg:inset-auto lg:border-t lg:border-[#e5dcd2] lg:bg-[#fbf7f2] lg:px-10 lg:py-10 xl:px-16",
+          // BB-289 — bỏ `khach-le-trai-lg` (công thức canh mép trái theo bề
+          // rộng TOÀN TRANG) ở đây: công thức đó dựng cho khối chữ tràn toàn
+          // section (BB-278), không còn đúng nữa khi khối chữ chỉ là MỘT CỘT
+          // trong lưới chia đôi (`lg:grid-cols-[42%_1fr]`) — padding cố định
+          // (`lg:px-10 xl:px-16`) là đúng cho một cột, không cần co theo cqw
+          // toàn trang nữa. `bb-240-man-khach-may-tinh.spec.ts` viết lại theo
+          // hướng này (xem ghi chú trong tệp đó).
+          "relative flex-1 border-t border-[#e5dcd2] bg-[#fbf7f2] px-6 py-7 sm:px-10",
+          "lg:flex lg:flex-col lg:justify-center lg:border-t-0 lg:px-10 lg:py-10 xl:px-16",
         )}
       >
         <div className="max-w-md lg:max-w-2xl">
-          <p className="text-[12px] uppercase tracking-[0.16em] text-white/90 lg:text-[#6b6057]">
+          <p className="text-[12px] uppercase tracking-[0.16em] text-[#6b6057]">
             {[ngay, chiNhanh].filter(Boolean).join(" · ")}
           </p>
 
-          <h1 className="mt-2 font-display text-[54px] font-light leading-[0.98] tracking-[-0.02em] sm:text-[68px] lg:mt-3 lg:text-[44px] lg:leading-[1.02] xl:text-[52px]">
+          <h1 className="mt-2 font-display text-[40px] font-light leading-[1.02] tracking-[-0.02em] sm:text-[48px] lg:mt-3 lg:text-[44px] xl:text-[52px]">
             {tieuDeBia}
           </h1>
 
-          <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-white/90 lg:max-w-2xl lg:text-base lg:text-[#4a423b]">
+          <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-[#4a423b] lg:max-w-2xl lg:text-base">
             {loiChaoBia}
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-x-2 gap-y-2 text-[14px] text-white/90 lg:mt-5 lg:text-[#4a423b]">
+          <div className="mt-6 flex flex-wrap gap-x-2 gap-y-2 text-[14px] text-[#4a423b] lg:mt-5">
             {hanMuc != null && (
-              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30 lg:border-[#2e2a27]/20">
+              <span className="inline-flex h-[36px] items-center gap-1.5 rounded-full border border-[#2e2a27]/15 px-3.5">
                 <Heart className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 {hanMuc} tấm trong gói
               </span>
             )}
             {conNgay != null && (
-              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30 lg:border-[#2e2a27]/20">
+              <span className="inline-flex h-[36px] items-center gap-1.5 rounded-full border border-[#2e2a27]/15 px-3.5">
                 <Clock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 Còn {conNgay} ngày để chọn
               </span>
             )}
             {khoa && (
-              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30 lg:border-[#2e2a27]/20">
+              <span className="inline-flex h-[36px] items-center gap-1.5 rounded-full border border-[#2e2a27]/15 px-3.5">
                 <Lock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 Đã chốt danh sách
               </span>
@@ -310,7 +359,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           <button
             type="button"
             onClick={onBatDau}
-            className="mt-8 inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#fbf7f2] px-7 text-[15px] font-medium text-[#2e2a27] transition hover:bg-white active:scale-[0.98] sm:w-auto lg:mt-7 lg:bg-[#2e2a27] lg:text-[#fbf7f2] lg:hover:bg-[#2e2a27]/90"
+            className="mt-8 inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#2e2a27] px-7 text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98] sm:w-auto lg:mt-7"
           >
             {nhanNut}
           </button>

@@ -164,8 +164,15 @@ const TheAnh = memo(function TheAnh({
           height={photo.height ?? undefined}
           className="pointer-events-none relative h-full w-full select-none object-cover transition-transform duration-500 ease-out group-hover:scale-[1.015]"
         />
+        {/*
+          BB-287 mục #6 — viền 1px đen quanh tấm đã chọn từng nhìn như lỗi
+          hiển thị, không giống một trạng thái "đã chọn". Chủ studio 23/09
+          (bản vẽ BB-281) không có viền này: trạng thái chọn chỉ thể hiện
+          bằng tim đặc terracotta + lớp phủ ấm 6% để vẫn nhận ra tấm đã chọn
+          cả khi tim nằm ngoài vùng nhìn (ảnh dài, đã cuộn qua tim).
+        */}
         {daChon && (
-          <span className="pointer-events-none absolute inset-0 rounded-[4px] ring-1 ring-inset ring-[#2e2a27]" />
+          <span className="pointer-events-none absolute inset-0 rounded-[4px] bg-[#c4645a]/[0.06]" />
         )}
 
         {/*
@@ -198,8 +205,16 @@ const TheAnh = memo(function TheAnh({
 
           Bộ ảnh đã khoá thì tấm chưa chọn không hiện tim: một nút bấm không được
           là một lời hứa sai.
+
+          BB-289 lượt 2 — bản vẽ `so-sanh-dien-thoai.html` (lưới CHỌN tấm để
+          so sánh): mỗi ô chỉ có MỘT dấu duy nhất, vòng số thứ tự (1–4), không
+          còn tim. Hai việc khác nhau ở cùng một ô (thả tim VÀ đánh dấu so
+          sánh) tranh nhau đúng một cú chạm — ẩn tim khi `soSanhBat` để cú
+          chạm vào ô chỉ còn một nghĩa. Tim quay lại bình thường khi tắt chế
+          độ so sánh; màn SO SÁNH THẬT (`so-sanh-anh.tsx`, dải điều khiển dưới
+          ảnh) vẫn giữ tim riêng của nó, không đụng ở đây.
         */}
-        {(!khoa || daChon) && (
+        {(!khoa || daChon) && !soSanhBat && (
           <button
             type="button"
             disabled={khoa || dangGui}
@@ -232,21 +247,16 @@ const TheAnh = memo(function TheAnh({
       </div>
 
       {/*
-        Tên tệp NGAY DƯỚI ảnh, không đè lên ảnh (BB-210, lời chủ studio
-        24/09/2026): "hiện tên file để khách dễ kiểm soát và đối chiếu với
-        file tải về cũng như danh sách mà CSKH tải về ảnh khách chọn chỉnh
-        sửa". Trước đó (23/09) từng cố tình BỎ tên file vì nó đè lên mặt bé —
-        nay chỗ này nằm ngoài khung ảnh nên không còn đụng vấn đề đó.
+        BB-287 mục #3/#5 — báo cáo chấm "khách khó tính": tên tệp BBS_0001.jpg
+        dưới mỗi ảnh "trông như ổ đĩa, không giống album". BB-210 (24/09) đã
+        thêm nó theo yêu cầu lúc đó ("khách dễ kiểm soát, đối chiếu file tải
+        về"), nhưng chủ studio chốt lại 27/09/2026: bỏ tên tệp khỏi MÀN KHÁCH
+        — CSKH/nhân viên vẫn đối chiếu được qua danh sách tải từ quản trị, và
+        màn khách hiện KHÔNG có vai xem riêng cho nhân viên (route `/g/[token]`
+        dùng chung cho mọi người cầm link). `CAO_CHU_THICH` vẫn giữ giá trị cũ
+        cho `xepSoLe`/`TheAnh` để không phải đo lại lưới so le — chừa đúng
+        khoảng trống trước đây dành cho dòng chữ, tránh ảnh xô sát nhau.
       */}
-      {photo.fileName && (
-        <p
-          className="mt-1 truncate px-0.5 text-[11px] leading-[14px] text-muted-foreground"
-          style={coViTri ? { height: CAO_CHU_THICH } : undefined}
-          title={photo.fileName}
-        >
-          {photo.fileName}
-        </p>
-      )}
     </div>
   );
 });

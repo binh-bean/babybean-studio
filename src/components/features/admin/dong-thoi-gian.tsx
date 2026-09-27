@@ -16,6 +16,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from "react";
+import { Info } from "lucide-react";
 
 interface DongThoiGian {
   luc: string;
@@ -63,7 +64,18 @@ function thoiGianTuongDoi(iso: string, bayGio: number = Date.now()): string {
   return `${ngayThang} ${gioPhut}`;
 }
 
-export function DongThoiGianHoatDong({ galleryId }: { galleryId: string }) {
+export function DongThoiGianHoatDong({
+  galleryId,
+  canhBaoLark,
+}: {
+  galleryId: string;
+  /**
+   * BB-290 lượt 2 (#36) — dòng "Lark: …" (trạng thái nội bộ đọc được từ
+   * Lark), chuyển từ dưới H1 xuống đây, dạng biểu tượng "i" + chữ nhỏ. Vẫn
+   * hiện chữ thật (không chỉ tooltip) — xem ghi chú ở gallery-detail.tsx.
+   */
+  canhBaoLark?: string | null;
+}) {
   const [items, setItems] = useState<DongThoiGian[] | null>(null);
   const [dangTai, setDangTai] = useState(false);
   const [dangTaiThem, setDangTaiThem] = useState(false);
@@ -125,9 +137,21 @@ export function DongThoiGianHoatDong({ galleryId }: { galleryId: string }) {
     }
   }
 
-  // Lỗi ngay lượt tải đầu tiên: ẩn cả khối, không làm hỏng phần còn lại của
-  // màn chi tiết.
-  if (loiDauTien) return null;
+  // Lỗi ngay lượt tải đầu tiên: ẩn phần "nhật ký", nhưng vẫn phải hiện dòng
+  // "Lark: …" nếu có — nó không phụ thuộc API dòng thời gian, và
+  // tests/e2e/bb-200-nhan-lark.spec.ts đợi dòng này hiện được bất kể nhật ký
+  // tải có thành công hay không.
+  if (loiDauTien) {
+    if (!canhBaoLark) return null;
+    return (
+      <section className="rounded-lg border border-[var(--bb-border)] p-4">
+        <p className="flex items-start gap-1.5 text-[11px] leading-snug text-[var(--bb-fg-muted)]">
+          <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+          <span>{canhBaoLark}</span>
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-lg border border-[var(--bb-border)] p-4">
@@ -166,6 +190,13 @@ export function DongThoiGianHoatDong({ galleryId }: { galleryId: string }) {
         >
           {dangTaiThem ? "Đang tải…" : "Xem thêm"}
         </button>
+      )}
+
+      {canhBaoLark && (
+        <p className="mt-3 flex items-start gap-1.5 border-t border-[var(--bb-border)] pt-3 text-[11px] leading-snug text-[var(--bb-fg-muted)]">
+          <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+          <span>{canhBaoLark}</span>
+        </p>
       )}
     </section>
   );

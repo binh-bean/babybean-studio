@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
 import { thangNay, thangTruoc, chenhLechPhanTram } from "@/lib/bao-cao/ky";
 import { locBoAnhThat } from "@/lib/bao-cao/loc-chung";
+import { qua60NgayFileGoc, laKhoaTheoLark } from "@/lib/lark/trang-thai-hau-ky";
 import {
   TRANG_THAI_DANG_HOAT_DONG,
   TRANG_THAI_DA_CHOT,
@@ -91,9 +92,28 @@ export async function GET(request: Request): Promise<Response> {
      * BB-270: mọi truy vấn đếm ở đây đều đi qua `locBoAnhThat()` — loại bộ ảnh
      * Fixture và đã lưu trữ khỏi MỌI con số, kể cả những thẻ đã có từ BB-060.
      */
+    /*
+      BB-285 — "Chờ khách chọn" phải NÓI CÙNG MỘT SỰ THẬT với Lark.
+
+      Trước đây đếm thẳng qua `v_gallery_progress` (view không có cột Lark).
+      Số đo 27/09/2026: 183 bộ app còn `ready`/`in_review` mà Lark đã ≥ "Đã
+      chọn hình", và 178/251 bộ ở Lark "Đã gửi file gốc" đã quá 60 ngày (đóng
+      theo quy định, docs/21) — cả hai loại đều KHÔNG còn là "chờ khách chọn"
+      thật, nhưng thẻ này vẫn cộng chúng vào.
+
+      Không sửa `v_gallery_progress` (đổi view là đổi hợp đồng chung, cần
+      migration — brief BB-285 cấm). Thay vào đó: đọc thẳng bảng `galleries`
+      kèm `lark_trang_thai`/`lark_trang_thai_tu`, rồi lọc bằng ĐÚNG hai hàm
+      dùng chung với màn khách (`laKhoaTheoLark`, `qua60NgayFileGoc` ở
+      `trang-thai-hau-ky.ts`) — một công thức, không tính lại kiểu khác ở đây.
+
+      Đổi từ `count: exact, head: true` sang tải cả dòng: quy mô hiện tại
+      (~500 bộ) không đáng ngại; tải hết rồi lọc trong TypeScript rẻ hơn một
+      hàm SQL mới (cũng là DDL, cũng bị cấm ở brief này).
+    */
     let truyVanChoChon = admin
-      .from("v_gallery_progress")
-      .select("*", { count: "exact", head: true })
+      .from("galleries")
+      .select("id, lark_trang_thai, lark_trang_thai_tu")
       .in("branch_id", branchIds)
       .in("status", ["ready", "in_review"]);
     truyVanChoChon = locBoAnhThat(truyVanChoChon);
@@ -159,7 +179,7 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const [
-      { count: waitingForSelection },
+      choChonRows,
       { count: dueSoon },
       { count: overdue },
       { count: waitingForRetouch },
@@ -167,6 +187,19 @@ export async function GET(request: Request): Promise<Response> {
       { count: totalGalleries },
       { count: deliveredKyTruoc },
     ] = ketQua;
+
+    // BB-285 — lọc bằng ĐÚNG công thức màn khách dùng: Lark ≥ "Đã chọn hình"
+    // hoặc quá 60 ngày ở "Đã gửi file gốc" thì KHÔNG còn là "chờ khách chọn".
+    const homNay = new Date();
+    const waitingForSelection = (
+      (choChonRows.data ?? []) as { lark_trang_thai: string | null; lark_trang_thai_tu: string | null }[]
+    ).filter((g) => {
+      if (laKhoaTheoLark(g.lark_trang_thai)) return false;
+      if (qua60NgayFileGoc(g.lark_trang_thai, g.lark_trang_thai_tu ? new Date(g.lark_trang_thai_tu) : null, homNay)) {
+        return false;
+      }
+      return true;
+    }).length;
 
     // BB-270: tiến độ theo chi nhánh — chỉ những chi nhánh nhân viên này được
     // xem (`branchIds` đã áp `staff.branchIds`/`system:superuser` ở trên).

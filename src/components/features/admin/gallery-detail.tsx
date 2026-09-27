@@ -36,6 +36,7 @@ import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 
 interface Component {
   id: string;
@@ -98,6 +99,8 @@ interface Detail {
   lastSyncedAt: string | null;
   syncError: string | null;
   photoCount: number;
+  /** BB-290 lượt 2 — "Chốt lúc" trong hàng 4 số liệu; null = khách chưa chốt. */
+  submittedAt: string | null;
   dueAmount: number;
   paidAmount: number;
   outstanding: number;
@@ -137,6 +140,10 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
    */
   const [daGhiLark, setDaGhiLark] = React.useState<boolean | null>(null);
   const [lyDoKhongGhiLark, setLyDoKhongGhiLark] = React.useState<string | null>(null);
+  /** BB-286 — nút "Làm nóng ảnh": tiến độ đọc được trong lúc đang chạy. */
+  const [dangLamNong, setDangLamNong] = React.useState(false);
+  const [tienDoLamNong, setTienDoLamNong] = React.useState<{ daXuLy: number; tong: number } | null>(null);
+  const [thongBaoLamNong, setThongBaoLamNong] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     const res = await fetch(`/api/admin/galleries/${galleryId}/items`);
@@ -389,6 +396,67 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   }
 
   /**
+   * BB-286 — "Làm nóng ảnh": kéo trước và ghi vào bộ đệm ảnh cỡ 800 cho cả bộ,
+   * để lần khách mở link đầu tiên không phải đợi từng tấm kéo từ Google.
+   *
+   * Tạo link (`taoLink` ở trên) đã tự làm nóng MỘT LÔ đầu chạy nền (đủ lo
+   * trước màn hình đầu tiên khách sẽ thấy), nhưng KHÔNG nong hết cả bộ — giả
+   * định hạ tầng là gói Hobby, một lần gọi hàm không đủ thời gian kéo hết
+   * 1.235 ảnh. Nút này là cách nong HẾT cả bộ: trình duyệt tự lặp lại route,
+   * mỗi lượt một lô nhỏ, không bị giới hạn bởi thời lượng của MỘT lần gọi
+   * hàm phía máy chủ.
+   *
+   * Gọi lặp lại route theo con trỏ `sort_index` (đọc lại API) tới khi xong
+   * hoặc bị chặn vì quota — cùng kiểu con trỏ với `/api/admin/galleries/[id]
+   * /photos`. `dangLamNong` khoá nút trong lúc chạy, không dùng `busy` chung
+   * vì thao tác này có thể chạy lâu (vài chục lượt gọi với bộ ảnh lớn) và
+   * không nên khoá luôn các nút khác của màn hình.
+   */
+  async function lamNongAnh() {
+    setDangLamNong(true);
+    setThongBaoLamNong(null);
+    setTienDoLamNong({ daXuLy: 0, tong: detail?.photoCount ?? 0 });
+    try {
+      let conTro = 0;
+      let daXuLy = 0;
+      // Mỗi lượt gọi chỉ xử lý MỘT LÔ nhỏ (40 ảnh, xem KICH_THUOC_LO_LAM_NONG
+      // ở lam-nong-cache.ts) vì gói Hobby giới hạn thời gian một lần gọi hàm.
+      // Vòng lặp này ở TRÌNH DUYỆT, không phải máy chủ — mỗi vòng là một yêu
+      // cầu HTTP riêng, nên không đụng giới hạn đó. Số 200 chỉ để chặn vòng
+      // lặp vô hạn nếu logic con trỏ phía máy chủ có lỗi lạ.
+      for (let luot = 0; luot < 200; luot++) {
+        const res = await fetch(
+          `/api/admin/galleries/${galleryId}/lam-nong-anh?sauSortIndex=${conTro}`,
+          { method: "POST" },
+        );
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          setThongBaoLamNong(json?.error?.message ?? "Không làm nóng được ảnh");
+          return;
+        }
+        conTro = json.data.conTroTiep;
+        daXuLy += json.data.soDaXuLyLoNay;
+        const tong = json.data.tongSoAnh as number;
+        setTienDoLamNong({ daXuLy, tong });
+
+        if (json.data.dungVìQuota) {
+          setThongBaoLamNong(
+            `Dừng lại vì Google Drive báo lỗi liên tục (có thể đã hết hạn mức) — đã làm nóng ${daXuLy}/${tong} ảnh. Thử lại sau vài phút.`,
+          );
+          return;
+        }
+        if (!json.data.conAnhChuaXuLy) {
+          setThongBaoLamNong(`Đã làm nóng xong ${tong} ảnh.`);
+          return;
+        }
+      }
+      setThongBaoLamNong("Đang làm nóng lâu hơn dự kiến — thử bấm lại.");
+    } finally {
+      setDangLamNong(false);
+    }
+  }
+
+  /**
    * Mở khoá lại link CŨ — giữ nguyên địa chỉ (BB-188).
    *
    * Khác hẳn `taoLink()`: không sinh mã mới, nên biểu tượng ba mẹ đã ghim ngoài
@@ -496,69 +564,105 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       {/* Bản vẽ quan-tri-chi-tiet.webp: tiêu đề serif lớn kèm nhãn trạng thái
           viên tròn ngay cạnh — trước đây trạng thái chỉ nằm lẫn trong lưới chỉ
           số bên dưới, phải đọc thêm mới biết bộ ảnh đang ở đâu. */}
-      <header>
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/*
-            BB-280: bỏ `sm:text-3xl` — thang chữ chung yêu cầu tiêu đề trang
-            một cỡ cố định ở mọi kích thước màn hình (docs/07-ui-ux.md).
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/*
+              BB-280: bỏ `sm:text-3xl` — thang chữ chung yêu cầu tiêu đề trang
+              một cỡ cố định ở mọi kích thước màn hình (docs/07-ui-ux.md).
+            */}
+            <h1 className={PAGE_TITLE_CLASS}>{detail.title}</h1>
+            <span className="inline-flex items-center gap-1.5">
+              {/* Chữ "Trạng thái" giữ lại làm nhãn — tests/e2e/bb-200-nhan-lark.spec.ts
+                  đợi đúng chữ này làm mốc "đã tải xong dữ liệu" trước khi kiểm
+                  phần hiện/ẩn theo quyền. Bỏ chữ là phép thử chờ mãi không thấy,
+                  không phải vì mã sai mà vì mốc chờ biến mất — AGENTS.md §5a. */}
+              <span className="text-xs text-[var(--bb-fg-muted)]">Trạng thái</span>
+              {detail.warningColor && canhBaoUi(detail.warningColor) && (
+                <span
+                  role="img"
+                  aria-label={`Mức cảnh báo: ${canhBaoUi(detail.warningColor)!.nhan}`}
+                  title={canhBaoUi(detail.warningColor)!.nhan}
+                  className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/10"
+                  style={{ backgroundColor: canhBaoUi(detail.warningColor)!.mauToken }}
+                />
+              )}
+              <Badge variant={statusBadge.variant}>{detail.statusLabel ?? statusBadge.label}</Badge>
+            </span>
+          </div>
+          {detail.contractCodes.length > 0 && (
+            <p className="mt-1 select-all font-mono text-xs text-[var(--bb-fg-muted)]">
+              {detail.contractCodes.join(" + ")}
+            </p>
+          )}
+          {/* BB-200 (3/3) → BB-290 lượt 2 (#36): dòng "Lark: …" KHÔNG còn đứng
+              ngay dưới H1 (đọc như một cảnh báo lớn cho một chi tiết kỹ thuật
+              nội bộ) — chuyển thành biểu tượng "i" nhỏ bên trong khối Nhật ký ở
+              cột phải (`DongThoiGianHoatDong`, prop `canhBaoLark`). Vẫn HIỆN
+              chữ, không chỉ ẩn trong tooltip — tests/e2e/bb-200-nhan-lark.spec.ts
+              đợi đúng chuỗi "Lark: …" nhìn thấy được trên trang.
           */}
-          <h1 className={PAGE_TITLE_CLASS}>{detail.title}</h1>
-          <span className="inline-flex items-center gap-1.5">
-            {/* Chữ "Trạng thái" giữ lại làm nhãn — tests/e2e/bb-200-nhan-lark.spec.ts
-                đợi đúng chữ này làm mốc "đã tải xong dữ liệu" trước khi kiểm
-                phần hiện/ẩn theo quyền. Bỏ chữ là phép thử chờ mãi không thấy,
-                không phải vì mã sai mà vì mốc chờ biến mất — AGENTS.md §5a. */}
-            <span className="text-xs text-[var(--bb-fg-muted)]">Trạng thái</span>
-            {detail.warningColor && canhBaoUi(detail.warningColor) && (
-              <span
-                role="img"
-                aria-label={`Mức cảnh báo: ${canhBaoUi(detail.warningColor)!.nhan}`}
-                title={canhBaoUi(detail.warningColor)!.nhan}
-                className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/10"
-                style={{ backgroundColor: canhBaoUi(detail.warningColor)!.mauToken }}
-              />
-            )}
-            <Badge variant={statusBadge.variant}>{detail.statusLabel ?? statusBadge.label}</Badge>
-          </span>
         </div>
-        {detail.contractCodes.length > 0 && (
-          <p className="mt-1 select-all font-mono text-xs text-[var(--bb-fg-muted)]">
-            {detail.contractCodes.join(" + ")}
-          </p>
+
+        {/* BB-290 lượt 2 (#36): MỘT nút chính màu mực ở đầu trang, theo
+            quan-tri-chi-tiet.png — trước đây nút "Xác nhận và chuyển sang
+            chỉnh ảnh" nằm tận cuối cột trái, sau rất nhiều khối khác. Chỉ
+            trạng thái "submitted" mới có hành động một-bấm-là-xong ở đây;
+            trạng thái "in_retouch" cần dán link trước khi gửi nên nút chính
+            của nó vẫn đứng cạnh ô nhập (RetouchSender, cột trái) — không
+            trạng thái nào hiện hai nút mực cùng lúc. */}
+        {detail.status === "submitted" && (
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {detail.outstanding > 0 && (
+              <p className="max-w-xs text-right text-xs text-[var(--bb-warning)]">
+                Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>
+              </p>
+            )}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void confirmSubmission()}
+              className="rounded-full bg-[var(--bb-fg)] px-4 py-2.5 text-sm font-medium text-[var(--bb-bg)] disabled:opacity-40"
+            >
+              Xác nhận và chuyển sang chỉnh ảnh
+            </button>
+          </div>
         )}
-        {/* BB-200 (3/3) — dòng nhỏ nói app đang thấy gì bên Lark, và đọc từ
-            lúc nào. Không có gì để đọc (chưa đồng bộ lần nào) thì nói thẳng,
-            không im lặng: CSKH cần biết số liệu trước mắt có mới hay không. */}
-        <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-          {detail.larkTenTrangThai
-            ? `Lark: ${detail.larkTenTrangThai} · đọc lúc ${new Date(detail.larkDocLuc ?? "").toLocaleString("vi-VN")}`
-            : "Chưa đọc được trạng thái từ Lark"}
-        </p>
       </header>
 
       {notice && (
         <p className="rounded-md border border-[var(--bb-border)] p-3 text-sm">{notice}</p>
       )}
 
-      {/* Bản vẽ: một thẻ trắng duy nhất, số lớn — thay cho bốn ô nhỏ rời rạc. */}
-      <section className="grid grid-cols-2 gap-4 rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] p-5 shadow-[var(--bb-shadow)] sm:grid-cols-4 sm:gap-6">
-        <Stat
-          label="Hạn mức"
-          value={detail.quotaKnown ? String(detail.includedQuota) : "chưa biết"}
+      {/* BB-290 lượt 2: hàng 4 số liệu theo quan-tri-chi-tiet.png — bốn THẺ
+          RIÊNG (trước là một thẻ lớn chia bốn cột trong). "Vượt hạn mức" và
+          "Còn phải thu" (thông tin tài chính chi tiết) vẫn còn đủ ở khối
+          "Tiền phát sinh" bên dưới — không mất chức năng, chỉ đổi tầng hiện
+          của hàng tóm tắt đầu trang cho khớp bản vẽ. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <TheSoLieu label="Ảnh trong bộ" value={String(detail.photoCount)} />
+        <TheSoLieu
+          label="Khách đã chọn"
+          value={String(detail.selectedCount)}
+          phu={detail.quotaKnown ? `/ ${detail.includedQuota} tấm` : undefined}
+          canhBao={overCount !== null && overCount > 0}
         />
-        <Stat label="Khách đã chọn" value={String(detail.selectedCount)} />
-        <Stat
-          label="Vượt hạn mức"
-          value={overCount === null ? "—" : String(overCount)}
-          hint={
-            overCount !== null && overCount > 0
-              ? formatCurrencyVND(overCount * detail.extraPhotoPrice)
+        <TheSoLieu
+          label="Mua thêm"
+          value={new Intl.NumberFormat("vi-VN").format(Math.max(0, detail.dueAmount))}
+          phu="₫"
+        />
+        <TheSoLieu
+          label="Chốt lúc"
+          value={detail.submittedAt ? formatNgayVN(detail.submittedAt) : "—"}
+          phu={
+            detail.submittedAt
+              ? new Date(detail.submittedAt).toLocaleTimeString("vi-VN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
               : undefined
           }
-        />
-        <Stat
-          label="Còn phải thu"
-          value={formatCurrencyVND(Math.max(0, detail.outstanding))}
         />
       </section>
 
@@ -576,7 +680,6 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             changeItem={changeItem}
             addItem={addItem}
             recordPayment={recordPayment}
-            confirmSubmission={confirmSubmission}
             sendRetouched={sendRetouched}
             reopen={reopen}
             galleryId={galleryId}
@@ -656,11 +759,14 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                   aria-label="Địa chỉ thư mục ảnh gốc"
                   className="min-w-64 flex-1 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
                 />
+                {/* BB-290 lượt 2 (#36): chỉ MỘT nút chính màu mực trên cả
+                    trang (xem nút xác nhận/gửi ảnh ở đầu trang) — nút phụ ở
+                    đây đổi về viền, không còn sage đặc. */}
                 <button
                   type="button"
                   disabled={busy || thuMucMoi.trim().length < 12}
                   onClick={() => void doiThuMuc(thuMucMoi.trim())}
-                  className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+                  className="rounded-md border border-[var(--bb-fg)] px-3 py-2 text-sm text-[var(--bb-fg)] disabled:opacity-40"
                 >
                   Lưu thư mục
                 </button>
@@ -668,8 +774,45 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             )}
           </section>
 
+          {/* BB-286 — làm nóng bộ đệm ảnh cỡ 800 trước khi khách mở link.
+              Tạo link (mục dưới) đã tự làm nóng lô ĐẦU chạy nền (đủ cho màn
+              hình đầu tiên); nút này nong HẾT cả bộ, gọi lặp từ trình duyệt
+              vì gói Hobby không đủ thời gian làm hết trong một lượt gọi hàm. */}
+          {/* BB-290 lượt 2 (#36): "gọn" — một dòng mô tả ngắn thay vì ba
+              dòng, chi tiết đầy đủ chuyển vào `title` cho ai cần đọc. */}
+          <section
+            className="rounded-lg border border-[var(--bb-border)] p-4"
+            title="Kéo trước ảnh cỡ xem lưới và ghi vào bộ đệm, để khách mở link không phải đợi từng tấm tải từ Google. Tạo link đã tự làm nóng một phần nhỏ — nút này làm nóng HẾT cả bộ."
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-medium">Bộ đệm ảnh</h2>
+                <p className="mt-0.5 text-xs text-[var(--bb-fg-muted)]">
+                  Kéo trước ảnh để khách mở link không phải chờ.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={dangLamNong}
+                onClick={() => void lamNongAnh()}
+                className="shrink-0 rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+              >
+                {dangLamNong ? "Đang làm nóng…" : "Làm nóng ảnh"}
+              </button>
+            </div>
+            {tienDoLamNong && (
+              <p className="mt-2 text-xs text-[var(--bb-fg-muted)]">
+                Đã nóng {tienDoLamNong.daXuLy}/{tienDoLamNong.tong} ảnh
+              </p>
+            )}
+
+            {thongBaoLamNong && <p className="mt-2 text-sm">{thongBaoLamNong}</p>}
+          </section>
+
           <section className="rounded-lg border border-[var(--bb-border)] p-4">
-            <h2 className="text-base font-medium">Link gửi khách</h2>
+            {/* BB-290 lượt 2: "Link khách" theo quan-tri-chi-tiet.png (nhãn
+                cũ "Link gửi khách" vẫn đúng nghĩa, đổi cho khớp bản vẽ). */}
+            <h2 className="text-base font-medium">Link khách</h2>
 
             {linkMoi ? (
               <div className="mt-3">
@@ -715,15 +858,16 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             {/* BB-188: hai nút, hai việc KHÁC HẲN NHAU.
                 — Mở khoá: giữ nguyên địa chỉ, biểu tượng ba mẹ đã ghim vẫn chạy.
                 — Tạo mới: đổi địa chỉ, mọi biểu tượng đã ghim đều chết.
-                Khi link cũ chỉ hết hạn thì việc ĐÚNG là mở khoá, nên nó là nút chính
-                và Tạo mới lui về nút phụ. Hai nút cùng màu là ngày nào đó bấm nhầm. */}
+                Khi link cũ chỉ hết hạn thì việc ĐÚNG là mở khoá, nên nó ĐẬM hơn
+                (viền dày + chữ đậm) — nhưng KHÔNG đặc màu: BB-290 lượt 2 (#36)
+                chốt chỉ một nút đặc màu mực trên cả trang, đứng ở đầu trang. */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {detail.shareLink && detail.shareLink.status !== "active" && (
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void moLaiLink()}
-                  className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+                  className="rounded-md border-2 border-[var(--bb-fg)] px-3 py-2 text-sm font-medium text-[var(--bb-fg)] disabled:opacity-40"
                 >
                   Mở khoá link cũ (giữ nguyên địa chỉ)
                 </button>
@@ -733,19 +877,61 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                 type="button"
                 disabled={busy || detail.photoCount === 0}
                 onClick={() => void taoLink()}
-                className={
-                  detail.shareLink && detail.shareLink.status !== "active"
-                    ? "rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
-                    : "rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
-                }
+                className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm text-[var(--bb-fg)] disabled:opacity-40"
               >
                 {detail.shareLink ? "Tạo link mới (ĐỔI địa chỉ)" : "Tạo link gửi khách"}
               </button>
             </div>
           </section>
 
+          {/* BB-290 lượt 2 (#36): "Xuất danh sách" chuyển từ cột trái sang
+              đây — lưới 3 cột, nhãn MỘT DÒNG ("Lightroom"/"Excel"/"Văn bản"),
+              ghi chú đầy đủ chuyển vào `title`/dòng nhỏ bên dưới thay vì
+              chiếm chỗ ngang hàng như trước (từng dài tới 5 dòng ở 390px). */}
+          {detail.selectedCount > 0 && (
+            <section className="rounded-lg border border-[var(--bb-border)] p-4">
+              <h2 className="text-base font-medium">{vi.admin.export.title}</h2>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <a
+                  href={`/api/admin/galleries/${galleryId}/export`}
+                  download
+                  title={vi.admin.export.formatLightroom}
+                  className="flex h-10 items-center justify-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-2 text-center text-xs hover:bg-[var(--bb-surface-2)]"
+                >
+                  Lightroom
+                </a>
+                <a
+                  href={`/api/admin/galleries/${galleryId}/export?format=csv`}
+                  download
+                  title={vi.admin.export.formatCsv}
+                  className="flex h-10 items-center justify-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-2 text-center text-xs hover:bg-[var(--bb-surface-2)]"
+                >
+                  Excel
+                </a>
+                <a
+                  href={`/api/admin/galleries/${galleryId}/export?format=chi-tiet`}
+                  download
+                  title={vi.admin.export.formatChiTiet}
+                  className="flex h-10 items-center justify-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-2 text-center text-xs hover:bg-[var(--bb-surface-2)]"
+                >
+                  Văn bản
+                </a>
+              </div>
+              <p className="mt-2 text-[11px] leading-snug text-[var(--bb-fg-muted)]">
+                Lightroom: danh sách tên file · Excel: kèm ghi chú · Văn bản: chi tiết cho CSKH
+              </p>
+            </section>
+          )}
+
           {/* BB-259 — bản vẽ quan-tri-chi-tiet.webp: khối cuối cột phải. */}
-          <DongThoiGianHoatDong galleryId={galleryId} />
+          <DongThoiGianHoatDong
+            galleryId={galleryId}
+            canhBaoLark={
+              detail.larkTenTrangThai
+                ? `Lark: ${detail.larkTenTrangThai} · đọc lúc ${new Date(detail.larkDocLuc ?? "").toLocaleString("vi-VN")}`
+                : "Chưa đọc được trạng thái từ Lark"
+            }
+          />
         </div>
       </div>
     </div>
@@ -764,7 +950,6 @@ function KhoiChinh({
   changeItem,
   addItem,
   recordPayment,
-  confirmSubmission,
   sendRetouched,
   reopen,
   galleryId,
@@ -775,7 +960,6 @@ function KhoiChinh({
   changeItem: (method: "PATCH" | "DELETE", body: Record<string, unknown>) => Promise<void>;
   addItem: (productId: string, quantity: number) => Promise<void>;
   recordPayment: (amount: number, method: string, note: string) => Promise<void>;
-  confirmSubmission: () => Promise<void>;
   sendRetouched: (url: string) => Promise<void>;
   reopen: (reason: string) => Promise<void>;
   galleryId: string;
@@ -796,35 +980,9 @@ function KhoiChinh({
         Dùng thẻ <a download> chứ không fetch rồi tự dựng Blob: trình duyệt lo
         hộp thoại lưu tệp, và máy chủ đã gửi sẵn `Content-Disposition`.
       */}
-      {detail.selectedCount > 0 && (
-        <section className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--bb-border)] p-4">
-          <span className="text-sm font-medium">{vi.admin.export.title}</span>
-          <span className="text-xs text-[var(--bb-fg-muted)]">{vi.admin.export.description}</span>
-          <span className="ml-auto flex gap-2">
-            <a
-              href={`/api/admin/galleries/${galleryId}/export`}
-              download
-              className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs hover:bg-[var(--bb-surface-2)]"
-            >
-              {vi.admin.export.formatLightroom}
-            </a>
-            <a
-              href={`/api/admin/galleries/${galleryId}/export?format=csv`}
-              download
-              className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs hover:bg-[var(--bb-surface-2)]"
-            >
-              {vi.admin.export.formatCsv}
-            </a>
-            <a
-              href={`/api/admin/galleries/${galleryId}/export?format=chi-tiet`}
-              download
-              className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs hover:bg-[var(--bb-surface-2)]"
-            >
-              {vi.admin.export.formatChiTiet}
-            </a>
-          </span>
-        </section>
-      )}
+      {/* BB-290 lượt 2: khối "Xuất danh sách" chuyển sang CỘT PHẢI (xem
+          `GalleryDetail`), cạnh "Link khách" — theo quan-tri-chi-tiet.png.
+          Giữ nguyên logic/route, chỉ đổi VỊ TRÍ và NHÃN hiện (ngắn hơn). */}
 
       {!detail.quotaKnown && (
         <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
@@ -1039,33 +1197,10 @@ function KhoiChinh({
 
       {/* BB-255: "Thư mục ảnh gốc" và "Link gửi khách" chuyển sang cột phải
           của `GalleryDetail` (thẻ trắng cạnh bìa bộ ảnh) theo bản vẽ
-          quan-tri-chi-tiet.webp — xem hàm `GalleryDetail` phía trên. */}
-
-      <section className="flex flex-wrap gap-3">
-
-
-        {detail.status === "submitted" && (
-          <div className="flex flex-col gap-2">
-            {/* Báo, KHÔNG chặn. Máy không quyết thay người ở bước này — nhưng
-                để CSKH bấm qua mà không thấy con số thì đúng bằng không có. */}
-            {detail.outstanding > 0 && (
-              <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
-                Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>.
-                Thu xong thì ghi nhận ở mục <em>Tiền phát sinh</em> phía trên rồi hãy
-                chuyển giai đoạn.
-              </p>
-            )}
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void confirmSubmission()}
-              className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white"
-            >
-              Xác nhận và chuyển sang chỉnh ảnh
-            </button>
-          </div>
-        )}
-      </section>
+          quan-tri-chi-tiet.webp — xem hàm `GalleryDetail` phía trên.
+          BB-290 lượt 2 (#36): nút "Xác nhận và chuyển sang chỉnh ảnh" +
+          cảnh báo còn thiếu tiền chuyển lên ĐẦU TRANG (header của
+          `GalleryDetail`) — đây là nút chính DUY NHẤT của cả màn hình. */}
     </>
   );
 }
@@ -1149,7 +1284,7 @@ function RetouchSender({
         type="button"
         disabled={disabled || !valid}
         onClick={() => onSubmit(trimmed)}
-        className="rounded-md bg-[var(--bb-accent)] px-3 py-2 text-sm text-white disabled:opacity-40"
+        className="rounded-md bg-[var(--bb-fg)] px-3 py-2 text-sm text-[var(--bb-bg)] disabled:opacity-40"
       >
         Gửi file đã chỉnh cho khách
       </button>
@@ -1379,37 +1514,45 @@ function AddItemForm({
   );
 }
 
-function Stat({
+/**
+ * Một thẻ số liệu — BB-290 lượt 2, theo `.the`/`.so` của quan-tri-chi-tiet.html:
+ * thẻ viền riêng, số serif 28px thường (không đậm), nhãn nhỏ phía trên, và
+ * một dòng "phụ" NHỎ, SANS, CÙNG DÒNG CƠ SỞ ngay cạnh số (không phải chỉ số
+ * trên) — dùng cho đơn vị "đ", "/ n tấm", hoặc giờ chốt.
+ */
+function TheSoLieu({
   label,
   value,
+  phu,
   canhBao,
-  hint,
 }: {
   label: string;
   value: string;
-  /** BB-200 — chấm màu mức cảnh báo từ Lark, chỉ hiện ở ô Trạng thái. */
-  canhBao?: MauCanhBao | null;
-  /** Bản vẽ quan-tri-chi-tiet.webp: dòng phụ nhỏ dưới số lớn (vd. số tiền vượt
-   * hạn mức) — chỉ hiện khi có, không chiếm chỗ khi không cần. */
-  hint?: string;
+  phu?: string;
+  /** Chấm cảnh báo nhẹ khi số liệu cần chú ý (vd. đã vượt hạn mức). */
+  canhBao?: boolean;
 }) {
-  const ui = canhBao ? canhBaoUi(canhBao) : null;
   return (
-    <div>
-      <div className="flex items-center gap-1.5 font-display text-3xl font-bold leading-none text-[var(--bb-fg)] sm:text-4xl">
-        {ui && (
+    <div className="rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] px-4 py-3.5">
+      <div className="text-xs text-[var(--bb-fg-muted)]">{label}</div>
+      {/* BB-290 lượt 2 (#36): "₫" cùng dòng cơ sở + số kiểu lining-nums —
+          Playfair Display mặc định vẽ số kiểu oldstyle (lệch chân), khiến số
+          tiền trông "trồi lên trụt xuống" cạnh nhau. `font-variant-numeric`
+          ép về lining + tabular, đều chân, đều bề ngang từng chữ số. */}
+      <div className="mt-1 flex items-baseline gap-1.5 font-display text-[26px] font-normal leading-none text-[var(--bb-fg)] [font-variant-numeric:lining-nums_tabular-nums] sm:text-[28px]">
+        {canhBao && (
           <span
             role="img"
-            aria-label={`Mức cảnh báo: ${ui.nhan}`}
-            title={ui.nhan}
-            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-black/10"
-            style={{ backgroundColor: ui.mauToken }}
+            aria-label="Cần chú ý"
+            title="Cần chú ý"
+            className="mb-0.5 inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--bb-warning)]"
           />
         )}
-        {value}
+        <span>{value}</span>
+        {phu && (
+          <span className="font-sans text-[13px] font-normal text-[var(--bb-fg-muted)]">{phu}</span>
+        )}
       </div>
-      <div className="mt-1.5 text-xs text-[var(--bb-fg-muted)]">{label}</div>
-      {hint && <div className="mt-0.5 text-xs text-[var(--bb-warning)]">{hint}</div>}
     </div>
   );
 }
@@ -1456,7 +1599,7 @@ function DongLinkApp({ diaChi }: { diaChi: string }) {
         onClick={() => void chep()}
         className="rounded-md border border-[var(--bb-border)] px-3 py-1.5 text-xs"
       >
-        {daChep ? "Đã sao chép" : "Sao chép"}
+        {daChep ? "Đã chép" : "Chép link"}
       </button>
       <a
         href={diaChi}

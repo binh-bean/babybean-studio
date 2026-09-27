@@ -70,3 +70,36 @@ export function PageHeader({
     </div>
   );
 }
+
+/**
+ * Trang "Không có quyền" dùng chung — BB-290 (#42).
+ *
+ * Trước đây mỗi trang tự viết một `<h1>` `text-xl font-semibold` (sans, không
+ * phải serif như mọi H1 khác của quản trị), không tranh minh hoạ, không nút
+ * quay lại — chủ studio đọc thấy như một trang lỗi khác hẳn phần còn lại của
+ * hệ thống. Dùng `PAGE_TITLE_CLASS` cho đúng thang chữ, và luôn có một lối ra.
+ */
+export function KhongCoQuyen({ mota }: { mota: string }) {
+  return (
+    <main className="mx-auto max-w-2xl py-10 text-center">
+      <img
+        src="/minh-hoa/khong-co-quyen.webp"
+        alt=""
+        width={200}
+        height={140}
+        className="mx-auto h-[140px] w-[200px] object-contain opacity-90"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
+      />
+      <h1 className={cn(PAGE_TITLE_CLASS, "mt-4")}>Không có quyền</h1>
+      <p className={cn("mt-2", PAGE_DESCRIPTION_CLASS)}>{mota}</p>
+      <a
+        href="/admin"
+        className="mt-6 inline-flex h-10 items-center rounded-[var(--bb-radius-sm)] bg-[var(--bb-fg)] px-4 text-sm font-medium text-white hover:opacity-90"
+      >
+        Về bảng điều khiển
+      </a>
+    </main>
+  );
+}

@@ -233,8 +233,12 @@ export function SettingsManager() {
         đúng hàm tải `tai()` — nạp lại giá trị đang lưu ở máy chủ, bỏ mọi ô
         đang gõ dở, không phải nút trang trí.
       */}
+      {/* BB-290 (#43): dải chân trước đây `max-w-5xl` — bám khác bề rộng của
+          thẻ cài đặt phía trên (thẻ đó rộng theo khung trang, không phải một
+          giới hạn 5xl riêng). Bỏ giới hạn riêng, để dải chân bám ĐÚNG bề rộng
+          nội dung như phần còn lại của trang. */}
       <div className="sticky -bottom-4 z-10 -mx-4 border-t border-[var(--bb-border)] bg-[var(--bb-surface)] sm:-bottom-6 sm:-mx-6 lg:-bottom-8 lg:-mx-8">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3 md:px-6">
+        <div className="mx-auto flex items-center justify-between gap-3 px-4 py-3 md:px-6">
           <span className="hidden text-xs text-[var(--bb-fg-muted)] sm:inline">
             {t.ghiChuBiMat}
           </span>
@@ -242,7 +246,15 @@ export function SettingsManager() {
             <Button variant="outline" type="button" onClick={() => void tai()} disabled={dangLuu}>
               {t.huy}
             </Button>
-            <Button onClick={() => void luu()} disabled={dangLuu}>
+            {/* BB-290 (#43): nút chính của trang dùng màu MỰC (--bb-fg), không
+                phải hồng cá hồi mặc định của `variant="default"` — chỉ đổi
+                tại chỗ (không đổi `button.tsx` dùng chung toàn hệ, kể cả màn
+                khách). */}
+            <Button
+              onClick={() => void luu()}
+              disabled={dangLuu}
+              className="bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90"
+            >
               {dangLuu ? t.dangLuu : t.luu}
             </Button>
           </div>

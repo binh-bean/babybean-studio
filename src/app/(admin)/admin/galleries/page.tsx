@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { vi } from "@/i18n";
 import { GalleryList } from "@/components/features/admin/gallery-list";
 import { CanXuLy } from "@/components/features/admin/can-xu-ly";
-import { PageHeader } from "@/components/features/admin/page-header";
+import { BoAnhPageHeader } from "@/components/features/admin/bo-anh-page-header";
 
 export const metadata: Metadata = {
   title: `${vi.admin.galleries.title} | BabyBean Studio`,
@@ -16,10 +16,13 @@ export default function AdminGalleriesPage() {
         cùng (xem `admin-header.tsx`), nên tiêu đề to ở đây là dòng thứ hai nói
         cùng một điều — và nó đẩy danh sách xuống thêm 56px trên một màn cao
         812px. Chủ studio 22/09/2026: "dồn gọn lên hết, sát với chữ BabyBean".
+        BB-290 lượt 2: H1 "Bộ ảnh" + dòng phụ "n bộ đang mở · m chi nhánh" +
+        nút "+ Tạo bộ ảnh" theo quan-tri-bo-anh-bang.png (BoAnhPageHeader).
       */}
-      <PageHeader title={vi.admin.galleries.title} hideOnMobile className="mb-0" />
+      <BoAnhPageHeader />
 
-      {/* BB-257: khối cảnh báo "cần xử lý trước khi gửi khách" — tự ẩn khi rỗng. */}
+      {/* BB-257 → BB-290 lượt 2: một dải cảnh báo GỌN, không còn liệt kê chi
+          tiết ở trang danh sách — chi tiết đã có ở /admin/viec-can-xu-ly. */}
       <CanXuLy />
 
       <GalleryList />

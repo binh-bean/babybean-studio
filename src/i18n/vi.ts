@@ -206,7 +206,10 @@ export const vi = {
 
     // BB-242 — chế độ "Ghim & vuốt" trong màn so sánh nhiều tấm.
     soSanh: {
-      cheDoGhimVuot: "Ghim & vuốt",
+      // BB-287 mục 5 — báo cáo chấm #16: "Ghim & vuốt" là thuật ngữ khó hiểu
+      // với ba mẹ (đọc như một thao tác kỹ thuật). Đổi thành câu ngắn, đúng
+      // nghĩa (tấm này đứng yên, tấm kia mới vuốt qua).
+      cheDoGhimVuot: "Giữ tấm này",
       cheDoLuoi: "Xem lưới",
       ghimTam: "Ghim tấm này",
       boGhimTam: "Bỏ ghim",
@@ -305,11 +308,11 @@ export const vi = {
       emptyBody: "Bấm Thêm nhân viên để cấp tài khoản đầu tiên.",
       loginNote: "Nhân viên đăng nhập bằng tên tài khoản này, không cần email.",
       roles: {
-        owner: "Chủ studio",
+        owner: "Admin",
         admin: "Quản trị hệ thống",
         branch_manager: "Quản lý chi nhánh",
         cs: "CSKH",
-        photographer: "Photographer",
+        photographer: "Thợ chụp",
         retoucher: "Người Photoshop",
         photoshop_ctv: "Photoshop CTV",
         accountant: "Kế toán",
@@ -341,19 +344,19 @@ export const vi = {
       loiLuu: "Lưu không thành công. Vai trò giữ nguyên như cũ.",
       loiXoa: "Xoá không thành công.",
       canhBaoHeThong:
-        "Đây là vai hệ thống. Bạn xem được bộ quyền của nó nhưng không sửa được — chủ studio phải luôn còn một vai đủ quyền để vào lại hệ thống.",
+        "Đây là vai hệ thống. Bạn xem được bộ quyền của nó nhưng không sửa được — admin phải luôn còn một vai đủ quyền để vào lại hệ thống.",
       chuaCoHieuLuc: "(chưa có hiệu lực)",
       khongSuaDuoc: "Vai hệ thống — không sửa hay xoá được",
       toanQuyen: "Toàn quyền",
       moTaToanQuyen:
-        "Vai này đã có đủ toàn bộ {n} quyền của hệ thống. Không cần cài đặt gì thêm, và cũng không sửa được — đây là vai để chủ studio luôn vào lại được.",
+        "Vai này đã có đủ toàn bộ {n} quyền của hệ thống. Không cần cài đặt gì thêm, và cũng không sửa được — đây là vai để admin luôn vào lại được.",
       ghiChuHieuLuc:
         "Ô ghi \"chưa có hiệu lực\" đã lưu được nhưng lớp bảo mật chưa hỏi tới. Sau chặng 2c, lớp bảo mật không còn đọc tên vai ở đâu nữa. Mười hai quyền đang thật sự đổi hành vi: xem ảnh, xem lựa chọn, thấy mọi bộ ảnh trong chi nhánh, tạo và sửa bộ ảnh, xem và sửa khách hàng, xem và sửa gói chụp, cập nhật giao ảnh, sửa cài đặt chi nhánh, và vượt trên mọi chi nhánh.",
     },
     caiDat: {
       title: "Cài đặt",
       subtitle:
-        "Những giá trị mặc định cho bộ ảnh tạo MỚI. Bộ ảnh đang chạy giữ nguyên cấu hình cũ của nó.",
+        "Những giá trị mặc định cho bộ ảnh tạo mới. Bộ ảnh đang chạy giữ nguyên cấu hình cũ của nó.",
       nhomAlbum: "Bộ ảnh",
       nhomAnh: "Ảnh",
       nhomQuangCao: "Quảng cáo",
@@ -377,7 +380,7 @@ export const vi = {
         "gallery.default_due_days": "Bao nhiêu ngày kể từ lúc gửi link thì khách phải chốt.",
         "gallery.reminder_days":
           "Tính từ ngày gửi link. App KHÔNG nhắn thẳng cho khách — nó báo vào nhóm Lark của chi nhánh để CSKH gọi. Nhập cách nhau dấu phẩy, ví dụ 3, 6. Tối đa 5 mốc, để trống là tắt hẳn.",
-        "gallery.link_ttl_days": "Quá hạn này link tự hết hiệu lực. Chủ studio chốt 60 ngày.",
+        "gallery.link_ttl_days": "Quá hạn này link tự hết hiệu lực. Mặc định 60 ngày.",
         "gallery.invite_default": "Ba mẹ có được chia sẻ link cho người thân cùng xem không.",
         "gallery.watermark_default": "Ảnh xem trước có đóng dấu mờ hay không.",
         "gallery.allow_download_default": "Khách có tải được ảnh xem trước về máy không.",
@@ -506,7 +509,7 @@ export const vi = {
       pendingSelection: "Chờ khách chọn",
       expiringSoon: "Sắp hết hạn",
       overdue: "Quá hạn",
-      pendingRetouch: "Chờ retouch",
+      pendingRetouch: "Chờ chỉnh ảnh",
       deliveredThisMonth: "Đã giao tháng này",
       urgentListTitle: "Cần xử lý ngay",
       childName: "Tên bé",
@@ -519,7 +522,10 @@ export const vi = {
       recentChartTitle: "Lượng bộ ảnh 14 ngày gần nhất",
     },
     galleries: {
-      title: "Danh sách bộ ảnh",
+      // BB-290 lượt 2: "Bộ ảnh" theo H1 của quan-tri-bo-anh-bang.png — "Danh
+      // sách bộ ảnh" cũ dài hơn cần, và trang chỉ có một H1 nên không lẫn với
+      // trang nào khác.
+      title: "Bộ ảnh",
       searchPlaceholder: "Tìm theo tên bé, tên khách, số điện thoại…",
       searchClear: "Xoá từ khoá tìm kiếm",
       searchOpen: "Tìm bộ ảnh",
@@ -527,7 +533,7 @@ export const vi = {
       filterBranch: "Chi nhánh",
       filterStatus: "Trạng thái",
       filterUrgency: "Mức khẩn",
-      filterPhotographer: "Photographer",
+      filterPhotographer: "Thợ chụp",
       filterDate: "Khoảng ngày",
       menuView: "Xem bộ ảnh",
       menuCopyLink: "Sao chép link",
@@ -565,7 +571,7 @@ export const vi = {
       createCustomer: "Thêm khách hàng mới",
       babyName: "Tên bé",
       shootDate: "Ngày chụp",
-      photographer: "Photographer",
+      photographer: "Thợ chụp",
       packageSelect: "Gói chụp",
       rulesTitle: "Thiết lập luật chọn ảnh",
       quota: "Số ảnh trong gói (quota)",
@@ -586,7 +592,7 @@ export const vi = {
       tabShareLinks: "Link chia sẻ",
       tabLogs: "Nhật ký",
       infoBranch: "Chi nhánh",
-      infoPhotographer: "Photographer",
+      infoPhotographer: "Thợ chụp",
       infoDate: "Ngày chụp",
       infoPackage: "Gói chụp",
       infoDeadline: "Hạn chốt",

@@ -105,13 +105,14 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await pg.end();
   });
 
-  test("1440×900: mép trái bìa, lưới ảnh, chân trang lệch nhau ≤ 1px", async ({ page }) => {
+  test("1440×900: mép trái lưới ảnh và chân trang lệch nhau ≤ 1px; bìa đứng đúng cột phải (42/58)", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`/g/${maLink}`);
 
     const tieuDeBia = page.locator("section[aria-label='Ảnh bìa'] h1");
     const tamDau = page.getByTestId("the-anh").first();
     const tieuDeChanTrang = page.locator("footer h2");
+    const khoiAnhBia = page.getByTestId("bia-khoi-anh");
 
     await expect(tieuDeBia).toBeVisible();
     await expect(tamDau).toBeVisible();
@@ -120,16 +121,28 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     const xBia = (await tieuDeBia.boundingBox())!.x;
     const xLuoi = (await tamDau.boundingBox())!.x;
     const xChanTrang = (await tieuDeChanTrang.boundingBox())!.x;
+    const rKhoiAnh = (await khoiAnhBia.boundingBox())!;
 
     // eslint-disable-next-line no-console
     console.log(`[BB-240] mép trái 1440×900 — bìa=${xBia} lưới=${xLuoi} chân trang=${xChanTrang}`);
 
-    // BB-258 — hoàn lại khẳng định chặt như trước BB-253: bìa tràn toàn màn,
-    // bố cục quay về XẾP DỌC (không còn cột trái/phải), nên mép trái bìa/lưới
-    // ảnh/chân trang lại phải lệch nhau ≤ 1px như công thức `khach-le-trai-lg`
-    // gốc (xem `src/styles/tokens.css`).
-    expect(Math.abs(xBia - xLuoi)).toBeLessThanOrEqual(1);
+    // BB-289 — BB-285 (đã duyệt) đổi hướng NGƯỢC BB-258: bìa máy tính CHIA
+    // ĐÔI thật (cột ảnh trái 42%, cột chữ phải) để sửa lỗi ảnh bìa bị cắt
+    // (xem ghi chú lớn trong `bia-bo-anh.tsx`, mục "ben-canh"). Mép trái bìa
+    // và lưới ảnh KHÔNG còn khớp nhau nữa — đó là chủ đích của bố cục chia
+    // đôi, không phải hồi quy. Thay bằng hai khẳng định đúng ý bố cục mới:
+    //  1. Khối ảnh bìa rộng ≈ 42% bề rộng section (±2%).
+    //  2. h1 nằm bên trong cột phải, ngay sau khối ảnh (mép trái h1 > mép
+    //     phải khối ảnh, và lệch một khoảng padding hợp lý 24–96px).
+    // Chân trang vẫn dùng chung công thức lưới ảnh — không đổi, giữ khẳng
+    // định chặt cũ.
     expect(Math.abs(xChanTrang - xLuoi)).toBeLessThanOrEqual(1);
+
+    const tiLeKhoiAnh = rKhoiAnh.width / 1440;
+    expect(Math.abs(tiLeKhoiAnh - 0.42)).toBeLessThanOrEqual(0.02);
+    expect(xBia).toBeGreaterThan(rKhoiAnh.x + rKhoiAnh.width - 1);
+    expect(xBia - (rKhoiAnh.x + rKhoiAnh.width)).toBeGreaterThanOrEqual(24);
+    expect(xBia - (rKhoiAnh.x + rKhoiAnh.width)).toBeLessThanOrEqual(96);
   });
 
   /**
@@ -138,22 +151,27 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
    * ảnh `mx-auto` canh theo bề rộng KHÔNG có thanh cuộn → chữ bìa lệch ~8px.
    * Ca 1440 không bắt được (dưới 1600px phần dư bằng 0). Nay dùng `100cqw`.
    */
-  test("1920×1080 (có thanh cuộn): mép trái bìa và lưới ảnh lệch ≤ 1px", async ({ page }) => {
+  test("1920×1080 (có thanh cuộn): khối ảnh bìa vẫn ≈42% bề rộng, h1 vẫn trong cột phải", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`/g/${maLink}`);
     const tieuDeBia = page.locator("section[aria-label='Ảnh bìa'] h1");
     const tamDau = page.getByTestId("the-anh").first();
+    const khoiAnhBia = page.getByTestId("bia-khoi-anh");
     await expect(tieuDeBia).toBeVisible();
     await expect(tamDau).toBeVisible();
     const thanhCuon = await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth);
     expect(thanhCuon).toBeGreaterThan(0);
     const xBia = (await tieuDeBia.boundingBox())!.x;
-    const xLuoi = (await tamDau.boundingBox())!.x;
+    const rKhoiAnh = (await khoiAnhBia.boundingBox())!;
     // eslint-disable-next-line no-console
-    console.log(`[BB-240] 1920 — thanh cuộn=${thanhCuon}px bìa=${xBia} lưới=${xLuoi}`);
-    // BB-258 — hoàn lại khẳng định chặt như trước BB-253 (xem giải thích ở ca
-    // 1440×900 phía trên).
-    expect(Math.abs(xBia - xLuoi)).toBeLessThanOrEqual(1);
+    console.log(`[BB-240] 1920 — thanh cuộn=${thanhCuon}px bìa=${xBia} khoiAnh=${JSON.stringify(rKhoiAnh)}`);
+    // BB-289 — bố cục chia đôi (xem ca 1440×900 phía trên) không phụ thuộc
+    // `khach-le-trai-lg`/thanh cuộn nữa (công thức đó đã bỏ khỏi khối chữ bìa
+    // vì không còn hợp lý cho một CỘT trong lưới chia đôi) — chỉ còn cần khối
+    // ảnh giữ đúng tỉ lệ 42% bất kể thanh cuộn, và h1 vẫn đứng sau khối ảnh.
+    const tiLeKhoiAnh = rKhoiAnh.width / (1920 - thanhCuon);
+    expect(Math.abs(tiLeKhoiAnh - 0.42)).toBeLessThanOrEqual(0.02);
+    expect(xBia).toBeGreaterThan(rKhoiAnh.x + rKhoiAnh.width - 1);
   });
 
   test("không còn 'Thành phần hợp đồng' hay 'Tổng cộng' trên màn khách", async ({ page }) => {

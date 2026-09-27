@@ -575,17 +575,19 @@ pwTest.describe("BB-277: màn quản trị — axe + bàn phím", () => {
     pwExpect(veLaiNutMo, "Esc đóng hộp thoại Chọn bìa nhưng focus không trả về nút Mở trình thiết kế bìa").toBe(true);
   });
 
-  pwTest("Danh sách bộ ảnh — nút Sao chép link icon-only có aria-label (điện thoại)", async ({ page }) => {
+  pwTest("Danh sách bộ ảnh — nút Chép link có chữ và aria-label (điện thoại)", async ({ page }) => {
     pwTest.setTimeout(60_000);
     await page.setViewportSize(DIEN_THOAI);
     await dangNhapNhanVien(page, email, password);
     await page.goto("/admin/galleries", { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 
-    // Trên < lg là danh sách thẻ (không phải bảng) — nút "Sao chép link" chỉ có icon.
+    // BB-290 (#33–#35): trên < lg là danh sách thẻ (không phải bảng) — nút
+    // sao chép link giờ có CHỮ "Chép link" (trước là icon-only "Sao chép
+    // link"), để rõ nghĩa hành động sao chép hơn trên thẻ điện thoại.
     const the = page.locator(`text=${NHAN} Bộ ảnh quản trị`).locator("xpath=ancestor::*[self::div][1]");
     await the.first().waitFor({ state: "visible", timeout: 15_000 }).catch(() => {});
-    const nutSaoChep = page.getByRole("button", { name: "Sao chép link" }).first();
+    const nutSaoChep = page.getByRole("button", { name: "Chép link" }).first();
     await pwExpect(nutSaoChep).toBeVisible({ timeout: 15_000 });
   });
 });

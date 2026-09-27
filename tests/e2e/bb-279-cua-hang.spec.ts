@@ -28,6 +28,19 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 const THU_MUC_ANH = "test-results/bb-279";
 fs.mkdirSync(THU_MUC_ANH, { recursive: true });
 
+/**
+ * BB-287 — báo cáo chấm mục #17/#22: chip kích thước từng hiện đúng chuỗi
+ * `products.size` đồng bộ từ Lark ("10x15", chữ x bàn phím). Từ BB-287,
+ * `cua-hang.tsx` hiển thị qua `formatKichThuoc` (`src/lib/utils/dinh-dang.ts`)
+ * đổi "x" thành dấu nhân thật "×". Hai ca dưới đây từng so khớp CHÍNH XÁC
+ * `bc.size1`/`size2` (chuỗi thô) — cập nhật để so khớp đúng chữ ĐÃ HIỂN THỊ,
+ * không phải chuỗi lưu trong DB. Bản thu nhỏ của `formatKichThuoc`, không
+ * import từ `src/lib` (chưa có tiền lệ import mã sản phẩm vào e2e ở tệp này).
+ */
+function nhanKichThuoc(size: string): string {
+  return size.replace(/(\d)\s*[xX]\s*(\d)/g, "$1×$2");
+}
+
 // BB-282 — ảnh chụp để đối chiếu TỪNG ĐIỂM với bản vẽ
 // `babybean-assets/BB-281/{cua-hang-cau-hinh,cua-hang-chon-anh}.png`.
 const THU_MUC_ANH_282 = "test-results/bb-282";
@@ -176,7 +189,7 @@ ownIpTest.describe("BB-279: cửa hàng tối giản", () => {
       await cuaHang.getByRole("button", { name: "Ảnh in", exact: true }).click();
 
       // Chip kích thước đầu tiên (đúng `size1`) đã tự chọn — bấm lại cho chắc.
-      await cuaHang.getByRole("button", { name: bc.size1, exact: true }).click();
+      await cuaHang.getByRole("button", { name: nhanKichThuoc(bc.size1), exact: true }).click();
 
       await page.screenshot({ path: `${THU_MUC_ANH}/1-cau-hinh-truoc.png` });
 
@@ -259,7 +272,7 @@ ownIpTest.describe("BB-279: cửa hàng tối giản", () => {
     await cuaHang.waitFor({ state: "visible" });
     await cuaHang.getByRole("button", { name: "Ảnh in", exact: true }).click();
 
-    await cuaHang.getByRole("button", { name: bc.size2, exact: true }).click();
+    await cuaHang.getByRole("button", { name: nhanKichThuoc(bc.size2), exact: true }).click();
     // Đổi kích thước xong thì KHÔNG còn hiện chip chất liệu của size1 nữa
     // (nếu material1 khác material của size2) — canh gián tiếp qua việc
     // trang không báo lỗi và vẫn hiện đúng bước Kích thước/Số lượng.

@@ -37,6 +37,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { moTaLoi } from "@/lib/drive/sync-gallery";
 import { DriveAccessDeniedError } from "@/lib/drive/client";
 import { GetCanXuLyQuerySchema } from "./schema";
+import { CANH_BAO_LARK } from "@/lib/lark/trang-thai-hau-ky";
 
 export const runtime = "nodejs";
 
@@ -115,7 +116,7 @@ export async function GET(request: Request): Promise<Response> {
       targetBranchIds = staff.branchIds;
       // Không gán chi nhánh nào thì không thấy bộ ảnh nào — không phải lỗi.
       if (targetBranchIds.length === 0) {
-        return ok({ driveChuaChiaSe: [], chuaCoAnh: [] });
+        return ok({ driveChuaChiaSe: [], chuaCoAnh: [], chuaCoHanMuc: [], canhBaoLark: 0 });
       }
     }
 
@@ -149,17 +150,76 @@ export async function GET(request: Request): Promise<Response> {
       .order("created_at", { ascending: true });
     if (targetBranchIds) qRong = qRong.in("branch_id", targetBranchIds);
 
-    const [resDrive, resRong] = await Promise.all([qDrive, qRong]);
+    // 4c. BB-285 — bộ ảnh CHƯA BIẾT hạn mức: `app.gallery_quota()` trả null.
+    //
+    // Không gọi RPC cho từng bộ (chậm, N chuyến hỏi). Thay vào đó: lấy trước
+    // các bộ có `included_quota is null` (nhánh chính của `gallery_quota()`
+    // khi bộ KHÔNG có `gallery_items`), rồi loại bỏ những bộ NÀO CÓ dòng
+    // `gallery_items` — nhánh đó tính hạn mức theo tổng thành phần hợp đồng,
+    // không theo `included_quota` nữa, và không đáng để kiểm ở đây (số đo
+    // 27/09/2026: 58 bộ chưa biết hạn mức chủ yếu rơi vào nhánh không có
+    // gallery_items). Đây là XẤP XỈ, ghi trong docs/tasks BB-285: một vài bộ
+    // có `gallery_items` mà tổng bằng 0 sẽ không lọt vào nhóm này.
+    let qChuaCoHanMuc = admin
+      .from("galleries")
+      .select(CAC_COT)
+      .is("included_quota", null)
+      .neq("status", "archived")
+      .neq("status", "sync_error")
+      .order("created_at", { ascending: true });
+    if (targetBranchIds) qChuaCoHanMuc = qChuaCoHanMuc.in("branch_id", targetBranchIds);
+
+    // 4d. BB-285 — cột "Cảnh Báo" của Lark đang đỏ/tím (docs/21). `due_at` chỉ
+    // có ở 2/491 bộ nên `dueSoon`/`overdue` gần như luôn trống; đây là tín
+    // hiệu việc gấp THẬT mà CSKH đang đọc trên Lark.
+    const maCanhBaoGap = Object.entries(CANH_BAO_LARK)
+      .filter(([, mau]) => mau === "do" || mau === "tim")
+      .map(([ma]) => ma);
+    let qCanhBao = admin
+      .from("galleries")
+      .select("id", { count: "exact", head: true })
+      .in("lark_canh_bao", maCanhBaoGap)
+      .neq("status", "archived");
+    if (targetBranchIds) qCanhBao = qCanhBao.in("branch_id", targetBranchIds);
+
+    const [resDrive, resRong, resHanMuc, resCanhBao] = await Promise.all([
+      qDrive,
+      qRong,
+      qChuaCoHanMuc,
+      qCanhBao,
+    ]);
 
     if (resDrive.error) return failUnexpected(resDrive.error, requestId);
     if (resRong.error) return failUnexpected(resRong.error, requestId);
+    if (resHanMuc.error) return failUnexpected(resHanMuc.error, requestId);
+    if (resCanhBao.error) return failUnexpected(resCanhBao.error, requestId);
 
     const driveChuaChiaSe = ((resDrive.data ?? []) as unknown as HangGalleryTho[]).map(chuyenHang);
     const chuaCoAnh = ((resRong.data ?? []) as unknown as HangGalleryTho[]).map(chuyenHang);
 
-    // 5. Trả kết quả. KHÔNG có tên/SĐT khách trong hai truy vấn trên: cả hai
-    // chỉ chọn cột của bảng `galleries` + tên chi nhánh, không join `customers`.
-    return ok({ driveChuaChiaSe, chuaCoAnh });
+    const ungVienHanMuc = (resHanMuc.data ?? []) as unknown as HangGalleryTho[];
+    let chuaCoHanMuc = ungVienHanMuc;
+    if (ungVienHanMuc.length > 0) {
+      const { data: coItems, error: loiItems } = await admin
+        .from("gallery_items")
+        .select("gallery_id")
+        .in(
+          "gallery_id",
+          ungVienHanMuc.map((g) => g.id),
+        );
+      if (loiItems) return failUnexpected(loiItems, requestId);
+      const coHangMucRieng = new Set((coItems ?? []).map((r: { gallery_id: string }) => r.gallery_id));
+      chuaCoHanMuc = ungVienHanMuc.filter((g) => !coHangMucRieng.has(g.id));
+    }
+
+    // 5. Trả kết quả. KHÔNG có tên/SĐT khách trong các truy vấn trên: chỉ chọn
+    // cột của bảng `galleries` + tên chi nhánh, không join `customers`.
+    return ok({
+      driveChuaChiaSe,
+      chuaCoAnh,
+      chuaCoHanMuc: chuaCoHanMuc.map(chuyenHang),
+      canhBaoLark: resCanhBao.count ?? 0,
+    });
   } catch (err) {
     if (err instanceof AuthError) {
       return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);

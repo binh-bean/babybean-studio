@@ -244,7 +244,7 @@ export function GalleryFilters({
               name="status"
               value={values.status}
               onChange={(e) => onChange({ status: e.target.value })}
-              className="w-full sm:w-[160px]"
+              className="w-full sm:w-[190px]"
               aria-label={vi.admin.galleries.filterStatus}
             >
               <option value="">{vi.admin.galleries.filterStatus}: Tất cả</option>
@@ -279,28 +279,44 @@ export function GalleryFilters({
             </Select>
           </div>
 
-          {/* Lọc khoảng ngày chụp */}
+          {/* Lọc khoảng ngày chụp — BB-290 (#34): `<input type="date">` gõ
+              tay số vẫn theo mm/dd/yyyy của Chromium bất kể `lang` (đã thử ở
+              lượt 1, chụp màn hình thật vẫn ra mm/dd/yyyy — Chromium chỉ đổi
+              CÁCH ĐỌC ngày tháng qua bàn phím, không đổi thứ tự ô nhập).
+              `ONgayVN` là ô chữ tự viết, ÉP dd/mm/yyyy thật sự, tự chèn "/"
+              khi gõ, và vẫn phát ra đúng chuỗi ISO (yyyy-mm-dd) mà bộ lọc
+              cần. */}
           <div className="flex items-center gap-1.5 w-full sm:w-auto">
-            <Input
-              type="date"
-              name="dateFrom"
+            <ONgayVN
               value={values.dateFrom}
-              onChange={(e) => onChange({ dateFrom: e.target.value })}
-              className="w-full sm:w-[145px]"
-              aria-label="Từ ngày chụp"
-              title="Từ ngày chụp"
+              onChange={(v) => onChange({ dateFrom: v })}
+              ariaLabel="Từ ngày chụp (dd/mm/yyyy)"
+              className="w-full sm:w-[120px]"
             />
-            <span className="text-[var(--bb-fg-muted)] text-xs">đến</span>
-            <Input
-              type="date"
-              name="dateTo"
+            <span className="text-[var(--bb-fg-muted)] text-xs">–</span>
+            <ONgayVN
               value={values.dateTo}
-              onChange={(e) => onChange({ dateTo: e.target.value })}
-              className="w-full sm:w-[145px]"
-              aria-label="Đến ngày chụp"
-              title="Đến ngày chụp"
+              onChange={(v) => onChange({ dateTo: v })}
+              ariaLabel="Đến ngày chụp (dd/mm/yyyy)"
+              className="w-full sm:w-[120px]"
             />
           </div>
+
+          {/* Xoá lọc — BB-290 (#34): gộp bộ lọc còn một hàng thì cần một cách
+              nhanh để về lại "Tất cả", thay vì bấm tắt từng ô. */}
+          {soBoLocDangBat > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-9 px-2 text-xs text-[var(--bb-fg-muted)]"
+              onClick={() =>
+                onChange({ branchId: "", status: "", photographerId: "", dateFrom: "", dateTo: "" })
+              }
+            >
+              <X className="h-3.5 w-3.5 mr-1" /> Xoá lọc
+            </Button>
+          )}
           </div>
         </div>
 
@@ -328,7 +344,7 @@ export function GalleryFilters({
               aria-label="Xem dạng Kanban"
             >
               <Kanban className="h-3.5 w-3.5 sm:mr-1" />
-              <span className="hidden sm:inline">Kanban</span>
+              <span className="hidden sm:inline">Bảng việc</span>
             </Button>
           </div>
 
@@ -337,7 +353,11 @@ export function GalleryFilters({
             Bảng/Kanban + nút chữ đầy đủ dài 383px, tức thò 8px khỏi mép phải.
             Chữ vẫn còn cho trình đọc màn hình qua `aria-label`.
           */}
-          <Link href="/admin/galleries/create">
+          {/* BB-290 lượt 2: từ `lg`, nút "+ Tạo bộ ảnh" đã có ở PageHeader
+              (BoAnhPageHeader, theo quan-tri-bo-anh-bang.png) — giữ nút này
+              chỉ để dùng dưới `lg`, tránh hai nút Tạo trùng nhau xếp chồng
+              trên màn rộng. */}
+          <Link href="/admin/galleries/create" className="lg:hidden">
             <Button
               variant="default"
               className="h-9 px-3 sm:px-4"
@@ -351,5 +371,85 @@ export function GalleryFilters({
         </div>
       </div>
     </div>
+  );
+}
+
+/** "2026-09-27" -> "27/09/2026". Chuỗi rỗng/hỏng thì trả rỗng. */
+function isoRaHienThi(iso: string): string {
+  const khop = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!khop) return "";
+  return `${khop[3]}/${khop[2]}/${khop[1]}`;
+}
+
+/**
+ * Ô nhập ngày kiểu Việt Nam (dd/mm/yyyy) — BB-290 (#34).
+ *
+ * `<input type="date">` của trình duyệt luôn nhận số gõ tay theo THỨ TỰ
+ * mm/dd/yyyy ở Chromium, bất kể `lang` đặt gì — chỉ đổi cách ĐỌC LẠI ngày đã
+ * chọn qua lịch popup, không đổi thứ tự ô khi gõ bàn phím. Ảnh chụp thật ở
+ * BB-290 lượt 1 vẫn ra "mm/dd/yyyy". Ô chữ tự viết này ép đúng thứ tự
+ * dd/mm/yyyy khi gõ, và phát ra/nhận vào chuỗi ISO `yyyy-mm-dd` — giữ nguyên
+ * hợp đồng dữ liệu với `GalleryFilterState`.
+ */
+function ONgayVN({
+  value,
+  onChange,
+  ariaLabel,
+  className,
+}: {
+  /** Chuỗi ISO `yyyy-mm-dd`, hoặc rỗng. */
+  value: string;
+  /** Nhận lại chuỗi ISO khi đã gõ đủ và hợp lệ; rỗng khi xoá hết. */
+  onChange: (isoValue: string) => void;
+  ariaLabel: string;
+  className?: string;
+}) {
+  const [chu, setChu] = React.useState(() => isoRaHienThi(value));
+
+  // Đồng bộ khi bộ lọc đổi từ NGOÀI vào (vd bấm "Xoá lọc") — không ghi đè
+  // trong lúc người dùng đang gõ dở (so sánh với giá trị ISO đã phát ra gần
+  // nhất qua closure của `xuLyGo`, đơn giản hoá bằng cách chỉ đồng bộ khi
+  // `value` đổi và không khớp với những gì ô đang hiện).
+  React.useEffect(() => {
+    setChu(isoRaHienThi(value));
+  }, [value]);
+
+  function xuLyGo(e: React.ChangeEvent<HTMLInputElement>) {
+    const so = e.target.value.replace(/\D/g, "").slice(0, 8); // ddmmyyyy
+    let hien = so;
+    if (so.length > 4) hien = `${so.slice(0, 2)}/${so.slice(2, 4)}/${so.slice(4)}`;
+    else if (so.length > 2) hien = `${so.slice(0, 2)}/${so.slice(2)}`;
+    setChu(hien);
+
+    if (so.length === 0) {
+      onChange("");
+      return;
+    }
+    if (so.length !== 8) return; // chưa gõ đủ — chưa báo lên bộ lọc
+
+    const ngay = Number(so.slice(0, 2));
+    const thang = Number(so.slice(2, 4));
+    const nam = so.slice(4, 8);
+    const iso = `${nam}-${String(thang).padStart(2, "0")}-${String(ngay).padStart(2, "0")}`;
+    const d = new Date(iso);
+    // Ngày không có thật (31/02…) thì không phát ISO — giữ nguyên bộ lọc cũ,
+    // để người dùng sửa tiếp thay vì lặng lẽ nhận một ngày sai.
+    if (!Number.isNaN(d.getTime()) && d.getUTCDate() === ngay && d.getUTCMonth() + 1 === thang) {
+      onChange(iso);
+    }
+  }
+
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      value={chu}
+      onChange={xuLyGo}
+      placeholder="dd/mm/yyyy"
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      maxLength={10}
+      className={className}
+    />
   );
 }

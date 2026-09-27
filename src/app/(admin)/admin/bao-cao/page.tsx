@@ -22,7 +22,9 @@ export default async function BaoCaoPage() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl p-6">
+    // BB-290 (#31): bỏ `p-6` riêng (khung cuộn của layout đã tự đệm), và
+    // dùng `max-w-6xl` — bề rộng tối đa DÙNG CHUNG cho mọi trang quản trị.
+    <main className="mx-auto max-w-6xl">
       <BaoCaoExplorer />
     </main>
   );

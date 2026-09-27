@@ -16,7 +16,7 @@ import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateAddonSchema } from "./schema";
-import { nhomSanPham, canGanAnh } from "@/lib/products/nhom-san-pham";
+import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 
 export const runtime = "nodejs";
 
@@ -73,6 +73,14 @@ export async function POST(request: Request): Promise<Response> {
 
     if (productError || !product || !product.is_active) {
       return fail("NOT_FOUND", "Sản phẩm không tồn tại hoặc đã ngừng kinh doanh");
+    }
+
+    // BB-288: chỉ bán 3 nhóm ảnh in/album/khung, và loại thêm canvas — cùng
+    // luật dùng để dựng `catalogue` ở /api/g/gallery (xem nhom-san-pham.ts).
+    // Không tin danh mục hiển thị: một productId hợp lệ nhưng ngoài danh mục
+    // (vd. canvas, hoặc kind dịch vụ kèm buổi chụp) bị chặn ngay ở đây.
+    if (!sanPhamBanChoKhach({ isActive: product.is_active, kind: product.kind, material: product.material })) {
+      return fail("NOT_FOUND", "Sản phẩm không nằm trong danh mục đang bán");
     }
 
     // Luật 3: list_price null thì KHÔNG bán

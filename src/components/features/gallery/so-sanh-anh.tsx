@@ -304,10 +304,11 @@ export function SoSanhAnh({
             boCuc === "luoi" && "grid-cols-2 grid-rows-2",
           )}
         >
-          {photos.map((photo) => (
+          {photos.map((photo, i) => (
             <OTamSoSanh
               key={photo.id}
               photo={photo}
+              thuTu={i + 1}
               dangGui={mutatingIds.has(photo.id)}
               khoa={isLocked}
               onToggleHeart={onToggleHeart}
@@ -392,17 +393,14 @@ function OTamGhimVuot({ photo, ghim, dangGui, khoa, onToggleHeart, onPhongTo, on
         </button>
       )}
 
-      {photo.fileName && (
-        <p className="pointer-events-none absolute bottom-3 left-3 max-w-[65%] truncate rounded-full bg-black/45 px-2.5 py-1 text-[11px] text-white/85">
-          {photo.fileName}
-        </p>
-      )}
+      {/* BB-287 mục #3 — bỏ tên tệp khỏi màn khách (xem ghi chú ở luoi-anh.tsx). */}
     </div>
   );
 }
 
 interface OTamSoSanhProps {
   photo: PhotoPublic;
+  thuTu: number;
   dangGui: boolean;
   khoa: boolean;
   onToggleHeart: (photo: PhotoPublic) => void;
@@ -410,7 +408,15 @@ interface OTamSoSanhProps {
   onPhongTo: (photo: PhotoPublic) => void;
 }
 
-function OTamSoSanh({ photo, dangGui, khoa, onToggleHeart, onBoKhoi, onPhongTo }: OTamSoSanhProps) {
+/**
+ * BB-289 lượt 3 — Opus, đối chiếu `so-sanh-hai-tam-dien-thoai.html`: dải
+ * điều khiển KHÔNG còn đè lên ảnh (nút "Bỏ khỏi so sánh" + tim to nổi góc
+ * trước đây là `absolute`) — nay là một HÀNG 44px riêng, đứng NGAY DƯỚI mỗi
+ * khung ảnh: tim (trái) · pill "Giữ tấm này"/"✓ Đang giữ tấm này" (giữa) · ×
+ * bỏ khỏi so sánh (phải). Số thứ tự ("Tấm N") đứng góc trên-trái khung ảnh,
+ * đúng bản vẽ (`.khung .so`).
+ */
+function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPhongTo }: OTamSoSanhProps) {
   /** Chạm hai lần trong 300ms — cùng ngưỡng với photo-lightbox.tsx. */
   const chamTruocRef = useRef(0);
   const daChon = photo.mark === "selected";
@@ -426,50 +432,71 @@ function OTamSoSanh({ photo, dangGui, khoa, onToggleHeart, onBoKhoi, onPhongTo }
   };
 
   return (
-    <div className="relative flex min-h-0 min-w-0 items-center justify-center overflow-hidden bg-bb-viewer-bg p-2">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={buildLightboxImageUrl(photo.id, 1600)}
-        alt={photo.fileName || "Ảnh so sánh"}
-        onClick={chamTam}
-        // "cursor-pointer" (không phải cursor-zoom-in như photo-lightbox.tsx):
-        // chạm một lần ở đây không làm gì thấy được — phải chạm HAI LẦN mới
-        // phóng to (mở màn xem lớn). Xem tests/unit/con-tro-ban-tay.test.ts.
-        className="h-auto max-h-full w-auto max-w-full cursor-pointer select-none object-contain"
-      />
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-bb-viewer-bg p-2">
+        <span className="absolute left-3 top-2.5 z-10 text-[11px] uppercase tracking-[0.1em] text-white/60">
+          Tấm {thuTu}
+        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={buildLightboxImageUrl(photo.id, 1600)}
+          alt={photo.fileName || "Ảnh so sánh"}
+          onClick={chamTam}
+          // "cursor-pointer" (không phải cursor-zoom-in như photo-lightbox.tsx):
+          // chạm một lần ở đây không làm gì thấy được — phải chạm HAI LẦN mới
+          // phóng to (mở màn xem lớn). Xem tests/unit/con-tro-ban-tay.test.ts.
+          className="h-auto max-h-full w-auto max-w-full cursor-pointer select-none object-contain"
+        />
+      </div>
 
-      <button
-        type="button"
-        onClick={() => onBoKhoi(photo)}
-        className="absolute left-2 top-2 z-10 rounded-full bg-black/55 px-3 py-1.5 text-[12px] text-white/90 backdrop-blur-md transition hover:bg-black/70 active:scale-95"
+      <div
+        data-testid="dai-dieu-khien-so-sanh"
+        className="flex h-11 shrink-0 items-center gap-2 border-t border-white/10 bg-[#231e1a] px-3"
       >
-        Bỏ khỏi so sánh
-      </button>
+        {(!khoa || daChon) ? (
+          <button
+            type="button"
+            disabled={khoa || dangGui}
+            onClick={() => onToggleHeart(photo)}
+            aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
+            aria-pressed={daChon}
+            className="shrink-0 rounded-full p-1.5 text-white/80 transition active:scale-90 disabled:opacity-40"
+          >
+            <Heart
+              className="h-5 w-5"
+              fill={daChon ? "currentColor" : "none"}
+              style={daChon ? { color: "#C4645A" } : undefined}
+              strokeWidth={1.7}
+            />
+          </button>
+        ) : (
+          <span className="h-5 w-5 shrink-0" aria-hidden="true" />
+        )}
 
-      {/* Tim to — như ở màn xem lớn. Khoá thì tấm chưa chọn không hiện tim. */}
-      {(!khoa || daChon) && (
         <button
           type="button"
           disabled={khoa || dangGui}
           onClick={() => onToggleHeart(photo)}
-          aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
-          aria-pressed={daChon}
           className={cn(
-            "absolute bottom-3 right-3 z-10 grid h-14 w-14 place-items-center rounded-full transition-all active:scale-90 touch-manipulation focus:outline-hidden disabled:opacity-40",
-            daChon
-              ? "bg-[#c4645a] text-white shadow-[0_10px_26px_-6px_rgba(196,100,90,.65)]"
-              : "bg-white/10 text-white ring-1 ring-white/25 hover:bg-white/15",
+            "mx-auto flex h-8 items-center justify-center rounded-full px-4 text-[13px] font-medium transition disabled:opacity-40",
+            daChon ? "bg-white text-[#231e1a]" : "border border-white/40 text-white",
           )}
         >
-          <Heart className="h-6 w-6" fill={daChon ? "currentColor" : "none"} strokeWidth={1.8} />
+          {daChon ? "✓ Đang giữ tấm này" : "Giữ tấm này"}
         </button>
-      )}
 
-      {photo.fileName && (
-        <p className="pointer-events-none absolute bottom-3 left-3 max-w-[65%] truncate rounded-full bg-black/45 px-2.5 py-1 text-[11px] text-white/85">
-          {photo.fileName}
-        </p>
-      )}
+        <button
+          type="button"
+          onClick={() => onBoKhoi(photo)}
+          aria-label="Bỏ khỏi so sánh"
+          title="Bỏ khỏi so sánh"
+          className="shrink-0 rounded-full p-1.5 text-white/70 transition hover:bg-white/10 active:scale-90"
+        >
+          <X className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* BB-287 mục #3 — bỏ tên tệp khỏi màn khách (xem ghi chú ở luoi-anh.tsx). */}
     </div>
   );
 }

@@ -97,8 +97,12 @@ test.describe("E-11: Kịch bản ảnh lớn 1.000 ảnh", () => {
         expect(count).toBeLessThan(200);
       }
 
-      // Check for last photo
-      const cuoi = theAnh.filter({ hasText: "BB231_1000.jpg" });
+      // Check for last photo — BB-287 bỏ tên tệp khỏi lưới khách (báo cáo
+      // chấm mục #5: "trông như ổ đĩa, không giống album"), nên không còn
+      // dò được "BB231_1000.jpg" trong chữ của thẻ. `alt="Ảnh 1000"` vẫn là
+      // một dấu vết RIÊNG cho đúng tấm cuối (luoi-anh.tsx đặt `alt={\`Ảnh
+      // ${thuTu + 1}\`}`), không phải chuỗi có trong mọi thẻ.
+      const cuoi = theAnh.filter({ has: page.locator('img[alt="Ảnh 1000"]') });
       if (await cuoi.count() > 0 && await cuoi.isVisible()) {
         timThayCuoi = true;
         break;
@@ -133,8 +137,9 @@ test.describe("E-11: Kịch bản ảnh lớn 1.000 ảnh", () => {
       expect(memLucSau).toBeLessThan(memBanDau * 2);
     }
 
-    // Mở màn xem lớn ở tấm cuối
-    const cuoi = theAnh.filter({ hasText: "BB231_1000.jpg" });
+    // Mở màn xem lớn ở tấm cuối — BB-287 bỏ tên tệp khỏi lưới khách, dùng
+    // `alt="Ảnh 1000"` làm dấu vết riêng cho đúng tấm cuối (xem ghi chú ở trên).
+    const cuoi = theAnh.filter({ has: page.locator('img[alt="Ảnh 1000"]') });
     await cuoi.click();
     
     const xemLon = page.getByRole("dialog").first();

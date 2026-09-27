@@ -226,7 +226,11 @@ ownIpTest.describe("BB-275: bố cục các màn phụ của màn khách", () =>
       const lightbox = page.getByRole("dialog").first();
       await lightbox.waitFor({ state: "visible" });
       // Ba nút cốt lõi phải bấm được: tim, đóng, chuyển ảnh (kế tiếp trên máy tính).
-      await ownIpExpect(lightbox.getByLabel(/Bỏ chọn|Chọn ảnh này/)).toBeVisible();
+      // BB-289: xem lớn có nút tim ở thanh 3 cột (điện thoại) và nút viên (máy
+      // tính) — mỗi khổ hiện đúng MỘT cái, cái kia ẩn bằng CSS.
+      const timHien = lightbox.getByLabel(/Bỏ chọn|Chọn ảnh này/).filter({ visible: true });
+      await ownIpExpect(timHien).toHaveCount(1);
+      await ownIpExpect(timHien).toBeVisible();
       gop(
         "man-khach-xem-lon",
         await kiemBoCuc(page, kichThuoc, (hau) => tenAnh("xem-lon", kichThuoc, hau)),

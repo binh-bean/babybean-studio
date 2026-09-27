@@ -57,7 +57,7 @@ export async function GET(
       // phục link cũ từ cột "Link app". BB-244 thêm cover_layout (kiểu chữ bìa).
       // Cùng luật viết liền một dòng (BB-150, BB-215) — Supabase suy kiểu từ
       // chuỗi literal, nối chuỗi là mất kiểu.
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc")
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc, submitted_at")
       .eq("id", galleryId)
       .single();
 
@@ -244,6 +244,10 @@ export async function GET(
     return ok({
       galleryId: gallery.id,
       photoCount: gallery.photo_count,
+      // BB-290 lượt 2: hàng 4 số liệu ở đầu trang chi tiết cần "Chốt lúc"
+      // (quan-tri-chi-tiet.png) — cột đã có sẵn trên `galleries`, chỉ thêm
+      // vào SELECT/response, không đổi schema.
+      submittedAt: gallery.submitted_at ?? null,
       dueAmount,
       paidAmount,
       outstanding: dueAmount - paidAmount,

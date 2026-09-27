@@ -11,7 +11,7 @@
 import { redirect } from "next/navigation";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { CustomersManager } from "@/components/features/admin/customers-manager";
-import { PageHeader } from "@/components/features/admin/page-header";
+import { PageHeader, KhongCoQuyen } from "@/components/features/admin/page-header";
 import { vi } from "@/i18n/vi";
 
 export const dynamic = "force-dynamic";
@@ -26,14 +26,7 @@ export default async function CustomersPage() {
   }
 
   if (!permissions.includes("customers:read")) {
-    return (
-      <main className="mx-auto max-w-2xl p-4 md:p-6">
-        <h1 className="text-xl font-semibold text-[var(--bb-fg)]">Không có quyền</h1>
-        <p className="mt-2 text-sm text-[var(--bb-fg-muted)]">
-          Vai trò của bạn chưa được cấp quyền xem danh sách khách hàng.
-        </p>
-      </main>
-    );
+    return <KhongCoQuyen mota="Vai trò của bạn chưa được cấp quyền xem danh sách khách hàng." />;
   }
 
   return (

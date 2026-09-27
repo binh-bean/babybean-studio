@@ -23,6 +23,19 @@
  * riêng), sản phẩm đó vẫn ra `sp-anh-in` — đúng nghĩa "tấm ảnh in", không
  * phải "khung tranh". Đây là quyết định có chủ đích theo đúng chữ đề bài,
  * không phải sơ suất.
+ *
+ * ---------------------------------------------------------------------------
+ * CẬP NHẬT BB-288 (27/09/2026) — canvas không còn BÁN qua hậu kỳ
+ * ---------------------------------------------------------------------------
+ * Ghi chú trên vẫn ĐÚNG cho việc CHỌN TRANH minh hoạ: `nhomSanPham()` không
+ * đổi, canvas vẫn xếp `anh_in` ở đây. Nhưng chủ studio BB-288 xác nhận LẠI
+ * rằng canvas không bán qua hậu kỳ nữa — `sanPhamBanChoKhach()`
+ * (`nhom-san-pham.ts`) lọc canvas khỏi `catalogue` của `/api/g/gallery` TRƯỚC
+ * khi tới màn cửa hàng. Nghĩa là với dữ liệu thật hiện tại, nhánh
+ * `sp-tranh-canvas` ở hàm `tranhCuaSanPham()` bên dưới không còn được gọi từ
+ * cửa hàng nữa (không sản phẩm canvas nào lọt vào `catalogue`) — vẫn giữ
+ * nguyên hàm vì `nhomSanPham()`/nhóm hiển thị "khung bọc canvas" không đổi,
+ * và để không vỡ nếu chủ studio đổi ý lần nữa.
  */
 
 import type { NhomSanPham } from "./nhom-san-pham";

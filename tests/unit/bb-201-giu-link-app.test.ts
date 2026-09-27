@@ -102,8 +102,8 @@ describe("BB-201: link hiện lại ở màn chi tiết", () => {
     );
     customerId = kh[0].id;
     const { rows: g } = await client.query(
-      `insert into galleries (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url, photo_count)
-       values ($1,$2,$3,'ready',$4,'https://example.com/x',1) returning id`,
+      `insert into galleries (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url, photo_count, included_quota)
+       values ($1,$2,$3,'ready',$4,'https://example.com/x',1,20) returning id`,
       [branchId, customerId, `Fixture BB-201 ${runId}`, `fixture-bb201-${runId}`],
     );
     galleryId = g[0].id;

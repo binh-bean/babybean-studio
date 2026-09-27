@@ -26,7 +26,11 @@ export default async function ViecCanXuLyPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl p-6">
+    // BB-290 (#31): KHÔNG thêm `p-6` riêng ở đây — khung cuộn của layout đã có
+    // `p-4 sm:p-6 lg:p-8` (admin-layout-shell.tsx). Lồng thêm một lớp đệm nữa
+    // là đúng lý do H1 của trang này lệch 24px so với các trang khác (đo được
+    // bằng e2e bb-290: x=304 ở đây, x=280 ở /admin).
+    <main className="mx-auto max-w-6xl">
       <ViecCanXuLy role={role} />
     </main>
   );

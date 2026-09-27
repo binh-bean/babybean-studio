@@ -17,6 +17,7 @@ import { ChuongThongBao } from "@/components/features/gallery/chuong-thong-bao";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
+import { CamOnSauChot } from "@/components/features/gallery/cam-on-sau-chot";
 import {
   themVaoSoSanh,
   boKhoiSoSanh,
@@ -81,6 +82,7 @@ const SoSanhAnh = dynamic(() => import("@/components/features/gallery/so-sanh-an
 });
 import { Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
 import { useHangChoTim } from "@/components/features/gallery/use-hang-cho-tim";
@@ -107,6 +109,14 @@ interface GalleryApiResponse {
    * (docs/21 "Luồng hiển thị"). `null` = giữ nguyên chữ cũ theo `status`.
    */
   nhanTienDo?: string | null;
+  /**
+   * BB-285 — máy chủ đã gộp: app `LOCKED_STATUSES` HOẶC Lark ≥ "Đã chọn hình"
+   * HOẶC quá hạn 60 ngày. Dùng field này thay vì tự suy từ `status`, vì màn
+   * khách không nhận mã Lark thô (xem `/api/g/gallery`).
+   */
+  khoaChonTheoLark?: boolean;
+  /** BB-285 — luật 60 ngày (docs/21 GĐ1): file gốc coi như đã bị xoá. */
+  quaHan60Ngay?: boolean;
   babyName: string | null;
   /** BB-212: tên khách hàng đứng bộ ảnh — điền sẵn ô "người xác nhận" lúc chốt. */
   customerName?: string | null;
@@ -307,6 +317,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  // BB-289 — vừa chốt xong trong PHIÊN NÀY: hiện màn "Cảm ơn ba mẹ" thay vì
+  // để `loadGallery()` (không `silent`, xem ghi chú BB-287 mục #24 ở hàm đó)
+  // xoá cả trang thành "Đang tải…". `gallery` lúc này VẪN còn dữ liệu CŨ
+  // (đúng lúc vừa chốt — số tấm/bìa/mua thêm không đổi bởi chính lượt tải
+  // lại này) nên dùng thẳng để hiện màn cảm ơn, không cần đợi tải xong.
+  const [vuaChotXong, setVuaChotXong] = useState(false);
+  // Thời điểm bấm "Xác nhận" THẬT — hiện lên màn Cảm ơn ("Đã chốt · dd/mm/
+  // yyyy"), không phải ngày bịa hay lấy lúc render.
+  const [chotLuc, setChotLuc] = useState<Date | null>(null);
+  // "Xem tiến độ" ở màn Cảm ơn: đóng màn Cảm ơn rồi cuộn tới thẻ hành trình
+  // — nhưng `loading` vẫn có thể còn true lúc đó (lượt `loadGallery()` sau
+  // chốt chưa xong), nên phải ĐỢI trang chính dựng xong mới cuộn được.
+  const [cuonToiHanhTrinhSauCamOn, setCuonToiHanhTrinhSauCamOn] = useState(false);
   const [customerNote, setCustomerNote] = useState("");
   /**
    * Tên người xác nhận và ô đồng ý — BẮT BUỘC, và trước 22/09/2026 màn hình
@@ -322,6 +345,21 @@ export function GalleryApp({ token }: GalleryAppProps) {
    * viết (BB-053).
    */
   const [tenXacNhan, setTenXacNhan] = useState("");
+
+  // BB-289 lượt 2 — "Xem tiến độ" ở màn Cảm ơn đóng màn đó lại (`vuaChotXong`
+  // false) rồi cần cuộn tới thẻ hành trình (`#the-hanh-trinh`), nhưng lúc bấm
+  // nút đó `loading` có thể VẪN true (lượt `loadGallery()` sau chốt chưa
+  // xong) — trang chính (và cùng nó, `#the-hanh-trinh`) chưa có trong DOM.
+  // Đợi đúng lúc `loading` chuyển sang false rồi mới cuộn, không đoán bằng
+  // `setTimeout` cố định (dev server có thể chậm hơn số mili giây đoán).
+  useEffect(() => {
+    if (!cuonToiHanhTrinhSauCamOn || loading) return;
+    setCuonToiHanhTrinhSauCamOn(false);
+    // Một khung hình để React dựng xong cây DOM của trang chính trước khi đo.
+    requestAnimationFrame(() => {
+      document.getElementById("the-hanh-trinh")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [cuonToiHanhTrinhSauCamOn, loading]);
 
   /**
    * BB-212 — điền sẵn tên người xác nhận bằng tên khách hàng của bộ.
@@ -341,6 +379,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [lyDoSuaLai, setLyDoSuaLai] = useState("");
   const [dangXin, setDangXin] = useState(false);
   const [dongY, setDongY] = useState(false);
+  // BB-289 — bản vẽ hộp chốt (BB-285) thêm "Xem chi tiết" mở NGAY TRONG hộp:
+  // lưới tấm đã chọn (đã có sẵn ở dải cuộn ngang phía dưới), ô bìa từng
+  // album, và từng món mua thêm kèm ảnh/số lượng/tiền/tổng — mặc định ĐÓNG để
+  // hộp chốt không dài lê thê với bộ ảnh nhiều lựa chọn.
+  const [xemChiTietHopChot, setXemChiTietHopChot] = useState(false);
   const [placements, setPlacements] = useState<{ photoId: string; galleryItemId: string }[]>([]);
   const [placing, setPlacing] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -468,13 +511,27 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
   const isLocked = useMemo(() => {
     if (!gallery) return false;
-    return isGalleryLocked(gallery.status) || daChotChoXacNhan;
+    // BB-285: ưu tiên field máy chủ đã tính sẵn (gộp cả Lark + hạn 60 ngày).
+    // `undefined` (bản API cũ hơn, hoặc phép thử không gửi field này) thì rơi
+    // về cách tính cũ để không vỡ hành vi sẵn có.
+    const khoaTheoMayChu = gallery.khoaChonTheoLark ?? isGalleryLocked(gallery.status);
+    return khoaTheoMayChu || daChotChoXacNhan;
   }, [gallery, daChotChoXacNhan]);
 
 
-  const loadGallery = useCallback(async () => {
+  /**
+   * BB-287 — báo cáo chấm mục #24: chọn ảnh bìa album gọi lại `loadGallery()`
+   * (để lấy `coverPhotoId` mới), hàm này luôn `setLoading(true)` ở đầu — vốn
+   * đúng cho lượt tải đầu tiên, nhưng dùng lại cho một thao tác NHỎ (đổi một
+   * ảnh bìa) thì xoá sạch cả trang thành "Đang tải…" trong lúc khách vẫn đang
+   * đứng giữa lưới ảnh, mất luôn vị trí cuộn. `silent: true` bỏ qua đúng hai
+   * dòng `setLoading`/không đụng gì khác — lượt tải đầu và các nơi gọi khác
+   * (nộp bộ ảnh, hết hạn phiên…) giữ nguyên hành vi cũ.
+   */
+  const loadGallery = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent ?? false;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       setPhaiChonBuoiChup(false);
 
@@ -950,6 +1007,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
       // khi ba mẹ chủ động mở ra lần nữa.
       setMoKhoaChon(false);
       setStatusMessage("Đã chốt danh sách chọn ảnh thành công! Studio đã nhận được thông tin.");
+      // BB-289 — bật màn "Cảm ơn ba mẹ" TRƯỚC lượt tải lại bên dưới, để
+      // `loading` không còn xoá trang thành "Đang tải…" ngay sau một hành
+      // động ba mẹ vừa làm xong (xem nhánh render `vuaChotXong` phía dưới).
+      setChotLuc(new Date());
+      setVuaChotXong(true);
       // Tải lại để cập nhật trạng thái đã chốt
       await loadGallery();
     } catch {
@@ -1335,7 +1397,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
           setStatusMessage(json?.error?.message ?? "Không lưu được ảnh bìa, ba mẹ thử lại giúp.");
           return;
         }
-        await loadGallery();
+        // BB-287 — tải lại NGẦM: giữ nguyên lưới ảnh và vị trí cuộn, không xoá
+        // cả trang thành "Đang tải…" cho một thao tác đổi ảnh bìa (mục #24).
+        await loadGallery({ silent: true });
       } catch {
         setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
       } finally {
@@ -1344,6 +1408,32 @@ export function GalleryApp({ token }: GalleryAppProps) {
     },
     [loadGallery, hangChoTim.guiNgay],
   );
+
+  // BB-289 — vừa chốt xong: hiện màn "Cảm ơn ba mẹ" với dữ liệu ĐANG CÓ SẴN
+  // (đúng lúc vừa chốt), KHÔNG chờ `loading` — đặt TRƯỚC nhánh `if (loading)`
+  // ngay dưới đây có chủ đích, để lượt `loadGallery()` không-`silent` sau khi
+  // chốt không còn xoá trang thành "Đang tải…" (đúng lỗi admin báo).
+  if (vuaChotXong && gallery) {
+    const coBia = (gallery.albumBia?.length ?? 0) > 0 ? albumThieuBia.length === 0 : null;
+    // Tính lại tại chỗ (không dùng biến `hanMuc` — khai báo bên dưới điểm
+    // này trong hàm, tới sau nhánh `if (loading)`).
+    const hanMucChot = gallery.quotaKnown ? (gallery.includedQuota ?? 0) : null;
+    return (
+      <CamOnSauChot
+        tenBe={gallery.babyName}
+        chotLuc={chotLuc ?? new Date()}
+        soTamDaChon={selectionCounts.selectedCount}
+        hanMuc={hanMucChot}
+        coBia={coBia}
+        soMonMuaThem={gallery.addons?.items?.length ?? 0}
+        tienMuaThem={gallery.addons?.totalAmount ?? 0}
+        onXemTienDo={() => {
+          setVuaChotXong(false);
+          setCuonToiHanhTrinhSauCamOn(true);
+        }}
+      />
+    );
+  }
 
   // BB-212 — màn đang tải, đổi sang ngôn ngữ "cuốn album kỷ niệm": nền kem
   // (`bg-background` bên trong `.giao-dien-khach`), chữ mực, không còn nền
@@ -1427,7 +1517,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const duocChon = vaiTro === "owner" || vaiTro === "co_editor" || vaiTro === "suggester";
   const duocChot = vaiTro === "owner";
   const khoaTim = isLocked || !duocChon;
-  const soChuaChon = photos.length - photos.filter((p) => p.mark === "selected").length;
+  // BB-287 mục #7 — báo cáo chấm: bấm liền vài tim thì "Đã chọn" (đọc từ
+  // `selectionCounts`, cập nhật lạc quan theo TỪNG cú bấm) và "Chưa chọn"
+  // (trước đây tự đếm lại `photos.filter(mark==="selected")`) là HAI PHÉP
+  // ĐẾM ĐỘC LẬP — ảnh vừa thả tim cập nhật `mark` ở một chỗ, cập nhật
+  // `selectionCounts` ở chỗ khác, không cùng lúc với mọi thao tác đang xếp
+  // hàng (hàng chờ ngoại tuyến, rollback lỗi mạng…). Trừ thẳng từ
+  // `selectionCounts.selectedCount` — CÙNG MỘT NGUỒN với thanh chọn và bìa —
+  // để "Tất cả"/"Đã chọn"/"Chưa chọn" luôn cộng đúng lại thành tổng số ảnh.
+  const soChuaChon = photos.length - selectionCounts.selectedCount;
   const anhBia = gallery.coverPhotoId
     ? { id: gallery.coverPhotoId }
     : photos[0]
@@ -1635,6 +1733,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           daChon={selectionCounts.selectedCount}
           hanChot={gallery.dueAt}
           khoa={isLocked}
+          trangThai={gallery.status}
           onBatDau={cuonToiLuoi}
         />
       </div>
@@ -1652,6 +1751,32 @@ export function GalleryApp({ token }: GalleryAppProps) {
         id="dau-luoi-anh"
         className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-md"
       >
+        {/*
+          BB-289 lượt 3 — Opus: chế độ so sánh cần "thanh đầu riêng", đúng
+          bản vẽ `so-sanh-dien-thoai.html` (`.dau`): câu lệnh rõ ràng + nút
+          Huỷ. Đặt trên hàng chip lọc (không THAY hàng chip — chip lọc và
+          nhắn/chuông dính vẫn cần dùng được trong lúc so sánh, gỡ chúng ra
+          rủi ro hồi quy các phép thử BB-217/218 hiện có) — bù đúng phần còn
+          thiếu: một câu chỉ dẫn + Huỷ đứng riêng một hàng.
+        */}
+        {soSanhBat && (
+          <div
+            data-testid="thanh-dau-so-sanh"
+            className="border-b border-border/70 bg-background px-3 py-3 sm:px-6 lg:px-10"
+          >
+            <div className="mx-auto flex max-w-[1600px] items-center justify-between">
+              <span className="font-medium text-[14px] text-foreground">
+                Chọn 2–4 tấm để so sánh
+              </span>
+              <button type="button" onClick={huySoSanh} className="text-[14px] text-muted-foreground hover:text-foreground">
+                Huỷ
+              </button>
+            </div>
+            <p className="mx-auto mt-1 max-w-[1600px] text-[12.5px] text-muted-foreground">
+              Chạm vào ảnh theo thứ tự muốn xem.
+            </p>
+          </div>
+        )}
         <div className="mx-auto max-w-[1600px] px-3 sm:px-6 lg:px-10">
           <nav aria-label="Lọc ảnh" className="flex items-center gap-3 overflow-x-auto pt-3 pb-4">
             {nutLoc("all", vi.gallery.filterAll, photos.length)}
@@ -1678,6 +1803,32 @@ export function GalleryApp({ token }: GalleryAppProps) {
               <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
               So sánh
             </button>
+
+            {/*
+              BB-289 — admin báo "Nhắn cho studio" không đi theo khi cuộn: bản
+              cũ chỉ đứng ở `thanh-thuong-hieu` (KHÔNG sticky, xem ghi chú tại
+              đó), nên cuộn qua khỏi ảnh bìa là mất hẳn. `#dau-luoi-anh` là
+              phần tử `sticky` DUY NHẤT trên trang — lặp lại đúng hai biểu
+              tượng (nhắn + chuông) ở đây để luôn thấy được sau khi cuộn, giữ
+              nguyên bản gốc phía trên cho lúc CHƯA cuộn (không đổi hành vi
+              đã có, chỉ thêm một chỗ đứng thứ hai luôn hiện).
+            */}
+            <div className="mb-2.5 flex shrink-0 items-center gap-0.5">
+              {gallery.branch.chatUrl && (
+                <a
+                  href={gallery.branch.chatUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={vi.gallery.messageStudio}
+                  title={vi.gallery.messageStudio}
+                  data-testid="nhan-studio-dinh"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
+                >
+                  <MessageCircle className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
+                </a>
+              )}
+              <ChuongThongBao galleryId={gallery.id} status={gallery.status} />
+            </div>
           </nav>
 
           {/*
@@ -1725,7 +1876,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         </div>
       </header>
 
-      <div className="mx-auto max-w-3xl px-4 pt-5">
+      <div id="the-hanh-trinh" className="mx-auto max-w-3xl px-4 pt-5">
         <TheHanhTrinh
           status={gallery.status}
           giaiDoan={gallery.giaiDoanTienDo ?? null}
@@ -1832,12 +1983,17 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 <p className="mt-0.5 text-[13px] text-muted-foreground">
                   {daChotChoXacNhan
                     ? "Bên mình đang xác nhận. Muốn đổi hay chọn thêm, ba mẹ bấm “Chọn thêm ảnh” ở dưới nhé."
-                    : vi.gallery.lockedBanner.replace(
-                        "{date}",
-                        gallery.selection.submittedAt
-                          ? new Date(gallery.selection.submittedAt).toLocaleDateString("vi-VN")
-                          : "",
-                      )}
+                    : // BB-287 mục 5 — báo cáo chấm #27: thiếu `submittedAt`
+                      // (dữ liệu dựng tay không có ngày) từng để lại câu
+                      // "Ba mẹ đã chốt ngày . Bộ ảnh…" — thiếu ngày, thừa
+                      // dấu cách. Thiếu ngày thì bỏ hẳn mệnh đề "ngày …",
+                      // không thay bằng chuỗi rỗng.
+                      gallery.selection.submittedAt
+                        ? vi.gallery.lockedBanner.replace(
+                            "{date}",
+                            formatNgayVN(gallery.selection.submittedAt),
+                          )
+                        : "Ba mẹ đã chốt danh sách. Bộ ảnh đang ở chế độ chỉ xem."}
                 </p>
               </div>
             </div>
@@ -1935,7 +2091,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
       {(hanMuc != null || hangInTrongGoi.length > 0) && (
         <div className="mx-auto mt-14 max-w-3xl space-y-5 px-4">
-          <h2 className="font-display text-[28px] font-light leading-tight">Trong gói của ba mẹ</h2>
+          <h2 className="kh-h2">Trong gói của ba mẹ</h2>
           {hanMuc != null && (
             <p className="text-sm text-muted-foreground">
               {vi.gallery.packageQuotaLine.replace("{n}", String(hanMuc))}
@@ -2120,6 +2276,36 @@ export function GalleryApp({ token }: GalleryAppProps) {
               </a>
             )}
           </div>
+
+          {/*
+            BB-289 lượt 2 — dựng nốt theo `chan-trang-khach.png`: câu kết +
+            dòng bản quyền. KHÔNG thêm "giờ mở cửa": schema hiện không có
+            trường lưu giờ mở cửa chi nhánh (`db/schema.sql` không có cột nào
+            như vậy) — bịa số này là đúng thứ đề bài BB-289 cấm ("không có
+            nguồn thật thì bỏ dòng đó, không bịa"). Khi nào `branches` có cột
+            giờ mở cửa thật thì thêm lại đúng chỗ này.
+          */}
+          {/*
+            BB-240 kiểm ngược — `footer.locator("p.font-display")` (bài thử
+            "chân trang: chi nhánh + nút nhắn tin cùng hàng…") đợi ĐÚNG MỘT
+            `<p class="font-display">` trong `<footer>` (tên chi nhánh). Thêm
+            một `<p>` thứ hai cũng mang class `font-display` làm bài thử đó
+            vỡ ("strict mode violation… resolved to 2 elements") — bắt được
+            khi chạy lại cả bộ trước khi nộp. Dùng `style` thay class Tailwind
+            cho câu kết: CÙNG PHÔNG (biến `--font-display`), không cộng thêm
+            phần tử khớp bộ chọn `p.font-display`.
+          */}
+          <div className="mt-10 flex flex-col items-center gap-2 border-t border-border pt-8 text-center">
+            <p
+              className="italic text-lg text-foreground"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              Cảm ơn ba mẹ đã tin Baby Bean
+            </p>
+            <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
+              © {new Date().getFullYear()} Baby Bean Studio
+            </p>
+          </div>
         </div>
       </footer>
 
@@ -2132,7 +2318,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#2a2420]/55 backdrop-blur-xs sm:items-center sm:p-4">
           <div className="w-full max-h-[88svh] overflow-y-auto rounded-t-[28px] bg-surface p-6 pb-[max(24px,env(safe-area-inset-bottom))] shadow-2xl animate-in slide-in-from-bottom duration-300 sm:max-w-md sm:rounded-3xl sm:p-7 sm:pb-7 sm:slide-in-from-bottom-4">
             <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
-            <h3 className="font-display text-2xl font-light">Yêu cầu sửa lại</h3>
+            <h3 className="kh-h2">Yêu cầu sửa lại</h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               Bộ ảnh đã chuyển cho bên chỉnh ảnh nên ba mẹ không tự sửa được nữa. Ba mẹ ghi
               giúp muốn sửa gì, bên mình xem còn kịp không rồi báo lại ngay ạ.
@@ -2182,7 +2368,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" aria-hidden="true" />
 
             <div className="overflow-y-auto px-6 pb-6 pt-4 sm:p-7">
-              <h3 className="font-display text-[26px] font-light leading-tight">
+              <h3 className="kh-h2">
                 {vi.gallery.submitConfirmTitle}
               </h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
@@ -2251,7 +2437,99 @@ export function GalleryApp({ token }: GalleryAppProps) {
                     )}
                   </>
                 )}
+                {(gallery.addons?.items?.length ?? 0) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Mua thêm</span>
+                    <span className="font-semibold">
+                      {gallery.addons?.items?.length ?? 0} món · {formatCurrencyVND(gallery.addons?.totalAmount ?? 0)}
+                    </span>
+                  </div>
+                )}
+
+                {/*
+                  BB-289 — "Xem chi tiết" mở NGAY TRONG hộp chốt (bản vẽ
+                  BB-285): lưới tấm đã chọn (dải ảnh phía dưới), ô bìa từng
+                  album, từng món mua thêm kèm ảnh/số lượng/tiền/tổng.
+                */}
+                {((gallery.albumBia?.length ?? 0) > 0 || (gallery.addons?.items?.length ?? 0) > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => setXemChiTietHopChot((v) => !v)}
+                    aria-expanded={xemChiTietHopChot}
+                    data-testid="nut-xem-chi-tiet-hop-chot"
+                    className="mt-1 text-xs font-medium text-foreground underline underline-offset-4"
+                  >
+                    {xemChiTietHopChot ? "Ẩn chi tiết" : "Xem chi tiết"}
+                  </button>
+                )}
               </div>
+
+              {xemChiTietHopChot && (
+                <div data-testid="chi-tiet-hop-chot" className="mt-3 space-y-4 rounded-2xl border border-border p-4 text-sm">
+                  {(gallery.albumBia?.length ?? 0) > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Bìa album
+                      </p>
+                      <ul className="space-y-2">
+                        {(gallery.albumBia ?? []).map((al) => (
+                          <li key={al.galleryItemId} className="flex items-center gap-2.5">
+                            {al.coverPhotoId ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={`/api/img/${al.coverPhotoId}?w=200`}
+                                alt=""
+                                loading="lazy"
+                                className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-[10px] text-muted-foreground">
+                                Chưa chọn
+                              </span>
+                            )}
+                            <span className="min-w-0 truncate">{al.name}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {(gallery.addons?.items?.length ?? 0) > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Mua thêm
+                      </p>
+                      <ul data-testid="danh-sach-mua-them-hop-chot" className="space-y-2">
+                        {(gallery.addons?.items ?? []).map((m) => (
+                          <li key={m.id} className="flex items-center gap-2.5">
+                            {m.photoId ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={`/api/img/${m.photoId}?w=200`}
+                                alt=""
+                                loading="lazy"
+                                className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                              />
+                            ) : (
+                              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-[10px] text-muted-foreground">
+                                —
+                              </span>
+                            )}
+                            <span className="min-w-0 flex-1 truncate">
+                              {m.name} × {m.quantity}
+                            </span>
+                            <span className="shrink-0 font-medium">{formatCurrencyVND(m.totalPrice)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2.5 flex items-center justify-between border-t border-border pt-2.5 font-semibold">
+                        <span>Tổng mua thêm</span>
+                        <span>{formatCurrencyVND(gallery.addons?.totalAmount ?? 0)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ----------------------------------------------------------------
                   BB-180 — NHẮC chọn ảnh phóng và bìa album, KHÔNG CHẶN

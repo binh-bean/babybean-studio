@@ -25,6 +25,14 @@
  * Cái giá phải trả: studio đặt tên một chất liệu mới mà không báo thì nó rơi
  * vào nhóm "ảnh in" theo mặc định. Đó là lý do có phép thử đối chiếu danh sách
  * này với bảng `products` thật — nó đỏ khi xuất hiện chất liệu lạ.
+ *
+ * ---------------------------------------------------------------------------
+ * NHÓM HIỂN THỊ khác DANH MỤC BÁN — xem `sanPhamBanChoKhach()` bên dưới
+ * ---------------------------------------------------------------------------
+ * `nhomSanPham()` xếp NHÓM để hiển thị/xử lý (kể cả hàng nằm sẵn trong gói đã
+ * mua). Việc gì được phép BÁN cho khách hậu kỳ là một luật RIÊNG, hẹp hơn
+ * (BB-288: loại thêm canvas) — dùng `sanPhamBanChoKhach()`, đừng suy luận lại
+ * từ `nhomSanPham()` ở nơi gọi.
  */
 
 export type NhomSanPham = "anh_in" | "album" | "khung";
@@ -74,4 +82,51 @@ export function nhomSanPham(kind: string | null, material: string | null): NhomS
  */
 export function canGanAnh(nhom: NhomSanPham | null): boolean {
   return nhom === "anh_in" || nhom === "khung";
+}
+
+/**
+ * Chất liệu này có phải canvas không (bỏ dấu, không phân biệt hoa/thường).
+ *
+ * Tên thật trên Lark là "Cavas/Kim tuyến" (lỗi chính tả "Cavas" thay vì
+ * "Canvas") — so khớp cả hai cách viết để không phụ thuộc vào việc ai đó bên
+ * Lark có sửa lỗi chính tả này hay chưa.
+ */
+function laVatLieuCanvas(material: string | null): boolean {
+  const cl = (material ?? "").toLowerCase();
+  return cl.includes("canvas") || cl.includes("cavas");
+}
+
+/**
+ * Sản phẩm này có được BÁN cho khách qua các luồng hậu kỳ không (cửa hàng,
+ * "Đặt in tấm này", mời mua lần hai, gợi ý người thân mua, và route ghi
+ * `/api/g/addons` + `/api/g/mua-them`)?
+ *
+ * BB-288 — chủ studio 27/09/2026, nguyên văn: "không được bịa danh mục sản
+ * phẩm. Lấy tên trên Lark, lưu ý chỉ lấy ảnh, khung ảnh và album. Các sản
+ * phẩm khác không lấy vì hậu kỳ không bán, còn đang kinh doanh nhé, không lấy
+ * ngừng kinh doanh."
+ *
+ * Ba điều kiện, phải khớp CẢ BA:
+ *   1. `is_active` — không bán hàng đã ngừng kinh doanh.
+ *   2. `nhomSanPham() !== null` — chỉ 3 nhóm ảnh in/album/khung (loại
+ *      `shoot_package`, `addon`, `service` — dịch vụ kèm buổi chụp).
+ *   3. KHÔNG phải canvas — BB-248 (22/09/2026) từng xếp canvas vào nhóm
+ *      `anh_in` để hiển thị màn "xem trên tường"; chủ studio BB-288 xác nhận
+ *      lại đó là SAI cho mục đích BÁN: canvas không bán qua hậu kỳ.
+ *
+ * CỐ Ý không sửa `nhomSanPham()` để loại canvas: hàm đó còn được dùng để xếp
+ * NHÓM HIỂN THỊ cho hàng đã nằm sẵn trong gói đã mua
+ * (`src/lib/products/hang-in-trong-goi.ts`) — hàng trong gói không bị lọc bởi
+ * luật bán hàng này (BB-288 mục 4: "không đụng" gallery_items). Hàm này là
+ * lớp lọc RIÊNG, chỉ áp cho đường bán hàng mới.
+ */
+export function sanPhamBanChoKhach(sp: {
+  isActive: boolean;
+  kind: string | null;
+  material: string | null;
+}): boolean {
+  if (!sp.isActive) return false;
+  if (nhomSanPham(sp.kind, sp.material) === null) return false;
+  if (laVatLieuCanvas(sp.material)) return false;
+  return true;
 }

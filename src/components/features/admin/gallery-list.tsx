@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
@@ -138,6 +139,21 @@ function formatDate(dateStr: string | null | undefined): string {
     return `${day}/${month}/${year}`;
   } catch {
     return dateStr;
+  }
+}
+
+/** BB-290 (#33): hạn chốt trong bảng rút gọn chỉ cần dd/mm, theo
+ * quan-tri-bo-anh-bang.png — năm không cần thiết ở một cột đã hẹp lại. */
+function formatDateShort(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "—";
+    const day = d.getDate().toString().padStart(2, "0");
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    return `${day}/${month}`;
+  } catch {
+    return "—";
   }
 }
 
@@ -523,24 +539,19 @@ export function GalleryList() {
       ) : filters.viewMode === "table" ? (
         /* ================= CHẾ ĐỘ XEM BẢNG ================= */
         <div className="space-y-4">
-          {/* Màn hình lớn (>= lg): BẢNG 10 CỘT */}
+          {/* Màn hình lớn (>= lg): BẢNG 6 CỘT — BB-290 #33, theo
+              quan-tri-bo-anh-bang.png. Bảng cũ có 11 cột (Photographer/Retouch/
+              CSKH/Ngày chụp/Đã chọn tách rời) khiến tên bộ ảnh vỡ thành 6 dòng ở
+              1440px. Tên khách + tên bé gộp vào cột "Bộ ảnh"; các cột phần lớn
+              trống (CSKH, người chỉnh ảnh) không còn chiếm chỗ riêng — xem chi
+              tiết đầy đủ ở trang Chi tiết bộ ảnh. */}
           <div className="hidden lg:block overflow-x-auto rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] shadow-sm">
             <table className="w-full text-left text-sm border-collapse">
               <thead className="bg-[var(--bb-surface-2)] border-b border-[var(--bb-border)] text-xs font-semibold text-[var(--bb-fg-muted)] uppercase tracking-wider">
                 <tr>
-                  {/* Thứ tự cột do chủ studio chốt 15.09.2026: số hoá đơn trước, rồi
-                      tên khách, rồi tên bé. Trước đó cột đầu mang nhãn "Tên bé" nhưng
-                      hiện mã hợp đồng — vì hầu hết bộ ảnh chưa có tên bé, và
-                      displayName rơi về item.title. Nhãn nói một đằng, nội dung một nẻo. */}
-                  <th className="px-4 py-3.5">Số hoá đơn</th>
-                  <th className="px-4 py-3.5">Khách hàng</th>
-                  <th className="px-4 py-3.5">Tên bé</th>
+                  <th className="px-4 py-3.5">Bộ ảnh</th>
                   <th className="px-4 py-3.5">Chi nhánh</th>
-                  <th className="px-4 py-3.5">Photographer</th>
-                  <th className="px-4 py-3.5">Retouch</th>
-                  <th className="px-4 py-3.5">CSKH</th>
-                  <th className="px-4 py-3.5">Ngày chụp</th>
-                  <th className="px-4 py-3.5">Đã chọn</th>
+                  <th className="px-4 py-3.5">Tiến độ chọn</th>
                   <th className="px-4 py-3.5">Hạn chốt</th>
                   <th className="px-4 py-3.5 text-center">Trạng thái</th>
                   <th className="px-4 py-3.5 text-right">Thao tác</th>
@@ -550,101 +561,95 @@ export function GalleryList() {
                 {items.map((item) => {
                   const statusConfig = getStatusBadgeConfig(item.status);
                   const tenBe = item.babyName || item.babyFullName || null;
+                  const tienDoTong = item.includedQuota > 0 ? item.includedQuota : item.selectedCount;
 
                   return (
                     <tr
                       key={item.id}
                       className="hover:bg-[var(--bb-surface-2)]/60 transition-colors"
                     >
-                      {/* 1. Số hoá đơn — mã hợp đồng, dán được thẳng vào ô tìm bên Lark */}
-                      <td className="px-4 py-3 font-medium text-[var(--bb-fg)]">
+                      {/* 1. Bộ ảnh — tên (mã hợp đồng, dán thẳng vào ô tìm Lark
+                          được) trên, tên khách + tên bé dưới. */}
+                      <td className="max-w-[260px] px-4 py-3">
+                        {/* BB-290 lượt 2: chặn bề rộng cột — tên bộ ảnh dài
+                            (vd tên Fixture kiểm thử) từng đẩy cả bảng tràn
+                            khỏi 1440px, đẩy cột Trạng thái/Thao tác ra ngoài
+                            tầm nhìn mà không cuộn ngang. */}
                         <Link
                           href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
-                          className="hover:text-[var(--bb-primary)] transition-colors"
+                          className="block truncate font-medium text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
                         >
                           {item.title}
                         </Link>
-                      </td>
-
-                      {/* 2. Khách hàng */}
-                      <td className="px-4 py-3">
-                        <div className="text-[var(--bb-fg)]">{item.customerName}</div>
-                        <div className="text-xs text-[var(--bb-fg-muted)] font-mono">
-                          {item.customerPhone}
+                        <div className="truncate text-xs text-[var(--bb-fg-muted)]">
+                          {item.customerName}
+                          {tenBe ? ` · bé ${tenBe}` : ""}
                         </div>
                       </td>
 
-                      {/* 3. Tên bé — trống ở hầu hết bộ ảnh kéo từ Lark: docs/16 §7.3 còn
-                          che tên cho tới khi có bb-prod (BB-138, BB-139). Để gạch ngang
-                          cho thật chứ đừng lấy mã hợp đồng lấp chỗ trống, vì lấp là
-                          nhân viên tưởng đã có tên. */}
-                      <td className="px-4 py-3 text-[var(--bb-fg)]">
-                        {tenBe ?? <span className="text-[var(--bb-fg-muted)]">—</span>}
-                      </td>
-
-                      {/* 3. Chi nhánh */}
+                      {/* 2. Chi nhánh */}
                       <td className="px-4 py-3 text-[var(--bb-fg-muted)]">
                         {item.branchName}
                       </td>
 
-                      {/* 4. Photographer */}
-                      <td className="px-4 py-3 text-[var(--bb-fg-muted)]">
-                        {item.photographerName || "—"}
-                      </td>
-
-                      {/* 5. Người photoshop */}
-                      <td className="px-4 py-3 text-[var(--bb-fg-muted)]">
-                        {item.editorName || "—"}
-                      </td>
-
-                      {/* 6. CSKH */}
-                      <td className="px-4 py-3 text-[var(--bb-fg-muted)]">
-                        {item.cskhName || "—"}
-                      </td>
-
-                      {/* 7. Ngày chụp */}
-                      <td className="px-4 py-3 text-[var(--bb-fg-muted)] font-mono text-xs">
-                        {formatDate(item.shootDate)}
-                      </td>
-
-                      {/* 8. Đã chọn N/M */}
-                      <td className="px-4 py-3 font-medium">
-                        <span className="text-[var(--bb-fg)]">{item.progress}</span>
-                        {item.extraCount > 0 && (
-                          <span className="ml-1 text-xs text-[var(--bb-warning)]">
-                            (+{item.extraCount})
+                      {/* 3. Tiến độ chọn — thanh + n/m */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2 min-w-[120px]">
+                          <div className="w-20">
+                            {/* `ariaLabel` bắt buộc — thiếu tên đọc được thì
+                                axe báo "ARIA progressbar nodes must have an
+                                accessible name" (bb-277). Dùng `ariaLabel`,
+                                không phải `label`, để không hiện thêm một
+                                dòng chữ trực quan — số n/m đã hiện cạnh
+                                thanh rồi. */}
+                            <ProgressBar
+                              value={item.selectedCount}
+                              max={Math.max(tienDoTong, 1)}
+                              size="sm"
+                              variant={item.extraCount > 0 ? "warning" : "accent"}
+                              ariaLabel={`Tiến độ chọn của ${item.title}: ${item.progress}`}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-[var(--bb-fg)] whitespace-nowrap">
+                            {item.progress}
                           </span>
-                        )}
+                          {item.extraCount > 0 && (
+                            <span className="text-[11px] text-[var(--bb-warning)] whitespace-nowrap">
+                              (+{item.extraCount})
+                            </span>
+                          )}
+                        </div>
                       </td>
 
-                      {/* 9. Hạn chốt */}
+                      {/* 4. Hạn chốt */}
                       <td className="px-4 py-3">
                         <div className="text-xs font-mono text-[var(--bb-fg-muted)]">
-                          {formatDate(item.dueAt)}
+                          {formatDateShort(item.dueAt)}
                         </div>
                         {item.urgency === "overdue" && (
-                          <span className="inline-flex items-center text-[10px] text-[var(--bb-danger)] font-medium">
+                          <span className="inline-flex items-center text-[10px] text-[var(--bb-danger)] font-medium whitespace-nowrap">
                             <AlertTriangle className="h-3 w-3 mr-0.5" /> Quá hạn
                           </span>
                         )}
                         {item.urgency === "due_soon" && (
-                          <span className="inline-flex items-center text-[10px] text-[var(--bb-warning)] font-medium">
+                          <span className="inline-flex items-center text-[10px] text-[var(--bb-warning)] font-medium whitespace-nowrap">
                             <Clock className="h-3 w-3 mr-0.5" /> Sắp hết
                           </span>
                         )}
                       </td>
 
-                      {/* 10. Trạng thái */}
+                      {/* 5. Trạng thái — chip MỘT DÒNG (BB-290 #33: chip cũ vỡ
+                          thành khối 5 dòng rộng 60px, xem báo cáo #33). */}
                       <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                           <ChamCanhBao mau={item.warningColor} />
-                          <Badge variant={statusConfig.variant}>
+                          <Badge variant={statusConfig.variant} className="whitespace-nowrap">
                             {item.statusLabel ?? statusConfig.label}
                           </Badge>
                         </span>
                       </td>
 
-                      {/* Thao tác */}
+                      {/* 6. Thao tác */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Link href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}>
@@ -689,29 +694,25 @@ export function GalleryList() {
                   key={item.id}
                   className="rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] shadow-sm hover:border-[var(--bb-primary)]/60 transition-all p-4 space-y-3"
                 >
-                  {/* Header thẻ: Tên bé & Trạng thái */}
-                  {/*
-                    `min-w-0` cho cột chữ và `shrink-0` cho nhãn trạng thái.
-                    Thiếu hai thứ đó thì nhãn "Chờ khách chọn" không co được mà
-                    cột chữ cũng không nhường — đo trên máy tính bảng 768px:
-                    nhãn thò ra 8px khỏi mép phải màn hình.
-                  */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <Link
-                        href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
-                        className="font-bold text-base text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
-                      >
-                        {item.title}
-                      </Link>
-                      <p className="truncate text-xs text-[var(--bb-fg-muted)]">
-                        {item.customerName}
-                        {tenBeThe ? ` · bé ${tenBeThe}` : ""}
-                      </p>
-                    </div>
-                    <span className="flex shrink-0 items-center gap-1.5">
+                  {/* Header thẻ: Tên bộ ảnh trên, nhãn trạng thái XUỐNG DÒNG
+                      DƯỚI (BB-290 #35) — trước đây nhãn nằm góc phải đẩy tên
+                      bộ ảnh xuống tới 5 dòng khi nhãn dài ("Chờ xác nhận"...).
+                      Tên bộ ảnh tối đa 2 dòng (line-clamp), tên khách/chi
+                      nhánh không còn bị cắt "…" vì nhãn không chiếm ngang nữa. */}
+                  <div className="space-y-1.5">
+                    <Link
+                      href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
+                      className="line-clamp-2 font-bold text-base text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
+                    >
+                      {item.title}
+                    </Link>
+                    <p className="text-xs text-[var(--bb-fg-muted)]">
+                      {item.customerName}
+                      {tenBeThe ? ` · bé ${tenBeThe}` : ""}
+                    </p>
+                    <span className="inline-flex items-center gap-1.5">
                       <ChamCanhBao mau={item.warningColor} />
-                      <Badge variant={statusConfig.variant}>
+                      <Badge variant={statusConfig.variant} className="whitespace-nowrap">
                         {item.statusLabel ?? statusConfig.label}
                       </Badge>
                     </span>
@@ -754,12 +755,12 @@ export function GalleryList() {
                   <div className="flex items-center justify-between text-[11px] text-[var(--bb-fg-muted)] pt-1">
                     <div className="flex items-center gap-2">
                       {item.photographerName && (
-                        <span className="flex items-center gap-1" title="Photographer">
+                        <span className="flex items-center gap-1" title="Thợ chụp">
                           <Camera className="h-3 w-3" /> {item.photographerName}
                         </span>
                       )}
                       {item.editorName && (
-                        <span className="flex items-center gap-1" title="Photoshop">
+                        <span className="flex items-center gap-1" title="Chỉnh ảnh">
                           <Paintbrush className="h-3 w-3" /> {item.editorName}
                         </span>
                       )}
@@ -789,10 +790,10 @@ export function GalleryList() {
                       size="sm"
                       onClick={() => copyShareLink(item.id)}
                       className="text-xs h-8 px-2.5"
-                      title="Sao chép link"
-                      aria-label="Sao chép link"
+                      title="Chép link"
+                      aria-label="Chép link"
                     >
-                      <Copy className="h-3.5 w-3.5" />
+                      <Copy className="h-3.5 w-3.5 mr-1" /> Chép link
                     </Button>
                   </div>
                 </Card>

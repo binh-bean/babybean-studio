@@ -52,6 +52,7 @@ import {
   xinQuyenVaDangKyPush,
 } from "@/lib/thong-bao/dung-day";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 
 export interface ChuongThongBaoProps {
   galleryId: string;
@@ -84,7 +85,7 @@ function thoiGianTuongDoi(iso: string): string {
   if (gio < 24) return `${gio} giờ trước`;
   const ngay = Math.floor(gio / 24);
   if (ngay < 30) return `${ngay} ngày trước`;
-  return new Date(iso).toLocaleDateString("vi-VN");
+  return formatNgayVN(iso);
 }
 
 export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoProps) {

@@ -220,7 +220,7 @@ export function MoiMuaLanHai({
   if (daGui) {
     return (
       <div className="space-y-2 rounded-2xl border border-border bg-surface p-5">
-        <p className="font-display text-lg font-light leading-tight">Yêu cầu mua thêm</p>
+        <p className="kh-h3">Yêu cầu mua thêm</p>
         <ul className="space-y-1.5">
           {dsDaGui.map((d) => (
             <li key={d.id} className="flex items-center justify-between gap-3 text-xs">
@@ -254,7 +254,7 @@ export function MoiMuaLanHai({
           />
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-start justify-center text-left">
-          <p className="font-display text-[22px] font-medium leading-[1.2] text-[#2E2A27]">
+          <p className="kh-h3 text-[#2E2A27]">
             {tieuDe ?? "Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?"}
           </p>
           <p className="mt-1.5 text-[13px] text-[#2E2A27]/60">
@@ -274,7 +274,7 @@ export function MoiMuaLanHai({
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
           <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-8">
             <div>
-              <h2 className="font-display text-2xl font-light leading-tight">
+              <h2 className="kh-h2">
                 {tieuDe ?? "Mua thêm sau khi duyệt"}
               </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -315,7 +315,7 @@ export function MoiMuaLanHai({
             {/* Tranh minh hoạ của nhóm đang xem (BB-248), cạnh tiêu đề nhóm. */}
             <div className="mb-3 flex items-center gap-3">
               <TranhNho ten={tranhCuaSanPham(nhomDangXem, null, "")} kichThuoc={72} />
-              <h3 className="font-display text-lg font-light leading-tight">
+              <h3 className="kh-h3">
                 {TEN_NHOM[nhomDangXem]}
               </h3>
             </div>

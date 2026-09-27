@@ -71,14 +71,26 @@
  */
 
 import { randomUUID, randomBytes, createHash } from "node:crypto";
+import { after } from "next/server";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiLinkAppVeLark, diaChiDayDu } from "@/lib/lark/ghi-link-app";
 import { maHoaMaLink } from "@/lib/auth/ma-link";
 import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
+import { lamNongMotLo } from "@/lib/drive/lam-nong-cache";
+import { qua60NgayFileGoc } from "@/lib/lark/trang-thai-hau-ky";
 
 export const runtime = "nodejs";
+// GIẢ ĐỊNH HẠ TẦNG: gói Hobby — 60 giây là mức TỐI ĐA Hobby cho phép (mặc
+// định chỉ 10s). Tạo link xong thì làm nóng ĐÚNG MỘT LÔ ảnh (40 tấm, xem
+// `lam-nong-cache.ts`) CHẠY NỀN qua after() (xem cuối tệp) — đủ lo trước màn
+// hình đầu tiên khách sẽ thấy, KHÔNG đủ nong hết một bộ 1.235 ảnh trong một
+// lượt gọi trên gói Hobby. Muốn nong hết cả bộ thì bấm "Làm nóng ảnh" ở màn
+// chi tiết (route riêng, trình duyệt tự gọi lặp). Không chặn phản hồi tạo
+// link: CSKH phải cầm được link ngay, làm nóng hỏng hay chậm không được làm
+// hỏng việc đó.
+export const maxDuration = 60;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -128,7 +140,9 @@ export async function POST(
       // lark_hauky_record_id: mã DÒNG Hậu Kỳ bên Lark, sẽ ghi link vào đúng
       // dòng đó. Tên cột là `lark_hauky_record_id` chứ không phải
       // `lark_record_id` — xem db/migrations/0027 và 0028.
-      .select("id, branch_id, customer_id, status, photo_count, lark_hauky_record_id, sent_at, due_at")
+      .select(
+        "id, branch_id, customer_id, status, photo_count, lark_hauky_record_id, sent_at, due_at, lark_trang_thai, lark_trang_thai_tu",
+      )
       .eq("id", galleryId)
       .maybeSingle();
 
@@ -141,6 +155,35 @@ export async function POST(
       return fail(
         "INVALID_INPUT",
         "Bộ ảnh chưa có tấm nào. Đồng bộ ảnh từ Drive xong rồi hãy tạo link.",
+      );
+    }
+
+    // BB-285 — luật 60 ngày (docs/21 GĐ1): Lark còn "Đã gửi file gốc" quá 60
+    // ngày thì file gốc coi như đã bị xoá; tạo link mới lúc này là gửi khách
+    // một link mở ra ảnh không còn.
+    if (
+      qua60NgayFileGoc(
+        gallery.lark_trang_thai,
+        gallery.lark_trang_thai_tu ? new Date(gallery.lark_trang_thai_tu) : null,
+        new Date(),
+      )
+    ) {
+      return fail(
+        "INVALID_INPUT",
+        "Bộ ảnh đã quá 60 ngày ở \"Đã gửi file gốc\" — đóng theo quy định (docs/21). Liên hệ khách để mở lại nếu thật sự cần.",
+      );
+    }
+
+    // BB-285 — chặn tạo link khi CHƯA BIẾT hạn mức, cùng lý do với bộ rỗng ở
+    // trên: khách mở link ra không chọn được ảnh nào, chỉ gọi điện hỏi.
+    const { data: quotaVal, error: quotaErr } = await admin.rpc("gallery_quota", {
+      p_gallery_id: galleryId,
+    });
+    if (quotaErr) throw quotaErr;
+    if (quotaVal === null || quotaVal === undefined) {
+      return fail(
+        "INVALID_INPUT",
+        "Bộ ảnh chưa biết hạn mức. Điền hạn mức (hoặc dòng hợp đồng) xong rồi hãy tạo link.",
       );
     }
 
@@ -289,6 +332,55 @@ export async function POST(
         lyDo: lark.lyDo ?? null,
       }),
     );
+
+    // --- BB-286: làm nóng ĐÚNG MỘT LÔ bộ đệm ảnh cỡ 800, CHẠY NỀN, sau khi
+    // phản hồi đã rời máy chủ.
+    //
+    // CHỈ MỘT LÔ (40 ảnh, không lặp): giả định hạ tầng là gói Hobby, và
+    // after() tính vào cùng thời lượng hàm với phần phản hồi — lặp tới khi
+    // xong cả bộ (có thể 1.235 ảnh) ở đây dễ vượt quá `maxDuration` của
+    // Hobby. Một lô đã đủ lo trước ĐÚNG những tấm khách nhìn thấy ở màn hình
+    // đầu tiên (lưới ảnh không tải hết 1.235 tấm cùng lúc). Muốn nong HẾT cả
+    // bộ thì bấm "Làm nóng ảnh" ở màn chi tiết — route đó để trình duyệt tự
+    // lặp lại, không bị giới hạn bởi thời lượng MỘT hàm.
+    //
+    // Hỏng ở đây chỉ log: link đã tạo xong, CSKH đã cầm được link.
+    const chayLamNongNen = async () => {
+      try {
+        const ketQua = await lamNongMotLo(admin, galleryId, 0, requestId);
+        if (ketQua.dungVìQuota) {
+          console.info(
+            JSON.stringify({
+              evt: "lam_nong.dung_vi_quota",
+              requestId,
+              galleryId,
+              conTro: ketQua.conTroTiep,
+            }),
+          );
+        }
+      } catch (err) {
+        console.error(
+          JSON.stringify({
+            evt: "lam_nong.that_bai_khi_tao_link",
+            requestId,
+            galleryId,
+            loi: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
+    };
+
+    try {
+      // `after()` chỉ dùng được TRONG một yêu cầu thật của Next.js. Gọi thẳng
+      // route handler ngoài ngữ cảnh đó (phép thử gọi trực tiếp hàm POST) làm
+      // nó ném lỗi ngay tại đây — xem chú thích cùng loại ở `/api/img`.
+      after(chayLamNongNen);
+    } catch {
+      // Không có ngữ cảnh để hoãn tới: chạy nhưng KHÔNG đợi — vẫn giữ đúng
+      // yêu cầu "không chặn phản hồi tạo link", chỉ khác chỗ chạy ngay sau
+      // thay vì sau khi phản hồi rời máy chủ.
+      void chayLamNongNen();
+    }
 
     return ok({
       shareLinkId: link.id,

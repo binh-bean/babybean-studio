@@ -59,8 +59,8 @@ describe("BB-127: tạo link gửi khách", () => {
     customerId = c[0].id;
     const { rows: g } = await client.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
-                              drive_folder_url, photo_count)
-       values ($1,$2,'Fixture BB-127','ready',$3,'https://example.com/x', 12)
+                              drive_folder_url, photo_count, included_quota)
+       values ($1,$2,'Fixture BB-127','ready',$3,'https://example.com/x', 12, 20)
        returning id`,
       [branchId, customerId, `fixture-bb127-${Date.now()}`],
     );
@@ -76,7 +76,13 @@ describe("BB-127: tạo link gửi khách", () => {
 
   beforeEach(async () => {
     await client.query("delete from share_links where gallery_id = $1", [galleryId]);
-    await client.query("update galleries set photo_count = 12 where id = $1", [galleryId]);
+    // BB-285: reset cả included_quota/lark_* — ca 9-10 bên dưới có đổi.
+    await client.query(
+      `update galleries set photo_count = 12, included_quota = 20,
+              lark_trang_thai = null, lark_trang_thai_tu = null
+        where id = $1`,
+      [galleryId],
+    );
   });
 
   const linkDangSong = async () => {
@@ -180,5 +186,43 @@ describe("BB-127: tạo link gửi khách", () => {
     const meta = JSON.stringify(rows[0].metadata);
     expect(meta).toContain(ma.slice(0, 6));
     expect(meta).not.toContain(ma);
+  });
+
+  // ---------------------------------------------------------------------
+  // BB-285 — chặn tạo link khi chưa biết hạn mức, và khi Lark quá 60 ngày ở
+  // "Đã gửi file gốc" (docs/21 GĐ1, luật "đóng theo quy định").
+  // ---------------------------------------------------------------------
+
+  it("9. Chưa biết hạn mức (included_quota null, không có gallery_items) -> từ chối", async () => {
+    await client.query("update galleries set included_quota = null where id = $1", [galleryId]);
+    asRole("cs");
+    const res = await taoLink(body(), params());
+    expect(res.status).toBe(400);
+    expect(await linkDangSong()).toHaveLength(0);
+  });
+
+  it("10. Lark 'Đã gửi file gốc' quá 60 ngày -> từ chối (đóng theo quy định)", async () => {
+    const quaHan = new Date();
+    quaHan.setDate(quaHan.getDate() - 61);
+    await client.query(
+      `update galleries set lark_trang_thai = 'optDAI9nFV', lark_trang_thai_tu = $2 where id = $1`,
+      [galleryId, quaHan.toISOString()],
+    );
+    asRole("cs");
+    const res = await taoLink(body(), params());
+    expect(res.status).toBe(400);
+    expect(await linkDangSong()).toHaveLength(0);
+  });
+
+  it("11. Lark 'Đã gửi file gốc' mới 59 ngày -> vẫn tạo link được", async () => {
+    const chuaQuaHan = new Date();
+    chuaQuaHan.setDate(chuaQuaHan.getDate() - 59);
+    await client.query(
+      `update galleries set lark_trang_thai = 'optDAI9nFV', lark_trang_thai_tu = $2 where id = $1`,
+      [galleryId, chuaQuaHan.toISOString()],
+    );
+    asRole("cs");
+    const res = await taoLink(body(), params());
+    expect(res.status).toBe(200);
   });
 });

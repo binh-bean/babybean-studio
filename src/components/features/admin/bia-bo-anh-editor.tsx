@@ -48,6 +48,9 @@ export function BiaBoAnhEditor({
   const [loi, setLoi] = useState(detail.welcomeMessage ?? "");
   const [layout, setLayout] = useState(detail.coverLayout ?? "ben-canh");
 
+  /** BB-290 (#38): nút đổi khung xem trước máy tính / điện thoại. */
+  const [thietBiXemTruoc, setThietBiXemTruoc] = useState<"may-tinh" | "dien-thoai">("may-tinh");
+
   const [luoi, setLuoi] = useState<AnhLuoi[]>([]);
   const [dangTaiLuoi, setDangTaiLuoi] = useState(false);
   const [conTiep, setConTiep] = useState(false);
@@ -98,11 +101,34 @@ export function BiaBoAnhEditor({
 
   return (
     <section className="rounded-lg border border-[var(--bb-border)] p-4">
-      <h2 className="text-base font-medium">Bìa bộ ảnh</h2>
-      <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-        Thiết kế bìa album, với lưới chọn ảnh và xem trước toàn phần.
-      </p>
-      
+      {/* BB-290 lượt 2: khi đã chọn bìa, hiện thumbnail + tóm tắt (thay vì
+          chỉ một nút trần) — theo khối "BÌA ALBUM" của quan-tri-chi-tiet.png.
+          Chưa chọn thì giữ nguyên lời mời cũ. */}
+      {detail.coverPhotoId ? (
+        <div className="flex items-center gap-3.5">
+          <img
+            src={`/api/img/${detail.coverPhotoId}?w=200`}
+            alt=""
+            className="h-20 w-16 shrink-0 rounded-md object-cover"
+          />
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--bb-fg-muted)]">
+              Bìa bộ ảnh
+            </div>
+            <p className="truncate text-sm font-medium text-[var(--bb-fg)]">
+              {detail.coverHeadline || detail.babyName || "Đã chọn ảnh bìa"}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <h2 className="text-base font-medium">Bìa bộ ảnh</h2>
+          <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
+            Thiết kế bìa album, với lưới chọn ảnh và xem trước toàn phần.
+          </p>
+        </>
+      )}
+
       <div className="mt-3 flex gap-2">
         <button
           type="button"
@@ -110,7 +136,7 @@ export function BiaBoAnhEditor({
           onClick={openEditor}
           className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm"
         >
-          Mở trình thiết kế bìa
+          {detail.coverPhotoId ? "Đổi bìa" : "Mở trình thiết kế bìa"}
         </button>
       </div>
 
@@ -137,22 +163,37 @@ export function BiaBoAnhEditor({
             </div>
             
             <h3 className="mb-2 text-md font-semibold mt-2">1. Chọn ảnh bìa</h3>
+            {/* BB-290 (#38): lưới LUÔN hiện, kể cả đang tải — trước đây mục
+                này trống trơn trong lúc `taiLuoi` chạy, trông như bộ ảnh
+                không có tấm nào. Khung xương giữ đúng chỗ cho lưới thật. */}
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {luoi.map((anh) => (
-                <button
-                  key={anh.id}
-                  onClick={() => setAnhBiaNhap(anh.id)}
-                  className={`relative aspect-[2/3] overflow-hidden rounded-md border-2 ${
-                    anhBiaNhap === anh.id ? "border-[var(--bb-accent)]" : "border-transparent"
-                  }`}
-                >
-                                    <img
-                    src={`/api/img/${anh.id}?w=400`}
-                    className="h-full w-full object-cover"
-                    alt=""
-                  />
-                </button>
-              ))}
+              {dangTaiLuoi && luoi.length === 0
+                ? Array.from({ length: 8 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="aspect-[2/3] animate-pulse rounded-md bg-[var(--bb-surface-2)]"
+                    />
+                  ))
+                : luoi.map((anh) => (
+                    <button
+                      key={anh.id}
+                      onClick={() => setAnhBiaNhap(anh.id)}
+                      className={`relative aspect-[2/3] overflow-hidden rounded-md border-2 ${
+                        anhBiaNhap === anh.id ? "border-[var(--bb-accent)]" : "border-transparent"
+                      }`}
+                    >
+                      <img
+                        src={`/api/img/${anh.id}?w=400`}
+                        className="h-full w-full object-cover"
+                        alt=""
+                      />
+                    </button>
+                  ))}
+              {!dangTaiLuoi && luoi.length === 0 && (
+                <p className="col-span-3 sm:col-span-4 py-6 text-center text-xs text-[var(--bb-fg-muted)]">
+                  Bộ ảnh chưa có ảnh nào để chọn làm bìa.
+                </p>
+              )}
             </div>
             {conTiep && (
               <button
@@ -164,7 +205,7 @@ export function BiaBoAnhEditor({
               </button>
             )}
 
-            <h3 className="mb-2 mt-6 text-md font-semibold">2. Bố cục (Layout)</h3>
+            <h3 className="mb-2 mt-6 text-md font-semibold">2. Bố cục</h3>
             <div className="flex flex-wrap gap-2">
               {[
                 { id: "tap-chi", label: "Tạp chí" },
@@ -245,12 +286,53 @@ export function BiaBoAnhEditor({
             </div>
           </div>
 
-          {/* Xem trước (phải / dưới) */}
-          <div className="relative flex-1 bg-gray-100 dark:bg-gray-900 md:w-1/2 flex items-center justify-center overflow-hidden">
-            <div className="absolute top-2 right-2 z-10 p-2 bg-white/50 backdrop-blur rounded text-xs">Xem trước</div>
-            
-            <div className="w-full h-full relative" style={{ zoom: 0.7 }}>
-              <div className="absolute inset-0 origin-top scale-[1.428] w-[142.8%] h-[142.8%] pointer-events-none">
+          {/* Xem trước (phải / dưới) — BB-290 (#38): thu nhỏ TRỌN khung theo
+              tỉ lệ thật của thiết bị, có nút đổi máy tính / điện thoại. Trước
+              đây `zoom: 0.7` lồng với một lớp `scale-[1.428]` bên trong —
+              nghịch đảo gần đúng nhau nên ảnh xem trước bị cắt ngang thay vì
+              thu gọn. Cách mới: khung ngoài cố định theo TỈ LỆ thiết bị, bên
+              trong render `BiaBoAnh` ở kích thước THẬT của thiết bị (1440×900
+              hoặc 390×844 — trùng khổ chụp ảnh của phép thử BB-290) rồi
+              `scale()` toàn bộ khung đó vừa khít chiều ngang của khung xem
+              trước bằng đơn vị container-query (`cqw`), nên không còn phép
+              tính tay dễ lệch. */}
+          <div className="relative flex-1 bg-gray-100 dark:bg-gray-900 md:w-1/2 flex flex-col items-center justify-center gap-3 overflow-hidden p-4">
+            <div className="flex items-center gap-1 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-white/70 backdrop-blur p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setThietBiXemTruoc("may-tinh")}
+                aria-pressed={thietBiXemTruoc === "may-tinh"}
+                className={`rounded px-2.5 py-1 ${thietBiXemTruoc === "may-tinh" ? "bg-[var(--bb-fg)] text-white" : "text-[var(--bb-fg-muted)]"}`}
+              >
+                Máy tính
+              </button>
+              <button
+                type="button"
+                onClick={() => setThietBiXemTruoc("dien-thoai")}
+                aria-pressed={thietBiXemTruoc === "dien-thoai"}
+                className={`rounded px-2.5 py-1 ${thietBiXemTruoc === "dien-thoai" ? "bg-[var(--bb-fg)] text-white" : "text-[var(--bb-fg-muted)]"}`}
+              >
+                Điện thoại
+              </button>
+            </div>
+
+            <div
+              className="relative overflow-hidden rounded-md border border-[var(--bb-border)] bg-white shadow-sm"
+              style={{
+                containerType: "size",
+                width: thietBiXemTruoc === "may-tinh" ? "100%" : "min(100%, 260px)",
+                maxWidth: thietBiXemTruoc === "may-tinh" ? "640px" : "260px",
+                aspectRatio: thietBiXemTruoc === "may-tinh" ? "16 / 10" : "9 / 19.5",
+              }}
+            >
+              <div
+                className="pointer-events-none absolute left-0 top-0 origin-top-left"
+                style={
+                  thietBiXemTruoc === "may-tinh"
+                    ? { width: "1440px", height: "900px", transform: "scale(calc(100cqw / 1440))" }
+                    : { width: "390px", height: "844px", transform: "scale(calc(100cqw / 390))" }
+                }
+              >
                 <BiaBoAnh
                   anhBia={anhBiaNhap ? { id: anhBiaNhap } : null}
                   coverHeadline={tieuDe}

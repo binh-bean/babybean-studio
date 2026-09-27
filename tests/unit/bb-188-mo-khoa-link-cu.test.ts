@@ -55,8 +55,8 @@ describe("BB-188 — mở khoá link cũ không đổi địa chỉ", () => {
     const themBo = async (ten: string, soAnh: number) => {
       const { rows: g } = await client.query(
         `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
-                                drive_folder_url, photo_count)
-         values ($1,$2,$3,'ready',$4,'https://example.com/x',$5) returning id`,
+                                drive_folder_url, photo_count, included_quota)
+         values ($1,$2,$3,'ready',$4,'https://example.com/x',$5,20) returning id`,
         [branchId, customerId, ten, `fixture-bb188-${ten}-${Date.now()}`, soAnh],
       );
       return g[0].id as string;

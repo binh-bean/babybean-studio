@@ -63,6 +63,7 @@ import {
   type SanPhamCuaHang,
 } from "@/lib/products/cau-hinh-cua-hang";
 import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
+import { formatKichThuoc } from "@/lib/utils/dinh-dang";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { ChonAnhNhieuTam, type AnhTrongLuoiChon } from "./chon-anh-nhieu-tam";
 
@@ -128,6 +129,25 @@ function moTaSanPham(sp: SanPhamCuaHang | null): string {
   if (!sp) return "Chọn kích thước và chất liệu còn bán bên dưới.";
   const phan = [sp.material, sp.size ? `${sp.size} cm` : null].filter(Boolean);
   return phan.length > 0 ? phan.join(" · ") : "In ảnh chất lượng cao, giao tận nơi.";
+}
+
+/**
+ * BB-287 — báo cáo chấm mục #17: tiêu đề hộp lặp lại y hệt tên sản phẩm thô
+ * đồng bộ từ Lark ("UV 10x15"). Tên hiển thị cho ba mẹ phải THÂN THIỆN, suy
+ * từ NHÓM + chất liệu ("Ảnh in UV") — không phải chuỗi nội bộ dùng để đối
+ * chiếu với Lark. `sp.name`/`sp.size` vẫn giữ nguyên cho mọi nơi khác (giỏ
+ * hàng, đối chiếu tồn kho…), hàm này chỉ đổi CHỮ HIỂN THỊ ở khối tiêu đề.
+ */
+const TIEN_TO_NHOM: Record<NhomSanPham, string> = {
+  anh_in: "Ảnh in",
+  album: "Album",
+  khung: "Khung",
+};
+
+function tenThanThienSanPham(nhom: NhomSanPham, sp: SanPhamCuaHang | null): string {
+  const tienTo = TIEN_TO_NHOM[nhom];
+  if (!sp?.material) return tienTo;
+  return `${tienTo} ${sp.material}`;
 }
 
 export function CuaHang({
@@ -284,7 +304,7 @@ export function CuaHang({
         <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-[var(--bb-border)] sm:hidden" />
 
         <header className="flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-2.5 sm:px-7 sm:pt-6">
-          <h2 className="font-display text-2xl font-normal leading-tight text-foreground">
+          <h2 className="kh-h2 text-foreground">
             Mua thêm sản phẩm
           </h2>
           <button
@@ -342,7 +362,7 @@ export function CuaHang({
                 </div>
                 <div className="min-w-0">
                   <p className="truncate font-display text-lg font-normal leading-tight text-foreground">
-                    {sanPham?.name ?? TEN_NHOM[nhomDangXem]}
+                    {tenThanThienSanPham(nhomDangXem, sanPham)}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{moTaSanPham(sanPham)}</p>
                   {daDat(sanPham?.productId ?? "") > 0 && (
@@ -363,7 +383,14 @@ export function CuaHang({
                       </p>
                       <span className="text-[11px] text-muted-foreground">cm</span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    {/*
+                      BB-287 mục 8 — báo cáo chấm #17: mười kích thước xếp
+                      thành 3 hàng trên điện thoại. `flex-wrap` đổi thành
+                      cuộn ngang MỘT hàng dưới `sm` (390px không đủ chỗ cho
+                      quá vài chip); từ `sm` trở lên đủ rộng nên quay lại
+                      xuống dòng bình thường.
+                    */}
+                    <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
                       {dsKichThuoc.map((kt) => (
                         <button
                           key={kt}
@@ -374,7 +401,7 @@ export function CuaHang({
                           }}
                           className={chipButton(kt === kichThuoc)}
                         >
-                          {kt}
+                          {formatKichThuoc(kt)}
                         </button>
                       ))}
                     </div>
@@ -386,18 +413,28 @@ export function CuaHang({
                     <p className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                       Chất liệu
                     </p>
-                    <div className="flex flex-wrap gap-2">
-                      {dsChatLieu.map((cl) => (
-                        <button
-                          key={cl}
-                          type="button"
-                          onClick={() => setChatLieuChon(cl)}
-                          className={chipButton(cl === chatLieu)}
-                        >
-                          {cl}
-                        </button>
-                      ))}
-                    </div>
+                    {/*
+                      BB-287 mục 8 — báo cáo chấm #17: nhóm chỉ có MỘT chất
+                      liệu vẫn hiện một chip "UV" cô đơn, trông như còn phải
+                      chọn. Chỉ một lựa chọn thì không có gì để chọn — hiện
+                      thành chữ thường, không thành chip bấm được.
+                    */}
+                    {dsChatLieu.length === 1 ? (
+                      <p className="text-sm text-foreground">{dsChatLieu[0]}</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {dsChatLieu.map((cl) => (
+                          <button
+                            key={cl}
+                            type="button"
+                            onClick={() => setChatLieuChon(cl)}
+                            className={chipButton(cl === chatLieu)}
+                          >
+                            {cl}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -516,7 +553,7 @@ export function CuaHang({
                         />
                       )}
                       <span className="truncate">
-                        {d.name} ×{d.quantity}
+                        {formatKichThuoc(d.name)} ×{d.quantity}
                       </span>
                     </span>
                     <span className="flex shrink-0 items-center gap-2">

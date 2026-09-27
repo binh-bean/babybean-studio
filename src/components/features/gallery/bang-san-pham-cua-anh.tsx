@@ -34,6 +34,7 @@
 import React from "react";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import { formatKichThuoc } from "@/lib/utils/dinh-dang";
 
 export interface SuatTrongGoi {
   galleryItemId: string;
@@ -163,24 +164,30 @@ export function BangSanPhamCuaAnh({
         phải nổi bật, ở TRÊN mọi danh mục khác — không chờ cuộn xuống mới thấy.
         Chỉ hiện khi có sản phẩm ảnh in để treo (không có thì màn kia trống trơn).
       */}
+      {/*
+        BB-287 — báo cáo chấm mục #11: gradient đỏ rượu viền vàng không nằm
+        trong bảng màu (#FBF7F2/#2E2A27/#C4645A/#E8A598/#4F5B45/#7FA99B) và
+        "nhìn rất sến". Đổi về nền tối #2E2A27 (mực), chữ kem — đúng tông thẻ
+        "Xem trên tường" theo hệ thiết kế, không còn amber/rose ngoài bảng.
+      */}
       {onXemTuong && (
         <button
           type="button"
           onClick={onXemTuong}
-          className="flex w-full items-center justify-between gap-2 rounded-xl bg-gradient-to-r from-amber-500/25 to-rose-500/20 px-3.5 py-3 text-left ring-1 ring-amber-300/40 transition hover:from-amber-500/35 hover:to-rose-500/30"
+          className="flex w-full items-center justify-between gap-2 rounded-xl bg-[#2E2A27] px-3.5 py-3 text-left ring-1 ring-white/10 transition hover:bg-[#3a352f]"
         >
           <span>
-            <span className="block text-sm font-semibold">Xem trên tường nhà mình</span>
-            <span className="block text-[11px] text-white/70">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
+            <span className="block text-sm font-semibold text-[#FBF7F2]">Xem trên tường nhà mình</span>
+            <span className="block text-[11px] text-[#FBF7F2]/70">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
           </span>
-          <span className="shrink-0 text-base leading-none">→</span>
+          <span className="shrink-0 text-base leading-none text-[#FBF7F2]">→</span>
         </button>
       )}
 
       {/* ---------- 1. TRONG GÓI ---------- */}
       {suatTrongGoi.length > 0 && (
         <section>
-          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">
+          <h3 className="kh-eyebrow mb-1.5 text-white/50">
             Trong gói
           </h3>
           <ul className="space-y-1.5">
@@ -195,7 +202,7 @@ export function BangSanPhamCuaAnh({
                     className={[
                       "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors",
                       sp.coAnhNay
-                        ? "bg-emerald-500/20 ring-1 ring-emerald-300/50"
+                        ? "bg-[#7FA99B]/20 ring-1 ring-[#7FA99B]/50"
                         : "bg-white/10 hover:bg-white/15",
                       khoa || dangLuu ? "opacity-60" : "",
                     ].join(" ")}
@@ -229,7 +236,7 @@ export function BangSanPhamCuaAnh({
       {/* ---------- 2. ALBUM ---------- */}
       {(albumTrongGoi.length > 0 || albumDaMua.length > 0 || albumBanDuoc.length > 0) && (
         <section>
-          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">
+          <h3 className="kh-eyebrow mb-1.5 text-white/50">
             Album
           </h3>
 
@@ -257,7 +264,7 @@ export function BangSanPhamCuaAnh({
                   className={[
                     "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors",
                     al.coAnhNay
-                      ? "bg-emerald-500/20 ring-1 ring-emerald-300/50"
+                      ? "bg-[#7FA99B]/20 ring-1 ring-[#7FA99B]/50"
                       : "bg-white/10 hover:bg-white/15",
                     khoa || dangLuu ? "opacity-60" : "",
                   ].join(" ")}
@@ -304,9 +311,15 @@ export function BangSanPhamCuaAnh({
           </ul>
 
           {albumBanDuoc.length > 0 && (
-            <details className="mt-1.5">
-              <summary className="cursor-pointer rounded-xl bg-white/10 px-3 py-2 text-xs font-medium">
-                Mua thêm một cuốn album
+            // BB-287 mục #11 — tam giác ▶ mặc định của trình duyệt thay bằng
+            // › xoay 90° khi mở (`list-none` + `::marker`/`-webkit-details-marker`
+            // ẩn dấu gốc, `group-open:rotate-90` xoay dấu tự vẽ).
+            <details className="group mt-1.5">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-medium marker:content-none [&::-webkit-details-marker]:hidden">
+                <span>Mua thêm một cuốn album</span>
+                <span aria-hidden className="text-sm leading-none transition-transform group-open:rotate-90">
+                  ›
+                </span>
               </summary>
               <ul className="mt-1 space-y-1">
                 {albumBanDuoc.map((al) => (
@@ -318,7 +331,7 @@ export function BangSanPhamCuaAnh({
                       <span className="block truncate text-xs">{al.name}</span>
                       <span className="block text-[11px] text-white/55">
                         {formatCurrencyVND(al.unitPrice)}
-                        {al.size ? ` · ${al.size}` : ""}
+                        {al.size ? ` · ${formatKichThuoc(al.size)}` : ""}
                       </span>
                     </span>
                     <button
@@ -353,7 +366,7 @@ export function BangSanPhamCuaAnh({
         hẳn đường mua khi một nơi gọi còn sót lại bản cũ.
       */}
       <section>
-        <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">
+        <h3 className="kh-eyebrow mb-1.5 text-white/50">
           Mua thêm cho tấm này
         </h3>
         {onDatInTamNay ? (
@@ -362,6 +375,11 @@ export function BangSanPhamCuaAnh({
               const ds = theoNhom(nhom);
               if (ds.length === 0) return null;
               const daDat = daDatTrongNhom(nhom);
+              // BB-289 lượt 2 — bản vẽ `xem-lon-dat-in-dien-thoai.png` ghi
+              // "từ <giá thấp nhất> ₫" ngay trên hàng mở nhóm, để ba mẹ biết
+              // khoảng giá trước khi bấm mở cửa hàng — giá thấp nhất trong
+              // ĐÚNG nhóm này, không phải giá cố định.
+              const giaThapNhat = Math.min(...ds.map((m) => m.unitPrice));
 
               return (
                 <button
@@ -374,10 +392,10 @@ export function BangSanPhamCuaAnh({
                   <span className="min-w-0">
                     <span className="block font-medium">{TEN_NHOM[nhom]}</span>
                     <span className="block text-white/55">
-                      {daDat > 0 ? `Đang đặt ${daDat}` : "Đặt in tấm này"}
+                      {daDat > 0 ? `Đang đặt ${daDat}` : `từ ${formatCurrencyVND(giaThapNhat)}`}
                     </span>
                   </span>
-                  <span className="shrink-0 text-base leading-none">→</span>
+                  <span className="shrink-0 text-base leading-none">›</span>
                 </button>
               );
             })}
@@ -400,7 +418,7 @@ export function BangSanPhamCuaAnh({
                     <span>{TEN_NHOM[nhom]}</span>
                     <span className="flex items-center gap-2 text-white/55">
                       {daDat > 0 && (
-                        <span className="rounded-full bg-emerald-500/25 px-2 py-0.5 text-[11px] text-emerald-200">
+                        <span className="rounded-full bg-[#7FA99B]/25 px-2 py-0.5 text-[11px] text-[#cfe6dd]">
                           {daDat}
                         </span>
                       )}
@@ -419,7 +437,7 @@ export function BangSanPhamCuaAnh({
                             <span className="block truncate text-xs">{m.name}</span>
                             <span className="block text-[11px] text-white/55">
                               {formatCurrencyVND(m.unitPrice)}
-                              {m.size ? ` · ${m.size}` : ""}
+                              {m.size ? ` · ${formatKichThuoc(m.size)}` : ""}
                             </span>
                           </span>
 

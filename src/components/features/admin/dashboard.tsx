@@ -79,7 +79,12 @@ export function Dashboard() {
   // từ `GET /api/admin/can-xu-ly`, gộp với `dueSoon`/`overdue` đã có sẵn
   // trong `data.stats`. Tải riêng, không chặn khối chính: hỏng thì khối chỉ
   // thiếu hai loại kia, không sập cả trang.
-  const [canXuLy, setCanXuLy] = useState<{ driveChuaChiaSe?: unknown[]; chuaCoAnh?: unknown[] } | null>(null);
+  const [canXuLy, setCanXuLy] = useState<{
+    driveChuaChiaSe?: unknown[];
+    chuaCoAnh?: unknown[];
+    chuaCoHanMuc?: unknown[];
+    canhBaoLark?: number;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -181,7 +186,7 @@ export function Dashboard() {
     { key: "waitingForSelection", label: "Chờ khách chọn", value: data.stats.waitingForSelection, huongTangLaTot: false },
     { key: "dueSoon", label: "Sắp hết hạn", value: data.stats.dueSoon, huongTangLaTot: false },
     { key: "overdue", label: "Quá hạn", value: data.stats.overdue, huongTangLaTot: false },
-    { key: "waitingForRetouch", label: "Chờ retouch", value: data.stats.waitingForRetouch, huongTangLaTot: false },
+    { key: "waitingForRetouch", label: "Chờ chỉnh ảnh", value: data.stats.waitingForRetouch, huongTangLaTot: false },
     { key: "deliveredThisMonth", label: "Đã giao tháng này", value: data.stats.deliveredThisMonth, huongTangLaTot: true },
   ];
 
@@ -202,8 +207,10 @@ export function Dashboard() {
         const merged: CanXuLyTongHop = {
           driveChuaChiaSe: canXuLy?.driveChuaChiaSe,
           chuaCoAnh: canXuLy?.chuaCoAnh,
+          chuaCoHanMuc: canXuLy?.chuaCoHanMuc,
           dueSoon: data.stats.dueSoon,
           overdue: data.stats.overdue,
+          canhBaoLark: canXuLy?.canhBaoLark,
         };
         const dong = dongCanXuLy(merged);
         return (

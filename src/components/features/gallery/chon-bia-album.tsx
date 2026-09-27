@@ -208,7 +208,7 @@ export function ChonBiaAlbum({
         className="h-[160px] w-full rounded-2xl object-cover sm:h-[200px]"
       />
       <div>
-        <h3 className="font-display text-lg font-medium">Chọn ảnh bìa album</h3>
+        <h3 className="kh-h2">Chọn ảnh bìa album</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Gói của ba mẹ có {albums.length > 1 ? `${albums.length} cuốn album` : "một cuốn album"} —
           mỗi cuốn cần một ảnh bìa, chọn trong những tấm ba mẹ đã thả tim.

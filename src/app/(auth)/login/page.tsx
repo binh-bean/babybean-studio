@@ -101,7 +101,7 @@ function LoginForm() {
           autoCapitalize="none"
           autoComplete="username"
           spellCheck={false}
-          placeholder="linh.q1"
+          placeholder="ten.dang.nhap"
         />
       </label>
 
@@ -127,7 +127,7 @@ function LoginForm() {
       </Button>
 
       <p className="text-center text-xs text-[var(--bb-fg-muted)]">
-        Quên mật khẩu? Nhờ chủ studio đặt lại giúp.
+        Quên mật khẩu? Nhờ admin đặt lại giúp.
       </p>
     </form>
   );
@@ -159,8 +159,11 @@ export default function LoginPage() {
 
       <div className="flex w-full flex-col items-center justify-center px-4 py-12 md:w-1/2">
         <div className="w-full max-w-sm">
-          <h1 className="text-center font-display text-2xl font-bold text-[var(--bb-fg)]">
-            BabyBean Studio
+          {/* BB-290 (#29): MỘT logo chữ duy nhất cho toàn hệ — "BABY BEAN"
+              giãn chữ, không còn "BabyBean Studio" Playfair đậm khác hẳn
+              thanh bên quản trị (admin-sidebar.tsx) và màn khách. */}
+          <h1 className="text-center font-display text-2xl font-normal tracking-[0.18em] text-[var(--bb-fg)]">
+            BABY BEAN
           </h1>
           <p className="mt-1 text-center text-sm text-[var(--bb-fg-muted)]">
             Đăng nhập dành cho nhân viên

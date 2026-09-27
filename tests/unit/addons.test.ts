@@ -57,8 +57,13 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       },
       {
         id: prodLowSamplesId,
-        name: "TEST Lookbook 03",
-        kind: "shoot_package",
+        // BB-288: phải là `kind: "print"` (một trong 3 nhóm đang bán), không
+        // phải `shoot_package` — từ BB-288, `/api/g/addons` chặn
+        // `shoot_package` NGAY ở luật nhóm (404 "ngoài danh mục"), trước khi
+        // chạm tới luật giá (400) mà ca này muốn canh riêng.
+        name: "TEST Gỗ hiếm mẫu 25x35",
+        kind: "print",
+        material: "Gỗ",
         list_price: 1800000,
         price_confidence: 1.0,
         price_samples: 1, // chỉ có 1 mẫu -> vi phạm luật 2 (cần >= 5)

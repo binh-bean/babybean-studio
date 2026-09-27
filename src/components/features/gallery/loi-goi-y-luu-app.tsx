@@ -16,9 +16,17 @@
  * gì đáng để "lưu lại mở nhanh hơn". Một biểu tượng điện thoại không giải
  * thích được lý do — chỉ người đã quen PWA mới đoán ra nó làm gì.
  *
- * Gợi ý này thay vào đó CHỜ một tín hiệu ba mẹ đã bắt đầu gắn bó với bộ ảnh:
- * thả tim tấm đầu tiên (chọn một tấm), hoặc quay lại mở link lần thứ hai.
- * Lúc đó câu "lưu ra màn hình để mở lại một chạm" mới có bối cảnh.
+ * ---------------------------------------------------------------------------
+ * BB-289 — sửa lỗi admin báo: chip KHÔNG BAO GIỜ hiện cho khách đã có tim
+ * ---------------------------------------------------------------------------
+ * Bản trước CHỜ một tín hiệu "vừa gắn bó": thả tim tấm đầu (0 -> >0) hoặc mở
+ * lại link lần thứ hai. Với khách MỞ LINK TỪ TIN NHẮN CŨ mà đã từng thả tim
+ * trước đó (bộ ảnh mở tab mới, hoặc mở lại sau nhiều ngày), `daChon` khởi
+ * động thẳng ở một số > 0 — không có cú 0 -> >0 nào để bắt, còn "lần mở thứ
+ * hai" đếm theo lượt MOUNT của component này (thường bị reset khi khác
+ * `token`/thiết bị) nên khách đó có thể không bao giờ thấy chip. Sửa tận
+ * gốc: hiện NGAY khi mở trang (không chờ tín hiệu nào), chỉ trừ khi đang
+ * chạy như app đã cài hoặc khách vừa bấm ẩn trong `NGAY_AN` ngày gần đây.
  *
  * ---------------------------------------------------------------------------
  * Không chồng lời mời với PWAInstallPrompt
@@ -85,64 +93,30 @@ function daAnGanDay(): boolean {
 }
 
 export interface LoiGoiYLuuAppProps {
-  /** Số tấm ba mẹ đã thả tim — 0 → >0 là tín hiệu "vừa thả tim tấm đầu". */
+  /** Không còn dùng để quyết định thời điểm hiện chip (BB-289) — giữ lại cho
+   *  tương thích chữ ký cũ, không đọc giá trị bên trong component. */
   daChon: number;
   onXemCachLuu: () => void;
 }
 
-export function LoiGoiYLuuApp({ daChon, onXemCachLuu }: LoiGoiYLuuAppProps) {
+export function LoiGoiYLuuApp({ onXemCachLuu }: LoiGoiYLuuAppProps) {
   const [hien, setHien] = useState(false);
   const daKichHoat = useRef(false); // đã tự hiện một lần trong phiên này chưa
-  const daChonTruoc = useRef(daChon);
-  // `daChon` khởi động ở 0 (giá trị mặc định của useState phía gallery-app.tsx)
-  // RỒI mới đổi sang số thật khi tải xong bộ ảnh — kể cả với ba mẹ ĐÃ chọn ảnh
-  // từ trước. So khớp "0 -> >0" ngay từ lúc mount sẽ hiểu nhầm cú đồng bộ dữ
-  // liệu cũ đó là "vừa thả tim tấm đầu", nên gợi ý bật lại mỗi lần MỞ LẠI một
-  // bộ ảnh đã từng chọn — kể cả sau khi ba mẹ đã bấm "Để sau". Chỉ bắt đầu so
-  // khớp SAU khi `daChon` đã ổn định lại một giá trị mới (nghĩa là dữ liệu
-  // ban đầu đã tải xong), không tính lần đổi giá trị đầu tiên đó.
-  const daOnDinh = useRef(false);
-  // React StrictMode (chỉ ở `next dev`) chủ động gọi mount -> cleanup -> mount
-  // MỘT LẦN NỮA để lộ side-effect thiếu dọn dẹp. Effect đếm lượt mở bên dưới
-  // ghi localStorage kiểu đọc-rồi-ghi (không nguyên tử), nên bị gọi hai lần
-  // là đếm dư thành 2 ngay trong CÙNG một lượt mở — tưởng nhầm là "lần thứ
-  // hai". Cờ này còn nguyên qua cả hai lần StrictMode gọi (cùng một instance
-  // component), nên chỉ lượt gọi thật đầu tiên mới thật sự ghi.
-  const daDemLuotMo = useRef(false);
 
-  // Lần mở thứ hai trở đi: đếm mount, không đợi tín hiệu thả tim.
+  // BB-289 — hiện NGAY khi mở trang, không chờ tín hiệu thả tim/lượt mở thứ
+  // hai nữa (xem ghi chú lớn ở đầu tệp: khách đã có tim từ trước không bao
+  // giờ tạo ra cú 0 -> >0 để bắt). Vẫn giữ đếm số lần mở (`KHOA_SO_LAN_MO`)
+  // vì các nơi khác trong mã có thể còn tham chiếu, nhưng không còn dùng nó
+  // để quyết định hiện/ẩn.
   useEffect(() => {
-    if (daDemLuotMo.current) return;
-    daDemLuotMo.current = true;
+    if (daKichHoat.current) return;
     if (dangChayNhuApp() || daAnGanDay()) return;
     const soLanTruoc = Number(docLuuTru(KHOA_SO_LAN_MO) ?? "0");
-    const soLanMoi = soLanTruoc + 1;
-    ghiLuuTru(KHOA_SO_LAN_MO, String(soLanMoi));
-    if (soLanMoi >= 2 && !daKichHoat.current) {
-      daKichHoat.current = true;
-      setHien(true);
-    }
-    // Chỉ chạy một lần khi component dựng — đếm lượt MỞ TRANG, không phải
-    // lượt render lại. Không phụ thuộc props/state nào nên mảng rỗng đúng.
+    ghiLuuTru(KHOA_SO_LAN_MO, String(soLanTruoc + 1));
+    daKichHoat.current = true;
+    setHien(true);
+    // Chỉ chạy một lần khi component dựng — mảng rỗng đúng.
   }, []);
-
-  // Thả tim tấm đầu tiên: 0 -> >0, CHỈ TÍNH sau khi dữ liệu ban đầu đã ổn định.
-  useEffect(() => {
-    if (!daOnDinh.current) {
-      // Lần đổi giá trị đầu tiên là cú đồng bộ từ server, không phải một cú
-      // bấm tim thật — chỉ ghi nhận làm mốc, không xét kích hoạt.
-      daOnDinh.current = true;
-      daChonTruoc.current = daChon;
-      return;
-    }
-    const truoc = daChonTruoc.current;
-    daChonTruoc.current = daChon;
-    if (truoc === 0 && daChon > 0 && !daKichHoat.current) {
-      if (dangChayNhuApp() || daAnGanDay()) return;
-      daKichHoat.current = true;
-      setHien(true);
-    }
-  }, [daChon]);
 
   const dong = () => {
     setHien(false);

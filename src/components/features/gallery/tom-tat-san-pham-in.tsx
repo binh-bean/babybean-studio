@@ -31,6 +31,7 @@
 import React from "react";
 import { cn } from "@/components/ui/utils";
 import { conThieuAnh, type HangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
+import { formatKichThuoc } from "@/lib/utils/dinh-dang";
 
 export interface DongSanPhamIn extends HangInTrongGoi {
   /** Ảnh đã xếp vào dòng hàng này. */
@@ -76,21 +77,28 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className }: TomTatSanPhamInPro
   if (dong.length === 0) return null;
 
   return (
-    <section className={cn("rounded-xl border bg-surface p-4", className)}>
-      <h3 className="text-base font-semibold">Sản phẩm in trong gói</h3>
+    // BB-287 mục #23 — báo cáo chấm: `border` không kèm màu thì ăn theo màu
+    // CHỮ (currentColor = #2E2A27, mực đậm) thay vì màu viền nhạt dùng chung
+    // (#E8E0D6/`--bb-border`) — nhìn "gắt hơn hẳn mọi thẻ khác". Khai rõ
+    // `border-[var(--bb-border)]` để không lặp lỗi này khi có ai đổi màu chữ
+    // mặc định của trang.
+    <section className={cn("rounded-xl border border-[var(--bb-border)] bg-surface p-4", className)}>
+      <h3 className="kh-h3">Sản phẩm in trong gói</h3>
       <p className="mt-1 text-sm text-muted-foreground">
+        {/* BB-287 mục 5 — "bảng bên phải" sai trên điện thoại (không có bảng
+            bên phải ở đó). Đổi thành thao tác đúng trên MỌI thiết bị. */}
         Những thứ này ba mẹ đã trả tiền trong hợp đồng rồi. Bấm vào một tấm ảnh để
-        xem lớn, rồi chọn ở bảng bên phải là tấm đó in ra sản phẩm nào.
+        xem lớn, rồi bấm biểu tượng khung để chọn tấm đó in ra sản phẩm nào.
       </p>
 
       <ul className="mt-3 space-y-2">
         {dong.map((d) => {
           const tt = loiTrangThai(d);
           return (
-            <li key={d.galleryItemId} className="rounded-lg border p-3">
+            <li key={d.galleryItemId} className="rounded-lg border border-[var(--bb-border)] p-3">
               <div className="flex items-baseline justify-between gap-3">
                 <p className="text-sm font-medium">
-                  {d.name}
+                  {formatKichThuoc(d.name)}
                   {d.quantity > 1 && (
                     <span className="ml-1.5 text-xs text-muted-foreground">×{d.quantity}</span>
                   )}
@@ -98,7 +106,10 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className }: TomTatSanPhamInPro
                 <p
                   className={cn(
                     "shrink-0 text-xs",
-                    tt.thieu ? "font-medium text-amber-600" : "text-muted-foreground",
+                    // BB-287 mục #23 — cam #D97706 không nằm trong bảng màu;
+                    // terracotta (heart) là màu nhấn trạng thái "cần chú ý"
+                    // dùng chung cho màn khách.
+                    tt.thieu ? "font-medium text-heart" : "text-muted-foreground",
                   )}
                 >
                   {tt.chu}
@@ -113,7 +124,7 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className }: TomTatSanPhamInPro
                         type="button"
                         onClick={() => onMoAnh(a.id)}
                         title={a.fileName}
-                        className="block h-14 w-14 overflow-hidden rounded-md border-2 border-emerald-500 transition-opacity hover:opacity-80"
+                        className="block h-14 w-14 overflow-hidden rounded-md border-2 border-moss transition-opacity hover:opacity-80"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
