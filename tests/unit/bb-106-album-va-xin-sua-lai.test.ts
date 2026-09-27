@@ -233,6 +233,29 @@ describe("Album mua thêm và yêu cầu sửa lại", () => {
     expect(g[0].s).toBe("in_retouch");
   });
 
+  it("5b. BB-276: tối đa 3 lần trong 1 giờ — lần thứ 4 bị chặn, không thêm dòng/tin Lark", async () => {
+    // Ca 5 đã gửi 1 lần; gửi thêm 2 lần là đủ trần 3.
+    const gui = () =>
+      xinSuaLai(
+        new Request("http://localhost/api/g/xin-sua-lai", {
+          method: "POST",
+          body: JSON.stringify({ lyDo: "Đổi thêm một tấm" }),
+        }),
+      );
+    phien();
+    expect((await gui()).status).toBe(200);
+    phien();
+    expect((await gui()).status).toBe(200);
+    phien();
+    expect((await gui()).status).toBe(429);
+
+    const { rows } = await client.query(
+      "select count(*)::int n from activity_logs where action='gallery.reopen_requested' and gallery_id=$1",
+      [galleryId],
+    );
+    expect(rows[0].n).toBe(3);
+  });
+
   it("6. Lý do rỗng thì từ chối", async () => {
     phien();
     const res = await xinSuaLai(

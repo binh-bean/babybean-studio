@@ -81,10 +81,8 @@ export async function DELETE(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    // Vẫn đòi phiên hợp lệ — huỷ đăng ký không phải thao tác công khai, dù
-    // xoá nhầm endpoint của người khác chỉ làm họ ngưng nhận thông báo (không
-    // lộ dữ liệu). Giữ luật chung của mọi route /api/g/* cho nhất quán.
-    await requireGallerySession();
+    // Vẫn đòi phiên hợp lệ — huỷ đăng ký không phải thao tác công khai.
+    const session = await requireGallerySession();
 
     const jsonBody = await readJsonBody(request);
     if (!jsonBody.ok) {
@@ -97,10 +95,15 @@ export async function DELETE(request: Request): Promise<Response> {
     }
 
     const admin = createAdminClient();
+    // BB-276: khoá thêm theo `gallery_id` của phiên đang gọi — trước đây xoá
+    // theo mỗi `endpoint` nghĩa là một phiên hợp lệ CỦA BỘ ẢNH BẤT KỲ có thể
+    // tắt thông báo của một bộ ảnh khác nếu biết (hoặc đoán trúng) endpoint
+    // của họ. Endpoint không phải bí mật được thiết kế để giữ kín tuyệt đối.
     const { error } = await admin
       .from("push_dang_ky")
       .delete()
-      .eq("endpoint", parsed.data.endpoint);
+      .eq("endpoint", parsed.data.endpoint)
+      .eq("gallery_id", session.galleryId);
     if (error) throw error;
 
     return ok({ dangKy: false });

@@ -37,6 +37,8 @@ import { enqueueLarkNotification } from "@/lib/lark/notify";
 export const runtime = "nodejs";
 
 const MAX_LY_DO = 500;
+/** BB-276: mỗi bộ ảnh tối đa chừng này lần xin sửa lại trong 1 giờ. */
+const MAX_XIN_MOI_GIO = 3;
 
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
@@ -70,6 +72,23 @@ export async function POST(request: Request): Promise<Response> {
       return fail(
         "INVALID_INPUT",
         "Bộ ảnh vẫn đang mở — ba mẹ sửa trực tiếp được, không cần xin ạ.",
+      );
+    }
+
+    // BB-276: mỗi lần gửi là một tin vào nhóm Lark của chi nhánh. Không trần
+    // thì một phiên bấm lặp (hoặc kịch bản) làm ngập nhóm CSKH. Đếm trên chính
+    // nhật ký vừa ghi — không cần bảng mới.
+    const { count: daGuiGanDay, error: demLoi } = await admin
+      .from("activity_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("gallery_id", gallery.id)
+      .eq("action", "gallery.reopen_requested")
+      .gte("created_at", new Date(Date.now() - 60 * 60 * 1000).toISOString());
+    if (demLoi) throw demLoi;
+    if ((daGuiGanDay ?? 0) >= MAX_XIN_MOI_GIO) {
+      return fail(
+        "RATE_LIMITED",
+        "Bên mình đã nhận yêu cầu của ba mẹ rồi ạ — CSKH sẽ liên hệ lại sớm.",
       );
     }
 

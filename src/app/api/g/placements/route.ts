@@ -327,10 +327,29 @@ export async function DELETE(request: NextRequest) {
       return fail("GALLERY_LOCKED", "Bộ ảnh đã được chốt, không thể thay đổi ảnh in");
     }
 
-    // 3. Xác định selection_item_id
-    let targetSelectionItemId = input.selectionItemId;
+    // 3. Xác định selection_item_id — BB-276: `selectionItemId` đến thẳng từ
+    // thân yêu cầu (không tin cậy). POST ở trên xác nhận nó thuộc ĐÚNG
+    // `session.selectionId`/`session.galleryId` trước khi dùng (bước 3 phía
+    // trên); DELETE trước đây dùng thẳng `input.selectionItemId` mà không
+    // kiểm gì cả — một phiên hợp lệ của bộ ảnh A có thể gửi
+    // `selectionItemId` của bộ ảnh B và xoá đúng dòng đặt ảnh của khách khác.
+    // Kiểm đối xứng với nhánh `photoId` ngay dưới đây, không tin thẳng id.
+    let targetSelectionItemId: string | null = null;
 
-    if (!targetSelectionItemId && input.photoId) {
+    if (input.selectionItemId) {
+      const { data: si, error: siError } = await admin
+        .from("selection_items")
+        .select("id")
+        .eq("id", input.selectionItemId)
+        .eq("selection_id", session.selectionId)
+        .eq("gallery_id", session.galleryId)
+        .maybeSingle();
+      if (siError) throw siError;
+      if (!si) {
+        return fail("NOT_FOUND", "Không tìm thấy ảnh đã chọn trong bộ ảnh này");
+      }
+      targetSelectionItemId = si.id;
+    } else if (input.photoId) {
       const { data: si } = await admin
         .from("selection_items")
         .select("id")
