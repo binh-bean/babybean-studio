@@ -604,7 +604,7 @@ export function PhotoLightbox({
             <span className="text-white/50">{total}</span>
           </div>
           {currentPhoto.fileName && (
-            <p className="mt-3 truncate px-2 text-[11px] text-white/40 max-w-[200px]">
+            <p className="mt-3 truncate px-2 text-[11px] text-white/60 max-w-[200px]">
               {currentPhoto.fileName}
             </p>
           )}

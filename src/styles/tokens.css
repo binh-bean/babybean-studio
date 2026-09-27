@@ -32,7 +32,7 @@
   --bb-success-fg: #ffffff;
   --bb-warning: #d9932b;
   --bb-warning-fg: #2e2211;
-  --bb-danger: #c4553f;
+  --bb-danger: #bd4f3a; /* 27/09: #c4553f -> đậm vừa đủ, chữ 12px trên nền trắng đạt 4.5:1 */
   --bb-danger-fg: #ffffff;
   /*
    * BB-200 — mức cảnh báo thứ tư từ Lark ("Phải xong trong ngày"), tím để

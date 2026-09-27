@@ -1501,7 +1501,7 @@ function TinhTrangLink({ detail }: { detail: Detail }) {
     <div className="mt-2 space-y-1 text-sm">
       <p>
         <span
-          className="mr-2 inline-block rounded-full border px-2 py-0.5 text-xs"
+          className="mr-2 inline-block rounded-full border px-2 py-0.5 text-xs text-[var(--bb-fg)]"
           style={{ borderColor: nhan.vien }}
         >
           {nhan.chu}

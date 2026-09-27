@@ -66,8 +66,12 @@ async function chayAxe(
   const dong = (v: (typeof nghiemTrong)[number]) =>
     `— Màn "${tenMan}": ${v.id} (${v.impact}) — ${v.help} — ${v.nodes.length} phần tử, vd: ${v.nodes[0]?.target.join(" ")}`;
   return {
-    phaiVa: nghiemTrong.filter((v) => v.id !== "color-contrast").map(dong),
-    mauSac: nghiemTrong.filter((v) => v.id === "color-contrast").map(dong),
+    // Chủ studio chốt 27/09: "đậm lên vừa đủ" — từ nay tương phản màu cũng
+    // làm phép thử đỏ, liệt kê đủ từng phần tử.
+    phaiVa: nghiemTrong.map(dong),
+    mauSac: nghiemTrong
+      .filter((v) => v.id === "color-contrast")
+      .flatMap((v) => v.nodes.map((n) => `— Màn "${tenMan}": ${n.target.join(" ")} — ${n.any[0]?.message ?? ""}`)),
   };
 }
 
@@ -241,10 +245,10 @@ ownIpTest.describe("BB-277: màn khách — axe + bàn phím", () => {
     }
 
     if (toanBoMauSac.length > 0) {
-      console.log(`[BB-277] Vi phạm tương phản màu (chỉ báo, không tự đổi màu):\n${toanBoMauSac.join("\n")}`);
+      console.log(`[BB-277] Vi phạm tương phản màu:\n${toanBoMauSac.join("\n")}`);
     }
     ownIpExpect
-      .soft(toanBoLoi, `Vi phạm axe mức serious/critical (không tính màu sắc):\n${toanBoLoi.join("\n")}`)
+      .soft(toanBoLoi, `Vi phạm axe mức serious/critical (kể cả màu sắc):\n${toanBoLoi.join("\n")}`)
       .toEqual([]);
   });
 
@@ -533,10 +537,10 @@ pwTest.describe("BB-277: màn quản trị — axe + bàn phím", () => {
     }
 
     if (toanBoMauSac.length > 0) {
-      console.log(`[BB-277] Vi phạm tương phản màu (chỉ báo, không tự đổi màu):\n${toanBoMauSac.join("\n")}`);
+      console.log(`[BB-277] Vi phạm tương phản màu:\n${toanBoMauSac.join("\n")}`);
     }
     pwExpect
-      .soft(toanBoLoi, `Vi phạm axe mức serious/critical (không tính màu sắc):\n${toanBoLoi.join("\n")}`)
+      .soft(toanBoLoi, `Vi phạm axe mức serious/critical (kể cả màu sắc):\n${toanBoLoi.join("\n")}`)
       .toEqual([]);
   });
 

@@ -18,7 +18,8 @@ const badgeVariants = cva(
         success:
           "bg-[var(--bb-success)]/15 text-[var(--bb-success)] border border-[var(--bb-success)]/30",
         warning:
-          "bg-[var(--bb-warning)]/15 text-[var(--bb-warning)] border border-[var(--bb-warning)]/30",
+          // Chữ cam gốc trên nền cam nhạt chỉ đạt 2:1 — pha 60% cam + đen, vẫn tông cam.
+          "bg-[var(--bb-warning)]/15 text-[color-mix(in_srgb,var(--bb-warning)_60%,black)] border border-[var(--bb-warning)]/30",
         danger:
           "bg-[var(--bb-danger)]/15 text-[var(--bb-danger)] border border-[var(--bb-danger)]/30",
       },
