@@ -790,6 +790,7 @@ export function GalleryList() {
                       onClick={() => copyShareLink(item.id)}
                       className="text-xs h-8 px-2.5"
                       title="Sao chép link"
+                      aria-label="Sao chép link"
                     >
                       <Copy className="h-3.5 w-3.5" />
                     </Button>

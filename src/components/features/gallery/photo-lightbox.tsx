@@ -125,6 +125,20 @@ export function PhotoLightbox({
     };
   }, []);
 
+  // BB-277 — focus quay về đúng tấm ảnh (hoặc nút) đã mở màn xem lớn khi đóng.
+  // Ghi lại phần tử đang giữ focus NGAY LÚC MỞ (còn là tấm bấm/Enter trong
+  // lưới), rồi trả focus về đó lúc màn này gỡ khỏi DOM (đóng, theo mọi
+  // đường: nút X, Esc, hay bấm nền).
+  const focusTruocKhiMoRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    focusTruocKhiMoRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      const veLai = focusTruocKhiMoRef.current;
+      if (veLai && document.contains(veLai)) veLai.focus();
+    };
+  }, []);
+
   const total = photos.length;
   const currentPhoto = photos[currentIndex];
 
@@ -569,7 +583,7 @@ export function PhotoLightbox({
             }}
             aria-label={vi.common.close}
             title={vi.common.close}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus:outline-hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg"
           >
             <X className="h-[22px] w-[22px]" strokeWidth={1.5} />
           </button>
@@ -606,7 +620,7 @@ export function PhotoLightbox({
               }}
               aria-label={vi.gallery.downloadThis}
               title={vi.gallery.downloadThis}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus:outline-hidden"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-90 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg"
             >
               <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -836,7 +850,8 @@ export function PhotoLightbox({
               aria-label={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
               aria-pressed={isCurrentSelected}
               className={cn(
-                "flex h-[48px] w-[88px] items-center justify-center rounded-full transition-all active:scale-90 touch-manipulation focus:outline-hidden disabled:opacity-40",
+                "flex h-[48px] w-[88px] items-center justify-center rounded-full transition-all active:scale-90 touch-manipulation disabled:opacity-40",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg",
                 isCurrentSelected
                   ? "bg-[#C4645A] text-[#2E2A27]"
                   : "bg-white/10 text-white hover:bg-white/15",
@@ -861,7 +876,12 @@ export function PhotoLightbox({
                       setTamMo("ghi-chu");
                     }
                   }}
-                  className={cn("p-2 transition active:scale-90", tamMo === "ghi-chu" || currentPhoto.retouchNote ? "text-[#C4645A]" : "text-white hover:text-[#C4645A]")}
+                  aria-label="Ghi chú cho thợ chỉnh ảnh"
+                  aria-expanded={tamMo === "ghi-chu"}
+                  className={cn(
+                    "p-2 transition active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg rounded-full",
+                    tamMo === "ghi-chu" || currentPhoto.retouchNote ? "text-[#C4645A]" : "text-white hover:text-[#C4645A]",
+                  )}
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                     <path d="M12 20h9" />
@@ -874,7 +894,9 @@ export function PhotoLightbox({
                 <button
                   type="button"
                   onClick={() => setTamMo("san-pham")}
-                  className="p-2 text-white transition hover:text-white/80 active:scale-90"
+                  aria-label="Sản phẩm cho tấm ảnh này"
+                  aria-expanded={tamMo === "san-pham"}
+                  className="p-2 text-white transition hover:text-white/80 active:scale-90 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-bb-viewer-bg"
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
                     <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />

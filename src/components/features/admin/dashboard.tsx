@@ -235,7 +235,15 @@ export function Dashboard() {
                 <p>Tuyệt vời! Không có album nào cần xử lý gấp.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto p-0">
+              <div
+                className="overflow-x-auto p-0"
+                // BB-277 kiểm ngược (axe `scrollable-region-focusable`) —
+                // vùng cuộn ngang phải tới được và cuộn được bằng bàn phím
+                // (mũi tên), không chỉ bằng chuột/chạm.
+                tabIndex={0}
+                role="region"
+                aria-label="Bảng cần xử lý ngay, cuộn ngang trên màn hẹp"
+              >
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -317,7 +325,12 @@ export function Dashboard() {
               14 cột với nhãn ngày không nhét vừa 375px, và thu nhỏ nữa thì
               nhãn chồng lên nhau, đọc được mới là thứ đáng giữ.
             */}
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto"
+              tabIndex={0}
+              role="region"
+              aria-label="Biểu đồ số album tạo mới 14 ngày qua, cuộn ngang"
+            >
               <div className="h-64 flex items-end gap-2 pt-4 min-w-[26rem]">
               {data.chartData.map((d, i) => {
                 const heightPercent = (d.count / maxChartValue) * 100;

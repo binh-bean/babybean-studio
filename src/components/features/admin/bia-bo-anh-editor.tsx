@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { MAU_CHU_BIA, dienMau } from "@/lib/gallery/mau-chu-bia";
 import { X } from "lucide-react";
+import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 
 interface AnhLuoi {
   id: string;
@@ -29,20 +30,19 @@ export function BiaBoAnhEditor({
   }) => void;
 }) {
   const [moEditor, setMoEditor] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!moEditor) return;
     document.body.style.overflow = "hidden";
-    const onEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMoEditor(false);
-    };
-    window.addEventListener("keydown", onEscape);
     return () => {
       document.body.style.overflow = "";
-      window.removeEventListener("keydown", onEscape);
     };
   }, [moEditor]);
-  
+
+  // BB-277 — Esc đóng + Tab quẩn trong hộp thoại + focus trả về nút mở.
+  useBayFocusHopThoai(moEditor, () => setMoEditor(false), dialogRef);
+
   const [anhBiaNhap, setAnhBiaNhap] = useState(detail.coverPhotoId);
   const [tieuDe, setTieuDe] = useState(detail.coverHeadline ?? "");
   const [loi, setLoi] = useState(detail.welcomeMessage ?? "");
@@ -115,12 +115,23 @@ export function BiaBoAnhEditor({
       </div>
 
       {moEditor && (
-        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex flex-col bg-background md:flex-row overflow-hidden">
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Thiết kế bìa bộ ảnh"
+          className="fixed inset-0 z-50 flex flex-col bg-background md:flex-row overflow-hidden"
+        >
           {/* Lưới chọn ảnh (trái / trên) */}
           <div className="flex flex-1 flex-col overflow-y-auto border-r border-border p-4 md:w-1/2">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Thiết kế bìa</h3>
-              <button onClick={() => setMoEditor(false)} className="p-2 border rounded-md">
+              <button
+                type="button"
+                onClick={() => setMoEditor(false)}
+                aria-label="Đóng"
+                className="p-2 border rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>

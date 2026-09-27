@@ -199,3 +199,5 @@ Chủ studio: "tận dụng tối đa banana và gemini 3.1 pro và các sonnet"
 | BB-273 | Sonnet → Opus soát | ĐÃ GỘP. Sao lưu hằng ngày trên GitHub Actions, mã hoá AES-256-GCM; NGỦ tới khi chủ studio thêm 2 secret (docs/24) |
 | BB-274 | Sonnet → Opus soát | ĐÃ GỘP. Soát bố cục 390/1440 mọi màn; Opus sửa gốc: tên màn là uuid → "Chi tiết bộ ảnh". Chưa soát: cửa hàng, lightbox, so sánh, người thân, chọn bìa album |
 | BB-275 | Sonnet → Opus soát | ĐÃ GỘP. Soát 6 màn phụ: tiêu đề treo tường không cắt chữ; chuông khoá cuộn nền + lớp phủ trên điện thoại |
+| BB-276 | Sonnet → Opus soát | ĐÃ GỘP. Soát bảo mật 11 route /api/g: vá IDOR xoá đặt ảnh + đăng ký thông báo của bộ khác, trần tên xác nhận; Opus thêm trần xin sửa lại 3 lần/giờ |
+| BB-277 | Sonnet → Opus soát | ĐÃ GỘP. Bàn phím + trình đọc màn hình (axe): nút mở ảnh riêng, thanh nổi inert, hộp thoại giữ focus/Esc. Tương phản màu 3 chỗ: CHỜ chủ studio quyết |

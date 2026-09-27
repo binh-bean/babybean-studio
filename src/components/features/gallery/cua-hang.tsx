@@ -46,6 +46,7 @@ import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
+import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 
 export interface MonTrongCuaHang {
   productId: string;
@@ -96,6 +97,11 @@ export function CuaHang({
 }: CuaHangProps) {
   const [nhomDangXem, setNhomDangXem] = React.useState<NhomSanPham>("anh_in");
   const [monDangChon, setMonDangChon] = React.useState<MonTrongCuaHang | null>(null);
+  const hopThoaiRef = React.useRef<HTMLDivElement>(null);
+
+  // BB-277 — hộp thoại toàn màn hình phải giữ focus bên trong (Tab quẩn lại)
+  // và Esc đóng được, focus trả về đúng nút đã mở cửa hàng.
+  useBayFocusHopThoai(mo, onDong, hopThoaiRef);
 
   if (!mo) return null;
 
@@ -106,7 +112,13 @@ export function CuaHang({
     daMua.filter((d) => d.productId === productId).reduce((n, d) => n + d.quantity, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div
+      ref={hopThoaiRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Mua thêm sản phẩm"
+      className="fixed inset-0 z-50 flex flex-col bg-background"
+    >
       <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-8">
         <div>
           <h2 className="font-display text-2xl font-light leading-tight">Mua thêm sản phẩm</h2>
@@ -117,7 +129,7 @@ export function CuaHang({
         <button
           type="button"
           onClick={onDong}
-          className="h-9 shrink-0 rounded-full border border-border px-4 text-xs font-medium transition hover:bg-surface-2"
+          className="h-9 shrink-0 rounded-full border border-border px-4 text-xs font-medium transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
         >
           Đóng
         </button>
@@ -273,7 +285,7 @@ export function CuaHang({
           <button
             type="button"
             onClick={onDong}
-            className="h-[56px] shrink-0 rounded-full bg-[#2E2A27] px-8 text-[15px] font-medium text-[#FBF7F2] transition hover:opacity-90"
+            className="h-[56px] shrink-0 rounded-full bg-[#2E2A27] px-8 text-[15px] font-medium text-[#FBF7F2] transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
           >
             Xong
           </button>

@@ -51,6 +51,7 @@ import {
   laIphoneChuaCai,
   xinQuyenVaDangKyPush,
 } from "@/lib/thong-bao/dung-day";
+import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 
 export interface ChuongThongBaoProps {
   galleryId: string;
@@ -93,6 +94,7 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
   const [dangTai, setDangTai] = useState(false);
   const [goiIosThemManHinh, setGoiIosThemManHinh] = useState(false);
   const hopRef = useRef<HTMLDivElement>(null);
+  const bangRef = useRef<HTMLDivElement>(null);
 
   const taiHopThu = useCallback(async () => {
     setDangTai(true);
@@ -198,6 +200,10 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
     }
   }, [mo, soChuaDoc]);
 
+  // BB-277 — bảng chuông là hộp thoại: Tab quẩn trong bảng, Esc đóng, focus
+  // trả về nút chuông khi đóng.
+  useBayFocusHopThoai(mo, () => setMo(false), bangRef);
+
   return (
     <div ref={hopRef} className={`relative inline-block ${className ?? ""}`}>
       <button
@@ -235,6 +241,7 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
             className="fixed inset-0 z-40 cursor-pointer bg-black/30 sm:hidden"
           />
           <div
+            ref={bangRef}
             role="dialog"
             aria-label="Danh sách thông báo"
             className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-[20px] border-t border-[var(--bb-border)] bg-[var(--bb-surface)] p-4 shadow-lg sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-96 sm:w-80 sm:rounded-2xl sm:border sm:p-3"

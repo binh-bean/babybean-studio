@@ -82,6 +82,14 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
           : "translate-y-0 opacity-100",
       )}
       aria-hidden={an}
+      // BB-277 kiểm ngược (axe `aria-hidden-focus`) — `aria-hidden` chỉ giấu
+      // khỏi trình đọc màn hình, KHÔNG tự rút phần tử con khỏi thứ tự Tab.
+      // Trước bản vá này, thanh ẩn lúc bìa còn cao (`an=true`) vẫn giữ nguyên
+      // hai nút "Mua thêm"/"Chốt danh sách" trong luồng bàn phím — Tab tới đó
+      // focus rơi vào một nút không hiện trên màn. `inert` (React 19) rút cả
+      // focus lẫn con trỏ khỏi toàn bộ nhánh khi ẩn, đúng một lần, không cần
+      // tự thêm `tabIndex={-1}` cho từng nút bên trong.
+      inert={an}
     >
       <div
         className={cn(
@@ -108,7 +116,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
             onClick={muaThem.onClick}
             aria-label="Mua thêm"
             title={muaThem.tien > 0 ? `Mua thêm — ${formatCurrencyVND(muaThem.tien)}` : "Mua thêm"}
-            className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full text-white/90 transition hover:bg-white/10"
+            className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2E2A27]"
           >
             <ShoppingBag className="h-[22px] w-[22px]" strokeWidth={1.8} aria-hidden="true" />
             {muaThem.tien > 0 && (
@@ -121,7 +129,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
           <button
             type="button"
             onClick={nutChinh.onClick}
-            className="h-[56px] shrink-0 rounded-full bg-[#FBF7F2] px-6 text-[15px] font-medium text-[#2E2A27] transition hover:bg-white active:scale-[0.97]"
+            className="h-[56px] shrink-0 rounded-full bg-[#FBF7F2] px-6 text-[15px] font-medium text-[#2E2A27] transition hover:bg-white active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2E2A27]"
           >
             {nutChinh.nhan}
           </button>

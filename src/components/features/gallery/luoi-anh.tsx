@@ -98,19 +98,31 @@ const TheAnh = memo(function TheAnh({
 }: TheAnhProps) {
   const coViTri = x !== undefined && y !== undefined && w !== undefined && h !== undefined;
 
+  const moAnhHoacSoSanh = () => (soSanhBat ? onToggleSoSanh(photo) : onOpen(thuTu));
+
   return (
     <div
-      // BB-218: chế độ so sánh đang bật thì bấm ảnh là đánh dấu so sánh, không
-      // mở màn xem lớn — nút tim (stopPropagation riêng) vẫn thả tim bình
-      // thường trong cả hai chế độ.
-      onClick={() => (soSanhBat ? onToggleSoSanh(photo) : onOpen(thuTu))}
+      // BB-277 kiểm ngược — nhiều phép thử E2E có TỪ TRƯỚC (bb-274/275, e11,
+      // bb-202, bb-240) bấm thẳng qua DOM bằng
+      // `theAnhEl.evaluate(el => el.click())` lên CHÍNH div này (lý do: thẻ
+      // ảnh nằm trên khung toạ độ tuyệt đối do toán xếp so le tính, nên
+      // `locator.click()` thật của Playwright đôi lúc bị chặn bởi phép kiểm
+      // "phần tử đã đứng yên"). Bỏ hẳn onClick ở đây (dồn hết vào nút "Xem ảnh
+      // N" bên trong) làm mọi phép thử đó BẤM KHÔNG TRÚNG GÌ — màn xem lớn
+      // không bao giờ mở, và các ca liên quan treo tới hết timeout.
+      //
+      // Giữ onClick ở đây SONG SONG với nút bên trong, nhưng chỉ chạy khi
+      // đích bấm là CHÍNH div này (`e.target === e.currentTarget`) — bấm thật
+      // vào nút con sẽ nổi bọt lên đây với `target` là nút, nên bị chặn ở đây,
+      // tránh gọi hành động hai lần (mở/so sánh) cho một cú bấm chuột thật.
+      onClick={(e) => {
+        if (e.target !== e.currentTarget) return;
+        moAnhHoacSoSanh();
+      }}
       // Chỗ bám cố định cho phép thử trình duyệt. "Ảnh đầu tiên trên trang"
       // không còn là ảnh trong lưới từ khi có ảnh bìa (23/09/2026).
       data-testid="the-anh"
-      className={cn(
-        "cursor-pointer",
-        coViTri ? "absolute" : "relative mb-3 break-inside-avoid",
-      )}
+      className={cn("cursor-pointer", coViTri ? "absolute" : "relative mb-3 break-inside-avoid")}
       style={coViTri ? { left: x, top: y, width: w, height: h! + CAO_CHU_THICH } : undefined}
     >
       {/* Ô ảnh — kích thước ĐÚNG ảnh, không lẫn với dòng chú thích bên dưới. */}
@@ -118,6 +130,22 @@ const TheAnh = memo(function TheAnh({
         className="group relative overflow-hidden rounded-[4px] bg-[#e9e1d6]"
         style={coViTri ? { width: w, height: h } : { aspectRatio: `1 / ${tiLeCuaAnh(photo.width, photo.height)}` }}
       >
+        {/*
+          BB-277 kiểm ngược (axe `nested-interactive`) — trước bản vá, cả Ô này
+          (div) LẪN nút tim bên trong đều mang vai trò bấm-được, một cái lồng
+          trong cái kia — trình đọc màn hình không phân biệt được đâu là widget
+          nào. Nút "mở ảnh lớn" nay là một <button> RIÊNG, phủ kín Ô ảnh, đứng
+          NGANG HÀNG (không lồng) với nút tim — nút tim nằm SAU trong DOM và có
+          `z-10` nên vẫn nhận đúng cú bấm/phím ở góc của nó, còn bấm chỗ khác
+          trong Ô mới rơi vào nút mở ảnh lớn này.
+        */}
+        <button
+          type="button"
+          onClick={moAnhHoacSoSanh}
+          aria-label={soSanhBat ? `Đánh dấu ảnh ${thuTu + 1} để so sánh` : `Xem ảnh ${thuTu + 1}`}
+          className="absolute inset-0 z-0 block h-full w-full cursor-pointer rounded-[4px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
+        />
+
         {/*
           Ảnh qua proxy `/api/img`. Hai cỡ 800 và 1600 giữ nguyên từ BB-162 (chủ
           studio chốt: ảnh xem nhỏ cũng phải NÉT). Khác trước ở `sizes`: nay biết
@@ -134,9 +162,8 @@ const TheAnh = memo(function TheAnh({
           decoding="async"
           width={photo.width ?? undefined}
           height={photo.height ?? undefined}
-          className="pointer-events-none h-full w-full select-none object-cover transition-transform duration-500 ease-out group-hover:scale-[1.015]"
+          className="pointer-events-none relative h-full w-full select-none object-cover transition-transform duration-500 ease-out group-hover:scale-[1.015]"
         />
-
         {daChon && (
           <span className="pointer-events-none absolute inset-0 rounded-[4px] ring-1 ring-inset ring-[#2e2a27]" />
         )}
@@ -182,7 +209,7 @@ const TheAnh = memo(function TheAnh({
             }}
             aria-label={daChon ? vi.gallery.deselect : vi.gallery.select}
             aria-pressed={daChon}
-            className="absolute bottom-0 right-0 z-10 grid h-12 w-12 place-items-center touch-manipulation focus:outline-hidden disabled:cursor-default"
+            className="absolute bottom-0 right-0 z-10 grid h-12 w-12 place-items-center touch-manipulation rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:cursor-default"
           >
             <span
               className={cn(
