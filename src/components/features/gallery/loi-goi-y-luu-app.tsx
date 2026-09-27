@@ -26,10 +26,26 @@
  * `src/components/ui/pwa-install-prompt.tsx` đã tự ẩn trên mọi trang bắt đầu
  * bằng `/g/` (xem ghi chú BB-213 trong tệp đó) — đúng nơi component này được
  * dựng. Không cần thêm điều kiện loại trừ ở đây.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-278/BB-281 — chuyển từ thẻ nổi ở ĐÁY sang chip nhỏ ở ĐẦU trang
+ * ---------------------------------------------------------------------------
+ * Bản cũ là một thẻ `fixed` gần đáy màn, tính khoảng cách CỐ ĐỊNH để đứng
+ * trên `ThanhChon`. Ảnh chụp máy thật chủ studio gửi 27/09/2026 cho thấy nó
+ * ĐÈ lên thanh chọn/chốt sau khi thanh đó được thu nhỏ lại (BB-278 mục 3) —
+ * khoảng cách cố định đó không còn đúng nữa, và hai thẻ `fixed` canh nhau
+ * bằng số đo tay luôn dễ vỡ khi MỘT bên đổi kích thước.
+ *
+ * Sửa tận gốc: bỏ hẳn kiểu `fixed`, đưa xuống thành một chip MỘT DÒNG, gọn,
+ * nằm trong DÒNG CHẢY bình thường của trang — `GalleryApp` render nó ngay
+ * dưới thanh thương hiệu "Baby Bean" (`thanh-thuong-hieu`), phía trên ảnh
+ * bìa. Không `fixed` = không có gì để tính khoảng cách/che nhau với thanh
+ * chọn/chốt ở đáy nữa — tách biệt bằng VỊ TRÍ, không phải bằng con số.
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { Sparkles, X } from "lucide-react";
+import { Smartphone, Plus, X } from "lucide-react";
+import { cn } from "@/components/ui/utils";
 import { vi } from "@/i18n";
 
 const KHOA_DA_DONG = "bb_luu_app_da_dong_luc"; // timestamp lần bấm "Để sau" / "Xem cách lưu" gần nhất
@@ -142,45 +158,48 @@ export function LoiGoiYLuuApp({ daChon, onXemCachLuu }: LoiGoiYLuuAppProps) {
   if (!hien) return null;
 
   return (
+    // BB-278/BB-281 — chip MỘT DÒNG, dựng đúng
+    // `babybean-assets/BB-281/goi-y-luu-app.png`: nền TRẮNG (không phải kem),
+    // viền mảnh, bóng rất nhẹ, icon điện thoại có dấu + màu rêu/sage
+    // (`--bb-accent-sage`, xem tokens.css), chữ serif, nút × mảnh. Nằm trong
+    // dòng chảy bình thường (KHÔNG `fixed`) ngay dưới thanh thương hiệu, tự
+    // canh giữa — xem ghi chú lớn ở đầu tệp. Bấm vào chip (trừ nút ×) mở tấm
+    // hướng dẫn đầy đủ.
     <div
       role="status"
       aria-label={vi.gallery.saveAppPrompt.message}
-      // LUÔN nằm TRÊN thanh đáy (ThanhChon cao 60px + lề 12px + vùng an toàn), ở
-      // MỌI cỡ màn. Bản đầu trên máy tính đặt góc dưới phải và che đúng nút
-      // "Chốt danh sách" — chặn thao tác quan trọng nhất (Opus soát, 25/09).
-      className="fixed inset-x-3 bottom-[calc(84px+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300 sm:right-6 sm:left-auto sm:mx-0"
+      data-testid="goi-y-luu-app"
+      className={cn(
+        "mx-auto flex h-9 w-fit max-w-full items-center gap-2 rounded-full border border-[#e5dcd2] bg-white px-3.5 text-[14px] text-[#2e2a27] shadow-[0_2px_10px_-2px_rgba(46,42,39,0.12)]",
+        "animate-in fade-in slide-in-from-top-2 duration-300",
+      )}
     >
-      <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-3.5 pr-3 text-sm shadow-lg">
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <p className="leading-relaxed text-foreground">{vi.gallery.saveAppPrompt.message}</p>
-          <div className="mt-2.5 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={xemCachLuu}
-              className="h-9 rounded-full bg-foreground px-4 text-xs font-medium text-background transition hover:opacity-90"
-            >
-              {vi.gallery.saveAppPrompt.howTo}
-            </button>
-            <button
-              type="button"
-              onClick={dong}
-              className="h-9 rounded-full px-3 text-xs font-medium text-muted-foreground transition hover:bg-surface-2"
-            >
-              {vi.gallery.saveAppPrompt.later}
-            </button>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={dong}
-          // Tên riêng, không "Đóng": trùng tên nút đóng màn xem ảnh lớn.
-          aria-label="Ẩn gợi ý lưu app"
-          className="shrink-0 rounded-full p-1 text-muted-foreground transition hover:bg-surface-2"
-        >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-        </button>
-      </div>
+      {/* Điện thoại + dấu "+" nhỏ màu sage — bản vẽ không có icon lucide khớp
+          y hệt nên ghép hai icon mảnh lại, giữ đúng Ý (điện thoại + thêm). */}
+      <span className="relative inline-flex h-4 w-4 shrink-0 items-center justify-center">
+        <Smartphone className="h-4 w-4 text-muted-foreground" strokeWidth={1.6} aria-hidden="true" />
+        <Plus
+          className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-white text-[var(--bb-accent)]"
+          strokeWidth={3}
+          aria-hidden="true"
+        />
+      </span>
+      <button
+        type="button"
+        onClick={xemCachLuu}
+        className="truncate font-display hover:underline"
+      >
+        {vi.gallery.saveAppPrompt.shortLabel}
+      </button>
+      <button
+        type="button"
+        onClick={dong}
+        // Tên riêng, không "Đóng": trùng tên nút đóng màn xem ảnh lớn.
+        aria-label="Ẩn gợi ý lưu app"
+        className="ml-0.5 shrink-0 rounded-full p-0.5 text-muted-foreground transition hover:bg-surface-2"
+      >
+        <X className="h-3.5 w-3.5" strokeWidth={1.5} aria-hidden="true" />
+      </button>
     </div>
   );
 }

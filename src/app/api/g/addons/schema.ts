@@ -26,6 +26,20 @@ export const CreateAddonSchema = z.object({
    * kiểm lại theo nhóm sản phẩm, không tin vào mỗi cái schema này.
    */
   photoId: z.string().uuid("photoId phải là UUID hợp lệ").nullish(),
+
+  /**
+   * BB-279 — đặt cùng lúc nhiều tấm (lưới chọn ảnh trong cửa hàng, hoặc "Đặt
+   * in tấm này" từ màn xem lớn không dùng nhánh này, chỉ dùng `photoId` đơn).
+   *
+   * Có mặt thì route dùng NHÁNH BATCH: ghi một dòng `selection_addons`/tấm,
+   * cùng `quantity`, bỏ qua `photoId` đơn. Trần 50 tấm một lượt — khớp trần
+   * dòng giỏ một lần gọi theo đề bài BB-279; nhiều hơn thì gọi thêm lượt.
+   */
+  photoIds: z
+    .array(z.string().uuid("mỗi phần tử của photoIds phải là UUID hợp lệ"))
+    .min(1, "photoIds không được rỗng nếu có mặt")
+    .max(50, "Mỗi lượt chỉ đặt tối đa 50 tấm")
+    .optional(),
 });
 
 export type CreateAddonInput = z.infer<typeof CreateAddonSchema>;

@@ -249,6 +249,23 @@ export function HuongDanThemManHinh({ mo, onDong }: HuongDanThemManHinhProps) {
             Thêm vào màn hình chính
           </button>
         )}
+
+        {/*
+          BB-281 — dựng đúng `babybean-assets/BB-281/goi-y-luu-app.png`: nút
+          chữ "Đã hiểu" gạch chân, không phải một nút nền đặc — cùng hành
+          động đóng như nút × ở góc, chỉ thêm một lối đóng THEO ĐÚNG bản vẽ
+          cho ca không có `beforeinstallprompt` (đa số — Zalo/Facebook/iOS
+          Safari không có sự kiện này).
+        */}
+        <div className="mt-5 flex justify-center">
+          <button
+            type="button"
+            onClick={onDong}
+            className="font-display text-sm text-foreground underline underline-offset-4 transition hover:opacity-70"
+          >
+            Đã hiểu
+          </button>
+        </div>
       </div>
     </div>
   );

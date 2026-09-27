@@ -226,21 +226,32 @@ pwTest.describe("BB-274: bố cục màn đăng nhập & quản trị", () => {
     });
   }
 
+  // BB-280: sắp lại menu quản trị theo bốn nhóm (Tổng quan/Vận hành/Báo
+  // cáo/Hệ thống). Ba trang báo cáo lỗi cũ gộp thành ba tab của MỘT trang
+  // (/admin/viec-can-xu-ly), và /admin/roles gộp vào /admin/staff làm tab
+  // thứ hai — giữ lại các đường dẫn CŨ trong danh sách này (chuyển hướng qua
+  // `next.config.ts`, không phải 404) để soát luôn cả trang đích sau chuyển
+  // hướng, và thêm đường dẫn MỚI là canonical.
   const manQuanTri: Array<[string, string]> = [
     ["bang-dieu-khien", "/admin"],
     ["danh-sach-bo-anh", "/admin/galleries"],
     ["tao-bo-anh", "/admin/galleries/create"],
     ["chi-tiet-bo-anh", ""], // gán path bằng galleryId lúc chạy
     ["khach-hang", "/admin/customers"],
-    ["nhan-su", "/admin/staff"],
+    ["nhan-su-vai-tro", "/admin/staff"],
     ["chi-nhanh", "/admin/branches"],
-    ["vai-tro", "/admin/roles"],
     ["cai-dat", "/admin/settings"],
     ["bao-cao", "/admin/bao-cao"],
-    ["bao-cao-link-sap-het-han", "/admin/reports/link-sap-het-han"],
-    ["bao-cao-loi-dong-bo", "/admin/reports/loi-dong-bo"],
+    ["viec-can-xu-ly", "/admin/viec-can-xu-ly"],
+    ["viec-can-xu-ly-tab-link", "/admin/viec-can-xu-ly?tab=link-sap-het-han"],
+    ["viec-can-xu-ly-tab-loi", "/admin/viec-can-xu-ly?tab=loi-dong-bo"],
+    ["viec-can-xu-ly-tab-quota", "/admin/viec-can-xu-ly?tab=over-quota"],
     ["bao-cao-nhat-ky", "/admin/reports/nhat-ky"],
-    ["bao-cao-vuot-han-muc", "/admin/reports/over-quota"],
+    // Đường dẫn CŨ — phải còn chuyển hướng được, không phải 404.
+    ["cu-vai-tro-chuyen-huong", "/admin/roles"],
+    ["cu-link-sap-het-han-chuyen-huong", "/admin/reports/link-sap-het-han"],
+    ["cu-loi-dong-bo-chuyen-huong", "/admin/reports/loi-dong-bo"],
+    ["cu-vuot-han-muc-chuyen-huong", "/admin/reports/over-quota"],
   ];
 
   for (const [tenKichThuoc, kichThuoc] of [

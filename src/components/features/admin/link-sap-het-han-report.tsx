@@ -29,6 +29,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { CARD_TITLE_CLASS } from "./page-header";
 
 interface Item {
   shareLinkId: string;
@@ -90,8 +91,9 @@ export function LinkSapHetHanReport() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* BB-280: tiêu đề cấp trang chuyển sang PageHeader của /admin/viec-can-xu-ly. */}
       <header>
-        <h1 className="text-xl font-semibold">Link gửi khách sắp hết hạn</h1>
+        <h2 className={CARD_TITLE_CLASS}>Link gửi khách sắp hết hạn</h2>
         <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
           Hạn đếm từ <strong>ngày cấp link</strong>, không phải ngày chụp. Hết hạn thì ba
           mẹ bấm vào thấy trang báo hết hạn — và không ai được báo trước, nên bảng này là

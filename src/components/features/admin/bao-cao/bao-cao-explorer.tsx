@@ -21,6 +21,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { BieuDoSvg } from "./bieu-do-svg";
 import type { KetQuaBaoCao } from "@/lib/bao-cao/loai";
 import { CAC_KY_DUNG_SAN, dinhDangNgayVN, kyTuMaDungSan, type MaKyDungSan } from "@/lib/bao-cao/ky";
+import { PAGE_TITLE_CLASS, CARD_TITLE_CLASS } from "../page-header";
 
 interface MucBaoCao {
   ma: string;
@@ -36,11 +37,15 @@ interface ChiNhanh {
   name: string;
 }
 
-/** Bốn báo cáo lẻ đã có trước BB-260 — giữ nguyên trang, chỉ gắn vào đây như mục danh sách. */
+/**
+ * Bốn báo cáo lẻ đã có trước BB-260 — giữ nguyên logic, chỉ gắn vào đây như
+ * mục danh sách. BB-280 gộp ba cái đầu vào ba tab của MỘT trang
+ * (/admin/viec-can-xu-ly); "Nhật ký thao tác" vẫn là trang riêng.
+ */
 const BAO_CAO_CU: { ten: string; href: string; icon: React.ComponentType<{ className?: string }> }[] = [
-  { ten: "Ảnh vượt hạn mức", href: "/admin/reports/over-quota", icon: AlertTriangle },
-  { ten: "Bộ ảnh lỗi tải", href: "/admin/reports/loi-dong-bo", icon: CloudOff },
-  { ten: "Link sắp hết hạn", href: "/admin/reports/link-sap-het-han", icon: Link2 },
+  { ten: "Ảnh vượt hạn mức", href: "/admin/viec-can-xu-ly?tab=over-quota", icon: AlertTriangle },
+  { ten: "Bộ ảnh lỗi tải", href: "/admin/viec-can-xu-ly?tab=loi-dong-bo", icon: CloudOff },
+  { ten: "Link sắp hết hạn", href: "/admin/viec-can-xu-ly?tab=link-sap-het-han", icon: Link2 },
   { ten: "Nhật ký thao tác", href: "/admin/reports/nhat-ky", icon: History },
 ];
 
@@ -159,12 +164,7 @@ export function BaoCaoExplorer() {
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <aside className="shrink-0 lg:w-72">
-        <h1
-          className="text-2xl font-semibold"
-          style={{ fontFamily: "var(--bb-font-display)" }}
-        >
-          Báo cáo
-        </h1>
+        <h1 className={PAGE_TITLE_CLASS}>Báo cáo</h1>
         <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
           Bộ báo cáo điều hành — chọn một báo cáo để xem chi tiết.
         </p>
@@ -318,9 +318,7 @@ function NoiDungBaoCao({
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold" style={{ fontFamily: "var(--bb-font-display)" }}>
-            {baoCao.ten}
-          </h2>
+          <h2 className={CARD_TITLE_CLASS}>{baoCao.ten}</h2>
           <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">{baoCao.moTa}</p>
         </div>
         {ketQua?.bang && (

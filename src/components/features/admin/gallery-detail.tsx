@@ -26,6 +26,7 @@ import { BiaBoAnhEditor } from "./bia-bo-anh-editor";
 import { DongThoiGianHoatDong } from "./dong-thoi-gian";
 import { YeuCauMuaThemBlock } from "./yeu-cau-mua-them";
 import { getStatusBadgeConfig } from "./gallery-list";
+import { PAGE_TITLE_CLASS } from "./page-header";
 
 import React from "react";
 import { Badge } from "@/components/ui/badge";
@@ -497,9 +498,11 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           số bên dưới, phải đọc thêm mới biết bộ ảnh đang ở đâu. */}
       <header>
         <div className="flex flex-wrap items-center gap-2.5">
-          <h1 className="font-display text-2xl font-bold text-[var(--bb-fg)] sm:text-3xl">
-            {detail.title}
-          </h1>
+          {/*
+            BB-280: bỏ `sm:text-3xl` — thang chữ chung yêu cầu tiêu đề trang
+            một cỡ cố định ở mọi kích thước màn hình (docs/07-ui-ux.md).
+          */}
+          <h1 className={PAGE_TITLE_CLASS}>{detail.title}</h1>
           <span className="inline-flex items-center gap-1.5">
             {/* Chữ "Trạng thái" giữ lại làm nhãn — tests/e2e/bb-200-nhan-lark.spec.ts
                 đợi đúng chữ này làm mốc "đã tải xong dữ liệu" trước khi kiểm

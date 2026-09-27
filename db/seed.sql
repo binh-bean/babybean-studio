@@ -165,7 +165,11 @@ insert into settings (key, branch_id, value) values
   ('gallery.link_ttl_days',         null, '60'::jsonb),
   -- One webhook per branch plus one management group; filled in at Phase 3.
   ('lark.webhook_url',              null, '""'::jsonb),
-  ('chat.page_url',                 null, '""'::jsonb)
+  ('chat.page_url',                 null, '""'::jsonb),
+  -- BB-284: internal reminders (staff-only) to Lark, off by default — Lark's
+  -- own automations in another group already cover this. Toggle at
+  -- Settings > Liên lạc when the app fully replaces that automation.
+  ('lark.nhac_noi_bo',              null, 'false'::jsonb)
 on conflict do nothing;
 
 commit;

@@ -121,7 +121,16 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
 
   // Ca cửa hàng chạy TRƯỚC: ca chọn bìa chốt thành công sẽ KHOÁ bộ ảnh dùng chung,
   // bộ đã khoá thì không còn nút "Mua thêm" (Opus soát BB-202).
-  test("2. Cửa hàng: sản phẩm nhóm album chỉ có nút Mua (số lượng), không mở bước chọn ảnh", async ({
+  //
+  // ĐỔI Ở BB-279 (27/09/2026): trước đây mỗi nhóm trong cửa hàng là một danh
+  // sách PHẲNG `<li>` từng sản phẩm, mỗi dòng có nút riêng ("Mua" cho album,
+  // "Chọn ảnh" cho ảnh in/khung). Từ BB-279, mỗi nhóm là MỘT bộ cấu hình
+  // (`cua-hang.tsx`): chọn kích thước/chất liệu bằng chip rồi MỘT nút duy
+  // nhất cho tổ hợp đang chọn — "Thêm vào giỏ" cho nhóm không gắn ảnh (album,
+  // đúng luật BB-202: chỉ đặt mua, không chọn ảnh), "Chọn ảnh" cho nhóm gắn
+  // ảnh (ảnh in/khung). Ca này viết lại để đo đúng luật đó qua giao diện MỚI,
+  // không còn giả định có `<li>` liệt kê từng sản phẩm.
+  test("2. Cửa hàng — nhóm Album: nút 'Thêm vào giỏ' trực tiếp, KHÔNG có bước 'Chọn ảnh'", async ({
     page,
   }) => {
     test.skip(!albumProductId, "bb-dev hiện không có sản phẩm album nào đủ điều kiện bán.");
@@ -136,29 +145,23 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
 
     // Mở cửa hàng qua nút nổi "Mua thêm" (cùng lối vào bb-248/bb-245 dùng).
     await page.getByRole("button", { name: /Mua thêm/i }).first().click();
+    const cuaHang = page.getByRole("dialog", { name: "Mua thêm sản phẩm" });
+    await expect(cuaHang).toBeVisible();
 
     // Chuyển sang nhóm Album.
-    await page.getByRole("button", { name: "Album", exact: true }).click();
+    await cuaHang.getByRole("button", { name: "Album", exact: true }).click();
 
-    // CHỈ những <li> có nút "Mua" — khối "Trong gói của ba mẹ" (TomTatSanPhamIn,
-    // chỉ đọc) cũng có <li> chứa chữ "Album" nhưng KHÔNG có nút nào, nên lọc
-    // theo "Album" không thôi bắt nhầm đúng listitem đó (đứng trước trong DOM).
-    const theAlbum = page
-      .locator("li")
-      .filter({ hasText: "Album" })
-      .filter({ has: page.getByRole("button", { name: "Mua" }) })
-      .first();
-    await expect(theAlbum).toBeVisible();
+    // Nhóm Album KHÔNG gắn ảnh (BB-202: chỉ đặt mua) -> nút phải là
+    // "Thêm vào giỏ", KHÔNG BAO GIỜ là "Chọn ảnh" (đó là nút của nhóm
+    // ảnh in/khung, canGanAnh=true).
+    await expect(cuaHang.getByRole("button", { name: "Chọn ảnh", exact: true })).toHaveCount(0);
+    const nutThem = cuaHang.getByRole("button", { name: "Thêm vào giỏ" });
+    await expect(nutThem).toBeVisible();
 
-    // Nút phải là "Mua" — không phải "Chọn ảnh" (đó là nút của ảnh in/khung).
-    await expect(theAlbum.getByRole("button", { name: "Chọn ảnh" })).toHaveCount(0);
-    const nutMua = theAlbum.getByRole("button", { name: "Mua" });
-    await expect(nutMua).toBeVisible();
+    await nutThem.click();
 
-    await nutMua.click();
-
-    // KHÔNG có lưới ảnh nào mở ra bên trong thẻ album — bấm Mua là xong luôn.
-    await expect(theAlbum.locator('img[src*="/api/img/"]')).toHaveCount(0);
+    // KHÔNG có lưới chọn ảnh nào mở ra — bấm "Thêm vào giỏ" là xong luôn.
+    await expect(page.getByRole("dialog", { name: "Chọn ảnh để đặt in" })).toHaveCount(0);
 
     // Đơn phải ghi nhận THẬT trong cơ sở dữ liệu: một dòng selection_addons,
     // KHÔNG gắn ảnh nào (photo_id null — "chỉ đặt mua", ảnh để CSKH trao đổi

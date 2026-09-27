@@ -260,3 +260,66 @@ Lark không làm lệch). Không bao giờ ghi hai cột đó.
   quản trị "Đã chọn hình · chờ chỉnh sửa", khách "Bộ ảnh đã được ghi nhận yêu cầu".
 - Lark "Đang làm" / "Leader check hình": cả hai màn "Đang chỉnh sửa".
 - Các giai đoạn sau theo bảng tóm tắt ở trên.
+
+---
+
+## BB-284 (27/09/2026) — app tập trung báo hai chiều với khách, tắt nhắc nội bộ
+
+Lời chủ studio: *"các tiến trình như ảnh về và cảnh báo nội bộ đã có automatic
+của Lark đảm nhận … tạm thời chưa cần, tắt tính năng đó để mở sau khi chuyển
+Lark qua app. Giờ app tập trung báo ảnh hai chiều với khách hàng."*
+
+Nghĩa là: các tin ở mục "App gửi phần còn lại" bên trên (nhắc CSKH/quản lý/nhóm
+— KHÔNG phải tin cho khách) tạm **TẮT**, vì automatic của Lark ở một nhóm chat
+khác đã lo phần này rồi. Khi studio chuyển hẳn Lark qua app thì bật lại.
+
+### Công tắc `settings.lark.nhac_noi_bo`
+
+Một khoá `boolean` toàn hệ thống (không theo chi nhánh), mặc định `false`.
+Sửa ở màn **Cài đặt → Liên lạc → "Nhắc nội bộ vào Lark"**, hoặc thẳng SQL:
+
+```sql
+update settings set value = 'true'::jsonb
+where key = 'lark.nhac_noi_bo' and branch_id is null;
+```
+
+Khi **TẮT**: `enqueueLarkNotification` (src/lib/lark/notify.ts) chặn các sự
+kiện nội bộ NGAY trước khi tra webhook — không gửi, không xếp hàng đợi thật sự
+(ghi một dòng `notifications` với `status = 'skipped'` kèm lý do, để còn dấu
+vết nếu CSKH thắc mắc "sao không thấy tin"). Lượt quét lại hằng ngày
+(`guiLaiThongBaoDangCho`) cũng tôn trọng công tắc này cho cả những dòng
+`pending`/`failed` ghi từ trước.
+
+**KHÔNG chặn** tin khách↔studio — những tin đó luôn gửi bất kể công tắc:
+`selection.submitted`, `gallery.reopen_requested`, `mua_them.yeu_cau`,
+`review.approved`, `review.changes_requested`.
+
+### Bảng "tin nào đi đâu" (tính đến BB-284)
+
+| Sự kiện | Chiều | Kênh | Dưới công tắc nội bộ? | Trạng thái trước BB-284 | Sau BB-284 |
+|---|---|---|---|---|---|
+| `selection.submitted` — khách chốt ảnh (kèm mua thêm lúc chọn) | Khách→Studio | Lark (nhóm chi nhánh) | Không | Gửi | Gửi — nay có thêm dòng "Mua thêm lúc chọn" nếu có |
+| `gallery.reopen_requested` — khách xin mở lại | Khách→Studio | Lark | Không | Gửi | Gửi (không đổi) |
+| `mua_them.yeu_cau` — mua thêm SAU khi đã duyệt | Khách→Studio | Lark | Không | Gửi | Gửi (không đổi) |
+| `review.approved` — khách duyệt, chuyển in (**mới**) | Khách→Studio | Lark | Không | (chưa có) | Gửi |
+| `review.changes_requested` — khách xin sửa kèm ghi chú (**mới**) | Khách→Studio | Lark | Không | (chưa có) | Gửi |
+| `hau_ky.nhac` — nhắc mốc hậu kỳ (CSKH/quản lý/nhóm) | Nội bộ | Lark | **Có** | Gửi | **Tắt mặc định** |
+| `gallery.due_soon` — nhắc khách chưa chốt (CSKH gọi) | Nội bộ | Lark | **Có** | Gửi | **Tắt mặc định** |
+| `gallery.overdue`, `gallery.sync_error`, `gallery.sent`, `gallery.first_view`, `delivery.ready` | Nội bộ | Lark | Có (dự phòng) | Khai trong `LarkEvent`, **chưa có nơi gọi** | Vẫn chưa có nơi gọi; nếu sau này nối dây thì mặc định tắt |
+| "Ảnh của bé đã chỉnh xong, mời ba mẹ duyệt" | Studio→Khách | Đẩy (push) + hộp thư `thong_bao_khach` | Không (không phải sự kiện Lark) | Gửi (BB-246, `retouch-done/route.ts`) | Không đổi |
+| "Sản phẩm của bé đã về" | Studio→Khách | Đẩy (push) + hộp thư `thong_bao_khach` | Không | Gửi (BB-250/252, `bao-hinh-da-ve.ts`) | Không đổi |
+
+Hai dòng cuối (Studio→Khách) đã có sẵn từ BB-246/250/252/261, không phải công
+tắc Lark — đi qua `guiThongBaoBoAnh` (đẩy web push + ghi chuông), không đụng
+webhook Lark, nên nằm ngoài phạm vi công tắc `lark.nhac_noi_bo`.
+
+### Giới hạn đã biết — ghi chú sửa là MỘT ô chung, không theo từng tấm
+
+`POST /api/g/review` (nhánh `revise`) chỉ nhận **một ghi chú chung** cho cả
+vòng sửa (`revision_requests.note` — xem `review-panel.tsx`, không có cấu trúc
+"chọn tấm nào, ghi gì cho tấm đó"). Thẻ `review.changes_requested` vì vậy hiện
+ghi chú chung (cắt ở 200 ký tự), không phải danh sách từng tấm kèm ghi chú
+riêng. Hàm dựng thẻ (`dungThe` trong `notify.ts`) đã chừa sẵn nhánh đọc mảng
+`cacTam` (từng tấm + ghi chú riêng, cắt ở 20 tấm rồi "và n tấm khác") cho một
+ADR sau này nếu studio muốn ghi chú theo từng tấm — cần thêm bảng/route mới,
+không phải việc của BB-284.

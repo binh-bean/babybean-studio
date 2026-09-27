@@ -187,6 +187,7 @@ export const en: Messages = {
     packageQuotaLine: "Your package includes {n} edited photos",
     saveAppPrompt: {
       message: "Save this gallery to your home screen to reopen it in one tap",
+      shortLabel: "Save to home screen",
       howTo: "See how",
       later: "Later",
     },
@@ -354,6 +355,7 @@ export const en: Messages = {
         "gallery.banner_link_url": "Where the promo image links to",
         "chat.page_url": "Studio chat page",
         "lark.webhook_url": "Lark group webhook",
+        "lark.nhac_noi_bo": "Internal reminders to Lark",
       },
       moTa: {
         "gallery.default_due_days": "Days from sending the link until the customer must confirm.",
@@ -372,6 +374,8 @@ export const en: Messages = {
           "Optional. Empty means the promo image is not clickable.",
         "chat.page_url": "Target of the 'Message the studio' button. Empty hides the button.",
         "lark.webhook_url": "Bot that posts into the Lark group. Secret, shown masked.",
+        "lark.nhac_noi_bo":
+          "Post-production and unconfirmed-selection reminders to Lark, for STAFF only. Does NOT affect customer-facing messages (selection submitted, reopen request, extra purchase, review approve/revise) — those always send. Off because Lark's own automation in another group already covers this.",
       },
       dangBat: "On",
       dangTat: "Off",

@@ -32,6 +32,7 @@ import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 
 export const runtime = "nodejs";
 
@@ -70,7 +71,7 @@ export async function POST(request: Request): Promise<Response> {
     const admin = createAdminClient();
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, branch_id, status")
+      .select("id, branch_id, status, title, customer_id")
       .eq("id", session.galleryId)
       .maybeSingle();
 
@@ -89,6 +90,21 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const now = new Date().toISOString();
+
+    // BB-284 — dữ liệu trang trí cho thẻ Lark (khách↔studio, LUÔN gửi bất kể
+    // công tắc nhắc nội bộ). Đọc hụt thì thẻ vẫn dựng được, chỉ thiếu tên/SĐT —
+    // không được phép làm hỏng quyết định của khách vì lỗi này.
+    let tenKhach: string | null = null;
+    let soKhach: string | null = null;
+    if (gallery.customer_id) {
+      const { data: khach } = await admin
+        .from("customers")
+        .select("full_name, phone")
+        .eq("id", gallery.customer_id)
+        .maybeSingle();
+      tenKhach = (khach?.full_name as string | undefined) ?? null;
+      soKhach = (khach?.phone as string | undefined) ?? null;
+    }
 
     if (decision === "approve") {
       const { error } = await admin
@@ -115,6 +131,19 @@ export async function POST(request: Request): Promise<Response> {
         entityType: "gallery",
         entityId: gallery.id,
         galleryId: gallery.id,
+      });
+
+      // Báo nhóm Lark của chi nhánh — chiều khách→studio, LUÔN gửi (không nằm
+      // dưới công tắc `lark.nhac_noi_bo`, xem `notify.ts`).
+      await enqueueLarkNotification({
+        branchId: gallery.branch_id,
+        event: "review.approved",
+        payload: {
+          galleryId: gallery.id,
+          galleryTitle: gallery.title,
+          customerName: tenKhach,
+          customerPhone: cheSoDienThoai(soKhach),
+        },
       });
 
       return ok({ status: "approved" });
@@ -164,6 +193,20 @@ export async function POST(request: Request): Promise<Response> {
       // Nội dung khách viết nằm ở `revision_requests.note`; ở đây chỉ cần đủ
       // để lần ra đúng vòng đó.
       metadata: { round },
+    });
+
+    // Báo nhóm Lark của chi nhánh — chiều khách→studio, LUÔN gửi. Ghi chú
+    // nguyên văn để người chỉnh ảnh không phải gọi lại hỏi sửa gì.
+    await enqueueLarkNotification({
+      branchId: gallery.branch_id,
+      event: "review.changes_requested",
+      payload: {
+        galleryId: gallery.id,
+        galleryTitle: gallery.title,
+        round,
+        ghiChu: note,
+        customerPhone: cheSoDienThoai(soKhach),
+      },
     });
 
     return ok({ status: "in_retouch", round });

@@ -118,7 +118,9 @@ test.describe("BB-260: Trung tâm báo cáo điều hành", () => {
 
       await dangNhapNhanVien(page, emailCtv, password);
 
-      await expect(page.getByRole("link", { name: "Báo cáo" })).toHaveCount(0);
+      // BB-280: mục menu đổi tên "Báo cáo" -> "Báo cáo điều hành" (nhóm
+      // "Báo cáo" trong sidebar mới) — vẫn phải ẩn với photoshop_ctv.
+      await expect(page.getByRole("link", { name: "Báo cáo điều hành" })).toHaveCount(0);
     } finally {
       await client.query("delete from staff_branches where staff_id = $1", [ctvId]);
       await client.query("delete from staff_profiles where id = $1", [ctvId]);

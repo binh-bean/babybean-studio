@@ -24,12 +24,12 @@ export interface MenuTaiAnhProps {
 export function MuiTenTai({ className }: { className?: string }) {
   return (
     <svg
-      width="18"
-      height="18"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -74,7 +74,9 @@ export function MenuTaiAnh({ soAnh, dungLuong, soDaChon, onTaiDaChon, onTaiCaBo 
         aria-label="Tải ảnh về máy"
         aria-expanded={mo}
         aria-haspopup="menu"
-        className="grid h-9 w-9 place-items-center rounded-full border border-border text-foreground transition hover:bg-surface-2"
+        // BB-281 (Opus soát lần 2, 27/09/2026) — bỏ viền/nền tĩnh, chỉ icon
+        // nét mảnh; vùng chạm giữ 40px.
+        className="grid h-10 w-10 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
       >
         <MuiTenTai />
       </button>

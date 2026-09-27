@@ -58,6 +58,8 @@ export default defineConfig({
     command: `node --require ./tests/fixtures/mock-drive-network.cjs ./node_modules/next/dist/bin/next dev -p ${PORT}`,
     port: PORT,
     reuseExistingServer: !process.env.CI,
+    // Không bao giờ gửi/ghi ra Lark thật từ phép thử trình duyệt (xem src/lib/kiem-thu.ts).
+    env: { PHEP_THU_TRINH_DUYET: "1" },
     timeout: 120_000,
     stdout: "pipe",
     stderr: "pipe",

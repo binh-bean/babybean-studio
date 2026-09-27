@@ -4,12 +4,9 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertCircle,
   CheckCircle2,
-  Clock,
   Inbox,
-  LayoutDashboard,
-  ArrowRight,
+  ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
@@ -17,16 +14,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/data-table";
-import { cn } from "@/components/ui/utils";
 import { bienDongLaTot } from "@/lib/utils/bang-dieu-khien";
+import { dongCanXuLy, type CanXuLyTongHop } from "@/lib/utils/can-xu-ly";
+import { CARD_TITLE_CLASS } from "./page-header";
 
 type DashboardStats = {
   waitingForSelection: number;
@@ -84,6 +74,13 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // BB-283 (soát 27/09/2026): "Cần xử lý ngay" giờ đọc CÙNG nguồn với huy
+  // hiệu sidebar (`admin-layout-shell.tsx`) — `driveChuaChiaSe`/`chuaCoAnh`
+  // từ `GET /api/admin/can-xu-ly`, gộp với `dueSoon`/`overdue` đã có sẵn
+  // trong `data.stats`. Tải riêng, không chặn khối chính: hỏng thì khối chỉ
+  // thiếu hai loại kia, không sập cả trang.
+  const [canXuLy, setCanXuLy] = useState<{ driveChuaChiaSe?: unknown[]; chuaCoAnh?: unknown[] } | null>(null);
+
   useEffect(() => {
     let active = true;
 
@@ -94,9 +91,9 @@ export function Dashboard() {
         const query = branchId ? `?branchId=${branchId}` : "";
         const res = await fetch(`/api/admin/dashboard${query}`);
         const result = await res.json();
-        
+
         if (!active) return;
-        
+
         if (!res.ok) {
           setError(result.error?.message || "Lỗi tải dữ liệu");
         } else {
@@ -116,6 +113,22 @@ export function Dashboard() {
       active = false;
     };
   }, [branchId]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/admin/can-xu-ly", { cache: "no-store" })
+      .then((res) => res.json().catch(() => null).then((json) => ({ ok: res.ok, json })))
+      .then(({ ok, json }) => {
+        if (!active || !ok || !json?.data) return;
+        setCanXuLy(json.data);
+      })
+      .catch(() => {
+        // Phụ — hỏng thì khối "Cần xử lý ngay" chỉ thiếu hai loại này.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (loading) {
     return <div className="p-8 text-center text-muted-foreground">Đang tải dữ liệu...</div>;
@@ -140,9 +153,9 @@ export function Dashboard() {
         <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
           <Inbox className="w-8 h-8 text-muted-foreground" />
         </div>
-        <h3 className="text-xl font-bold mb-2">Chưa có album nào</h3>
+        <h3 className="text-xl font-bold mb-2">Chưa có bộ ảnh nào</h3>
         <p className="text-muted-foreground max-w-md mb-6">
-          Chi nhánh này hiện chưa có album nào. Hãy bắt đầu bằng việc đồng bộ ảnh chụp cho khách hàng.
+          Chi nhánh này hiện chưa có bộ ảnh nào. Hãy bắt đầu bằng việc đồng bộ ảnh chụp cho khách hàng.
         </p>
         <Button asChild>
           <Link href="/admin/galleries">Đi tới Quản lý bộ ảnh</Link>
@@ -156,25 +169,81 @@ export function Dashboard() {
   // `key`: tên trong `data.stats`/`data.soSanhKy` để tra chip so kỳ trước.
   // `huongTangLaTot`: chỉ đọc khi có chip — thẻ "trong kỳ" mới có mục trong
   // `soSanhKy` (API không trả cho thẻ số dồn hiện tại, xem route.ts).
+  //
+  // BB-283 (soát 27/09/2026): bỏ icon tròn nhiều màu ở góc thẻ — bản vẽ
+  // quan-tri-menu-nhom.png không có, chỉ nhãn hoa + số serif + chip %.
   const stats: {
     key: keyof DashboardStats;
     label: string;
     value: number;
-    icon: typeof Inbox;
-    color: string;
-    bg: string;
     huongTangLaTot: boolean;
   }[] = [
-    { key: "waitingForSelection", label: "Chờ khách chọn", value: data.stats.waitingForSelection, icon: Inbox, color: "text-blue-500", bg: "bg-blue-500/10", huongTangLaTot: false },
-    { key: "dueSoon", label: "Sắp hết hạn", value: data.stats.dueSoon, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10", huongTangLaTot: false },
-    { key: "overdue", label: "Quá hạn", value: data.stats.overdue, icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10", huongTangLaTot: false },
-    { key: "waitingForRetouch", label: "Chờ retouch", value: data.stats.waitingForRetouch, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10", huongTangLaTot: false },
-    { key: "deliveredThisMonth", label: "Đã giao tháng này", value: data.stats.deliveredThisMonth, icon: LayoutDashboard, color: "text-purple-500", bg: "bg-purple-500/10", huongTangLaTot: true },
+    { key: "waitingForSelection", label: "Chờ khách chọn", value: data.stats.waitingForSelection, huongTangLaTot: false },
+    { key: "dueSoon", label: "Sắp hết hạn", value: data.stats.dueSoon, huongTangLaTot: false },
+    { key: "overdue", label: "Quá hạn", value: data.stats.overdue, huongTangLaTot: false },
+    { key: "waitingForRetouch", label: "Chờ retouch", value: data.stats.waitingForRetouch, huongTangLaTot: false },
+    { key: "deliveredThisMonth", label: "Đã giao tháng này", value: data.stats.deliveredThisMonth, huongTangLaTot: true },
   ];
 
   return (
     <div className="space-y-8">
-      {/* 1. Hàng thẻ số — bản vẽ quan-tri-bang-dieu-khien.webp: nhãn nhỏ trên
+      {/*
+        BB-280: chủ studio 27/09/2026 chốt lại tư duy màn Tổng quan — khối
+        "Cần xử lý" phải lên ĐẦU trang, trước cả hàng thẻ số. Trước đây nó
+        đứng thứ hai, sau hàng thẻ số — đúng thứ tự CSKH quan tâm là "việc gì
+        cần làm ngay" trước rồi mới tới "số liệu tổng quan".
+      */}
+      {(() => {
+        // BB-283 (soát 27/09/2026): MỘT khối, MỘT nguồn — không còn bảng
+        // riêng của BB-270 (due_soon/overdue) đứng cạnh huy hiệu sidebar nói
+        // điều khác. `merged`/`dong`/`tong` dùng ĐÚNG hàm sidebar dùng
+        // (`src/lib/utils/can-xu-ly.ts`), nên tổng các dòng ở đây LUÔN khớp
+        // số trên huy hiệu — không tính lại theo cách khác ở đây.
+        const merged: CanXuLyTongHop = {
+          driveChuaChiaSe: canXuLy?.driveChuaChiaSe,
+          chuaCoAnh: canXuLy?.chuaCoAnh,
+          dueSoon: data.stats.dueSoon,
+          overdue: data.stats.overdue,
+        };
+        const dong = dongCanXuLy(merged);
+        return (
+          <Card className="flex flex-col overflow-hidden min-w-0">
+            <CardHeader>
+              <CardTitle className={CARD_TITLE_CLASS}>Cần xử lý ngay</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 p-0">
+              {dong.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-4 py-12">
+                  <CheckCircle2 className="w-12 h-12 text-emerald-500/50" />
+                  <p>Tuyệt vời! Không có bộ ảnh nào cần xử lý gấp.</p>
+                </div>
+              ) : (
+                <ul data-testid="can-xu-ly-ngay-rows">
+                  {dong.map((d) => (
+                    <li key={d.key} className="border-t border-[var(--bb-border)] first:border-t-0">
+                      <Link
+                        href={d.href}
+                        className="flex items-center gap-3 px-6 py-3 text-sm transition-colors hover:bg-[var(--bb-surface-2)]"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: d.mauCham }}
+                        />
+                        <span className="flex-1 font-medium text-[var(--bb-fg)]">{d.nhan}</span>
+                        <span className="font-mono text-[var(--bb-fg-muted)]">{d.soLuong}</span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[var(--bb-fg-muted)]" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* Hàng thẻ số — bản vẽ quan-tri-bang-dieu-khien.webp: nhãn nhỏ trên
           cùng, số lớn bên dưới, chip % so kỳ trước ở góc phải (BB-270). Thẻ
           không có mục trong `soSanhKy` (số dồn hiện tại, không phải "trong
           kỳ") thì không hiện chip — xem định nghĩa ở route.ts. */}
@@ -185,19 +254,18 @@ export function Dashboard() {
           return (
             <Card key={i}>
               <CardContent className="p-5 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium uppercase tracking-wide text-[var(--bb-fg-muted)]">
-                    {stat.label}
-                  </span>
-                  <div className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", stat.bg, stat.color)}>
-                    <stat.icon className="w-3.5 h-3.5" />
-                  </div>
-                </div>
+                <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--bb-fg-muted)]">
+                  {stat.label}
+                </span>
                 <div className="flex items-end justify-between gap-2">
-                  <div className="font-display text-3xl font-bold text-[var(--bb-fg)]">{stat.value}</div>
+                  <div className="font-display text-[32px] font-normal text-[var(--bb-fg)]">{stat.value}</div>
                   {soSanh && soSanh.chenhLechPhanTram !== null && (
                     <Badge
-                      variant={laTot === true ? "accent" : laTot === false ? "default" : "secondary"}
+                      // Bản vẽ: chip "so kỳ trước" nền sage NHẠT — chỉ đúng khi biến động
+                      // là TỐT (laTot === true). Biến động xấu vẫn phải nổi bật khác màu
+                      // (variant="default", hồng đất) để CSKH nhận ra ngay — đó là dữ liệu
+                      // thật từ BB-270, không phải trang trí, nên KHÔNG gộp về một màu.
+                      variant={laTot === true ? "soft-accent" : laTot === false ? "default" : "secondary"}
                       className="gap-0.5 px-1.5 py-0.5"
                       title={`Kỳ trước: ${soSanh.kyTruoc}`}
                     >
@@ -222,102 +290,11 @@ export function Dashboard() {
         nên nó đẩy cả cột rộng 653px trên màn 375px — đo thật ngày 21/09/2026:
         bảng điều khiển phải kéo ngang mới đọc được trên điện thoại.
       */}
-      <div className="grid lg:grid-cols-4 gap-8">
-        {/* 2. Bảng cần xử lý ngay */}
-        <Card className="lg:col-span-2 flex flex-col overflow-hidden min-w-0">
-          <CardHeader>
-            <CardTitle className="font-display">Cần xử lý ngay</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 p-0">
-            {data.actionRequired.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-4 py-12">
-                <CheckCircle2 className="w-12 h-12 text-emerald-500/50" />
-                <p>Tuyệt vời! Không có album nào cần xử lý gấp.</p>
-              </div>
-            ) : (
-              <div
-                className="overflow-x-auto p-0"
-                // BB-277 kiểm ngược (axe `scrollable-region-focusable`) —
-                // vùng cuộn ngang phải tới được và cuộn được bằng bàn phím
-                // (mũi tên), không chỉ bằng chuột/chạm.
-                tabIndex={0}
-                role="region"
-                aria-label="Bảng cần xử lý ngay, cuộn ngang trên màn hẹp"
-              >
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-6">Album</TableHead>
-                      <TableHead>Khách hàng</TableHead>
-                      <TableHead>Tiến độ</TableHead>
-                      <TableHead>Trạng thái</TableHead>
-                      <TableHead className="pr-6"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.actionRequired.map((item) => {
-                      // Chấm màu nhỏ trước tên album — cùng ngôn ngữ với danh
-                      // sách "needs attention today" trong bản vẽ, tái dùng
-                      // đúng mức cảnh báo `urgency` đã tính ở máy chủ.
-                      const chamMau =
-                        item.urgency === "overdue"
-                          ? "bg-[var(--bb-danger)]"
-                          : item.urgency === "due_soon"
-                            ? "bg-[var(--bb-warning)]"
-                            : item.status === "submitted"
-                              ? "bg-[var(--bb-success)]"
-                              : "bg-[var(--bb-fg-muted)]";
-                      return (
-                      <TableRow key={item.id}>
-                        <TableCell className="pl-6">
-                          <div className="flex items-center gap-2 font-medium">
-                            <span aria-hidden="true" className={cn("h-2 w-2 shrink-0 rounded-full", chamMau)} />
-                            {item.title}
-                          </div>
-                          <div className="pl-4 text-xs text-muted-foreground">{item.branch_name}</div>
-                        </TableCell>
-                        <TableCell>{item.customer_name}</TableCell>
-                        <TableCell>
-                          {item.included_quota !== null ? (
-                            <span className="text-sm font-mono">
-                              {item.selected_count}/{item.included_quota}
-                            </span>
-                          ) : (
-                            <span className="text-sm font-mono">{item.selected_count} ảnh</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {item.urgency === "overdue" ? (
-                            <Badge variant="danger">Quá hạn</Badge>
-                          ) : item.urgency === "due_soon" ? (
-                            <Badge variant="warning">Sắp hết hạn</Badge>
-                          ) : item.status === "submitted" ? (
-                            <Badge variant="success">Chờ retouch</Badge>
-                          ) : (
-                            <Badge variant="outline">{item.status}</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="pr-6 text-right">
-                          <Button variant="ghost" size="icon" asChild>
-                            <Link href={`/admin/galleries/${item.id}`}>
-                              <ArrowRight className="w-4 h-4" />
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* 3. Biểu đồ cột */}
+      <div className="grid lg:grid-cols-2 gap-8">
+        {/* Biểu đồ cột */}
         <Card className="min-w-0">
           <CardHeader>
-            <CardTitle className="font-display">Album tạo mới (14 ngày)</CardTitle>
+            <CardTitle className={CARD_TITLE_CLASS}>Bộ ảnh mới (14 ngày)</CardTitle>
           </CardHeader>
           <CardContent>
             {/*
@@ -329,7 +306,7 @@ export function Dashboard() {
               className="overflow-x-auto"
               tabIndex={0}
               role="region"
-              aria-label="Biểu đồ số album tạo mới 14 ngày qua, cuộn ngang"
+              aria-label="Biểu đồ số bộ ảnh mới 14 ngày qua, cuộn ngang"
             >
               <div className="h-64 flex items-end gap-2 pt-4 min-w-[26rem]">
               {data.chartData.map((d, i) => {
@@ -365,7 +342,7 @@ export function Dashboard() {
         */}
         <Card className="min-w-0">
           <CardHeader>
-            <CardTitle className="font-display">Tiến độ theo chi nhánh</CardTitle>
+            <CardTitle className={CARD_TITLE_CLASS}>Tiến độ theo chi nhánh</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {data.tienDoChiNhanh.length === 0 ? (

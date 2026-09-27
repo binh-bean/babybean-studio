@@ -157,7 +157,8 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           <div className={`absolute inset-0 ${bgOverlay}`} />
         </div>
         <div className="z-10 flex flex-col items-center text-center px-6 max-w-2xl">
-          <p className="uppercase tracking-[0.2em] mb-4 text-[13px] opacity-90">Baby Bean</p>
+          {/* BB-278 — "Baby Bean" chuyển lên thanh thương hiệu đầu trang, bỏ
+              khỏi khối chữ bìa để không lặp; chỉ còn ngày · chi nhánh. */}
           <p className="text-[12px] uppercase tracking-[0.16em] opacity-85 mb-4">
             {[ngay, chiNhanh].filter(Boolean).join(" · ")}
           </p>
@@ -180,7 +181,8 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           <div className={`absolute inset-0 bg-gradient-to-t ${mauChu === 'sang' ? 'from-black/70 to-transparent' : 'from-white/70 to-transparent'} h-1/2 bottom-0 top-auto`} />
         </div>
         <div className="z-10 w-full max-w-3xl">
-          <p className="uppercase tracking-[0.2em] mb-2 text-[12px] opacity-90">Baby Bean · {[ngay, chiNhanh].filter(Boolean).join(" · ")}</p>
+          {/* BB-278 — "Baby Bean" chuyển lên thanh thương hiệu đầu trang. */}
+          <p className="uppercase tracking-[0.2em] mb-2 text-[12px] opacity-90">{[ngay, chiNhanh].filter(Boolean).join(" · ")}</p>
           <h1 className="font-display text-[48px] sm:text-[60px] lg:text-[72px] font-light leading-[1] tracking-[-0.02em] mb-4">{tieuDeBia}</h1>
           <p className="text-[15px] leading-relaxed opacity-90 max-w-md">{loiChaoBia}</p>
           <MetaInfo />
@@ -200,7 +202,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           <div className={`absolute inset-0 bg-gradient-to-br ${mauChu === 'sang' ? 'from-black/60 to-transparent' : 'from-white/60 to-transparent'} w-full h-full`} />
         </div>
         <div className="z-10 w-full p-8 lg:p-16 flex flex-col justify-start mt-10">
-          <p className="uppercase tracking-[0.2em] mb-2 text-[12px] opacity-90">Baby Bean</p>
+          {/* BB-278 — "Baby Bean" chuyển lên thanh thương hiệu đầu trang. */}
           <p className="text-[12px] uppercase tracking-[0.16em] opacity-85 mb-4">
             {[ngay, chiNhanh].filter(Boolean).join(" · ")}
           </p>
@@ -218,17 +220,36 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
   // ben-canh (default) - cập nhật theo màn bìa chuẩn
   //
   // BB-258 — chủ studio 26/09/2026: bìa máy tính KHÔNG được chia đôi (chữ
-  // trái nền kem, ảnh phải) như BB-253 đã dựng. Ảnh phải TRÀN TOÀN MÀN
-  // (`object-cover`, ~100dvh) ở mọi bề rộng; máy tính thì chữ nằm trong một
-  // mảng phủ mờ ĐÈ LÊN bên trái ảnh — không cắt đôi ảnh, ảnh vẫn chạy hết bề
-  // rộng phía sau lớp mờ. Điện thoại/máy tính bảng giữ nguyên chữ đè đáy ảnh
-  // như trước.
+  // trái nền kem, ảnh phải) như BB-253 đã dựng. Điện thoại/máy tính bảng vẫn
+  // ảnh TRÀN TOÀN MÀN với chữ đè đáy như BB-258 đã dựng.
+  //
+  // BB-278 — chủ studio 27/09/2026: "phần thông tin ảnh bìa trên pc màn
+  // ngang rất dễ đè lấp mất hình". Mảng phủ mờ của BB-258 (đè chữ lên bên
+  // trái ảnh) vẫn CHE MỘT PHẦN ảnh trên máy tính — đúng thứ chủ studio vừa
+  // chỉ ra. Từ lg: bỏ hẳn lớp phủ đè lên ảnh; ảnh là MỘT KHỐI riêng (cao giới
+  // hạn, không phải nền tuyệt đối phủ hết section), chữ là MỘT DẢI CHÚ THÍCH
+  // riêng ngay dưới ảnh (nền kem, chữ mực) — hai khối không bao giờ giao
+  // nhau, đo bằng `tests/e2e/bb-278-dau-trang-bia.spec.ts`.
   return (
     <section
       aria-label="Ảnh bìa"
-      className={cn("@container relative isolate h-[86svh] min-h-[540px] max-h-[980px] w-full overflow-hidden bg-[#2a2420] text-white lg:h-[100dvh] lg:max-h-none lg:min-h-[600px]", className)}
+      data-testid="bia-bo-anh"
+      className={cn(
+        "@container relative isolate w-full overflow-hidden bg-[#2a2420] text-white",
+        "h-[86svh] min-h-[540px] max-h-[980px]",
+        "lg:flex lg:h-auto lg:max-h-none lg:min-h-0 lg:flex-col lg:bg-[#fbf7f2] lg:text-[#2e2a27]",
+        className,
+      )}
     >
-      <div className="absolute inset-0 -z-10">
+      {/*
+        Khối ảnh — nền tuyệt đối tràn toàn section dưới lg (như BB-258). Từ
+        lg là một khối THẬT trong dòng chảy (không còn `absolute inset-0`),
+        cao giới hạn, để dải chữ bên dưới không cần đè lên nó.
+      */}
+      <div
+        data-testid="bia-khoi-anh"
+        className="absolute inset-0 -z-10 lg:static lg:z-auto lg:h-[64vh] lg:max-h-[760px] lg:min-h-[420px]"
+      >
         {imgEl}
         <div
           aria-hidden="true"
@@ -237,44 +258,49 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
       </div>
 
       {/*
-        Mảng phủ mờ bên trái, chỉ máy tính (≥1024px): thay cho cột 50vw nền
-        kem của BB-253. `pointer-events-none` để không chặn thao tác trên
-        phần ảnh còn lại (không có nút nào cần bấm ở đây ngoài nút bên dưới).
+        BB-278 — MỘT khối chữ duy nhất (không phải hai bản sao ẩn/hiện bằng
+        CSS): tự đổi vị trí + màu theo bề rộng, thay vì đè lên ảnh dưới lg và
+        tách dải riêng từ lg. Từng thử dựng HAI khối riêng (một cho di động,
+        một cho lg) rồi ẩn bằng `hidden`/`lg:hidden` — cả hai vẫn nằm trong
+        DOM cùng lúc nên `h1` (và mọi phần tử con) bị NHÂN ĐÔI, làm hỏng mọi
+        chỗ dò `section[aria-label='Ảnh bìa'] h1` (bb-240, bb-274, bb-258 đều
+        có chỗ dò kiểu này — soát bằng cách chạy lại bộ đó phát hiện ra).
       */}
       <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 left-0 hidden w-[min(46%,720px)] bg-black/40 backdrop-blur-md lg:block"
-      />
-
-      <div className="khach-le-trai-lg absolute inset-x-0 bottom-0 z-10 px-6 pb-9 sm:px-10 lg:inset-x-auto lg:inset-y-0 lg:left-0 lg:flex lg:w-[min(46%,720px)] lg:flex-col lg:justify-center lg:pb-0 lg:pr-10">
-        <div className="max-w-md">
-          <p className="text-[12px] uppercase tracking-[0.16em] text-white/90">
-            BABY BEAN · {[ngay, chiNhanh].filter(Boolean).join(" · ")}
+        data-testid="bia-khoi-chu"
+        className={cn(
+          "khach-le-trai-lg absolute inset-x-0 bottom-0 z-10 px-6 pb-9 sm:px-10",
+          "lg:static lg:z-auto lg:inset-auto lg:border-t lg:border-[#e5dcd2] lg:bg-[#fbf7f2] lg:px-10 lg:py-10 xl:px-16",
+        )}
+      >
+        <div className="max-w-md lg:max-w-2xl">
+          <p className="text-[12px] uppercase tracking-[0.16em] text-white/90 lg:text-[#6b6057]">
+            {[ngay, chiNhanh].filter(Boolean).join(" · ")}
           </p>
 
-          <h1 className="mt-2 font-display text-[54px] font-light leading-[0.98] tracking-[-0.02em] sm:text-[68px] lg:mt-4 lg:text-[76px]">
+          <h1 className="mt-2 font-display text-[54px] font-light leading-[0.98] tracking-[-0.02em] sm:text-[68px] lg:mt-3 lg:text-[44px] lg:leading-[1.02] xl:text-[52px]">
             {tieuDeBia}
           </h1>
 
-          <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-white/90 lg:mt-5 lg:text-base">
+          <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-white/90 lg:max-w-2xl lg:text-base lg:text-[#4a423b]">
             {loiChaoBia}
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-x-2 gap-y-2 text-[14px] text-white/90">
+          <div className="mt-6 flex flex-wrap gap-x-2 gap-y-2 text-[14px] text-white/90 lg:mt-5 lg:text-[#4a423b]">
             {hanMuc != null && (
-              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30">
+              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30 lg:border-[#2e2a27]/20">
                 <Heart className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 {hanMuc} tấm trong gói
               </span>
             )}
             {conNgay != null && (
-              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30">
+              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30 lg:border-[#2e2a27]/20">
                 <Clock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 Còn {conNgay} ngày để chọn
               </span>
             )}
             {khoa && (
-              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30">
+              <span className="inline-flex h-[36px] px-3.5 items-center gap-1.5 rounded-full border border-white/30 lg:border-[#2e2a27]/20">
                 <Lock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 Đã chốt danh sách
               </span>
@@ -284,7 +310,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           <button
             type="button"
             onClick={onBatDau}
-            className="mt-8 inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#fbf7f2] px-7 text-[15px] font-medium text-[#2e2a27] transition hover:bg-white active:scale-[0.98] sm:w-auto"
+            className="mt-8 inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#fbf7f2] px-7 text-[15px] font-medium text-[#2e2a27] transition hover:bg-white active:scale-[0.98] sm:w-auto lg:mt-7 lg:bg-[#2e2a27] lg:text-[#fbf7f2] lg:hover:bg-[#2e2a27]/90"
           >
             {nhanNut}
           </button>

@@ -64,13 +64,7 @@ export function NhatKyReport() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header>
-        <h1 className="text-xl font-semibold">{t.title}</h1>
-        <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
-          {t.subtitle}
-        </p>
-      </header>
-
+      {/* BB-280: tiêu đề cấp trang chuyển sang PageHeader trong page.tsx. */}
       <div className="flex flex-wrap items-center gap-4 rounded-md border border-[var(--bb-border)] bg-[var(--bb-bg-muted)] p-4 text-sm">
         <div className="flex flex-col gap-1">
           <label className="font-medium">{t.filterActor}</label>

@@ -2,6 +2,11 @@
 
 Studio đang dùng **Lark** để quản trị nội bộ. Nguyên tắc: **không bắt nhân viên bỏ Lark**. Web app là nơi khách chọn ảnh và là nguồn sự thật về album; Lark là nơi nhân viên nhận thông báo và làm việc hằng ngày.
 
+> **BB-284 (27/09/2026):** tài liệu này là bản thiết kế GỐC (Phase 3). Danh
+> sách sự kiện thật đang chạy, sự kiện nào bị TẮT bởi công tắc
+> `settings.lark.nhac_noi_bo`, và bảng "tin nào đi đâu" hiện hành — xem
+> `docs/21-quy-trinh-hau-ky-va-cskh.md` mục "BB-284 (27/09/2026)".
+
 ## 1. Ba mức tích hợp, làm theo thứ tự
 
 | Mức | Nội dung | Công sức | Phase |

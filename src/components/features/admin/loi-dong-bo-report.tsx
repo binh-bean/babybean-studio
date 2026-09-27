@@ -33,6 +33,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { CARD_TITLE_CLASS } from "./page-header";
 
 interface LoiItem {
   galleryId: string;
@@ -162,9 +163,15 @@ export function LoiDongBoReport() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/*
+        BB-280: trang riêng cũ (/admin/reports/loi-dong-bo) đã gộp thành một
+        tab trong /admin/viec-can-xu-ly — PageHeader của trang đó đã in tiêu
+        đề cấp trang, nên ở đây chỉ còn tiêu đề THẺ (CARD_TITLE_CLASS, xem
+        docs/07-ui-ux.md), không phải h1.
+      */}
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Bộ ảnh tải từ Drive bị lỗi</h1>
+          <h2 className={CARD_TITLE_CLASS}>Bộ ảnh tải từ Drive bị lỗi</h2>
           <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
             Những bộ ảnh chưa kéo được ảnh từ Google Drive về. Sửa nguyên nhân bên
             Drive trước, rồi bấm Thử lại.

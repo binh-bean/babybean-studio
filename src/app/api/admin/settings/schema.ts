@@ -87,6 +87,14 @@ export const CAI_DAT_SUA_DUOC: DinhNghiaCaiDat[] = [
   // --- Liên lạc ------------------------------------------------------------
   { key: "chat.page_url", nhom: "lien-lac", schema: diaChiHttps },
   { key: "lark.webhook_url", nhom: "lien-lac", biMat: true, schema: diaChiHttps },
+  /*
+    BB-284 — chủ studio 27/09/2026: automatic của Lark ở nhóm khác đã lo phần
+    "ảnh về" và "cảnh báo nội bộ" rồi, tạm tắt tin TRÙNG này trong app tới khi
+    chuyển hẳn Lark qua app. Mặc định TẮT (xem `notify.ts` §`nhacNoiBoDangBat`).
+    KHÔNG chặn tin khách↔studio (khách chốt ảnh, xin mở lại, mua thêm, duyệt/
+    xin sửa) — những tin đó luôn gửi bất kể công tắc này.
+  */
+  { key: "lark.nhac_noi_bo", nhom: "lien-lac", schema: z.boolean() },
 ];
 
 export const KHOA_SUA_DUOC = new Set(CAI_DAT_SUA_DUOC.map((c) => c.key));

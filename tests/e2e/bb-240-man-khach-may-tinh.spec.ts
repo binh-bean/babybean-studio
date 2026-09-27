@@ -240,9 +240,12 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
       name: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
     });
     await expect(goiY).toBeVisible();
-    // Opus soát (25/09): bản đầu trên máy tính đặt gợi ý góc dưới phải, ĐÈ LÊN
-    // nút "Chốt danh sách" — E-1/E-2/E-8 không bấm được Chốt. Gợi ý và thanh
-    // đáy không được chồng nhau, ở máy tính lẫn điện thoại.
+    // BB-278/BB-281 (27/09/2026) — gợi ý không còn là thẻ `fixed` gần đáy: nó
+    // đè lên thanh chọn/chốt sau khi thanh đó thu nhỏ lại (ảnh chụp máy thật
+    // chủ studio gửi). Nay là một chip nằm trong DÒNG CHẢY của trang, ngay
+    // dưới thanh thương hiệu — tách biệt bằng VỊ TRÍ (đầu trang, không
+    // `fixed`) với thanh chọn/chốt (đáy trang, `fixed`) nên không còn cách
+    // nào chồng lên nhau; vẫn giữ phép đo dưới đây làm chốt chặn hồi quy.
     const khongChong = async () => {
       const a = (await goiY.boundingBox())!;
       const b = (await page.getByRole("button", { name: "Chốt danh sách" }).first().boundingBox())!;
@@ -254,7 +257,9 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await khongChong();
     await page.setViewportSize({ width: 1440, height: 900 });
 
-    await goiY.getByRole("button", { name: "Để sau" }).click();
+    // BB-278/BB-281 — chip một dòng chỉ còn nút × để ẩn (không còn nút "Để
+    // sau" riêng); cùng một hàm `dong()` ghi mốc "đã ẩn" như bản cũ.
+    await goiY.getByRole("button", { name: "Ẩn gợi ý lưu app" }).click();
     await expect(goiY).toBeHidden();
 
     await page.reload();
@@ -265,7 +270,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     ).toHaveCount(0);
   });
 
-  test("Lưu app: 'Xem cách lưu' mở đúng tấm hướng dẫn có sẵn", async ({ page }) => {
+  test("Lưu app: bấm chip mở đúng tấm hướng dẫn có sẵn", async ({ page }) => {
     // Dọn lựa chọn còn sót từ ca thử trước — cùng lý do ghi ở ca "Để sau"
     // phía trên: trạng thái "đã chọn" nằm ở server, dùng chung `maLink`.
     await pg.query("delete from selection_items where selection_id in (select id from selections where gallery_id = $1)", [galleryId]);
@@ -286,7 +291,10 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
       name: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
     });
     await expect(goiY).toBeVisible();
-    await goiY.getByRole("button", { name: "Xem cách lưu" }).click();
+    // BB-278/BB-281 — chip chỉ còn MỘT nhãn bấm được (nhãn ngắn), thay cho
+    // nút "Xem cách lưu" riêng của thẻ cũ; bấm vào nhãn mở đúng tấm hướng dẫn
+    // như trước.
+    await goiY.getByRole("button", { name: "Lưu ra màn hình chính" }).click();
 
     await expect(page.getByRole("dialog", { name: "Lưu app ra màn hình chính" })).toBeVisible();
   });

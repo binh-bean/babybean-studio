@@ -12,6 +12,12 @@
  * hoàn nguyên bia-bo-anh.tsx/gallery-app.tsx/thanh-chon.tsx về bản BB-253 thì
  * các khẳng định bên dưới đỏ (ghi trong báo cáo bàn giao).
  *
+ * CẬP NHẬT 27/09/2026 (BB-278) — mục (1) "chữ đè lên ảnh" bị chủ studio
+ * ĐẢO NGƯỢC: "phần thông tin ảnh bìa trên pc màn ngang rất dễ đè lấp mất
+ * hình". Ca thử theo viewport bên dưới đã đổi khẳng định cho khớp (chữ nằm
+ * DƯỚI ảnh, không đè lên) — xem ghi chú ngay tại ca thử đó. Mục (2) không
+ * đổi.
+ *
  * Dữ liệu: chỉ tạo dòng "Fixture BB-258 …", xoá sạch ở afterAll — theo đúng
  * mẫu `tests/e2e/bb-240-man-khach-may-tinh.spec.ts`.
  */
@@ -91,31 +97,37 @@ test.describe("BB-258: bìa tràn toàn màn + thanh nổi không che tên mục
     { w: 1440, h: 900 },
     { w: 1920, h: 1080 },
   ]) {
-    test(`${vp.w}×${vp.h}: ảnh bìa tràn khung nhìn, tiêu đề nằm trong vùng ảnh`, async ({ page }) => {
+    test(`${vp.w}×${vp.h}: ảnh bìa tràn khung nhìn, tiêu đề KHÔNG đè lên ảnh (BB-278)`, async ({ page }) => {
       await page.setViewportSize({ width: vp.w, height: vp.h });
       await page.goto(`/g/${maLink}`);
 
       const bia = page.locator("section[aria-label='Ảnh bìa']");
+      // BB-281 (27/09/2026) — cả bìa (`bia-khoi-anh`) và dải chữ
+      // (`bia-khoi-chu`) đều là con của MỘT `section` chung, nên đo diện tích
+      // đúng của TỪNG khối phải dùng testid riêng, không dùng bounding box
+      // của cả `section` (nó luôn "chứa" cả hai, kể cả khi chữ đã tách hẳn
+      // xuống dưới — phép đo cũ dựa trên `section` không còn phân biệt được
+      // "chữ đè ảnh" với "chữ nằm dưới ảnh").
+      const khoiAnh = page.locator("[data-testid='bia-khoi-anh']");
       const tieuDe = bia.locator("h1");
       await expect(tieuDe).toBeVisible();
 
       const boxBia = (await bia.boundingBox())!;
+      const boxKhoiAnh = (await khoiAnh.boundingBox())!;
       const boxTieuDe = (await tieuDe.boundingBox())!;
       const thanhCuon = await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth);
 
       // eslint-disable-next-line no-console
-      console.log(`[BB-258] ${vp.w}×${vp.h} bìa=${JSON.stringify(boxBia)} thanhCuon=${thanhCuon}`);
+      console.log(`[BB-258] ${vp.w}×${vp.h} bìa=${JSON.stringify(boxBia)} khoiAnh=${JSON.stringify(boxKhoiAnh)} thanhCuon=${thanhCuon}`);
 
       // Rộng bằng khung nhìn, trừ thanh cuộn thật (±2px).
       expect(Math.abs(boxBia.width - (vp.w - thanhCuon))).toBeLessThanOrEqual(2);
-      // Cao tối thiểu 90% khung nhìn — không còn chia đôi/co lại theo cột.
-      expect(boxBia.height).toBeGreaterThanOrEqual(vp.h * 0.9);
 
-      // Tiêu đề nằm TRONG vùng ảnh bìa (đè lên ảnh, không phải ngoài/dưới nó).
-      expect(boxTieuDe.x).toBeGreaterThanOrEqual(boxBia.x - 1);
-      expect(boxTieuDe.x + boxTieuDe.width).toBeLessThanOrEqual(boxBia.x + boxBia.width + 1);
-      expect(boxTieuDe.y).toBeGreaterThanOrEqual(boxBia.y - 1);
-      expect(boxTieuDe.y + boxTieuDe.height).toBeLessThanOrEqual(boxBia.y + boxBia.height + 1);
+      // BB-278 (27/09/2026, chủ studio): "phần thông tin ảnh bìa trên pc màn
+      // ngang rất dễ đè lấp mất hình" — đảo NGƯỢC khẳng định cũ của BB-258
+      // ("chữ đè lên ảnh"). Nay tiêu đề phải nằm HẲN DƯỚI khối ảnh, không
+      // giao nhau theo trục dọc.
+      expect(boxTieuDe.y).toBeGreaterThanOrEqual(boxKhoiAnh.y + boxKhoiAnh.height - 1);
     });
   }
 
@@ -149,19 +161,21 @@ test.describe("BB-258: bìa tràn toàn màn + thanh nổi không che tên mục
 
     await expect(thanhNoi).toHaveAttribute("aria-hidden", "false");
 
-    const tieuDeMuc = page.locator("#dau-luoi-anh p.font-display").first();
+    // BB-281 (27/09/2026) — tên mục/tên bộ ảnh không còn lặp lại trong
+    // `#dau-luoi-anh` (quyết định điều hành: thanh dính chỉ còn hàng chip
+    // lọc, tên bộ ảnh chỉ hiện đúng MỘT LẦN ở ảnh bìa; xem `gallery-app.tsx`
+    // và `tests/e2e/bb-278-dau-trang-bia.spec.ts`). Phép "không che" ở đây
+    // chỉ còn xét hàng chip lọc — phần tử duy nhất còn lại trong thanh dính.
     const nutLoc = page.getByRole("button", { name: /^Tất cả/ });
-    await expect(tieuDeMuc).toBeVisible();
     await expect(nutLoc).toBeVisible();
 
     const khongGiao = async (a: { x: number; y: number; width: number; height: number }, hop: string) => {
-      const b = (await (hop === "tieuDe" ? tieuDeMuc : nutLoc).boundingBox())!;
+      const b = (await nutLoc.boundingBox())!;
       const giao = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
       expect(giao, `thanh nổi ${JSON.stringify(a)} đè lên ${hop} ${JSON.stringify(b)}`).toBe(false);
     };
 
     const boxThanhNoi = (await thanhNoi.boundingBox())!;
-    await khongGiao(boxThanhNoi, "tieuDe");
     await khongGiao(boxThanhNoi, "nutLoc");
 
     // Cuộn LÊN một chút → thanh nổi hiện lại NGAY, nút chính bấm được.

@@ -9,12 +9,13 @@
  */
 
 import { Dashboard } from "@/components/features/admin/dashboard";
+import { PageHeader } from "@/components/features/admin/page-header";
 
 export default function AdminDashboardPage() {
   return (
-    <main className="mx-auto min-w-0 max-w-7xl">
+    <main className="mx-auto min-w-0 max-w-7xl space-y-4 lg:space-y-6">
       {/* Thanh trên cùng đã ghi tên màn — xem ghi chú ở màn Khách hàng. */}
-      <h1 className="mb-6 hidden font-display text-2xl font-bold tracking-tight lg:block">Bảng điều khiển</h1>
+      <PageHeader title="Bảng điều khiển" hideOnMobile className="mb-0" />
       <Dashboard />
     </main>
   );

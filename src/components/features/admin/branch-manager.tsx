@@ -12,6 +12,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Button, Input, Badge, Card, Spinner, EmptyState } from "@/components/ui";
 import { Field, RequiredLegend } from "./field";
+import { PageHeader } from "./page-header";
 import { vi } from "@/i18n/vi";
 
 const t = vi.admin.branches;
@@ -95,13 +96,11 @@ export function BranchManager() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-[var(--bb-fg)]">{t.title}</h1>
-          <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">{t.subtitle}</p>
-        </div>
-        {canCreate && <Button onClick={() => setShowForm((v) => !v)}>{t.addButton}</Button>}
-      </header>
+      <PageHeader
+        title={t.title}
+        description={t.subtitle}
+        actions={canCreate ? <Button onClick={() => setShowForm((v) => !v)}>{t.addButton}</Button> : undefined}
+      />
 
       {error && (
         <div

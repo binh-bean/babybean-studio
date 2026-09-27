@@ -1,11 +1,19 @@
 /**
  * BB-248 — tranh minh hoạ màu nước gắn vào cửa hàng (mua thêm sản phẩm).
  *
- * Mở cửa hàng từ nút "Mua thêm" ở thanh đáy, lần lượt bấm qua ba nhóm sản
- * phẩm (`THU_TU_NHOM`), và mỗi nhóm phải có một tranh minh hoạ
- * `/san-pham/sp-*.webp` cạnh tiêu đề nhóm — hiện cả khi nhóm KHÔNG có sản
- * phẩm nào đang bán (tranh gắn theo nhóm đang xem, không phụ thuộc danh mục
- * `products` thật của studio đang có gì).
+ * Mở cửa hàng từ nút "Mua thêm" ở thanh đáy, lần lượt bấm qua các nhóm sản
+ * phẩm ĐANG CÓ TAB (`THU_TU_NHOM`), và mỗi nhóm phải có một tranh minh hoạ
+ * `/san-pham/sp-*.webp` cạnh tiêu đề nhóm.
+ *
+ * ĐỔI Ở BB-279 (27/09/2026, chủ studio chốt "tối giản"): trước đây cả BA
+ * nhóm luôn hiện tab kể cả khi KHÔNG có sản phẩm nào đang bán (tranh gắn
+ * theo nhóm đang xem, không phụ thuộc danh mục). Từ BB-279, `cua-hang.tsx`
+ * CHỈ hiện tab của nhóm ĐANG CÓ HÀNG (`nhomCoHang()`) — bày tab rỗng là một
+ * phần của "danh mục tràn lan" chủ studio muốn bỏ. Ca thử dưới đây vì vậy
+ * không còn giả định cố định "luôn có 3 tab": nó đọc THẲNG những tab đang
+ * hiện trong DOM rồi bấm qua từng cái, thay vì lặp qua danh sách tên nhóm cố
+ * định — vẫn canh đúng điều BB-248 cần canh (tranh minh hoạ tải được ở MỌI
+ * nhóm ba mẹ thực sự bấm vào được), chỉ bỏ giả định "luôn đủ 3 tab".
  *
  * Dữ liệu: chỉ tạo dòng "Fixture BB-248 …", xoá sạch ở afterAll — theo đúng
  * luật AGENTS.md §6. Danh mục sản phẩm (`catalogue`) đến từ bảng `products`
@@ -104,13 +112,22 @@ test.describe("BB-248: tranh minh hoạ sản phẩm trong cửa hàng", () => {
     await expect(nutMuaThem).toBeVisible();
     await nutMuaThem.click();
 
-    const manCuaHang = page.getByRole("heading", { name: "Mua thêm sản phẩm" });
-    await expect(manCuaHang).toBeVisible();
+    const cuaHang = page.getByRole("dialog", { name: "Mua thêm sản phẩm" });
+    await expect(cuaHang).toBeVisible();
 
-    // Ba nhóm chủ studio gọi tên — bấm từng nhóm, canh tranh minh hoạ của
-    // ĐÚNG nhóm đó tải được thật (naturalWidth > 0, không chỉ có mặt trong DOM).
-    for (const tenNhom of ["Ảnh in và ảnh phóng", "Album", "Khung ảnh"]) {
-      await page.getByRole("button", { name: tenNhom, exact: true }).click();
+    // BB-279: chỉ những nhóm ĐANG CÓ HÀNG mới hiện tab — đọc thẳng tên các
+    // tab đang có TRONG HỘP THOẠI CỬA HÀNG (nav bọc các nút tên nhóm), thay
+    // vì giả định cố định đủ ba nhóm "Ảnh in và ảnh phóng" / "Album" /
+    // "Khung ảnh". Scoped vào `cuaHang`, không phải cả trang — trang khách có
+    // `nav` khác (thanh lọc "Tất cả"/"Đã chọn" của lưới ảnh chính) đứng SAU
+    // hộp thoại trong DOM nên vẫn khớp `page.locator("nav button")` dù đang
+    // bị hộp thoại che, và Playwright coi các nút đó "visible" (chỉ bị che
+    // trực quan) — click nhầm nút ẩn sau lưng treo test tới hết timeout.
+    const tenCacTab = await cuaHang.locator("nav button").allTextContents();
+    expect(tenCacTab.length, "cửa hàng phải có ít nhất một tab nhóm đang bán").toBeGreaterThan(0);
+
+    for (const tenNhom of tenCacTab) {
+      await cuaHang.getByRole("button", { name: tenNhom, exact: true }).click();
 
       const tranhNhom = page.locator("img[src*='/san-pham/sp-']").first();
       await expect(tranhNhom).toBeVisible();
@@ -130,20 +147,8 @@ test.describe("BB-248: tranh minh hoạ sản phẩm trong cửa hàng", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/g/${maLink}`);
 
-    // Opus soát BB-258/261: ở 390px tiêu đề đầu trang từng ĐÈ lên "Nhắn cho
-    // studio" (tiêu đề căn giữa kiểu absolute + 3 nút bên phải).
-    const tieuDe = page.locator("#dau-luoi-anh p.font-display").first();
-    // Đo nhóm nút BÊN PHẢI đầu trang (Nhắn cho studio / tải / chuông) — luôn
-    // có ít nhất chuông, nên phép đo không bao giờ tự bỏ qua.
-    const nhomNut = page.locator("#dau-luoi-anh").getByRole("button", { name: /^Thông báo/ });
-    await expect(nhomNut).toBeVisible();
-    const nhanStudio = page.locator("#dau-luoi-anh").getByText("Nhắn cho studio");
-    for (const nut of [nhomNut, ...(await nhanStudio.count() ? [nhanStudio.first()] : [])]) {
-      const a = (await tieuDe.boundingBox())!;
-      const b = (await nut.boundingBox())!;
-      const giao = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-      expect(giao, "tiêu đề đè lên nút ở đầu trang").toBe(false);
-    }
+    // Chữ/nút đầu trang không đè nhau: nay canh ở bb-278-dau-trang-bia.spec.ts
+    // (BB-278 dời chuông + nhắn studio lên thanh thương hiệu).
     // BB-258: thanh nổi (chứa "Mua thêm") ẨN khi bìa tràn màn còn hiện — cuộn
     // xuống lưới ảnh như khách thật rồi mới tìm nút.
     await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));

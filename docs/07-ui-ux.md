@@ -170,6 +170,97 @@ Tab: **Tổng quan** (thông tin, tiến độ, dòng thời gian hoạt động
 ### 4.5 Xuất danh sách
 Hộp thoại chọn định dạng, có ô xem trước và nút "Copy vào clipboard" cho định dạng Lightroom.
 
+### 4.6 Sơ đồ menu quản trị (BB-280)
+
+Chủ studio 27/09/2026: "trên màn quản trị tôi thấy đang lộn xộn không logic từ
+tư duy quản trị hệ thống". Menu cũ là 12 mục phẳng trộn lẫn việc hằng ngày,
+báo cáo và cấu hình hệ thống. Từ BB-280, sidebar chia bốn nhóm theo BẢN CHẤT
+công việc — không theo thứ tự màn được thêm vào:
+
+| Nhóm | Mục | Ghi chú |
+|---|---|---|
+| **Tổng quan** | Bảng điều khiển | Khối "Cần xử lý" lên đầu trang, trước cả hàng thẻ số |
+| **Vận hành** | Bộ ảnh · Khách hàng · Việc cần xử lý | "Việc cần xử lý" gộp ba trang cũ (`/admin/reports/loi-dong-bo`, `/admin/reports/link-sap-het-han`, `/admin/reports/over-quota`) thành ba tab của `/admin/viec-can-xu-ly` |
+| **Báo cáo** | Báo cáo điều hành | Ẩn với `photoshop_ctv` |
+| **Hệ thống** | Chi nhánh · Nhân sự & vai trò · Cài đặt · Nhật ký thao tác | "Nhân sự & vai trò" gộp `/admin/staff` và `/admin/roles` cũ thành hai tab của `/admin/staff`; chỉ chủ studio/quản trị hệ thống thấy trọn |
+
+Đường dẫn cũ (`/admin/reports/*`, `/admin/roles`) vẫn hoạt động — chuyển hướng
+sang tab tương ứng qua `next.config.ts` (`redirects()`), không phải 404. Luật
+ẩn theo vai (`ownerOnly`, `hiddenForRoles`) giữ nguyên như trước BB-280, chỉ
+đổi CHỖ ĐẶT trong cây menu — xem `src/components/features/admin/admin-sidebar.tsx`.
+
+Nhóm rỗng với một vai nào đó (ví dụ "Báo cáo" với `photoshop_ctv`) thì cả tiêu
+đề nhóm cũng ẩn theo, không để lại một dòng chữ hoa đứng trên khoảng trống.
+
+**BB-283 — số đo đúng bản vẽ `BB-281/quan-tri-menu-nhom.png`:**
+
+| Phần | Số đo | Token/lớp |
+|---|---|---|
+| Chiều rộng sidebar | 248px | `w-[248px]` (`admin-sidebar.tsx`) |
+| Nền sidebar | `#f6f0e8`, khác nền trang `#FBF7F2` | `--bb-sidebar-bg` |
+| Logo | "BABY BEAN" serif, giãn chữ, 18px | `font-display text-[18px] tracking-[0.14em]` |
+| Nhãn nhóm | 10.5px hoa, giãn chữ `.14em`, màu muted | `text-[10.5px] tracking-[0.14em] text-[var(--bb-fg-muted)]` |
+| Mục menu | cao 38px, bo góc 10px, icon nét 1.5 cỡ 18px | `h-[38px] rounded-[10px]`, `<Icon size={18} strokeWidth={1.5} />` |
+| Mục đang mở | nền sage nhạt, chữ xanh đậm | `--bb-accent-soft` / `--bb-accent-soft-fg` (bg `#dfeae5`, chữ `#2f4a40`) — khác `--bb-accent` (sage đậm) dùng cho nút/nhấn mạnh |
+| Huy hiệu "Việc cần xử lý" | số đỏ đất, tròn | `--bb-danger`, lấy từ `GET /api/admin/can-xu-ly` (BB-257) MỘT LẦN khi `AdminLayoutShell` tải — lỗi thì ẩn huy hiệu, không chặn menu. Hàm cộng số: `demSoCanXuLy()` (`admin-sidebar.tsx`) |
+
+Lưu ý: huy hiệu đọc từ `/api/admin/can-xu-ly` (driveChuaChiaSe + chuaCoAnh —
+hai trong ba loại việc), KHÔNG phải tổng ba tab thật của trang
+`/admin/viec-can-xu-ly` (route đó gộp thêm "Link sắp hết hạn" qua route
+riêng). Bản vẽ chỉ định đúng route `/api/admin/can-xu-ly`, nên số trên huy
+hiệu có thể thấp hơn tổng ba tab — chấp nhận được vì đây là tín hiệu "có việc
+cần xử lý", không phải bộ đếm chính xác tuyệt đối; xem chú thích trong
+`admin-layout-shell.tsx`.
+
+### 4.7 Thang chữ khu quản trị (BB-280, chỉnh lại ở BB-283)
+
+Trước BB-280, mỗi trang `/admin/**` tự chọn cỡ chữ tiêu đề riêng —
+`text-xl`, `text-2xl`, `text-3xl`, có nơi thêm `font-display` có nơi không.
+Chủ studio gọi đúng: "phông chữ đang chữ cao chữ thấp". Từ nay dùng đúng NĂM
+cỡ sau, không tự chọn cỡ khác cho tiêu đề/nhãn/chữ thân:
+
+**BB-283**: khớp lại đúng số đo bản vẽ `BB-281/html/chung.css` (`.tde h1`,
+`.the h2`) — tiêu đề trang **30px, weight 400** (không còn 24px/`font-bold`),
+tiêu đề thẻ **18px, weight 400** (không còn 20px/`font-semibold`). `<PageHeader>`
+giờ có thêm vạch mảnh dưới (`border-b`, cách 24px/`pb-6`) đúng `.tde` trong
+bản vẽ — áp dụng đồng loạt cho mọi trang dùng `<PageHeader>`.
+
+| Cấp | Cỡ chữ | Trọng lượng/font | Hằng số / component | Dùng cho |
+|---|---|---|---|---|
+| Tiêu đề trang | 30px (`text-[30px]`) | `font-display` (serif), `font-normal` | `PAGE_TITLE_CLASS`, `<PageHeader>` | `<h1>` đầu mỗi trang `/admin/**` |
+| Tiêu đề thẻ | 18px (`text-[18px]`) | `font-display`, `font-normal` | `CARD_TITLE_CLASS`, `<CardTitle className={CARD_TITLE_CLASS}>` | Tiêu đề của từng Card/section trong trang |
+| Nhãn | 14px (`text-sm`) | `font-medium` | — | Nhãn cột bảng, nhãn ô nhập |
+| Chữ thân | 14px (`text-sm`) | thường | — | Nội dung bảng, đoạn văn chính |
+| Chữ phụ | 12–13px (`text-xs`) | `text-[var(--bb-fg-muted)]` | `PAGE_DESCRIPTION_CLASS` (mô tả phụ dùng `text-sm` muted, xem dưới) | Ghi chú, dòng phụ dưới số liệu |
+| Nhãn thẻ số (Bảng điều khiển) | 11px, hoa, giãn chữ `.14em` | `text-[11px] tracking-[0.14em]` | — | Nhãn nhỏ phía trên số trong thẻ 4 số |
+| Số trong thẻ (Bảng điều khiển) | 32px | `font-display`, `font-normal` | — | Số lớn trong thẻ 4 số |
+
+`<CardTitle>` mặc định của `src/components/ui/card.tsx` (`text-xl
+font-semibold`, dùng chung cho cả màn khách) KHÔNG đổi — khu quản trị ghi đè
+bằng `className={CARD_TITLE_CLASS}` tại nơi dùng (`dashboard.tsx` và các màn
+báo cáo trong `viec-can-xu-ly.tsx`), để không ảnh hưởng màn khách.
+
+Mô tả phụ ngay dưới tiêu đề trang (`<PageHeader description>`) dùng 14px
+muted (`PAGE_DESCRIPTION_CLASS`), không phải chữ phụ 12px — đây là câu giải
+thích trang làm gì, cần đọc được dễ hơn một ghi chú nhỏ.
+
+`src/components/features/admin/page-header.tsx` xuất ba thứ:
+- `<PageHeader title description actions hideOnMobile />` — dùng khi tiêu đề
+  đứng một mình đầu trang, có thể kèm mô tả và nút hành động bên phải.
+- `PAGE_TITLE_CLASS` — dùng khi tiêu đề phải nằm cạnh thứ khác không hợp bố
+  cục mặc định của `PageHeader` (ví dụ nhãn trạng thái cạnh tiêu đề ở Chi
+  tiết bộ ảnh, hoặc cột điều hướng của Báo cáo điều hành).
+- `CARD_TITLE_CLASS` — dùng cho `<h2>`/`<h3>` viết tay thay vì qua component
+  `<Card>`, để hai cách viết ra cùng một cỡ.
+
+Áp dụng cho: Bảng điều khiển, Bộ ảnh, Chi tiết bộ ảnh, Tạo bộ ảnh, Khách
+hàng, Việc cần xử lý, Báo cáo điều hành, Chi nhánh, Nhân sự & vai trò, Cài
+đặt, Nhật ký thao tác.
+
+`hideOnMobile` giữ lại quyết định của chủ studio 22/09/2026: dưới `lg`, thanh
+trên cùng (`admin-header.tsx`) đã in tên màn cạnh chữ BabyBean, nên in lại
+tiêu đề to ngay dưới là một dòng thứ hai nói cùng một điều.
+
 ## 5. Thư viện component
 
 | Nhóm | Component | Sở hữu |

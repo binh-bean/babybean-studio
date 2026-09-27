@@ -36,7 +36,7 @@
 
 import "server-only";
 import { HOST, larkAuth, type LarkAuthHeader } from "@/lib/lark/sync-retouch";
-import { dangChayPhepThu } from "@/lib/kiem-thu";
+import { khongGuiRaLarkThat } from "@/lib/kiem-thu";
 
 /** Tên bảng Hậu Kỳ — cùng mẫu với scripts/sync-lark-hauky.mjs. */
 export const MAU_TEN_BANG_HAU_KY = /h[aậ]u k[yỳ]/i;
@@ -248,7 +248,7 @@ export interface TuyChonGhiLink {
 export async function ghiLinkAppVeLark(opts: TuyChonGhiLink): Promise<KetQuaGhiLark> {
   const chayThu = !opts.ghiThat;
 
-  if (dangChayPhepThu()) {
+  if (khongGuiRaLarkThat()) {
     return {
       ghiDuoc: false,
       chayThu: true,

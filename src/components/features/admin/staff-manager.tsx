@@ -255,13 +255,14 @@ export function StaffManager() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-[var(--bb-fg)]">{t.title}</h1>
-          <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">{t.subtitle}</p>
-        </div>
+      {/*
+        BB-280: tiêu đề "Nhân sự" và mô tả phụ chuyển sang PageHeader của
+        trang gộp /admin/staff (xem nhan-su-vai-tro.tsx) — ở đây chỉ còn nút
+        hành động, để khỏi in tiêu đề hai lần.
+      */}
+      <div className="flex justify-end">
         <Button onClick={() => setShowForm((v) => !v)}>{t.addButton}</Button>
-      </header>
+      </div>
 
       {error && (
         <div

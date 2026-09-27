@@ -8,7 +8,16 @@ import { Button } from "@/components/ui/button";
 import { NavLinks } from "./admin-sidebar";
 import { AdminAccountMenu } from "./admin-account-menu";
 
-export function AdminHeader({ role, hoTen }: { role?: string; hoTen?: string | null }) {
+export function AdminHeader({
+  role,
+  hoTen,
+  canXuLyCount,
+}: {
+  role?: string;
+  hoTen?: string | null;
+  /** Huy hiệu "Việc cần xử lý" trong menu Sheet điện thoại — xem admin-layout-shell.tsx. */
+  canXuLyCount?: number | null;
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -25,10 +34,10 @@ export function AdminHeader({ role, hoTen }: { role?: string; hoTen?: string | n
             <SheetContent side="left" className="w-[280px] p-0" aria-describedby={undefined}>
               <SheetTitle className="sr-only">Menu Điều Hướng</SheetTitle>
               <div className="flex h-16 items-center border-b border-[var(--bb-border)] px-4">
-                <span className="font-display text-lg font-bold">BabyBean Studio</span>
+                <span className="font-display text-[18px] tracking-[0.14em] text-[var(--bb-fg)]">BABY BEAN</span>
               </div>
               <div className="overflow-y-auto">
-                <NavLinks onClick={() => setMobileOpen(false)} role={role} />
+                <NavLinks onClick={() => setMobileOpen(false)} role={role} canXuLyCount={canXuLyCount} />
               </div>
             </SheetContent>
           </Sheet>

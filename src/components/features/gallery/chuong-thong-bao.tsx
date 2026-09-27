@@ -211,9 +211,12 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
         onClick={() => void moBang()}
         aria-label={soChuaDoc > 0 ? `Thông báo, ${soChuaDoc} chưa đọc` : "Thông báo"}
         aria-expanded={mo}
-        className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--bb-border)] bg-[var(--bb-surface)] text-[var(--bb-fg)] transition-colors hover:bg-[var(--bb-surface-2)]"
+        // BB-281 (Opus soát lần 2, 27/09/2026) — bản vẽ chỉ có biểu tượng nét
+        // mảnh, KHÔNG viền/không nền tĩnh; bỏ `border`/`bg` mặc định, giữ
+        // vùng chạm 40px và nền chỉ hiện khi hover/bấm.
+        className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--bb-fg)] transition-colors hover:bg-[var(--bb-surface-2)]"
       >
-        <Bell className="h-5 w-5" aria-hidden="true" />
+        <Bell className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
         {soChuaDoc > 0 && (
           <span
             aria-hidden="true"

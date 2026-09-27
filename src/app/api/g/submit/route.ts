@@ -287,6 +287,34 @@ export async function POST(request: Request): Promise<Response> {
       biaAlbumTen = [];
     }
 
+    /*
+      BB-284 — thẻ Lark báo chốt ảnh trước nay KHÔNG hiện sản phẩm mua thêm lúc
+      chọn (`selection_addons`, route /api/g/addons) — chỉ hiện "chọn thêm ẢNH"
+      (extraCount/extraAmount, khác khái niệm). CSKH đọc thẻ (a) tưởng khách
+      chỉ chọn thêm ảnh, bỏ sót đơn mua sản phẩm đã có trong lượt chốt này.
+
+      Bọc try/catch cùng luật với khối bìa album ở trên: dữ liệu TRANG TRÍ,
+      đứng sau giao dịch đã commit, không được phép làm hỏng nút Chốt.
+    */
+    let cacMonMuaThem: { ten: string; soLuong: number }[] = [];
+    try {
+      const { data: monMua } = await admin
+        .from("selection_addons")
+        .select("product_id, quantity")
+        .eq("selection_id", session.selectionId);
+      const idSanPham = [...new Set((monMua ?? []).map((m) => m.product_id))];
+      if (idSanPham.length > 0) {
+        const { data: sanPham } = await admin.from("products").select("id, name").in("id", idSanPham);
+        const tenTheoId = new Map((sanPham ?? []).map((s) => [s.id, String(s.name)]));
+        cacMonMuaThem = (monMua ?? []).map((m) => ({
+          ten: tenTheoId.get(m.product_id) ?? "Sản phẩm",
+          soLuong: Number(m.quantity),
+        }));
+      }
+    } catch {
+      cacMonMuaThem = [];
+    }
+
     await enqueueLarkNotification({
       branchId: gallery.branch_id,
       event: "selection.submitted",
@@ -306,6 +334,7 @@ export async function POST(request: Request): Promise<Response> {
         // Khoá KHÔNG được chứa chữ "anh" — `locBoAnh()` cắt mọi khoá khớp
         // chữ đó (bẫy đã canh ở BB-200/BB-245, xem lark/notify.ts).
         biaAlbumTen,
+        cacMonMuaThem,
       },
     });
 

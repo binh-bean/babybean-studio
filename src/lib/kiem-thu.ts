@@ -38,3 +38,17 @@ export function dangChayPhepThu(): boolean {
   if (process.env.CHO_PHEP_GOI_MANG_TRONG_PHEP_THU === "1") return false;
   return Boolean(process.env.VITEST) || process.env.NODE_ENV === "test";
 }
+
+/**
+ * Chốt riêng cho việc GHI/GỬI ra Lark thật (tin nhóm, ghi cột bảng Hậu Kỳ).
+ *
+ * 27/09/2026: `dangChayPhepThu()` chỉ biết Vitest. Phép thử trình duyệt
+ * (Playwright) dựng `next dev` bình thường — không có VITEST, NODE_ENV là
+ * development — nên 175 thẻ "Fixture … đã chốt" đã bay vào nhóm Lark thật.
+ * Không dùng chung chốt cho Drive: e2e CẦN gọi Drive (đã giả lập bằng
+ * `tests/fixtures/mock-drive-network.cjs`), còn Lark thì không bao giờ.
+ * `playwright.config.ts` đặt `PHEP_THU_TRINH_DUYET=1` cho máy chủ thử.
+ */
+export function khongGuiRaLarkThat(): boolean {
+  return dangChayPhepThu() || process.env.PHEP_THU_TRINH_DUYET === "1";
+}

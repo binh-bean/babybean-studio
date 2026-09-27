@@ -11,6 +11,7 @@
 import { redirect } from "next/navigation";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { CustomersManager } from "@/components/features/admin/customers-manager";
+import { PageHeader } from "@/components/features/admin/page-header";
 import { vi } from "@/i18n/vi";
 
 export const dynamic = "force-dynamic";
@@ -46,9 +47,7 @@ export default async function CustomersPage() {
       Quản lý bộ ảnh, theo yêu cầu của chủ studio 22/09/2026.
     */
     <div className="min-w-0 space-y-4 lg:space-y-6">
-      <h1 className="hidden text-2xl font-display font-bold tracking-tight lg:block">
-        {vi.admin.khachHang.title}
-      </h1>
+      <PageHeader title={vi.admin.khachHang.title} hideOnMobile className="mb-0" />
       <CustomersManager
         coQuyenSua={permissions.includes("customers:write")}
         coQuyenXoa={permissions.includes("customers:delete")}

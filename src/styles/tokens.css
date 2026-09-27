@@ -7,6 +7,19 @@
   --bb-primary-fg: #2e2a27; /* Đảm bảo tương phản ≥ 4.5:1 trên nền pastel */
   --bb-accent: #7fa99b; /* xanh sage */
   --bb-accent-fg: #142e25; /* Đảm bảo tương phản ≥ 4.5:1 trên nền sage */
+  /*
+   * BB-283 — sage NHẠT, khác với --bb-accent (sage đậm dùng cho nút/nhấn
+   * mạnh). Dùng cho mục sidebar đang mở và chip % tăng trong bảng điều khiển,
+   * đúng bản vẽ quan-tri-menu-nhom.png (.muc.on, .tang trong chung.css).
+   * Không đổi biến `accent` sẵn có vì nó còn dùng cho badge trạng thái
+   * "Sẵn sàng" (gallery-list.tsx) — đổi chung sẽ ảnh hưởng màn không nằm
+   * trong phạm vi BB-283.
+   */
+  --bb-accent-soft: #dfeae5;
+  --bb-accent-soft-fg: #2f4a40;
+  /* Nền riêng cho sidebar quản trị — khác nền trang (--bb-bg) để tạo ra hai
+     lớp mặt phẳng như bản vẽ (aside #f6f0e8 trên nền trang #FBF7F2). */
+  --bb-sidebar-bg: #f6f0e8;
   --bb-cream: #fbf7f2;
 
   /* Nền */
@@ -87,6 +100,9 @@
   --bb-primary-fg: #16130f;
   --bb-accent: #7fa99b;
   --bb-accent-fg: #0e1f19;
+  --bb-accent-soft: #22362f;
+  --bb-accent-soft-fg: #bfe3d5;
+  --bb-sidebar-bg: #1c1815;
   --bb-success: #4e9a6b;
   --bb-success-fg: #ffffff;
   --bb-warning: #d9932b;
@@ -129,6 +145,9 @@
     --bb-primary-fg: #16130f;
     --bb-accent: #7fa99b;
     --bb-accent-fg: #0e1f19;
+    --bb-accent-soft: #22362f;
+    --bb-accent-soft-fg: #bfe3d5;
+    --bb-sidebar-bg: #1c1815;
     --bb-success: #4e9a6b;
     --bb-success-fg: #ffffff;
     --bb-warning: #d9932b;
@@ -165,6 +184,9 @@
   --color-bb-primary-fg: var(--bb-primary-fg);
   --color-bb-accent: var(--bb-accent);
   --color-bb-accent-fg: var(--bb-accent-fg);
+  --color-bb-accent-soft: var(--bb-accent-soft);
+  --color-bb-accent-soft-fg: var(--bb-accent-soft-fg);
+  --color-bb-sidebar-bg: var(--bb-sidebar-bg);
   --color-bb-cream: var(--bb-cream);
   --color-bb-bg: var(--bb-bg);
   --color-bb-surface: var(--bb-surface);

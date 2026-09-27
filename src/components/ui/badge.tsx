@@ -11,6 +11,12 @@ const badgeVariants = cva(
           "bg-[var(--bb-primary)] text-[var(--bb-primary-fg)]",
         accent:
           "bg-[var(--bb-accent)] text-[var(--bb-accent-fg)]",
+        /* BB-283: chip sage NHẠT dùng cho chip "% so kỳ trước" khi biến động
+           tốt trong bảng điều khiển quản trị (quan-tri-menu-nhom.png .tang).
+           Tách khỏi `accent` (sage đậm) vì `accent` còn dùng cho badge trạng
+           thái "Sẵn sàng" nơi khác — đổi chung sẽ ảnh hưởng màn ngoài phạm vi. */
+        "soft-accent":
+          "bg-[var(--bb-accent-soft)] text-[var(--bb-accent-soft-fg)]",
         secondary:
           "bg-[var(--bb-surface-2)] text-[var(--bb-fg)]",
         outline:

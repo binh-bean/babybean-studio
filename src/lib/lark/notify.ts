@@ -64,7 +64,7 @@
 
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { dangChayPhepThu } from "@/lib/kiem-thu";
+import { khongGuiRaLarkThat } from "@/lib/kiem-thu";
 
 export type LarkEvent =
   | "gallery.sent"
@@ -81,7 +81,11 @@ export type LarkEvent =
    * BB-245 — ba mẹ gửi yêu cầu mua thêm sau khi ĐÃ DUYỆT ảnh (bộ ảnh đã khoá,
    * không có vòng xin sửa nào). App KHÔNG cộng tiền, CSKH gọi lại chốt giá.
    */
-  | "mua_them.yeu_cau";
+  | "mua_them.yeu_cau"
+  /** BB-284 — khách DUYỆT ảnh đã chỉnh, không xin sửa gì thêm. Chuyển in. */
+  | "review.approved"
+  /** BB-284 — khách xin sửa kèm ghi chú, sau khi xem bản đã chỉnh. */
+  | "review.changes_requested";
 
 export interface LarkNotification {
   /** Chi nhánh của bộ ảnh. `null` = tin của nhóm quản lý chung. */
@@ -179,6 +183,52 @@ export async function timWebhook(branchId: string | null): Promise<string | null
     if (rieng) return rieng;
   }
   return doc(null);
+}
+
+/**
+ * BB-284 — "nhắc nội bộ": tin CHỈ để nhân viên biết (nhắc hậu kỳ, nhắc khách
+ * chưa chốt...), phân biệt với tin khách→studio (`selection.submitted`,
+ * `gallery.reopen_requested`, `mua_them.yeu_cau`, `review.*`) — những tin đó
+ * LUÔN gửi, không nằm dưới công tắc này.
+ *
+ * Chủ studio 27/09/2026: automatic của Lark ở nhóm khác đã lo phần "ảnh về" và
+ * "cảnh báo nội bộ" rồi, nên tắt các tin này trong app — tạm thời, tới lúc
+ * chuyển hẳn Lark qua app thì bật lại bằng đúng công tắc này.
+ *
+ * Liệt kê theo CODE THẬT tính đến BB-284: chỉ `hau_ky.nhac`
+ * (`src/app/api/cron/hau-ky/route.ts`) và `gallery.due_soon`
+ * (`src/lib/gallery/nhac-khach.ts`) có nơi gọi thật. Năm sự kiện còn lại nằm
+ * sẵn trong `LarkEvent` từ trước nhưng CHƯA có chỗ nào gọi (`dungThe` cũng
+ * chưa có mẫu thẻ cho chúng) — liệt kê ở đây để nếu sau này có người nối dây
+ * thêm thì mặc định vẫn TẮT, không phải nhớ quay lại sửa danh sách này.
+ */
+const SU_KIEN_NHAC_NOI_BO = new Set<LarkEvent>([
+  "hau_ky.nhac",
+  "gallery.due_soon",
+  "gallery.overdue",
+  "gallery.sync_error",
+  "gallery.sent",
+  "gallery.first_view",
+  "delivery.ready",
+]);
+
+/**
+ * Đọc công tắc `lark.nhac_noi_bo` trong `settings` (toàn hệ thống, không theo
+ * chi nhánh). Mặc định TẮT (`false`) khi chưa cấu hình — đúng yêu cầu BB-284:
+ * an toàn hơn là mặc định BẬT rồi quên tắt.
+ *
+ * Bật lại: màn Cài đặt → nhóm "Liên lạc" → "Nhắc nội bộ vào Lark", hoặc ghi
+ * thẳng `update settings set value = 'true'::jsonb where key = 'lark.nhac_noi_bo'
+ * and branch_id is null`.
+ */
+async function nhacNoiBoDangBat(admin: ReturnType<typeof createAdminClient>): Promise<boolean> {
+  const { data } = await admin
+    .from("settings")
+    .select("value")
+    .eq("key", "lark.nhac_noi_bo")
+    .is("branch_id", null)
+    .maybeSingle();
+  return (data as { value?: unknown } | null)?.value === true;
 }
 
 /** Dựng thẻ tin nhắn. Trả `null` cho sự kiện chưa có mẫu — không bịa ra tin. */
@@ -291,6 +341,24 @@ export function dungThe(
       elements.push({
         tag: "div",
         text: { tag: "lark_md", content: `**Bìa album:** ${tenBia.join(", ")}` },
+      });
+    }
+
+    /*
+      BB-284 — sản phẩm mua thêm LÚC CHỌN ảnh (`selection_addons`, khác với
+      "chọn thêm ẢNH" ở `extraCount`/`extraAmount` phía trên, và khác với
+      `mua_them.yeu_cau` — sự kiện đó là mua thêm SAU KHI đã duyệt ảnh).
+      Không có dòng này thì CSKH đọc thẻ tưởng khách chỉ chọn thêm ảnh, bỏ sót
+      đơn hàng sản phẩm đã nằm sẵn trong lượt chốt này.
+    */
+    const monMuaThem = Array.isArray(p.cacMonMuaThem)
+      ? (p.cacMonMuaThem as Record<string, unknown>[])
+      : [];
+    if (monMuaThem.length > 0) {
+      const dong = monMuaThem.map((m) => `• ${chu(m.ten)} ×${so(m.soLuong)}`);
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: `**Mua thêm lúc chọn:**\n${dong.join("\n")}` },
       });
     }
 
@@ -491,6 +559,102 @@ ${chu(p.lyDo)}` },
     };
   }
 
+  /**
+   * BB-284 — khách DUYỆT ảnh đã chỉnh, không xin sửa gì. Thẻ XANH: đây là tin
+   * CSKH cần biết để bắt đầu chuẩn bị in, không phải tin phải xử lý gấp.
+   */
+  if (event === "review.approved") {
+    const truong = [o("Bộ ảnh", chu(p.galleryTitle)), o("Khách", chu(p.customerName))];
+    if (p.customerPhone) truong.push(o("Điện thoại", chu(p.customerPhone)));
+
+    const elements: Record<string, unknown>[] = [{ tag: "div", fields: truong }];
+    if (diaChiAdmin) {
+      elements.push({
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "Mở bộ ảnh" },
+            type: "primary",
+            url: diaChiAdmin,
+          },
+        ],
+      });
+    }
+
+    return {
+      msg_type: "interactive",
+      card: {
+        header: {
+          template: "green",
+          title: { tag: "plain_text", content: "Khách duyệt ảnh — chuyển in" },
+        },
+        elements,
+      },
+    };
+  }
+
+  /**
+   * BB-284 — khách xem bản đã chỉnh nhưng xin sửa kèm ghi chú. Thẻ ĐỎ, cùng
+   * mức ưu tiên với `gallery.reopen_requested`: người chỉnh ảnh cần đọc đúng
+   * chữ khách viết để không phải gọi lại hỏi sửa gì.
+   *
+   * `cacTam` (không phải "danhSachAnh" — `locBoAnh()` cắt mọi khoá khớp chữ
+   * "anh", và "danhSach" dính bẫy đó, xem ghi chú ở `hau_ky.nhac`) là chỗ để
+   * MỞ RỘNG sau này nếu app có ghi chú theo từng tấm; hiện `POST /api/g/review`
+   * chỉ có một ghi chú chung cho cả vòng sửa (`revision_requests.note`), nên
+   * mảng này thường rỗng và thẻ rơi về nhánh ghi chú chung bên dưới.
+   */
+  if (event === "review.changes_requested") {
+    const CAT_GHI_CHU = 200;
+    const catNgan = (s: string) => (s.length > CAT_GHI_CHU ? `${s.slice(0, CAT_GHI_CHU)}…` : s);
+
+    const truong = [o("Bộ ảnh", chu(p.galleryTitle)), o("Vòng sửa", `Lần ${so(p.round)}`)];
+    if (p.customerPhone) truong.push(o("Điện thoại", chu(p.customerPhone)));
+
+    const cacTam = Array.isArray(p.cacTam) ? (p.cacTam as Record<string, unknown>[]) : [];
+    let noiDungGhiChu: string;
+    if (cacTam.length > 0) {
+      const TRAN = 20;
+      const dong = cacTam
+        .slice(0, TRAN)
+        .map((t, i) => `${i + 1}. **${chu(t.ten)}** — ${catNgan(chu(t.ghiChu))}`);
+      if (cacTam.length > TRAN) dong.push(`… và ${cacTam.length - TRAN} tấm khác`);
+      noiDungGhiChu = dong.join("\n");
+    } else {
+      noiDungGhiChu = catNgan(chu(p.ghiChu));
+    }
+
+    const elements: Record<string, unknown>[] = [
+      { tag: "div", fields: truong },
+      { tag: "div", text: { tag: "lark_md", content: `**Ba mẹ ghi cần sửa:**\n${noiDungGhiChu}` } },
+    ];
+    if (diaChiAdmin) {
+      elements.push({
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "Mở bộ ảnh" },
+            type: "primary",
+            url: diaChiAdmin,
+          },
+        ],
+      });
+    }
+
+    return {
+      msg_type: "interactive",
+      card: {
+        header: {
+          template: "red",
+          title: { tag: "plain_text", content: "Khách xin sửa ảnh đã chỉnh" },
+        },
+        elements,
+      },
+    };
+  }
+
   return null;
 }
 
@@ -557,13 +721,31 @@ export async function enqueueLarkNotification(tin: LarkNotification): Promise<vo
       .select("id")
       .single();
 
-    if (dangChayPhepThu()) {
+    if (khongGuiRaLarkThat()) {
       if (dong?.id) {
         const { error: err0 } = await admin
           .from("notifications")
           .update({ status: "skipped", last_error: "Đang chạy phép thử — không bắn tin thật" })
           .eq("id", dong.id);
         if (err0) console.error("Lỗi cập nhật skipped cho " + dong.id, err0);
+      }
+      return;
+    }
+
+    // BB-284 — tin nội bộ (nhắc nhân viên, không phải tin khách↔studio) đứng
+    // dưới công tắc `lark.nhac_noi_bo`, mặc định TẮT. Chặn TRƯỚC khi tra
+    // webhook: tắt nghĩa là không hỏi Lark gì cả, không phải hỏi xong rồi
+    // không gửi.
+    if (SU_KIEN_NHAC_NOI_BO.has(tin.event) && !(await nhacNoiBoDangBat(admin))) {
+      if (dong?.id) {
+        const { error: errNoiBo } = await admin
+          .from("notifications")
+          .update({
+            status: "skipped",
+            last_error: "Nhắc nội bộ đang TẮT (lark.nhac_noi_bo) — bật lại ở Cài đặt > Liên lạc",
+          })
+          .eq("id", dong.id);
+        if (errNoiBo) console.error("Lỗi cập nhật skipped (nhắc nội bộ) cho " + dong.id, errNoiBo);
       }
       return;
     }
@@ -644,7 +826,7 @@ export async function guiLaiThongBaoDangCho(): Promise<{
   let conHong = 0;
 
   // Cùng chốt như `enqueueLarkNotification` — xem ghi chú ở `dangChayPhepThu`.
-  if (dangChayPhepThu()) return { daXu: 0, daGui: 0, conHong: 0 };
+  if (khongGuiRaLarkThat()) return { daXu: 0, daGui: 0, conHong: 0 };
 
   const { data: dong } = await admin
     .from("notifications")
@@ -670,7 +852,26 @@ export async function guiLaiThongBaoDangCho(): Promise<{
   // BB-186 vừa dẹp xong.
   const dsDong = (Array.isArray(dong) ? dong : []) as unknown as Dong[];
 
+  // Đọc một lần cho cả lượt quét, không phải mỗi dòng — công tắc không đổi
+  // giữa chừng một lượt quét vài chục dòng.
+  const noiBoDangBat = await nhacNoiBoDangBat(admin);
+
   for (const d of dsDong) {
+    // BB-284 — dòng cũ (ghi trước khi có công tắc, hoặc ghi lúc công tắc còn
+    // bật) mà giờ công tắc đã tắt thì không gửi lại — cùng luật với đường gửi
+    // ngay ở `enqueueLarkNotification`.
+    if (SU_KIEN_NHAC_NOI_BO.has(d.template as LarkEvent) && !noiBoDangBat) {
+      const { error: errNoiBo } = await admin
+        .from("notifications")
+        .update({
+          status: "skipped",
+          last_error: "Nhắc nội bộ đang TẮT (lark.nhac_noi_bo) — bật lại ở Cài đặt > Liên lạc",
+        })
+        .eq("id", d.id);
+      if (errNoiBo) console.error("Lỗi cập nhật skipped (nhắc nội bộ, retry) cho " + d.id, errNoiBo);
+      continue;
+    }
+
     const webhook = await timWebhook(d.branch_id);
     const the = webhook ? dungThe(d.template as LarkEvent, d.payload, diaChiBoAnh(d.payload?.galleryId)) : null;
 

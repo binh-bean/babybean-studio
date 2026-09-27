@@ -15,10 +15,15 @@ function getBreadcrumbName(path: string, cha?: string) {
   if (path === "galleries") return "Quản lý Bộ ảnh";
   if (path === "customers") return "Khách hàng";
   if (path === "settings") return "Cài đặt";
-  if (path === "staff") return "Nhân sự";
-  if (path === "roles") return "Vai trò";
+  // BB-280: /admin/staff giờ là trang gộp "Nhân sự & vai trò" (hai tab); giữ
+  // "roles" cũ lại phòng khi còn liên kết cũ nào đó chưa qua redirect.
+  if (path === "staff") return "Nhân sự & vai trò";
+  if (path === "roles") return "Nhân sự & vai trò";
   if (path === "branches") return "Chi nhánh";
   if (path === "reports") return "Báo cáo";
+  if (path === "bao-cao") return "Báo cáo điều hành";
+  // BB-280: gộp ba trang báo cáo lỗi cũ vào một trang ba tab.
+  if (path === "viec-can-xu-ly") return "Việc cần xử lý";
   if (path === "nhat-ky") return "Nhật ký thao tác";
   if (path === "over-quota") return "Ảnh vượt hạn mức";
   if (path === "loi-dong-bo") return "Bộ ảnh lỗi tải";
@@ -41,7 +46,7 @@ export function AdminBreadcrumb() {
   });
 
   return (
-    <nav aria-label="Breadcrumb" className="hidden sm:flex items-center text-sm text-[var(--bb-fg-muted)] space-x-1">
+    <nav aria-label="Breadcrumb" className="hidden sm:flex items-center text-[13px] text-[var(--bb-fg-muted)] space-x-1">
       {breadcrumbs.map((bc, idx) => {
         const isLast = idx === breadcrumbs.length - 1;
         return (

@@ -90,10 +90,21 @@ test.describe("BB-186: bảng link sắp hết hạn", () => {
     await page.goto("/admin/galleries");
 
     // 1. CSKH phải TÌM ĐƯỢC bảng này mà không cần ai chỉ đường.
-    const mucMenu = page.getByRole("link", { name: "Link sắp hết hạn" }).first();
+    //
+    // BB-280: "Link sắp hết hạn" không còn là mục menu riêng — nó là một tab
+    // trong trang gộp "Việc cần xử lý" (menu mục "Việc cần xử lý" dẫn tới
+    // /admin/viec-can-xu-ly). Đường dẫn CŨ /admin/reports/link-sap-het-han vẫn
+    // chuyển hướng được (next.config.ts), nhưng đường đi thật của CSKH giờ là
+    // qua menu rồi bấm tab.
+    const mucMenu = page.getByRole("link", { name: "Việc cần xử lý" }).first();
     await expect(mucMenu).toBeVisible();
     await mucMenu.click();
-    await page.waitForURL("**/admin/reports/link-sap-het-han");
+    await page.waitForURL("**/admin/viec-can-xu-ly*");
+
+    const tabLink = page.getByRole("tab", { name: /Link sắp hết hạn/ });
+    await expect(tabLink).toBeVisible();
+    await tabLink.click();
+    await page.waitForURL("**/admin/viec-can-xu-ly?tab=link-sap-het-han");
 
     // 2. Nhà sắp mất link phải hiện lên, kèm số ngày còn lại.
     //

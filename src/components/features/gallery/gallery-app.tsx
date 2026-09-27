@@ -85,7 +85,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
 import { useHangChoTim } from "@/components/features/gallery/use-hang-cho-tim";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Info, Lock } from "lucide-react";
+import { AlertTriangle, Info, Lock, MessageCircle } from "lucide-react";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -379,6 +379,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [moKhoaChon, setMoKhoaChon] = useState(false);
   /** Cửa hàng mua thêm — mở từ nút riêng, không nằm cuối trang. */
   const [moCuaHang, setMoCuaHang] = useState(false);
+  /**
+   * BB-279 — đường thứ hai vào cửa hàng: "Đặt in tấm này" ở màn xem ảnh lớn
+   * mở thẳng ĐÚNG nhóm sản phẩm với tấm đang xem đã chọn sẵn, bỏ qua bước
+   * lưới ảnh (xem `bang-san-pham-cua-anh.tsx` → `onDatInTamNay`).
+   */
+  const [presetCuaHang, setPresetCuaHang] = useState<{
+    nhom: NhomSanPham;
+    photoId: string;
+  } | null>(null);
   /**
    * BB-217 — màn "treo ảnh của con lên tường", mở từ nút trong bảng sản phẩm
    * của màn xem ảnh lớn. Nhớ ID ảnh đang xem lúc bấm, không phải chỉ true/
@@ -1211,6 +1220,36 @@ export function GalleryApp({ token }: GalleryAppProps) {
   );
 
   /**
+   * BB-279 — đặt một sản phẩm gắn ảnh cho NHIỀU tấm cùng lúc (nhánh batch của
+   * `/api/g/addons`). Cùng logic tải lại như `datSoLuongMuaThem`: không đoán
+   * tiền ở máy khách, luôn lấy số máy chủ vừa tính.
+   */
+  const datNhieuAnhMuaThem = useCallback(
+    async (productId: string, soLuong: number, photoIds: string[]) => {
+      if (photoIds.length === 0) return;
+      setPlacing(true);
+      try {
+        const res = await fetch("/api/g/addons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId, quantity: soLuong, photoIds }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          setStatusMessage(json?.error?.message ?? "Không lưu được, ba mẹ thử lại giúp.");
+          return;
+        }
+        await loadGallery();
+      } catch {
+        setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
+      } finally {
+        setPlacing(false);
+      }
+    },
+    [loadGallery],
+  );
+
+  /**
    * Đưa tấm ảnh vào (hoặc lấy ra khỏi) một album ĐÃ MUA.
    *
    * Đi cùng đường với việc đặt ảnh vào dòng hàng trong gói, chỉ khác đích:
@@ -1463,6 +1502,125 @@ export function GalleryApp({ token }: GalleryAppProps) {
         </div>
       )}
 
+      {/*
+        BB-278 — thanh thương hiệu ĐẦU TRANG, đứng NGOÀI ảnh bìa (không phải
+        lớp phủ đè lên ảnh): chủ studio 27/09/2026 "để phía trên như bản
+        trước không đưa xuống dưới". Đây là phần tử ĐẦU TIÊN của trang — nằm
+        trong luồng bình thường (KHÔNG `sticky`) nên "Baby Bean" hiện ngay khi
+        mở trang (chưa cuộn), cả điện thoại lẫn máy tính. Nền riêng (không
+        phải overlay trong suốt) nên không phụ thuộc độ sáng ảnh bìa như chữ
+        trong bìa. Không dùng `sticky`: từng thử dính lại khi cuộn, nhưng cộng
+        dồn với `#dau-luoi-anh` (cũng sticky ngay dưới) chiếm vĩnh viễn ~44px
+        đầu màn — ở bộ ảnh ngắn, cuộn tới đáy thì thẻ ảnh CUỐI rơi đúng vào dải
+        đó và bị che (bb-274/bb-275 bắt được: "Xem ảnh N"/"Chọn ảnh này" bị
+        che bởi thanh thương hiệu).
+
+        BB-281 — dựng đúng bản vẽ `babybean-assets/BB-281/thanh-chon-*.png`:
+        điện thoại "BABY BEAN" CĂN GIỮA cỡ 20px, máy tính chữ nằm TRÁI cỡ
+        18px. Lưới 3 cột (`grid-cols-[1fr_auto_1fr]`) — cột 1 là Ô GIỮ CHỖ
+        rỗng cùng bề rộng linh hoạt với cột 3 (cụm biểu tượng), nên tên
+        thương hiệu ở cột giữa canh ĐÚNG GIỮA MÀN HÌNH bất kể cụm biểu tượng
+        rộng bao nhiêu — không phải đoán bằng margin tay. Từ lg chuyển hẳn
+        sang flex trái-phải (cột giữ chỗ ẩn đi) vì bản vẽ máy tính không căn
+        giữa.
+
+        Chuông thông báo VÀ hai việc phụ ("Nhắn cho studio", tải ảnh) đều dồn
+        về đây — quyết định điều hành 27/09/2026: điện thoại từng có HAI
+        thanh đầu trang chồng nhau (thanh thương hiệu + thanh dính lặp tên bộ
+        ảnh + hai nút to). Nay thanh dính bên dưới (`#dau-luoi-anh`) chỉ còn
+        hàng chip lọc; "Nhắn cho studio" thu thành biểu tượng nhỏ (giữ
+        `aria-label`, không mất chức năng) đứng cạnh nút tải và chuông.
+      */}
+      <div
+        data-testid="thanh-thuong-hieu"
+        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-[#e5dcd2] bg-[#fbf7f2] px-4 py-3.5 sm:px-6 lg:flex lg:justify-between lg:px-10 lg:py-3"
+      >
+        {/*
+          Opus soát lần 2 (27/09/2026) — `1fr` cùng ĐƠN VỊ nhưng KHÔNG cùng
+          "sàn tối thiểu": mặc định một cột `1fr` không thể co dưới bề rộng
+          NỘI DUNG của nó (`min-width: auto`), nên khi cụm 3 nút bên phải rộng
+          hơn cột trống bên trái, cột phải bị "kéo" rộng thêm để vừa nội
+          dung — lấy mất phần lẽ ra chia đều, đẩy chữ lệch trái (đo được tâm
+          chữ ~170px/390 thay vì 195px). `minmax(0,1fr)` bỏ sàn tối thiểu đó
+          — hai cột luôn chia đúng-đều phần còn lại, không phụ thuộc cột phải
+          rộng bao nhiêu. Đo lại bằng `tests/e2e/bb-278-dau-trang-bia.spec.ts`
+          (|tâm chữ − 195| ≤ 4px ở 390×844).
+        */}
+        {/*
+          Opus soát lần 3 — chữ căn giữa THẬT + ba biểu tượng bên phải không
+          đủ chỗ ở 390px (nhắn tin đè chữ "BEAN"). Điện thoại: nhắn tin sang
+          ô TRÁI cho cân, bên phải còn tải + chuông. Máy tính: về cụm phải.
+        */}
+        <div className="flex items-center justify-self-start lg:hidden">
+          {gallery.branch.chatUrl && (
+            <a
+              href={gallery.branch.chatUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={vi.gallery.messageStudio}
+              title={vi.gallery.messageStudio}
+              className="grid h-10 w-10 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
+            >
+              <MessageCircle className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+            </a>
+          )}
+        </div>
+        <span
+          data-testid="ten-thuong-hieu"
+          className="justify-self-center font-display text-[20px] uppercase tracking-[0.14em] text-[#2e2a27] lg:text-[18px] lg:tracking-[0.12em]"
+        >
+          Baby Bean
+        </span>
+        <div className="flex items-center justify-self-end gap-1">
+          {/*
+            BB-281 — "Nhắn cho studio" thu thành biểu tượng (trước là pill có
+            chữ) để vừa chỗ cạnh chuông trên điện thoại; `aria-label` giữ
+            đúng nghĩa cũ, hành vi (mở link chat của chi nhánh) không đổi.
+
+            Opus soát lần 2 — bản vẽ chỉ có biểu tượng nét MẢNH, KHÔNG viền/
+            không nền (ba nút viền tròn trước đó nặng, không khớp). Bỏ
+            `border`/nền mặc định, giữ vùng chạm ≥40px (`h-10 w-10`) và
+            `hover:bg-surface-2` làm phản hồi khi bấm — không phải viền tĩnh.
+          */}
+          {gallery.branch.chatUrl && (
+            <a
+              href={gallery.branch.chatUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={vi.gallery.messageStudio}
+              title={vi.gallery.messageStudio}
+              className="hidden h-10 w-10 place-items-center rounded-full text-foreground transition hover:bg-surface-2 lg:grid"
+            >
+              <MessageCircle className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+            </a>
+          )}
+          {choPhepTai && photos.length > 0 && (
+            <MenuTaiAnh
+              soAnh={photos.length}
+              dungLuong={doDocDuocDungLuong(gallery.tongDungLuongAnh)}
+              soDaChon={soAnhDaChon}
+              onTaiDaChon={taiAnhDaChon}
+              onTaiCaBo={taiCaBo}
+            />
+          )}
+          <ChuongThongBao galleryId={gallery.id} status={gallery.status} />
+        </div>
+      </div>
+
+      {/*
+        BB-278/BB-281 — lời gợi ý "Lưu app" dời từ thẻ nổi ở ĐÁY (che thanh
+        chọn/chốt sau khi thanh đó thu nhỏ — ảnh chụp máy thật chủ studio gửi
+        27/09/2026) sang một chip nhỏ MỘT DÒNG ngay dưới thanh thương hiệu.
+        Không `fixed` nên không bao giờ chồng lên `ThanhChon` ở đáy — tách
+        biệt bằng vị trí trong trang, xem ghi chú ở `loi-goi-y-luu-app.tsx`.
+      */}
+      <div className="flex justify-center border-b border-[#e5dcd2] bg-[#fbf7f2] px-4 py-2 empty:hidden sm:px-6 sm:py-2.5 lg:px-10">
+        <LoiGoiYLuuApp
+          daChon={selectionCounts.selectedCount}
+          onXemCachLuu={() => setMoHuongDanLuuApp(true)}
+        />
+      </div>
+
       {/* MÀN 1 — ẢNH BÌA (tràn toàn màn, xem BB-258) */}
       <div ref={biaRef}>
         <BiaBoAnh
@@ -1482,71 +1640,20 @@ export function GalleryApp({ token }: GalleryAppProps) {
       </div>
 
       {/*
-        ĐẦU TRANG DÍNH — gọn còn tên, bộ lọc, và hai việc phụ (nhắn studio,
-        tải ảnh). Thanh 6 bước và 4 ô số đã rời khỏi đây: ba mẹ không cần biết
-        quy trình nội bộ của studio, và số tấm đã có ở thanh đáy.
+        ĐẦU TRANG DÍNH — CHỈ còn hàng chip lọc. Tên bộ ảnh/chi nhánh và hai
+        việc phụ (nhắn studio, tải ảnh) đã dời lên thanh thương hiệu phía
+        trên (`thanh-thuong-hieu`, đứng ngoài `biaRef`) — quyết định điều
+        hành BB-281 (27/09/2026): điện thoại từng có HAI thanh dính chồng
+        nhau (thanh thương hiệu + thanh này) cùng lặp lại tên bộ ảnh, thêm
+        hai nút to (nhắn studio + tải) chật chội ngay dưới. Giữ nguyên đây
+        đúng MỘT việc: lọc/so sánh — không lặp lại thông tin đã có ở trên.
       */}
       <header
         id="dau-luoi-anh"
         className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-md"
       >
         <div className="mx-auto max-w-[1600px] px-3 sm:px-6 lg:px-10">
-          <div className="relative flex items-center justify-between gap-3 pt-4 pb-4 border-b border-[#e5dcd2]">
-            {/* Dưới lg: tiêu đề nằm TRÁI, tự cắt gọn, nhường chỗ nhóm nút phải
-                (Nhắn cho studio + tải + chuông). Bản căn giữa kiểu `absolute`
-                đè lên "Nhắn cho studio" ở 390px khi thêm chuông (Opus soát
-                BB-258/261). Từ lg mới căn giữa như bản vẽ. */}
-            <div className="min-w-0 flex-1 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:flex lg:flex-col lg:items-center lg:justify-center">
-              <p className="truncate font-display text-[20px] leading-tight text-[#2e2a27] sm:text-[24px] lg:pointer-events-auto">
-                {gallery.babyName || "Khoảnh khắc của con"}
-              </p>
-              <p className="mt-0.5 truncate text-xs text-[#6b6057] lg:pointer-events-auto">
-                {gallery.branch.name}
-              </p>
-            </div>
-
-            <div className="relative z-10 flex shrink-0 items-center gap-1.5">
-              {/*
-                "Nhắn cho studio" giữ nguyên CHỮ, không thu thành biểu tượng:
-                đây là đường duy nhất ba mẹ liên lạc với studio ngay trên màn
-                đang xem ảnh, và một biểu tượng bong bóng chat thì nhiều người
-                không bấm.
-              */}
-              {gallery.branch.chatUrl && (
-                <a
-                  href={gallery.branch.chatUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-[36px] items-center rounded-full border border-[#2e2a27] px-4 text-xs font-medium transition hover:bg-[#2e2a27]/5"
-                >
-                  {vi.gallery.messageStudio}
-                </a>
-              )}
-              {/*
-                BB-241 - nút biểu tượng "Lưu app" ở đây bị ẩn: chủ studio
-                24/09/2026 "nếu không phải người thiết kế thì không biết nó để
-                làm gì". Thay bằng lời gợi ý ĐÚNG LÚC (`LoiGoiYLuuApp`, đứng ở
-                cuối màn) - hiện sau khi ba mẹ thả tim tấm đầu hoặc ở lần mở
-                thứ hai, đúng lúc họ đã thấy giá trị của bộ ảnh thay vì hiện
-                ngay từ đầu như một nút không rõ nghĩa.
-              */}
-              {choPhepTai && photos.length > 0 && (
-                <MenuTaiAnh
-                  soAnh={photos.length}
-                  dungLuong={doDocDuocDungLuong(gallery.tongDungLuongAnh)}
-                  soDaChon={soAnhDaChon}
-                  onTaiDaChon={taiAnhDaChon}
-                  onTaiCaBo={taiCaBo}
-                />
-              )}
-              {/* BB-261 — chuông thông báo, NGOÀI CÙNG bên phải (chủ studio 26/09:
-                  "biểu tượng là cái chuông ở góc phải thôi"). Tự hỏi quyền ở cú
-                  chạm đầu tiên; thay dòng "Bật thông báo" cũ đã gỡ ở BB-258. */}
-              <ChuongThongBao galleryId={gallery.id} status={gallery.status} />
-            </div>
-          </div>
-
-          <nav aria-label="Lọc ảnh" className="mt-4 flex items-center gap-3 overflow-x-auto pb-4">
+          <nav aria-label="Lọc ảnh" className="flex items-center gap-3 overflow-x-auto pt-3 pb-4">
             {nutLoc("all", vi.gallery.filterAll, photos.length)}
             {nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
             {nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
@@ -1854,7 +1961,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
       <CuaHang
         mo={moCuaHang}
-        onDong={() => setMoCuaHang(false)}
+        onDong={() => {
+          setMoCuaHang(false);
+          setPresetCuaHang(null);
+        }}
         khoa={isLocked}
         dangLuu={placing}
         danhMuc={(gallery.addons?.catalogue ?? []).map((sp) => ({
@@ -1878,9 +1988,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
         anhDaChon={photos
           .filter((p) => p.mark === "selected")
           .map((p) => ({ id: p.id, fileName: p.fileName }))}
+        tatCaAnh={photos.map((p) => ({ id: p.id, fileName: p.fileName }))}
         onMua={(productId, soLuong, photoId) =>
           void datSoLuongMuaThem(productId, soLuong, photoId)
         }
+        onMuaNhieu={(productId, soLuong, photoIds) =>
+          void datNhieuAnhMuaThem(productId, soLuong, photoIds)
+        }
+        presetPhotoId={presetCuaHang?.photoId ?? null}
+        presetNhom={presetCuaHang?.nhom ?? null}
       />
 
       {/* THANH ĐÁY — một viên duy nhất: đã chọn mấy tấm, bước tiếp theo. */}
@@ -2451,6 +2567,20 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   ? () => setManTreoTuongTuAnh(anh.id)
                   : undefined
               }
+              // BB-279 — "Đặt in tấm này": mở cửa hàng thẳng vào nhóm này với
+              // tấm đang xem đã chọn sẵn (đường thứ hai vào cửa hàng).
+              //
+              // Đóng màn xem lớn TRƯỚC khi mở cửa hàng: cả hai đều là hộp
+              // thoại toàn màn hình `z-50`, cùng bậc — nếu không đóng, màn
+              // xem lớn (đứng sau trong cây DOM) vẽ ĐÈ LÊN cửa hàng, và nút
+              // "Thêm vào giỏ" tuy có mặt trong DOM nhưng không bấm được (lộ
+              // ra qua e2e: `locator.click` treo vì "subtree intercepts
+              // pointer events" từ `<main>` của màn xem lớn).
+              onDatInTamNay={(nhom) => {
+                setLightboxIndex(null);
+                setPresetCuaHang({ nhom, photoId: anh.id });
+                setMoCuaHang(true);
+              }}
             />
           )}
         />
@@ -2520,14 +2650,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
         />
       )}
 
-      {/* BB-213 — tấm hướng dẫn "Lưu app", mở từ lời gợi ý BB-241 bên dưới. */}
+      {/*
+        BB-213 — tấm hướng dẫn "Lưu app", mở từ chip BB-278/BB-281 ở đầu
+        trang (`LoiGoiYLuuApp` nay render ngay dưới thanh thương hiệu, phía
+        trên `biaRef` — không còn ở đây).
+      */}
       <HuongDanThemManHinh mo={moHuongDanLuuApp} onDong={() => setMoHuongDanLuuApp(false)} />
-
-      {/* BB-241 — lời gợi ý "Lưu app" đúng lúc, thay cho nút biểu tượng cũ. */}
-      <LoiGoiYLuuApp
-        daChon={selectionCounts.selectedCount}
-        onXemCachLuu={() => setMoHuongDanLuuApp(true)}
-      />
     </div>
   );
 }

@@ -52,9 +52,13 @@ export interface ThanhChonProps {
 export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0, an = false }: ThanhChonProps) {
 
   const vuot = soTamThem > 0;
+  const canhBao = vuot || soChuaGui > 0;
 
   // Ngắn, vì trên điện thoại 375px dòng này chỉ còn chừng 95px sau hai nút.
   // Số tấm đã nằm ở dòng trên ("17 / 15 tấm"), dòng này chỉ nói phần còn lại.
+  // `Chip` là bản NGẮN (không có chữ "tấm") cho viên be nhỏ ở máy tính —
+  // xem `bia-khoi-chu`-kiểu ghi chú ở dưới, cùng một khối chữ nhưng đổi lời
+  // theo bề rộng qua CSS, không nhân đôi thẻ `data-testid`.
   const dongPhu =
     hanMuc == null
       ? "Chờ hạn mức"
@@ -63,20 +67,20 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
         : hanMuc - daChon > 0
           ? `Còn ${hanMuc - daChon} tấm`
           : "Đủ trong gói";
+  const dongPhuChip =
+    hanMuc == null
+      ? "Chờ hạn mức"
+      : vuot
+        ? `Thêm ${formatCurrencyVND(tienThem)}`
+        : hanMuc - daChon > 0
+          ? `Còn ${hanMuc - daChon}`
+          : "Đủ trong gói";
 
   return (
     <div
       data-testid="thanh-noi"
       className={cn(
         "pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(12px,env(safe-area-inset-bottom))] transition-all duration-300 ease-out",
-        // Máy tính: gọn vào góc phải dưới, không còn choán giữa màn — đó là
-        // đúng vùng chủ studio chỉ ra đang che tên mục/thanh lọc. GIỮ NGUYÊN
-        // `bottom-0` (không thêm `lg:bottom-6`): `loi-goi-y-luu-app.tsx` định
-        // vị chính nó bằng một khoảng cách CỐ ĐỊNH tính từ đáy màn hình lên
-        // trên thanh này (`bottom-[calc(84px+...)]`) — nâng thanh này lên
-        // thêm sẽ ăn mất khoảng hở đó và đè lên nút "Chốt danh sách"
-        // (bb-240 bắt được: hộp gợi ý {y:694.5-816} đè nút {y:796-852}).
-        "lg:inset-x-auto lg:right-6 lg:px-0",
         an
           ? "translate-y-[calc(100%+env(safe-area-inset-bottom)+16px)] opacity-0"
           : "translate-y-0 opacity-100",
@@ -91,17 +95,36 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
       // tự thêm `tabIndex={-1}` cho từng nút bên trong.
       inert={an}
     >
+      {/*
+        BB-278/BB-281 — dựng đúng `babybean-assets/BB-281/thanh-chon-*.png`:
+        điện thoại viên RỘNG gần hết bề ngang (không còn cụm nhỏ giữa màn),
+        số đếm serif lớn; máy tính viên NHỎ ~420px CĂN GIỮA đáy (bản vẽ vẽ
+        giữa đáy, không phải góc phải như BB-258 cũ — an toàn đổi lại vì
+        `loi-goi-y-luu-app.tsx` không còn `fixed` nên hết ràng buộc khoảng
+        cách giữa hai thẻ nổi). "Chốt danh sách" máy tính: bản vẽ ghi chữ
+        trắng/kem trên nền hồng đất nhạt #E8A598 — ĐO THỬ contrast hai màu đó
+        chỉ ~2:1 (dưới 4.5:1 bắt buộc), nên theo đúng điều khoản dự phòng của
+        chính bản chỉ đạo ("nếu không đạt thì chữ mực") — giữ chữ mực #2E2A27
+        như mobile, không dùng chữ trắng.
+      */}
       <div
         className={cn(
-          "mx-auto flex h-[80px] max-w-[400px] items-center gap-3 rounded-full bg-[#2E2A27] pl-8 pr-3 shadow-2xl lg:mx-0",
+          "mx-auto flex h-12 max-w-[520px] items-center gap-2 rounded-full border border-[#e5dcd2] bg-[#FBF7F2]/92 pl-5 pr-2 text-[#2E2A27] shadow-lg backdrop-blur-md lg:h-11 lg:max-w-[420px]",
           an ? "pointer-events-none" : "pointer-events-auto",
         )}>
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate font-display text-[26px] font-light text-[#FBF7F2]">
+          <p className="truncate font-display text-[22px] leading-none lg:text-[16px] lg:font-medium">
             <span data-testid="dem-da-chon">{daChon}</span>
-            {hanMuc != null ? ` / ${hanMuc}` : ""}
+            {hanMuc != null && (
+              <>
+                {" / "}
+                {hanMuc}
+                <span className="hidden lg:inline"> tấm</span>
+              </>
+            )}
           </p>
-          <p className={cn("truncate text-[12px] mt-0.5", vuot ? "text-[#C4645A]" : "text-white/70")}>
+          {/* Dưới lg: dòng phụ nằm NGAY DƯỚI số đếm, như thẻ điện thoại của bản vẽ. */}
+          <p className={cn("mt-1 truncate text-[12px] lg:hidden", canhBao ? "font-medium text-[#9C4A41]" : "text-[#6b6057]")}>
             {soChuaGui > 0 ? (
               <span data-testid="chua-luu">{`${vi.common.unsaved} — ${soChuaGui} tấm`}</span>
             ) : (
@@ -110,17 +133,27 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
           </p>
         </div>
 
+        {/* Từ lg: viên be nhỏ riêng cạnh số đếm, đúng bản vẽ máy tính. */}
+        <span
+          className={cn(
+            "hidden shrink-0 truncate rounded-full bg-[#efe7dc] px-2.5 py-1 text-[12px] lg:inline-block",
+            canhBao ? "font-medium text-[#9C4A41]" : "text-[#6b6057]",
+          )}
+        >
+          {soChuaGui > 0 ? `${vi.common.unsaved} — ${soChuaGui}` : dongPhuChip}
+        </span>
+
         {muaThem && (
           <button
             type="button"
             onClick={muaThem.onClick}
             aria-label="Mua thêm"
             title={muaThem.tien > 0 ? `Mua thêm — ${formatCurrencyVND(muaThem.tien)}` : "Mua thêm"}
-            className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2E2A27]"
+            className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#2E2A27]/75 transition hover:bg-[#2E2A27]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FBF7F2]"
           >
-            <ShoppingBag className="h-[22px] w-[22px]" strokeWidth={1.8} aria-hidden="true" />
+            <ShoppingBag className="h-[17px] w-[17px]" strokeWidth={1.6} aria-hidden="true" />
             {muaThem.tien > 0 && (
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#C4645A]" aria-hidden="true" />
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[#C4645A]" aria-hidden="true" />
             )}
           </button>
         )}
@@ -129,7 +162,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
           <button
             type="button"
             onClick={nutChinh.onClick}
-            className="h-[56px] shrink-0 rounded-full bg-[#FBF7F2] px-6 text-[15px] font-medium text-[#2E2A27] transition hover:bg-white active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2E2A27]"
+            className="h-9 shrink-0 rounded-full bg-[#E8A598] px-4 font-display text-[14px] text-[#2E2A27] transition hover:bg-[#E8A598]/85 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FBF7F2]"
           >
             {nutChinh.nhan}
           </button>

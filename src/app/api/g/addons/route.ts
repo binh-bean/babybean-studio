@@ -107,6 +107,162 @@ export async function POST(request: Request): Promise<Response> {
     const nhom = nhomSanPham(product.kind, product.material);
     const photoId = input.photoId ?? null;
 
+    // Đơn giá chốt lúc bấm mua — dùng chung cho cả nhánh đơn và nhánh batch.
+    const unitPrice = Number(product.list_price);
+
+    /**
+     * BB-279 — NHÁNH BATCH: cửa hàng chọn nhiều tấm cùng lúc, ghi một dòng
+     * `selection_addons` cho MỖI tấm với cùng `quantity`.
+     *
+     * Ba ràng buộc giữ nguyên tinh thần luật 5 ở nhánh đơn bên dưới, chỉ khác
+     * là kiểm THEO LÔ thay vì từng ảnh một:
+     *  1. Nhóm không gắn ảnh (album) thì không dùng nhánh này.
+     *  2. Mọi photoId phải thuộc ĐÚNG bộ ảnh của phiên — chặn IDOR kiểu
+     *     BB-276 (ảnh của bộ khác lẫn vào request).
+     *  3. Mọi photoId phải nằm trong danh sách phiên ĐÃ CHỌN (mark='selected').
+     * Trượt điều nào của MỘT ảnh trong lô -> từ chối CẢ LÔ, không âm thầm bỏ
+     * qua ảnh sai — ba mẹ cần biết chính xác ảnh nào bị từ chối để sửa.
+     */
+    if (input.photoIds && input.photoIds.length > 0) {
+      if (!canGanAnh(nhom)) {
+        return fail(
+          "INVALID_INPUT",
+          "Sản phẩm này không gắn vào một tấm ảnh cụ thể, không đặt theo nhiều tấm được",
+        );
+      }
+
+      const idsYeuCau = Array.from(new Set(input.photoIds));
+
+      const { data: anhHopLe, error: anhErr } = await admin
+        .from("photos")
+        .select("id")
+        .eq("gallery_id", session.galleryId)
+        .in("id", idsYeuCau);
+      if (anhErr) throw anhErr;
+      const idThuocBoNay = new Set((anhHopLe ?? []).map((r) => r.id as string));
+
+      const { data: daChonRows, error: chonErr } = await admin
+        .from("selection_items")
+        .select("photo_id")
+        .eq("selection_id", session.selectionId)
+        .eq("mark", "selected")
+        .in("photo_id", idsYeuCau);
+      if (chonErr) throw chonErr;
+      const idDaChon = new Set((daChonRows ?? []).map((r) => r.photo_id as string));
+
+      const idBiTuChoi = idsYeuCau.filter((id) => !idThuocBoNay.has(id) || !idDaChon.has(id));
+      if (idBiTuChoi.length > 0) {
+        return fail(
+          "INVALID_INPUT",
+          "Một số ảnh không thuộc bộ ảnh này hoặc chưa được ba mẹ chọn",
+          { photoIds: idBiTuChoi },
+        );
+      }
+
+      interface DongMuaThemBatch {
+        id: string;
+        selection_id: string;
+        product_id: string;
+        photo_id: string | null;
+        quantity: number;
+        unit_price: number;
+        created_at: string;
+      }
+      const ketQua: DongMuaThemBatch[] = [];
+
+      for (const photoIdLo of idsYeuCau) {
+        if (input.quantity === 0) {
+          const { error: delErr } = await admin
+            .from("selection_addons")
+            .delete()
+            .eq("selection_id", session.selectionId)
+            .eq("product_id", product.id)
+            .eq("photo_id", photoIdLo);
+          if (delErr) throw delErr;
+          continue;
+        }
+
+        // TÌM RỒI SỬA — lý do giống hệt nhánh đơn bên dưới: chỉ mục một phần
+        // của 0061 không khớp cú pháp `on conflict` của supabase-js.
+        const { data: dongCu } = await admin
+          .from("selection_addons")
+          .select("id")
+          .eq("selection_id", session.selectionId)
+          .eq("product_id", product.id)
+          .eq("photo_id", photoIdLo)
+          .maybeSingle();
+
+        const ghi = dongCu
+          ? admin
+              .from("selection_addons")
+              .update({ quantity: input.quantity, unit_price: unitPrice })
+              .eq("id", dongCu.id)
+          : admin.from("selection_addons").insert({
+              selection_id: session.selectionId,
+              product_id: product.id,
+              photo_id: photoIdLo,
+              quantity: input.quantity,
+              unit_price: unitPrice,
+            });
+
+        const { data, error: ghiErr } = await ghi
+          .select("id, selection_id, product_id, photo_id, quantity, unit_price, created_at")
+          .single();
+        if (ghiErr || !data) throw ghiErr || new Error("Không lưu được sản phẩm mua thêm (batch)");
+        ketQua.push(data as unknown as DongMuaThemBatch);
+      }
+
+      const { data: allAddonsBatch, error: sumErrorBatch } = await admin
+        .from("selection_addons")
+        .select("quantity, unit_price")
+        .eq("selection_id", session.selectionId);
+      if (sumErrorBatch) throw sumErrorBatch;
+
+      const totalAddonsAmountBatch = (allAddonsBatch || []).reduce(
+        (sum, item) => sum + Number(item.unit_price) * item.quantity,
+        0,
+      );
+
+      const { error: logErrBatch } = await admin.from("activity_logs").insert({
+        actor_type: "customer",
+        actor_id: session.selectionId,
+        actor_label: "Customer",
+        action: input.quantity === 0 ? "addon.batch_remove" : "addon.batch_set",
+        entity_type: "gallery",
+        entity_id: session.galleryId,
+        metadata: {
+          productId: product.id,
+          productName: product.name,
+          photoIds: idsYeuCau,
+          quantity: input.quantity,
+          unitPrice,
+        },
+      });
+      if (logErrBatch) console.error("[activity_logs] Ghi hụt:", logErrBatch);
+
+      return NextResponse.json(
+        {
+          data: {
+            addons: ketQua.map((a) => ({
+              id: a.id,
+              selectionId: a.selection_id,
+              productId: a.product_id,
+              productName: product.name,
+              material: product.material,
+              size: product.size,
+              photoId: a.photo_id,
+              quantity: a.quantity,
+              unitPrice,
+              totalPrice: unitPrice * a.quantity,
+              createdAt: a.created_at,
+            })),
+            totalAddonsAmount: totalAddonsAmountBatch,
+          },
+        },
+        { status: 200, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
     if (canGanAnh(nhom) && !photoId) {
       return fail("INVALID_INPUT", "Ba mẹ chọn giúp em tấm ảnh cần in cho sản phẩm này");
     }
@@ -132,8 +288,8 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
-    // Luật 1: Đơn giá chốt tại thời điểm mua, lấy từ products.list_price
-    const unitPrice = Number(product.list_price);
+    // Luật 1: Đơn giá chốt tại thời điểm mua (đã tính ở `unitPrice` phía trên,
+    // dùng chung với nhánh batch).
 
     /**
      * 5. ĐẶT số lượng, không phải cộng dồn.

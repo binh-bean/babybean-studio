@@ -197,6 +197,9 @@ export const vi = {
     /** BB-241 — lời gợi ý "Lưu app", thay cho nút biểu tượng khó hiểu. */
     saveAppPrompt: {
       message: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
+      // BB-278/BB-281 — nhãn ngắn cho chip một dòng ở đầu trang (thay bản thẻ
+      // nổi ở đáy cũ); "message" (câu đầy đủ) vẫn dùng cho `aria-label`.
+      shortLabel: "Lưu ra màn hình chính",
       howTo: "Xem cách lưu",
       later: "Để sau",
     },
@@ -345,13 +348,13 @@ export const vi = {
       moTaToanQuyen:
         "Vai này đã có đủ toàn bộ {n} quyền của hệ thống. Không cần cài đặt gì thêm, và cũng không sửa được — đây là vai để chủ studio luôn vào lại được.",
       ghiChuHieuLuc:
-        "Ô ghi \"chưa có hiệu lực\" đã lưu được nhưng lớp bảo mật chưa hỏi tới. Sau chặng 2c, lớp bảo mật không còn đọc tên vai ở đâu nữa. Mười hai quyền đang thật sự đổi hành vi: xem ảnh, xem lựa chọn, thấy mọi album trong chi nhánh, tạo và sửa album, xem và sửa khách hàng, xem và sửa gói chụp, cập nhật giao ảnh, sửa cài đặt chi nhánh, và vượt trên mọi chi nhánh.",
+        "Ô ghi \"chưa có hiệu lực\" đã lưu được nhưng lớp bảo mật chưa hỏi tới. Sau chặng 2c, lớp bảo mật không còn đọc tên vai ở đâu nữa. Mười hai quyền đang thật sự đổi hành vi: xem ảnh, xem lựa chọn, thấy mọi bộ ảnh trong chi nhánh, tạo và sửa bộ ảnh, xem và sửa khách hàng, xem và sửa gói chụp, cập nhật giao ảnh, sửa cài đặt chi nhánh, và vượt trên mọi chi nhánh.",
     },
     caiDat: {
       title: "Cài đặt",
       subtitle:
-        "Những giá trị mặc định cho album tạo MỚI. Album đang chạy giữ nguyên cấu hình cũ của nó.",
-      nhomAlbum: "Album",
+        "Những giá trị mặc định cho bộ ảnh tạo MỚI. Bộ ảnh đang chạy giữ nguyên cấu hình cũ của nó.",
+      nhomAlbum: "Bộ ảnh",
       nhomAnh: "Ảnh",
       nhomQuangCao: "Quảng cáo",
       nhomLienLac: "Liên lạc",
@@ -368,6 +371,7 @@ export const vi = {
         "gallery.banner_link_url": "Bấm vào ảnh quảng cáo thì mở trang nào",
         "chat.page_url": "Trang nhắn tin của studio",
         "lark.webhook_url": "Webhook nhóm Lark",
+        "lark.nhac_noi_bo": "Nhắc nội bộ vào Lark",
       },
       moTa: {
         "gallery.default_due_days": "Bao nhiêu ngày kể từ lúc gửi link thì khách phải chốt.",
@@ -386,6 +390,8 @@ export const vi = {
           "Không bắt buộc. Để trống thì ảnh quảng cáo chỉ để xem, bấm vào không đi đâu.",
         "chat.page_url": "Địa chỉ nút 'Nhắn cho studio' trên màn khách. Để trống thì nút không hiện.",
         "lark.webhook_url": "Bot báo tin vào nhóm Lark. Đây là địa chỉ bí mật nên chỉ hiện dạng che.",
+        "lark.nhac_noi_bo":
+          "Nhắc hậu kỳ và nhắc khách chưa chốt gửi vào Lark cho NHÂN VIÊN. KHÔNG ảnh hưởng tin khách↔studio (khách chốt ảnh, xin mở lại, mua thêm, duyệt/xin sửa) — những tin đó luôn gửi. Đang tắt vì automatic của Lark ở nhóm khác đã lo phần này.",
       },
       dangBat: "Đang bật",
       dangTat: "Đang tắt",

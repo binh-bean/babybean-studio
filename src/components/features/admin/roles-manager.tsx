@@ -167,8 +167,10 @@ export function RolesManager() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-[var(--bb-fg-muted)]">{t.subtitle}</p>
-
+      {/*
+        BB-280: mô tả phụ chuyển sang PageHeader của trang gộp
+        /admin/staff (nhan-su-vai-tro.tsx) — không in hai lần.
+      */}
       {loi && (
         <div
           role="alert"

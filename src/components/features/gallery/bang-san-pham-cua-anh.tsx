@@ -111,6 +111,15 @@ export interface BangSanPhamCuaAnhProps {
    * nào để treo — không có gì để ướm lên tường).
    */
   onXemTuong?: () => void;
+  /**
+   * BB-279 — ĐƯỜNG THỨ HAI vào cửa hàng: mở thẳng bộ cấu hình của nhóm này
+   * (`cua-hang.tsx`) với tấm đang xem đã chọn sẵn, thay vì liệt kê phẳng từng
+   * sản phẩm ở đây (đó chính là "danh mục tràn lan" chủ studio muốn bỏ).
+   *
+   * `undefined` thì không hiện nút — dùng khi màn gọi component này chưa nối
+   * cửa hàng mới (vd. còn nơi khác dùng bảng này trước khi BB-279 gộp xong).
+   */
+  onDatInTamNay?: (nhom: NhomSanPham) => void;
 }
 
 export function BangSanPhamCuaAnh({
@@ -130,6 +139,7 @@ export function BangSanPhamCuaAnh({
   onDatMuaThem,
   onMuaAlbum,
   onXemTuong,
+  onDatInTamNay,
 }: BangSanPhamCuaAnhProps) {
   const [nhomDangMo, setNhomDangMo] = React.useState<NhomSanPham | null>(null);
 
@@ -327,86 +337,122 @@ export function BangSanPhamCuaAnh({
         </section>
       )}
 
-      {/* ---------- 3. MUA THÊM ---------- */}
+      {/*
+        ---------- 3. MUA THÊM ----------
+
+        BB-279 — chủ studio 27/09/2026: "danh mục quá tràn lan tôi muốn tối
+        giản". Trước đây mỗi nhóm mở ra một danh sách PHẲNG từng sản phẩm
+        (size × chất liệu, có nhóm tới hàng chục dòng) — đúng thứ "tràn lan"
+        bị chê. Từ BB-279, đây là ĐƯỜNG THỨ HAI vào cửa hàng: một nút gọn mở
+        thẳng bộ cấu hình (nhóm → kích thước → chất liệu → số lượng → giá) của
+        `cua-hang.tsx`, với tấm đang xem đã chọn sẵn — không liệt kê lại từng
+        sản phẩm ở đây nữa.
+
+        Nếu màn gọi component này chưa nối `onDatInTamNay` (chưa nâng cấp),
+        giữ nguyên danh sách phẳng cũ làm phương án dự phòng — không để mất
+        hẳn đường mua khi một nơi gọi còn sót lại bản cũ.
+      */}
       <section>
         <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">
           Mua thêm cho tấm này
         </h3>
-        <div className="space-y-1.5">
-          {THU_TU_NHOM.map((nhom) => {
-            const ds = theoNhom(nhom);
-            if (ds.length === 0) return null;
-            const dangMo = nhomDangMo === nhom;
-            const daDat = daDatTrongNhom(nhom);
+        {onDatInTamNay ? (
+          <div className="space-y-1.5">
+            {THU_TU_NHOM.map((nhom) => {
+              const ds = theoNhom(nhom);
+              if (ds.length === 0) return null;
+              const daDat = daDatTrongNhom(nhom);
 
-            return (
-              <div key={nhom} className="rounded-xl bg-white/10">
+              return (
                 <button
+                  key={nhom}
                   type="button"
-                  onClick={() => setNhomDangMo(dangMo ? null : nhom)}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium"
+                  disabled={khoa || dangLuu}
+                  onClick={() => onDatInTamNay(nhom)}
+                  className="flex w-full items-center justify-between gap-2 rounded-full bg-white/10 px-4 py-2.5 text-left text-xs transition-colors hover:bg-white/15 disabled:opacity-40"
                 >
-                  <span>{TEN_NHOM[nhom]}</span>
-                  <span className="flex items-center gap-2 text-white/55">
-                    {daDat > 0 && (
-                      <span className="rounded-full bg-emerald-500/25 px-2 py-0.5 text-[11px] text-emerald-200">
-                        {daDat}
-                      </span>
-                    )}
-                    <span>{dangMo ? "−" : "+"}</span>
+                  <span className="min-w-0">
+                    <span className="block font-medium">{TEN_NHOM[nhom]}</span>
+                    <span className="block text-white/55">
+                      {daDat > 0 ? `Đang đặt ${daDat}` : "Đặt in tấm này"}
+                    </span>
                   </span>
+                  <span className="shrink-0 text-base leading-none">→</span>
                 </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {THU_TU_NHOM.map((nhom) => {
+              const ds = theoNhom(nhom);
+              if (ds.length === 0) return null;
+              const dangMo = nhomDangMo === nhom;
+              const daDat = daDatTrongNhom(nhom);
 
-                {dangMo && (
-                  <ul className="space-y-1 px-2 pb-2">
-                    {ds.map((m) => (
-                      <li
-                        key={m.productId}
-                        className="flex items-center justify-between gap-2 rounded-lg bg-black/25 px-2.5 py-1.5"
-                      >
-                        <span className="min-w-0">
-                          {/*
-                            Chất liệu và kích thước là hai thứ ba mẹ so sánh.
-                            Tên sản phẩm bên Lark đã gộp sẵn cả hai ("Gỗ 40x60"),
-                            nên hiện tên là đủ; dòng dưới nhắc lại kích thước
-                            cho dễ dò khi danh sách dài.
-                          */}
-                          <span className="block truncate text-xs">{m.name}</span>
-                          <span className="block text-[11px] text-white/55">
-                            {formatCurrencyVND(m.unitPrice)}
-                            {m.size ? ` · ${m.size}` : ""}
+              return (
+                <div key={nhom} className="rounded-xl bg-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setNhomDangMo(dangMo ? null : nhom)}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium"
+                  >
+                    <span>{TEN_NHOM[nhom]}</span>
+                    <span className="flex items-center gap-2 text-white/55">
+                      {daDat > 0 && (
+                        <span className="rounded-full bg-emerald-500/25 px-2 py-0.5 text-[11px] text-emerald-200">
+                          {daDat}
+                        </span>
+                      )}
+                      <span>{dangMo ? "−" : "+"}</span>
+                    </span>
+                  </button>
+
+                  {dangMo && (
+                    <ul className="space-y-1 px-2 pb-2">
+                      {ds.map((m) => (
+                        <li
+                          key={m.productId}
+                          className="flex items-center justify-between gap-2 rounded-lg bg-black/25 px-2.5 py-1.5"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-xs">{m.name}</span>
+                            <span className="block text-[11px] text-white/55">
+                              {formatCurrencyVND(m.unitPrice)}
+                              {m.size ? ` · ${m.size}` : ""}
+                            </span>
                           </span>
-                        </span>
 
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          <button
-                            type="button"
-                            aria-label={`Bớt ${m.name}`}
-                            disabled={khoa || dangLuu || m.soLuong === 0}
-                            onClick={() => onDatMuaThem(m.productId, Math.max(0, m.soLuong - 1))}
-                            className="h-7 w-7 rounded-full bg-white/10 text-sm disabled:opacity-30"
-                          >
-                            −
-                          </button>
-                          <span className="w-5 text-center text-xs tabular-nums">{m.soLuong}</span>
-                          <button
-                            type="button"
-                            aria-label={`Thêm ${m.name}`}
-                            disabled={khoa || dangLuu}
-                            onClick={() => onDatMuaThem(m.productId, m.soLuong + 1)}
-                            className="h-7 w-7 rounded-full bg-white/10 text-sm disabled:opacity-30"
-                          >
-                            +
-                          </button>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <button
+                              type="button"
+                              aria-label={`Bớt ${m.name}`}
+                              disabled={khoa || dangLuu || m.soLuong === 0}
+                              onClick={() => onDatMuaThem(m.productId, Math.max(0, m.soLuong - 1))}
+                              className="h-7 w-7 rounded-full bg-white/10 text-sm disabled:opacity-30"
+                            >
+                              −
+                            </button>
+                            <span className="w-5 text-center text-xs tabular-nums">{m.soLuong}</span>
+                            <button
+                              type="button"
+                              aria-label={`Thêm ${m.name}`}
+                              disabled={khoa || dangLuu}
+                              onClick={() => onDatMuaThem(m.productId, m.soLuong + 1)}
+                              className="h-7 w-7 rounded-full bg-white/10 text-sm disabled:opacity-30"
+                            >
+                              +
+                            </button>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
     </div>
   );
