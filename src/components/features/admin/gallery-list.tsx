@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Spinner } from "@/components/ui/spinner";
-import { EmptyState } from "@/components/ui/empty-state";
 import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
 import { getContractCodesForGalleries } from "@/app/(admin)/admin/galleries/actions";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
+import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
   Calendar,
@@ -532,10 +532,29 @@ export function GalleryList() {
           <p className="mt-3 text-sm text-[var(--bb-fg-muted)]">Đang tải danh sách bộ ảnh…</p>
         </div>
       ) : items.length === 0 ? (
-        <EmptyState
-          title="Không tìm thấy bộ ảnh nào"
-          description="Hãy thử thay đổi điều kiện lọc hoặc tạo bộ ảnh mới."
-        />
+        // BB-292: tranh trạng thái trống dùng chung (`ngang-quan-tri-trong`)
+        // cho danh sách rỗng lẫn không khớp bộ lọc — cùng thông điệp cũ, chỉ
+        // thêm tranh phía trên thay vì icon tròn mặc định của `EmptyState`.
+        //
+        // BB-292 vòng 2 — giám đốc chấm: bỏ khối nền full-bleed riêng quanh
+        // tranh, đổi `object-contain` + `max-w-[360px]` căn giữa (không cắt
+        // vật nào), kèm `layerMoNgang` để tan vào nền thẻ.
+        <div className="flex flex-col items-center rounded-[var(--bb-radius)] border border-dashed border-[var(--bb-border)] bg-[var(--bb-surface)]/50 p-8 text-center">
+          <img
+            src="/minh-hoa/ngang-quan-tri-trong-1280.webp"
+            srcSet="/minh-hoa/ngang-quan-tri-trong-640.webp 640w, /minh-hoa/ngang-quan-tri-trong-1280.webp 1280w"
+            sizes="360px"
+            alt=""
+            width={1280}
+            height={714}
+            className="mb-4 w-full max-w-[360px] object-contain"
+            style={layerMoNgang}
+          />
+          <h3 className="text-base font-semibold text-[var(--bb-fg)] mb-1">Không tìm thấy bộ ảnh nào</h3>
+          <p className="max-w-md text-sm text-[var(--bb-fg-muted)]">
+            Hãy thử thay đổi điều kiện lọc hoặc tạo bộ ảnh mới.
+          </p>
+        </div>
       ) : filters.viewMode === "table" ? (
         /* ================= CHẾ ĐỘ XEM BẢNG ================= */
         <div className="space-y-4">

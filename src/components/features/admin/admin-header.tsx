@@ -51,7 +51,10 @@ export function AdminHeader({
           bên dưới. Nay tên màn nằm luôn ở đây.
         */}
         <span className="flex min-w-0 items-baseline gap-1.5 sm:hidden">
-          <span className="font-display font-bold text-[var(--bb-fg)]">BabyBean</span>
+          {/* BB-292: "BabyBean" liền chữ khác hẳn thanh bên/Sheet (đều giãn
+              chữ "BABY BEAN" serif) — đồng bộ lại, giữ nhỏ + không xuống dòng
+              để còn chỗ cho tên màn ngay bên cạnh. */}
+          <span className="font-display whitespace-nowrap tracking-[0.08em] text-[var(--bb-fg)]">BABY BEAN</span>
           <span className="truncate text-sm text-[var(--bb-fg-muted)]">
             <span aria-hidden="true">· </span>
             <TenManHinh />

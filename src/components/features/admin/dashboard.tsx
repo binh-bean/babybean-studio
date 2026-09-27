@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
-  Inbox,
   ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
@@ -16,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { bienDongLaTot } from "@/lib/utils/bang-dieu-khien";
 import { dongCanXuLy, type CanXuLyTongHop } from "@/lib/utils/can-xu-ly";
+import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
 import { CARD_TITLE_CLASS } from "./page-header";
 
 type DashboardStats = {
@@ -153,11 +153,28 @@ export function Dashboard() {
   if (!data) return null;
 
   if (data.stats.totalGalleries === 0) {
+    // BB-292: tranh trạng thái trống dùng chung cho các màn quản trị
+    // (`ngang-quan-tri-trong`) thay vòng tròn icon `Inbox` trơn — cùng ngôn
+    // ngữ hình ảnh với `bao-cao-trong` ở màn Báo cáo.
+    //
+    // BB-292 vòng 2 — giám đốc chấm hai lỗi:
+    //  1. `object-cover` tràn hết bề ngang kéo giãn tranh bàn, cắt mất đỉnh
+    //     lọ hoa — đổi `object-contain` + `max-w-[360px]`, không cắt vật nào.
+    //  2. Bỏ khối nền riêng quanh tranh (`overflow-hidden` full-bleed cũ) —
+    //     tranh nay nằm thẳng trên nền thẻ, kèm `layerMoNgang` (multiply +
+    //     mặt nạ mờ mép) để tan vào nền thay vì nổi thành khối kem.
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-center rounded-xl border border-dashed bg-muted/20">
-        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-          <Inbox className="w-8 h-8 text-muted-foreground" />
-        </div>
+      <div className="flex flex-col items-center rounded-xl border border-dashed bg-muted/20 p-8 text-center">
+        <img
+          src="/minh-hoa/ngang-quan-tri-trong-1280.webp"
+          srcSet="/minh-hoa/ngang-quan-tri-trong-640.webp 640w, /minh-hoa/ngang-quan-tri-trong-1280.webp 1280w"
+          sizes="360px"
+          alt=""
+          width={1280}
+          height={714}
+          className="mb-4 w-full max-w-[360px] object-contain"
+          style={layerMoNgang}
+        />
         <h3 className="text-xl font-bold mb-2">Chưa có bộ ảnh nào</h3>
         <p className="text-muted-foreground max-w-md mb-6">
           Chi nhánh này hiện chưa có bộ ảnh nào. Hãy bắt đầu bằng việc đồng bộ ảnh chụp cho khách hàng.

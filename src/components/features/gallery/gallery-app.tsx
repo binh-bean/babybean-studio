@@ -83,6 +83,7 @@ const SoSanhAnh = dynamic(() => import("@/components/features/gallery/so-sanh-an
 import { Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { layerMoVuong } from "@/lib/utils/tranh-tan-nen";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
 import { useHangChoTim } from "@/components/features/gallery/use-hang-cho-tim";
@@ -2296,6 +2297,27 @@ export function GalleryApp({ token }: GalleryAppProps) {
             phần tử khớp bộ chọn `p.font-display`.
           */}
           <div className="mt-10 flex flex-col items-center gap-2 border-t border-border pt-8 text-center">
+            {/*
+              BB-292 vòng 2 — giám đốc chấm: `ngang-chan-trang` (tranh bàn
+              rộng cắt còn một dải) làm vật trong tranh chỉ còn vài điểm ảnh,
+              không đọc ra là gì. Cắt sát riêng bằng sharp từ
+              `babybean-assets/BB-291/5-chan-trang.png` (vùng cành bạch đàn +
+              tim, đệm ~15% quanh) → `chan-trang-vat-{160,320}.webp`. Tệp
+              nguồn giữ nguyên, không sửa. Cao ~56px (< 120px cho phép), kèm
+              `mix-blend-mode: multiply` + mặt nạ toả tròn (`layerMoVuong`)
+              để tan vào nền `#FBF7F2` thay vì hiện thành khối kem tách biệt.
+              `alt=""` vì trang trí, không mang thông tin.
+            */}
+            <img
+              src="/minh-hoa/chan-trang-vat-320.webp"
+              srcSet="/minh-hoa/chan-trang-vat-160.webp 160w, /minh-hoa/chan-trang-vat-320.webp 320w"
+              sizes="82px"
+              alt=""
+              width={320}
+              height={220}
+              className="h-[56px] w-auto object-contain opacity-90"
+              style={layerMoVuong}
+            />
             <p
               className="italic text-lg text-foreground"
               style={{ fontFamily: "var(--font-display)" }}

@@ -20,6 +20,7 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/components/ui/utils";
+import { layerMoVuong } from "@/lib/utils/tranh-tan-nen";
 
 export const PAGE_TITLE_CLASS = "font-display text-[30px] font-normal text-[var(--bb-fg)]";
 export const PAGE_DESCRIPTION_CLASS = "text-sm text-[var(--bb-fg-muted)]";
@@ -82,15 +83,30 @@ export function PageHeader({
 export function KhongCoQuyen({ mota }: { mota: string }) {
   return (
     <main className="mx-auto max-w-2xl py-10 text-center">
+      {/*
+        BB-292 — bắt được lỗi thật: `onError` trên <img> ở đây làm CẢ TRANG vỡ
+        500 ("Event handlers cannot be passed to Client Component props"),
+        không chỉ lặng lẽ ẩn tranh — `KhongCoQuyen` được gọi từ page.tsx là
+        Server Component (`customers/page.tsx`, `staff/page.tsx`), không có
+        "use client", nên một hàm truyền làm prop cho phần tử DOM ở đây không
+        hợp lệ. Bỏ hẳn `onError`: đường dẫn tranh nay trỏ đúng tệp thật có sẵn
+        (`khong-co-quyen-{320,640}.webp`), không cần lưới đỡ khi tải hỏng nữa.
+      */}
+      {/*
+        BB-292 vòng 2 — giám đốc chấm: nền kem của tranh tách khỏi nền trang
+        thành một khối vuông thấy rõ viền. `layerMoVuong` (multiply + mặt nạ
+        toả tròn, `src/lib/utils/tranh-tan-nen.ts`) cho nền tranh tan vào
+        `--bb-bg`, chỉ còn nét vẽ nổi lên.
+      */}
       <img
-        src="/minh-hoa/khong-co-quyen.webp"
+        src="/minh-hoa/khong-co-quyen-640.webp"
+        srcSet="/minh-hoa/khong-co-quyen-320.webp 320w, /minh-hoa/khong-co-quyen-640.webp 640w"
+        sizes="200px"
         alt=""
         width={200}
-        height={140}
+        height={200}
         className="mx-auto h-[140px] w-[200px] object-contain opacity-90"
-        onError={(e) => {
-          (e.currentTarget as HTMLImageElement).style.display = "none";
-        }}
+        style={layerMoVuong}
       />
       <h1 className={cn(PAGE_TITLE_CLASS, "mt-4")}>Không có quyền</h1>
       <p className={cn("mt-2", PAGE_DESCRIPTION_CLASS)}>{mota}</p>

@@ -19,6 +19,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { Button, Input, Spinner } from "@/components/ui";
 import { toAuthEmail } from "@/lib/auth/username";
 import { vi } from "@/i18n/vi";
+import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
 
 function LoginForm() {
   const [identifier, setIdentifier] = useState("");
@@ -136,9 +137,27 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     // Bản vẽ dang-nhap.webp: nửa trái tranh tĩnh vật trên nền kem, nửa phải
-    // form hẹp giữa trang. Dưới 768px chỉ còn form — không đủ chỗ cho tranh,
-    // và tranh chỉ minh hoạ, không mang thông tin cần đọc.
-    <main className="flex min-h-screen w-full bg-[var(--bb-bg)]">
+    // form hẹp giữa trang. Dưới 768px không còn nửa trái, nhưng BB-292: thay
+    // vì để trống hẳn phía trên form, có một dải tranh ngang
+    // (`dai-dang-nhap-*.webp`) ~160px cao đầu trang — máy tính vẫn giữ
+    // nguyên tranh dọc hiện có, không hiện cả hai cùng lúc.
+    <main className="flex min-h-screen w-full flex-col bg-[var(--bb-bg)] md:flex-row">
+      <div
+        aria-hidden="true"
+        className="relative h-[160px] w-full shrink-0 overflow-hidden bg-[#fbf7f2] md:hidden"
+      >
+        <img
+          src="/minh-hoa/dai-dang-nhap-1920.webp"
+          srcSet="/minh-hoa/dai-dang-nhap-960.webp 960w, /minh-hoa/dai-dang-nhap-1920.webp 1920w"
+          sizes="100vw"
+          alt=""
+          width={1920}
+          height={634}
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          style={layerMoNgang}
+        />
+      </div>
+
       <div
         aria-hidden="true"
         className="relative hidden w-1/2 overflow-hidden bg-[#fbf7f2] md:block"

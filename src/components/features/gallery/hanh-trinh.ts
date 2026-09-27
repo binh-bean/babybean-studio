@@ -104,7 +104,13 @@ export interface HanhTrinhInfo {
  * Lưu ý: nếu không in thì từ Duyệt (2) nhảy thẳng lên Nhận ảnh (4), đây là hành vi thiết kế có chủ ý.
  */
 export function buocHanhTrinh(status: string, giaiDoan: number | null): HanhTrinhInfo {
-  const buoc = ["Chọn ảnh", "Chỉnh sửa", "Duyệt", "In", "Nhận ảnh"];
+  // BB-292: nhãn theo bản vẽ BB-285 `dang-chinh-da-giao-dien-thoai.png` — đổi
+  // tên 1:1 theo đúng vị trí cũ, KHÔNG đổi chỉ số `hienTai` bên dưới ("Chọn
+  // ảnh"→"Đã chốt" (thẻ này chỉ hiện sau khi đã chốt — BB-292 chốt lại đúng
+  // pha đầu thay vì bước chọn ảnh đã qua), "Chỉnh sửa"→"Đang chỉnh",
+  // "Duyệt"→"Duyệt ảnh", "In"→"In/nhận ảnh" (gộp — không có trường riêng
+  // phân biệt hai giai đoạn này trên màn khách), "Nhận ảnh"→"Đã giao").
+  const buoc = ["Đã chốt", "Đang chỉnh", "Duyệt ảnh", "In/nhận ảnh", "Đã giao"];
   let hienTai = 0;
 
   if (status === "awaiting_approval") {

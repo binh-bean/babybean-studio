@@ -125,7 +125,7 @@ export function GalleryFilters({
         <div className="flex min-w-0 flex-wrap items-center gap-3 lg:flex-1">
           {/* Tìm kiếm Tên bé, Tên khách, SĐT — thu lại khi không dùng */}
           {dangHien ? (
-            <div className="relative w-full min-w-0 sm:w-72 lg:w-auto lg:flex-1">
+            <div className="relative w-full min-w-0 sm:w-72 lg:w-auto lg:flex-1 lg:min-w-[220px]">
               <Input
                 ref={oRef}
                 name="search"
@@ -163,8 +163,19 @@ export function GalleryFilters({
             </div>
           ) : (
             <>
-              {/* Máy tính: ô tìm mở sẵn và giãn ra lấp khoảng hở ở giữa. */}
-              <div className="relative hidden min-w-0 lg:block lg:w-auto lg:flex-1">
+              {/*
+                Máy tính: ô tìm mở sẵn và giãn ra lấp khoảng hở ở giữa.
+
+                BB-292 vòng 2 — giám đốc báo ô tìm bị ép còn ~70px ở 1440px,
+                chữ gõ vào không đọc được: `lg:flex-1` (flex-basis 0%) không
+                có sàn, nên khi hàng chật, trình duyệt co ô này gần về 0
+                trước khi tính tới việc xuống dòng — `khoi-bo-loc` (chứa các
+                ô lọc + hai ô ngày) vẫn còn `flex-wrap` riêng, nên thêm sàn
+                `lg:min-w-[220px]` ở đây là đủ: khi không đủ chỗ, phần không
+                vừa (hai ô ngày, đứng cuối `khoi-bo-loc`) tự xuống dòng thay
+                vì ô tìm bị bóp.
+              */}
+              <div className="relative hidden min-w-0 lg:block lg:w-auto lg:flex-1 lg:min-w-[220px]">
                 <Input
                   name="search"
                   value={values.search}

@@ -9,9 +9,11 @@
  * hàm đó trong `gallery-app.tsx`) trong lúc dữ liệu mới đang tải về — vài
  * giây trắng trơn ngay sau một hành động quan trọng.
  *
- * Bản vẽ đã duyệt `babybean-assets/BB-285/cam-on-sau-chot-dien-thoai.html`:
- * tranh màu nước tròn (`/hanh-trinh/chot-thanh-cong-*.webp`, huy hiệu tích
- * sage đè lên), nhãn "ĐÃ CHỐT · dd/mm/yyyy", tiêu đề serif lớn, thẻ tóm tắt,
+ * Bản vẽ đã duyệt `babybean-assets/BB-285/cam-on-sau-chot-dien-thoai.png`:
+ * tranh màu nước tròn (BB-292: `/minh-hoa/cam-on-phong-thu-*.webp`, vẽ riêng
+ * theo đúng bản vẽ này — trước đó tạm dùng tranh hành trình `chot-thanh-cong`
+ * dùng chung với thẻ khác; huy hiệu tích sage đè lên), nhãn "ĐÃ CHỐT ·
+ * dd/mm/yyyy", tiêu đề serif lớn, thẻ tóm tắt,
  * nút "Xem tiến độ" (không phải "Xem chi tiết" — quyết định Opus lượt 2,
  * BB-289: nút này đưa ba mẹ tới đúng thẻ hành trình 5 bước đã có sẵn trên
  * trang, không mở lại hộp chốt).
@@ -85,8 +87,8 @@ export function CamOnSauChot({
       */}
       <div className="relative h-[140px] w-[140px] shrink-0 overflow-hidden rounded-full sm:h-[180px] sm:w-[180px]">
         <img
-          src="/hanh-trinh/chot-thanh-cong-640.webp"
-          srcSet="/hanh-trinh/chot-thanh-cong-320.webp 320w, /hanh-trinh/chot-thanh-cong-640.webp 640w"
+          src="/minh-hoa/cam-on-phong-thu-640.webp"
+          srcSet="/minh-hoa/cam-on-phong-thu-320.webp 320w, /minh-hoa/cam-on-phong-thu-640.webp 640w"
           sizes="180px"
           alt=""
           className="h-full w-full object-cover"

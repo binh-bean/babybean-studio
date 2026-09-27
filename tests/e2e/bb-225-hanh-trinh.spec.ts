@@ -88,13 +88,14 @@ test.describe("BB-225 Hanh Trinh", () => {
     const img = page.locator("img[src*='tien-do-chinh-sua']");
     await expect(img).toBeVisible();
 
-    const stepChinhSua = page.locator("div[aria-current='step']:has-text('Chỉnh sửa')");
+    const stepChinhSua = page.locator("div[aria-current='step']:has-text('Đang chỉnh')");
     await expect(stepChinhSua).toBeVisible();
 
     // Opus soát: 5 nhãn bước căn giữa dưới chấm — nhãn ở hai mép không được
     // tràn khỏi màn điện thoại (tràn là trang cuộn ngang).
+    // BB-292: nhãn đổi theo bản vẽ BB-285 — mép trái/phải nay là "Đã chốt"/"Đã giao".
     await page.screenshot({ path: "test-results/bb-225-390.png", fullPage: false });
-    for (const nhan of ["Chọn ảnh", "Nhận ảnh"]) {
+    for (const nhan of ["Đã chốt", "Đã giao"]) {
       const hop = await page.getByText(nhan, { exact: true }).boundingBox();
       expect(hop, nhan).not.toBeNull();
       expect(hop!.x, `${nhan} tràn trái`).toBeGreaterThanOrEqual(0);
@@ -115,7 +116,7 @@ test.describe("BB-225 Hanh Trinh", () => {
     const imgIn = page.locator("img[src*='tien-do-in']");
     await expect(imgIn).toBeVisible();
 
-    const stepIn = page.locator("div[aria-current='step']:has-text('In')");
+    const stepIn = page.locator("div[aria-current='step']:has-text('In/nhận ảnh')");
     await expect(stepIn).toBeVisible();
   });
 
