@@ -24,6 +24,11 @@ import {
   xoaSachGiaoDich,
   xuatSaoLuu,
   sanLuuGanNhatTrongThuMuc,
+  ghiMocSaoLuuGanNhat,
+  docMocSaoLuuGanNhat,
+  docBanSaoLuuTaiThuMuc,
+  khoiPhucGiaoDich,
+  banGiuLieuKhongRong,
   chayNap,
   danhSachLenhNap,
   THU_TU_XOA,
@@ -79,7 +84,7 @@ function taoClientGia(duLieuTheoBang: BangGia = {}) {
 }
 
 describe("phanLoaiBang — phân loại giữ / xoá", () => {
-  it("giữ đúng 7 bảng cấu hình, xoá phần còn lại", () => {
+  it("giữ đúng 6 bảng cấu hình, xoá phần còn lại (BB-311: products chuyển sang xoá, packages vẫn giữ)", () => {
     const bangThat = [...BANG_GIU_NGUYEN, ...THU_TU_XOA];
     const { giu, xoa, moi } = phanLoaiBang(bangThat);
     expect(giu.sort()).toEqual([...BANG_GIU_NGUYEN].sort());
@@ -111,6 +116,8 @@ describe("kiemTraThuTuAnToan — thứ tự xoá phải khớp khoá ngoại th�
       { tu: "selection_items", den: "selections", batBuoc: true },
       { tu: "selection_items", den: "photos", batBuoc: true },
       { tu: "selection_items", den: "galleries", batBuoc: true },
+      { tu: "selection_addons", den: "products", batBuoc: true },
+      { tu: "gallery_items", den: "products", batBuoc: true },
       { tu: "gallery_payments", den: "galleries", batBuoc: true },
       { tu: "selections", den: "galleries", batBuoc: true },
       { tu: "selections", den: "share_links", batBuoc: true },
@@ -137,6 +144,14 @@ describe("kiemTraThuTuAnToan — thứ tự xoá phải khớp khoá ngoại th�
     const { anToan, loi } = kiemTraThuTuAnToan(thuTuSai, canhFk);
     expect(anToan).toBe(false);
     expect(loi[0]).toMatch(/babies -> customers/);
+  });
+
+  it("BB-311: bắt được thứ tự sai nếu products bị xoá TRƯỚC gallery_items (khoá ngoại NOT NULL)", () => {
+    const thuTuSai = ["products", "gallery_items"]; // đảo ngược, sai
+    const canhFk = [{ tu: "gallery_items", den: "products", batBuoc: true }];
+    const { anToan, loi } = kiemTraThuTuAnToan(thuTuSai, canhFk);
+    expect(anToan).toBe(false);
+    expect(loi[0]).toMatch(/gallery_items -> products/);
   });
 });
 
@@ -366,8 +381,138 @@ describe("sanLuuGanNhatTrongThuMuc — tìm bản sao lưu mới nhất", () => 
   });
 });
 
+describe("A2 — NỐI HAI BƯỚC: --sao-luu vào một thư mục bất kỳ rồi --xoa phải nhận ra nó", () => {
+  let gocMacDinh: string; // giả lập BACKUP_DIR / gocSaoLuuMacDinh()
+  let thuMucX: string; // nơi admin CHỌN cho --sao-luu, KHÁC gocMacDinh
+  beforeEach(() => {
+    gocMacDinh = fs.mkdtempSync(path.join(os.tmpdir(), "bb300-goc-mac-dinh-"));
+    thuMucX = fs.mkdtempSync(path.join(os.tmpdir(), "bb300-thu-muc-x-"));
+  });
+  afterEach(() => {
+    fs.rmSync(gocMacDinh, { recursive: true, force: true });
+    fs.rmSync(thuMucX, { recursive: true, force: true });
+  });
+
+  it("sao lưu vào thư mục X (không phải thư mục mặc định) rồi --xoa (tra cứu thư mục mặc định) vẫn thấy bản đó", async () => {
+    const client = taoClientGia({ customers: [{ id: 1 }, { id: 2 }] });
+    const tong = await xuatSaoLuu(client, ["customers"], thuMucX);
+
+    // Đây là dòng NỐI hai bước — xoá nó đi thì ca dưới phải đỏ (kiểm ngược).
+    ghiMocSaoLuuGanNhat(gocMacDinh, thuMucX);
+
+    const tim = sanLuuGanNhatTrongThuMuc(gocMacDinh);
+    expect(tim).not.toBeNull();
+    expect(tim?.tongSoDong).toBe(tong.tongSoDong);
+    expect(tim?.duongDan).toBe(path.resolve(thuMucX));
+  });
+
+  it("KHÔNG ghi tệp mốc thì --xoa (tra cứu thư mục mặc định) KHÔNG thấy bản sao lưu ở thư mục X", async () => {
+    // Đây chính là hành vi lỗi A2 trước khi vá: hai thư mục không có gì nối
+    // với nhau. Ca này chứng minh ghiMocSaoLuuGanNhat() ở ca trên thật sự là
+    // phần bắt buộc, không phải phép thử giả — bỏ nó đi thì --xoa mù.
+    const client = taoClientGia({ customers: [{ id: 1 }] });
+    await xuatSaoLuu(client, ["customers"], thuMucX);
+
+    const tim = sanLuuGanNhatTrongThuMuc(gocMacDinh);
+    expect(tim).toBeNull();
+  });
+
+  it("docMocSaoLuuGanNhat trả null khi bản sao lưu bị xoá sau khi ghi mốc", async () => {
+    const client = taoClientGia({ customers: [{ id: 1 }] });
+    await xuatSaoLuu(client, ["customers"], thuMucX);
+    ghiMocSaoLuuGanNhat(gocMacDinh, thuMucX);
+
+    fs.rmSync(thuMucX, { recursive: true, force: true });
+
+    expect(docMocSaoLuuGanNhat(gocMacDinh)).toBeNull();
+  });
+
+  it("--tu <thư mục> đọc thẳng bản sao lưu tại đó, không cần tệp mốc", async () => {
+    const client = taoClientGia({ customers: [{ id: 1 }, { id: 2 }, { id: 3 }] });
+    const tong = await xuatSaoLuu(client, ["customers"], thuMucX);
+
+    const tim = docBanSaoLuuTaiThuMuc(thuMucX);
+    expect(tim).not.toBeNull();
+    expect(tim?.tongSoDong).toBe(tong.tongSoDong);
+  });
+
+  it("--tu trỏ vào thư mục không có bản sao lưu -> null", () => {
+    const rong = fs.mkdtempSync(path.join(os.tmpdir(), "bb300-rong-"));
+    try {
+      expect(docBanSaoLuuTaiThuMuc(rong)).toBeNull();
+    } finally {
+      fs.rmSync(rong, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("khoiPhucGiaoDich / banGiuLieuKhongRong — khôi phục từ bản sao lưu", () => {
+  it("banGiuLieuKhongRong chỉ liệt kê bảng có dòng", () => {
+    expect(banGiuLieuKhongRong({ customers: 0, galleries: 3, photos: 0 })).toEqual(["galleries"]);
+    expect(banGiuLieuKhongRong({ customers: 0, galleries: 0 })).toEqual([]);
+  });
+
+  it("khoiPhucGiaoDich chèn lại đúng số dòng, theo thứ tự gốc trước lá sau, trong một giao dịch", async () => {
+    const thuMuc = fs.mkdtempSync(path.join(os.tmpdir(), "bb300-khoi-phuc-"));
+    try {
+      fs.writeFileSync(
+        path.join(thuMuc, "customers.json"),
+        JSON.stringify([{ id: "c1", full_name: "Fixture Khách A" }]),
+      );
+      fs.writeFileSync(
+        path.join(thuMuc, "galleries.json"),
+        JSON.stringify([{ id: "g1", customer_id: "c1", title: "Fixture Bộ 1" }]),
+      );
+      const client = taoClientGia({ customers: [], galleries: [] });
+      const thuTu = ["galleries", "customers"]; // lá trước — đảo lại để kiểm thứ tự chèn
+      const dem = await khoiPhucGiaoDich(client, [...thuTu].reverse(), thuMuc);
+      expect(dem).toEqual({ customers: 1, galleries: 1 });
+
+      const lenh = (client as unknown as { lenhDaGoi: string[] }).lenhDaGoi;
+      expect(lenh[0]).toBe("begin");
+      expect(lenh[lenh.length - 1]).toBe("commit");
+      const iCustomers = lenh.findIndex((l) => /^insert into "customers"/i.test(l));
+      const iGalleries = lenh.findIndex((l) => /^insert into "galleries"/i.test(l));
+      expect(iCustomers).toBeGreaterThan(-1);
+      expect(iCustomers).toBeLessThan(iGalleries); // customers (gốc) chèn TRƯỚC galleries (lá)
+    } finally {
+      fs.rmSync(thuMuc, { recursive: true, force: true });
+    }
+  });
+
+  it("khoiPhucGiaoDich bỏ qua bảng không có tệp, không coi là lỗi", async () => {
+    const thuMuc = fs.mkdtempSync(path.join(os.tmpdir(), "bb300-khoi-phuc-thieu-"));
+    try {
+      const client = taoClientGia({ customers: [] });
+      const dem = await khoiPhucGiaoDich(client, ["customers", "galleries"], thuMuc);
+      expect(dem).toEqual({ customers: 0, galleries: 0 });
+    } finally {
+      fs.rmSync(thuMuc, { recursive: true, force: true });
+    }
+  });
+
+  it("khoiPhucGiaoDich rollback khi một lượt chèn lỗi giữa chừng", async () => {
+    const thuMuc = fs.mkdtempSync(path.join(os.tmpdir(), "bb300-khoi-phuc-loi-"));
+    try {
+      fs.writeFileSync(path.join(thuMuc, "customers.json"), JSON.stringify([{ id: "c1" }]));
+      const client = taoClientGia({ customers: [] });
+      const goiGoc = client.query.bind(client);
+      let daGoiRollback = false;
+      client.query = async (sql: string, tso?: unknown[]) => {
+        if (/^insert into "customers"/i.test(sql)) throw new Error("giả lập lỗi Postgres");
+        if (/^rollback$/i.test(sql)) daGoiRollback = true;
+        return goiGoc(sql, tso);
+      };
+      await expect(khoiPhucGiaoDich(client, ["customers"], thuMuc)).rejects.toThrow("giả lập lỗi Postgres");
+      expect(daGoiRollback).toBe(true);
+    } finally {
+      fs.rmSync(thuMuc, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("chayNap — dừng ở bước lỗi đầu tiên", () => {
-  it("chạy đủ 4 bước theo đúng thứ tự phụ thuộc thật khi mọi bước thành công", () => {
+  it("chạy đủ 5 bước theo đúng thứ tự phụ thuộc thật khi mọi bước thành công (BB-311: thêm bước đồng bộ Drive)", () => {
     const goiThuTu: string[] = [];
     const runner = (lenh: string, tso: string[]) => {
       goiThuTu.push(tso.join(" "));
@@ -380,7 +525,15 @@ describe("chayNap — dừng ở bước lỗi đầu tiên", () => {
       "hậu kỳ (khách / bộ ảnh)",
       "hợp đồng (dòng hàng)",
       "chỉnh sửa (retouch)",
+      "ảnh (đồng bộ Drive)",
     ]);
+    // Bước cuối phải gọi đúng script đồng bộ Drive, tuần tự (--luong 1) và có
+    // nghỉ giữa hai bộ (--nghi-ms) — không phải lệnh mặc định 3 luồng.
+    const buocAnh = goiThuTu[goiThuTu.length - 1] ?? "";
+    expect(buocAnh).toContain("sync-drive.ts");
+    expect(buocAnh).toContain("--tat-ca");
+    expect(buocAnh).toContain("--luong 1");
+    expect(buocAnh).toContain("--nghi-ms 300");
   });
 
   it("dừng ngay khi bước thứ hai lỗi, không chạy bước ba và bốn", () => {

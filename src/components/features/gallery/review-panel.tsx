@@ -82,8 +82,6 @@ export function ReviewPanel({
   review,
   hotline,
   onDecide,
-  choPhepTai = false,
-  onTaiCaBo,
 }: {
   status: string;
   /**
@@ -107,15 +105,6 @@ export function ReviewPanel({
   review: ReviewData;
   hotline: string;
   onDecide: (decision: "approve" | "revise", note?: string) => Promise<void>;
-  /**
-   * BB-295 mục #15 — báo cáo chấm độc lập: trạng thái "đã giao" cần một khối
-   * "Ảnh đã hoàn thiện" có nút "Tải cả bộ" rõ ràng, không chỉ một dòng tiêu
-   * đề. Chỉ hiện nút khi app THẬT SỰ có đường tải cả bộ cho bộ ảnh này
-   * (`choPhepTai` — `gallery.options.download === true`, đã có sẵn từ
-   * BB-156) — không tự thêm nút cho một khả năng không tồn tại.
-   */
-  choPhepTai?: boolean;
-  onTaiCaBo?: () => void;
 }) {
   const [writing, setWriting] = React.useState(false);
   const [note, setNote] = React.useState("");
@@ -141,7 +130,16 @@ export function ReviewPanel({
   // cùng `nhanTienDo` với tiêu đề thẻ hành trình nên mới thật sự lặp lại
   // nguyên văn. Nhánh `awaiting_approval`/đã duyệt dùng câu RIÊNG của khung
   // này (không đọc `nhanTienDo`), không lặp, nên vẫn hiện như cũ.
-  const anCauTrangThai = coTheHanhTrinh && status === "in_retouch";
+  //
+  // BB-310 mục 3 — báo cáo chấm độc lập vòng 4: màn "Đã giao" có tới 4 thẻ
+  // đứng trước lưới ảnh (bản vẽ `babybean-assets/BB-297/da-giao-*.png` chỉ
+  // vẽ bìa rồi thẳng xuống lưới), trong đó khung này góp một thẻ "Ảnh đã
+  // hoàn thiện" TRÙNG với huy hiệu + tiêu đề bìa (`bia-bo-anh.tsx`, nhánh
+  // `trangThai === "delivered"`) vừa hiện ngay phía trên. Gộp `delivered`
+  // vào cùng cơ chế "câu đã có nơi khác nói rồi" — khung này chỉ còn hiện
+  // khi CÒN THÔNG TIN THẬT SỰ MỚI (link Drive, lịch sử vòng sửa), không tự
+  // vẽ lại tiêu đề/nút tải đã có ở bìa.
+  const anCauTrangThai = (coTheHanhTrinh && status === "in_retouch") || status === "delivered";
 
   // BB-295 mục #14 — không vẽ thẻ khi không có nội dung (xem hàm thuần
   // `coNoiDungDeVe` ở trên và phép thử `tests/unit/bb-295-review-panel.test.ts`).
@@ -186,20 +184,12 @@ export function ReviewPanel({
       )}
 
       {/*
-        BB-295 mục #15 — nút "Tải cả bộ" chỉ hiện khi bộ ảnh đã giao VÀ app
-        thật sự có đường tải cả bộ (`choPhepTai`, đã nối với `onTaiCaBo` sẵn có
-        từ BB-156 — không phải nút mới không nối vào đâu).
+        BB-310 mục 3 — báo cáo chấm độc lập vòng 4: "Tải cả bộ" hiện HAI LẦN
+        trên màn Đã giao (đây, và nút chính hero của bìa —
+        `bia-bo-anh.tsx` nhánh `trangThai === "delivered"`, dùng đúng cùng
+        `choPhepTai`/`onTaiCaBo`). Bìa luôn đứng TRƯỚC khung này trên trang
+        nên nó luôn là bản trùng — bỏ hẳn, chỉ còn MỘT nút duy nhất ở bìa.
       */}
-      {status === "delivered" && choPhepTai && onTaiCaBo && (
-        <button
-          type="button"
-          onClick={onTaiCaBo}
-          data-testid="nut-tai-ca-bo-da-giao"
-          className="h-11 rounded-full bg-[#2e2a27] px-5 text-sm font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
-        >
-          Tải cả bộ
-        </button>
-      )}
 
       {canDecide && !review.finalDriveUrl && (
         <p className="text-xs text-heart">

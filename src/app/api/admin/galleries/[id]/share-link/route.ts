@@ -78,7 +78,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiLinkAppVeLark, diaChiDayDu } from "@/lib/lark/ghi-link-app";
 import { maHoaMaLink } from "@/lib/auth/ma-link";
 import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
-import { lamNongMotLo } from "@/lib/drive/lam-nong-cache";
+import { lamNongAnhBia } from "@/lib/drive/lam-nong-cache";
 import { qua60NgayFileGoc } from "@/lib/lark/trang-thai-hau-ky";
 
 export const runtime = "nodejs";
@@ -333,28 +333,23 @@ export async function POST(
       }),
     );
 
-    // --- BB-286: làm nóng ĐÚNG MỘT LÔ bộ đệm ảnh cỡ 800, CHẠY NỀN, sau khi
-    // phản hồi đã rời máy chủ.
+    // --- BB-286, đơn giản hoá BB-311 mục A: làm nóng ẢNH BÌA, CHẠY NỀN, sau
+    // khi phản hồi đã rời máy chủ.
     //
-    // CHỈ MỘT LÔ (40 ảnh, không lặp): giả định hạ tầng là gói Hobby, và
-    // after() tính vào cùng thời lượng hàm với phần phản hồi — lặp tới khi
-    // xong cả bộ (có thể 1.235 ảnh) ở đây dễ vượt quá `maxDuration` của
-    // Hobby. Một lô đã đủ lo trước ĐÚNG những tấm khách nhìn thấy ở màn hình
-    // đầu tiên (lưới ảnh không tải hết 1.235 tấm cùng lúc). Muốn nong HẾT cả
-    // bộ thì bấm "Làm nóng ảnh" ở màn chi tiết — route đó để trình duyệt tự
-    // lặp lại, không bị giới hạn bởi thời lượng MỘT hàm.
-    //
-    // Hỏng ở đây chỉ log: link đã tạo xong, CSKH đã cầm được link.
+    // Từ 28/09/2026 lưới ảnh KHÔNG còn đệm (xem `/api/img/[photoId]/route.ts`)
+    // — chỉ còn đúng MỘT ảnh (bìa) × hai cỡ (1600, 2048) đáng làm nóng, không
+    // còn cần cơ chế lô/con trỏ của `lamNongMotLo` (giữ lại, không xoá, nhưng
+    // không còn nơi nào gọi). Hỏng ở đây chỉ log: link đã tạo xong, CSKH đã
+    // cầm được link.
     const chayLamNongNen = async () => {
       try {
-        const ketQua = await lamNongMotLo(admin, galleryId, 0, requestId);
+        const ketQua = await lamNongAnhBia(admin, galleryId, requestId);
         if (ketQua.dungVìQuota) {
           console.info(
             JSON.stringify({
               evt: "lam_nong.dung_vi_quota",
               requestId,
               galleryId,
-              conTro: ketQua.conTroTiep,
             }),
           );
         }

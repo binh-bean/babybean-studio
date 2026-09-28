@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "../styles/tokens.css";
 
+/* Khoá bảng màu kem cho cả app (admin 28/09): ô nhập, thanh cuộn, lịch của trình duyệt cũng giữ tông sáng. */
+:root {
+  color-scheme: light;
+}
+
 body {
   background: var(--bb-bg);
   color: var(--bb-fg);

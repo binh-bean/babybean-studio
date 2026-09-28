@@ -38,6 +38,7 @@ import { moTaLoi } from "@/lib/drive/sync-gallery";
 import { DriveAccessDeniedError } from "@/lib/drive/client";
 import { GetCanXuLyQuerySchema } from "./schema";
 import { CANH_BAO_LARK } from "@/lib/lark/trang-thai-hau-ky";
+import { layDanhSachChoXuLyMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 
 export const runtime = "nodejs";
 
@@ -116,7 +117,7 @@ export async function GET(request: Request): Promise<Response> {
       targetBranchIds = staff.branchIds;
       // Không gán chi nhánh nào thì không thấy bộ ảnh nào — không phải lỗi.
       if (targetBranchIds.length === 0) {
-        return ok({ driveChuaChiaSe: [], chuaCoAnh: [], chuaCoHanMuc: [], canhBaoLark: 0 });
+        return ok({ driveChuaChiaSe: [], chuaCoAnh: [], chuaCoHanMuc: [], canhBaoLark: 0, choMoLai: 0 });
       }
     }
 
@@ -182,11 +183,17 @@ export async function GET(request: Request): Promise<Response> {
       .neq("status", "archived");
     if (targetBranchIds) qCanhBao = qCanhBao.in("branch_id", targetBranchIds);
 
-    const [resDrive, resRong, resHanMuc, resCanhBao] = await Promise.all([
+    // 4e. BB-312 — bộ ảnh đang có yêu cầu "xin mở lại" CHƯA XỬ LÝ. Cùng công
+    // thức với tab "Yêu cầu mở lại" (/admin/viec-can-xu-ly) — một chỗ tính,
+    // không lệch giữa huy hiệu và trang chi tiết (BB-283).
+    const choMoLaiPromise = layDanhSachChoXuLyMoLai(admin, targetBranchIds);
+
+    const [resDrive, resRong, resHanMuc, resCanhBao, choMoLai] = await Promise.all([
       qDrive,
       qRong,
       qChuaCoHanMuc,
       qCanhBao,
+      choMoLaiPromise,
     ]);
 
     if (resDrive.error) return failUnexpected(resDrive.error, requestId);
@@ -219,6 +226,7 @@ export async function GET(request: Request): Promise<Response> {
       chuaCoAnh,
       chuaCoHanMuc: chuaCoHanMuc.map(chuyenHang),
       canhBaoLark: resCanhBao.count ?? 0,
+      choMoLai: choMoLai.length,
     });
   } catch (err) {
     if (err instanceof AuthError) {

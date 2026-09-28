@@ -220,6 +220,29 @@ function buildContractTree(contractCode, invoiceLines, components, productByLark
  *
  * Chỉ xoá dòng CỦA HỢP ĐỒNG NÀY (lark_contract_code), không đụng dòng của hợp
  * đồng khác trong cùng album — một album có thể gom nhiều hợp đồng.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-313 mục 2 — không ghi đè dòng CSKH vừa sửa tay
+ * ---------------------------------------------------------------------------
+ * Màn chi tiết bộ ảnh (`/api/admin/galleries/[id]/items` PATCH) cho CSKH sửa
+ * số lượng một dòng — ví dụ khách mua thêm 1 file chỉnh sửa, "Edit file x15"
+ * thành "x16". Route đó "TÁCH" dòng vừa sửa khỏi hợp đồng bằng cách xoá
+ * `lark_contract_code` (giữ nguyên `lark_record_id`, cột UNIQUE, làm dấu vết)
+ * — nên câu `delete ... where lark_contract_code = $2` ở trên KHÔNG xoá được
+ * dòng đã tách. Nhưng nếu vòng lặp dưới đây cứ INSERT một dòng MỚI cho đúng
+ * `lark_record_id` đó (Lark vẫn "nói" dòng x15 tồn tại), sẽ vỡ ràng buộc
+ * UNIQUE(lark_record_id) — hoặc tệ hơn nếu ai đó lỡ bỏ ràng buộc đó, ĐẾM LẶP
+ * hạn mức (16 dòng tách + 15 dòng Lark = 31, sai).
+ *
+ * Sửa: tra trước NHỮNG `lark_record_id` sắp ghi đã có sẵn trong CHÍNH ALBUM
+ * này chưa (không cần lọc theo hợp đồng — cột này UNIQUE toàn bảng) — có rồi
+ * thì BỎ QUA, dùng lại id dòng đã có làm `parent_item_id` cho con của nó thay
+ * vì chèn thêm. Một dòng cha bị tách kéo theo: các dòng CON CHƯA AI SỬA của nó
+ * (còn `lark_contract_code`) vẫn bị xoá/ghi lại đúng số Lark như thường —
+ * route PATCH tách CẢ dòng cha lẫn dòng con vừa sửa cùng lúc (xem chú thích ở
+ * đó, tránh cascade xoá theo `parent_item_id ... on delete cascade`), nên chỉ
+ * đúng CỤM đã có người sửa mới ngừng nhận cập nhật từ Lark — cụm khác của
+ * cùng album vẫn đồng bộ bình thường.
  */
 async function writeGallery(client, galleryId, contractCode, parents) {
   await client.query(
@@ -227,28 +250,56 @@ async function writeGallery(client, galleryId, contractCode, parents) {
     [galleryId, contractCode],
   );
 
+  const larkIdsSapGhi = [
+    ...parents.map((p) => p.larkRecordId),
+    ...parents.flatMap((p) => p.children.map((c) => c.larkRecordId)),
+  ].filter(Boolean);
+  const { rows: dongDaCo } = larkIdsSapGhi.length
+    ? await client.query(
+        `select id, lark_record_id from gallery_items where gallery_id = $1 and lark_record_id = any($2::text[])`,
+        [galleryId, larkIdsSapGhi],
+      )
+    : { rows: [] };
+  const idTheoLarkRecordId = new Map(dongDaCo.map((r) => [r.lark_record_id, r.id]));
+
   let written = 0;
+  let boQuaDaSuaTay = 0;
   for (const p of parents) {
-    const { rows } = await client.query(
-      `insert into gallery_items
-         (gallery_id, product_id, parent_item_id, quantity, unit_price, line_total,
-          lark_contract_code, lark_record_id)
-       values ($1,$2,null,$3,$4,$5,$6,$7)
-       returning id`,
-      [galleryId, p.productId, p.quantity, p.unitPrice, p.lineTotal, contractCode, p.larkRecordId],
-    );
-    written += 1;
+    let parentId = idTheoLarkRecordId.get(p.larkRecordId);
+    if (parentId) {
+      boQuaDaSuaTay += 1;
+    } else {
+      const { rows } = await client.query(
+        `insert into gallery_items
+           (gallery_id, product_id, parent_item_id, quantity, unit_price, line_total,
+            lark_contract_code, lark_record_id)
+         values ($1,$2,null,$3,$4,$5,$6,$7)
+         returning id`,
+        [galleryId, p.productId, p.quantity, p.unitPrice, p.lineTotal, contractCode, p.larkRecordId],
+      );
+      parentId = rows[0].id;
+      written += 1;
+    }
 
     for (const c of p.children) {
+      if (idTheoLarkRecordId.has(c.larkRecordId)) {
+        boQuaDaSuaTay += 1;
+        continue;
+      }
       await client.query(
         `insert into gallery_items
            (gallery_id, product_id, parent_item_id, quantity, unit_price, line_total,
             lark_contract_code, lark_record_id)
          values ($1,$2,$3,$4,null,null,$5,$6)`,
-        [galleryId, c.productId, rows[0].id, c.quantity, contractCode, c.larkRecordId],
+        [galleryId, c.productId, parentId, c.quantity, contractCode, c.larkRecordId],
       );
       written += 1;
     }
+  }
+  if (boQuaDaSuaTay > 0) {
+    console.log(
+      `   Giữ nguyên ${boQuaDaSuaTay} dòng CSKH đã sửa tay (không ghi đè bằng số Lark).`,
+    );
   }
   return written;
 }

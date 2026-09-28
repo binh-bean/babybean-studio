@@ -32,8 +32,9 @@ import { PageHeader } from "./page-header";
 import { LoiDongBoReport } from "./loi-dong-bo-report";
 import { LinkSapHetHanReport } from "./link-sap-het-han-report";
 import { OverQuotaReport } from "./over-quota-report";
+import { YeuCauMoLaiReport } from "./yeu-cau-mo-lai-report";
 
-type TabValue = "loi-dong-bo" | "link-sap-het-han" | "over-quota";
+type TabValue = "loi-dong-bo" | "link-sap-het-han" | "over-quota" | "yeu-cau-mo-lai";
 
 interface DinhNghiaTab {
   value: TabValue;
@@ -80,10 +81,24 @@ const TABS: DinhNghiaTab[] = [
       return d?.items?.length ?? 0;
     },
   },
+  {
+    // BB-312 — cùng nguồn với huy hiệu "Cần xử lý ngay"
+    // (src/lib/utils/can-xu-ly.ts → choMoLai), một công thức, một chỗ (BB-283).
+    value: "yeu-cau-mo-lai",
+    label: "Yêu cầu mở lại",
+    api: "/api/admin/reports/yeu-cau-mo-lai",
+    hiddenForRoles: ["photoshop_ctv"],
+    demSo: (data) => {
+      const d = data as { items?: unknown[] } | null;
+      return d?.items?.length ?? 0;
+    },
+  },
 ];
 
 function laTabHopLe(v: string | null): v is TabValue {
-  return v === "loi-dong-bo" || v === "link-sap-het-han" || v === "over-quota";
+  return (
+    v === "loi-dong-bo" || v === "link-sap-het-han" || v === "over-quota" || v === "yeu-cau-mo-lai"
+  );
 }
 
 export function ViecCanXuLy({ role }: { role?: string }) {
@@ -162,6 +177,11 @@ export function ViecCanXuLy({ role }: { role?: string }) {
         {tabsChoVai.some((t) => t.value === "over-quota") && (
           <TabsContent value="over-quota">
             <OverQuotaReport />
+          </TabsContent>
+        )}
+        {tabsChoVai.some((t) => t.value === "yeu-cau-mo-lai") && (
+          <TabsContent value="yeu-cau-mo-lai">
+            <YeuCauMoLaiReport />
           </TabsContent>
         )}
       </Tabs>

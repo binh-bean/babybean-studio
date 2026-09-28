@@ -14,6 +14,7 @@ import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { ChuongThongBao } from "@/components/features/gallery/chuong-thong-bao";
+import { YeuCauMoLaiTrangThai } from "@/components/features/gallery/yeu-cau-mo-lai-trang-thai";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
@@ -83,7 +84,7 @@ const SoSanhAnh = dynamic(() => import("@/components/features/gallery/so-sanh-an
 });
 import { Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, tinhTenBiaTuDuLieu } from "@/lib/utils/dinh-dang";
 import { layerMoVuong } from "@/lib/utils/tranh-tan-nen";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
@@ -120,6 +121,13 @@ interface GalleryApiResponse {
   /** BB-285 — luật 60 ngày (docs/21 GĐ1): file gốc coi như đã bị xoá. */
   quaHan60Ngay?: boolean;
   babyName: string | null;
+  /**
+   * BB-310 mục 6/7 — hai trường THÔ (không gộp sẵn như `babyName`), để
+   * `tinhTenBiaTuDuLieu()` tự quyết định tên gọi lớn (nickname, hay chữ cuối
+   * họ tên đầy đủ khi mất nickname) và họ tên đầy đủ cho dòng phụ nhỏ.
+   */
+  babyNickname?: string | null;
+  babyFullName?: string | null;
   /** BB-212: tên khách hàng đứng bộ ảnh — điền sẵn ô "người xác nhận" lúc chốt. */
   customerName?: string | null;
   shootDate: string | null;
@@ -202,6 +210,18 @@ interface GalleryApiResponse {
   }>;
   // Vòng duyệt ảnh đã chỉnh. null khi bộ ảnh chưa tới bước đó.
   review?: ReviewData | null;
+  /**
+   * BB-312 — trạng thái "xin mở lại" của CHÍNH bộ ảnh này (khác `review` ở
+   * trên: đó là vòng duyệt ẢNH ĐÃ CHỈNH). `khong_co` = chưa từng xin.
+   */
+  reopenRequest?: {
+    trangThai: "khong_co" | "cho_xu_ly" | "da_mo" | "bi_tu_choi";
+    lucGuiGanNhat: string | null;
+    lyDoKhach: string | null;
+    lyDoTuChoi: string | null;
+    lucXuLy: string | null;
+    lanThu: number;
+  } | null;
   /**
    * Dải quảng cáo của studio, hiện ở khoảng trống bên tấm ảnh đang xem lớn.
    * `null` khi chủ studio chưa đặt ảnh trong màn Cài đặt.
@@ -1405,12 +1425,16 @@ export function GalleryApp({ token }: GalleryAppProps) {
       setXinSuaLai(false);
       setLyDoSuaLai("");
       setStatusMessage(json?.data?.loiNhan ?? "Bên mình đã nhận yêu cầu của ba mẹ.");
+      // BB-312 — tải lại để `gallery.reopenRequest` chuyển sang "cho_xu_ly":
+      // nút chính đổi nhãn "Đã gửi yêu cầu · lần N" và dải trạng thái hiện ra,
+      // không phải đợi khách tự tải lại trang mới thấy.
+      await loadGallery({ silent: true });
     } catch {
       setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
     } finally {
       setDangXin(false);
     }
-  }, [lyDoSuaLai]);
+  }, [lyDoSuaLai, loadGallery]);
 
   const datAnhVaoAlbum = useCallback(
     async (photoId: string, addonId: string, dat: boolean) => {
@@ -1462,6 +1486,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
           setStatusMessage(json?.error?.message ?? "Không lưu được ảnh bìa, ba mẹ thử lại giúp.");
           return;
         }
+        // BB-310 mục 2 — báo cáo chấm độc lập vòng 4: chọn bìa xong mở lại
+        // hộp chốt, nút Xác nhận còn khoá thêm 3,8–7,6 giây vì hộp chốt đọc
+        // `albumThieuBia` từ `gallery.albumBia`, mà trước đây chỗ này chỉ
+        // cập nhật field đó SAU khi `loadGallery` tải lại TOÀN BỘ. Vá NGAY
+        // tại đây — LẠC QUAN, đúng field hộp chốt đọc — ngay khi máy chủ xác
+        // nhận lưu xong, không chờ vòng tải lại (vẫn chạy dưới để đối chiếu
+        // lại toàn bộ dữ liệu như cũ).
+        setGallery((g) =>
+          g
+            ? {
+                ...g,
+                albumBia: (g.albumBia ?? []).map((a) =>
+                  a.galleryItemId === galleryItemId ? { ...a, coverPhotoId: photoId } : a,
+                ),
+              }
+            : g,
+        );
         // BB-287 — tải lại NGẦM: giữ nguyên lưới ảnh và vị trí cuộn, không xoá
         // cả trang thành "Đang tải…" cho một thao tác đổi ảnh bìa (mục #24).
         await loadGallery({ silent: true });
@@ -1483,9 +1524,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
     // Tính lại tại chỗ (không dùng biến `hanMuc` — khai báo bên dưới điểm
     // này trong hàm, tới sau nhánh `if (loading)`).
     const hanMucChot = gallery.quotaKnown ? (gallery.includedQuota ?? 0) : null;
+    // BB-310 mục 6 — dùng chung `tinhTenBiaTuDuLieu()` với bìa/đã giao/đầu
+    // lưới, để không bao giờ lệch tên gọi giữa các màn.
+    const tenBeChot = tinhTenBiaTuDuLieu(gallery.babyNickname, gallery.babyFullName);
     return (
       <CamOnSauChot
-        tenBe={gallery.babyName}
+        tenBe={tenBeChot || null}
         chotLuc={chotLuc ?? new Date()}
         soTamDaChon={selectionCounts.selectedCount}
         hanMuc={hanMucChot}
@@ -1597,6 +1641,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
   // `selectionCounts.selectedCount` — CÙNG MỘT NGUỒN với thanh chọn và bìa —
   // để "Tất cả"/"Đã chọn"/"Chưa chọn" luôn cộng đúng lại thành tổng số ảnh.
   const soChuaChon = photos.length - selectionCounts.selectedCount;
+  // BB-310 mục 6/7 — NGUỒN DUY NHẤT cho tên gọi bé ở màn khách (bìa, đầu
+  // lưới; "cảm ơn"/"đã giao" tính riêng ở nhánh return sớm của chúng vì
+  // `gallery` chưa chắc còn giữ tham chiếu này lúc đó). Chỉ đạo admin
+  // 28/09/2026: còn nickname thì dùng nguyên nickname (qua `tenGoiBe`); mất
+  // nickname thì bìa in NGUYÊN HỌ TÊN ĐẦY ĐỦ (không rút gọn, không thêm
+  // "Bé ") — `bia-bo-anh.tsx` tự co cỡ chữ theo độ dài (`coChuTieuDeBia`).
+  const tenBeHienThi = tinhTenBiaTuDuLieu(gallery.babyNickname, gallery.babyFullName);
   const anhBia = gallery.coverPhotoId
     ? { id: gallery.coverPhotoId }
     : photos[0]
@@ -1619,7 +1670,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
       ? // Đã chốt, CSKH chưa xác nhận: mở lại là việc của chính ba mẹ.
         { nhan: "Chọn thêm ảnh", onClick: () => setMoKhoaChon(true) }
       : // Đã khoá thật: không sửa thẳng được, nhưng phải có ĐƯỜNG NÓI.
-        { nhan: "Yêu cầu sửa lại", onClick: () => setXinSuaLai(true) };
+        // BB-312 — đang có yêu cầu CHƯA XỬ LÝ thì nhãn nói rõ, tránh cảm
+        // giác "bấm gửi yêu cầu mới" khi thật ra chỉ có chỗ xem lại trạng
+        // thái (hộp thoại tự ẩn ô viết/nút gửi khi đang chờ, xem bên dưới).
+        gallery.reopenRequest?.trangThai === "cho_xu_ly"
+          ? { nhan: `Đã gửi yêu cầu · lần ${gallery.reopenRequest.lanThu}`, onClick: () => setXinSuaLai(true) }
+          : { nhan: "Yêu cầu sửa lại", onClick: () => setXinSuaLai(true) };
 
   /*
     BB-258 — chủ studio 26/09/2026: "Bộ ảnh đã được ghi nhận yêu cầu" hiện HAI
@@ -1830,7 +1886,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         <BiaBoAnh
           anhBia={anhBia}
           coverHeadline={gallery.coverHeadline ?? null}
-          tenBe={gallery.babyName}
+          tenBe={tenBeHienThi || null}
           sessionType={gallery.sessionType}
           ngayChup={gallery.shootDate}
           chiNhanh={gallery.branch.name}
@@ -2009,7 +2065,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               buổi chụp".
             */}
             <span className="hidden shrink-0 whitespace-nowrap text-[13px] text-muted-foreground lg:inline">
-              {gallery.babyName?.trim() || "Khoảnh khắc của con"}
+              {tenBeHienThi || "Khoảnh khắc của con"}
             </span>
 
             <div className="flex shrink-0 items-center gap-3 lg:ml-10">
@@ -2136,7 +2192,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
       */}
 
       {/* Thông báo trạng thái bộ ảnh — chỉ hiện khi có điều cần nói. */}
-      {(gallery.review || isLocked || !gallery.quotaKnown || !duocChon) && (
+      {(gallery.review ||
+        isLocked ||
+        !gallery.quotaKnown ||
+        !duocChon ||
+        (gallery.reopenRequest && gallery.reopenRequest.trangThai !== "khong_co")) && (
         <div className="mx-auto max-w-3xl space-y-3 px-4 pt-5">
           {gallery.review && (
             <ReviewPanel
@@ -2146,10 +2206,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
               review={gallery.review}
               hotline={gallery.branch.hotline}
               onDecide={decideReview}
-              choPhepTai={choPhepTai}
-              onTaiCaBo={taiCaBo}
             />
           )}
+
+          {/* BB-312 — "đã gửi yêu cầu / studio đã mở lại / studio từ chối kèm
+              lý do", cùng số lần đã xin. Đứng NGOÀI hộp thoại "Yêu cầu sửa
+              lại" (form gửi yêu cầu MỚI) — dải này luôn hiện, kể cả sau khi
+              bộ ảnh đã hết khoá (nút gửi yêu cầu biến mất, nhưng ba mẹ vẫn
+              cần biết vừa xảy ra chuyện gì). */}
+          <YeuCauMoLaiTrangThai
+            reopenRequest={gallery.reopenRequest}
+            hotline={gallery.branch.hotline}
+            zaloOa={gallery.branch.zaloOa}
+          />
 
           {/* Người chỉ xem (link mời ông bà) không gửi được yêu cầu theo luật
               BB-245 (đã duyệt, không vòng sửa) — route trả 403/409 nếu bấm
@@ -2217,7 +2286,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
             </div>
           )}
 
-          {isLocked && (
+          {/*
+            BB-310 mục 3 — báo cáo chấm độc lập vòng 4: màn Đã giao có 4 thẻ
+            thừa đứng trước lưới ảnh, khác hẳn bố cục bản vẽ
+            `babybean-assets/BB-297/da-giao-*.png` (bìa rồi thẳng xuống
+            lưới). Thẻ này là một trong số đó: bìa (`bia-bo-anh.tsx`, nhánh
+            "delivered") đã tự nói "Đã hoàn thiện", còn câu "Chọn thêm ảnh"
+            bên dưới còn SAI hẳn — không còn sửa được sau khi đã giao.
+          */}
+          {isLocked && gallery.status !== "delivered" && (
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-4">
               <Lock className="mt-0.5 h-[18px] w-[18px] shrink-0 text-muted-foreground" />
               <div className="text-sm">
@@ -2458,7 +2535,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
           Tim của ông bà vốn đã không cộng vào `selectionCounts` (route chặn ở
           `EDITING_ROLES`), nhưng bản thân thanh này vẫn là CỦA BA MẸ.
         */
-        duocChon && (
+        // BB-310 mục 3 — báo cáo chấm độc lập vòng 4: màn Đã giao vẫn hiện
+        // "Còn 5 · Yêu cầu sửa lại" ở đáy, sai cả hai vế sau khi đã giao
+        // (không còn gì "còn thiếu" để chọn, và "Yêu cầu sửa lại" là luồng
+        // của lúc duyệt ảnh chỉnh). Bản vẽ `da-giao-*.png` không có thanh
+        // đáy — bỏ hẳn khi đã giao.
+        duocChon && gallery.status !== "delivered" && (
         <ThanhChon
           an={thanhNoiAn}
           daChon={selectionCounts.selectedCount}
@@ -2640,37 +2722,70 @@ export function GalleryApp({ token }: GalleryAppProps) {
           <div className="w-full max-h-[88svh] overflow-y-auto rounded-t-[28px] bg-surface p-6 pb-[max(24px,env(safe-area-inset-bottom))] shadow-2xl animate-in slide-in-from-bottom duration-300 sm:max-w-md sm:rounded-3xl sm:p-7 sm:pb-7 sm:slide-in-from-bottom-4">
             <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
             <h3 className="kh-h2">Yêu cầu sửa lại</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Bộ ảnh đã chuyển cho bên chỉnh ảnh nên ba mẹ không tự sửa được nữa. Ba mẹ ghi
-              giúp muốn sửa gì, bên mình xem còn kịp không rồi báo lại ngay ạ.
-            </p>
-            <textarea
-              value={lyDoSuaLai}
-              onChange={(e) => setLyDoSuaLai(e.target.value)}
-              maxLength={500}
-              rows={3}
-              placeholder="Ví dụ: em muốn đổi tấm số 12 sang tấm 15 giúp em"
-              className="mt-4 h-24 w-full resize-none rounded-2xl border border-border bg-background p-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
-            />
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setXinSuaLai(false)}
-                disabled={dangXin}
-                className="h-11 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-50"
-              >
-                {vi.common.cancel}
-              </button>
-              <button
-                type="button"
-                onClick={() => void guiXinSuaLai()}
-                disabled={dangXin || lyDoSuaLai.trim().length === 0}
-                className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
-              >
-                {dangXin && <Spinner className="h-4 w-4" />}
-                Gửi cho studio
-              </button>
-            </div>
+
+            {/*
+              BB-312 — đang có một yêu cầu CHƯA XỬ LÝ: đây chỉ còn là chỗ XEM
+              LẠI trạng thái, không phải form gửi mới (nút chính bên ngoài đã
+              đổi nhãn "Đã gửi yêu cầu · lần N" cho khớp). Không cho gửi
+              trùng — chỉ còn nút Đóng.
+            */}
+            {gallery.reopenRequest?.trangThai === "cho_xu_ly" ? (
+              <>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Bên mình đã nhận yêu cầu và sẽ liên hệ lại với ba mẹ sớm nhất.
+                </p>
+                <div className="mt-5 flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setXinSuaLai(false)}
+                    className="h-11 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  Bộ ảnh đã chuyển cho bên chỉnh ảnh nên ba mẹ không tự sửa được nữa. Ba mẹ ghi
+                  giúp muốn sửa gì, bên mình xem còn kịp không rồi báo lại ngay ạ.
+                </p>
+                {/* BB-312 — vừa bị từ chối thì nhắc lại lý do ngay trong form
+                    gửi lần mới, để ba mẹ không phải nhớ lại đã đọc ở đâu. */}
+                {gallery.reopenRequest?.trangThai === "bi_tu_choi" && gallery.reopenRequest.lyDoTuChoi && (
+                  <p className="mt-2 rounded-xl bg-[#fbf3e2] p-2.5 text-[13px] text-[#5c4413]">
+                    Lần trước studio phản hồi: {gallery.reopenRequest.lyDoTuChoi}
+                  </p>
+                )}
+                <textarea
+                  value={lyDoSuaLai}
+                  onChange={(e) => setLyDoSuaLai(e.target.value)}
+                  maxLength={500}
+                  rows={3}
+                  placeholder="Ví dụ: em muốn đổi tấm số 12 sang tấm 15 giúp em"
+                  className="mt-4 h-24 w-full resize-none rounded-2xl border border-border bg-background p-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
+                />
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setXinSuaLai(false)}
+                    disabled={dangXin}
+                    className="h-11 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-50"
+                  >
+                    {vi.common.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void guiXinSuaLai()}
+                    disabled={dangXin || lyDoSuaLai.trim().length === 0}
+                    className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                  >
+                    {dangXin && <Spinner className="h-4 w-4" />}
+                    Gửi cho studio
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -2885,9 +3000,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 >
                   {albumThieuBia.length > 0 && (
                     <div className="flex items-center justify-between gap-3">
+                      {/*
+                        BB-310 mục 2 — báo cáo chấm độc lập vòng 4: câu cũ
+                        "Còn thiếu ảnh bìa album" đứng ngay trên câu "để sau
+                        cũng được, CSKH sẽ hỏi lại" (dành cho sản phẩm thiếu
+                        ảnh, KHÔNG chặn) — đọc liền hai câu trong cùng một
+                        khối, ba mẹ hiểu nhầm bìa album cũng "để sau được".
+                        Quy tắc GIỮ NGUYÊN (bìa album vẫn BẮT BUỘC), chỉ đổi
+                        chữ cho rõ ràng, khớp với chữ dưới nút Xác nhận.
+                      */}
                       <p className="font-medium">
-                        Còn thiếu ảnh bìa album
-                        {albumThieuBia.length > 1 ? ` (${albumThieuBia.length})` : ""}
+                        Chọn một tấm làm bìa cuốn album để xác nhận
+                        {albumThieuBia.length > 1 ? ` (${albumThieuBia.length} cuốn)` : ""}
                       </p>
                       <button
                         type="button"
@@ -2992,7 +3116,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 */}
                 {!submitting && albumThieuBia.length > 0 && (
                   <p data-testid="ly-do-khoa-nut-chot" className="text-xs text-muted-foreground">
-                    Chọn bìa album để xác nhận
+                    Chọn một tấm làm bìa cuốn album để xác nhận
                   </p>
                 )}
                 {!submitting && albumThieuBia.length === 0 && tenXacNhan.trim().length === 0 && (

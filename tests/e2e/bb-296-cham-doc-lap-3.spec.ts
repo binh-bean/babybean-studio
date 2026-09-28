@@ -403,11 +403,15 @@ ownIpTest.describe("BB-296 mục #5: đã giao — không còn khối chọn bì
       // Khối "Chọn ảnh bìa album" (ChonBiaAlbum) không còn trong DOM khi khoá.
       await ownIpExpect(page.getByText("Chọn ảnh bìa album")).toHaveCount(0);
 
-      // Dòng trạng thái album trong TomTatSanPhamIn không còn tô đỏ (text-heart).
-      const dongAlbum = page.locator("li", { has: page.getByText(/Chưa có tấm nào trong cuốn này/) });
+      // BB-310 mục 3 — báo cáo chấm độc lập vòng 4: bỏ màu đỏ (BB-296) chưa
+      // đủ — chữ "Chưa có tấm nào…" (ngụ ý còn đang chờ) vẫn sai khi đã
+      // giao. Khoá thì dòng trạng thái đổi hẳn sang câu trung tính "Không có
+      // tấm nào trong cuốn" (không còn chữ "Chưa"), và vẫn không tô đỏ.
+      await ownIpExpect(page.getByText("Chưa có tấm nào trong cuốn này")).toHaveCount(0);
+      const dongAlbum = page.locator("li", { has: page.getByText(/Không có tấm nào trong cuốn/) });
       if ((await dongAlbum.count()) > 0) {
         const mau = await dongAlbum
-          .locator("p", { hasText: /Chưa có tấm nào/ })
+          .locator("p", { hasText: /Không có tấm nào/ })
           .evaluate((el) => getComputedStyle(el).color);
         // Màu heart (#C4645A) không được dùng khi đã khoá.
         pwExpect(mau).not.toBe("rgb(196, 100, 90)");

@@ -16,9 +16,15 @@
  * lại toán của `phong-anh.ts`) — mở thẳng tấm đó trong màn xem lớn đã có sẵn
  * đủ cử chỉ phóng to (chỗ gọi `onPhongTo` lo việc đó).
  *
- * Nền tối và mọi màu lấy từ `.giao-dien-khach` trong tokens.css, giống hệt
- * `photo-lightbox.tsx` — hai màn cùng là "đang xem ảnh lớn", chỉ khác đang
- * xem một tấm hay nhiều tấm.
+ * BB-310 mục 5 — báo cáo chấm độc lập vòng 4: nền tối `bg-bb-viewer-bg` (gần
+ * đen) đứng lạc giữa hệ màu KEM của toàn màn khách — "hai mảng tối lạc giữa
+ * hệ kem" cùng với tấm trượt "Tấm này dùng cho…" của `photo-lightbox.tsx`
+ * (đã đổi ở đó). Màn này đổi SANG cùng hệ kem: nền #F3EDE5 (khối chữ) hoặc
+ * #FBF7F2 (khối viền/nút), chữ mực #2E2A27 — CHỈ đổi các mảng CHROME (đầu
+ * trang, dải nhãn, thanh điều khiển, khe hở giữa các tấm); các nút nổi TRÊN
+ * ảnh (ghim, tim, mũi tên trượt) giữ nguyên nền tối bán trong suốt — ảnh bên
+ * dưới đổi màu tuỳ ý, nút nổi trên ảnh cần tương phản với CHÍNH ẢNH, không
+ * phải với trang.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -179,7 +185,7 @@ export function SoSanhAnh({
       role="dialog"
       aria-modal="true"
       aria-label="So sánh nhiều tấm"
-      className="fixed inset-0 z-50 flex flex-col bg-bb-viewer-bg text-white select-none"
+      className="fixed inset-0 z-50 flex flex-col bg-[#F3EDE5] text-[#2E2A27] select-none"
       data-con-tro="mac-dinh"
     >
       <header className="relative z-20 flex shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
@@ -189,11 +195,11 @@ export function SoSanhAnh({
           bản NGẮN "2 tấm · 5/10"; máy tính (đủ chỗ hơn, `sm:` trở lên) giữ
           câu đầy đủ như cũ.
         */}
-        <span className="min-w-0 flex-1 truncate px-2 text-[13px] text-white/75">
+        <span className="min-w-0 flex-1 truncate px-2 text-[13px] text-[#2E2A27]/75">
           <span className="sm:hidden">
             {photos.length} tấm
             {typeof daChon === "number" && (
-              <span className="text-white/50">
+              <span className="text-[#6b6057]">
                 {" "}
                 · {daChon}
                 {hanMuc != null ? `/${hanMuc}` : ""}
@@ -203,7 +209,7 @@ export function SoSanhAnh({
           <span className="hidden sm:inline">
             So sánh {photos.length} tấm
             {typeof daChon === "number" && (
-              <span className="text-white/50">
+              <span className="text-[#6b6057]">
                 {" "}
                 · {daChon}
                 {hanMuc != null ? ` / ${hanMuc}` : ""} tấm đã chọn
@@ -217,7 +223,7 @@ export function SoSanhAnh({
           aria-pressed={cheDoGhim}
           className={cn(
             "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition active:scale-95",
-            cheDoGhim ? "bg-white text-bb-viewer-bg" : "bg-white/10 text-white/85 hover:bg-white/15",
+            cheDoGhim ? "bg-[#2E2A27] text-[#F3EDE5]" : "bg-black/5 text-[#2E2A27]/85 hover:bg-black/10",
           )}
         >
           {cheDoGhim ? (
@@ -231,7 +237,7 @@ export function SoSanhAnh({
           type="button"
           onClick={onDong}
           aria-label={vi.common.close}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/10 active:scale-95 touch-manipulation focus:outline-hidden"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#2E2A27]/85 transition-colors hover:bg-black/5 active:scale-95 touch-manipulation focus:outline-hidden"
         >
           <X className="h-6 w-6" strokeWidth={1.8} />
         </button>
@@ -240,7 +246,7 @@ export function SoSanhAnh({
       {cheDoGhim && ghimPhoto ? (
         <div
           className={cn(
-            "flex min-h-0 flex-1 gap-px overflow-hidden bg-white/10",
+            "flex min-h-0 flex-1 gap-px overflow-hidden bg-[#e5dcd2]",
             manHinhDoc ? "flex-col" : "flex-row",
           )}
         >
@@ -254,7 +260,7 @@ export function SoSanhAnh({
             onGhim={() => troGhim(ghimPhoto.id)}
           />
           <div
-            className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-bb-viewer-bg"
+            className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#F3EDE5]"
             onTouchStart={(e) => {
               const t = e.touches[0];
               if (!t) return;
@@ -280,7 +286,7 @@ export function SoSanhAnh({
                 onGhim={() => troGhim(vuotPhoto.id)}
               />
             ) : (
-              <p className="px-6 text-center text-sm text-white/60">Chưa có tấm nào để vuốt sang.</p>
+              <p className="px-6 text-center text-sm text-[#6b6057]">Chưa có tấm nào để vuốt sang.</p>
             )}
 
             {dsVuot.length > 0 && (
@@ -316,7 +322,7 @@ export function SoSanhAnh({
       ) : (
         <div
           className={cn(
-            "grid min-h-0 flex-1 gap-px overflow-hidden bg-white/10",
+            "grid min-h-0 flex-1 gap-px overflow-hidden bg-[#e5dcd2]",
             boCuc === "doc" && "grid-rows-2",
             boCuc === "ngang" && "grid-cols-2",
             boCuc === "luoi" && "grid-cols-2 grid-rows-2",
@@ -367,7 +373,7 @@ function OTamGhimVuot({ photo, ghim, dangGui, khoa, onToggleHeart, onPhongTo, on
   };
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-bb-viewer-bg p-2">
+    <div className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#F3EDE5] p-2">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={buildLightboxImageUrl(photo.id, 1600)}
@@ -376,6 +382,13 @@ function OTamGhimVuot({ photo, ghim, dangGui, khoa, onToggleHeart, onPhongTo, on
         className="h-auto max-h-full w-auto max-w-full cursor-pointer select-none object-contain"
       />
 
+      {/*
+        BB-310 mục 5 — nút nổi TRÊN ảnh (không phải trên trang): giữ quy ước
+        cũ (nền tối bán trong suốt) vì cần tương phản với chính ảnh đang
+        xem, màu ảnh thay đổi tuỳ tấm — chỉ đổi trạng thái "đang ghim" từ
+        trắng phẳng (lạc tông so với hệ kem xung quanh khi nhìn cả màn) sang
+        mực đậm, nhất quán với mọi trạng thái "đang chọn" khác trong app.
+      */}
       <button
         type="button"
         onClick={onGhim}
@@ -383,7 +396,7 @@ function OTamGhimVuot({ photo, ghim, dangGui, khoa, onToggleHeart, onPhongTo, on
         aria-label={ghim ? vi.gallery.soSanh.boGhimTam : vi.gallery.soSanh.ghimTam}
         className={cn(
           "absolute left-2 top-2 z-10 flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-md transition active:scale-90",
-          ghim ? "bg-white text-bb-viewer-bg" : "bg-black/55 text-white/90 hover:bg-black/70",
+          ghim ? "bg-[#2E2A27] text-[#F3EDE5]" : "bg-black/55 text-white/90 hover:bg-black/70",
         )}
       >
         {ghim ? (
@@ -462,10 +475,10 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
         riêng NGOÀI khung ảnh (giống dải điều khiển bên dưới) — luôn đọc
         được trọn vẹn, không phụ thuộc nội dung ảnh bên dưới nó.
       */}
-      <div className="flex h-6 shrink-0 items-center bg-[#231e1a] px-3 text-[11px] uppercase tracking-[0.1em] text-white/60">
+      <div className="flex h-6 shrink-0 items-center bg-[#e5dcd2] px-3 text-[11px] uppercase tracking-[0.1em] text-[#6b6057]">
         Tấm {thuTu}
       </div>
-      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-bb-viewer-bg p-2">
+      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#F3EDE5] p-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={buildLightboxImageUrl(photo.id, 1600)}
@@ -492,13 +505,15 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
       */}
       <div
         data-testid="dai-dieu-khien-so-sanh"
-        className="flex h-11 shrink-0 items-center gap-2 border-t border-white/10 bg-[#231e1a] px-3"
+        className="flex h-11 shrink-0 items-center gap-2 border-t border-[#e5dcd2] bg-[#F3EDE5] px-3"
       >
         <div className="mx-auto flex min-w-0 items-center gap-2">
           {(!khoa || daChon) ? (
             daChon ? (
               <>
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#7FA99B]/25 px-2.5 py-1 text-[12px] font-medium text-[#cfe6dd]">
+                {/* BB-310 mục 5 — sage nhạt trên nền kem, cùng công thức với
+                    banner "Đã thêm vào giỏ" (cua-hang.tsx) — đã kiểm ở đó. */}
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#e3eee9] px-2.5 py-1 text-[12px] font-medium text-[#2f4a40]">
                   <span aria-hidden="true">✓</span>
                   Đã chọn
                 </span>
@@ -507,7 +522,7 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
                   disabled={khoa || dangGui}
                   onClick={() => onToggleHeart(photo)}
                   aria-pressed={daChon}
-                  className="flex h-8 shrink-0 items-center justify-center rounded-full border border-white/40 px-4 text-[13px] font-medium text-white transition hover:bg-white/10 disabled:opacity-40"
+                  className="flex h-8 shrink-0 items-center justify-center rounded-full border border-[#2E2A27]/25 px-4 text-[13px] font-medium text-[#2E2A27] transition hover:bg-black/5 disabled:opacity-40"
                 >
                   Bỏ chọn
                 </button>
@@ -518,7 +533,7 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
                 disabled={khoa || dangGui}
                 onClick={() => onToggleHeart(photo)}
                 aria-pressed={daChon}
-                className="flex h-8 shrink-0 items-center justify-center rounded-full bg-[#2E2A27] px-4 text-[13px] font-medium text-white ring-1 ring-white/15 transition hover:opacity-90 disabled:opacity-40"
+                className="flex h-8 shrink-0 items-center justify-center rounded-full bg-[#2E2A27] px-4 text-[13px] font-medium text-[#F3EDE5] ring-1 ring-black/10 transition hover:opacity-90 disabled:opacity-40"
               >
                 Chọn tấm này
               </button>
@@ -533,7 +548,7 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
           onClick={() => onBoKhoi(photo)}
           aria-label="Bỏ khỏi so sánh"
           title="Bỏ khỏi so sánh"
-          className="ml-auto shrink-0 rounded-full p-1.5 text-white/70 transition hover:bg-white/10 active:scale-90"
+          className="ml-auto shrink-0 rounded-full p-1.5 text-[#2E2A27]/70 transition hover:bg-black/5 active:scale-90"
         >
           <X className="h-5 w-5" strokeWidth={1.7} aria-hidden="true" />
         </button>

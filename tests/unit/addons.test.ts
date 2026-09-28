@@ -40,6 +40,22 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     customerId = customer.id;
 
     // 2. Tạo sản phẩm giả
+    //
+    // BB-309: tiền tố "Fixture " (không phải "TEST ") để scripts/cleanup-test-
+    // galleries.mjs nhận diện và dọn được nếu lượt chạy này chết giữa chừng.
+    //
+    // `is_active: true` là BẮT BUỘC cho cả 4 dòng, không thể đặt false: route
+    // `/api/g/addons` từ chối NGAY ở `!product.is_active` (dòng ~74 của
+    // src/app/api/g/addons/route.ts) TRƯỚC KHI chạm tới ba luật giá mà chính
+    // các ca thử này cần canh (Test 2, 2b, 3 dưới đây phải đi qua is_active
+    // để thấy đúng lỗi 400 luật giá, không phải 404 "ngừng kinh doanh"). Rủi
+    // ro còn lại: `prodReliableId` (250.000đ, đủ tin cậy) khớp đúng bộ lọc
+    // catalogue của /api/g/gallery trong lúc phép thử này chạy — một khách
+    // thật mở app đúng lúc có thể thấy sản phẩm "Fixture Gỗ tráng gương
+    // 20x30" trong cửa hàng. Giảm bằng: afterAll dọn ngay khi hết bài, cộng
+    // lưới đỡ theo tuổi ở `npm run db:cleanup` (dọn Fixture còn sót >6 giờ).
+    // Cách hết hẳn rủi ro này là chạy bộ phép thử trên bb-test thay vì bb-dev
+    // — việc đó nằm ngoài phạm vi BB-309 (xem lộ trình mở app, mục Q2).
     prodReliableId = randomUUID();
     prodLowSamplesId = randomUUID();
     prodLowConfidenceId = randomUUID();
@@ -48,7 +64,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     const prods = [
       {
         id: prodReliableId,
-        name: "TEST Gỗ tráng gương 20x30",
+        name: "Fixture Gỗ tráng gương 20x30",
         kind: "print",
         list_price: 250000,
         price_confidence: 0.95,
@@ -61,7 +77,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
         // phải `shoot_package` — từ BB-288, `/api/g/addons` chặn
         // `shoot_package` NGAY ở luật nhóm (404 "ngoài danh mục"), trước khi
         // chạm tới luật giá (400) mà ca này muốn canh riêng.
-        name: "TEST Gỗ hiếm mẫu 25x35",
+        name: "Fixture Gỗ hiếm mẫu 25x35",
         kind: "print",
         material: "Gỗ",
         list_price: 1800000,
@@ -71,7 +87,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       },
       {
         id: prodLowConfidenceId,
-        name: "TEST Khung kính đa giác",
+        name: "Fixture Khung kính đa giác",
         kind: "print",
         list_price: 150000,
         price_confidence: 0.5, // vi phạm luật 2 (cần >= 0.8)
@@ -80,7 +96,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       },
       {
         id: prodNullPriceId,
-        name: "TEST Khung tranh chưa định giá",
+        name: "Fixture Khung tranh chưa định giá",
         kind: "print",
         list_price: null, // vi phạm luật 3 (list_price null)
         price_confidence: null,

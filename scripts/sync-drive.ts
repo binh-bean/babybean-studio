@@ -57,11 +57,16 @@ const tatCa = co("--tat-ca");
 const lamLai = co("--lam-lai");
 const gioiHan = soSau("--so");
 const luong = soSau("--luong") ?? 3;
+// BB-311 mục 2: `db:nap-lai -- --nap` gọi script này với `--luong 1 --nghi-ms
+// 300` — tuần tự (một bộ một lúc) VÀ có nghỉ giữa hai bộ, tôn trọng quota
+// Drive khi nạp lại hàng trăm bộ liên tiếp ngay sau khi xoá sạch. Không đặt
+// cờ này (dùng lẻ, ví dụ đồng bộ một bộ vừa tạo) thì không nghỉ gì cả.
+const nghiMs = soSau("--nghi-ms") ?? 0;
 
 // Bỏ giá trị đi ngay sau các cờ có tham số, phần còn lại mới là mã bộ ảnh.
 // So sánh theo giá trị (`a !== String(gioiHan)`) thì "--so 3 --luong 3" ăn
 // nhầm nhau, và lỗi kiểu đó chỉ lộ ra đúng lúc hai con số trùng nhau.
-const COF_CO_GIA_TRI = new Set(["--so", "--luong"]);
+const COF_CO_GIA_TRI = new Set(["--so", "--luong", "--nghi-ms"]);
 const viTriGiaTri = new Set<number>();
 args.forEach((a, i) => {
   if (COF_CO_GIA_TRI.has(a)) viTriGiaTri.add(i + 1);
@@ -120,6 +125,10 @@ async function chonBoAnh(): Promise<Array<{ id: string; title: string }>> {
   return data ?? [];
 }
 
+const cho = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+let tongAnhDaKeo = 0;
+
 async function chayMot(bo: { id: string; title: string }): Promise<Loi | null> {
   const requestId = randomUUID();
   let thongTin;
@@ -134,6 +143,7 @@ async function chayMot(bo: { id: string; title: string }): Promise<Loi | null> {
 
   try {
     const kq = await dongBoBoAnh(db, bo.id, thongTin, requestId);
+    tongAnhDaKeo += kq.photoCount;
     console.log(
       `  ok   ${String(kq.photoCount).padStart(4)} ảnh  ` +
         `(thêm ${kq.them}, cập nhật ${kq.capNhat}, mất ${kq.mat})  ${bo.title}`,
@@ -144,6 +154,8 @@ async function chayMot(bo: { id: string; title: string }): Promise<Loi | null> {
     await ghiLoiDongBo(db, bo.id, thongTin.giaiDoanDau, err);
     console.log(`  LỖI  ${lyDo}  —  ${bo.title}`);
     return { id: bo.id, title: bo.title, lyDo };
+  } finally {
+    if (nghiMs > 0) await cho(nghiMs);
   }
 }
 
@@ -172,7 +184,10 @@ async function main(): Promise<void> {
   );
 
   const giay = Math.round((Date.now() - batDau) / 1000);
-  console.log(`\nXong sau ${giay}s: ${danhSach.length - loi.length} bộ đồng bộ được, ${loi.length} bộ lỗi.`);
+  console.log(
+    `\nXong sau ${giay}s: ${danhSach.length - loi.length} bộ đồng bộ được, ` +
+      `${loi.length} bộ lỗi, tổng ${tongAnhDaKeo} ảnh đã kéo.`,
+  );
 
   if (loi.length > 0) {
     // Gom theo lý do: một vấn đề lặp lại 40 lần khác hẳn 40 vấn đề khác nhau, và

@@ -1,12 +1,76 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+import path from "node:path";
 
 try { process.loadEnvFile?.('.env.local'); } catch {}
+
+/**
+ * BB-309 — CI không có Supabase thật (không secret cho database, cố ý: xem
+ * AGENTS.md §6, bb-dev mang tên khách thật). Chạy `npm run test` ở đó vốn
+ * gãy hàng loạt ngay từ `createClient(undefined, undefined)` ở dòng đầu mỗi
+ * tệp — không phải một lỗi logic nào, chỉ là thiếu môi trường.
+ *
+ * Quét NỘI DUNG từng tệp .test.ts, không phải một danh sách tay: tệp nào
+ * chạm `createClient(` hoặc đọc trực tiếp biến NEXT_PUBLIC_SUPABASE_URL /
+ * SUPABASE_SERVICE_ROLE_KEY / SUPABASE_DB_URL thì coi là "cần cơ sở dữ liệu
+ * thật". Thêm một tệp .test.ts mới chạm DB thì nó tự động rơi vào nhóm này,
+ * không cần nhớ sửa cấu hình.
+ *
+ * CHỈ loại các tệp đó khi biến môi trường THẬT SỰ thiếu — máy dev có
+ * `.env.local` thật thì `npm run test` vẫn chạy TOÀN BỘ như trước giờ, không
+ * gì đổi. Việc bật lại phần này trên CI (trỏ vào bb-test, không phải bb-dev)
+ * ghi ở docs/11-deployment.md §2a.
+ */
+function timTepPhepThuChamDb(gocTests: string): string[] {
+  const KHOP =
+    /createClient\s*\(|createAdminClient\s*\(|process\.env\.(NEXT_PUBLIC_SUPABASE_URL|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_DB_URL)\b/;
+  const ket: string[] = [];
+  const duyet = (dir: string) => {
+    if (!fs.existsSync(dir)) return;
+    for (const ten of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, ten.name);
+      if (ten.isDirectory()) {
+        duyet(p);
+        continue;
+      }
+      if (!/\.test\.tsx?$/.test(ten.name)) continue;
+      let noiDung = "";
+      try {
+        noiDung = fs.readFileSync(p, "utf8");
+      } catch {
+        continue;
+      }
+      if (KHOP.test(noiDung)) ket.push(p);
+    }
+  };
+  duyet(gocTests);
+  return ket;
+}
+
+const DB_MOI_TRUONG_THIEU = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY;
+const gocTests = fileURLToPath(new URL("./tests", import.meta.url));
+const tepChamDb = DB_MOI_TRUONG_THIEU
+  ? timTepPhepThuChamDb(gocTests).map((p) => path.relative(process.cwd(), p).split(path.sep).join("/"))
+  : [];
+
+if (DB_MOI_TRUONG_THIEU && tepChamDb.length) {
+  console.warn(
+    `\n[vitest] Thiếu NEXT_PUBLIC_SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY — ` +
+      `bỏ qua ${tepChamDb.length} tệp phép thử cần cơ sở dữ liệu thật. ` +
+      `Xem docs/11-deployment.md §2a để bật lại (trỏ vào bb-test).\n`,
+  );
+}
 
 export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      ...tepChamDb,
+    ],
 
     /**
      * Chạy lần lượt từng tệp, không song song.

@@ -48,6 +48,11 @@ export interface TomTatSanPhamInProps {
    * hoặc đã giao) không còn sửa được nữa — dòng "Chưa có tấm nào trong cuốn
    * này" tô đỏ như một việc CẦN LÀM là hứa sai, ba mẹ không bấm gì được nữa.
    * Khoá thì chữ vẫn nói đúng sự thật (còn thiếu hay đủ), chỉ bỏ MÀU BÁO ĐỘNG.
+   *
+   * BB-310 mục 3 — báo cáo chấm độc lập vòng 4: bỏ màu vẫn chưa đủ — chữ
+   * "Chưa có tấm nào…" ("chưa" = còn chờ) vẫn còn nguyên trên màn Đã giao,
+   * lúc không còn gì để chờ nữa. Khoá thì `loiTrangThai()` đổi hẳn sang câu
+   * QUÁ KHỨ/trung tính, không còn chữ "chưa" ngụ ý một việc đang treo.
    */
   khoa?: boolean;
 }
@@ -59,20 +64,28 @@ export interface TomTatSanPhamInProps {
  * chốt. Hai chỗ tự tính riêng thì có ngày bảng này nói "đủ" còn lời nhắc nói
  * "còn thiếu", và ba mẹ không biết tin bên nào.
  */
-function loiTrangThai(dong: DongSanPhamIn): { chu: string; thieu: boolean } {
+export function loiTrangThai(dong: DongSanPhamIn, khoa: boolean): { chu: string; thieu: boolean } {
   const daCo = dong.anh.length;
   const thieu = conThieuAnh(dong, daCo);
 
   if (dong.nhom === "album") {
     return {
-      chu: thieu ? "Chưa có tấm nào trong cuốn này" : `Đang có ${daCo} tấm trong cuốn`,
+      // BB-310 mục 3 — khoá (chốt xong hoặc đã giao) thì không còn gì đang
+      // "chờ" nữa: bỏ chữ "Chưa" (ngụ ý một việc còn treo) khi đã khoá.
+      chu: thieu
+        ? khoa
+          ? "Không có tấm nào trong cuốn"
+          : "Chưa có tấm nào trong cuốn này"
+        : `Đang có ${daCo} tấm trong cuốn`,
       thieu,
     };
   }
 
   return {
     chu: thieu
-      ? `Còn ${dong.quantity - daCo}/${dong.quantity} suất chưa chọn ảnh`
+      ? khoa
+        ? `${dong.quantity - daCo}/${dong.quantity} suất chưa gán ảnh`
+        : `Còn ${dong.quantity - daCo}/${dong.quantity} suất chưa chọn ảnh`
       : `Đủ ${dong.quantity} tấm`,
     thieu,
   };
@@ -100,7 +113,7 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false }: TomT
 
       <ul className="mt-3 space-y-2">
         {dong.map((d) => {
-          const tt = loiTrangThai(d);
+          const tt = loiTrangThai(d, khoa);
           return (
             <li key={d.galleryItemId} className="rounded-lg border border-[var(--bb-border)] p-3">
               <div className="flex items-baseline justify-between gap-3">

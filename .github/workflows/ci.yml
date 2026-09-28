@@ -21,19 +21,23 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+
+      # BB-309: CI không có Supabase thật (cố ý — bb-dev mang tên khách thật,
+      # xem AGENTS.md §6). `npm run test` (vitest.config.ts) tự phát hiện thiếu
+      # NEXT_PUBLIC_SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY và BỎ QUA riêng các
+      # tệp .test.ts chạm cơ sở dữ liệu thật, kèm thông báo rõ trong log — các
+      # phép thử thuần logic (phần lớn bộ test) vẫn chạy đầy đủ. Xem
+      # docs/11-deployment.md §2a để bật lại phần DB trên CI (trỏ bb-test).
       - run: npm run test
+
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
           APP_SECRET: placeholder-secret-at-least-32-characters
 
-      # Secrets must never reach the browser bundle. See docs/12-security.md §5.
-      - name: Scan client bundle for secrets
-        run: |
-          if grep -rlE "SUPABASE_SERVICE_ROLE_KEY|GOOGLE_DRIVE_API_KEY|APP_SECRET|CRON_SECRET|LARK_APP_SECRET|UPSTASH_REDIS_REST_TOKEN|ZALO_ACCESS_TOKEN" .next/static/ 2>/dev/null; then
-            echo "::error::Secret name found in client bundle"
-            exit 1
-          fi
-          echo "Client bundle clean"
+      # Đọc lại chính file đã build: bí mật lọt vào bundle trình duyệt, font
+      # khai mà không được nạp. `npm run build` thoát 0 chỉ có nghĩa trình
+      # biên dịch hài lòng — xem AGENTS.md §0.5.
+      - run: npm run verify:build
 

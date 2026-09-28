@@ -93,10 +93,19 @@ export interface CuaHangProps {
   tatCaAnh?: AnhChonDuoc[];
   khoa: boolean;
   dangLuu: boolean;
-  /** Mua trực tiếp, không gắn ảnh (album). */
-  onMua: (productId: string, soLuong: number, photoId: string | null) => void;
+  /**
+   * Mua trực tiếp, không gắn ảnh (album).
+   *
+   * BB-310 mục 1 — báo cáo chấm độc lập vòng 4: chữ ký cũ `=> void` khiến
+   * component gọi xong là hiện banner "Đã thêm vào giỏ" NGAY LẬP TỨC, trong
+   * khi máy chủ còn đang lưu — banner/"Hoàn tác" hiện SUỐT lúc lưu (đo được
+   * 5,4 giây trên máy dev) rồi tự ẩn mà chưa ai bấm được. Cho phép trả về
+   * Promise để component `await` xong xuôi mới hiện banner (xem
+   * `nutHanhDong`).
+   */
+  onMua: (productId: string, soLuong: number, photoId: string | null) => void | Promise<void>;
   /** BB-279 — mua một sản phẩm gắn ảnh cho NHIỀU tấm cùng lúc (nhánh batch). */
-  onMuaNhieu?: (productId: string, soLuong: number, photoIds: string[]) => void;
+  onMuaNhieu?: (productId: string, soLuong: number, photoIds: string[]) => void | Promise<void>;
   /**
    * BB-279 — đường thứ hai: mở cửa hàng thẳng vào đúng nhóm này với tấm đang
    * xem đã chọn sẵn ("Đặt in tấm này" từ màn xem ảnh lớn).
@@ -218,9 +227,23 @@ export function CuaHang({
    * đường xoá riêng thì bỏ nút — LUẬT-DOT-8, không lách bằng cách khác).
    * `hoanTac: null` = không hoàn tác được (giữ đúng chữ, không hiện nút).
    */
-  const [thongBaoDaThem, setThongBaoDaThem] = React.useState<{ text: string; hoanTac: (() => void) | null } | null>(
-    null,
-  );
+  const [thongBaoDaThem, setThongBaoDaThem] = React.useState<{
+    text: string;
+    hoanTac: (() => void | Promise<void>) | null;
+  } | null>(null);
+  /**
+   * BB-310 mục 1 — hai cờ BUSY CỤC BỘ, tách khỏi `dangLuu` (cờ TOÀN CỤC của
+   * `gallery-app.tsx`, dùng chung cho mọi lượt lưu — chọn bìa album, đổi
+   * tim…). Trước bản vá, mọi nút phụ trong hộp (số lượng, chip, ảnh, xoá
+   * dòng giỏ) đều khoá theo `dangLuu` nên suốt lúc chờ máy chủ (đo 5,4 giây
+   * trên máy dev chạy song song nhiều agent) CẢ HỘP nhìn như bị mờ/đơ — báo
+   * cáo chấm độc lập vòng 4 gọi đúng là "cả form đang mờ". `dangGuiThem` chỉ
+   * bật đúng lúc NÚT "Thêm vào giỏ" của nó đang gửi; `dangHoanTac` chỉ bật
+   * đúng lúc nút "Hoàn tác" đang gửi — không đụng gì tới nhau hay tới phần
+   * còn lại của hộp.
+   */
+  const [dangGuiThem, setDangGuiThem] = React.useState(false);
+  const [dangHoanTac, setDangHoanTac] = React.useState(false);
   /** BB-299 mục 4 — bản vẽ: giỏ dài hơn 2 món chỉ hiện 2 + "Xem cả N món ›". */
   const [xemHetGio, setXemHetGio] = React.useState(false);
   /**
@@ -249,6 +272,8 @@ export function CuaHang({
     setThongBaoDaThem(null);
     setXemHetGio(false);
     setMoGioMobile(false);
+    setDangGuiThem(false);
+    setDangHoanTac(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mo, presetNhom]);
 
@@ -322,17 +347,28 @@ export function CuaHang({
   const nutHanhDong = !sanPham ? null : !sanPham.canGanAnh ? (
     <button
       type="button"
-      disabled={khoa || dangLuu}
-      onClick={() => {
+      disabled={khoa || dangGuiThem}
+      onClick={async () => {
         // BB-299 mục 4 — nhớ số lượng TRƯỚC khi thêm để "Hoàn tác" trả lại
         // đúng số cũ. `onMua` nhận SỐ LƯỢNG TUYỆT ĐỐI (không phải cộng dồn ở
         // máy chủ), nên hoàn tác chỉ cần gọi lại với số lượng cũ này.
+        //
+        // BB-310 mục 1 — báo cáo chấm độc lập vòng 4: dòng "Đã thêm vào giỏ"
+        // (và "Hoàn tác" bên trong) chỉ hiện SAU KHI `onMua` lưu xong, không
+        // phải ngay lúc bấm — nên đồng hồ 6 giây tự ẩn (effect phía trên)
+        // cũng chỉ bắt đầu đếm từ lúc lưu xong, và Hoàn tác luôn bấm được
+        // ngay khi vừa hiện vì không còn request nào đang treo lúc đó.
         const truoc = daDat(sanPham.productId);
-        onMua(sanPham.productId, truoc + soLuong, null);
-        setThongBaoDaThem({
-          text: `${soLuong} ${tenThanThienSanPham(nhomDangXem, sanPham)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong)}`,
-          hoanTac: () => onMua(sanPham.productId, truoc, null),
-        });
+        setDangGuiThem(true);
+        try {
+          await onMua(sanPham.productId, truoc + soLuong, null);
+          setThongBaoDaThem({
+            text: `${soLuong} ${tenThanThienSanPham(nhomDangXem, sanPham)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong)}`,
+            hoanTac: () => onMua(sanPham.productId, truoc, null),
+          });
+        } finally {
+          setDangGuiThem(false);
+        }
       }}
       className="h-11 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
     >
@@ -341,9 +377,14 @@ export function CuaHang({
   ) : dangDatPresetChoNhomNay ? (
     <button
       type="button"
-      disabled={khoa || dangLuu}
-      onClick={() => {
-        onMuaNhieu?.(sanPham.productId, soLuong, [presetPhotoId as string]);
+      disabled={khoa || dangGuiThem}
+      onClick={async () => {
+        setDangGuiThem(true);
+        try {
+          await onMuaNhieu?.(sanPham.productId, soLuong, [presetPhotoId as string]);
+        } finally {
+          setDangGuiThem(false);
+        }
         onDong();
       }}
       className="h-11 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
@@ -355,23 +396,28 @@ export function CuaHang({
     // thật sự thêm vào giỏ, kèm tiền để khách biết đang mua gì hết bao nhiêu.
     <button
       type="button"
-      disabled={khoa || dangLuu}
-      onClick={() => {
+      disabled={khoa || dangGuiThem}
+      onClick={async () => {
         const anhVuaThem = anhDaChonTrongLuoi.map((a) => a.id);
-        onMuaNhieu?.(sanPham.productId, soLuong, anhVuaThem);
-        setThongBaoDaThem({
-          text: `${anhVuaThem.length} ảnh ${tenThanThienSanPham(nhomDangXem, sanPham)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong * anhVuaThem.length)}`,
-          // BB-299 mục 4 — "Hoàn tác" xoá ĐÚNG món vừa thêm, dùng API mua
-          // thêm có sẵn (đặt số lượng 0 cho đúng các photoId vừa thêm — cùng
-          // đường "Xoá" của từng dòng giỏ ở đáy hộp, xem `<footer>` dưới).
-          hoanTac: () => onMuaNhieu?.(sanPham.productId, 0, anhVuaThem),
-        });
-        // Đặt lại cấu hình cho món tiếp theo — không tự đóng cửa hàng, ba mẹ
-        // có thể mua tiếp món khác ngay.
-        setAnhDaChonTrongLuoi([]);
-        setKichThuocChon(null);
-        setChatLieuChon(null);
-        setSoLuong(1);
+        setDangGuiThem(true);
+        try {
+          await onMuaNhieu?.(sanPham.productId, soLuong, anhVuaThem);
+          setThongBaoDaThem({
+            text: `${anhVuaThem.length} ảnh ${tenThanThienSanPham(nhomDangXem, sanPham)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong * anhVuaThem.length)}`,
+            // BB-299 mục 4 — "Hoàn tác" xoá ĐÚNG món vừa thêm, dùng API mua
+            // thêm có sẵn (đặt số lượng 0 cho đúng các photoId vừa thêm — cùng
+            // đường "Xoá" của từng dòng giỏ ở đáy hộp, xem `<footer>` dưới).
+            hoanTac: () => onMuaNhieu?.(sanPham.productId, 0, anhVuaThem),
+          });
+          // Đặt lại cấu hình cho món tiếp theo — không tự đóng cửa hàng, ba
+          // mẹ có thể mua tiếp món khác ngay.
+          setAnhDaChonTrongLuoi([]);
+          setKichThuocChon(null);
+          setChatLieuChon(null);
+          setSoLuong(1);
+        } finally {
+          setDangGuiThem(false);
+        }
       }}
       className="h-11 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
     >
@@ -380,7 +426,7 @@ export function CuaHang({
   ) : (
     <button
       type="button"
-      disabled={khoa || dangLuu}
+      disabled={khoa || dangGuiThem}
       onClick={() => setMoLuoiChon(true)}
       // BB-295 mục #8 — báo cáo chấm độc lập: nút này là hành động CHÍNH của
       // dòng sản phẩm (chọn ảnh cho sản phẩm), nhưng màu be nhạt cũ trông như
@@ -622,7 +668,7 @@ export function CuaHang({
                         // bấm "Xong". Bấm vào hàng này mở lại lưới để đổi.
                         <button
                           type="button"
-                          disabled={khoa || dangLuu}
+                          disabled={khoa || dangGuiThem}
                           onClick={() => setMoLuoiChon(true)}
                           aria-label={`Đổi ${anhDaChonTrongLuoi.length} ảnh đã chọn`}
                           className="flex items-center gap-1.5 rounded-[10px] disabled:opacity-40"
@@ -649,7 +695,7 @@ export function CuaHang({
                       ) : (
                         <button
                           type="button"
-                          disabled={khoa || dangLuu}
+                          disabled={khoa || dangGuiThem}
                           onClick={() => setMoLuoiChon(true)}
                           // Tên hỗ trợ tiếp cận RIÊNG với nút "Chọn ảnh" ở đáy
                           // dính — cả hai cùng mở một lưới, nhưng trùng tên
@@ -712,10 +758,20 @@ export function CuaHang({
               {thongBaoDaThem.hoanTac && (
                 <button
                   type="button"
-                  disabled={khoa || dangLuu}
-                  onClick={() => {
-                    thongBaoDaThem.hoanTac?.();
-                    setThongBaoDaThem(null);
+                  // BB-310 mục 1 — CHỈ khoá theo `khoa` (album thật sự đã
+                  // chốt) và `dangHoanTac` (đúng lượt Hoàn tác này đang gửi),
+                  // KHÔNG theo `dangLuu` toàn cục — banner này chỉ hiện SAU
+                  // khi lượt thêm đã lưu xong (xem `nutHanhDong`), nên không
+                  // còn request nào đang treo lúc nó vừa hiện: bấm được ngay.
+                  disabled={khoa || dangHoanTac}
+                  onClick={async () => {
+                    setDangHoanTac(true);
+                    try {
+                      await thongBaoDaThem.hoanTac?.();
+                      setThongBaoDaThem(null);
+                    } finally {
+                      setDangHoanTac(false);
+                    }
                   }}
                   className="shrink-0 self-start text-[13px] font-medium underline underline-offset-2 disabled:opacity-40"
                 >
@@ -777,12 +833,16 @@ export function CuaHang({
                     <button
                       type="button"
                       aria-label={`Xoá ${d.name}`}
-                      disabled={khoa || dangLuu}
-                      onClick={() =>
-                        d.photoId
-                          ? onMuaNhieu?.(d.productId, 0, [d.photoId])
-                          : onMua(d.productId, 0, null)
-                      }
+                      disabled={khoa || dangGuiThem}
+                      onClick={async () => {
+                        setDangGuiThem(true);
+                        try {
+                          if (d.photoId) await onMuaNhieu?.(d.productId, 0, [d.photoId]);
+                          else await onMua(d.productId, 0, null);
+                        } finally {
+                          setDangGuiThem(false);
+                        }
+                      }}
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-[var(--bb-surface-2)] disabled:opacity-30"
                     >
                       <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>

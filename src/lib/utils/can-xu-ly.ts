@@ -50,6 +50,14 @@ export interface CanXuLyTongHop {
    * thật CSKH đang dùng để biết việc gấp.
    */
   canhBaoLark?: number;
+  /**
+   * BB-312 — `GET /api/admin/can-xu-ly` → data.choMoLai: số bộ ảnh đang có
+   * yêu cầu "xin mở lại" CHƯA XỬ LÝ (xem src/lib/gallery/yeu-cau-mo-lai.ts).
+   * Trước bản vá này yêu cầu chỉ nằm lẫn trong Dòng thời gian hoạt động của
+   * từng bộ — không chỗ nào tổng hợp lại để CSKH biết đang có bao nhiêu việc
+   * đang chờ trên toàn chi nhánh.
+   */
+  choMoLai?: number;
 }
 
 /**
@@ -66,7 +74,8 @@ export function demSoCanXuLy(d: CanXuLyTongHop | null | undefined): number {
     (d.chuaCoHanMuc?.length ?? 0) +
     (d.dueSoon ?? 0) +
     (d.overdue ?? 0) +
-    (d.canhBaoLark ?? 0)
+    (d.canhBaoLark ?? 0) +
+    (d.choMoLai ?? 0)
   );
 }
 
@@ -127,6 +136,13 @@ export function dongCanXuLy(d: CanXuLyTongHop | null | undefined): DongCanXuLy[]
       soLuong: d.canhBaoLark ?? 0,
       mauCham: "var(--bb-danger)",
       href: "/admin/galleries",
+    },
+    {
+      key: "cho-mo-lai",
+      nhan: "Khách xin mở lại",
+      soLuong: d.choMoLai ?? 0,
+      mauCham: "var(--bb-warning)",
+      href: "/admin/viec-can-xu-ly?tab=yeu-cau-mo-lai",
     },
   ];
   return tatCa.filter((dong) => dong.soLuong > 0);

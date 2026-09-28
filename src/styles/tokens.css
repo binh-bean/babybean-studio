@@ -133,51 +133,12 @@
   --ring: var(--bb-primary);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bb-bg: #16130f;
-    --bb-surface: #211d19;
-    --bb-surface-2: #2b2621;
-    --bb-border: #3a332c;
-    --bb-fg: #f2ede7;
-    --bb-fg-muted: #a69b91;
-    --bb-primary: #e8a598;
-    --bb-primary-fg: #16130f;
-    --bb-accent: #7fa99b;
-    --bb-accent-fg: #0e1f19;
-    --bb-accent-soft: #22362f;
-    --bb-accent-soft-fg: #bfe3d5;
-    --bb-sidebar-bg: #1c1815;
-    --bb-success: #4e9a6b;
-    --bb-success-fg: #ffffff;
-    --bb-warning: #d9932b;
-    --bb-warning-fg: #1a1309;
-    --bb-danger: #c4553f;
-    --bb-danger-fg: #ffffff;
-    --bb-urgent: #9078c9;
-    --bb-urgent-fg: #16130f;
-
-    --background: var(--bb-bg);
-    --foreground: var(--bb-fg);
-    --card: var(--bb-surface);
-    --card-foreground: var(--bb-fg);
-    --popover: var(--bb-surface);
-    --popover-foreground: var(--bb-fg);
-    --primary: var(--bb-primary);
-    --primary-foreground: var(--bb-primary-fg);
-    --secondary: var(--bb-surface-2);
-    --secondary-foreground: var(--bb-fg);
-    --muted: var(--bb-surface-2);
-    --muted-foreground: var(--bb-fg-muted);
-    --accent: var(--bb-accent);
-    --accent-foreground: var(--bb-accent-fg);
-    --destructive: var(--bb-danger);
-    --destructive-foreground: var(--bb-danger-fg);
-    --border: var(--bb-border);
-    --input: var(--bb-border);
-    --ring: var(--bb-primary);
-  }
-}
+/*
+ * 28/09/2026 — admin chốt: cả app KHOÁ một bảng màu kem, không tự đổi sang
+ * nền tối theo chế độ của máy. Khối @media (prefers-color-scheme: dark) có sẵn
+ * từ bộ khung dựng 08/09 (không ai yêu cầu) đã bỏ. Bảng tối .dark/[data-theme]
+ * bên trên chỉ còn làm dự phòng, không nơi nào bật.
+ */
 
 @theme {
   --color-bb-primary: var(--bb-primary);

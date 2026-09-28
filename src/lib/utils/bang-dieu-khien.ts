@@ -104,10 +104,19 @@ export type NhomViecHomNay = "qua_han" | "hom_nay" | "ngay_mai";
 export interface ViecHomNayThoLuoc {
   dueAt: string | null;
   status: string;
+  /**
+   * BB-312 — việc không có hạn giao thật (không phải "hạn khách chọn ảnh")
+   * nhưng vẫn cần STUDIO xử lý NGAY hôm nay, vd khách xin mở lại bộ ảnh. Đứng
+   * ngoài enum `status` nên không dùng nhánh `submitted` sẵn có (nhánh đó gắn
+   * chặt với nghĩa "khách đã chốt", đúng cả ở `nhomThaoTacViec` phía
+   * `dashboard.tsx` — ép trạng thái thành `submitted` giả sẽ làm sai nút "Làm
+   * nhanh"). Cờ riêng, mặc định false/undefined không đổi hành vi cũ.
+   */
+  forceHomNay?: boolean;
 }
 
 export function nhomViecHomNay(v: ViecHomNayThoLuoc, now: Date = new Date()): NhomViecHomNay | null {
-  if (v.status === "submitted") return "hom_nay";
+  if (v.status === "submitted" || v.forceHomNay) return "hom_nay";
   if (!v.dueAt) return null;
   const due = new Date(v.dueAt);
   if (Number.isNaN(due.getTime())) return null;

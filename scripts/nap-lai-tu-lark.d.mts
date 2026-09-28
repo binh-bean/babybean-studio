@@ -40,6 +40,7 @@ export interface SanLuu {
   thoiDiem: string;
   tongSoDong?: number;
   demTheoBang?: Record<string, number>;
+  duongDan?: string;
 }
 
 export function kiemTraDieuKienXoa(opts: {
@@ -62,10 +63,20 @@ export function xuatSaoLuu(
   thuMucDich: string,
 ): Promise<{ thoiDiem: string; tongSoDong: number; demTheoBang: Record<string, number> }>;
 export function sanLuuGanNhatTrongThuMuc(gocSaoLuu: string): SanLuu | null;
+export const TEN_TEP_MOC: string;
+export function docMocSaoLuuGanNhat(gocSaoLuu: string): SanLuu | null;
+export function ghiMocSaoLuuGanNhat(gocSaoLuu: string, thuMucBanSaoLuu: string): void;
+export function docBanSaoLuuTaiThuMuc(thuMuc: string | null | undefined): SanLuu | null;
 export function xoaSachGiaoDich(
   client: DbGia,
   thuTuXoa: string[],
 ): Promise<Record<string, number>>;
+export function khoiPhucGiaoDich(
+  client: DbGia,
+  thuTuKhoiPhuc: string[],
+  thuMucNguon: string,
+): Promise<Record<string, number>>;
+export function banGiuLieuKhongRong(demHienTai: Record<string, number>): string[];
 
 export interface LenhNap {
   ten: string;

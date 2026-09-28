@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Be_Vietnam_Pro, Playfair_Display } from "next/font/google";
 import { PWAInstallPrompt } from "@/components/ui/pwa-install-prompt";
+import { AnhLuiProxy } from "@/components/ui/anh-lui-proxy";
 import "./globals.css";
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -75,6 +76,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         {children}
         <PWAInstallPrompt />
+        <AnhLuiProxy />
       </body>
     </html>
   );

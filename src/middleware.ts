@@ -72,7 +72,12 @@ function applySecurityHeaders(response: NextResponse, pathname: string): void {
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "img-src 'self' data: blob:",
+      // BB-314: ảnh nhỏ (lưới/thu nhỏ, w<=800) nay điều hướng 302 thẳng sang
+      // lh3.googleusercontent.com thay vì đi qua hàm Vercel — xem
+      // src/app/api/img/[photoId]/route.ts. Không có nguồn này thì CSP chặn
+      // trình duyệt tải ảnh sau khi theo điều hướng, dù route đã xét quyền
+      // đúng và trả Location đúng.
+      "img-src 'self' data: blob: https://lh3.googleusercontent.com",
       // 'unsafe-eval' CHỈ ở môi trường dev. Hot-reload của Next dùng eval; CSP
       // chặn nó thì React không hydrate được, và hậu quả không hề giống một lỗi
       // bảo mật: mọi nút bấm chết lặng, form gửi theo kiểu mặc định của trình

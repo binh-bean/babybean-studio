@@ -46,12 +46,12 @@ describe("BB-102: Thành phần hợp đồng và hạn mức ảnh (gallery_ite
     prodWoodFrame = randomUUID();
 
     const prods = [
-      { id: prodPkgBaby02, name: "TEST Baby 02", kind: "shoot_package", list_price: 2000000 },
-      { id: prodPkgBaby01, name: "TEST Baby 01", kind: "shoot_package", list_price: 1500000 },
-      { id: prodPkgFam, name: "TEST Family Classic", kind: "shoot_package", list_price: 3000000 },
-      { id: prodEditFile, name: "TEST Edit file", kind: "edited_photo", list_price: 50000 },
-      { id: prodMakeup, name: "TEST Makeup", kind: "service", list_price: 300000 },
-      { id: prodWoodFrame, name: "TEST Gỗ 15x21", kind: "print", material: "Gỗ", size: "15x21", list_price: 150000 },
+      { id: prodPkgBaby02, name: "Fixture Baby 02", kind: "shoot_package", list_price: 2000000 },
+      { id: prodPkgBaby01, name: "Fixture Baby 01", kind: "shoot_package", list_price: 1500000 },
+      { id: prodPkgFam, name: "Fixture Family Classic", kind: "shoot_package", list_price: 3000000 },
+      { id: prodEditFile, name: "Fixture Edit file", kind: "edited_photo", list_price: 50000 },
+      { id: prodMakeup, name: "Fixture Makeup", kind: "service", list_price: 300000 },
+      { id: prodWoodFrame, name: "Fixture Gỗ 15x21", kind: "print", material: "Gỗ", size: "15x21", list_price: 150000 },
     ];
 
     for (const p of prods) {
@@ -153,7 +153,7 @@ describe("BB-102: Thành phần hợp đồng và hạn mức ảnh (gallery_ite
     const parent = summary.items[0]!;
     expect(parent).toBeDefined();
     expect(parent.productId).toBe(prodPkgBaby02);
-    expect(parent.name).toBe("TEST Baby 02");
+    expect(parent.name).toBe("Fixture Baby 02");
     expect(parent.quantity).toBe(1);
     expect(parent.unitPrice).toBe(2000000);
     expect(parent.totalPrice).toBe(2000000);

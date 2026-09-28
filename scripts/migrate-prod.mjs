@@ -48,6 +48,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
+import { inMoiTruong, kiemTraMoiTruongChoPhep, kiemTraCoBbProd } from "./lib/moi-truong.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const goc = path.resolve(__dirname, "..");
@@ -66,48 +67,38 @@ const boQuaSaoLuu = process.argv.includes("--bo-qua-sao-luu");
 const epAp = process.argv.includes("--ep-ap");
 
 /**
- * Dãy migration bb-prod đang thiếu, theo đúng thứ tự phải áp.
- *
- * 0045 dựng lại `v_share_links` và `create_gallery_bundle` rồi mới bỏ cột PIN —
- * đảo thứ tự là gãy. 0048 phải đứng sau 0047 vì nó thu hồi lại quyền mà chính
- * 0047 lỡ cấp cho PUBLIC.
+ * Mốc bắt đầu của dãy migrate-prod biết áp: `0045` là tệp NGAY SAU baseline mà
+ * `setup-prod.mjs` (schema + 0001..0044) đã dựng lên bb-prod ngày 16/09/2026 —
+ * xem docs/18 §2.0. Những tệp 0001–0044 không nằm trong dãy này vì chúng thuộc
+ * về ảnh chụp `db/schema.sql` + lượt setup ban đầu, không phải "khoảng lệch"
+ * migrate-prod được sinh ra để vá.
  */
-const DAY = [
-  "0045-bo-ma-pin.sql",
-  "0046-link-ttl.sql",
-  "0047-xoa-nhan-su.sql",
-  "0048-khoa-lai-check-staff-deletable.sql",
-  "0049-dong-chat-page-url.sql",
-  "0050-quyen-mac-dinh-cho-vat-sinh-sau.sql",
-  "0051-activity-logs-gallery-fk.sql",
-  "0052-vai-tro-dong.sql",
-  "0053-quyen-doc-tu-bang-roles.sql",
-  "0054-bo-dong-require-pin-default.sql",
-  "0055-chot-vai-he-thong-that-su-chan.sql",
-  "0056-policy-thoi-doc-ten-vai.sql",
-  "0057-quyen-ghi-thoi-tang-kem-quyen-doc.sql",
-  "0058-quyen-quan-ly-chi-nhanh-va-gan-vai-tay.sql",
-  "0059-mot-san-pham-mua-them-mot-dong.sql",
-  "0060-chot-chua-phai-la-khoa.sql",
-  "0061-mua-them-gan-vao-anh-cu-the.sql",
-  "0062-anh-trong-album-mua-them.sql",
-  "0063-chu-tren-bia.sql",
-  "0064-dem-luot-mo-link.sql",
-  "0065-gia-anh-chon-them-mac-dinh.sql",
-  "0066-cskh-mo-lai-bo-anh.sql",
-  "0067-trang-thai-hau-ky-tu-lark.sql",
-  "0068-admin-galleries-rpc-tra-them-lark.sql",
-  "0069-kieu-chu-bia.sql",
-  "0070-giu-ma-link-ma-hoa.sql",
-  "0071-dang-ky-thong-bao-day.sql",
-  "0072-yeu-cau-mua-them.sql",
-  "0073-mua-them-nguoi-mua.sql",
-  "0074-hop-thu-thong-bao.sql",
-  "0075-bia-album.sql",
-];
+const TU_TEP = "0045-";
+
+/**
+ * BB-315 — trước đây DAY là một mảng gõ TAY, và mỗi migration mới (0054..0075,
+ * rồi các tệp BB-31x sau này) đòi một lượt sửa tay ở đây — quên sửa là
+ * `migrate-prod` báo "không có gì phải vá" trong khi tệp mới chưa từng chạy
+ * trên bb-prod. Nay đọc THẲNG từ `db/migrations/`, sắp theo tên tệp — cùng thư
+ * mục là nguồn sự thật duy nhất, không còn bản sao có thể lệch nhau.
+ *
+ * Điều kiện để một tệp được coi là an toàn đưa vào đây VẪN như cũ (xem đầu
+ * tệp): phải chạy lại được nhiều lần mà kết quả không đổi. Đó là quy ước của
+ * đội, không phải điều gì hàm này kiểm được — người viết migration chịu trách
+ * nhiệm giữ quy ước đó.
+ */
+export function danhSachMigrationCanAp(gocRepo = goc, tuTep = TU_TEP) {
+  const thuMuc = path.join(gocRepo, "db", "migrations");
+  return fs
+    .readdirSync(thuMuc)
+    .filter((t) => t.endsWith(".sql") && t >= tuTep)
+    .sort();
+}
+
+const DAY = danhSachMigrationCanAp();
 
 /** Chín mốc kiểm. `dat` nhận kết quả đo và trả true khi nó khớp bb-dev. */
-const MOC = [
+export const MOC = [
   {
     ten: "Khung nhìn public.v_staff_deletable",
     sql: `select count(*)::int n from pg_views where schemaname='public' and viewname='v_staff_deletable'`,
@@ -233,13 +224,6 @@ const MOC = [
   },
 ];
 
-/** Nhãn ngắn để người chạy biết mình đang nối vào đâu — không in khoá. */
-function nhanDb() {
-  const u = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const ref = u.replace(/^https:\/\/([a-z0-9]+).*/, "$1");
-  return ref && ref !== u ? `${ref.slice(0, 6)}…supabase.co` : "không rõ";
-}
-
 /**
  * Một mốc đo hỏng thì chỉ mốc đó hỏng.
  *
@@ -248,7 +232,7 @@ function nhanDb() {
  * mà cả công dụng là "nói cho tôi biết đang thiếu những gì", đó là hỏng đúng
  * chỗ tệ nhất.
  */
-async function doMoc(client) {
+export async function doMoc(client) {
   const ketQua = [];
   for (const m of MOC) {
     try {
@@ -261,7 +245,7 @@ async function doMoc(client) {
   return ketQua;
 }
 
-function inBang(tieuDe, ketQua) {
+export function inBang(tieuDe, ketQua) {
   console.log(`\n${tieuDe}`);
   for (const k of ketQua) {
     console.log(`  ${k.dat ? "OK " : "-- "} ${k.moc.ten.padEnd(38)} ${k.so}`);
@@ -275,10 +259,18 @@ async function main() {
     process.exit(1);
   }
 
+  // BB-315: in mã dự án + tên môi trường TRƯỚC MỌI bước, từ chối mã lạ — cùng
+  // chốt dùng ở nap-lai-tu-lark.mjs và chep-cau-hinh.mjs, một nguồn sự thật.
+  inMoiTruong(dbUrl);
+  const ktMoiTruong = kiemTraMoiTruongChoPhep(dbUrl);
+  if (!ktMoiTruong.choPhep) {
+    console.error(ktMoiTruong.ly_do);
+    process.exit(2);
+  }
+
   const client = new pg.Client({ connectionString: dbUrl });
   await client.connect();
 
-  console.log(`Cơ sở dữ liệu: ${nhanDb()}`);
   const dem = (
     await client.query(
       `select (select count(*) from galleries) bo_anh, (select count(*) from staff_profiles) nhan_su`
@@ -312,6 +304,13 @@ async function main() {
   }
 
   // --- từ đây là ghi thật ---------------------------------------------------
+  const ktGhi = kiemTraCoBbProd(dbUrl, process.argv.includes("--that-su-la-bb-prod"));
+  if (!ktGhi.choPhep) {
+    console.error(ktGhi.ly_do);
+    await client.end();
+    process.exit(2);
+  }
+
   if (boQuaSaoLuu) {
     console.log("\n!!! BỎ QUA SAO LƯU. Nếu đây là bb-prod thì đang không có đường lùi.");
   } else {
@@ -363,7 +362,15 @@ async function main() {
   console.log("\nChín mốc đều đạt. Bước tiếp: npm run verify:db, rồi mở màn Nhân sự xem thật.");
 }
 
-main().catch((e) => {
-  console.error(e.message);
-  process.exit(1);
-});
+// BB-315: file này giờ có thể bị IMPORT (so-sanh-migration.mjs dùng lại MOC,
+// doMoc, danhSachMigrationCanAp). Không được để việc import kéo theo chạy
+// main() — main() nối thật và có thể GHI vào một cơ sở dữ liệu thật. Chỉ chạy
+// khi tệp này được gọi trực tiếp bằng `node migrate-prod.mjs`, cùng cách
+// nap-lai-tu-lark.mjs đã dùng.
+const chayTrucTiep = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (chayTrucTiep) {
+  main().catch((e) => {
+    console.error(e.message);
+    process.exit(1);
+  });
+}

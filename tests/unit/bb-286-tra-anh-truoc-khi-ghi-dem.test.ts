@@ -26,8 +26,15 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { Client } from "pg";
+import { pngGiaHopLe } from "../fixtures/anh-gia";
 
 vi.mock("server-only", () => ({}));
+
+// BB-311: chốt "không ghi đệm khi đang chạy phép thử" chặn CẢ phép thử này
+// theo mặc định — nó CỐ Ý ghi vào đệm thật (fixture riêng, dọn ở afterAll) để
+// canh đúng THỜI ĐIỂM ghi. Xin đi qua bằng cờ thoát đã có sẵn trong
+// kiem-thu.ts (biên giới mạng driveFetch đã bị giả lập ngay dưới đây).
+process.env.CHO_PHEP_GOI_MANG_TRONG_PHEP_THU = "1";
 
 const capturedAfter = vi.hoisted(() => [] as Array<() => void | Promise<void>>);
 
@@ -57,7 +64,9 @@ describe("BB-286(a): /api/img trả ảnh TRƯỚC KHI ghi xong bộ đệm", ()
   let khach = "";
   let bo = "";
   let anh = "";
-  const cachePath = () => `${anh}/800.jpg`;
+  // BB-311: chỉ ảnh BÌA (w>=1600) mới đi qua đệm — đổi từ 800 sang 1600,
+  // đúng khuôn "canh thời điểm ghi đệm" vẫn giữ nguyên ý nghĩa gốc.
+  const cachePath = () => `${anh}/1600.jpg`;
 
   beforeAll(async () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
@@ -85,6 +94,11 @@ describe("BB-286(a): /api/img trả ảnh TRƯỚC KHI ghi xong bộ đệm", ()
       [bo, `fixture-bb286-file-${runId}`],
     );
     anh = p[0].id;
+
+    // BB-311: /api/img giờ CHỈ đệm ẢNH BÌA (w>=1600 KHÔNG đủ một mình — phải
+    // đúng galleries.cover_photo_id). Đánh dấu ảnh fixture này LÀ bìa để phép
+    // thử "canh thời điểm ghi đệm" còn đúng ý nghĩa.
+    await client.query("update galleries set cover_photo_id = $1 where id = $2", [anh, bo]);
   });
 
   afterAll(async () => {
@@ -109,9 +123,9 @@ describe("BB-286(a): /api/img trả ảnh TRƯỚC KHI ghi xong bộ đệm", ()
       permissions: quyenCuaVai("owner"),
     } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
     vi.spyOn(driveClient, "driveFetch").mockImplementation(async () => {
-      return new Response(new Uint8Array([255, 216, 255, 0, 1, 2, 3]), {
+      return new Response(pngGiaHopLe(), {
         status: 200,
-        headers: { "Content-Type": "image/jpeg" },
+        headers: { "Content-Type": "image/png" },
       });
     });
   });
@@ -121,7 +135,7 @@ describe("BB-286(a): /api/img trả ảnh TRƯỚC KHI ghi xong bộ đệm", ()
     // Chắc chắn đệm đang rỗng trước khi bắt đầu.
     await admin.storage.from("thumbnails").remove([cachePath()]);
 
-    const res = await layAnh(new Request(`http://localhost/api/img/${anh}?w=800`), {
+    const res = await layAnh(new Request(`http://localhost/api/img/${anh}?w=1600`), {
       params: Promise.resolve({ photoId: anh }),
     });
 

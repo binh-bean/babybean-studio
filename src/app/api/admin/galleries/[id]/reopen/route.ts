@@ -36,6 +36,7 @@ import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib
 import { createAdminClient } from "@/lib/supabase/admin";
 import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { guiThongBaoBoAnh } from "@/lib/thong-bao/gui-day";
 
 export const runtime = "nodejs";
 
@@ -140,6 +141,15 @@ export async function POST(
       entityId: galleryId,
       galleryId,
       metadata: { tuTrangThai: gallery.status, lyDo: reason, hanMoi },
+    });
+
+    // BB-312: báo khách qua chuông + đẩy — KHÔNG qua Lark (đó là kênh
+    // Studio→Studio, xem docs/21). Không bao giờ ném (guiThongBaoBoAnh tự
+    // nuốt lỗi), nên không cần try/catch riêng ở đây.
+    await guiThongBaoBoAnh(admin, galleryId, {
+      tieuDe: "Bộ ảnh đã mở lại",
+      noiDung: "Studio đã mở lại bộ ảnh, ba mẹ chọn tiếp nhé.",
+      loai: "reopen_da_mo",
     });
 
     return ok({ status: "in_review", reopenedAt: now, dueAt: hanMoi });

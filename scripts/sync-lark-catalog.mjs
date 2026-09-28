@@ -33,6 +33,8 @@
  */
 
 import pg from "pg";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const HOST = "https://open.larksuite.com/open-apis";
 
@@ -232,6 +234,35 @@ function packageQuotas(componentRows) {
   return out;
 }
 
+// --- sản phẩm lạc (BB-309, theo A4 báo cáo phản biện vòng 4) ----------------
+
+/**
+ * Sản phẩm phải TẮT sau bước nạp — KHÔNG XOÁ, chỉ `is_active = false` — vì
+ * hai lý do khác nhau:
+ *
+ *   1. `lark_record_id` rỗng: Lark chưa từng biết tới sản phẩm này. Trong dữ
+ *      liệu thật, sản phẩm luôn đến từ đây (đồng bộ upsert bên dưới); một
+ *      dòng không có mã Lark là dữ liệu ghi thẳng vào DB bằng đường khác —
+ *      phép thử, thử tay, hoặc fixture còn sót. "Chỉ bán theo danh mục Lark"
+ *      nghĩa là dòng này không được đứng bán, có mã Lark thật hay không.
+ *   2. `lark_record_id` có, nhưng KHÔNG còn trong lượt đọc Lark vừa rồi: sản
+ *      phẩm đã bị xoá hoặc đổi mã bên Lark. Không xoá bên app để giữ lịch sử
+ *      (đơn hàng cũ, `selection_addons` cũ vẫn tham chiếu `product_id`), chỉ
+ *      ngừng bán tiếp.
+ *
+ * Chỉ xét sản phẩm ĐANG `is_active`, để không in lại những dòng đã tắt từ
+ * trước — danh sách in ra chỉ nên là những gì đổi trong lượt chạy này.
+ *
+ * `boMaLarkDangDoc` phải là tập RECORD ID CỦA MỌI DÒNG đọc được từ bảng Lark,
+ * kể cả dòng bị `skipped` (tên trống / phân loại lạ) — một sản phẩm bị bỏ qua
+ * vì chưa phân loại được VẪN đang tồn tại bên Lark, tắt nó là sai.
+ */
+export function sanPhamCanTat(sanPhamHienCo, boMaLarkDangDoc) {
+  return sanPhamHienCo.filter(
+    (p) => p.is_active && (!p.lark_record_id || !boMaLarkDangDoc.has(p.lark_record_id)),
+  );
+}
+
 // --- chạy -------------------------------------------------------------------
 
 async function main() {
@@ -258,12 +289,16 @@ async function main() {
 
   const items = [];
   const skipped = [];
+  // Mọi record_id đọc được từ Lark, KỂ CẢ dòng bị skip — dùng để biết sản
+  // phẩm nào KHÔNG còn bên Lark nữa (xem sanPhamCanTat).
+  const boMaLarkDangDoc = new Set();
 
   for (const row of catalog.rows) {
     const f = row.fields ?? {};
     const name = cellText(f["Tên SP/DV"]).trim();
     const category = cellText(f["Phân Loại Sản Xuất"]).trim();
     const recordId = cellText(f["Record ID"]).trim() || row.record_id;
+    if (recordId) boMaLarkDangDoc.add(recordId);
 
     if (!name) {
       skipped.push({ name: "(tên trống)", why: "không có tên" });
@@ -345,9 +380,34 @@ async function main() {
         ],
       );
     }
+
+    // BB-309 (A4) — tắt sản phẩm lạc: không có lark_record_id, hoặc có nhưng
+    // không còn trong lượt đọc Lark vừa rồi. Đọc TRONG cùng giao dịch để thấy
+    // đúng trạng thái vừa upsert ở trên, KHÔNG xoá — chỉ ngừng bán.
+    const { rows: hienCo } = await client.query(
+      `select id, name, lark_record_id, is_active from products`,
+    );
+    const canTat = sanPhamCanTat(hienCo, boMaLarkDangDoc);
+    if (canTat.length) {
+      await client.query(
+        `update products set is_active = false, updated_at = now() where id = any($1)`,
+        [canTat.map((p) => p.id)],
+      );
+    }
+
     await client.query("commit");
     const { rows } = await client.query("select count(*)::int as n from products");
     console.log(`\nĐã ghi. Bảng products hiện có ${rows[0].n} dòng.`);
+
+    if (canTat.length) {
+      console.log(`\nĐã TẮT ${canTat.length} sản phẩm lạc (is_active=false, không xoá) — admin xem lại:`);
+      for (const p of canTat) {
+        const ly_do = p.lark_record_id ? "không còn trong Lark" : "không có mã Lark (lark_record_id rỗng)";
+        console.log(`   ${p.name}  —  ${ly_do}`);
+      }
+    } else {
+      console.log("\nKhông có sản phẩm lạc nào cần tắt.");
+    }
   } catch (err) {
     await client.query("rollback").catch(() => {});
     throw err;
@@ -356,7 +416,13 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err.message);
-  process.exit(1);
-});
+// Chỉ chạy main() khi gọi trực tiếp (`node sync-lark-catalog.mjs`), không khi
+// một tệp phép thử `import` các hàm thuần ở trên — nếu không, import thôi
+// cũng đã gọi Lark/DB thật. Cùng cách làm với scripts/nap-lai-tu-lark.mjs.
+const chayTrucTiep = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (chayTrucTiep) {
+  main().catch((err) => {
+    console.error(err.message);
+    process.exit(1);
+  });
+}

@@ -482,10 +482,14 @@ function TheSoCard({ theSo }: { theSo: KetQuaBaoCao["theSo"][number] }) {
     <Card>
       <CardContent className="p-4">
         <div className="text-xs text-[var(--bb-fg-muted)]">{theSo.nhan}</div>
-        <div
-          className="mt-1 text-2xl font-semibold"
-          style={{ fontFamily: "var(--bb-font-display)" }}
-        >
+        {/* BB-308 (vòng 4, mục #7 báo cáo chấm 28/09/2026) — số liệu Báo cáo
+            vẫn dùng Playfair Display ("O bộ" nhìn như chữ, số oldstyle lệch
+            chân), trái quyết định số 2 admin đã duyệt ở BB-301
+            (babybean-assets/BB-301/XONG.md): "Số liệu: Be Vietnam Pro,
+            tabular-nums ở mọi thẻ và bảng". `.bb-so` (tokens.css) là ĐÚNG
+            token đã dùng cho mọi thẻ số quản trị khác (gallery-detail.tsx,
+            dashboard.tsx) — dùng lại, không tự định nghĩa cỡ lẻ mới. */}
+        <div className="bb-so mt-1 text-2xl">
           {theSo.giaTri}
           {theSo.donVi && <span className="ml-1 text-sm font-normal text-[var(--bb-fg-muted)]">{theSo.donVi}</span>}
         </div>
@@ -562,7 +566,12 @@ function BangSapXep({ bang }: { bang: NonNullable<KetQuaBaoCao["bang"]> }) {
             {dongDaSap.map((dong, i) => (
               <tr key={i} className="border-b border-[var(--bb-border)]">
                 {dong.map((o, j) => (
-                  <td key={j} className={`py-2 pr-3 ${typeof o === "number" ? "text-right" : ""}`}>
+                  // BB-308 (vòng 4, mục #7): `tabular-nums` cho cột số —
+                  // quyết định BB-301 số 2 ghi rõ "mọi thẻ VÀ BẢNG".
+                  <td
+                    key={j}
+                    className={`py-2 pr-3 ${typeof o === "number" ? "text-right tabular-nums" : ""}`}
+                  >
                     {o ?? "—"}
                   </td>
                 ))}

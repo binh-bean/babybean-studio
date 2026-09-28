@@ -20,6 +20,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BranchSelector } from "./branch-selector";
 import {
   bienDongLaTot,
   chaoTheoBuoi,
@@ -31,6 +33,7 @@ import {
 import { THU_TU_HIEN_THI_MUA_THEM } from "@/lib/utils/mua-them-7-ngay";
 import { dongCanXuLy, type CanXuLyTongHop } from "@/lib/utils/can-xu-ly";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
+import { tinhTenBiaTuDuLieu, tinhTieuDeBoAnhQuanTri } from "@/lib/utils/dinh-dang";
 import { CARD_TITLE_CLASS, PAGE_TITLE_CLASS } from "./page-header";
 
 /** Màu dải cơ cấu Mua thêm theo ĐÚNG bản vẽ: Ảnh in (mực) · Khung (rêu) · Album (hồng). */
@@ -96,11 +99,25 @@ type ViecHomNayItem = ViecHomNayThoLuoc & {
   selectedCount: number;
   includedQuota: number | null;
   urgency: string;
-  babyName: string | null;
+  /**
+   * BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — nickname/họ tên đầy đủ RIÊNG
+   * (route API đã đổi, `src/app/api/admin/dashboard/route.ts`), để tự áp
+   * `tinhTieuDeBoAnhQuanTri` đúng luật — không lùi về `tenGoiBe()` vô điều
+   * kiện như bản cũ (thêm nhầm "Bé " trước họ tên đầy đủ khi bé không có
+   * nickname).
+   */
+  babyNickname: string | null;
+  babyFullName: string | null;
   packageName: string | null;
   customerPhone: string | null;
   coverPhotoId: string | null;
   sentAt: string | null;
+  /**
+   * BB-312 — có giá trị khi dòng này là một bộ ảnh đang có yêu cầu "xin mở
+   * lại" CHƯA XỬ LÝ (không phải việc theo hạn giao thật — `dueAt` của dòng
+   * này luôn null, xếp vào "Hôm nay" qua `forceHomNay`, xem bang-dieu-khien.ts).
+   */
+  waitingReopen?: { requestedAt: string; lyDo: string | null; lanThu: number };
 };
 
 type CoCauMuaThemApi = { nhom: string; ten: string; soMon: number; tongTien: number };
@@ -143,7 +160,30 @@ type DashboardData = {
 
 export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   const searchParams = useSearchParams();
-  const branchId = searchParams?.get("branchId") || "";
+  /**
+   * BB-308 (bản vẽ BB-301: "bộ chọn chi nhánh cạnh nút + Tạo bộ ảnh") —
+   * `BranchSelector` đã có sẵn trong dự án (branch-selector.tsx) nhưng chưa
+   * gắn vào trang nào (xem chú thích cũ ở `khoiChao` bên dưới). Nó ĐỔI chi
+   * nhánh bằng `window.history.pushState` + sự kiện `branchChange` — không
+   * qua router Next.js — nên `useSearchParams()` chỉ bắt được giá trị BAN
+   * ĐẦU (khi vào thẳng URL có `?branchId=`); mọi lần đổi sau đó phải nghe sự
+   * kiện, ĐÚNG cách `gallery-list.tsx` đã làm (`window.addEventListener("branchChange", …)`),
+   * để không lặp lại một router state thứ hai không đồng bộ.
+   */
+  const [branchId, setBranchId] = useState(() => searchParams?.get("branchId") || "");
+
+  useEffect(() => {
+    setBranchId(searchParams?.get("branchId") || "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    function xuLyDoiChiNhanh(e: Event) {
+      const detail = (e as CustomEvent<string>).detail;
+      setBranchId(detail ?? "");
+    }
+    window.addEventListener("branchChange", xuLyDoiChiNhanh);
+    return () => window.removeEventListener("branchChange", xuLyDoiChiNhanh);
+  }, []);
 
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -368,17 +408,20 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
       </div>
       {/* BB-303 (bang-dieu-khien.html): nút "+ Tạo bộ ảnh" cạnh lời chào —
           CÙNG đích/CÙNG kiểu nút với trang Bộ ảnh (`bo-anh-page-header.tsx`),
-          không viết lại luồng tạo bộ ảnh ở đây. Bộ lọc chi nhánh trong bản vẽ
-          KHÔNG thêm ở đây: `BranchSelector` (src/components/features/admin/
-          branch-selector.tsx) đã có sẵn trong dự án nhưng CHƯA được gắn vào
-          bất cứ trang nào — gắn nó là việc rộng hơn phạm vi BB-303 (ảnh hưởng
-          mọi trang quản trị đọc `branchId`), nên chỉ ghi vào bàn giao. */}
-      <Link href="/admin/galleries/create" className="shrink-0">
-        <Button className="bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90" size="sm">
-          <Plus className="mr-1.5 h-4 w-4" />
-          Tạo bộ ảnh
-        </Button>
-      </Link>
+          không viết lại luồng tạo bộ ảnh ở đây.
+          BB-308: bộ chọn chi nhánh (`BranchSelector`) giờ đứng CẠNH nút này,
+          đúng bản vẽ — trước đây có sẵn trong dự án nhưng chưa gắn vào trang
+          nào (BB-303 chỉ ghi nhận vào bàn giao). Tự ẩn khi nhân viên chỉ phụ
+          trách một chi nhánh (xem `branch-selector.tsx`). */}
+      <div className="flex shrink-0 items-center gap-2">
+        <BranchSelector />
+        <Link href="/admin/galleries/create">
+          <Button className="bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90" size="sm">
+            <Plus className="mr-1.5 h-4 w-4" />
+            Tạo bộ ảnh
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 
@@ -643,9 +686,18 @@ function AnhBiaViec({ coverPhotoId, title }: { coverPhotoId: string | null; titl
   );
 }
 
-/** Dòng phụ "Loại buổi · Bé … · Ba mẹ · Chi nhánh", chỉ nối các phần THẬT SỰ có dữ liệu. */
+/**
+ * Dòng phụ "Loại buổi · Bé … · Ba mẹ · Chi nhánh", chỉ nối các phần THẬT SỰ
+ * có dữ liệu. BB-308 (vòng 4, mục #8): `tenGoiBe` thay `` `Bé ${...}` `` —
+ * tránh "Bé Bé Na" cho bé đã có "Bé" trong nickname.
+ *
+ * BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — dùng `tinhTenBiaTuDuLieu` (đúng
+ * hàm dùng chung, dinh-dang.ts) thay vì gọi `tenGoiBe()` vô điều kiện: mất
+ * nickname thì hiện HỌ TÊN ĐẦY ĐỦ NGUYÊN VẸN, không thêm "Bé ".
+ */
 function dongPhuViec(item: ViecHomNayItem): string {
-  const phan = [item.packageName, item.babyName ? `Bé ${item.babyName}` : null, item.customerName, item.branchName].filter(
+  const tenBe = tinhTenBiaTuDuLieu(item.babyNickname, item.babyFullName);
+  const phan = [item.packageName, tenBe || null, item.customerName, item.branchName].filter(
     (v): v is string => !!v,
   );
   return phan.join(" · ");
@@ -653,6 +705,10 @@ function dongPhuViec(item: ViecHomNayItem): string {
 
 /** Nhãn hạn + có trễ hay không — "Trễ N ngày/giờ" / "hôm nay HH:mm" / "HH:mm" / "dd/mm". */
 function nhanHanViec(item: ViecHomNayItem, now: Date): { text: string; tre: boolean } {
+  // BB-312 — không có "hạn giao" thật; "lần N" nói rõ hơn cho CSKH đây là
+  // việc đã dồn lại bao nhiêu lượt, thay vì im lặng như "Cần xử lý" chung
+  // chung của các dòng thiếu `dueAt` khác.
+  if (item.waitingReopen) return { text: `Xin lần ${item.waitingReopen.lanThu}`, tre: true };
   if (!item.dueAt) return { text: item.status === "submitted" ? "Cần xử lý" : "—", tre: false };
   const due = new Date(item.dueAt);
   if (Number.isNaN(due.getTime())) return { text: "—", tre: false };
@@ -667,6 +723,30 @@ function nhanHanViec(item: ViecHomNayItem, now: Date): { text: string; tre: bool
     return { text: due.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }), tre: false };
   }
   return { text: due.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }), tre: false };
+}
+
+/**
+ * BB-308 (bản vẽ BB-301: chip lọc "Tất cả / Nhắc khách / Duyệt & giao") —
+ * phân nhóm MỖI DÒNG "Việc hôm nay" theo đúng nhánh nút "Làm nhanh" mà
+ * `NutLamNhanhViec` bên dưới đã vẽ: ba trạng thái "submitted"/"in_retouch"/
+ * "ready chưa gửi" cần STUDIO xử lý tiếp (duyệt, chuyển, giao) → nhóm
+ * "duyet_giao"; mọi trường hợp còn lại là đang chờ KHÁCH phản hồi → nhóm
+ * "nhac_khach". Tách thành hàm riêng (không viết lại logic bên trong
+ * `NutLamNhanhViec`) để chip đếm/lọc và nút hiển thị luôn khớp nhau — đổi
+ * một nơi, không lệch hai chỗ.
+ */
+export type NhomThaoTacViec = "duyet_giao" | "nhac_khach";
+/** Xuất ra để `tests/unit/bb-308-nhom-thao-tac-viec.test.ts` thử trực tiếp — cùng cách `tenThanThienMuaThem` (gallery-detail.tsx) đã làm cho BB-296. */
+export function nhomThaoTacViec(
+  item: Pick<ViecHomNayItem, "status" | "sentAt" | "waitingReopen">,
+): NhomThaoTacViec {
+  // BB-312 — yêu cầu "xin mở lại" luôn cần STUDIO trả lời trước, không phải
+  // chờ khách — cùng nhóm với "Duyệt & giao".
+  if (item.waitingReopen) return "duyet_giao";
+  if (item.status === "submitted") return "duyet_giao";
+  if (item.status === "in_retouch") return "duyet_giao";
+  if (item.status === "ready" && !item.sentAt) return "duyet_giao";
+  return "nhac_khach";
 }
 
 /** Nút "Làm nhanh" đổi theo trạng thái — bo-anh-danh-sach.png/bang-dieu-khien.html. */
@@ -684,7 +764,11 @@ function NutLamNhanhViec({
   async function chepLoiNhac() {
     try {
       await navigator.clipboard.writeText(
-        loiNhacKhach({ customerName: item.customerName, babyName: item.babyName, title: item.title }),
+        loiNhacKhach({
+          customerName: item.customerName,
+          babyName: tinhTenBiaTuDuLieu(item.babyNickname, item.babyFullName) || null,
+          title: item.title,
+        }),
       );
       setDaChep(true);
       window.setTimeout(() => setDaChep(false), 2000);
@@ -693,6 +777,18 @@ function NutLamNhanhViec({
     }
   }
 
+  // BB-312 — yêu cầu "xin mở lại" không đi qua "Chuyển chỉnh"/"Duyệt-giao" cũ
+  // (đó là hai việc khác hẳn); nút riêng mở đúng bộ ảnh, nơi có khối nổi bật
+  // để xử lý (`YeuCauMoLaiBanner`).
+  if (item.waitingReopen) {
+    return (
+      <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`}>
+        <Button variant="outline" size="sm" className="h-8 shrink-0 whitespace-nowrap text-xs">
+          <Send className="mr-1 h-3.5 w-3.5" /> Xem yêu cầu
+        </Button>
+      </Link>
+    );
+  }
   if (item.status === "submitted") {
     return (
       <Button
@@ -748,11 +844,27 @@ function DongViec({ item, onLamMoi }: { item: ViecHomNayItem; onLamMoi: () => Pr
 
   const IconHan = item.dueAt && new Date(item.dueAt).toDateString() !== now.toDateString() ? CalendarClock : Clock;
 
+  // BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — dòng ĐẬM chính của "Việc hôm
+  // nay" trước đây LUÔN in `item.title` (thường là mã hợp đồng), kể cả khi
+  // đã biết tên bé/tên khách — mã lại đứng vai trò nổi bật nhất, tên bé chỉ
+  // nằm ở dòng phụ nhỏ bên dưới (`dongPhuViec`). Đảo lại đúng luật: tên đứng
+  // trước, mã hợp đồng chỉ dùng khi không còn tên nào — và khi đó thêm
+  // `tabular-nums` cho đúng luật phông (mã số không dùng chữ kiểu tự do).
+  const { tieuDe, laMaHopDong } = tinhTieuDeBoAnhQuanTri({
+    packageName: item.packageName,
+    babyNickname: item.babyNickname,
+    babyFullName: item.babyFullName,
+    customerName: item.customerName,
+    duPhong: item.title,
+  });
+
   return (
     <li className="flex items-center gap-3 border-t border-[var(--bb-border)] px-4 py-3 first:border-t-0 sm:px-6">
-      <AnhBiaViec coverPhotoId={item.coverPhotoId} title={item.title} />
+      <AnhBiaViec coverPhotoId={item.coverPhotoId} title={tieuDe} />
       <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`} className="min-w-0 flex-1 hover:opacity-80">
-        <p className="truncate text-sm font-medium text-[var(--bb-fg)]">{item.title}</p>
+        <p className={`truncate text-sm font-medium text-[var(--bb-fg)]${laMaHopDong ? " tabular-nums" : ""}`}>
+          {tieuDe}
+        </p>
         <p className="truncate text-xs text-[var(--bb-fg-muted)]">{dongPhuViec(item)}</p>
       </Link>
       <span
@@ -780,22 +892,72 @@ function DongViec({ item, onLamMoi }: { item: ViecHomNayItem; onLamMoi: () => Pr
  * thứ tự nào".
  */
 function ViecHomNayCard({ items, onLamMoi }: { items: ViecHomNayItem[]; onLamMoi: () => Promise<void> }) {
-  const xep = xepViecHomNay(items);
+  // BB-308 — chip lọc "Tất cả / Nhắc khách / Duyệt & giao", có số đếm. Đếm
+  // trên TOÀN BỘ `items` (trước khi lọc theo hạn) để số trên chip không đổi
+  // khi người dùng chuyển chip qua lại.
+  const [locChip, setLocChip] = useState<"tat_ca" | NhomThaoTacViec>("tat_ca");
+  const soNhacKhach = items.filter((i) => nhomThaoTacViec(i) === "nhac_khach").length;
+  const soDuyetGiao = items.length - soNhacKhach;
+  const itemsLoc =
+    locChip === "tat_ca" ? items : items.filter((i) => nhomThaoTacViec(i) === locChip);
+
+  const xep = xepViecHomNay(itemsLoc);
   const tongSo = xep.quaHan.length + xep.homNay.length + xep.ngayMai.length;
 
   return (
     <Card className="flex flex-col overflow-hidden">
       <CardHeader>
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
           <CardTitle className={CARD_TITLE_CLASS}>Việc hôm nay</CardTitle>
           <span className="text-xs text-[var(--bb-fg-muted)]">xếp theo hạn, việc trễ lên đầu</span>
         </div>
+        <Tabs value={locChip} onValueChange={(v) => setLocChip(v as "tat_ca" | NhomThaoTacViec)} className="mt-2">
+          {/* `TabsTrigger` gốc không gắn `data-state` (chỉ đổi className theo
+              `aria-selected` nội bộ) nên so trực tiếp `locChip` ở đây, không
+              dùng biến thể `data-[state=active]:` (sẽ không bao giờ khớp). */}
+          <TabsList className="h-auto flex-wrap justify-start gap-1 bg-transparent p-0">
+            <TabsTrigger
+              value="tat_ca"
+              className={
+                "h-8 min-h-0 rounded-full border border-[var(--bb-border)] px-3 py-1 text-xs shadow-none " +
+                (locChip === "tat_ca" ? "bg-[var(--bb-fg)] text-[var(--bb-bg)]" : "bg-transparent")
+              }
+            >
+              Tất cả <span className="ml-1 tabular-nums">{items.length}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="nhac_khach"
+              className={
+                "h-8 min-h-0 rounded-full border border-[var(--bb-border)] px-3 py-1 text-xs shadow-none " +
+                (locChip === "nhac_khach" ? "bg-[var(--bb-fg)] text-[var(--bb-bg)]" : "bg-transparent")
+              }
+            >
+              Nhắc khách <span className="ml-1 tabular-nums">{soNhacKhach}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="duyet_giao"
+              className={
+                "h-8 min-h-0 rounded-full border border-[var(--bb-border)] px-3 py-1 text-xs shadow-none " +
+                (locChip === "duyet_giao" ? "bg-[var(--bb-fg)] text-[var(--bb-bg)]" : "bg-transparent")
+              }
+            >
+              Duyệt &amp; giao <span className="ml-1 tabular-nums">{soDuyetGiao}</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </CardHeader>
       <CardContent className="p-0">
         {tongSo === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-[var(--bb-fg-muted)]">
             <CheckCircle2 className="h-10 w-10 text-emerald-500/50" />
-            <p className="text-sm">Không có việc nào cần làm hôm nay hoặc ngày mai.</p>
+            <p className="text-sm">
+              {/* BB-308 — items.length > 0 nhưng itemsLoc rỗng nghĩa là chỉ đang
+                  lọc hết theo chip, không phải "hết việc" — hai câu khác nghĩa
+                  nhau, không dùng chung một câu. */}
+              {items.length > 0
+                ? "Không có việc nào thuộc nhóm đang lọc."
+                : "Không có việc nào cần làm hôm nay hoặc ngày mai."}
+            </p>
           </div>
         ) : (
           <>

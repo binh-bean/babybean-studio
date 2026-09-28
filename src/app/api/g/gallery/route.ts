@@ -7,6 +7,7 @@ import { bamMaLink } from "@/lib/auth/bam-ma-link";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { nhanHienThi, qua60NgayFileGoc } from "@/lib/lark/trang-thai-hau-ky";
+import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 
 export async function GET(request: Request) {
   try {
@@ -446,6 +447,11 @@ export async function GET(request: Request) {
     // app còn ghi ready/in_review/submitted. Không trả mã Lark thô cho khách
     // (xem chú thích cũ dưới đây) — chỉ trả boolean đã tính sẵn.
     const khoaChonTheoLark = isGalleryLocked(gallery.status, gallery.lark_trang_thai) || quaHan60Ngay;
+
+    // BB-312 — trạng thái "xin mở lại" của CHÍNH bộ ảnh này, để màn khách nói
+    // rõ: đang chờ (không cho gửi trùng), đã mở, hay bị từ chối kèm lý do.
+    const reopenRequest = await layTrangThaiXinMoLai(supabase, gallery.id);
+
     const responseData = {
       id: gallery.id,
       title: gallery.title,
@@ -466,6 +472,15 @@ export async function GET(request: Request) {
       khoaChonTheoLark,
       quaHan60Ngay,
       babyName: baby?.nickname || baby?.full_name || null,
+      // BB-310 mục 7 — báo cáo chấm độc lập vòng 4: 254/258 bé thật không có
+      // `nickname` nên `babyName` (gộp sẵn ở trên) rơi về HỌ TÊN ĐẦY ĐỦ, và
+      // bìa từng in nguyên họ tên đó ở cỡ chữ lớn nhất trang. Trả THÊM hai
+      // trường thô (không gộp) để `tinhTenBiaTuDuLieu()` (dinh-dang.ts) tự
+      // quyết định tên gọi lớn (nickname, hoặc chữ cuối họ tên đầy đủ) và họ
+      // tên đầy đủ cho dòng phụ nhỏ — không đổi `babyName` để không phá các
+      // chỗ khác đang dùng trường gộp sẵn này.
+      babyNickname: baby?.nickname || null,
+      babyFullName: baby?.full_name || null,
       // BB-212 — xem ghi chú ở chỗ truy vấn `customer` phía trên.
       customerName: customer?.full_name || null,
       shootDate: (gallery.shoot_date as unknown as { shoot_date: string }[])?.[0]?.shoot_date || (gallery.shoot_date as unknown as { shoot_date: string })?.shoot_date || null,
@@ -536,6 +551,8 @@ export async function GET(request: Request) {
       /** BB-202 — bìa của mỗi album TRONG GÓI (rỗng = gói không có album nào). */
       albumBia,
       review,
+      // BB-312 — xem chú thích ở phần tính phía trên.
+      reopenRequest,
     };
 
     return ok(responseData);

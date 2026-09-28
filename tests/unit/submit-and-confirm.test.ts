@@ -44,9 +44,9 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
     prodServiceMakeup = randomUUID();
 
     const prods = [
-      { id: prodPkgBaby01, name: "TEST Gói Baby 01", kind: "shoot_package", list_price: 1500000, is_active: true },
-      { id: prodEditFile, name: "TEST Edit file", kind: "edited_photo", list_price: 50000, is_active: true },
-      { id: prodServiceMakeup, name: "TEST Dịch vụ Makeup", kind: "service", list_price: 300000, is_active: true },
+      { id: prodPkgBaby01, name: "Fixture Gói Baby 01", kind: "shoot_package", list_price: 1500000, is_active: true },
+      { id: prodEditFile, name: "Fixture Edit file", kind: "edited_photo", list_price: 50000, is_active: true },
+      { id: prodServiceMakeup, name: "Fixture Dịch vụ Makeup", kind: "service", list_price: 300000, is_active: true },
     ];
 
     for (const p of prods) createdProductIds.push(p.id);

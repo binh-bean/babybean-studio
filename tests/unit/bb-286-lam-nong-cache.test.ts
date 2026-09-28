@@ -29,8 +29,15 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { pngGiaHopLe } from "../fixtures/anh-gia";
 
 vi.mock("server-only", () => ({}));
+
+// BB-311: chốt "không ghi đệm khi đang chạy phép thử" (kiem-thu.ts) mặc định
+// chặn ghi đệm trong MỌI phép thử — đúng ý nghĩa của nó. Tệp này giả lập toàn
+// bộ biên giới (driveFetch VÀ client Supabase), không chạm bb-dev, nên xin đi
+// qua chốt để canh đúng hành vi "có ghi hay không / gọi Drive bao nhiêu lần".
+process.env.CHO_PHEP_GOI_MANG_TRONG_PHEP_THU = "1";
 
 import * as driveClient from "@/lib/drive/client";
 import {
@@ -109,9 +116,9 @@ function anhGia(n: number, tienTo = "anh"): Anh[] {
 }
 
 function driveResOk(): Response {
-  return new Response(new Uint8Array([255, 216, 255, 0]), {
+  return new Response(pngGiaHopLe(), {
     status: 200,
-    headers: { "Content-Type": "image/jpeg" },
+    headers: { "Content-Type": "image/png" },
   });
 }
 

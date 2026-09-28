@@ -234,11 +234,19 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     // BB-295 mục #6 — báo cáo chấm độc lập: hai hộp đỏ trùng ý gộp thành
     // một lời nhắc dịu ("Còn thiếu ảnh bìa album") với một nút "Chọn bìa
     // ngay" (trước là "Ba mẹ chưa chọn ảnh bìa cho:" + "Đi tới chọn bìa").
-    await expect(page.getByText("Còn thiếu ảnh bìa album")).toBeVisible();
+    //
+    // BB-310 mục 2 — báo cáo chấm độc lập vòng 4: câu cũ đứng cạnh câu "để
+    // sau cũng được, CSKH sẽ hỏi lại" (dành cho sản phẩm thiếu ảnh, KHÔNG
+    // chặn) làm ba mẹ hiểu nhầm bìa album cũng để sau được. Đổi chữ rõ ràng
+    // hơn, GIỮ NGUYÊN quy tắc (bìa album vẫn bắt buộc). Chữ này lặp lại ở cả
+    // khối nhắc lẫn dòng lý do khoá nút (cố ý) — `.first()` tránh strict mode.
+    await expect(page.getByText("Chọn một tấm làm bìa cuốn album để xác nhận").first()).toBeVisible();
     // Nút Xác nhận phải bị khoá lại — không cho chốt khi còn thiếu bìa — và
     // lý do khoá phải hiện ngay dưới nút (BB-295 mục #6).
     await expect(page.getByRole("button", { name: "Xác nhận" })).toBeDisabled();
-    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText("Chọn bìa album để xác nhận");
+    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText(
+      "Chọn một tấm làm bìa cuốn album để xác nhận",
+    );
 
     await page.getByTestId("nut-chon-bia-ngay").click();
 
@@ -258,7 +266,10 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Mẹ Bean BB-202");
     await page.getByRole("checkbox").setChecked(true, { force: true });
-    await expect(page.getByText("Còn thiếu ảnh bìa album")).toHaveCount(0);
+    // BB-310 mục 2 — chọn bìa xong mở lại hộp chốt phải thấy NGAY hộp đã hết
+    // khoá (cập nhật lạc quan tại chỗ, không chờ tải lại toàn bộ — xem
+    // `chonBiaAlbum` ở `gallery-app.tsx`).
+    await expect(page.getByText("Chọn một tấm làm bìa cuốn album để xác nhận")).toHaveCount(0);
     await page.getByRole("button", { name: "Xác nhận" }).click();
 
     await expect

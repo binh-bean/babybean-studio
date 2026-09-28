@@ -52,3 +52,22 @@ export function dangChayPhepThu(): boolean {
 export function khongGuiRaLarkThat(): boolean {
   return dangChayPhepThu() || process.env.PHEP_THU_TRINH_DUYET === "1";
 }
+
+/**
+ * Chốt riêng cho việc GHI vào bộ đệm ảnh dùng chung (Supabase Storage, bucket
+ * `thumbnails`). Cùng điều kiện như `khongGuiRaLarkThat()` (phép thử đơn vị
+ * HOẶC phép thử trình duyệt) nhưng tách tên riêng — BB-311 P0: 42 ảnh đệm của
+ * 19 bộ ảnh THẬT bị mock `/api/img` của Playwright ghi đè thành PNG trong
+ * suốt 78 byte, vì máy chủ thử dựng `next dev` bình thường (không có
+ * `VITEST`) và route ảnh không hề biết mình đang chạy phép thử.
+ *
+ * Đặt tên khác `khongGuiRaLarkThat` dù cùng logic: một cái canh gửi Lark, cái
+ * này canh ghi Storage — dùng chung tên cũ ở một chỗ không liên quan tới Lark
+ * là một cái bẫy đọc mã cho người sau (xem AGENTS.md — đặt tên đúng phạm vi).
+ *
+ * Nơi gọi chốt này: `src/app/api/img/[photoId]/route.ts`,
+ * `src/lib/drive/lam-nong-cache.ts`.
+ */
+export function khongGhiDemPhepThu(): boolean {
+  return dangChayPhepThu() || process.env.PHEP_THU_TRINH_DUYET === "1";
+}

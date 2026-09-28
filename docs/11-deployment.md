@@ -99,6 +99,43 @@ Yêu cầu với `scripts/db-push.mjs`:
 
 **Không có `.env` nào được commit.** `.env.example` chỉ chứa tên biến, không chứa giá trị.
 
+## 2a. Bật phần phép thử cần cơ sở dữ liệu trên CI (BB-309)
+
+`.github/workflows/ci.yml` hiện chạy `npm run test` **không có** Supabase
+thật — `vitest.config.ts` tự phát hiện thiếu
+`NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` và loại riêng các tệp
+`.test.ts` chạm cơ sở dữ liệu (nhận diện qua `createClient(`,
+`createAdminClient(`, hoặc đọc thẳng ba biến `NEXT_PUBLIC_SUPABASE_URL` /
+`SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_DB_URL`), kèm dòng cảnh báo trong log
+CI nói rõ bỏ qua bao nhiêu tệp và vì sao. Các phép thử thuần logic (không
+chạm DB) vẫn chạy đầy đủ trên mọi lượt CI, không cần bước này.
+
+Đây là cố ý, KHÔNG phải thiếu sót cần "sửa cho xong": CI không được trỏ vào
+bb-dev (dữ liệu khách thật — AGENTS.md §6), và tới nay chưa có project
+`bb-test` để trỏ vào (xem quyết định Q2 trong lộ trình mở app, mục "Cơ sở dữ
+liệu cho phép thử").
+
+**Khi có `bb-test`, bật lại bằng các bước sau:**
+
+1. Tạo project Supabase riêng cho `bb-test`, dựng schema bằng
+   `db/schema.sql` + `db/policies.sql` (xem §1c) — KHÔNG sao chép dữ liệu từ
+   bb-dev sang, chỉ dựng cấu trúc trống rồi seed dữ liệu giả (AGENTS.md §6).
+2. Thêm 4 GitHub Secret cho riêng CI, tên gợi ý (không trùng biến production ở
+   Vercel để tránh nhầm khi đọc log):
+   - `TEST_NEXT_PUBLIC_SUPABASE_URL`
+   - `TEST_NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `TEST_SUPABASE_SERVICE_ROLE_KEY`
+   - `TEST_SUPABASE_DB_URL`
+3. Trong `.github/workflows/ci.yml`, thêm `env:` vào bước `npm run test` ánh
+   xạ 4 secret trên sang đúng tên biến `NEXT_PUBLIC_SUPABASE_URL` /
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` /
+   `SUPABASE_DB_URL` mà `vitest.config.ts` và code đang đọc.
+4. Sau bước 3, `vitest.config.ts` sẽ thấy đủ biến và tự chạy TOÀN BỘ bộ test
+   (không loại bớt tệp nào) — không cần sửa gì thêm ở đó.
+5. **Trước khi bật**: chạy thử toàn bộ `npm run test` nhắm vào bb-test ở máy
+   dev một lượt, xác nhận không tệp nào vô tình đọc/ghi vào bb-dev (kiểm bằng
+   mã dự án Supabase trong chuỗi kết nối — xem `src/lib/lark/muc-tieu-du-lieu.ts`).
+
 ## 3. Quy trình phát hành
 
 ```
@@ -184,6 +221,15 @@ Vì vậy `flush-notifications` (mỗi 5 phút, đẩy hàng đợi Lark/Zalo) �
 
 Giờ trong `vercel.json` là **UTC**. `0 18 * * *` UTC = 01:00 giờ Việt Nam. `0 2 * * *` UTC = 09:00 giờ Việt Nam.
 Mọi handler cron kiểm `Authorization: Bearer <CRON_SECRET>` trước khi làm gì.
+
+**BB-311 (28/09/2026, admin — mục A):** `/api/cron/expire-galleries` giờ làm
+thêm việc thứ 6, "đi nhờ" đúng cách mục 4/5 đã đi nhờ — KHÔNG thêm cron mới
+(gói Hobby chỉ cho 2 cron/ngày, cả hai đã dùng hết, xem đầu mục này): dọn bộ
+đệm ẢNH BÌA (`scripts/don-dem-het-han.ts`) của các bộ đã xong vòng đời
+(`status ∈ {delivered, expired, archived}`) quá N ngày — N tính động theo
+lượng khách mới (`shoots.shoot_date`, nguồn Lark) để giữ tổng đệm dưới ~60%
+hạn mức Storage free. Bọc riêng try/catch, không làm hỏng phần chính của cron
+nếu bước dọn đệm lỗi. Chạy tay xem trước: `npm run anh:don-dem-het-han`.
 
 > **Kiểm 25/09/2026 (`vercel env ls production`): KHÔNG có `CRON_SECRET`, KHÔNG
 > có `SUPABASE_DB_URL`.** Vercel chỉ gắn header `Authorization` khi biến

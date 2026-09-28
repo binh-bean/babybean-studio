@@ -9,10 +9,11 @@
  *     link.
  *   - Mỗi màn thường 2 phông, tối đa 3.
  *
- * Canh trên BỐN màn: Bảng điều khiển, Danh sách bộ ảnh, Chi tiết bộ ảnh,
- * Khách hàng — gom TẬP `getComputedStyle(el).fontFamily` (họ đầu tiên) của
- * mọi phần tử có văn bản, phải là tập con của {Playfair Display, Be Vietnam
- * Pro}, và không phần tử Playfair nào `font-style: italic`.
+ * Canh trên NĂM màn: Bảng điều khiển, Danh sách bộ ảnh, Chi tiết bộ ảnh,
+ * Khách hàng, Báo cáo (BB-308 vòng 4, mục #7) — gom TẬP
+ * `getComputedStyle(el).fontFamily` (họ đầu tiên) của mọi phần tử có văn
+ * bản, phải là tập con của {Playfair Display, Be Vietnam Pro}, và không phần
+ * tử Playfair nào `font-style: italic`.
  *
  * KIỂM NGƯỢC (chạy tay trước khi nộp, dán cả hai kết quả vào bàn giao): thêm
  * tạm một chỗ `font-mono` vào một trong bốn màn trên → ca dưới đây phải ĐỎ;
@@ -180,6 +181,14 @@ test.describe("BB-303: luật phông — chỉ Playfair Display + Be Vietnam Pro
     );
     await kiemTrang("/admin/customers", () =>
       page.locator("input#tim-khach").waitFor({ state: "attached", timeout: 20_000 }),
+    );
+    // BB-308 (vòng 4, mục #7 báo cáo chấm 28/09/2026) — trang Báo cáo chọn
+    // sẵn báo cáo ĐẦU TIÊN khi vào không kèm `?ma=`; chờ thẻ số (`.bb-so`,
+    // đúng token Be Vietnam Pro tabular-nums BB-301 quyết định số 2) render
+    // xong trước khi gom phông, không chờ tiêu đề "Báo cáo" (hiện ngay từ
+    // đầu, trước khi báo cáo tải xong).
+    await kiemTrang("/admin/bao-cao", () =>
+      page.locator(".bb-so").first().waitFor({ state: "attached", timeout: 20_000 }),
     );
 
     expect(loiTheoTrang, `Vi phạm luật phông:\n${loiTheoTrang.join("\n")}`).toEqual([]);

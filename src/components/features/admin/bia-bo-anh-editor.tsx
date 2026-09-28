@@ -5,6 +5,7 @@ import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { MAU_CHU_BIA, dienMau } from "@/lib/gallery/mau-chu-bia";
 import { X } from "lucide-react";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
+import { tinhTenBiaTuDuLieu } from "@/lib/utils/dinh-dang";
 
 interface AnhLuoi {
   id: string;
@@ -20,7 +21,40 @@ export function BiaBoAnhEditor({
   onSave,
 }: {
   galleryId: string;
-  detail: { coverPhotoId?: string | null, coverHeadline?: string | null, welcomeMessage?: string | null, coverLayout?: string | null, babyName?: string | null, branchName?: string | null, createdAt?: string | null, photoCount: number, includedQuota: number | null, selectedCount: number };
+  detail: {
+    coverPhotoId?: string | null;
+    coverHeadline?: string | null;
+    welcomeMessage?: string | null;
+    coverLayout?: string | null;
+    /**
+     * BB-313 (ảnh chụp app thật, Đợt 9, mục 3) — nickname/họ tên đầy đủ
+     * RIÊNG (trước là một `babyName` đã coalesce sẵn, dùng thẳng làm `tenBe`
+     * mà KHÔNG qua `tenGoiBe` — nickname thật thì khung xem trước thiếu tiền
+     * tố "Bé " so với đúng bìa khách thấy). Tính lại bằng
+     * `tinhTenBiaTuDuLieu` NGAY TRONG component này — cùng hàm, cùng luật
+     * `gallery-app.tsx` (màn khách) đang dùng, để khung xem trước giống hệt.
+     */
+    babyNickname?: string | null;
+    babyFullName?: string | null;
+    branchName?: string | null;
+    /**
+     * BB-308 (vòng 4, mục #5 báo cáo chấm 28/09/2026) — khung xem trước
+     * trước đây dùng `detail.createdAt` (trường KHÔNG TỪNG tồn tại trên
+     * `Detail` của `gallery-detail.tsx` — luôn `undefined` khi gọi thật, nên
+     * ngày chụp trên khung xem trước luôn trống). Đổi sang `shootDate`
+     * (ngày chụp THẬT, `shoots.shoot_date`) — đúng trường màn khách dùng.
+     */
+    shootDate?: string | null;
+    /**
+     * BB-308 (vòng 4, mục #5) — "loại buổi chụp" ("Thôi nôi"…) để khung xem
+     * trước hiện đúng dòng phụ dưới tên bé, khớp bìa khách thấy
+     * (`tinhBiaMacDinh`, bia-bo-anh.tsx).
+     */
+    sessionType?: string | null;
+    photoCount: number;
+    includedQuota: number | null;
+    selectedCount: number;
+  };
   busy: boolean;
   onSave: (thayDoi: {
     coverPhotoId?: string | null;
@@ -85,8 +119,13 @@ export function BiaBoAnhEditor({
     if (luoi.length === 0) void taiLuoi(true);
   }
 
+  // BB-313 mục 3 — MỘT lần tính duy nhất, dùng lại cho cả `duLieuBia` (mẫu
+  // chữ có sẵn), placeholder ô tiêu đề, và prop `tenBe` gửi xuống `BiaBoAnh` ở
+  // khung xem trước — đúng cùng chuỗi `gallery-app.tsx` tính cho màn khách.
+  const tenBeHienThi = tinhTenBiaTuDuLieu(detail.babyNickname, detail.babyFullName) || null;
+
   const duLieuBia = {
-    tenBe: detail.babyName ?? null,
+    tenBe: tenBeHienThi,
     ngayChup: null,
     chiNhanh: detail.branchName ?? "",
   };
@@ -116,7 +155,7 @@ export function BiaBoAnhEditor({
               Bìa bộ ảnh
             </div>
             <p className="truncate text-sm font-medium text-[var(--bb-fg)]">
-              {detail.coverHeadline || detail.babyName || "Đã chọn ảnh bìa"}
+              {detail.coverHeadline || tenBeHienThi || "Đã chọn ảnh bìa"}
             </p>
           </div>
         </div>
@@ -242,7 +281,7 @@ export function BiaBoAnhEditor({
                 value={tieuDe}
                 onChange={(e) => setTieuDe(e.target.value)}
                 className="rounded border border-[var(--bb-border)] px-2 py-2"
-                placeholder={detail.babyName || "Khoảnh khắc của con"}
+                placeholder={tenBeHienThi || "Khoảnh khắc của con"}
               />
             </label>
             <label className="mt-3 flex flex-col gap-1 text-sm">
@@ -277,6 +316,12 @@ export function BiaBoAnhEditor({
             </div>
             
             <div className="mt-8 flex gap-3 pb-8">
+              {/* BB-308 (vòng 4, mục #5 báo cáo chấm 28/09/2026) — "Lưu bìa"
+                  vẫn dùng `--bb-accent` (sage/bạc hà nhạt), màu BB-301 đã bỏ
+                  cho nút chính ("Nhất quán: bạc hà là một màu lạ nằm ngoài
+                  bảng màu"). Đổi sang mực (`--bb-fg`) — cùng token mọi nút
+                  chính khác trong quản trị dùng (gallery-detail.tsx,
+                  settings-manager.tsx). */}
               <button
                 disabled={!doiGi || busy}
                 onClick={() => {
@@ -288,7 +333,7 @@ export function BiaBoAnhEditor({
                   });
                   setMoEditor(false);
                 }}
-                className="rounded-md bg-[var(--bb-accent)] px-4 py-2 text-sm text-white disabled:opacity-50 flex-1"
+                className="flex-1 rounded-md bg-[var(--bb-fg)] px-4 py-2 text-sm text-[var(--bb-bg)] disabled:opacity-50"
               >
                 Lưu bìa
               </button>
@@ -333,18 +378,20 @@ export function BiaBoAnhEditor({
               style={{
                 containerType: "size",
                 width: thietBiXemTruoc === "may-tinh" ? "100%" : "min(100%, 260px)",
-                // BB-296 mục #2 — báo cáo chấm độc lập lần 3 cũng nói khung
-                // xem trước máy tính có "dải trắng thừa bên phải". Thử nới
-                // `maxWidth` lên 900px lộ ra một lỗi HIỂN THỊ KHÁC (nội dung
-                // bìa tràn ra ngoài khung bo góc ở một số bề rộng cửa sổ —
-                // khả năng do `container-type: size` + `cqw` tính lệch một
-                // nhịp khi đổi kích thước, xem ảnh chụp `test-results` lúc
-                // soát). Không có bản vẽ định con số chính xác, và việc sửa
-                // đúng gốc (đổi hẳn cách quy đổi tỉ lệ, không còn dùng cqw)
-                // vượt phạm vi mục #2 (chỉ nói "bỏ dải trắng thừa", không xin
-                // đổi cơ chế dựng khung xem trước) — GIỮ NGUYÊN 640px an
-                // toàn, chỉ sửa phần chắc chắn của mục #2 (placeholder khi
-                // chưa chọn ảnh, lưới dt không kẹt ô cuộn). Ghi vào bàn giao.
+                // BB-308 (vòng 4, mục #5 báo cáo chấm 28/09/2026) — "dải
+                // trắng thừa bên phải" ĐÃ BẮT ĐƯỢC gốc từ BB-296 mục #2
+                // (chú thích cũ): `container-type: size` + `100cqw` làm tròn
+                // độ phóng xuống một phần rất nhỏ dưới tỉ lệ thật ở một số bề
+                // rộng cửa sổ — nội dung 1440px co hụt vài phần trăm pixel so
+                // với khung 640px, để lộ đúng nền TRẮNG của khung (`bg-white`
+                // ở div này) thành một sợi/dải mỏng bên phải, nơi
+                // `overflow-hidden` không có gì để cắt vì nội dung đã HỤT chứ
+                // không TRÀN. Sửa tại gốc: phóng dư một phần rất nhỏ
+                // (`+ 0.002`, dưới 1 phần nghìn — không thấy được bằng mắt)
+                // để mọi sai số làm tròn luôn rơi về phía TRÀN thay vì HỤT —
+                // phần tràn đó mới bị `overflow-hidden` cắt sạch, không còn
+                // lộ nền trắng. Không đổi maxWidth (vẫn 640px, an toàn như
+                // BB-296 đã chốt).
                 maxWidth: thietBiXemTruoc === "may-tinh" ? "640px" : "260px",
                 aspectRatio: thietBiXemTruoc === "may-tinh" ? "16 / 10" : "9 / 19.5",
               }}
@@ -353,16 +400,56 @@ export function BiaBoAnhEditor({
                 className="pointer-events-none absolute left-0 top-0 origin-top-left"
                 style={
                   thietBiXemTruoc === "may-tinh"
-                    ? { width: "1440px", height: "900px", transform: "scale(calc(100cqw / 1440))" }
-                    : { width: "390px", height: "844px", transform: "scale(calc(100cqw / 390))" }
+                    ? {
+                        width: "1440px",
+                        height: "900px",
+                        // BB-313 mục 3 — `100cqw / 1440` chia MỘT CHIỀU DÀI cho
+                        // MỘT SỐ THUẦN (không đơn vị): kết quả vẫn là MỘT CHIỀU
+                        // DÀI. `scale()` đòi một SỐ THUẦN, và CSS không cho
+                        // cộng chiều dài với số thuần (`+ 0.002` phía sau) —
+                        // toàn bộ `calc()` này KHÔNG HỢP LỆ, trình duyệt bỏ
+                        // qua cả khai báo `transform`, khung xem trước render
+                        // ĐÚNG KÍCH THƯỚC THẬT (1440×900/390×844) rồi bị
+                        // `overflow-hidden` của khung ngoài cắt cụt — chỉ còn
+                        // thấy đúng góc trên-trái, đúng lỗi "chữ đè kín ảnh,
+                        // ảnh bị đẩy sang mép phải/chữ mất hẳn" trong ảnh chụp
+                        // app thật (Đợt 9). Bám dữ liệu, không đoán: kiểm bằng
+                        // `getComputedStyle(...).transform` trong phép thử e2e
+                        // (`tests/e2e/bb-313-chi-tiet-va-bia.spec.ts`) đo được
+                        // đúng `"none"` trước khi sửa dòng này. Sửa: chia cho
+                        // MỘT CHIỀU DÀI (`1440px`, không phải số thuần `1440`)
+                        // — chiều dài chia chiều dài ra ĐÚNG một số thuần, để
+                        // cộng `+ 0.002` hợp lệ.
+                        transform: "scale(calc(100cqw / 1440px + 0.002))",
+                        // Xem chú thích dài ở bia-bo-anh.tsx
+                        // (`--bb-bia-khung-cao`): dùng CHO CẢ khối ảnh máy
+                        // tính (chặn dải trắng thừa, chấm lại 28/09/2026 —
+                        // bìa trước đó chỉ cao ~40% khung) lẫn khối ảnh điện
+                        // thoại (chặn mất chữ) — đặt biến này để ghim đúng
+                        // 900px, đúng khung đang vẽ.
+                        ["--bb-bia-khung-cao" as string]: "900px",
+                      }
+                    : {
+                        width: "390px",
+                        height: "844px",
+                        // Cùng lỗi/cùng sửa như nhánh máy tính ở trên — chia
+                        // cho `390px` (chiều dài), không phải `390` (số thuần).
+                        transform: "scale(calc(100cqw / 390px + 0.002))",
+                        ["--bb-bia-khung-cao" as string]: "844px",
+                      }
                 }
               >
                 <BiaBoAnh
                   anhBia={anhBiaNhap ? { id: anhBiaNhap } : null}
                   coverHeadline={tieuDe}
                   coverLayout={layout}
-                  tenBe={detail.babyName ?? null}
-                  ngayChup={detail.createdAt ?? null}
+                  tenBe={tenBeHienThi}
+                  // BB-308 (vòng 4, mục #5) — `detail.createdAt` không tồn
+                  // tại trên `Detail` thật (gallery-detail.tsx) nên luôn
+                  // `undefined`: ngày chụp trên khung xem trước luôn trống.
+                  // `shootDate` là ngày chụp THẬT, đúng trường màn khách dùng.
+                  ngayChup={detail.shootDate ?? null}
+                  sessionType={detail.sessionType ?? null}
                   chiNhanh={detail.branchName ?? "BabyBean"}
                   loiChao={loi}
                   soAnh={detail.photoCount}

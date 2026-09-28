@@ -578,12 +578,13 @@ export function PhotoLightbox({
       aria-label={vi.common.view || "Xem ảnh"}
       // BB-298 — bản vẽ `xem-lon-may-tinh.html` (admin duyệt 28/09/2026, mục
       // #5 XONG.md): vùng trái màn xem lớn MÁY TÍNH phải là MỘT MÀU kem
-      // #F3EDE5, KHÔNG "nhoè lưới phía sau" như nền trong mờ + blur cũ (nhìn
-      // xuyên thấy lưới ảnh phía sau bị làm mờ — report chê không tinh tế).
-      // Điện thoại GIỮ NGUYÊN nền trong mờ + blur cũ (bản vẽ của đợt này chỉ
-      // có `xem-lon-may-tinh`, không có bản điện thoại mới) — chỉ ép màu đặc
-      // và bỏ blur từ `lg:` trở lên.
-      className="fixed inset-0 z-50 flex flex-col justify-between bg-[rgba(251,247,242,0.66)] backdrop-blur-lg text-[#2e2a27] select-none overflow-hidden touch-none lg:bg-[#F3EDE5] lg:backdrop-blur-none"
+      // #F3EDE5, KHÔNG "nhoè lưới phía sau" như nền trong mờ + blur cũ.
+      //
+      // BB-310 mục 4 — báo cáo chấm độc lập vòng 4: điện thoại vẫn dùng nền
+      // trong mờ + blur cũ, lộ bóng lưới ảnh và chữ phía sau qua lớp kính —
+      // "trông đục" (kh-dt-06b-xem-lon-anh-ngang). Áp CÙNG một nền kem đặc
+      // cho cả hai khổ — không còn khác biệt theo `lg:`.
+      className="fixed inset-0 z-50 flex flex-col justify-between bg-[#F3EDE5] text-[#2e2a27] select-none overflow-hidden touch-none"
       // Cố ý KHÔNG hiện bàn tay trên nền: con trỏ kế thừa xuống mọi thứ bên
       // trong (tấm ảnh, ô ghi chú), và nền trống chỉ là một dải mỏng quanh
       // ảnh. Xem tests/unit/con-tro-ban-tay.test.ts.
@@ -750,7 +751,17 @@ export function PhotoLightbox({
                 // đúng tỉ lệ ảnh gốc bên trong khung đó — không cắt, không
                 // méo, chỉ khác chỗ khung không còn phụ thuộc độ phân giải
                 // ảnh gốc nữa. Đo bằng `tests/e2e/bb-289-theo-ban-ve.spec.ts`.
-                className="w-full h-full object-contain select-none shadow-2xl pointer-events-auto cursor-zoom-in"
+                // BB-310 mục 4 — báo cáo chấm độc lập vòng 4: ảnh dọc trên
+                // máy tính "nằm trên tấm trắng giữa nền kem, thành hai tông"
+                // (kh-mt-06-xem-lon). `w-full h-full` (giữ nguyên, lý do ở
+                // trên) khiến khung <img> LUÔN bằng cả vùng `main` — với ảnh
+                // dọc trên màn rộng, `shadow-2xl` (bóng đổ lớn) vẽ quanh
+                // TRỌN khung đó, không phải quanh phần ảnh THẬT (object-
+                // contain co lại ở giữa) — tạo cảm giác một "tấm" riêng nổi
+                // trên nền. Bỏ bóng đổ từ `lg:` — ảnh đặt thẳng trên nền kem,
+                // không có khung nổi nào bao quanh. Điện thoại giữ nguyên
+                // (bóng đổ hợp lý hơn trên nền tràn màn không có viền khác).
+                className="w-full h-full object-contain select-none shadow-2xl lg:shadow-none pointer-events-auto cursor-zoom-in"
                 style={
                   isCurrent
                     ? {
@@ -764,6 +775,25 @@ export function PhotoLightbox({
                 }}
                 onDoubleClick={isCurrent ? handleImgDoubleClick : undefined}
                 onMouseDown={isCurrent ? handleImgMouseDown : undefined}
+                // BB-314: `srcSet` (buildLightboxSrcSet) có ứng viên 800w —
+                // cỡ đó nay bị `/api/img` điều hướng 302 sang lh3. Nếu lh3
+                // lỗi (cho BẤT KỲ ứng viên nào trình duyệt chọn, kể cả
+                // src chính 1600/2048), thử lại ĐÚNG MỘT LẦN qua route cũ
+                // với `?qua=1` — bỏ luôn `srcSet` để trình duyệt không tự
+                // chọn lại một ứng viên khác vẫn đang hỏng. `currentSrc` giữ
+                // đúng URL trình duyệt vừa thử (không nhất thiết là `src`
+                // gốc khi có `srcSet`). `dataset.qua` chặn lỗi lần hai gọi
+                // lại chính nó — tránh vòng lặp lỗi vô hạn.
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  if (img.dataset.qua === "1") return;
+                  img.dataset.qua = "1";
+                  const urlLoi = img.currentSrc || img.src;
+                  const url = new URL(urlLoi, window.location.origin);
+                  url.searchParams.set("qua", "1");
+                  img.removeAttribute("srcset");
+                  img.src = url.toString();
+                }}
               />
             </div>
           );
@@ -907,7 +937,9 @@ export function PhotoLightbox({
           chốt ngày 17/09 khi bỏ hai nút to đè lên đáy ảnh.
       */}
       <footer
-        className="relative z-20 shrink-0 border-t border-[#e5dcd2] bg-[rgba(251,247,242,0.6)] backdrop-blur-md pb-[max(10px,env(safe-area-inset-bottom))] lg:border-0 lg:bg-transparent lg:backdrop-blur-none lg:px-4 lg:pt-2"
+        // BB-310 mục 4 — cùng nền kem đặc như gốc (không còn kính mờ trên
+        // điện thoại), xem ghi chú ở nền gốc phía trên.
+        className="relative z-20 shrink-0 border-t border-[#e5dcd2] bg-[#F3EDE5] pb-[max(10px,env(safe-area-inset-bottom))] lg:border-0 lg:bg-transparent lg:px-4 lg:pt-2"
         onClick={(e) => e.stopPropagation()}
       >
         {nhanDungCho.length > 0 && (
@@ -1107,9 +1139,16 @@ export function PhotoLightbox({
             // chỉ đổi chữ hiển thị theo bản vẽ.
             aria-label="In ảnh này"
             data-testid="tam-truot-dung-cho"
-            className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#231e1a] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-white shadow-2xl animate-in slide-in-from-bottom-8"
+            // BB-310 mục 5 — báo cáo chấm độc lập vòng 4: nền gần đen
+            // (#231e1a) lạc hẳn khỏi hệ màu kem của toàn app ("mảng tối lạc
+            // giữa hệ kem" — kh-dt-07b-san-pham-tam-nay). Đổi sang cùng hệ
+            // kem #FBF7F2 + chữ mực #2E2A27 như mọi tấm trượt khác, và
+            // `bangSanPham` gọi với `tong="sang"` (đã có sẵn ở
+            // `bang-san-pham-cua-anh.tsx`, dựng cho đúng trường hợp nền
+            // sáng này) thay vì mặc định `tong="toi"`.
+            className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#FBF7F2] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-[#2E2A27] shadow-2xl animate-in slide-in-from-bottom-8"
           >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/25" aria-hidden="true" />
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#2E2A27]/15" aria-hidden="true" />
             {/*
               BB-289 lượt 2 — tiêu đề đúng bản vẽ `xem-lon-dat-in-dien-thoai.png`:
               "Tấm này dùng cho…" + phụ đề số thứ tự, nút × đóng cùng hàng.
@@ -1120,7 +1159,7 @@ export function PhotoLightbox({
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2 className="font-display text-2xl font-normal">Tấm này dùng cho…</h2>
-                <p className="mt-1 text-[13px] text-white/60">
+                <p className="mt-1 text-[13px] text-[#6b6057]">
                   Tấm {currentIndex + 1} · chọn được nhiều mục
                 </p>
               </div>
@@ -1128,12 +1167,12 @@ export function PhotoLightbox({
                 type="button"
                 onClick={() => setTamMo(null)}
                 aria-label={vi.common.close}
-                className="shrink-0 rounded-full p-1.5 text-white/70 transition hover:bg-white/10"
+                className="shrink-0 rounded-full p-1.5 text-[#2E2A27]/70 transition hover:bg-black/5"
               >
                 <X className="h-5 w-5" strokeWidth={1.6} aria-hidden="true" />
               </button>
             </div>
-            {bangSanPham?.(currentPhoto)}
+            {bangSanPham?.(currentPhoto, "sang")}
           </div>
         </div>
       )}

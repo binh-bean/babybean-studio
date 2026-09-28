@@ -65,6 +65,10 @@ export async function driveFetch(
   path: string,
   params: Record<string, string>,
   ctx: DriveRequestContext,
+  // BB-311: chỉ dùng cho ảnh BÌA — xin Google trả WebP qua content
+  // negotiation (`Accept: image/webp,image/*`). Tham số THỨ TƯ, có mặc định,
+  // nên MỌI lời gọi cũ (3 tham số) vẫn nguyên hành vi, không phải sửa lại.
+  extraHeaders?: Record<string, string>,
 ): Promise<Response> {
   if (dangChayPhepThu()) {
     throw new Error("Đang chạy phép thử — không gọi Drive thật");
@@ -87,7 +91,11 @@ export async function driveFetch(
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
-      const res = await fetch(url, { signal: controller.signal, cache: "no-store" });
+      const res = await fetch(url, {
+        signal: controller.signal,
+        cache: "no-store",
+        ...(extraHeaders ? { headers: extraHeaders } : {}),
+      });
       lastStatus = res.status;
 
       logDriveCall(ctx, path, res.status, Date.now() - started, attempt, params.pageToken);

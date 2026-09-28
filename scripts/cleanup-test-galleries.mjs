@@ -82,6 +82,25 @@ const KHACH_THU = `(
   or cu.full_name = 'Khách Mới Test'
 )`;
 
+/**
+ * Sản phẩm do phép thử dựng ra (BB-309). Cả hai tiền tố: "Fixture " là quy
+ * ước mới (xem AGENTS.md và tests/unit/addons.test.ts), "TEST " là tiền tố cũ
+ * còn sót lại từ trước khi đổi quy ước — vẫn phải nhận diện được, không thì
+ * rác cũ nằm lại vĩnh viễn.
+ *
+ * KHÔNG lọc theo chữ "test" nằm giữa tên, cùng lý do với KHACH_THU ở trên.
+ *
+ * CHỈ nhận sản phẩm cũ hơn 6 GIỜ (`created_at`). Bộ test tự dọn đúng sản
+ * phẩm của mình ở `afterAll` — dọn ở đây chỉ nên vá lượt nào CHẾT GIỮA CHỪNG.
+ * Không có mốc tuổi, script này (chạy tay hoặc theo lịch) có thể xoá/tắt một
+ * sản phẩm Fixture của một bộ test ĐANG CHẠY DỞ trên máy khác, làm ca đó đỏ
+ * oan — không phải vì mã sai, mà vì hai lượt chạy giẫm lên nhau.
+ */
+const SAN_PHAM_THU = `(
+  (p.name like 'Fixture %' or p.name like 'TEST %')
+  and p.created_at < now() - interval '6 hours'
+)`;
+
 async function main() {
   const dbUrl = process.env.SUPABASE_DB_URL;
   if (!dbUrl) {
@@ -147,7 +166,20 @@ async function main() {
     );
     console.log(`Nhật ký mồ côi (do phép thử xoá bộ ảnh): ${logXem[0].n}`);
 
-    if (!bo.length && !kh.length && !nsXem.length && !tbXem[0].n && !logXem[0].n) {
+    const { rows: spXem } = await client.query(
+      `select p.id, p.name, p.is_active,
+              (select count(*)::int from selection_addons sa where sa.product_id = p.id)
+            + (select count(*)::int from gallery_items gi where gi.product_id = p.id) as dau_vet
+         from products p where ${SAN_PHAM_THU} order by p.name`,
+    );
+    console.log(`Sản phẩm do phép thử dựng: ${spXem.length}`);
+    for (const s of spXem) {
+      const trang_thai = s.is_active ? "đang bán" : "đã tắt";
+      const ke_hoach = s.dau_vet > 0 ? `còn ${s.dau_vet} dấu vết trên đơn — sẽ TẮT, không xoá` : "không dấu vết — sẽ XOÁ";
+      console.log(`   ${s.name}  —  ${trang_thai}  —  ${ke_hoach}`);
+    }
+
+    if (!bo.length && !kh.length && !nsXem.length && !tbXem[0].n && !logXem[0].n && !spXem.length) {
       console.log("Không có gì để dọn.");
       return;
     }
@@ -203,6 +235,39 @@ async function main() {
       await client.query(`update galleries set cover_photo_id = null where id = any($1)`, [gIds]);
       await xoa("ảnh", `delete from photos where gallery_id = any($1)`, [gIds]);
       await xoa("bộ ảnh", `delete from galleries where id = any($1)`, [gIds]);
+    }
+
+    // Sản phẩm do phép thử dựng (BB-309). Đọc LẠI trong giao dịch, SAU khi
+    // gallery_items/selection_addons của các bộ ảnh Fixture đã bị xoá ở trên
+    // — một sản phẩm chỉ còn "dấu vết" từ chính những dòng hàng vừa xoá thì
+    // giờ đã rảnh để xoá hẳn, không cần đợi lượt chạy sau.
+    const { rows: sp } = await client.query(
+      `select p.id, p.name, p.is_active,
+              (select count(*)::int from selection_addons sa where sa.product_id = p.id)
+            + (select count(*)::int from gallery_items gi where gi.product_id = p.id) as dau_vet
+         from products p where ${SAN_PHAM_THU}`,
+    );
+    if (sp.length) {
+      const khongDauVet = sp.filter((s) => Number(s.dau_vet) === 0);
+      const conDauVet = sp.filter((s) => Number(s.dau_vet) > 0);
+      if (khongDauVet.length) {
+        await xoa(
+          "sản phẩm do phép thử dựng (xoá hẳn, không còn dấu vết)",
+          `delete from products where id = any($1)`,
+          [khongDauVet.map((s) => s.id)],
+        );
+      }
+      const canTat = conDauVet.filter((s) => s.is_active);
+      if (canTat.length) {
+        await xoa(
+          "sản phẩm do phép thử dựng (tắt, còn dấu vết trên đơn — không xoá)",
+          `update products set is_active = false, updated_at = now() where id = any($1)`,
+          [canTat.map((s) => s.id)],
+        );
+      }
+      if (conDauVet.length && !canTat.length) {
+        console.log(`   ${conDauVet.length} sản phẩm Fixture còn dấu vết trên đơn, đã tắt từ trước — giữ nguyên.`);
+      }
     }
 
     const { rows: ns } = await client.query(

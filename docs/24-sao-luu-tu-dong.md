@@ -22,14 +22,24 @@ ngày — vì vậy:
 1. Tệp sao lưu luôn được **mã hoá** trước khi rời máy chủ GitHub.
 2. Máy chủ GitHub **không tự có** mật khẩu hay đường vào cơ sở dữ liệu — chủ
    studio phải tự đặt hai thứ đó ("bí mật", gọi là *Secret*) thì việc sao lưu
-   mới chạy. Chưa đặt thì lịch chạy mỗi ngày vẫn báo **thành công (xanh)**,
-   chỉ là không làm gì — coi như đang "ngủ".
+   mới chạy. Chưa đặt thì lịch chạy mỗi ngày báo **lỗi (đỏ)** trên tab
+   **Actions**, kèm dòng chữ nói rõ thiếu Secret nào — đây là báo lỗi CỐ Ý
+   (từ BB-309): trước đây lịch báo xanh dù chưa tạo được bản sao lưu nào, và
+   không ai để ý một dòng ::notice:: nằm giữa hàng loạt lượt chạy trông như
+   thành công. Thấy đỏ ở đây thì nghĩa là chưa bật, làm theo mục 2 bên dưới.
 
 ## 2. Bật sao lưu tự động — làm một lần
 
 ### Bước 1 — Lấy chuỗi kết nối cơ sở dữ liệu (Supabase)
 
-1. Vào [supabase.com](https://supabase.com), mở dự án app ĐANG CHẠY THẬT (hôm nay 26/09 là **bb-dev**; sau khi chốt cơ sở dữ liệu chính thức ở docs/23 thì dùng dự án đó).
+> **Cập nhật sau khi cắt sang bb-prod (`docs/26-cat-sang-bb-prod.md`):** secret
+> `BACKUP_DATABASE_URL` phải trỏ vào **bb-prod**, không còn bb-dev — app thật
+> đã chuyển sang đó, sao lưu bb-dev cũ không còn bảo vệ dữ liệu khách đang
+> dùng. Đây là một trong các bước của runbook cắt sang, làm **cùng lượt** với
+> lúc đổi 3 biến Supabase trên Vercel (docs/26 §Vercel), không phải việc làm
+> sau. Trước 06/10/2026, giá trị đúng vẫn là bb-dev.
+
+1. Vào [supabase.com](https://supabase.com), mở dự án app ĐANG CHẠY THẬT — **bb-prod** sau khi cắt sang (docs/26); trước đó vẫn là **bb-dev**.
 2. Bấm nút **Connect** (góc trên) → **Connection string** → chọn tab **URI**.
 3. Chọn kiểu **Session pooler** (không chọn "Direct connection" — pooler chạy
    ổn định hơn từ máy chủ GitHub).

@@ -25,6 +25,16 @@ import { layerMoVuong } from "@/lib/utils/tranh-tan-nen";
 export const PAGE_TITLE_CLASS = "font-display text-[30px] font-normal text-[var(--bb-fg)]";
 export const PAGE_DESCRIPTION_CLASS = "text-sm text-[var(--bb-fg-muted)]";
 /**
+ * BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — khi tiêu đề trang không còn tên
+ * nào để thay (không tên bé, không tên khách) và phải lùi về MÃ HỢP ĐỒNG
+ * ("HD_20260911#5087"), luật phông cấm dùng Playfair Display (`PAGE_TITLE_CLASS`)
+ * cho mã/số: chữ chân serif khiến số 0 dễ đọc lầm chữ O. Dùng lớp `.bb-so`
+ * (Be Vietnam Pro, tabular-nums — `styles/tokens.css`, cùng kiểu số các thẻ
+ * thống kê quản trị) giữ NGUYÊN cỡ 30px của `PAGE_TITLE_CLASS` để không lệch
+ * thang chữ trang khi tiêu đề đổi qua lại giữa hai dạng.
+ */
+export const PAGE_TITLE_FALLBACK_CLASS = "bb-so text-[30px]";
+/**
  * Tiêu đề thẻ (`.the h2` trong bản vẽ) — serif, weight thường, 18px. KHÔNG còn
  * cùng cỡ với `<CardTitle>` mặc định (src/components/ui/card.tsx: `text-xl
  * font-semibold`, dùng chung cho cả màn khách) — dùng hằng số này (qua

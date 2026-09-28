@@ -11,7 +11,7 @@ import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
 import { getContractCodesForGalleries } from "@/app/(admin)/admin/galleries/actions";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
-import { formatSdt } from "@/lib/utils/dinh-dang";
+import { formatSdt, tinhTieuDeBoAnhQuanTri } from "@/lib/utils/dinh-dang";
 import { loiNhacKhach } from "@/lib/utils/bang-dieu-khien";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
@@ -42,7 +42,16 @@ import {
  * gọi Lark cho mỗi dòng, không hợp để làm hàng loạt trên cả trang danh sách).
  * Nhân viên mở bộ ảnh (nút Eye) để lấy link thật nếu cần gửi kèm.
  */
-function LamNhanh({ item, onCopyLink }: { item: GalleryItem; onCopyLink: () => void }) {
+function LamNhanh({
+  item,
+  onCopyLink,
+  dangChepLink,
+}: {
+  item: GalleryItem;
+  onCopyLink: () => void;
+  /** BB-311: nút "Sao chép link" giờ gọi API để giải mã link khách — có độ trễ mạng. */
+  dangChepLink?: boolean;
+}) {
   const [daChep, setDaChep] = React.useState(false);
 
   async function chepLoiNhac() {
@@ -111,10 +120,11 @@ function LamNhanh({ item, onCopyLink }: { item: GalleryItem; onCopyLink: () => v
       size="icon"
       className="h-8 w-8"
       onClick={onCopyLink}
-      title="Sao chép link"
-      aria-label="Sao chép link"
+      disabled={dangChepLink}
+      title={dangChepLink ? "Đang lấy link…" : "Sao chép link"}
+      aria-label={dangChepLink ? "Đang lấy link khách" : "Sao chép link"}
     >
-      <Copy className="h-4 w-4" />
+      {dangChepLink ? <Spinner size="sm" /> : <Copy className="h-4 w-4" />}
     </Button>
   );
 }
@@ -164,14 +174,29 @@ export interface GalleryItem {
 
 /**
  * BB-303 (bo-anh-danh-sach.png): "Newborn · Bé Bin" thay cho mã hợp đồng thô
- * khi có đủ dữ liệu gói + tên bé; còn thiếu thì lùi về tên bộ ảnh cũ
- * (`item.title`, thường là mã hợp đồng) — KHÔNG bịa "Loại buổi" hay tên bé.
+ * khi có đủ dữ liệu gói + tên bé; không có tên bé thì lùi về tên khách; còn
+ * thiếu cả hai mới lùi về tên bộ ảnh cũ (`item.title`, thường là mã hợp
+ * đồng) — KHÔNG bịa "Loại buổi" hay tên bé.
+ *
+ * BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — gộp về `tinhTieuDeBoAnhQuanTri`
+ * dùng chung (dinh-dang.ts). `item.babyName` là `coalesce(nickname, full_name)`
+ * đã tính sẵn ở RPC `get_admin_galleries` (0068) — khác `item.babyFullName`
+ * (luôn là họ tên đầy đủ) nghĩa là `babyName` đang mang NICKNAME; giống nhau
+ * (hoặc `babyName` rỗng) nghĩa là bé không có nickname riêng. Suy ngược từ
+ * hai cột RPC đã trả sẵn, không đổi RPC (hợp đồng chung, brief cấm migration).
+ * Bản cũ gọi `tenGoiBe()` (chỉ dành cho nickname) VÔ ĐIỀU KIỆN lên chuỗi đã
+ * coalesce — bé không có nickname bị thêm nhầm "Bé " trước cả họ tên đầy đủ.
  */
 function tieuDeBoAnh(item: GalleryItem): string {
-  const tenBe = item.babyName || item.babyFullName;
-  if (item.packageName && tenBe) return `${item.packageName} · Bé ${tenBe}`;
-  if (tenBe) return `Bé ${tenBe}`;
-  return item.title;
+  const nickname = item.babyName && item.babyName !== item.babyFullName ? item.babyName : null;
+  const { tieuDe } = tinhTieuDeBoAnhQuanTri({
+    packageName: item.packageName,
+    babyNickname: nickname,
+    babyFullName: item.babyFullName ?? item.babyName,
+    customerName: item.customerName,
+    duPhong: item.title,
+  });
+  return tieuDe;
 }
 
 export interface GalleryCounts {
@@ -518,6 +543,11 @@ export function GalleryList() {
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
+  // BB-311: id bộ ảnh đang chờ API trả link khách (Spinner ở nút Copy), và
+  // thông báo lỗi/thành công của lần chép gần nhất.
+  const [copyingId, setCopyingId] = useState<string | null>(null);
+  const [copyNotice, setCopyNotice] = useState<string | null>(null);
+
   // Tải danh sách options (chi nhánh & thợ ảnh)
   useEffect(() => {
     async function loadOptions() {
@@ -638,9 +668,51 @@ export function GalleryList() {
     void fetchGalleries(true, nextCursor);
   };
 
-  const copyShareLink = (galleryId: string) => {
-    const link = `${window.location.origin}/admin/galleries/${encodeURIComponent(contractCodes[galleryId] || galleryId)}`;
-    void navigator.clipboard.writeText(link);
+  /**
+   * BB-311 (P1) — sửa lỗi nghiêm trọng: bản cũ dựng link QUẢN TRỊ
+   * (`/admin/galleries/<id>`) và chép thẳng vào clipboard bằng
+   * `contractCodes`/`galleryId`, không hề gọi tới link KHÁCH thật.
+   *
+   * Mã link khách (`/g/<token>`) không nằm ở đâu trong dữ liệu đã tải cho
+   * trang danh sách — cơ sở dữ liệu chỉ giữ bản băm sha256 của nó
+   * (`share_links.token_hash`), nên phải gọi route riêng để giải mã ĐÚNG lúc
+   * bấm nút (`GET .../link-khach`, xem chú thích ở route đó vì sao không tải
+   * hàng loạt cho cả trang).
+   */
+  const copyShareLink = async (galleryId: string) => {
+    setCopyNotice(null);
+    setCopyingId(galleryId);
+    try {
+      const res = await fetch(`/api/admin/galleries/${encodeURIComponent(galleryId)}/link-khach`, {
+        cache: "no-store",
+      });
+      const body = await res.json().catch(() => null);
+
+      if (!res.ok || !body?.data) {
+        setCopyNotice(
+          body?.error?.message ?? "Không lấy được link khách. Vui lòng thử lại.",
+        );
+        return;
+      }
+
+      const shareUrl: string =
+        body.data.shareUrl ?? `${window.location.origin}${body.data.duongDan}`;
+
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopyNotice("Đã chép link khách vào bộ nhớ tạm.");
+      } catch {
+        // Trình duyệt chặn Clipboard API (http, quyền) — link đã lấy được,
+        // chỉ là không tự chép vào clipboard được.
+        setCopyNotice("Lấy được link khách nhưng trình duyệt chặn chép tự động. Thử lại hoặc mở chi tiết bộ ảnh.");
+      }
+    } catch (err) {
+      console.error("Lỗi khi lấy link khách:", err);
+      setCopyNotice("Không lấy được link khách — kiểm tra kết nối mạng.");
+    } finally {
+      setCopyingId(null);
+      window.setTimeout(() => setCopyNotice(null), 4000);
+    }
   };
 
   // Các cột trạng thái trong Kanban
@@ -664,6 +736,16 @@ export function GalleryList() {
         branches={branches}
         photographers={photographers}
       />
+
+      {/* BB-311: kết quả lần chép link khách gần nhất (thành công hoặc lỗi). */}
+      {copyNotice && (
+        <p
+          role="status"
+          className="rounded-md border border-[var(--bb-border)] bg-[var(--bb-surface)] p-3 text-sm text-[var(--bb-fg)]"
+        >
+          {copyNotice}
+        </p>
+      )}
 
       {/* Trạng thái đang tải lần đầu */}
       {loading ? (
@@ -829,7 +911,11 @@ export function GalleryList() {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
-                          <LamNhanh item={item} onCopyLink={() => copyShareLink(item.id)} />
+                          <LamNhanh
+                            item={item}
+                            onCopyLink={() => void copyShareLink(item.id)}
+                            dangChepLink={copyingId === item.id}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -944,7 +1030,11 @@ export function GalleryList() {
                         <Eye className="h-3.5 w-3.5 mr-1" /> Xem bộ ảnh
                       </Button>
                     </Link>
-                    <LamNhanh item={item} onCopyLink={() => copyShareLink(item.id)} />
+                    <LamNhanh
+                      item={item}
+                      onCopyLink={() => void copyShareLink(item.id)}
+                      dangChepLink={copyingId === item.id}
+                    />
                   </div>
                 </Card>
               );

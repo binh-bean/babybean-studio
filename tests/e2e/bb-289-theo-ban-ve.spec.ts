@@ -463,16 +463,26 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
   });
 
   // -------------------------------------------------------------------------
-  // B1 — màn xem ảnh lớn: nền KÍNH (alpha < 1 + blur), không còn màu tối đặc.
+  // B1 — màn xem ảnh lớn: nền kem MỘT MÀU đặc ở CẢ HAI khổ (BB-297, chủ
+  // studio chốt — ghi đè quyết định "nền kính trong suốt" của BB-289 gốc).
+  //
+  // BB-313 (chấm lại 28/09/2026, mục 3) — ca khổ điện thoại từng đòi nền
+  // TRONG SUỐT (alpha<1 + backdrop-blur), đúng bản vẽ BB-289 GỐC. Bản vẽ
+  // BB-297 sau đó chốt lại: CẢ HAI khổ dùng chung MỘT nền kem #F3EDE5 ĐẶC,
+  // không phân biệt máy tính/điện thoại nữa — ca cũ lỗi thời, canh đúng
+  // hành vi CŨ đã bị bản vẽ MỚI thay thế (không phải app sai). Sửa ca này
+  // khớp bản vẽ mới nhất, không sửa app để né phép thử.
+  //
+  // Kiểm ngược: đổi nền lightbox sang trong suốt trong photo-lightbox.tsx →
+  // ca dưới đây phải ĐỎ (không còn khớp #F3EDE5 đặc) → trả lại đúng nền kem
+  // đặc → xanh. Kết quả dán ở bàn giao BB-313.
   // -------------------------------------------------------------------------
   for (const [tenKichThuoc, kichThuoc] of [
     ["390x844", DIEN_THOAI],
     ["1440x900", MAY_TINH],
   ] as const) {
     ownIpTest(
-      kichThuoc === MAY_TINH
-        ? `Xem ảnh lớn ${tenKichThuoc}: nền kem MỘT MÀU đặc, không nhoè lưới phía sau (BB-298, ghi đè BB-289)`
-        : `Xem ảnh lớn ${tenKichThuoc}: nền kính trong (alpha<1 + blur), không phải màu tối đặc`,
+      `Xem ảnh lớn ${tenKichThuoc}: nền kem MỘT MÀU đặc, không nhoè lưới phía sau (BB-297, chốt chung cho cả hai khổ)`,
       async ({ page }) => {
       await page.setViewportSize(kichThuoc);
       await page.goto(`/g/${maLinkA}`);
@@ -496,30 +506,16 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
         return { bgColor: cs.backgroundColor, blurLen: filter.includes("blur") ? filter.length : 0 };
       });
 
-      if (kichThuoc === MAY_TINH) {
-        // BB-298 — bản vẽ `xem-lon-may-tinh.html` (admin duyệt 28/09/2026,
-        // mục #5 XONG.md): vùng trái máy tính phải là MỘT MÀU kem #F3EDE5
-        // ĐẶC (alpha=1, không blur) — "không nhoè lưới phía sau". Ghi đè
-        // đúng khẳng định NGƯỢC LẠI mà BB-289 từng chốt cho breakpoint này.
-        ownIpExpect
-          .soft(bgColor, `Nền màn xem lớn máy tính phải ĐẶC màu (rgb, không rgba), đo được: ${bgColor}`)
-          .toBe("rgb(243, 237, 229)");
-        ownIpExpect
-          .soft(blurLen, `Nền màn xem lớn máy tính KHÔNG được còn backdrop-filter blur, đo được: "${bgColor}"`)
-          .toBe(0);
-      } else {
-        // rgba(r,g,b,a) hoặc rgb(...) — đọc kênh alpha, mặc định 1 nếu không có.
-        const alphaKhop = bgColor.match(/rgba?\(([^)]+)\)/);
-        const kenh = alphaKhop?.[1] ? alphaKhop[1].split(",").map((s) => Number(s.trim())) : [];
-        const alpha = kenh.length === 4 ? kenh[3] : 1;
-
-        ownIpExpect
-          .soft(alpha, `Nền màn xem lớn phải trong suốt một phần (alpha<1), đo được: ${bgColor}`)
-          .toBeLessThan(1);
-        ownIpExpect
-          .soft(blurLen, `Nền màn xem lớn phải có backdrop-filter blur, đo được: "${bgColor}"`)
-          .toBeGreaterThan(0);
-      }
+      // BB-297 (chủ studio chốt) — MỘT nền kem #F3EDE5 ĐẶC (alpha=1, không
+      // blur) cho CẢ HAI khổ, "không nhoè lưới phía sau". Trước đây khổ điện
+      // thoại có ngoại lệ riêng ("nền kính" trong suốt+blur) theo bản vẽ
+      // BB-289 gốc — bản vẽ BB-297 sau đó bỏ hẳn ngoại lệ đó.
+      ownIpExpect
+        .soft(bgColor, `Nền màn xem lớn (${tenKichThuoc}) phải ĐẶC màu kem (rgb, không rgba), đo được: ${bgColor}`)
+        .toBe("rgb(243, 237, 229)");
+      ownIpExpect
+        .soft(blurLen, `Nền màn xem lớn (${tenKichThuoc}) KHÔNG được còn backdrop-filter blur, đo được: "${bgColor}"`)
+        .toBe(0);
 
       // BB-289 lượt 3 — Opus chấm ảnh chụp: ảnh chính gần như vô hình (một
       // chấm ~4px giữa màn) vì `w-auto h-auto` đo theo kích thước GỐC của

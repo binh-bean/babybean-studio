@@ -8,10 +8,21 @@
  * với Lark hay không.
  *
  * Chạy:
- *   npm run db:nap-lai                              -- --dem (mặc định, chỉ đọc)
- *   npm run db:nap-lai -- --sao-luu "D:/duong/dan"   -- xuất JSON, không xoá
- *   npm run db:nap-lai -- --xoa --xac-nhan ABC123    -- xoá thật
- *   npm run db:nap-lai -- --nap                      -- nạp lại từ Lark
+ *   npm run db:nap-lai                                -- --dem (mặc định, chỉ đọc)
+ *   npm run db:nap-lai -- --sao-luu "D:/duong/dan"     -- xuất JSON, không xoá
+ *   npm run db:nap-lai -- --xoa --xac-nhan ABC123      -- xoá thật
+ *   npm run db:nap-lai -- --xoa --xac-nhan ABC123 \
+ *       --tu "D:/duong/dan/<thư-mục-lượt-sao-lưu>"     -- chỉ đích danh bản sao lưu, bỏ qua tệp mốc
+ *   npm run db:nap-lai -- --that-su-la-bb-dev ...       -- bắt buộc khi SUPABASE_DB_URL trỏ vào bb-dev
+ *   npm run db:nap-lai -- --nap                        -- nạp lại từ Lark
+ *   npm run db:nap-lai -- --khoi-phuc "D:/duong/dan/<thư-mục-lượt-sao-lưu>"
+ *                                                        -- nạp lại TỪ MỘT BẢN SAO LƯU (không phải từ Lark)
+ *                                                           thêm --buoc-khoi-phuc để ghi đè bảng đang có dữ liệu
+ *
+ * --sao-luu ghi kèm một tệp mốc `sao-luu-gan-nhat.json` vào thư mục MẶC ĐỊNH
+ * (BACKUP_DIR hoặc <cha của repo>/babybean-sao-luu), trỏ tới đúng thư mục vừa
+ * ghi — dù thư mục đó nằm ở đâu. --xoa (không có --tu) đọc tệp mốc này trước
+ * tiên. Đây là cách hai bước NỐI với nhau; xem ghiMocSaoLuuGanNhat().
  *
  * ---------------------------------------------------------------------------
  * Bốn bước, bốn cờ riêng — cố ý không gộp
@@ -83,6 +94,8 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import pg from "pg";
 import { maDuAn } from "../src/lib/lark/muc-tieu-du-lieu.ts";
+import { inMoiTruong, kiemTraMoiTruongChoPhep, kiemTraCoBbProd } from "./lib/moi-truong.mjs";
+import { docTepEnv } from "./lib/doc-tep-env.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const GOC_REPO = path.resolve(__dirname, "..");
@@ -90,16 +103,39 @@ export const GOC_REPO = path.resolve(__dirname, "..");
 /** Mã dự án Supabase của bb-dev. Xem src/lib/lark/muc-tieu-du-lieu.ts. */
 export const MA_BB_DEV = "ohkfoqqsrpvsponiwcij";
 
-/** Bảng KHÔNG bị xoá. Lý do từng bảng ghi ở đầu tệp. */
-export const BANG_GIU_NGUYEN = [
-  "branches",
-  "staff_profiles",
-  "staff_branches",
-  "roles",
-  "packages",
-  "products",
-  "settings",
-];
+/**
+ * Bảng KHÔNG bị xoá. Lý do từng bảng ghi ở đầu tệp.
+ *
+ * ---------------------------------------------------------------------------
+ * 28/09/2026 — admin chốt thu hẹp danh sách này (BB-311 mục B)
+ * ---------------------------------------------------------------------------
+ * Trước đây `packages` và `products` cũng nằm trong danh sách giữ. Từ hôm nay:
+ *
+ *   products  CHUYỂN SANG XOÁ — xem THU_TU_XOA. Lý do đổi: báo cáo vận hành
+ *             vòng 4 (28/09/2026 §6) phát hiện hai dòng "Fixture BB-279 Album"
+ *             / "Fixture BB-279 In ảnh 30x40" đang BÀY BÁN cho khách thật vì
+ *             sản phẩm phép thử chưa dọn hết. `products` CÓ đồng bộ đầy đủ từ
+ *             Lark qua bước "danh mục sản phẩm" (`sync:catalog`, upsert theo
+ *             `lark_record_id`) — xoá sạch rồi nạp lại là cách chắc chắn nhất
+ *             dọn hết rác Fixture/TEST còn sót, không phải chỉ tắt is_active
+ *             từng dòng.
+ *
+ *   packages  VẪN GIỮ — KHÔNG chuyển sang xoá, dù admin có nhắc tới trong yêu
+ *             cầu ngày 28/09. Đã KIỂM TRA: không có script `sync-lark-*` nào
+ *             ghi vào bảng `packages` (chỉ `sync-lark-catalog.mjs` ghi
+ *             `products`; grep `scripts/*.mjs` cho "packages" chỉ ra hai tệp
+ *             — `verify-db.mjs` (chỉ đọc, kiểm schema) và chính tệp này,
+ *             không tệp nào NẠP dữ liệu packages). Bảng `packages` là danh
+ *             mục giá "gói chụp" do APP tự quản (không có nguồn Lark tương
+ *             ứng) — xoá bảng này mà không có bước --nap nào nạp lại sẽ để
+ *             app THIẾU VĨNH VIỄN toàn bộ gói chụp sau khi chạy --nap, không
+ *             có cách phục hồi tự động nào ngoài bản sao lưu (bước 2). ĐÂY LÀ
+ *             QUYẾT ĐỊNH CẦN ADMIN XÁC NHẬN LẠI — xem bàn giao BB-311: nếu
+ *             admin thật sự muốn xoá packages, cần trả lời trước "packages"
+ *             sẽ nạp lại từ đâu (viết script đồng bộ mới, hay chấp nhận gõ
+ *             tay lại toàn bộ gói chụp sau khi xoá?).
+ */
+export const BANG_GIU_NGUYEN = ["branches", "staff_profiles", "staff_branches", "roles", "settings", "packages"];
 
 /**
  * Thứ tự xoá bảng nghiệp vụ, lá trước gốc sau. Danh sách này được kiểm lại
@@ -116,6 +152,11 @@ export const THU_TU_XOA = [
   "revision_requests",
   "deliveries",
   "gallery_items",
+  // 28/09/2026 (BB-311 mục B): products chuyển từ GIỮ sang XOÁ — xem lý do ở
+  // BANG_GIU_NGUYEN. Phải đứng SAU gallery_items và selection_addons (khoá
+  // ngoại NOT NULL products.id <- gallery_items.product_id,
+  // selection_addons.product_id — cả hai đã xoá xong ở đây).
+  "products",
   // (bước riêng: gỡ galleries.cover_photo_id về null ở đây, xem xoaSachGiaoDich)
   "photos",
   "galleries",
@@ -327,6 +368,15 @@ export async function xuatSaoLuu(client, danhSachBang, thuMucDich) {
 
 /** Tìm bản sao lưu gần nhất trong thư mục gốc sao lưu (mỗi lượt là một thư mục con). */
 export function sanLuuGanNhatTrongThuMuc(gocSaoLuu) {
+  // Ưu tiên tệp mốc — xem ghiMocSaoLuuGanNhat(). Đây là cách --xoa NHẬN RA
+  // một bản sao lưu vừa tạo ở BẤT KỲ thư mục nào admin chọn cho --sao-luu,
+  // kể cả khi thư mục đó không nằm trong gocSaoLuu (BACKUP_DIR mặc định).
+  // Không có tệp mốc, hoặc tệp mốc hỏng/trỏ tới chỗ đã mất, thì rơi về cách cũ:
+  // quét các thư mục CON của gocSaoLuu (chỉ đúng khi admin luôn chọn CÙNG một
+  // gocSaoLuu cho --sao-luu).
+  const moc = docMocSaoLuuGanNhat(gocSaoLuu);
+  if (moc) return moc;
+
   if (!fs.existsSync(gocSaoLuu)) return null;
   const conCac = fs
     .readdirSync(gocSaoLuu, { withFileTypes: true })
@@ -345,6 +395,65 @@ export function sanLuuGanNhatTrongThuMuc(gocSaoLuu) {
     .filter(Boolean)
     .sort((a, b) => new Date(b.thoiDiem) - new Date(a.thoiDiem));
   return banGhi[0] ?? null;
+}
+
+/**
+ * Đọc tệp thư mục con tại nơi --xoa mặc định tìm (gocSaoLuu = BACKUP_DIR hoặc
+ * gocSaoLuuMacDinh()). Trả về đúng nội dung tong-so-dong.json của bản sao lưu
+ * mà tệp mốc trỏ tới, kèm `duongDan` — hoặc null nếu không có/tệp mốc hỏng/
+ * bản sao lưu bị xoá mất sau khi ghi mốc.
+ */
+export function docMocSaoLuuGanNhat(gocSaoLuu) {
+  const tepMoc = path.join(gocSaoLuu, TEN_TEP_MOC);
+  if (!fs.existsSync(tepMoc)) return null;
+  try {
+    const moc = JSON.parse(fs.readFileSync(tepMoc, "utf8"));
+    const tepTong = path.join(moc.duongDan, "tong-so-dong.json");
+    if (!fs.existsSync(tepTong)) return null;
+    const tong = JSON.parse(fs.readFileSync(tepTong, "utf8"));
+    return { ...tong, duongDan: moc.duongDan };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Đọc trực tiếp tong-so-dong.json của MỘT thư mục bản sao lưu cụ thể — dùng
+ * cho `--xoa --tu <thư mục>` khi admin muốn chỉ đích danh, bỏ qua tệp mốc và
+ * bỏ qua BACKUP_DIR mặc định. Cũng là cách khôi phục hoạt động khi có nhiều
+ * bản sao lưu cũ và admin muốn chọn đúng bản.
+ */
+export function docBanSaoLuuTaiThuMuc(thuMuc) {
+  if (!thuMuc) return null;
+  const tepTong = path.join(path.resolve(thuMuc), "tong-so-dong.json");
+  if (!fs.existsSync(tepTong)) return null;
+  try {
+    const tong = JSON.parse(fs.readFileSync(tepTong, "utf8"));
+    return { ...tong, duongDan: path.resolve(thuMuc) };
+  } catch {
+    return null;
+  }
+}
+
+export const TEN_TEP_MOC = "sao-luu-gan-nhat.json";
+
+/**
+ * Ghi/ghi đè tệp mốc "bản sao lưu mới nhất" vào gocSaoLuu — nơi --xoa mặc
+ * định tra cứu. Gọi ngay sau xuatSaoLuu(), TRƯỚC KHI in kết quả cho admin.
+ *
+ * Đây là phần NỐI hai bước sao lưu → xoá: không có nó, --sao-luu ghi vào một
+ * thư mục admin tự chọn còn --xoa lại tìm ở một thư mục mặc định khác hẳn
+ * (BACKUP_DIR hoặc <cha của repo>/babybean-sao-luu) — hai đường không bao giờ
+ * gặp nhau trừ khi admin tình cờ chọn đúng thư mục mặc định. Ghi tệp mốc vào
+ * gocSaoLuu bất kể thuMucBanSaoLuu nằm ở đâu là cách duy nhất nối chắc chắn.
+ */
+export function ghiMocSaoLuuGanNhat(gocSaoLuu, thuMucBanSaoLuu) {
+  fs.mkdirSync(gocSaoLuu, { recursive: true });
+  fs.writeFileSync(
+    path.join(gocSaoLuu, TEN_TEP_MOC),
+    JSON.stringify({ duongDan: path.resolve(thuMucBanSaoLuu), ghiLuc: new Date().toISOString() }, null, 2),
+    "utf8",
+  );
 }
 
 /**
@@ -368,6 +477,57 @@ export async function xoaSachGiaoDich(client, thuTuXoa) {
     await client.query("rollback").catch(() => {});
     throw e;
   }
+}
+
+/**
+ * Nạp lại dữ liệu từ các tệp JSON của một bản sao lưu (xuatSaoLuu ghi ra),
+ * theo thứ tự NGƯỢC với THU_TU_XOA — gốc trước, lá sau — để không vỡ khoá
+ * ngoại. Chạy trong MỘT giao dịch: gãy giữa chừng thì hoàn tác sạch, không để
+ * lại một nửa dữ liệu.
+ *
+ * Bảng không có tệp (không nằm trong bản sao lưu, hoặc tệp rỗng `[]`) được bỏ
+ * qua, không coi là lỗi — một bản sao lưu cũ có thể thiếu bảng mới thêm sau.
+ */
+export async function khoiPhucGiaoDich(client, thuTuKhoiPhuc, thuMucNguon) {
+  await client.query("begin");
+  try {
+    const dem = {};
+    for (const bang of thuTuKhoiPhuc) {
+      const tepBang = path.join(thuMucNguon, `${bang}.json`);
+      if (!fs.existsSync(tepBang)) {
+        dem[bang] = 0;
+        continue;
+      }
+      const dong = JSON.parse(fs.readFileSync(tepBang, "utf8"));
+      dem[bang] = dong.length;
+      for (const row of dong) {
+        const cot = Object.keys(row);
+        if (!cot.length) continue;
+        const giuCho = cot.map((_, i) => `$${i + 1}`).join(", ");
+        const danhSachCot = cot.map((c) => `"${c}"`).join(", ");
+        await client.query(
+          `insert into "${bang}" (${danhSachCot}) values (${giuCho})`,
+          cot.map((c) => row[c]),
+        );
+      }
+    }
+    await client.query("commit");
+    return dem;
+  } catch (e) {
+    await client.query("rollback").catch(() => {});
+    throw e;
+  }
+}
+
+/**
+ * Bảng nghiệp vụ nào ĐANG có dòng — chặn khôi phục đè lên dữ liệu sống, tránh
+ * trùng khoá chính hoặc trộn lẫn hai bộ dữ liệu khác thời điểm. Khôi phục chỉ
+ * nên chạy sau --xoa (bảng đã rỗng) hoặc trên một cơ sở dữ liệu trống.
+ */
+export function banGiuLieuKhongRong(demHienTai) {
+  return Object.entries(demHienTai)
+    .filter(([, n]) => n > 0)
+    .map(([bang]) => bang);
 }
 
 // ============================================================================
@@ -406,6 +566,29 @@ export function danhSachLenhNap() {
         "--write",
       ],
     },
+    // BB-311 mục 2 (P0): bốn bước trên chỉ nạp DÒNG DỮ LIỆU (khách, bộ ảnh,
+    // hợp đồng, trạng thái chỉnh sửa) — KHÔNG bộ nào kéo ẢNH từ Drive. Thiếu
+    // bước này, --nap xong mọi bộ có `photo_count = 0` (đo thật 28/09/2026,
+    // xem báo cáo vận hành vòng 4 §6 mục 3). `--luong 1 --nghi-ms 300`: tuần
+    // tự, có nghỉ 300ms giữa hai bộ — hàng trăm bộ liên tiếp ngay sau khi vừa
+    // xoá sạch dễ dồn cục vào quota Drive (10.000 req/100s) hơn nhịp dùng
+    // hàng ngày bình thường.
+    {
+      ten: "ảnh (đồng bộ Drive)",
+      lenh: "node",
+      tso: [
+        "--env-file-if-exists=.env.local",
+        "--import",
+        "tsx",
+        "scripts/sync-drive.ts",
+        "--",
+        "--tat-ca",
+        "--luong",
+        "1",
+        "--nghi-ms",
+        "300",
+      ],
+    },
   ];
 }
 
@@ -441,15 +624,63 @@ function gocSaoLuuMacDinh() {
   return path.resolve(path.dirname(GOC_REPO), "babybean-sao-luu");
 }
 
+/**
+ * Cờ `--env <đường dẫn>` — chọn tệp môi trường để nối, cho phép chạy công cụ
+ * này lên bb-prod (BB-315). `node --env-file` của Node chỉ nạp được một tệp cố
+ * định TRƯỚC khi script chạy; cờ này đọc THÊM một tệp lúc script đang chạy và
+ * GHI ĐÈ lên biến đã có — admin gõ `--env` là admin muốn tệp đó thắng, không
+ * phải tệp `.env.local` mà `db:nap-lai` đã nạp sẵn qua `--env-file-if-exists`.
+ *
+ * Không bao giờ in nội dung tệp ra console — có thể là khoá bb-prod.
+ */
+function napTepMoiTruongTuyChon(argv) {
+  const i = argv.indexOf("--env");
+  if (i === -1) return;
+  const duong = argv[i + 1];
+  if (!duong) {
+    console.error("Thiếu đường dẫn sau --env. Dùng: --env .env.prod.local");
+    process.exit(2);
+  }
+  const bien = docTepEnv(path.resolve(GOC_REPO, duong));
+  if (!bien) {
+    console.error(`Không thấy tệp môi trường: ${path.resolve(GOC_REPO, duong)}`);
+    process.exit(2);
+  }
+  for (const [k, v] of Object.entries(bien)) process.env[k] = v;
+}
+
 async function main() {
   const argv = process.argv.slice(2);
+  napTepMoiTruongTuyChon(argv);
+
   const laXoa = argv.includes("--xoa");
   const laNap = argv.includes("--nap");
   const iSaoLuu = argv.indexOf("--sao-luu");
   const laSaoLuu = iSaoLuu !== -1;
-  const laDem = !laXoa && !laNap && !laSaoLuu; // mặc định
+  const iKhoiPhuc = argv.indexOf("--khoi-phuc");
+  const laKhoiPhuc = iKhoiPhuc !== -1;
+  const laDem = !laXoa && !laNap && !laSaoLuu && !laKhoiPhuc; // mặc định
+  const coBbProd = argv.includes("--that-su-la-bb-prod");
+
+  // BB-315: đo TRƯỚC MỌI bước — in mã dự án + tên môi trường, từ chối mã lạ.
+  // Áp dụng cho cả --nap: nó không mở kết nối pg ở đây, nhưng SPAWN các script
+  // sync-lark-*/sync-drive thừa hưởng nguyên process.env, tức cũng ghi vào
+  // đúng cơ sở dữ liệu mà --env vừa chọn.
+  const dbUrlSoat = env("SUPABASE_DB_URL");
+  inMoiTruong(dbUrlSoat);
+  const ktMoiTruong = kiemTraMoiTruongChoPhep(dbUrlSoat);
+  if (!ktMoiTruong.choPhep) {
+    console.error(ktMoiTruong.ly_do);
+    process.exit(2);
+  }
 
   if (laNap) {
+    // --nap luôn GHI (nó tạo/sửa khách, bộ ảnh...). Đòi cờ bb-prod y hệt --xoa.
+    const ktGhi = kiemTraCoBbProd(dbUrlSoat, coBbProd);
+    if (!ktGhi.choPhep) {
+      console.error(ktGhi.ly_do);
+      process.exit(2);
+    }
     console.log("Nạp lại từ Lark — bốn bước, dừng ở lỗi đầu tiên.\n");
     const ketQua = chayNap(danhSachLenhNap());
     for (const b of ketQua) {
@@ -465,7 +696,7 @@ async function main() {
     return;
   }
 
-  const dbUrl = env("SUPABASE_DB_URL");
+  const dbUrl = dbUrlSoat;
   const client = taoClient(dbUrl);
   await client.connect();
   try {
@@ -492,8 +723,52 @@ async function main() {
         process.exit(2);
       }
       const tong = await xuatSaoLuu(client, xoa, kt.duong);
+      // Nối bước sao lưu với bước xoá: ghi tệp mốc vào thư mục MẶC ĐỊNH mà
+      // --xoa tra cứu, bất kể admin vừa chọn --sao-luu vào đâu. Không có
+      // bước này, --xoa sẽ không "nhìn thấy" bản sao lưu vừa tạo trừ khi
+      // admin tình cờ chọn đúng thư mục mặc định (BACKUP_DIR).
+      ghiMocSaoLuuGanNhat(process.env.BACKUP_DIR || gocSaoLuuMacDinh(), kt.duong);
       console.log(`Đã sao lưu ${tong.tongSoDong} dòng vào ${kt.duong}`);
       for (const [b, n] of Object.entries(tong.demTheoBang)) console.log(`   ${String(n).padStart(6)}  ${b}`);
+      return;
+    }
+
+    if (laKhoiPhuc) {
+      const ktGhiKp = kiemTraCoBbProd(dbUrl, coBbProd);
+      if (!ktGhiKp.choPhep) {
+        console.error(ktGhiKp.ly_do);
+        process.exit(2);
+      }
+      const nguon = argv[iKhoiPhuc + 1];
+      if (!nguon) {
+        console.error("Thiếu thư mục nguồn. Dùng: --khoi-phuc \"D:/duong/dan/2026-09-28T...\"");
+        process.exit(2);
+      }
+      const thuMucNguon = path.resolve(nguon);
+      const tepTong = path.join(thuMucNguon, "tong-so-dong.json");
+      if (!fs.existsSync(tepTong)) {
+        console.error(`Không thấy tong-so-dong.json trong ${thuMucNguon} — đây có phải thư mục một bản sao lưu không?`);
+        process.exit(2);
+      }
+      const demHienTai = await demBang(client, xoa);
+      const conDong = banGiuLieuKhongRong(demHienTai);
+      if (conDong.length && !argv.includes("--buoc-khoi-phuc")) {
+        console.error("Từ chối khôi phục: các bảng sau ĐANG có dữ liệu, khôi phục đè lên sẽ trùng khoá chính:");
+        for (const b of conDong) console.error(`   ${b} (${demHienTai[b]} dòng)`);
+        console.error("Chạy --xoa trước, hoặc thêm --buoc-khoi-phuc nếu chắc chắn muốn ghi đè.");
+        process.exit(2);
+      }
+      const canh = await canhKhoaNgoai(client);
+      const antoan = kiemTraThuTuAnToan(THU_TU_XOA, canh);
+      if (!antoan.anToan) {
+        console.error("Thứ tự xoá hardcode không còn khớp sơ đồ khoá ngoại hiện tại:");
+        for (const l of antoan.loi) console.error(`   ${l}`);
+        process.exit(2);
+      }
+      const thuTuKhoiPhuc = [...THU_TU_XOA].reverse();
+      const dem = await khoiPhucGiaoDich(client, thuTuKhoiPhuc, thuMucNguon);
+      console.log(`Đã khôi phục từ ${thuMucNguon}:`);
+      for (const [b, n] of Object.entries(dem)) console.log(`   ${String(n).padStart(6)}  ${b}`);
       return;
     }
 
@@ -501,7 +776,11 @@ async function main() {
       const iMa = argv.indexOf("--xac-nhan");
       const maNhapVao = iMa !== -1 ? argv[iMa + 1] : null;
       const demHienTai = await demBang(client, xoa);
-      const sanLuu = sanLuuGanNhatTrongThuMuc(process.env.BACKUP_DIR || gocSaoLuuMacDinh());
+      const iTu = argv.indexOf("--tu");
+      const sanLuu =
+        iTu !== -1
+          ? docBanSaoLuuTaiThuMuc(argv[iTu + 1])
+          : sanLuuGanNhatTrongThuMuc(process.env.BACKUP_DIR || gocSaoLuuMacDinh());
 
       const kt = kiemTraDieuKienXoa({
         maNhapVao,
@@ -511,9 +790,13 @@ async function main() {
         urlKetNoi: dbUrl,
         coCoThatSuLaBbDev: argv.includes("--that-su-la-bb-dev"),
       });
-      if (!kt.choPhep) {
+      // BB-315: cờ bb-prod là một điều kiện RIÊNG, cộng thêm vào — không thay
+      // cho kiemTraDieuKienXoa() (giữ nguyên hành vi bb-dev, không đổi test cũ).
+      const ktGhiXoa = kiemTraCoBbProd(dbUrl, coBbProd);
+      const loiTong = [...kt.loi, ...(ktGhiXoa.choPhep ? [] : [ktGhiXoa.ly_do])];
+      if (loiTong.length) {
         console.error("Từ chối xoá:");
-        for (const l of kt.loi) console.error(`   - ${l}`);
+        for (const l of loiTong) console.error(`   - ${l}`);
         process.exit(2);
       }
 
@@ -528,6 +811,40 @@ async function main() {
       const dem = await xoaSachGiaoDich(client, xoa);
       console.log("Đã xoá:");
       for (const [b, n] of Object.entries(dem)) console.log(`   ${String(n).padStart(6)}  ${b}`);
+
+      // 28/09/2026 (BB-311 mục B): "Tắt đệm ảnh sau khi xoá" — DB nghiệp vụ đã
+      // rỗng nên MỌI đối tượng trong bucket `thumbnails` giờ mồ côi (photoId
+      // không còn tồn tại). Chỉ chạy khi có cờ RIÊNG `--cung-don-dem-anh` —
+      // xác nhận thêm, tách khỏi mã --xac-nhan 6 ký tự, giống cách
+      // `--that-su-la-bb-dev` là một xác nhận độc lập cho một hành động khác
+      // (xem kiemTraDieuKienXoa). Gọi ĐÚNG công cụ dọn đệm đã có
+      // (`npm run anh:don-dem-hong`) ở chế độ `--tat-ca --write` — không tự
+      // viết lại logic xoá Storage ở đây.
+      if (argv.includes("--cung-don-dem-anh")) {
+        console.log("\nDọn bộ đệm ảnh (bucket thumbnails) — --tat-ca --write:");
+        const r = spawnSync(
+          "node",
+          [
+            "--env-file-if-exists=.env.local",
+            "--import",
+            "tsx",
+            "scripts/don-dem-hong.ts",
+            "--tat-ca",
+            "--write",
+          ],
+          { cwd: GOC_REPO, encoding: "utf8", shell: process.platform === "win32" },
+        );
+        if (r.stdout) console.log(r.stdout.trim());
+        if ((r.status ?? 1) !== 0) {
+          if (r.stderr) console.error(r.stderr.trim());
+          console.error("Dọn đệm ảnh THẤT BẠI — dữ liệu nghiệp vụ đã xoá xong, nhưng bucket thumbnails có thể còn rác mồ côi. Chạy tay: npm run anh:don-dem-hong -- --tat-ca --write");
+        }
+      } else {
+        console.log(
+          "\n(Chưa dọn bộ đệm ảnh — thêm cờ --cung-don-dem-anh vào lệnh --xoa để tự dọn, " +
+            "hoặc chạy riêng: npm run anh:don-dem-hong -- --tat-ca --write)",
+        );
+      }
       return;
     }
 

@@ -36,6 +36,7 @@
 import React, { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Heart, Printer } from "lucide-react";
 import { cn } from "@/components/ui/utils";
+import { chonCoAnhTheoO } from "@/lib/utils/chon-co-anh";
 import { vi } from "@/i18n";
 import type { PhotoPublic } from "@/types/domain";
 import {
@@ -147,22 +148,41 @@ const TheAnh = memo(function TheAnh({
         />
 
         {/*
-          Ảnh qua proxy `/api/img`. Hai cỡ 800 và 1600 giữ nguyên từ BB-162 (chủ
-          studio chốt: ảnh xem nhỏ cũng phải NÉT). Khác trước ở `sizes`: nay biết
-          CHÍNH XÁC bề ngang ô, nên trình duyệt chọn đúng cỡ theo độ nét của máy
-          thay vì đoán theo phần trăm màn hình.
+          BB-311 (mục #5, báo cáo vận hành vòng 4): TỰ chọn cỡ theo bề rộng ô
+          thật × DPR GIỚI HẠN ở 2 (`chonCoAnhTheoO`), thay vì để trình duyệt tự
+          chọn qua `srcSet`/`sizes` theo `devicePixelRatio` THẬT. Trên điện
+          thoại DPR 3 đo trong báo cáo, một ô 186px trước đây luôn kéo bản
+          800w (136KB); giới hạn DPR ở 2 chỉ cần bậc 400w (45KB, giảm ~67%) mà
+          vẫn đủ nét cho ảnh XEM LƯỚT — không phải ảnh xem lớn (xem
+          `photo-lightbox.tsx`, vẫn dùng DPR thật). Bỏ `srcSet`/`sizes`: đã tự
+          chọn đúng cỡ, không cần trình duyệt chọn lại. Cỡ này giờ KHÔNG được
+          đệm Storage nữa (`/api/img` chỉ đệm ảnh bìa) — luôn lấy trực tiếp từ
+          Google, nên chọn nhỏ đúng mức càng quan trọng hơn trước.
         */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/api/img/${photo.id}?w=800`}
-          srcSet={`/api/img/${photo.id}?w=800 800w, /api/img/${photo.id}?w=1600 1600w`}
-          sizes={w ? `${Math.ceil(w)}px` : "50vw"}
+          src={`/api/img/${photo.id}?w=${chonCoAnhTheoO(w)}`}
           alt={`Ảnh ${thuTu + 1}`}
           loading="lazy"
           decoding="async"
           width={photo.width ?? undefined}
           height={photo.height ?? undefined}
           className="pointer-events-none relative h-full w-full select-none object-cover transition-transform duration-500 ease-out group-hover:scale-[1.015]"
+          // BB-314: cỡ này (w<=800) nay được `/api/img` điều hướng 302 thẳng
+          // sang lh3.googleusercontent.com (xem route). Nếu lh3 lỗi ngay
+          // trên trình duyệt khách (chặn CORS lạ, quá tải tạm thời…), thử
+          // lại ĐÚNG MỘT LẦN qua chính route cũ với `?qua=1` — route thấy cờ
+          // này thì bỏ qua điều hướng, tự kéo ảnh qua Vercel như trước bản
+          // vá. Đánh dấu bằng `dataset.qua` để lần lỗi THỨ HAI không tự gọi
+          // lại chính nó — tránh vòng lặp lỗi vô hạn.
+          onError={(e) => {
+            const img = e.currentTarget;
+            if (img.dataset.qua === "1") return;
+            img.dataset.qua = "1";
+            const url = new URL(img.src, window.location.origin);
+            url.searchParams.set("qua", "1");
+            img.src = url.toString();
+          }}
         />
         {/*
           BB-287 mục #6 — viền 1px đen quanh tấm đã chọn từng nhìn như lỗi

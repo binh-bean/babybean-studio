@@ -16,6 +16,8 @@ import { fail, failUnexpected } from "@/lib/api-response";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { driveFetch } from "@/lib/drive/client";
 import { xacThucTokenBoAnh } from "@/lib/auth/xac-thuc-token-bo-anh";
+import { khongGhiDemPhepThu } from "@/lib/kiem-thu";
+import { kiemAnhTruocKhiGhiDem } from "@/lib/drive/kiem-tra-anh";
 
 export const runtime = "nodejs";
 
@@ -97,13 +99,33 @@ export async function GET(
 
     if (!buffer) return fail("DRIVE_UNAVAILABLE", "Không tải được ảnh bìa");
 
-    const upRes = await storage.upload(cachePath, buffer, {
-      contentType: "image/jpeg",
-      upsert: true,
-    });
-    if (upRes.error && (upRes.error as { code?: string }).code === "NoSuchBucket") {
-      await supabase.storage.createBucket("thumbnails", { public: false });
-      await storage.upload(cachePath, buffer, { contentType: "image/jpeg", upsert: true });
+    // BB-311 P0: hai chốt độc lập giống `/api/img`, trước khi ghi vào bộ đệm
+    // DÙNG CHUNG (xem `src/lib/kiem-thu.ts`, `src/lib/drive/kiem-tra-anh.ts`).
+    // Route này CŨNG ghi Storage (thư mục `icon/`), nên cũng phải qua hai
+    // chốt — bỏ sót đúng chỗ này là đúng cách 42 ảnh thật từng bị mock phép
+    // thử ghi đè (báo cáo vận hành vòng 4). Chỉ chặn GHI, vẫn trả icon bình
+    // thường cho người gọi (kể cả phép thử).
+    const boQuaGhiDem = khongGhiDemPhepThu();
+    const kiemAnh = boQuaGhiDem ? null : kiemAnhTruocKhiGhiDem(buffer);
+    if (!boQuaGhiDem && kiemAnh!.hopLe) {
+      const upRes = await storage.upload(cachePath, buffer, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+      if (upRes.error && (upRes.error as { code?: string }).code === "NoSuchBucket") {
+        await supabase.storage.createBucket("thumbnails", { public: false });
+        await storage.upload(cachePath, buffer, { contentType: "image/jpeg", upsert: true });
+      }
+    } else if (!boQuaGhiDem) {
+      console.error(
+        JSON.stringify({
+          evt: "bia_vuong_cache_write_skipped",
+          requestId,
+          galleryId: boAnh.galleryId,
+          size,
+          lyDo: kiemAnh?.lyDo,
+        }),
+      );
     }
 
     return new Response(buffer, {

@@ -21,6 +21,7 @@ import {
   type DongMuaThem,
 } from "@/lib/utils/mua-them-7-ngay";
 import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
+import { layDanhSachChoXuLyMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 
 export const runtime = "nodejs";
 
@@ -289,11 +290,22 @@ export async function GET(request: Request): Promise<Response> {
       selectedCount: unknown;
       includedQuota: unknown;
       urgency: unknown;
-      babyName: string | null;
+      /**
+       * BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — nickname/họ tên đầy đủ
+       * RIÊNG, thay cho một `babyName` đã coalesce sẵn: màn hình phải tự áp
+       * `tinhTenBiaTuDuLieu`/`tinhTieuDeBoAnhQuanTri`, không được lùi về
+       * `tenGoiBe()` vô điều kiện (thêm nhầm "Bé " trước họ tên đầy đủ khi
+       * bé không có nickname).
+       */
+      babyNickname: string | null;
+      babyFullName: string | null;
       packageName: string | null;
       customerPhone: string | null;
       coverPhotoId: string | null;
       sentAt: string | null;
+      /** BB-312 — xem `forceHomNay`/`waitingReopen` ở `bang-dieu-khien.ts`/`dashboard.tsx`. */
+      forceHomNay?: boolean;
+      waitingReopen?: { requestedAt: string; lyDo: string | null; lanThu: number };
     };
     let viecHomNay: ViecHomNayRow[] = [];
     let muaThem7Ngay = {
@@ -320,7 +332,14 @@ export async function GET(request: Request): Promise<Response> {
     const idsViecHomNay = (actionRequired ?? []).map((r) => String(r.id));
     const chiTietBoSung = new Map<
       string,
-      { babyName: string | null; packageName: string | null; customerPhone: string | null; coverPhotoId: string | null; sentAt: string | null }
+      {
+        babyNickname: string | null;
+        babyFullName: string | null;
+        packageName: string | null;
+        customerPhone: string | null;
+        coverPhotoId: string | null;
+        sentAt: string | null;
+      }
     >();
     if (idsViecHomNay.length > 0) {
       const { data: rows, error: loiBoSung } = await admin
@@ -344,7 +363,9 @@ export async function GET(request: Request): Promise<Response> {
           ? admin.from("customers").select("id, phone").in("id", customerIds)
           : Promise.resolve({ data: [] as { id: string; phone: string | null }[] }),
       ]);
-      const tenBe = new Map((babyRows.data ?? []).map((b) => [String(b.id), b.nickname || b.full_name]));
+      const beMap = new Map(
+        (babyRows.data ?? []).map((b) => [String(b.id), { nickname: b.nickname, full_name: b.full_name }]),
+      );
       const tenGoi = new Map((packageRows.data ?? []).map((p) => [String(p.id), String(p.name)]));
       const sdt = new Map((customerRows.data ?? []).map((c) => [String(c.id), c.phone as string | null]));
 
@@ -355,8 +376,10 @@ export async function GET(request: Request): Promise<Response> {
 
       for (const r of rows ?? []) {
         const id = String(r.id);
+        const be = r.baby_id ? beMap.get(String(r.baby_id)) : null;
         chiTietBoSung.set(id, {
-          babyName: r.baby_id ? tenBe.get(String(r.baby_id)) ?? null : null,
+          babyNickname: be?.nickname ?? null,
+          babyFullName: be?.full_name ?? null,
           packageName: r.package_id ? tenGoi.get(String(r.package_id)) ?? null : null,
           customerPhone: r.customer_id ? sdt.get(String(r.customer_id)) ?? null : null,
           coverPhotoId: anhBia.get(id) ?? null,
@@ -376,13 +399,48 @@ export async function GET(request: Request): Promise<Response> {
         selectedCount: r.selected_count,
         includedQuota: r.included_quota,
         urgency: r.urgency,
-        babyName: bs?.babyName ?? null,
+        babyNickname: bs?.babyNickname ?? null,
+        babyFullName: bs?.babyFullName ?? null,
         packageName: bs?.packageName ?? null,
         customerPhone: bs?.customerPhone ?? null,
         coverPhotoId: bs?.coverPhotoId ?? null,
         sentAt: bs?.sentAt ?? null,
       };
     });
+
+    /**
+     * BB-312 — thêm các bộ ảnh đang có yêu cầu "xin mở lại" CHƯA XỬ LÝ vào
+     * cùng khối "Việc hôm nay". Trước bản vá này yêu cầu chỉ hiện MỘT DÒNG
+     * lẫn trong Dòng thời gian hoạt động của từng bộ — CSKH không có chỗ nào
+     * thấy TẤT CẢ yêu cầu đang chờ trên toàn chi nhánh cùng lúc.
+     *
+     * Không lặp bộ đã có mặt qua `actionRequired` ở trên (một bộ có thể vừa
+     * sắp hết hạn/vừa đang có yêu cầu mở lại — một dòng, không hai).
+     */
+    const idsDaCoTrongViecHomNay = new Set(viecHomNay.map((v) => String(v.id)));
+    const choXuLyMoLai = await layDanhSachChoXuLyMoLai(admin, branchIds);
+    for (const r of choXuLyMoLai) {
+      if (idsDaCoTrongViecHomNay.has(r.galleryId)) continue;
+      viecHomNay.push({
+        id: r.galleryId,
+        title: r.title,
+        customerName: r.customerName ?? "",
+        branchName: r.branchName ?? "",
+        status: r.status,
+        dueAt: null,
+        selectedCount: 0,
+        includedQuota: null,
+        urgency: "cho_mo_lai",
+        babyNickname: null,
+        babyFullName: null,
+        packageName: null,
+        customerPhone: null,
+        coverPhotoId: null,
+        sentAt: null,
+        forceHomNay: true,
+        waitingReopen: { requestedAt: r.requestedAt, lyDo: r.lyDo, lanThu: r.lanThu },
+      });
+    }
 
     /**
      * BB-303 — "Mua thêm · 7 ngày qua" + "Theo chi nhánh": CÙNG ĐỊNH NGHĨA

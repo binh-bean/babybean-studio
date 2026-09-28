@@ -149,9 +149,16 @@ test.describe("BB-295: màn khách — trạng thái đã giao, chân trang", ()
       await expect(loc.getByText("Đã chọn", { exact: false })).toHaveCount(0);
       await expect(loc.getByText("Chưa chọn", { exact: false })).toHaveCount(0);
 
-      // #15 — khối "Ảnh đã hoàn thiện" + nút "Tải cả bộ" (download_enabled=true).
-      await expect(page.getByText("Ảnh đã hoàn thiện")).toBeVisible();
-      await expect(page.getByTestId("nut-tai-ca-bo-da-giao")).toBeVisible();
+      // #15 — dấu "Đã hoàn thiện" + nút "Tải cả bộ" (download_enabled=true).
+      //
+      // BB-310 mục 3 — báo cáo chấm độc lập vòng 4: "Tải cả bộ" từng hiện
+      // HAI LẦN (đây, khối `ReviewPanel` "Ảnh đã hoàn thiện" bên dưới lưới —
+      // VÀ ở bìa, `bia-bo-anh.tsx` nhánh "delivered"). Bìa luôn đứng trước
+      // nên là bản chính — bỏ hẳn bản trùng ở `ReviewPanel`, đo lại đúng
+      // testid của bìa.
+      await expect(page.getByTestId("dau-da-hoan-thien")).toContainText("Đã hoàn thiện");
+      await expect(page.getByTestId("nut-tai-ca-bo-bia")).toBeVisible();
+      await expect(page.getByTestId("nut-tai-ca-bo-da-giao")).toHaveCount(0);
     });
   }
 

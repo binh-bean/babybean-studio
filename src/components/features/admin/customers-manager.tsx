@@ -30,7 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Input, Card, Spinner, Badge, Avatar, AvatarFallback } from "@/components/ui";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
-import { formatNgayVN, formatSdt } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, formatSdt, tenGoiBe } from "@/lib/utils/dinh-dang";
 import { mauAvatarStyle } from "@/lib/utils/mau-avatar";
 import { vi } from "@/i18n/vi";
 import { Phone as PhoneIcon, Copy as CopyIcon } from "lucide-react";
@@ -206,7 +206,9 @@ export function CustomersManager({
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-9 w-9 shrink-0">
-                      <AvatarFallback style={mauAvatarStyle(k.id || k.fullName)}>
+                      {/* BB-308 — `data-testid` chỉ để phép thử tìm đúng chữ
+                          cái avatar, tách khỏi tên/nhãn khác trong cùng ô. */}
+                      <AvatarFallback data-testid="chu-cai-dau" style={mauAvatarStyle(k.id || k.fullName)}>
                         {chuCaiDau(k.fullName)}
                       </AvatarFallback>
                     </Avatar>
@@ -218,9 +220,10 @@ export function CustomersManager({
                           chi nhánh chuyển xuống HÀNG DƯỚI, cùng hàng với
                           SĐT/số bộ/ngày. */}
                       <div className="line-clamp-2 break-words font-medium">{k.fullName}</div>
-                      {/* BB-303 (khach-hang.png) — nối khách với bé, khi có dữ liệu thật. */}
+                      {/* BB-303 (khach-hang.png) — nối khách với bé, khi có dữ liệu thật.
+                          BB-308 (vòng 4, mục #8): `tenGoiBe` tránh "Bé Bé Na". */}
                       {k.babyName && (
-                        <p className="mt-0.5 text-xs text-[var(--bb-fg-muted)]">mẹ của Bé {k.babyName}</p>
+                        <p className="mt-0.5 text-xs text-[var(--bb-fg-muted)]">mẹ của {tenGoiBe(k.babyName)}</p>
                       )}
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--bb-fg-muted)]">
                         {/* BB-290 (#40): SĐT sans 14px tabular-nums, không
@@ -278,7 +281,7 @@ export function CustomersManager({
                     <td className={dangMo === k.id ? "bb-muc-on py-2 pr-3" : "py-2 pr-3"}>
                       <div className="flex items-center gap-2.5">
                         <Avatar className="h-8 w-8 shrink-0">
-                          <AvatarFallback style={mauAvatarStyle(k.id || k.fullName)}>
+                          <AvatarFallback data-testid="chu-cai-dau" style={mauAvatarStyle(k.id || k.fullName)}>
                             {chuCaiDau(k.fullName)}
                           </AvatarFallback>
                         </Avatar>
@@ -286,9 +289,10 @@ export function CustomersManager({
                           <button type="button" className="text-left font-medium hover:underline">
                             {k.fullName}
                           </button>
-                          {/* BB-303 (khach-hang.png) — nối khách với bé, khi có dữ liệu thật. */}
+                          {/* BB-303 (khach-hang.png) — nối khách với bé, khi có dữ liệu thật.
+                              BB-308 (vòng 4, mục #8): `tenGoiBe` tránh "Bé Bé Na". */}
                           {k.babyName && (
-                            <p className="text-xs text-[var(--bb-fg-muted)]">mẹ của Bé {k.babyName}</p>
+                            <p className="text-xs text-[var(--bb-fg-muted)]">mẹ của {tenGoiBe(k.babyName)}</p>
                           )}
                         </div>
                         {k.trungSdtChiNhanhKhac && (
@@ -734,15 +738,23 @@ function NutChepZalo({ so }: { so: string }) {
   );
 }
 
-/** Chữ cái đầu để làm avatar — bản vẽ quan-tri-khach-hang.webp dùng chữ cái
+/**
+ * Chữ cái đầu để làm avatar — bản vẽ quan-tri-khach-hang.webp dùng chữ cái
  * đầu tên thay vì ảnh, đúng luật §6: không có ảnh chân dung khách trong hệ
- * thống này. */
-function chuCaiDau(hoTen: string): string {
+ * thống này.
+ *
+ * BB-308 (bản vẽ BB-301 khach-hang.html, admin duyệt 28/09/2026) — đổi từ
+ * HAI chữ cái (đầu họ + đầu tên) sang MỘT chữ cái của TÊN GỌI, tức chữ cuối
+ * của họ tên đầy đủ: "Nguyễn Thị Mai" → "M" (không phải "NM"). Người Việt
+ * gọi nhau bằng tên, không phải họ — bản vẽ khách hàng liệt kê đúng một chữ
+ * cho mỗi khách ("M", "H", "A", "T"…), khớp cách CSKH thật sự gọi khách.
+ * Xuất hàm ra để `tests/unit/bb-308-chu-cai-dau.test.ts` thử trực tiếp,
+ * cùng cách `tenThanThienMuaThem` (gallery-detail.tsx) đã làm cho BB-296.
+ */
+export function chuCaiDau(hoTen: string): string {
   const tu = hoTen.trim().split(/\s+/).filter(Boolean);
   if (tu.length === 0) return "?";
-  const dau = tu[0]!.charAt(0);
-  const cuoi = tu.length > 1 ? tu[tu.length - 1]!.charAt(0) : "";
-  return (dau + cuoi).toUpperCase();
+  return tu[tu.length - 1]!.charAt(0).toUpperCase();
 }
 
 

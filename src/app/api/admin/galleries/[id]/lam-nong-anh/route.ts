@@ -2,39 +2,34 @@
  * POST /api/admin/galleries/[id]/lam-nong-anh — nút "Làm nóng ảnh" ở màn chi
  * tiết bộ ảnh quản trị.
  *
- * OWNER: DEV-INT. Task BB-286.
- * Đề xuất #5a của báo cáo vận hành 27/09/2026 (mục 4, đề xuất #5): bộ đệm ảnh
- * mới phủ 4,3% (11/490 bộ) — khách mở một bộ mới toanh thì gần như tấm nào
- * cũng phải đợi kéo từ Google.
+ * OWNER: DEV-INT. Task BB-286, đơn giản hoá BB-311 mục A (28/09/2026).
  *
- * Hàm dùng chung nằm ở `src/lib/drive/lam-nong-cache.ts` — CSKH tạo link gửi
- * khách (`/share-link`) cũng gọi đúng hàm đó, chạy nền, nhưng CHỈ ĐÚNG MỘT LÔ
- * (đề bài giả định gói Hobby, xem đầu tệp `lam-nong-cache.ts`): đủ lo trước
- * màn hình đầu tiên khách sẽ thấy, không đủ nong hết một bộ 1.235 ảnh. Route
- * này — gọi LẶP LẠI từ trình duyệt (`lamNongAnh()` ở `gallery-detail.tsx`) —
- * là cách làm nóng HẾT cả bộ ảnh.
+ * TRƯỚC: làm nóng cỡ 800 cho CẢ BỘ (tới 1.235 ảnh) — route này để trình
+ * duyệt gọi LẶP LẠI theo lô 40 ảnh/lượt vì gói Hobby giới hạn thời lượng một
+ * lần gọi hàm.
  *
- * Thân trả về đủ số liệu để màn hình vẽ "đã nóng N/M ảnh" — không cần bảng
- * mới, xem đầu tệp `lam-nong-cache.ts`.
+ * TỪ 28/09/2026: `/api/img` không còn đệm ảnh lưới (chỉ đệm ảnh BÌA, w≥1600)
+ * — nong cả bộ ở cỡ 800 không còn ý nghĩa (bị chính route đó bỏ qua khi đọc
+ * lại). Route này giờ CHỈ làm nóng ẢNH BÌA của bộ (`lamNongAnhBia()`, đúng
+ * MỘT ảnh × hai cỡ 1600/2048) — xong trong một lượt gọi, KHÔNG cần trình
+ * duyệt lặp lại nữa.
  */
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { lamNongMotLo } from "@/lib/drive/lam-nong-cache";
+import { lamNongAnhBia } from "@/lib/drive/lam-nong-cache";
 
 export const runtime = "nodejs";
-// GIẢ ĐỊNH HẠ TẦNG: gói Hobby — 60 giây là mức TỐI ĐA Hobby cho phép (mặc
-// định chỉ 10s). Một lô 40 ảnh (KICH_THUOC_LO_LAM_NONG) an toàn trong mức
-// này; trình duyệt gọi lặp route này tới khi xong cả bộ. Xem đầu tệp
-// lam-nong-cache.ts.
-export const maxDuration = 60;
+// Chỉ 1 ảnh × 2 cỡ — không cần kịch trần 60s như trước, nhưng vẫn để dư so
+// với mặc định 10s phòng khi Drive đang lùi (backoff) đúng lúc admin bấm nút.
+export const maxDuration = 30;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(
-  request: Request,
+  _request: Request,
   context: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const requestId = randomUUID();
@@ -58,21 +53,14 @@ export async function POST(
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     requireBranch(staff, gallery.branch_id);
 
-    const url = new URL(request.url);
-    const sauSortIndexTho = Number(url.searchParams.get("sauSortIndex") ?? "0");
-    const sauSortIndex = Number.isFinite(sauSortIndexTho) ? sauSortIndexTho : 0;
-
-    const ketQua = await lamNongMotLo(admin, galleryId, sauSortIndex, requestId);
+    const ketQua = await lamNongAnhBia(admin, galleryId, requestId);
 
     return ok({
-      conTroTiep: ketQua.conTroTiep,
-      soDaXuLyLoNay: ketQua.soDaXuLyLoNay,
-      soDaCoSanLoNay: ketQua.soDaCoSanLoNay,
-      soMoiNongLoNay: ketQua.soMoiNongLoNay,
-      soLoiLoNay: ketQua.soLoiLoNay,
-      conAnhChuaXuLy: ketQua.conAnhChuaXuLy,
+      coAnhBia: ketQua.coAnhBia,
+      soDaCoSan: ketQua.soDaCoSan,
+      soMoiNong: ketQua.soMoiNong,
+      soLoi: ketQua.soLoi,
       dungVìQuota: ketQua.dungVìQuota,
-      tongSoAnh: ketQua.tongSoAnh,
     });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code === "FORBIDDEN" ? "FORBIDDEN" : "UNAUTHENTICATED");

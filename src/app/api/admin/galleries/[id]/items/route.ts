@@ -20,6 +20,7 @@ import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { nhanHienThi, mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-hau-ky";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
+import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 
 export const runtime = "nodejs";
 
@@ -196,6 +197,11 @@ export async function GET(
       .eq("gallery_id", gallery.id)
       .order("round", { ascending: false });
 
+    // BB-312 — trạng thái "khách xin mở lại" (khác hẳn `revision_requests` ở
+    // trên, đó là vòng DUYỆT ẢNH ĐÃ CHỈNH). Khối nổi bật đầu trang
+    // (`YeuCauMoLaiBanner`) đọc field này.
+    const reopenRequest = await layTrangThaiXinMoLai(admin, gallery.id);
+
     // Link thư mục ảnh đã chỉnh gần nhất, để màn hình điền sẵn khi gửi lại.
     const { data: delivery } = await admin
       .from("deliveries")
@@ -332,11 +338,22 @@ export async function GET(
     // ngày chụp" + tiêu đề "Loại buổi · Bé …". `package_id` có thể nằm ở
     // `galleries` hoặc chỉ ở `shoots` (buổi chụp) tuỳ luồng tạo bộ ảnh — thử
     // cột trên `galleries` trước, thiếu thì lấy từ `shoots`.
+    // BB-308 (vòng 4, mục #5 báo cáo chấm 28/09/2026) — thêm `concept` vào
+    // SELECT: khung xem trước bìa của trình thiết kế quản trị (BiaBoAnhEditor)
+    // thiếu "Thôi nôi" vì route này chưa từng đọc cột này — chỉ thêm cột vào
+    // truy vấn có sẵn, không đổi schema. Cùng nguồn `shoots.concept` mà màn
+    // khách đọc qua (`GET /api/g/gallery`, prop `sessionType` của `BiaBoAnh`).
     const [{ data: customer }, { data: shoot }] = await Promise.all([
       admin.from("customers").select("full_name, phone").eq("id", gallery.customer_id).maybeSingle(),
       gallery.shoot_id
-        ? admin.from("shoots").select("shoot_date, package_id").eq("id", gallery.shoot_id).maybeSingle()
-        : Promise.resolve({ data: null as { shoot_date: string | null; package_id: string | null } | null }),
+        ? admin
+            .from("shoots")
+            .select("shoot_date, package_id, concept")
+            .eq("id", gallery.shoot_id)
+            .maybeSingle()
+        : Promise.resolve({
+            data: null as { shoot_date: string | null; package_id: string | null; concept: string | null } | null,
+          }),
     ]);
     const packageId = gallery.package_id ?? shoot?.package_id ?? null;
     const { data: goiChup } = packageId
@@ -355,6 +372,8 @@ export async function GET(
       paidAmount,
       outstanding: dueAmount - paidAmount,
       revisions: revisions ?? [],
+      // BB-312 — xem chú thích ở phần truy vấn phía trên.
+      reopenRequest,
       catalog: catalog ?? [],
       finalDriveUrl: delivery?.final_drive_url ?? null,
       // Thư mục ảnh GỐC — khác hẳn finalDriveUrl ở trên (ảnh ĐÃ CHỈNH gửi khách
@@ -382,18 +401,39 @@ export async function GET(
       // BB-200 (3/3) — form "Mở lại cho khách chọn tiếp" chỉ hiện khi nhân
       // viên có quyền này (xem src/app/api/admin/galleries/[id]/reopen/route.ts).
       canReopen: staff.permissions.includes("galleries:reopen"),
+      // BB-311 — nút "Đã giao ảnh" chỉ hiện khi nhân viên có quyền
+      // `deliveries:write` (xem src/app/api/admin/galleries/[id]/delivered/route.ts).
+      canMarkDelivered: staff.permissions.includes("deliveries:write"),
+      // BB-313 mục 2 — "Quyền: vai có quyền sửa bộ ảnh". Route PATCH/POST/
+      // DELETE của tệp này đã chặn bằng `requirePermission(staff,
+      // "galleries:write")` (xem `loadEditableGallery`) — cờ này chỉ để MÀN
+      // HÌNH ẩn nút sửa/xoá/thêm cho đúng vai, không phải ranh giới an ninh.
+      canEditItems: staff.permissions.includes("galleries:write"),
       // BB-215: dữ liệu cho khối "Bìa bộ ảnh".
       coverPhotoId: gallery.cover_photo_id ?? null,
       coverHeadline: gallery.cover_headline ?? null,
       welcomeMessage: gallery.welcome_message ?? null,
       coverLayout: gallery.cover_layout ?? null,
-      babyName: baby?.nickname || baby?.full_name || null,
+      // BB-313 (ảnh chụp app thật, Đợt 9) — gửi nickname/họ tên đầy đủ RIÊNG,
+      // để chỗ gọi tự chọn `tinhTenBiaTuDuLieu`/`tinhTieuDeBoAnhQuanTri` đúng
+      // luật (nickname → tenGoiBe, mất nickname → HỌ TÊN NGUYÊN VẸN, không
+      // thêm "Bé "). Gửi sẵn một chuỗi COALESCE (`nickname || full_name`,
+      // cách cũ) buộc chỗ gọi phải áp `tenGoiBe` MÙ QUÁNG lên cả hai trường
+      // hợp — đúng lỗi đã sửa ở mục 1 (họ tên đầy đủ bị ăn nhầm "Bé ").
+      babyNickname: baby?.nickname ?? null,
+      babyFullName: baby?.full_name ?? null,
       branchName: branch?.name ?? null,
       // BB-303 — xem chú thích ở phần truy vấn phía trên.
       packageName: goiChup?.name ?? null,
       customerName: customer?.full_name ?? null,
       customerPhone: customer?.phone ?? null,
       shootDate: shoot?.shoot_date ?? null,
+      // BB-308 (vòng 4, mục #5) — "loại buổi chụp" ("Thôi nôi", "Newborn"…),
+      // CÙNG TÊN PROP `sessionType` mà `BiaBoAnh` (component dùng chung với
+      // màn khách) đã nhận sẵn. KHÁC `packageName` ở trên (tên GÓI/sản phẩm
+      // chụp, vd "Gói Newborn Premium") — hai khái niệm khác nhau dù nghe
+      // tương tự, đừng gộp lại.
+      sessionType: shoot?.concept ?? null,
       contractCodes: gallery.lark_contract_codes ?? [],
       extraPhotoPrice: Number(gallery.extra_photo_price ?? 0),
       quotaKnown: summary.quotaKnown,
@@ -608,16 +648,72 @@ export async function PATCH(
 
     const quotaBefore = await quotaOf(admin, galleryId);
 
+    // BB-313 mục 2 — dòng hàng ĐANG mang `lark_contract_code` là dòng
+    // `scripts/sync-lark-contracts.mjs` còn quản lý: lần đồng bộ Lark SAU sẽ
+    // `delete from gallery_items where gallery_id = $1 and lark_contract_code
+    // = $2` rồi ghi lại nguyên số lượng theo Lark — XOÁ MẤT số nhân viên vừa
+    // sửa tay mà không báo gì (đọc kỹ script trước khi sửa mục này, đúng yêu
+    // cầu brief BB-313).
+    //
+    // Thiết kế: "detach" dòng vừa sửa khỏi hợp đồng — NULL `lark_contract_code`
+    // (cột SẴN CÓ, không cần migration) để câu DELETE của lần đồng bộ sau
+    // không còn khớp dòng này nữa; GIỮ NGUYÊN `lark_record_id` (cũng cột sẵn
+    // có, có ràng buộc UNIQUE) làm "dấu vết" — sync script (đã sửa cùng lúc,
+    // xem writeGallery()) kiểm tra dòng nào ĐÃ TỒN TẠI theo `lark_record_id`
+    // trước khi ghi lại, thấy trùng thì BỎ QUA dòng đó thay vì chèn thêm —
+    // vừa tránh vỡ ràng buộc UNIQUE, vừa tránh đếm lặp hạn mức (một dòng thật
+    // thay vì hai dòng cộng dồn).
+    //
+    // Giới hạn đã biết (ghi vào bàn giao): cách này bảo vệ được SỬA SỐ LƯỢNG
+    // vĩnh viễn. XOÁ HẲN một dòng còn `lark_contract_code` (route DELETE bên
+    // dưới) thì KHÔNG có cơ chế tương đương — dòng biến mất khỏi bảng nên
+    // `lark_record_id` cũng biến mất theo, và lần đồng bộ Lark sau sẽ tạo lại
+    // đúng dòng đó từ đầu (Lark vẫn "nói" dòng này tồn tại). Muốn xoá vĩnh
+    // viễn một dòng hợp đồng thật thì phải sửa trên Lark, không phải trong
+    // app này — không xây thêm bảng "đã xoá tay" (tombstone) trong đợt này vì
+    // cần một migration mới, mà brief cấm áp migration lên bb-dev.
+    const { data: dongHienTai, error: loiDoc } = await admin
+      .from("gallery_items")
+      .select("quantity, lark_contract_code, parent_item_id")
+      .eq("id", body.itemId)
+      .eq("gallery_id", galleryId)
+      .maybeSingle();
+    if (loiDoc) throw loiDoc;
+    if (!dongHienTai) return fail("NOT_FOUND", "Không tìm thấy dòng hàng này");
+
+    const quantityBefore = Number(dongHienTai.quantity);
+    const tachKhoiLark = dongHienTai.lark_contract_code !== null;
+
     // Ràng buộc gallery_id trong câu update, không chỉ ràng id: thiếu nó thì
     // một mã dòng hàng của bộ ảnh KHÁC vẫn sửa được, và kiểm quyền chi nhánh ở
     // trên chẳng bảo vệ được gì.
     const { error } = await admin
       .from("gallery_items")
-      .update({ quantity })
+      .update(tachKhoiLark ? { quantity, lark_contract_code: null } : { quantity })
       .eq("id", body.itemId)
       .eq("gallery_id", galleryId);
 
     if (error) throw error;
+
+    // BB-313 mục 2 — dòng vừa sửa là THÀNH PHẦN (có `parent_item_id`, ví dụ
+    // "Edit file" nằm trong gói) thì phải tách LUÔN dòng CHA khỏi Lark, không
+    // chỉ dòng này. `parent_item_id references gallery_items(id) on delete
+    // cascade` (db/schema.sql) — nếu chỉ tách dòng con, dòng cha vẫn mang
+    // `lark_contract_code` cũ, lần đồng bộ Lark sau XOÁ đúng dòng cha đó (vẫn
+    // khớp câu `delete ... where lark_contract_code = $2`), và Postgres CASCADE
+    // xoá theo mọi con của nó — kể cả con vừa được tách, dù bản thân nó không
+    // còn `lark_contract_code`. Tách luôn dòng cha chặn cascade này. Các con
+    // KHÁC (chưa ai sửa) của cùng dòng cha vẫn còn `lark_contract_code`, vẫn
+    // được xoá/ghi lại đúng số Lark như cũ — chỉ dòng cha (giá/tên) và dòng
+    // con vừa sửa là ngừng nhận cập nhật từ Lark từ nay (đã ghi ở bàn giao).
+    if (tachKhoiLark && dongHienTai.parent_item_id) {
+      const { error: loiTachCha } = await admin
+        .from("gallery_items")
+        .update({ lark_contract_code: null })
+        .eq("id", dongHienTai.parent_item_id)
+        .eq("gallery_id", galleryId);
+      if (loiTachCha) throw loiTachCha;
+    }
 
     const quotaAfter = await quotaOf(admin, galleryId);
     await ghiNhatKy({
@@ -628,7 +724,11 @@ export async function PATCH(
       entityType: "gallery",
       entityId: galleryId,
       galleryId,
-      metadata: { itemId: body.itemId, quantity, quotaBefore, quotaAfter },
+      // "từ bao nhiêu thành bao nhiêu" (BB-313 mục 2) — `quantityBefore`/
+      // `quantity` là số lượng CỦA DÒNG NÀY; `quotaBefore`/`quotaAfter` là
+      // hạn mức TOÀN BỘ ẢNH của cả bộ (có thể khác dòng vì bộ có nhiều dòng
+      // edited_photo) — giữ cả hai, đừng nhầm lẫn.
+      metadata: { itemId: body.itemId, quantityBefore, quantity, quotaBefore, quotaAfter, tachKhoiLark },
     });
 
     return ok({ quotaBefore, quotaAfter });
@@ -662,6 +762,20 @@ export async function DELETE(
 
     const quotaBefore = await quotaOf(admin, galleryId);
 
+    // BB-313 mục 2 — đọc trước khi xoá để nhật ký nói được "từ bao nhiêu"
+    // (không chỉ hạn mức toàn bộ mà cả số lượng CỦA DÒNG bị xoá), và để báo
+    // cho CSKH biết dòng này có mang `lark_contract_code` không: xoá xong,
+    // dòng biến mất nên KHÔNG còn cách nào chặn lần đồng bộ Lark sau tạo lại
+    // đúng dòng đó (xem chú thích dài ở PATCH phía trên — cùng giới hạn, xoá
+    // vĩnh viễn một dòng hợp đồng thật phải sửa trên Lark).
+    const { data: dongHienTai } = await admin
+      .from("gallery_items")
+      .select("quantity, lark_contract_code")
+      .eq("id", itemId)
+      .eq("gallery_id", galleryId)
+      .maybeSingle();
+    const tuLark = dongHienTai?.lark_contract_code != null;
+
     // Xoá dòng cha kéo theo thành phần của nó (0014 khai on delete cascade),
     // nên bỏ một gói chụp là bỏ luôn hạn mức nằm trong gói đó.
     const { error } = await admin
@@ -681,10 +795,19 @@ export async function DELETE(
       entityType: "gallery",
       entityId: galleryId,
       galleryId,
-      metadata: { itemId, quotaBefore, quotaAfter },
+      metadata: {
+        itemId,
+        quantityBefore: dongHienTai ? Number(dongHienTai.quantity) : null,
+        quotaBefore,
+        quotaAfter,
+        tuLark,
+      },
     });
 
-    return ok({ quotaBefore, quotaAfter });
+    // `tuLark`: CSKH cần biết dòng vừa xoá có thể quay lại sau lần đồng bộ
+    // Lark kế tiếp (xem chú thích ở trên) — màn hình hiện cảnh báo đúng lúc,
+    // không phải đoán.
+    return ok({ quotaBefore, quotaAfter, tuLark });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
     return failUnexpected(err, requestId);

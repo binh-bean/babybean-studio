@@ -35,6 +35,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guiLaiThongBaoDangCho } from "@/lib/lark/notify";
 import { quetNhacKhachChuaChot } from "@/lib/gallery/nhac-khach";
+import { chayDonDemHetHan } from "../../../../../scripts/don-dem-het-han";
 
 export const runtime = "nodejs";
 
@@ -141,12 +142,28 @@ async function chay(request: Request) {
       nhac = { loi: err instanceof Error ? err.message : String(err) };
     }
 
+    // 6. BB-311 mục A: dọn bộ đệm ẢNH BÌA của các bộ đã xong vòng đời quá N
+    // ngày (N tính theo lượng khách mới, xem `scripts/don-dem-het-han.ts`).
+    //
+    // Đi nhờ lượt chạy này, cùng lý do mục 4/5: gói Hobby chỉ cho 2 cron/ngày
+    // (xem vercel.json), cả hai đã dùng hết — không thêm cron thứ ba. Bọc
+    // riêng: các phần trên ĐÃ xong việc; một lỗi ở đây không được phép biến
+    // cả lượt chạy thành 500.
+    let donDemHetHan: unknown = { boQua: "không chạy được" };
+    try {
+      donDemHetHan = await chayDonDemHetHan(admin, { ghiThat: true });
+    } catch (err) {
+      console.error("[cron/expire-galleries] dọn đệm ảnh bìa hết hạn hỏng:", err);
+      donDemHetHan = { loi: err instanceof Error ? err.message : String(err) };
+    }
+
     const stats = {
       expiredGalleries: expiredGalleriesCount || 0,
       expiredLinks: expiredLinksCount || 0,
       linkChetTrong7Ngay: sapChet ?? 0,
       larkGuiLai: lark,
       nhacKhachChuaChot: nhac,
+      donDemHetHan,
     };
 
     console.info(JSON.stringify({ evt: "cron.expire_galleries", ...stats }));

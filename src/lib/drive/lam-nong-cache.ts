@@ -53,9 +53,26 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { driveFetch, DriveUnavailableError, DriveAccessDeniedError } from "@/lib/drive/client";
+import { khongGhiDemPhepThu } from "@/lib/kiem-thu";
+import { kiemAnhTruocKhiGhiDem } from "@/lib/drive/kiem-tra-anh";
 
-/** Cỡ ảnh được làm nóng — khớp cỡ lưới ảnh khách xem đầu tiên (BB-137). */
+/**
+ * Cỡ ảnh được làm nóng.
+ *
+ * ĐỔI 28/09/2026 (BB-311 mục A, admin): "Không đệm ảnh nhỏ; ảnh bìa cũng rất
+ * cần sắc nét". Trước đây làm nóng cỡ 800 (khớp lưới ảnh, BB-137) cho CẢ BỘ —
+ * tới 1.235 lượt gọi Drive + ghi Storage cho MỘT bộ ảnh. Từ nay lưới KHÔNG
+ * đệm nữa (`/api/img` chỉ đệm w ≥ 1600 — xem route đó), nên làm nóng cả bộ
+ * không còn ý nghĩa: mọi lượt nong cỡ 800 sẽ bị chính `/api/img` bỏ qua khi
+ * đọc lại. Giữ hằng số CŨ (deprecated, không xoá — `KetQuaMotAnh`/`nongMotAnh`
+ * vẫn tổng quát theo `width`, có thể cần lại nếu chính sách đổi tiếp) để
+ * không vỡ chữ ký hàm hiện có, nhưng ĐƯỜNG DÙNG THẬT giờ là
+ * `CAC_CO_ANH_BIA_LAM_NONG` + `lamNongAnhBia()` bên dưới.
+ */
 export const CO_ANH_LAM_NONG = 800;
+
+/** Hai cỡ ảnh BÌA cần làm nóng — đủ nét cho điện thoại (1600) lẫn máy tính (2048). */
+export const CAC_CO_ANH_BIA_LAM_NONG = [1600, 2048] as const;
 
 /**
  * Số ảnh xử lý mỗi lượt gọi. Nhỏ CỐ Ý — gói Hobby giới hạn thời gian hàm
@@ -81,9 +98,13 @@ async function daCoTrongDem(
   width: number,
 ): Promise<boolean> {
   try {
+    // Kiểm CẢ hai đuôi — `/api/img` từ BB-311 có thể ghi `.webp` (content
+    // negotiation với Google thành công) hoặc `.jpg` (không thành công, hoặc
+    // ảnh đã đệm TRƯỚC bản vá này). `list()` với `search` khớp CHỨA chuỗi
+    // (prefix match theo tên tệp), nên tìm bằng "${width}." bắt được cả hai.
     const { data } = await client.storage.from("thumbnails").list(photoId, {
-      limit: 1,
-      search: `${width}.jpg`,
+      limit: 2,
+      search: `${width}.`,
     });
     return Array.isArray(data) && data.length > 0;
   } catch {
@@ -104,14 +125,39 @@ async function nongMotAnh(
   }
 
   const url = `https://lh3.googleusercontent.com/d/${photo.drive_file_id}=w${width}`;
+  // Cùng "cố gắng tốt nhất" WebP như `/api/img` cho ảnh bìa (width ≥ 1600) —
+  // xem chú thích ở route đó. Không đảm bảo, không lỗi nếu Google không trả.
+  const headerTheoBia = width >= 1600 ? { Accept: "image/webp,image/*" } : undefined;
 
   try {
-    const res = await driveFetch(url, {}, { requestId });
+    const res = await driveFetch(url, {}, { requestId }, headerTheoBia);
     if (!res.ok) return { ketQua: "loi", loiQuota: false };
 
     const buffer = await res.arrayBuffer();
+
+    // BB-311 P0: hai chốt độc lập giống `/api/img` — xem `kiem-thu.ts` và
+    // `kiem-tra-anh.ts`. Làm nóng đệm cũng là một đường GHI Storage dùng
+    // chung, và cũng chạy trong phép thử trình duyệt (nút "Làm nóng ảnh",
+    // hoặc tạo link chia sẻ gọi `lamNongMotLo` — cả hai đều có e2e).
+    if (khongGhiDemPhepThu()) {
+      return { ketQua: "loi", loiQuota: false };
+    }
+    const kiemAnh = kiemAnhTruocKhiGhiDem(buffer);
+    if (!kiemAnh.hopLe) {
+      console.error(
+        JSON.stringify({
+          evt: "lam_nong.ghi_dem_bo_qua",
+          requestId,
+          photoId: photo.id,
+          lyDo: kiemAnh.lyDo,
+          byteLength: buffer.byteLength,
+        }),
+      );
+      return { ketQua: "loi", loiQuota: false };
+    }
+
     const contentType = res.headers.get("Content-Type") || "image/jpeg";
-    const cachePath = `${photo.id}/${width}.jpg`;
+    const cachePath = `${photo.id}/${width}.${contentType.includes("webp") ? "webp" : "jpg"}`;
     const storage = client.storage.from("thumbnails");
 
     const upRes = await storage.upload(cachePath, buffer, { contentType, upsert: true });
@@ -236,4 +282,70 @@ export async function lamNongMotLo(
     dungVìQuota,
     tongSoAnh,
   };
+}
+
+export interface KetQuaLamNongAnhBia {
+  /** false = bộ chưa có `cover_photo_id` (chưa đồng bộ Drive, hoặc chưa chọn bìa) — không có gì để nong. */
+  coAnhBia: boolean;
+  soDaCoSan: number;
+  soMoiNong: number;
+  soLoi: number;
+  dungVìQuota: boolean;
+}
+
+/**
+ * Làm nóng bộ đệm ẢNH BÌA (`galleries.cover_photo_id`) ở CẢ HAI cỡ
+ * (`CAC_CO_ANH_BIA_LAM_NONG` = 1600, 2048).
+ *
+ * ĐƠN GIẢN HOÁ 28/09/2026 (BB-311 mục A) so với `lamNongMotLo`: từ khi ảnh
+ * lưới không còn đệm (xem `/api/img/[photoId]/route.ts`), phần cần làm nóng
+ * chỉ còn ĐÚNG MỘT ảnh (bìa) × hai cỡ — không cần cơ chế lô/con trỏ/giới hạn
+ * song song nữa (đó là cơ chế cho HÀNG NGHÌN ảnh của `lamNongMotLo`, vẫn giữ
+ * nguyên hàm đó — xem chú thích deprecated ở `CO_ANH_LAM_NONG` — phòng khi
+ * chính sách đổi lại, nhưng KHÔNG còn được gọi ở đâu trong app từ bản vá này).
+ */
+export async function lamNongAnhBia(
+  client: SupabaseClient,
+  galleryId: string,
+  requestId: string,
+): Promise<KetQuaLamNongAnhBia> {
+  const { data: gallery } = await client
+    .from("galleries")
+    .select("cover_photo_id")
+    .eq("id", galleryId)
+    .maybeSingle();
+
+  const coverPhotoId = (gallery as { cover_photo_id?: string | null } | null)?.cover_photo_id;
+  if (!coverPhotoId) {
+    return { coAnhBia: false, soDaCoSan: 0, soMoiNong: 0, soLoi: 0, dungVìQuota: false };
+  }
+
+  const { data: photo } = await client
+    .from("photos")
+    .select("id, drive_file_id, sort_index")
+    .eq("id", coverPhotoId)
+    .maybeSingle();
+
+  if (!photo) {
+    return { coAnhBia: false, soDaCoSan: 0, soMoiNong: 0, soLoi: 0, dungVìQuota: false };
+  }
+
+  let soDaCoSan = 0;
+  let soMoiNong = 0;
+  let soLoi = 0;
+  let dungVìQuota = false;
+
+  for (const width of CAC_CO_ANH_BIA_LAM_NONG) {
+    if (dungVìQuota) break; // quota cạn ở cỡ trước -> không thử cỡ sau, tốn thêm lượt gọi vô ích.
+    const kq = await nongMotAnh(client, photo as AnhCanNong, width, requestId);
+    if (kq.ketQua === "loi" && kq.loiQuota) {
+      dungVìQuota = true;
+      continue;
+    }
+    if (kq.ketQua === "da_co_san") soDaCoSan++;
+    else if (kq.ketQua === "moi_nong") soMoiNong++;
+    else soLoi++;
+  }
+
+  return { coAnhBia: true, soDaCoSan, soMoiNong, soLoi, dungVìQuota };
 }

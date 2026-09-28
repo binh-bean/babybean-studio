@@ -2,10 +2,14 @@ name: Sao lưu tự động
 
 # BB-273. Chạy trên máy chủ GitHub, không phụ thuộc máy studio.
 #
-# "Ngủ" cho tới khi chủ studio thêm 2 secret (BACKUP_DATABASE_URL,
-# BACKUP_PASSPHRASE) ở Settings -> Secrets and variables -> Actions. Thiếu một
-# trong hai thì job kết thúc XANH sau một dòng ::notice:: — không báo lỗi, vì
-# chưa bật KHÔNG phải là hỏng. Xem docs/24-sao-luu-tu-dong.md.
+# BB-309 (theo báo cáo phản biện vòng 4, mục B1): trước đây thiếu secret thì
+# job kết thúc XANH sau một dòng ::notice:: — trông giống "đang chạy tốt"
+# trong khi thực ra CHƯA HỀ TẠO một bản sao lưu nào. Không ai đọc ::notice::
+# giữa hàng loạt lượt chạy xanh mỗi đêm. Từ BB-309: thiếu secret thì job báo
+# ĐỎ rõ ràng — im lặng ở đây là đúng thứ khiến phản biện vòng 4 phải ghi "sao
+# lưu tự động vẫn ngủ" hàng tuần liền mà không ai để ý dashboard Actions.
+# Bật lên: thêm 2 secret (BACKUP_DATABASE_URL, BACKUP_PASSPHRASE) ở Settings
+# -> Secrets and variables -> Actions. Xem docs/24-sao-luu-tu-dong.md.
 
 on:
   schedule:
@@ -34,11 +38,11 @@ jobs:
           CO_MAT_KHAU: ${{ secrets.BACKUP_PASSPHRASE != '' }}
         run: |
           if [ "$CO_DB_URL" != "true" ] || [ "$CO_MAT_KHAU" != "true" ]; then
-            echo "::notice::Sao lưu tự động chưa bật — thiếu BACKUP_DATABASE_URL hoặc BACKUP_PASSPHRASE trong GitHub Secrets. Xem docs/24-sao-luu-tu-dong.md để bật. (trạng thái: ngủ)"
+            echo "::error::Sao lưu tự động CHƯA BẬT — thiếu BACKUP_DATABASE_URL hoặc BACKUP_PASSPHRASE trong GitHub Secrets. KHÔNG có bản sao lưu nào được tạo đêm nay. Xem docs/24-sao-luu-tu-dong.md để bật (2 secret, mục 'Bật lên')."
             echo "bat=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "bat=true" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+          echo "bat=true" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         if: steps.kiem.outputs.bat == 'true'

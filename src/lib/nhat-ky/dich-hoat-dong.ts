@@ -119,6 +119,9 @@ const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
   "gallery.review_revise": { nhom: "khach", cau: () => "Ba mẹ yêu cầu chỉnh sửa lại" },
   "gallery.reopen": { nhom: "nhan_vien", cau: () => "Nhân viên mở lại bộ ảnh" },
   "gallery.reopen_requested": { nhom: "khach", cau: () => "Ba mẹ xin mở lại bộ ảnh để sửa" },
+  // BB-312 — CSKH từ chối yêu cầu mở lại kèm lý do. Lý do là trường tự do
+  // (nhân viên gõ tay) nên KHÔNG ghép vào câu — cùng luật ghi ở đầu tệp.
+  "gallery.reopen_rejected": { nhom: "nhan_vien", cau: () => "Nhân viên từ chối yêu cầu mở lại" },
   "gallery.payment_recorded": {
     nhom: "tien",
     cau: (m) => {

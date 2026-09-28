@@ -29,7 +29,18 @@ function getBreadcrumbName(path: string, cha?: string) {
   if (path === "loi-dong-bo") return "Bộ ảnh lỗi tải";
   if (path === "link-sap-het-han") return "Link sắp hết hạn";
   if (path === "create") return "Tạo bộ ảnh mới";
-  return path;
+  // BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — đoạn cuối `/admin/galleries/…`
+  // có thể là MÃ HỢP ĐỒNG thay vì uuid (route đọc theo mã khi không khớp
+  // `LA_MA`, xem `[id]/page.tsx`), và mã dạng "HD_20260911#5087" luôn đi qua
+  // `encodeURIComponent` trước khi ghép vào URL (dấu `#` phải mã hoá, không
+  // thì trình duyệt cắt mất phần sau nó) — `usePathname()` trả nguyên văn
+  // đoạn đường dẫn đã mã hoá đó ("HD_20260911%235087"), không tự giải mã
+  // giúp. Giải mã lại ở đây để breadcrumb hiện đúng "#", không phải "%23".
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
 }
 
 export function AdminBreadcrumb() {

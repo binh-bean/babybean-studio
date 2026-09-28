@@ -52,11 +52,11 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
     prodServiceMakeup = randomUUID();
 
     const prods = [
-      { id: prodPkgBaby01, name: "TEST Gói Baby 01", kind: "shoot_package", list_price: 1500000, is_active: true },
-      { id: prodEditFile, name: "TEST Edit file", kind: "edited_photo", list_price: 50000, is_active: true },
-      { id: prodAlbumPrint, name: "TEST Album (Ultra HD) 20x20", kind: "print", material: "Photobook", size: "20x20", list_price: 800000, is_active: true },
-      { id: prodWoodPrint, name: "TEST Ảnh gỗ 15x21", kind: "print", material: "Gỗ", size: "15x21", list_price: 150000, is_active: true },
-      { id: prodServiceMakeup, name: "TEST Dịch vụ Makeup", kind: "service", list_price: 300000, is_active: true },
+      { id: prodPkgBaby01, name: "Fixture Gói Baby 01", kind: "shoot_package", list_price: 1500000, is_active: true },
+      { id: prodEditFile, name: "Fixture Edit file", kind: "edited_photo", list_price: 50000, is_active: true },
+      { id: prodAlbumPrint, name: "Fixture Album (Ultra HD) 20x20", kind: "print", material: "Photobook", size: "20x20", list_price: 800000, is_active: true },
+      { id: prodWoodPrint, name: "Fixture Ảnh gỗ 15x21", kind: "print", material: "Gỗ", size: "15x21", list_price: 150000, is_active: true },
+      { id: prodServiceMakeup, name: "Fixture Dịch vụ Makeup", kind: "service", list_price: 300000, is_active: true },
     ];
 
     for (const p of prods) createdProductIds.push(p.id);
