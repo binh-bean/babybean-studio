@@ -110,6 +110,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await page.goto(`/g/${maLink}`);
 
     const tieuDeBia = page.locator("section[aria-label='Ảnh bìa'] h1");
+    const khoiChuBia = page.getByTestId("bia-khoi-chu");
     const tamDau = page.getByTestId("the-anh").first();
     const tieuDeChanTrang = page.locator("footer h2");
     const khoiAnhBia = page.getByTestId("bia-khoi-anh");
@@ -119,6 +120,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await expect(tieuDeChanTrang).toBeVisible();
 
     const xBia = (await tieuDeBia.boundingBox())!.x;
+    const rKhoiChu = (await khoiChuBia.boundingBox())!;
     const xLuoi = (await tamDau.boundingBox())!.x;
     const xChanTrang = (await tieuDeChanTrang.boundingBox())!.x;
     const rKhoiAnh = (await khoiAnhBia.boundingBox())!;
@@ -127,22 +129,30 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     console.log(`[BB-240] mép trái 1440×900 — bìa=${xBia} lưới=${xLuoi} chân trang=${xChanTrang}`);
 
     // BB-289 — BB-285 (đã duyệt) đổi hướng NGƯỢC BB-258: bìa máy tính CHIA
-    // ĐÔI thật (cột ảnh trái 42%, cột chữ phải) để sửa lỗi ảnh bìa bị cắt
-    // (xem ghi chú lớn trong `bia-bo-anh.tsx`, mục "ben-canh"). Mép trái bìa
-    // và lưới ảnh KHÔNG còn khớp nhau nữa — đó là chủ đích của bố cục chia
-    // đôi, không phải hồi quy. Thay bằng hai khẳng định đúng ý bố cục mới:
-    //  1. Khối ảnh bìa rộng ≈ 42% bề rộng section (±2%).
-    //  2. h1 nằm bên trong cột phải, ngay sau khối ảnh (mép trái h1 > mép
-    //     phải khối ảnh, và lệch một khoảng padding hợp lý 24–96px).
+    // ĐÔI thật để sửa lỗi ảnh bìa bị cắt (xem ghi chú lớn trong
+    // `bia-bo-anh.tsx`, mục "ben-canh"). Mép trái bìa và lưới ảnh KHÔNG còn
+    // khớp nhau nữa — đó là chủ đích của bố cục chia đôi, không phải hồi quy.
+    //
+    // BB-298 (điều hành, sau khi admin xem bản dựng) — ĐẢO NGƯỢC cột so với
+    // bản dựng đầu của BB-298: ảnh nay ở CỘT PHẢI, chữ ở CỘT TRÁI (ngược bản
+    // vẽ gốc `bia-may-tinh-tap-chi.html`). Hai khẳng định đổi chiều theo:
+    //  1. Khối ảnh bìa rộng ≈ 42% bề rộng section (±2%) — không đổi.
+    //  2. h1 nằm bên trong cột TRÁI, NGAY TRƯỚC khối ảnh (mép phải h1 < mép
+    //     trái khối ảnh, lệch một khoảng padding hợp lý 24–96px) — đảo chiều
+    //     so với bản trước ("mép trái h1 > mép phải khối ảnh").
     // Chân trang vẫn dùng chung công thức lưới ảnh — không đổi, giữ khẳng
     // định chặt cũ.
     expect(Math.abs(xChanTrang - xLuoi)).toBeLessThanOrEqual(1);
 
     const tiLeKhoiAnh = rKhoiAnh.width / 1440;
     expect(Math.abs(tiLeKhoiAnh - 0.42)).toBeLessThanOrEqual(0.02);
-    expect(xBia).toBeGreaterThan(rKhoiAnh.x + rKhoiAnh.width - 1);
-    expect(xBia - (rKhoiAnh.x + rKhoiAnh.width)).toBeGreaterThanOrEqual(24);
-    expect(xBia - (rKhoiAnh.x + rKhoiAnh.width)).toBeLessThanOrEqual(96);
+    // Đo theo mép phải của KHỐI CHỮ (cột trái), không phải mép phải riêng
+    // của chữ h1 — h1 có `max-w` nên có thể hẹp hơn cả cột. Lưới hai cột
+    // không có `gap`, nên hai cột phải liền kề nhau (lệch ≤ 2px làm tròn).
+    const xKhoiChuPhai = rKhoiChu.x + rKhoiChu.width;
+    expect(Math.abs(rKhoiAnh.x - xKhoiChuPhai)).toBeLessThanOrEqual(2);
+    // h1 vẫn phải đứng ở CỘT TRÁI (trước khối ảnh), không tràn sang phải.
+    expect(xBia).toBeLessThan(rKhoiAnh.x);
   });
 
   /**
@@ -151,7 +161,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
    * ảnh `mx-auto` canh theo bề rộng KHÔNG có thanh cuộn → chữ bìa lệch ~8px.
    * Ca 1440 không bắt được (dưới 1600px phần dư bằng 0). Nay dùng `100cqw`.
    */
-  test("1920×1080 (có thanh cuộn): khối ảnh bìa vẫn ≈42% bề rộng, h1 vẫn trong cột phải", async ({ page }) => {
+  test("1920×1080 (có thanh cuộn): khối ảnh bìa vẫn ≈42% bề rộng, h1 vẫn trong cột trái", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`/g/${maLink}`);
     const tieuDeBia = page.locator("section[aria-label='Ảnh bìa'] h1");
@@ -168,10 +178,13 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // BB-289 — bố cục chia đôi (xem ca 1440×900 phía trên) không phụ thuộc
     // `khach-le-trai-lg`/thanh cuộn nữa (công thức đó đã bỏ khỏi khối chữ bìa
     // vì không còn hợp lý cho một CỘT trong lưới chia đôi) — chỉ còn cần khối
-    // ảnh giữ đúng tỉ lệ 42% bất kể thanh cuộn, và h1 vẫn đứng sau khối ảnh.
+    // ảnh giữ đúng tỉ lệ 42% bất kể thanh cuộn.
+    //
+    // BB-298 (điều hành) — ĐẢO NGƯỢC cột: ảnh nay CỘT PHẢI, h1 vẫn ở CỘT
+    // TRÁI (trước khối ảnh) — đảo chiều bất đẳng thức so với bản trước.
     const tiLeKhoiAnh = rKhoiAnh.width / (1920 - thanhCuon);
     expect(Math.abs(tiLeKhoiAnh - 0.42)).toBeLessThanOrEqual(0.02);
-    expect(xBia).toBeGreaterThan(rKhoiAnh.x + rKhoiAnh.width - 1);
+    expect(xBia).toBeLessThan(rKhoiAnh.x);
   });
 
   test("không còn 'Thành phần hợp đồng' hay 'Tổng cộng' trên màn khách", async ({ page }) => {
@@ -193,7 +206,10 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
 
     const footer = page.locator("footer");
     await footer.scrollIntoViewIfNeeded();
-    const tenChiNhanh = footer.locator("p.font-display");
+    // BB-305 — tên chi nhánh không còn lớp font-display (chuyển sang Be
+    // Vietnam Pro theo LUẬT PHÔNG mới); chọn bằng data-testid thay vì lớp
+    // phông để không phụ thuộc việc màn khách đang dùng phông gì.
+    const tenChiNhanh = footer.getByTestId("chan-trang-ten-chi-nhanh");
     const nutNhan = footer.getByRole("link", { name: "Nhắn cho studio" });
 
     if ((await nutNhan.count()) > 0) {
@@ -239,6 +255,17 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // Nút biểu tượng "Lưu app" cũ ở đầu trang phải KHÔNG còn.
     await expect(page.getByRole("button", { name: "Lưu app ra màn hình chính" })).toHaveCount(0);
 
+    // BB-298 — bản vẽ bìa máy tính (`bia-may-tinh-tap-chi.html`, admin duyệt
+    // 28/09/2026, mục 1): bỏ hẳn chip "Lưu ra màn hình chính" ở đầu bìa MÁY
+    // TÍNH — nửa phải của bìa chia đôi đã đủ đầy, thêm chip là thừa. Chip vẫn
+    // đúng chỗ ở ĐIỆN THOẠI (không đổi), nên phần còn lại của ca thử này
+    // chuyển hẳn sang bề rộng điện thoại để tiếp tục canh đúng hành vi chip.
+    await expect(
+      page.getByRole("status", { name: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm" }),
+    ).toHaveCount(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+
     const tamDau = page.getByTestId("the-anh").first();
     await expect(tamDau).toBeVisible();
     await tamDau.getByRole("button", { name: "Chọn ảnh này" }).click();
@@ -273,7 +300,9 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await khongChong();
     await page.setViewportSize({ width: 375, height: 812 });
     await khongChong();
-    await page.setViewportSize({ width: 1440, height: 900 });
+    // BB-298 — KHÔNG quay lại 1440×900 nữa: chip đã ẩn hẳn ở máy tính (mục
+    // 1 ở trên), nên phần còn lại của ca thử (bấm nút ẩn chip) chỉ còn ý
+    // nghĩa ở bề rộng điện thoại nơi chip thực sự tồn tại.
 
     // BB-278/BB-281 — chip một dòng chỉ còn nút × để ẩn (không còn nút "Để
     // sau" riêng); cùng một hàm `dong()` ghi mốc "đã ẩn" như bản cũ.
@@ -298,7 +327,10 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
         [galleryId],
       )).rows[0].n as number;
     await expect.poll(soDaChonDb, { timeout: 10_000 }).toBe(0);
-    await page.setViewportSize({ width: 1440, height: 900 });
+    // BB-298 — chip "Lưu ra màn hình chính" đã bỏ khỏi bìa MÁY TÍNH (mục 1,
+    // xem ca thử phía trên); ca này canh việc bấm chip nên chuyển sang bề
+    // rộng điện thoại, nơi chip còn tồn tại.
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/g/${maLink}`);
 
     const tamDau = page.getByTestId("the-anh").first();

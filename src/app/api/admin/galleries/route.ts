@@ -22,6 +22,7 @@ import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-lin
 import { CreateGallerySchema, GetGalleriesQuerySchema } from "./schema";
 import { nhanHienThi, mauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
 
 export const runtime = "nodejs";
 
@@ -290,6 +291,47 @@ export async function GET(request: Request): Promise<Response> {
      * cần nhãn đã tính (`statusLabel`) và mức màu (`warningColor`), giữ mã Lark
      * là chi tiết triển khai nội bộ.
      */
+    /**
+     * BB-303 (bản vẽ BB-301, admin duyệt 28/09/2026) — "ảnh bìa nhỏ đầu hàng
+     * LUÔN hiện". `get_admin_galleries` (RPC, 0068) không trả `cover_photo_id`
+     * — không sửa RPC (đổi hàm SQL là đổi hợp đồng chung, brief BB-303 cấm
+     * migration) — nên đọc thẳng cột đó từ `galleries` cho đúng các id RPC vừa
+     * trả, rồi suy bìa/tấm-đầu bằng `anhBiaTheoBo()` (dùng chung với khối
+     * "Việc hôm nay" của Bảng điều khiển).
+     */
+    const idsTrangNay = rawItems.map((raw) => String((raw as Record<string, unknown>).id));
+    const coverMap = new Map<string, string | null>();
+    const packageNameMap = new Map<string, string | null>();
+    if (idsTrangNay.length > 0) {
+      const { data: biaRows, error: loiBia } = await admin
+        .from("galleries")
+        .select("id, cover_photo_id, package_id")
+        .in("id", idsTrangNay);
+      if (loiBia) {
+        console.error(JSON.stringify({ evt: "galleries_list_cover_lookup_failed", requestId, loi: loiBia.message }));
+      } else {
+        for (const r of biaRows ?? []) {
+          coverMap.set(String(r.id), (r.cover_photo_id as string | null) ?? null);
+          packageNameMap.set(String(r.id), (r.package_id as string | null) ?? null); // tạm giữ package_id, đổi thành tên bên dưới
+        }
+        const packageIds = [...new Set([...packageNameMap.values()].filter((v): v is string => !!v))];
+        if (packageIds.length > 0) {
+          const { data: goiRows } = await admin.from("packages").select("id, name").in("id", packageIds);
+          const tenGoi = new Map((goiRows ?? []).map((g) => [String(g.id), String(g.name)]));
+          for (const [galleryId, pid] of packageNameMap) {
+            packageNameMap.set(galleryId, pid ? tenGoi.get(pid) ?? null : null);
+          }
+        } else {
+          for (const galleryId of packageNameMap.keys()) packageNameMap.set(galleryId, null);
+        }
+      }
+      const anhBia = await anhBiaTheoBo(
+        admin,
+        idsTrangNay.map((id) => ({ id, coverPhotoId: coverMap.get(id) ?? null })),
+      );
+      for (const [id, photoId] of anhBia) coverMap.set(id, photoId);
+    }
+
     const items = rawItems.map((raw) => {
       const item = raw as Record<string, unknown>;
       const status = String(item.status ?? "");
@@ -300,6 +342,11 @@ export async function GET(request: Request): Promise<Response> {
         ...rest,
         statusLabel: nhanHienThi(status, larkTrangThai, (s) => GALLERY_STATUS_LABEL[s] ?? s).quanTri,
         warningColor: mauCanhBao(larkCanhBao),
+        coverPhotoId: coverMap.get(String(item.id)) ?? null,
+        // BB-303 — "Loại buổi" (tên gói chụp) cho tiêu đề "Loại buổi · Bé …"
+        // ở danh sách/chi tiết bộ ảnh (bo-anh-danh-sach.png). `null` khi bộ
+        // ảnh không gắn gói (hợp đồng cũ trước khi có packages, hoặc lỗi tra).
+        packageName: packageNameMap.get(String(item.id)) ?? null,
       };
     });
 

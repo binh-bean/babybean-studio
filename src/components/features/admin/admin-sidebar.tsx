@@ -227,11 +227,13 @@ export function NavLinks({
                   onClick={onClick}
                   className={cn(
                     "flex h-[38px] items-center gap-3 rounded-[10px] px-3 text-sm font-medium transition-colors",
-                    // Bản vẽ quan-tri-menu-nhom.png: mục đang chọn trong thanh bên là
-                    // viên sage NHẠT (--bb-accent-soft), không phải hồng đất — hồng để
-                    // dành cho nút hành động chính.
+                    // BB-303 (bản vẽ BB-301, admin duyệt 28/09/2026): mục đang chọn
+                    // đổi từ nền bạc hà (--bb-accent-soft) sang nền be ấm
+                    // (--bb-sidebar-active-bg) + vạch rêu 3px mép trái (.bb-muc-on,
+                    // xem src/styles/tokens.css) — bạc hà là màu lạ nằm ngoài bảng
+                    // màu theo báo cáo chấm độc lập.
                     isActive
-                      ? "bg-[var(--bb-accent-soft)] text-[var(--bb-accent-soft-fg)]"
+                      ? "bb-muc-on bg-[var(--bb-sidebar-active-bg)] font-medium text-[var(--bb-fg)]"
                       : "text-[var(--bb-fg)] hover:bg-[var(--bb-surface-2)]"
                   )}
                   title={isCollapsed ? item.name : undefined}
@@ -275,8 +277,18 @@ export function AdminSidebar({ isCollapsed, onToggle, role, canXuLyCount }: Admi
         )}
       >
         {!isCollapsed && (
-          <span className="font-display whitespace-nowrap overflow-hidden text-[18px] tracking-[0.14em] text-[var(--bb-fg)]">
-            BABY BEAN
+          // BB-306 — logo hạt đậu trước chữ, căn giữa dọc theo chữ.
+          <span className="flex min-w-0 items-center gap-[7px] overflow-hidden">
+            <img
+              data-testid="logo-hat-dau"
+              src="/brand/logo-hat-dau-64.png"
+              alt=""
+              aria-hidden="true"
+              className="h-[21px] w-[21px] shrink-0"
+            />
+            <span className="whitespace-nowrap font-display text-[18px] tracking-[0.14em] text-[var(--bb-fg)]">
+              BABY BEAN
+            </span>
           </span>
         )}
         <Button

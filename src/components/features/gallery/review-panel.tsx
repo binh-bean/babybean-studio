@@ -24,9 +24,10 @@
  * Đến vòng thứ ba, câu hỏi của cả hai bên đều là "lần trước đã nói gì rồi".
  * Giấu đi thì khách viết lại yêu cầu cũ, và người chỉnh ảnh sửa lại thứ đã sửa.
  *
- * BB-212 — đổi sang ngôn ngữ "cuốn album kỷ niệm" (font-display Fraunces, nút
- * viên tròn màu mực, viền mảnh cho nút phụ). Hành vi và luật quyết định
- * (`lib/selection/review-rules`) giữ nguyên.
+ * BB-212 — đổi sang ngôn ngữ "cuốn album kỷ niệm" (font-display, nút viên
+ * tròn màu mực, viền mảnh cho nút phụ). Hành vi và luật quyết định
+ * (`lib/selection/review-rules`) giữ nguyên. BB-305 (28/09/2026): font-display
+ * chuyển từ Fraunces sang Playfair Display (LUẬT PHÔNG mới).
  */
 
 "use client";
@@ -45,6 +46,13 @@ export interface ReviewRound {
 export interface ReviewData {
   finalDriveUrl: string | null;
   rounds: ReviewRound[];
+  /**
+   * BB-298 — ngày giao thật (`deliveries.delivered_at`), cho dấu "Đã hoàn
+   * thiện · giao ngày dd/mm/yyyy" ở màn "Đã giao" (bản vẽ BB-297). `null` khi
+   * chưa có dòng `deliveries` hoặc chưa ghi ngày giao — màn khách ẩn phần
+   * ngày, không bịa.
+   */
+  deliveredAt?: string | null;
 }
 
 /**

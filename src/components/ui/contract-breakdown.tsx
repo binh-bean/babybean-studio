@@ -119,7 +119,8 @@ export function ContractBreakdown({
                       className="flex items-center justify-between gap-2 text-xs sm:text-sm text-[var(--bb-fg-muted)]"
                     >
                       <span className="truncate pr-2">{child.name}</span>
-                      <span className="shrink-0 font-medium font-mono text-[var(--bb-fg)]/80">
+                      {/* BB-305 — con số: bỏ font-mono, thêm tabular-nums. */}
+                      <span className="shrink-0 font-medium tabular-nums text-[var(--bb-fg)]/80">
                         x{child.quantity}{child.unit ? ` ${child.unit}` : ""}
                       </span>
                     </div>

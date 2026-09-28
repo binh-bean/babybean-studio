@@ -181,8 +181,18 @@ export default function LoginPage() {
           {/* BB-290 (#29): MỘT logo chữ duy nhất cho toàn hệ — "BABY BEAN"
               giãn chữ, không còn "BabyBean Studio" Playfair đậm khác hẳn
               thanh bên quản trị (admin-sidebar.tsx) và màn khách. */}
-          <h1 className="text-center font-display text-2xl font-normal tracking-[0.18em] text-[var(--bb-fg)]">
-            BABY BEAN
+          {/* BB-306 — logo hạt đậu trước chữ, căn giữa dọc theo chữ. `h1`
+              vẫn là MỘT phần tử, nhãn truy cập giữ nguyên "BABY BEAN" (ảnh
+              `aria-hidden`, không thêm vào tên truy cập). */}
+          <h1 className="flex items-center justify-center gap-[10px] font-display text-2xl font-normal tracking-[0.18em] text-[var(--bb-fg)]">
+            <img
+              data-testid="logo-hat-dau"
+              src="/brand/logo-hat-dau-64.png"
+              alt=""
+              aria-hidden="true"
+              className="h-[28px] w-[28px] shrink-0"
+            />
+            <span>BABY BEAN</span>
           </h1>
           <p className="mt-1 text-center text-sm text-[var(--bb-fg-muted)]">
             Đăng nhập dành cho nhân viên

@@ -200,9 +200,10 @@ export function AddonSelector({
                         >
                           <Minus className="h-3.5 w-3.5" />
                         </button>
+                        {/* BB-305 — con số: Be Vietnam Pro (mặc định) + tabular-nums, không font-mono. */}
                         <span
                           aria-label={`Số lượng hiện tại ${product.name}`}
-                          className="w-9 text-center font-mono text-sm font-semibold text-[var(--bb-fg)]"
+                          className="w-9 text-center text-sm font-semibold tabular-nums text-[var(--bb-fg)]"
                         >
                           {qty}
                         </span>
@@ -231,7 +232,8 @@ export function AddonSelector({
                   ) : (
                     /* Không đủ tin cậy về giá: KHÔNG cho bấm mua */
                     <div className="text-right">
-                      <span className="text-xs text-[var(--bb-fg-muted)] italic">
+                      {/* BB-305 — bỏ nghiêng theo LUẬT PHÔNG mới. */}
+                      <span className="text-xs text-[var(--bb-fg-muted)]">
                         {vi.ui.addonSelector.priceQuotePending}
                       </span>
                     </div>

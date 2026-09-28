@@ -30,8 +30,16 @@ export interface OAnh {
   h: number;
 }
 
-/** Tỉ lệ cao/rộng khi ảnh chưa có kích thước — khung dọc 2:3 phổ biến nhất. */
-export const TI_LE_MAC_DINH = 1.5;
+/**
+ * Tỉ lệ cao/rộng khi ảnh chưa có kích thước.
+ *
+ * BB-299 mục 2 — bản vẽ đã duyệt (`babybean-assets/BB-297/html/luoi-*.html`,
+ * phần chú thích) chốt khung dự phòng 4:5 (rộng:cao), không phải 2:3 cũ.
+ * 4:5 → cao/rộng = 5/4 = 1.25. Đo lại 23/09/2026: chỉ 6/155.028 tấm thiếu
+ * width/height, nên hằng số này gần như không ảnh hưởng tới bố cục thật,
+ * chỉ đổi cho đúng khung dự phòng bản vẽ chọn.
+ */
+export const TI_LE_MAC_DINH = 1.25;
 
 /**
  * Chặn hai đầu tỉ lệ. Một tấm toàn cảnh 1:4 sẽ thành một dải mỏng như sợi chỉ,
@@ -59,9 +67,15 @@ export function soCotSoLe(rongMan: number): number {
   return 2;
 }
 
-/** Khoảng hở giữa hai tấm: hẹp trên điện thoại để ảnh được to nhất có thể. */
+/**
+ * Khoảng hở giữa hai tấm: hẹp trên điện thoại để ảnh được to nhất có thể.
+ *
+ * BB-299 mục 2 — khớp đúng số đo bản vẽ đã duyệt: máy tính khe 8
+ * (`luoi-may-tinh.html`, "khe 8"), điện thoại khe 4 (`luoi-dien-thoai.html`,
+ * "khe 4").
+ */
 export function kheSoLe(rongMan: number): number {
-  return rongMan >= 1024 ? 10 : 6;
+  return rongMan >= 1024 ? 8 : 4;
 }
 
 /**

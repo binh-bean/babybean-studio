@@ -123,6 +123,12 @@ interface GalleryApiResponse {
   /** BB-212: tên khách hàng đứng bộ ảnh — điền sẵn ô "người xác nhận" lúc chốt. */
   customerName?: string | null;
   shootDate: string | null;
+  /**
+   * BB-298 — "loại buổi chụp" (Thôi nôi, Newborn, Sinh nhật…), lấy từ
+   * `shoots.concept`. `null`/`undefined` khi bộ ảnh không gắn buổi chụp hoặc
+   * buổi chụp chưa ghi loại — bìa ẩn phần này, không bịa.
+   */
+  sessionType?: string | null;
   branch: {
     name: string;
     address?: string | null;
@@ -463,6 +469,47 @@ export function GalleryApp({ token }: GalleryAppProps) {
   */
   const biaRef = useRef<HTMLDivElement>(null);
   const [thanhNoiAn, setThanhNoiAn] = useState(true);
+  /**
+   * BB-306 — bìa máy tính (layout "ben-canh"/BB-298) không tràn `100svh`
+   * (`lg:min-h-0 lg:h-auto`, xem `bia-bo-anh.tsx`), nên `#dau-luoi-anh` (dính
+   * ngay sau bìa) lọt vào khung nhìn máy tính TỪ LÚC MỞ TRANG, chưa cuộn gì —
+   * "Baby Bean" hiện HAI LẦN cùng lúc: thanh thương hiệu đầu trang + hàng
+   * logo trong thanh dính. Tái dùng ĐÚNG observer đo `biaConHien` phía trên
+   * (không mở thêm observer thứ hai) — `entry.isIntersecting === false` là
+   * bìa đã cuộn QUA HẲN (0% còn trong khung nhìn), đúng lúc thanh dính bắt
+   * đầu "dính" ở mép trên. Cụm logo+chữ máy tính trong `#dau-luoi-anh` chỉ
+   * hiện khi `true` — điện thoại không cần (bìa điện thoại luôn tràn màn nên
+   * không có lỗi lặp này), giữ nguyên hàng 1 điện thoại không đổi.
+   */
+  const [hienLogoDinhMayTinh, setHienLogoDinhMayTinh] = useState(false);
+
+  /**
+   * BB-298 (điều hành, sau khi giám đốc duyệt phần lớn) — bìa điện thoại
+   * tràn màn `min-h-[100svh]` cộng thêm hai khối đứng TRÊN nó (thanh thương
+   * hiệu + chip "Lưu ra màn hình chính") đẩy nút "Bắt đầu chọn ảnh" và dòng
+   * "N ảnh | M tấm | Chọn trước" xuống dưới mép màn hình 844px — bắt được
+   * qua ảnh `1-bia-390x844.png` giám đốc chụp lại.
+   *
+   * Sửa bằng ĐO THẬT, không đoán: `phanTrenBiaRef` bọc đúng hai khối đứng
+   * trên bìa (thanh thương hiệu + chip, chip có thể ẩn/hiện tuỳ trạng thái
+   * "đã ẩn gần đây" của `LoiGoiYLuuApp` nên chiều cao đổi động — dùng
+   * `ResizeObserver`, không phải một hằng số cộng dồn hai chiều cao đoán
+   * trước). Chiều cao đo được đưa xuống làm biến CSS `--bb-phan-tren-bia`
+   * trên chính khối bọc `<BiaBoAnh>` (`biaRef`) — `bia-bo-anh.tsx` trừ đúng
+   * số đó ra khỏi `100svh` ở khối ảnh điện thoại. Máy tính không đụng gì
+   * (giữ `lg:min-h-0`, không dùng biến này).
+   */
+  const phanTrenBiaRef = useRef<HTMLDivElement>(null);
+  const [phanTrenBiaCao, setPhanTrenBiaCao] = useState(0);
+  useEffect(() => {
+    const el = phanTrenBiaRef.current;
+    if (!el) return;
+    const capNhat = () => setPhanTrenBiaCao(el.offsetHeight);
+    capNhat();
+    const ro = new ResizeObserver(capNhat);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loading, phaiChonBuoiChup, error, gallery]);
   useEffect(() => {
     const elBia = biaRef.current;
     if (!elBia) return;
@@ -483,6 +530,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
           ? entry.isIntersecting && entry.intersectionRect.height > window.innerHeight * 0.4
           : true;
         capNhat();
+        // BB-306 — xem ghi chú ở khai báo `hienLogoDinhMayTinh` phía trên.
+        setHienLogoDinhMayTinh(entry ? !entry.isIntersecting : false);
       },
       { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1] },
     );
@@ -1651,6 +1700,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
         hàng chip lọc; "Nhắn cho studio" thu thành biểu tượng nhỏ (giữ
         `aria-label`, không mất chức năng) đứng cạnh nút tải và chuông.
       */}
+      {/*
+        BB-298 — `phanTrenBiaRef` bọc đúng hai khối đứng TRÊN bìa điện thoại
+        (thanh thương hiệu + chip Lưu app) để đo chiều cao THẬT bằng
+        `ResizeObserver` (xem ghi chú lớn ở khai báo `phanTrenBiaRef` phía
+        trên) — không phải một `<div>` trang trí, chỉ để đo.
+      */}
+      <div ref={phanTrenBiaRef}>
       <div
         data-testid="thanh-thuong-hieu"
         className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-[#e5dcd2] bg-[#fbf7f2] px-4 py-3.5 sm:px-6 lg:flex lg:justify-between lg:px-10 lg:py-3"
@@ -1685,11 +1741,28 @@ export function GalleryApp({ token }: GalleryAppProps) {
             </a>
           )}
         </div>
+        {/*
+          BB-306 — logo hạt đậu đứng TRƯỚC chữ, căn giữa dọc theo chữ
+          (`items-center`). `data-testid="ten-thuong-hieu"` VÀ `justify-self-center`
+          dời từ chữ sang khối bọc này — bb-278 đo bounding box của đúng
+          testid này để kiểm căn giữa màn hình, nay đo cả logo+chữ như MỘT
+          cụm thương hiệu, không phải căn giữa riêng chữ nữa (logo cố định
+          gắn liền chữ là thay đổi thiết kế có chủ đích, không phải hồi quy).
+        */}
         <span
           data-testid="ten-thuong-hieu"
-          className="justify-self-center font-display text-[20px] uppercase tracking-[0.14em] text-[#2e2a27] lg:text-[18px] lg:tracking-[0.12em]"
+          className="inline-flex items-center gap-[8px] justify-self-center lg:gap-[7px]"
         >
-          Baby Bean
+          <img
+            data-testid="logo-hat-dau"
+            src="/brand/logo-hat-dau-64.png"
+            alt=""
+            aria-hidden="true"
+            className="h-[23px] w-[23px] shrink-0 lg:h-[21px] lg:w-[21px]"
+          />
+          <span className="font-display text-[20px] uppercase tracking-[0.14em] text-[#2e2a27] lg:text-[18px] lg:tracking-[0.12em]">
+            Baby Bean
+          </span>
         </span>
         <div className="flex items-center justify-self-end gap-1">
           {/*
@@ -1734,19 +1807,31 @@ export function GalleryApp({ token }: GalleryAppProps) {
         Không `fixed` nên không bao giờ chồng lên `ThanhChon` ở đáy — tách
         biệt bằng vị trí trong trang, xem ghi chú ở `loi-goi-y-luu-app.tsx`.
       */}
-      <div className="flex justify-center border-b border-[#e5dcd2] bg-[#fbf7f2] px-4 py-2 empty:hidden sm:px-6 sm:py-2.5 lg:px-10">
+      {/*
+        BB-298 — bản vẽ bìa máy tính (`bia-may-tinh-tap-chi.html`, admin
+        duyệt 28/09/2026) không có chip này ở đầu trang — nửa phải của bìa
+        chia đôi đã đủ đầy (tên, lời chào, thông tin, nút, dải ảnh), thêm chip
+        "Lưu ra màn hình chính" phía trên nữa là thừa. Điện thoại GIỮ NGUYÊN
+        (chip vẫn đúng chỗ, đúng lý do — xem `loi-goi-y-luu-app.tsx`).
+      */}
+      <div className="flex justify-center border-b border-[#e5dcd2] bg-[#fbf7f2] px-4 py-2 empty:hidden sm:px-6 sm:py-2.5 lg:hidden">
         <LoiGoiYLuuApp
           daChon={selectionCounts.selectedCount}
           onXemCachLuu={() => setMoHuongDanLuuApp(true)}
         />
       </div>
+      </div>
 
       {/* MÀN 1 — ẢNH BÌA (tràn toàn màn, xem BB-258) */}
-      <div ref={biaRef}>
+      <div
+        ref={biaRef}
+        style={{ ["--bb-phan-tren-bia" as string]: `${phanTrenBiaCao}px` }}
+      >
         <BiaBoAnh
           anhBia={anhBia}
           coverHeadline={gallery.coverHeadline ?? null}
           tenBe={gallery.babyName}
+          sessionType={gallery.sessionType}
           ngayChup={gallery.shootDate}
           chiNhanh={gallery.branch.name}
           loiChao={gallery.welcomeMessage}
@@ -1755,19 +1840,52 @@ export function GalleryApp({ token }: GalleryAppProps) {
           daChon={selectionCounts.selectedCount}
           hanChot={gallery.dueAt}
           khoa={isLocked}
+          chatUrl={gallery.branch.chatUrl}
+          // BB-298 — dải "Vài khoảnh khắc trong bộ" ở chân bìa máy tính, 4 tấm
+          // đầu tiên đã tải (không gọi thêm API riêng cho dải này).
+          anhXemTruoc={photos.slice(0, 4)}
+          choPhepTai={choPhepTai}
+          onTaiCaBo={taiCaBo}
+          ngayGiao={gallery.review?.deliveredAt ?? null}
           trangThai={gallery.status}
           onBatDau={cuonToiLuoi}
         />
       </div>
 
       {/*
-        ĐẦU TRANG DÍNH — CHỈ còn hàng chip lọc. Tên bộ ảnh/chi nhánh và hai
-        việc phụ (nhắn studio, tải ảnh) đã dời lên thanh thương hiệu phía
-        trên (`thanh-thuong-hieu`, đứng ngoài `biaRef`) — quyết định điều
-        hành BB-281 (27/09/2026): điện thoại từng có HAI thanh dính chồng
-        nhau (thanh thương hiệu + thanh này) cùng lặp lại tên bộ ảnh, thêm
-        hai nút to (nhắn studio + tải) chật chội ngay dưới. Giữ nguyên đây
-        đúng MỘT việc: lọc/so sánh — không lặp lại thông tin đã có ở trên.
+        BB-299 — ĐẦU LƯỚI GỘP: bản vẽ đã duyệt `babybean-assets/BB-297/html/
+        luoi-may-tinh.html` + `luoi-dien-thoai.html` vẽ MỘT thanh dính duy
+        nhất (logo, vạch, "tên bé · …", cụm chip lọc, So sánh NGAY SAU cụm
+        chip, tin nhắn/chuông ở bên phải) — không còn hai thanh tách rời
+        (thương hiệu không dính phía trên + chip dính `#dau-luoi-anh` phía
+        dưới, kiểu BB-278/281 cũ).
+
+        GIỮ NGUYÊN `id="dau-luoi-anh"` VÀ VỊ TRÍ (ngay sau ảnh bìa): rất
+        nhiều chỗ phụ thuộc đúng điểm neo này để "cuộn qua khỏi bìa" —
+        `cuonToiLuoi()` (nút "Bắt đầu chọn ảnh" ở bìa) VÀ hơn chục tệp phép
+        thử e2e (`bb-166`, `bb-202`, `bb-240`, `bb-246`, `bb-248`, `bb-258`,
+        `bb-275`, `bb-279`, `bb-287`, `bb-289`, `bb-293`, `bb-295`, `bb-296`…)
+        gọi `scrollIntoView` trên chính id này. Dời hẳn thanh lên TRƯỚC ảnh
+        bìa (đúng nghĩa đen "một thanh dính từ đầu trang") sẽ biến mọi lệnh
+        cuộn đó thành vô tác dụng (phần tử đã nằm sẵn trong khung nhìn) —
+        gãy cả nút "Bắt đầu chọn ảnh" lẫn hàng loạt phép thử ngoài phạm vi
+        BB-299. Nên "gộp" ở đây nghĩa là: NỘI DUNG của thanh thương hiệu
+        (logo, tên) được thêm vào bên trong `#dau-luoi-anh`, còn thanh
+        thương hiệu không-dính phía trên bìa (`thanh-thuong-hieu`, hiện
+        NGAY khi mở trang — chủ studio 27/09/2026 "để phía trên như bản
+        trước") GIỮ NGUYÊN không đổi. Vì thanh đó không `sticky`, nó luôn
+        cuộn khuất khi tới lưới — không bao giờ chồng lên `#dau-luoi-anh`,
+        nên không tái phát lỗi "hai thanh dính chồng nhau che thẻ ảnh cuối"
+        của BB-278 (ở đây CHỈ CÓ MỘT phần tử `sticky` trên trang).
+
+        Testid "ten-thuong-hieu-dinh"/không gắn testid cho bản sao logo/tin
+        nhắn bên trong thanh này — CỐ Ý khác `data-testid="ten-thuong-hieu"`
+        của thanh thương hiệu phía trên, để `getByTestId("ten-thuong-hieu")`
+        (bb-278) không bao giờ khớp hai phần tử cùng lúc (Playwright strict
+        mode). `data-testid="nhan-studio-dinh"` CHỈ đặt ở bản điện thoại
+        (hàng 1 bên dưới) vì `bb-289-theo-ban-ve.spec.ts` dò đúng testid này
+        ở khổ 390×844 sau khi cuộn — đặt thêm ở bản máy tính sẽ khớp hai
+        phần tử cùng lúc và vỡ đúng phép thử đó.
       */}
       <header
         id="dau-luoi-anh"
@@ -1799,32 +1917,133 @@ export function GalleryApp({ token }: GalleryAppProps) {
             </p>
           </div>
         )}
+
+        {/*
+          Hàng 1 — CHỈ điện thoại (bản vẽ `luoi-dien-thoai.html` .dau1): logo
+          căn giữa THẬT bằng lưới 3 cột (giữ đúng thủ thuật `minmax` mà Opus
+          đã soát ở thanh thương hiệu phía trên — cột trái/phải cùng 44px
+          cố định nên không cần `minmax(0,1fr)` ở đây), tin nhắn trái/chuông
+          phải. Máy tính gộp thẳng vào MỘT hàng duy nhất bên dưới, ẩn hàng
+          này (`lg:hidden`).
+        */}
+        <div className="grid h-14 grid-cols-[44px_1fr_44px] items-center border-b border-[#e5dcd2] px-2 lg:hidden">
+          <div className="flex items-center justify-self-start">
+            {gallery.branch.chatUrl && (
+              <a
+                href={gallery.branch.chatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={vi.gallery.messageStudio}
+                title={vi.gallery.messageStudio}
+                data-testid="nhan-studio-dinh"
+                className="grid h-11 w-11 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
+              >
+                <MessageCircle className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+              </a>
+            )}
+          </div>
+          {/* BB-306 — logo hạt đậu trước chữ, testid dời sang khối bọc (xem ghi chú ở thanh-thuong-hieu phía trên). */}
+          <span
+            data-testid="ten-thuong-hieu-dinh"
+            className="inline-flex items-center gap-[6px] justify-self-center"
+          >
+            <img
+              data-testid="logo-hat-dau"
+              src="/brand/logo-hat-dau-64.png"
+              alt=""
+              aria-hidden="true"
+              className="h-[18px] w-[18px] shrink-0"
+            />
+            <span className="font-display text-[16px] uppercase tracking-[0.2em] text-[#2e2a27]">
+              Baby Bean
+            </span>
+          </span>
+          <div className="flex items-center justify-self-end">
+            <ChuongThongBao galleryId={gallery.id} status={gallery.status} />
+          </div>
+        </div>
+
         <div className="mx-auto max-w-[1600px] px-3 sm:px-6 lg:px-10">
-          <nav aria-label="Lọc ảnh" className="flex items-center gap-3 overflow-x-auto pt-3 pb-4">
+          <nav
+            aria-label="Lọc ảnh"
+            className="flex items-center gap-3 overflow-x-auto pt-3 pb-4 lg:h-14 lg:gap-0 lg:overflow-visible lg:py-0"
+          >
             {/*
-              BB-293 mục #12: chế độ "chọn để so sánh" ẩn hàng chip lọc (ba mẹ đang CHỌN, không LỌC).
-              BB-295 mục #15: bộ ảnh đã khoá thì ẩn "Đã chọn/Chưa chọn", giữ "Tất cả".
+              Máy tính — MỘT hàng duy nhất (bản vẽ `luoi-may-tinh.html`
+              .dau): logo, vạch, "tên bé", rồi mới tới cụm chip lọc (đẩy
+              sang phải 40px `lg:ml-10` đúng số đo chú thích bản vẽ). Điện
+              thoại đã có logo ở hàng 1 phía trên nên ẩn ở đây.
             */}
-            {!soSanhBat && (
+            {/*
+              BB-306 — cụm logo+chữ máy tính CHỈ dựng khi `hienLogoDinhMayTinh`
+              (đã cuộn qua hẳn bìa) — xem ghi chú lớn ở khai báo state. Vạch
+              ngăn đi kèm (chỉ ngăn logo với tên bé, không có gì để ngăn khi
+              logo chưa hiện) nên gộp cùng điều kiện, không tách riêng.
+            */}
+            {hienLogoDinhMayTinh && (
               <>
-                {nutLoc("all", vi.gallery.filterAll, photos.length)}
-                {!isLocked && nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
-                {!isLocked && nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
-                {photosLoading && <Spinner className="mb-2.5 h-4 w-4 shrink-0 text-muted-foreground" />}
+                <span
+                  data-testid="ten-thuong-hieu-dinh"
+                  className="hidden shrink-0 items-center gap-[6px] lg:inline-flex"
+                >
+                  <img
+                    data-testid="logo-hat-dau"
+                    src="/brand/logo-hat-dau-64.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-[18px] w-[18px] shrink-0"
+                  />
+                  <span className="font-display text-[16px] uppercase tracking-[0.12em] text-[#2e2a27]">
+                    Baby Bean
+                  </span>
+                </span>
+                <span className="mx-5 hidden h-5 w-px shrink-0 bg-[#e5dcd2] lg:inline-block" aria-hidden="true" />
               </>
             )}
+            {/*
+              BB-299 — không có trường "loại buổi chụp" riêng trong dữ liệu
+              (`GalleryApiResponse` chỉ có `babyName`/`title` nội bộ quản
+              trị) — theo LUẬT-DOT-8 "không có trường thì ẩn, ghi vào bàn
+              giao": chỉ hiện tên bé, dùng lại đúng câu dự phòng đã duyệt ở
+              bìa (`bia-bo-anh.tsx`) khi thiếu tên, không bịa thêm "loại
+              buổi chụp".
+            */}
+            <span className="hidden shrink-0 whitespace-nowrap text-[13px] text-muted-foreground lg:inline">
+              {gallery.babyName?.trim() || "Khoảnh khắc của con"}
+            </span>
+
+            <div className="flex shrink-0 items-center gap-3 lg:ml-10">
+              {/*
+                BB-293 mục #12: chế độ "chọn để so sánh" ẩn hàng chip lọc (ba mẹ đang CHỌN, không LỌC).
+                BB-295 mục #15: bộ ảnh đã khoá thì ẩn "Đã chọn/Chưa chọn", giữ "Tất cả".
+              */}
+              {!soSanhBat && (
+                <>
+                  {nutLoc("all", vi.gallery.filterAll, photos.length)}
+                  {!isLocked && nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
+                  {!isLocked && nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
+                  {photosLoading && <Spinner className="mb-2.5 h-4 w-4 shrink-0 text-muted-foreground lg:mb-0" />}
+                </>
+              )}
+            </div>
+
+            {/* Vạch ngăn CHỈ máy tính — bản vẽ: "So sánh liền cụm chip". */}
+            <span className="mx-3 hidden h-5 w-px shrink-0 bg-[#e5dcd2] lg:inline-block" aria-hidden="true" />
 
             {/*
-              BB-218 — bật/tắt chế độ "chọn để so sánh". Đặt cuối hàng bộ lọc
-              (không xen giữa Tất cả/Đã chọn/Chưa chọn) vì đây là một CHẾ ĐỘ
-              thao tác, không phải thêm một bộ lọc thứ tư.
+              BB-218 — bật/tắt chế độ "chọn để so sánh". Điện thoại: đẩy về
+              mép phải như bản vẽ cũ (`ml-auto`, tin nhắn/chuông không còn ở
+              hàng này nên So sánh là phần tử cuối). Máy tính: đứng NGAY SAU
+              cụm chip (`lg:ml-0`, bản vẽ "So sánh liền cụm chip" — trước
+              đây `ml-auto` đẩy nó ra tít mép phải cùng tin nhắn/chuông,
+              đúng lỗi báo cáo chấm BB-299 mục 1).
             */}
             <button
               type="button"
               onClick={() => (soSanhBat ? huySoSanh() : setSoSanhBat(true))}
               aria-pressed={soSanhBat}
               className={cn(
-                "mb-2.5 ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+                "mb-2.5 ml-auto flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors lg:mb-0 lg:ml-0",
                 soSanhBat
                   ? "border-foreground bg-foreground text-background"
                   : "border-border text-muted-foreground hover:text-foreground",
@@ -1835,15 +2054,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
             </button>
 
             {/*
-              BB-289 — admin báo "Nhắn cho studio" không đi theo khi cuộn: bản
-              cũ chỉ đứng ở `thanh-thuong-hieu` (KHÔNG sticky, xem ghi chú tại
-              đó), nên cuộn qua khỏi ảnh bìa là mất hẳn. `#dau-luoi-anh` là
-              phần tử `sticky` DUY NHẤT trên trang — lặp lại đúng hai biểu
-              tượng (nhắn + chuông) ở đây để luôn thấy được sau khi cuộn, giữ
-              nguyên bản gốc phía trên cho lúc CHƯA cuộn (không đổi hành vi
-              đã có, chỉ thêm một chỗ đứng thứ hai luôn hiện).
+              Tin nhắn + chuông — CHỈ máy tính ở đây (`hidden lg:flex`, đẩy
+              hẳn về mép phải bằng `lg:ml-auto`). Điện thoại đã có hai biểu
+              tượng này ở hàng 1 phía trên (cùng một `#dau-luoi-anh` dính),
+              không lặp lại ở hàng chip — bản vẽ điện thoại (`.dau2`) không
+              có tin nhắn/chuông trong hàng chip.
             */}
-            <div className="mb-2.5 flex shrink-0 items-center gap-0.5">
+            <div className="hidden shrink-0 items-center gap-0.5 lg:ml-auto lg:flex">
               {gallery.branch.chatUrl && (
                 <a
                   href={gallery.branch.chatUrl}
@@ -1851,7 +2068,6 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   rel="noopener noreferrer"
                   aria-label={vi.gallery.messageStudio}
                   title={vi.gallery.messageStudio}
-                  data-testid="nhan-studio-dinh"
                   className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
                 >
                   <MessageCircle className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
@@ -2108,7 +2324,16 @@ export function GalleryApp({ token }: GalleryAppProps) {
         độ rộng đọc dễ vì `ChonBiaAlbum`/`TomTatSanPhamIn` tự xếp lưới ảnh
         nhiều cột, không phải một khối chữ dài tràn hết 1600px.
       */}
-      {albumTrongGoi.length > 0 && (
+      {/*
+        BB-296 mục #5 — báo cáo chấm độc lập lần 3: bộ ảnh ĐÃ GIAO vẫn hiện
+        khối "chọn bìa album" + dòng đỏ "Chưa có tấm nào trong cuốn này" ở
+        `TomTatSanPhamIn` bên dưới — ba mẹ đã nhận ảnh xong, không còn gì để
+        chọn nữa, dòng đỏ chỉ gây hoang mang. Ẩn hẳn khối chọn bìa album khi
+        đã khoá (`isLocked` đúng cho cả "đã chốt chờ CSKH" lẫn "đã giao" — cả
+        hai đều không sửa thẳng được nữa, các nút bên trong vốn đã `disabled`
+        khi khoá, ẩn nguyên khối gọn hơn là để một khối xám không bấm được).
+      */}
+      {albumTrongGoi.length > 0 && !isLocked && (
         <div className="mx-auto mt-14 max-w-[1600px] px-4 sm:px-6 lg:px-10">
           <ChonBiaAlbum
             albums={gallery.albumBia ?? albumTrongGoi.map((a) => ({
@@ -2148,6 +2373,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 }),
             }))}
             onMoAnh={moAnhTheoId}
+            khoa={isLocked}
           />
         </div>
       )}
@@ -2242,7 +2468,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
           nutChinh={nutChinh}
           muaThem={
             (gallery.addons?.catalogue?.length ?? 0) > 0 && !isLocked && duocChon
-              ? { tien: gallery.addons?.totalAmount ?? 0, onClick: () => setMoCuaHang(true) }
+              ? {
+                  tien: gallery.addons?.totalAmount ?? 0,
+                  // BB-299 mục 3 — bản vẽ `luoi-may-tinh.html`/`luoi-dien-thoai.html`
+                  // vẽ huy hiệu túi là MỘT SỐ (đã có mấy món), không phải chấm
+                  // tròn như bản cũ.
+                  soMon: gallery.addons?.items?.length ?? 0,
+                  onClick: () => setMoCuaHang(true),
+                }
               : null
           }
           soChuaGui={hangChoTim.soChuaGui}
@@ -2288,7 +2521,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
           </h2>
           <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
             <div className="space-y-1">
-              <p className="font-display text-xl text-foreground">{gallery.branch.name}</p>
+              {/* BB-305 — tên chi nhánh trong "Thông tin studio" là nội
+                  dung, không phải H1/H2 của màn: bỏ font-display, dùng Be
+                  Vietnam Pro. `data-testid` thay cho selector `p.font-display`
+                  cũ (bb-240) vì lớp đó không còn gắn ở đây nữa. */}
+              <p data-testid="chan-trang-ten-chi-nhanh" className="text-xl font-medium text-foreground">
+                {gallery.branch.name}
+              </p>
               {gallery.branch.address && <p className="text-muted-foreground">{gallery.branch.address}</p>}
               {gallery.branch.hotline && (
                 <p>
@@ -2353,14 +2592,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
             giờ mở cửa thật thì thêm lại đúng chỗ này.
           */}
           {/*
-            BB-240 kiểm ngược — `footer.locator("p.font-display")` (bài thử
-            "chân trang: chi nhánh + nút nhắn tin cùng hàng…") đợi ĐÚNG MỘT
-            `<p class="font-display">` trong `<footer>` (tên chi nhánh). Thêm
-            một `<p>` thứ hai cũng mang class `font-display` làm bài thử đó
-            vỡ ("strict mode violation… resolved to 2 elements") — bắt được
-            khi chạy lại cả bộ trước khi nộp. Dùng `style` thay class Tailwind
-            cho câu kết: CÙNG PHÔNG (biến `--font-display`), không cộng thêm
-            phần tử khớp bộ chọn `p.font-display`.
+            BB-305 — câu kết "Cảm ơn ba mẹ…" là một đoạn văn (nội dung), không
+            phải tiêu đề: bỏ font-display + italic, dùng Be Vietnam Pro mặc
+            định theo LUẬT PHÔNG mới. Việc này cũng gỡ luôn khoản kiểm ngược
+            BB-240 cũ (`footer.locator("p.font-display")` từng phải đếm ĐÚNG
+            MỘT phần tử) vì giờ không còn `<p>` nào trong chân trang mang lớp
+            đó — bài thử đã đổi sang `data-testid="chan-trang-ten-chi-nhanh"`
+            cho tên chi nhánh, không phụ thuộc lớp phông nữa.
           */}
           <div className="mt-10 flex flex-col items-center gap-2 border-t border-border pt-8 text-center">
             {/*
@@ -2384,12 +2622,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               className="h-[56px] w-auto object-contain opacity-90"
               style={layerMoVuong}
             />
-            <p
-              className="italic text-lg text-foreground"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              Cảm ơn ba mẹ đã tin Baby Bean
-            </p>
+            <p className="text-lg text-foreground">Cảm ơn ba mẹ đã tin Baby Bean</p>
             <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
               © {new Date().getFullYear()} Baby Bean Studio
             </p>

@@ -105,8 +105,14 @@ test.describe("BB-244: Chọn ảnh bìa popup full màn hình", () => {
     const anh2 = dialog.locator('button img').nth(1);
     await anh2.click();
 
-    // Khung xem trước cập nhật liền
-    const xemTruoc = dialog.locator("div.relative.flex-1").first();
+    // Khung xem trước cập nhật liền.
+    // BB-298 — bia-bo-anh.tsx đổi cấu trúc lưới (một `<h1>`/khối ảnh dùng
+    // chung cho cả hai bề rộng thay vì hai khối tách rời), nên lớp CSS
+    // "relative flex-1" không còn ở khối ảnh nữa. Đổi sang `data-testid`
+    // ổn định (`bia-khoi-anh`, luôn có trong `BiaBoAnh`) thay vì canh đúng
+    // tên lớp CSS đang dùng lúc dựng (AGENTS.md §5a: canh hành vi, không
+    // canh cách viết HTML nhất thời).
+    const xemTruoc = dialog.getByTestId("bia-khoi-anh");
     await expect(xemTruoc).toBeVisible();
     await expect(xemTruoc.locator(`img[src*='${photos[1]}']`)).toBeVisible();
 

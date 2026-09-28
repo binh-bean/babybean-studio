@@ -335,6 +335,30 @@ export function ManTreoTuong({
   const kho: KhoAnhPhong = manRong ? "ngang" : "doc";
   const phong = PHONG_TREO[maPhong][kho];
 
+  /**
+   * BB-296 mục #3 — báo cáo chấm độc lập lần 3: trên điện thoại, khung nằm ở
+   * y≈500–600px, phần lớn bị bảng điều khiển (`max-h-[30vh]` dính đáy màn,
+   * xem JSX bên dưới) che khuất. Luật 2/3 của `tinhKhungTrenTuong` đặt khung
+   * SÁT ĐÁY mảng tường trống (`tuong.cao` đo trên ảnh phòng GỐC) — không biết
+   * gì về bảng nổi phía trên nó ở màn hình THẬT. Trừ bớt chiều cao bảng (quy
+   * đổi ngược từ px container về px ảnh gốc qua đúng `scale` của
+   * `object-fit: cover`) khỏi `tuong.cao` TRƯỚC khi tính khung — khung tự lùi
+   * lên nằm trong phần tường còn lại phía trên bảng. Chỉ áp dụng trên điện
+   * thoại (bảng máy tính là cột dọc bên phải, không che theo chiều cao).
+   */
+  const TY_LE_CHIEU_CAO_BANG_DIEN_THOAI = 0.3; // khớp `max-h-[30vh]` trong JSX
+  const phongDeTinhKhung = useMemo(() => {
+    if (manRong || khungRef.h === 0) return phong;
+    const scale = tiLeHienThi(khungRef.w, khungRef.h, phong.rongAnhPx, phong.caoAnhPx);
+    if (scale <= 0) return phong;
+    const bangPxContainer = khungRef.h * TY_LE_CHIEU_CAO_BANG_DIEN_THOAI;
+    const bangPxGoc = bangPxContainer / scale;
+    return {
+      ...phong,
+      tuong: { ...phong.tuong, cao: Math.max(0, phong.tuong.cao - bangPxGoc) },
+    };
+  }, [phong, manRong, khungRef]);
+
   // Hướng khung theo TẤM ẢNH CỦA BÉ (dọc/ngang), không theo khổ ảnh phòng —
   // đúng đề bài "ảnh dọc 40×60 = rộng 40 cao 60".
   const huongKhung: "doc" | "ngang" =
@@ -358,7 +382,7 @@ export function ManTreoTuong({
       if (!m.material || !m.size) continue;
       const k = tachCoKhung(m.size);
       if (!k) continue;
-      const fit = tinhKhungTrenTuong(phong, m.size, huongKhung, coKhung, mauKhungDaChon.vienCm);
+      const fit = tinhKhungTrenTuong(phongDeTinhKhung, m.size, huongKhung, coKhung, mauKhungDaChon.vienCm);
       if (!fit.vua) continue;
       ungVien.push({ material: m.material, size: m.size, dienTich: k.canhNgan * k.canhDai });
     }
@@ -368,7 +392,7 @@ export function ManTreoTuong({
     let lonNhat = nguon[0]!;
     for (const u of nguon) if (u.dienTich > lonNhat.dienTich) lonNhat = u;
     return lonNhat;
-  }, [monAnhIn, phong, huongKhung, coKhung, mauKhungDaChon]);
+  }, [monAnhIn, phongDeTinhKhung, huongKhung, coKhung, mauKhungDaChon]);
 
   useEffect(() => {
     if (chatLieu !== null) return;
@@ -396,9 +420,9 @@ export function ManTreoTuong({
   const coVua = useMemo(
     () =>
       coCoBan.filter(
-        (c) => tinhKhungTrenTuong(phong, c, huongKhung, coKhung, mauKhungDaChon.vienCm).vua
+        (c) => tinhKhungTrenTuong(phongDeTinhKhung, c, huongKhung, coKhung, mauKhungDaChon.vienCm).vua
       ),
-    [coCoBan, phong, huongKhung, coKhung, mauKhungDaChon]
+    [coCoBan, phongDeTinhKhung, huongKhung, coKhung, mauKhungDaChon]
   );
 
   /**
@@ -428,8 +452,8 @@ export function ManTreoTuong({
   }, [coVua, co, coMacDinhTuDanhMuc]);
 
   const ketQuaKhung = useMemo(
-    () => tinhKhungTrenTuong(phong, co, huongKhung, coKhung, mauKhungDaChon.vienCm),
-    [phong, co, huongKhung, coKhung, mauKhungDaChon]
+    () => tinhKhungTrenTuong(phongDeTinhKhung, co, huongKhung, coKhung, mauKhungDaChon.vienCm),
+    [phongDeTinhKhung, co, huongKhung, coKhung, mauKhungDaChon]
   );
 
   const viTriHienThi = useMemo(() => {
@@ -926,7 +950,8 @@ export function ManTreoTuong({
           )}
           <div className="flex items-baseline justify-between pt-1.5 text-base">
             <span className="font-medium text-bb-fg">Tổng cộng</span>
-            <span className="font-display text-xl font-medium text-bb-fg">
+            {/* BB-305 — giá tiền: bỏ font-display, thêm tabular-nums. */}
+            <span className="text-xl font-medium tabular-nums text-bb-fg">
               {formatCurrencyVND(tongGia)}
             </span>
           </div>

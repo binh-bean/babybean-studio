@@ -43,6 +43,13 @@ export interface TomTatSanPhamInProps {
   /** Mở tấm ảnh ra màn xem lớn, nơi ba mẹ đổi được sản phẩm cho tấm đó. */
   onMoAnh: (photoId: string) => void;
   className?: string;
+  /**
+   * BB-296 mục #5 — báo cáo chấm độc lập lần 3: bộ ảnh ĐÃ KHOÁ (chốt xong
+   * hoặc đã giao) không còn sửa được nữa — dòng "Chưa có tấm nào trong cuốn
+   * này" tô đỏ như một việc CẦN LÀM là hứa sai, ba mẹ không bấm gì được nữa.
+   * Khoá thì chữ vẫn nói đúng sự thật (còn thiếu hay đủ), chỉ bỏ MÀU BÁO ĐỘNG.
+   */
+  khoa?: boolean;
 }
 
 /**
@@ -71,7 +78,7 @@ function loiTrangThai(dong: DongSanPhamIn): { chu: string; thieu: boolean } {
   };
 }
 
-export function TomTatSanPhamIn({ dong, onMoAnh, className }: TomTatSanPhamInProps) {
+export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false }: TomTatSanPhamInProps) {
   // Hợp đồng không có hàng in thì không hiện gì. Đây là luật cũ của docs/16
   // mục 3.3 và nó vẫn đúng: không bịa ra ô chọn cho thứ khách chưa mua.
   if (dong.length === 0) return null;
@@ -109,7 +116,7 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className }: TomTatSanPhamInPro
                     // BB-287 mục #23 — cam #D97706 không nằm trong bảng màu;
                     // terracotta (heart) là màu nhấn trạng thái "cần chú ý"
                     // dùng chung cho màn khách.
-                    tt.thieu ? "font-medium text-heart" : "text-muted-foreground",
+                    tt.thieu && !khoa ? "font-medium text-heart" : "text-muted-foreground",
                   )}
                 >
                   {tt.chu}

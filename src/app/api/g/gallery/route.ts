@@ -67,7 +67,7 @@ export async function GET(request: Request) {
     const { data: gallery, error: galleryError } = await supabase
       .from("galleries")
       .select(`
-        id, title, welcome_message, status, baby_id, customer_id, shoot_date:shoots(shoot_date),
+        id, title, welcome_message, status, baby_id, customer_id, shoot_date:shoots(shoot_date, concept),
         branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
         cover_photo_id, cover_headline, cover_layout, download_enabled, notes_enabled, invite_enabled,
@@ -375,6 +375,7 @@ export async function GET(request: Request) {
     // đã qua bước chỉnh — trước đó chưa có gì để xem.
     let review: {
       finalDriveUrl: string | null;
+      deliveredAt: string | null;
       rounds: Array<{ round: number; note: string; createdAt: string; resolved: boolean }>;
     } | null = null;
 
@@ -382,7 +383,7 @@ export async function GET(request: Request) {
       const [{ data: delivery }, { data: rounds }] = await Promise.all([
         supabase
           .from("deliveries")
-          .select("final_drive_url")
+          .select("final_drive_url, delivered_at")
           .eq("gallery_id", gallery.id)
           .maybeSingle(),
         supabase
@@ -394,6 +395,8 @@ export async function GET(request: Request) {
 
       review = {
         finalDriveUrl: delivery?.final_drive_url ?? null,
+        // BB-298 — ngày giao thật cho dấu "Đã hoàn thiện" ở màn "Đã giao".
+        deliveredAt: delivery?.delivered_at ?? null,
         rounds: (rounds ?? []).map((r) => ({
           round: r.round as number,
           note: r.note as string,
@@ -466,6 +469,13 @@ export async function GET(request: Request) {
       // BB-212 — xem ghi chú ở chỗ truy vấn `customer` phía trên.
       customerName: customer?.full_name || null,
       shootDate: (gallery.shoot_date as unknown as { shoot_date: string }[])?.[0]?.shoot_date || (gallery.shoot_date as unknown as { shoot_date: string })?.shoot_date || null,
+      // BB-298 — "loại buổi chụp" (Thôi nôi, Newborn, Sinh nhật…) cho bìa và
+      // màn "Đã giao" (bản vẽ BB-297). Cột có sẵn từ lâu ở `shoots.concept`
+      // (docs/16 — không nhầm với "concept" = thư mục con trên Drive dùng ở
+      // chỗ khác của màn này), chỉ thiếu đường trả ra cho khách — không đổi
+      // schema, không migration. Không có buổi chụp gắn với bộ (`shoot_id`
+      // null) hoặc buổi chụp chưa ghi loại thì trả `null`, màn khách tự ẩn.
+      sessionType: (gallery.shoot_date as unknown as { concept: string | null }[])?.[0]?.concept || (gallery.shoot_date as unknown as { concept: string | null })?.concept || null,
       branch: {
         name: (gallery.branch as unknown as { name: string }[])?.[0]?.name || (gallery.branch as unknown as { name: string })?.name,
         address:

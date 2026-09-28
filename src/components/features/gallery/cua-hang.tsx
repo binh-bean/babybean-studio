@@ -199,6 +199,38 @@ export function CuaHang({
   const [chatLieuChon, setChatLieuChon] = React.useState<string | null>(null);
   const [soLuong, setSoLuong] = React.useState(1);
   const [moLuoiChon, setMoLuoiChon] = React.useState(false);
+  /**
+   * BB-296 mục #1 — báo cáo chấm độc lập lần 3: bấm "Xong" trong lưới chọn
+   * nhiều tấm gọi thẳng `onMuaNhieu` (mua luôn), đóng lưới, KHÔNG có chỗ nào
+   * hiện lại ảnh vừa chọn — ô "Ảnh" luôn trống, không có phản hồi, khách
+   * tưởng thao tác không có tác dụng dù hộp chốt sau đó đã cộng tiền.
+   *
+   * Đổi hai bước: "Xong" trong lưới chỉ LƯU TẠM lựa chọn (state này) và hiện
+   * hàng ảnh thu nhỏ trong ô Ảnh; nút chính đổi thành "Thêm vào giỏ · {tiền}"
+   * — bấm nút đó mới thật sự gọi `onMuaNhieu`. Xong thì báo "Đã thêm vào
+   * giỏ" và đặt lại cấu hình (ảnh, kích thước, chất liệu, số lượng) cho món
+   * tiếp theo — đúng yêu cầu đề bài, không phải suy đoán thêm.
+   */
+  const [anhDaChonTrongLuoi, setAnhDaChonTrongLuoi] = React.useState<AnhChonDuoc[]>([]);
+  /**
+   * BB-299 mục 4 — bản vẽ `cua-hang-sau-them-*.html` đòi dòng xác nhận có
+   * "Hoàn tác" xoá ĐÚNG món vừa thêm bằng API mua thêm có sẵn (không có
+   * đường xoá riêng thì bỏ nút — LUẬT-DOT-8, không lách bằng cách khác).
+   * `hoanTac: null` = không hoàn tác được (giữ đúng chữ, không hiện nút).
+   */
+  const [thongBaoDaThem, setThongBaoDaThem] = React.useState<{ text: string; hoanTac: (() => void) | null } | null>(
+    null,
+  );
+  /** BB-299 mục 4 — bản vẽ: giỏ dài hơn 2 món chỉ hiện 2 + "Xem cả N món ›". */
+  const [xemHetGio, setXemHetGio] = React.useState(false);
+  /**
+   * BB-299 mục 4 — điện thoại: bản vẽ `cua-hang-sau-them-dien-thoai.html`
+   * (`.gio`) vẽ giỏ thành MỘT DÒNG PILL gọn "Giỏ · N món · tiền · Xem giỏ ›",
+   * bấm mới mở ra danh sách đầy đủ — khác máy tính (`.day` của bản vẽ máy
+   * tính) vốn LUÔN hiện danh sách ở đáy ngăn kéo (đủ chỗ ngang 520px). Từ
+   * `sm` trở lên bỏ qua state này, luôn hiện danh sách (`sm:block`).
+   */
+  const [moGioMobile, setMoGioMobile] = React.useState(false);
   const hopThoaiRef = React.useRef<HTMLDivElement>(null);
 
   // BB-277 — hộp thoại toàn màn hình phải giữ focus bên trong (Tab quẩn lại)
@@ -213,8 +245,36 @@ export function CuaHang({
     setChatLieuChon(null);
     setSoLuong(1);
     setMoLuoiChon(false);
+    setAnhDaChonTrongLuoi([]);
+    setThongBaoDaThem(null);
+    setXemHetGio(false);
+    setMoGioMobile(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mo, presetNhom]);
+
+  // "Đã thêm vào giỏ" chỉ là phản hồi TỨC THỜI — tự ẩn sau 6s (bản vẽ BB-297:
+  // "Giữ 6 giây rồi thu lại"), không cần khách bấm tắt.
+  React.useEffect(() => {
+    if (!thongBaoDaThem) return;
+    const id = window.setTimeout(() => setThongBaoDaThem(null), 6000);
+    return () => window.clearTimeout(id);
+  }, [thongBaoDaThem]);
+
+  /*
+    BB-296 mục #1 kiểm ngược — báo lỗi thật khi chạy `bb-279-cua-hang.spec.ts`:
+    truyền thẳng `anhDaChonTrongLuoi.map(...)` làm prop `daChonSan` của
+    `ChonAnhNhieuTam` tạo một MẢNG MỚI mỗi lần CuaHang render lại (kể cả khi
+    nội dung không đổi — vd poll `/api/g/thong-bao-khach` mỗi vài giây làm
+    gallery-app re-render). `ChonAnhNhieuTam` có effect
+    `useEffect(() => setDaChon(new Set(daChonSan)), [mo, daChonSan])` — mảng
+    đổi THAM CHIẾU mỗi render khiến effect chạy lại, XOÁ SẠCH lựa chọn ba mẹ
+    đang bấm dở trong lưới. `useMemo` giữ nguyên tham chiếu khi nội dung thật
+    sự không đổi.
+  */
+  const idAnhDaChonTrongLuoi = React.useMemo(
+    () => anhDaChonTrongLuoi.map((a) => a.id),
+    [anhDaChonTrongLuoi],
+  );
 
   const dsKichThuoc = React.useMemo(
     () => kichThuocCuaNhom(danhMuc, nhomDangXem),
@@ -263,7 +323,17 @@ export function CuaHang({
     <button
       type="button"
       disabled={khoa || dangLuu}
-      onClick={() => onMua(sanPham.productId, daDat(sanPham.productId) + soLuong, null)}
+      onClick={() => {
+        // BB-299 mục 4 — nhớ số lượng TRƯỚC khi thêm để "Hoàn tác" trả lại
+        // đúng số cũ. `onMua` nhận SỐ LƯỢNG TUYỆT ĐỐI (không phải cộng dồn ở
+        // máy chủ), nên hoàn tác chỉ cần gọi lại với số lượng cũ này.
+        const truoc = daDat(sanPham.productId);
+        onMua(sanPham.productId, truoc + soLuong, null);
+        setThongBaoDaThem({
+          text: `${soLuong} ${tenThanThienSanPham(nhomDangXem, sanPham)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong)}`,
+          hoanTac: () => onMua(sanPham.productId, truoc, null),
+        });
+      }}
       className="h-11 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
     >
       Thêm vào giỏ
@@ -279,6 +349,33 @@ export function CuaHang({
       className="h-11 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
     >
       Thêm vào giỏ
+    </button>
+  ) : anhDaChonTrongLuoi.length > 0 ? (
+    // BB-296 mục #1 — đã chọn ảnh trong lưới (bước tạm), nút chính giờ mới
+    // thật sự thêm vào giỏ, kèm tiền để khách biết đang mua gì hết bao nhiêu.
+    <button
+      type="button"
+      disabled={khoa || dangLuu}
+      onClick={() => {
+        const anhVuaThem = anhDaChonTrongLuoi.map((a) => a.id);
+        onMuaNhieu?.(sanPham.productId, soLuong, anhVuaThem);
+        setThongBaoDaThem({
+          text: `${anhVuaThem.length} ảnh ${tenThanThienSanPham(nhomDangXem, sanPham)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong * anhVuaThem.length)}`,
+          // BB-299 mục 4 — "Hoàn tác" xoá ĐÚNG món vừa thêm, dùng API mua
+          // thêm có sẵn (đặt số lượng 0 cho đúng các photoId vừa thêm — cùng
+          // đường "Xoá" của từng dòng giỏ ở đáy hộp, xem `<footer>` dưới).
+          hoanTac: () => onMuaNhieu?.(sanPham.productId, 0, anhVuaThem),
+        });
+        // Đặt lại cấu hình cho món tiếp theo — không tự đóng cửa hàng, ba mẹ
+        // có thể mua tiếp món khác ngay.
+        setAnhDaChonTrongLuoi([]);
+        setKichThuocChon(null);
+        setChatLieuChon(null);
+        setSoLuong(1);
+      }}
+      className="h-11 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
+    >
+      Thêm vào giỏ · {formatCurrencyVND(sanPham.unitPrice * soLuong * anhDaChonTrongLuoi.length)}
     </button>
   ) : (
     <button
@@ -305,13 +402,19 @@ export function CuaHang({
     // để lớp phủ nhận sự kiện chuột, nó chặn luôn phép thử tại vùng trống đó
     // dù không hề có gì để bấm. Hộp thoại thật (`hopThoaiRef`) bật lại
     // `pointer-events-auto` để vẫn bấm được bình thường.
-    <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-[2px] sm:items-center sm:p-6">
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-[2px] sm:items-stretch sm:justify-end">
+      {/*
+        BB-299 mục 4 — bản vẽ `cua-hang-sau-them-may-tinh.html` (`.ngan`)
+        đòi NGĂN KÉO PHẢI rộng 520, cao trọn màn — không còn hộp giữa màn
+        480px cũ. Điện thoại giữ nguyên tấm trượt đáy (`.tam` của bản vẽ
+        điện thoại).
+      */}
       <div
         ref={hopThoaiRef}
         role="dialog"
         aria-modal="true"
         aria-label="Mua thêm sản phẩm"
-        className="pointer-events-auto flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[22px] bg-background sm:max-h-[85dvh] sm:w-full sm:max-w-[480px] sm:rounded-[22px] sm:shadow-2xl"
+        className="pointer-events-auto flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[22px] bg-background sm:h-full sm:max-h-full sm:w-[520px] sm:max-w-[520px] sm:rounded-none sm:shadow-[-12px_0_40px_rgba(46,42,39,0.2)]"
       >
         {/* Tay nắm — chỉ điện thoại, bản vẽ 40×4px. */}
         <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-[var(--bb-border)] sm:hidden" />
@@ -343,6 +446,8 @@ export function CuaHang({
                     setNhomDangXem(nhom);
                     setKichThuocChon(null);
                     setChatLieuChon(null);
+                    setAnhDaChonTrongLuoi([]);
+                    setThongBaoDaThem(null);
                   }}
                   className={cn(
                     "flex-1 rounded-full py-2 text-[13px] font-medium leading-4 transition-colors",
@@ -374,7 +479,9 @@ export function CuaHang({
                   />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-display text-lg font-normal leading-tight text-foreground">
+                  {/* BB-305 — tên sản phẩm là nhãn nội dung, không phải tiêu
+                      đề màn: bỏ font-display, dùng Be Vietnam Pro. */}
+                  <p className="truncate text-lg font-medium leading-tight text-foreground">
                     {tenThanThienSanPham(nhomDangXem, sanPham)}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{moTaSanPham(sanPham)}</p>
@@ -466,7 +573,8 @@ export function CuaHang({
                       >
                         −
                       </button>
-                      <span className="w-4 text-center font-display text-lg tabular-nums text-foreground">
+                      {/* BB-305 — con số: Be Vietnam Pro + tabular-nums, không font-display. */}
+                      <span className="w-4 text-center text-lg font-medium tabular-nums text-foreground">
                         {soLuong}
                       </span>
                       <button
@@ -486,9 +594,13 @@ export function CuaHang({
                 {sanPham?.canGanAnh && (
                   <div className="py-3.5">
                     <p className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      {dangDatPresetChoNhomNay ? "Ảnh · 1 tấm" : "Ảnh"}
+                      {dangDatPresetChoNhomNay
+                        ? "Ảnh · 1 tấm"
+                        : anhDaChonTrongLuoi.length > 0
+                          ? `Ảnh · ${anhDaChonTrongLuoi.length} tấm`
+                          : "Ảnh"}
                     </p>
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2.5">
                       {dangDatPresetChoNhomNay ? (
                         <>
                           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px]">
@@ -504,6 +616,36 @@ export function CuaHang({
                           </div>
                           <p className="text-[12px] text-muted-foreground">Áp dụng cho tấm đang xem</p>
                         </>
+                      ) : anhDaChonTrongLuoi.length > 0 ? (
+                        // BB-296 mục #1 — ảnh vừa chọn ở lưới hiện thành hàng
+                        // ảnh thu nhỏ tại đây, không còn "biến mất" sau khi
+                        // bấm "Xong". Bấm vào hàng này mở lại lưới để đổi.
+                        <button
+                          type="button"
+                          disabled={khoa || dangLuu}
+                          onClick={() => setMoLuoiChon(true)}
+                          aria-label={`Đổi ${anhDaChonTrongLuoi.length} ảnh đã chọn`}
+                          className="flex items-center gap-1.5 rounded-[10px] disabled:opacity-40"
+                        >
+                          {anhDaChonTrongLuoi.slice(0, 4).map((a) => (
+                            <span
+                              key={a.id}
+                              className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[10px] border border-[var(--bb-border)]"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={`/api/img/${a.id}?w=200`}
+                                alt=""
+                                className="h-full w-full object-cover"
+                              />
+                            </span>
+                          ))}
+                          {anhDaChonTrongLuoi.length > 4 && (
+                            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-[10px] border border-[var(--bb-border)] bg-[var(--bb-surface-2)] text-[12px] font-medium text-foreground">
+                              +{anhDaChonTrongLuoi.length - 4}
+                            </span>
+                          )}
+                        </button>
                       ) : (
                         <button
                           type="button"
@@ -538,57 +680,131 @@ export function CuaHang({
         </div>
 
         {/*
-          Đáy dính — tạm tính/đơn giá + viên "Thêm vào giỏ". Giỏ hàng gọn lại
-          thành một dòng tóm tắt mở ra bằng <details>, không đẩy dài đáy như
-          trước (mọi dòng giỏ luôn hiện).
+          Đáy dính — dòng xác nhận (sau khi thêm) + danh sách giỏ + tạm
+          tính/đơn giá + viên "Thêm vào giỏ".
+
+          BB-299 mục 4 — bản vẽ `cua-hang-sau-them-*.html` đổi hai chỗ so
+          với BB-296:
+            1. Dòng xác nhận đổi màu (tint sage, không còn nền xám trung
+               tính) + vòng check + "Hoàn tác" xoá đúng món vừa thêm.
+            2. Giỏ không còn gọn trong `<details>` — bản vẽ vẽ nó LUÔN HIỆN
+               thành từng thẻ (điện thoại: một dòng pill "Giỏ · N món ·
+               tiền · Xem giỏ ›"; máy tính: danh sách đầy đủ, tối đa 2 món +
+               "Xem cả N món ›" khi dài hơn).
         */}
         <footer className="shrink-0 border-t border-[var(--bb-border)] bg-background px-5 py-3.5 sm:px-7">
+          {/* BB-299 mục 4 — dòng xác nhận tint sage + Hoàn tác, tự ẩn 6s (xem effect ở trên). */}
+          {thongBaoDaThem && (
+            <div
+              role="status"
+              data-testid="da-them-vao-gio"
+              className="mb-3 flex items-center gap-2.5 rounded-xl bg-[#e3eee9] px-3 py-2.5 text-[#2f4a40]"
+            >
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#7FA99B] text-white">
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                  <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <p className="min-w-0 flex-1 text-[13px] leading-snug">
+                <span className="block font-semibold">Đã thêm vào giỏ</span>
+                <span className="block truncate">{thongBaoDaThem.text}</span>
+              </p>
+              {thongBaoDaThem.hoanTac && (
+                <button
+                  type="button"
+                  disabled={khoa || dangLuu}
+                  onClick={() => {
+                    thongBaoDaThem.hoanTac?.();
+                    setThongBaoDaThem(null);
+                  }}
+                  className="shrink-0 self-start text-[13px] font-medium underline underline-offset-2 disabled:opacity-40"
+                >
+                  Hoàn tác
+                </button>
+              )}
+            </div>
+          )}
+
           {daMua.length > 0 && (
-            <details className="group mb-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between text-xs text-muted-foreground [&::-webkit-details-marker]:hidden">
+            <div className="mb-3" data-testid="gio-cua-hang">
+              {/* Điện thoại — pill gọn, bấm để mở/đóng danh sách. */}
+              <button
+                type="button"
+                onClick={() => setMoGioMobile((v) => !v)}
+                aria-expanded={moGioMobile}
+                className="mb-2 flex w-full items-center gap-2 rounded-xl bg-[var(--bb-surface-2)] px-3.5 py-2.5 text-[13px] sm:hidden"
+              >
+                <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                  <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M3 6h18" strokeLinecap="round" />
+                  <path d="M16 10a4 4 0 0 1-8 0" strokeLinecap="round" />
+                </svg>
                 <span>
-                  Giỏ · {daMua.length} món · {formatCurrencyVND(tongTien)}
+                  Giỏ · <b className="font-semibold">{daMua.length} món · {formatCurrencyVND(tongTien)}</b>
                 </span>
-                <span aria-hidden className="text-[10px] transition-transform group-open:rotate-180">
-                  ▾
+                <span className="ml-auto flex shrink-0 items-center gap-1 font-medium">
+                  Xem giỏ
+                  <svg viewBox="0 0 24 24" className={cn("h-4 w-4 transition-transform", moGioMobile && "rotate-90")} fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </span>
-              </summary>
-              <ul className="mt-2 max-h-28 space-y-1 overflow-y-auto text-xs text-muted-foreground">
-                {daMua.map((d) => (
-                  <li key={d.id} className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      {d.photoId && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={`/api/img/${d.photoId}?w=200`}
-                          alt=""
-                          className="h-6 w-6 shrink-0 rounded object-cover"
-                        />
-                      )}
-                      <span className="truncate">
-                        {formatKichThuoc(d.name)} ×{d.quantity}
-                      </span>
+              </button>
+
+              {/* Máy tính — luôn hiện; điện thoại — chỉ hiện khi bấm mở pill trên. */}
+              <div className={cn(moGioMobile ? "block" : "hidden", "sm:block")}>
+              <p className="mb-2 hidden text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:block">
+                Giỏ của ba mẹ · {daMua.length} món · {formatCurrencyVND(tongTien)}
+              </p>
+              <ul className="space-y-1.5">
+                {(xemHetGio ? daMua : daMua.slice(0, 2)).map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex items-center gap-2.5 rounded-xl border border-[var(--bb-border)] bg-white px-3 py-2"
+                  >
+                    {d.photoId && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={`/api/img/${d.photoId}?w=200`}
+                        alt=""
+                        className="h-8 w-8 shrink-0 rounded-md object-cover"
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 text-[13px] leading-snug">
+                      <span className="block truncate">{formatKichThuoc(d.name)}</span>
+                      <span className="block text-[12px] text-muted-foreground">×{d.quantity}</span>
                     </span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      <span>{formatCurrencyVND(d.totalPrice)}</span>
-                      <button
-                        type="button"
-                        aria-label={`Xoá ${d.name}`}
-                        disabled={khoa || dangLuu}
-                        onClick={() =>
-                          d.photoId
-                            ? onMuaNhieu?.(d.productId, 0, [d.photoId])
-                            : onMua(d.productId, 0, null)
-                        }
-                        className="text-[var(--bb-heart,#C4645A)] disabled:opacity-30"
-                      >
-                        Xoá
-                      </button>
-                    </span>
+                    <span className="shrink-0 text-[14px] font-medium">{formatCurrencyVND(d.totalPrice)}</span>
+                    <button
+                      type="button"
+                      aria-label={`Xoá ${d.name}`}
+                      disabled={khoa || dangLuu}
+                      onClick={() =>
+                        d.photoId
+                          ? onMuaNhieu?.(d.productId, 0, [d.photoId])
+                          : onMua(d.productId, 0, null)
+                      }
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-[var(--bb-surface-2)] disabled:opacity-30"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path d="M3 6h18" strokeLinecap="round" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
                   </li>
                 ))}
               </ul>
-            </details>
+              {!xemHetGio && daMua.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => setXemHetGio(true)}
+                  className="mt-1.5 text-[12.5px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                >
+                  Xem cả {daMua.length} món ›
+                </button>
+              )}
+              </div>
+            </div>
           )}
 
           <div className="flex items-center justify-between gap-3">
@@ -600,7 +816,8 @@ export function CuaHang({
                       ? "Đơn giá"
                       : `Tạm tính · ${soLuong} × ${formatCurrencyVND(sanPham.unitPrice)}`}
                   </p>
-                  <p className="font-display text-xl font-medium text-foreground">
+                  {/* BB-305 — giá tiền là nội dung: bỏ font-display, thêm tabular-nums. */}
+                  <p className="text-xl font-medium tabular-nums text-foreground">
                     <span data-testid="gia-tam-tinh">
                       {formatCurrencyVND(sanPham.unitPrice * soLuong)}
                     </span>
@@ -623,9 +840,14 @@ export function CuaHang({
         onDong={() => setMoLuoiChon(false)}
         anhDaThaTim={anhDaChon}
         tatCaAnh={tatCaAnh ?? anhDaChon}
+        daChonSan={idAnhDaChonTrongLuoi}
         dangLuu={dangLuu}
         onXacNhan={(photoIds) => {
-          if (sanPham) onMuaNhieu?.(sanPham.productId, soLuong, photoIds);
+          // BB-296 mục #1 — CHỈ lưu tạm lựa chọn, không mua ngay. Nút "Thêm
+          // vào giỏ" ở đáy hộp mới thật sự gọi `onMuaNhieu` (xem `nutHanhDong`
+          // ở trên) — khách cần thấy ảnh đã chọn và giá trước khi trả tiền.
+          const nguon = tatCaAnh ?? anhDaChon;
+          setAnhDaChonTrongLuoi(nguon.filter((a) => photoIds.includes(a.id)));
           setMoLuoiChon(false);
         }}
       />

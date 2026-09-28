@@ -331,16 +331,34 @@ test.describe("BB-219: con trỏ bàn tay trên mọi màn", () => {
       // phần dọn hỏng (khoá ngoại share_links.created_by). Không bấm ở đó.
       const laChiTietBoAnh = route.includes("[id]");
       if (!laChiTietBoAnh && (await nutMo.isVisible().catch(() => false))) {
+        // BB-307 kiểm ngược: đọc nhãn nút TRƯỚC khi bấm — sau khi bấm, nút có
+        // thể đã biến mất khỏi trang (điều hướng đi nơi khác), khiến locator
+        // gọi lại `.textContent()` chờ vô hạn tới hết 180s timeout của test.
+        // Đã bắt được thật ở "/admin/galleries": "+ Tạo bộ ảnh mới"
+        // (BoAnhPageHeader) là <Link> điều hướng sang /admin/galleries/create,
+        // không phải nút mở hộp thoại tại chỗ như phần lớn nút "Thêm/Tạo" khác.
+        const nhanNut = (await nutMo.textContent().catch(() => "")) ?? "";
+        const urlTruoc = page.url();
         await nutMo.click().catch(() => {});
         await page.waitForTimeout(300);
-        const moDuocDialog = await page
-          .getByRole("dialog")
-          .first()
-          .isVisible()
-          .catch(() => false);
-        await doMotTrang(page, `${routeThat} (mở "${await nutMo.textContent()}")`, viPham);
-        lopNoiDaMo.push(`${routeThat}: bấm nút "${await nutMo.textContent()}"${moDuocDialog ? " → hộp thoại" : " → khối mở rộng"}`);
-        await page.keyboard.press("Escape").catch(() => {});
+        if (page.url() === urlTruoc) {
+          // Không điều hướng — coi là lớp nổi (hộp thoại/khối mở rộng) trên
+          // CÙNG trang, dò tiếp cursor trong lớp đó rồi đóng lại.
+          const moDuocDialog = await page
+            .getByRole("dialog")
+            .first()
+            .isVisible()
+            .catch(() => false);
+          await doMotTrang(page, `${routeThat} (mở "${nhanNut}")`, viPham);
+          lopNoiDaMo.push(`${routeThat}: bấm nút "${nhanNut}"${moDuocDialog ? " → hộp thoại" : " → khối mở rộng"}`);
+          await page.keyboard.press("Escape").catch(() => {});
+        } else {
+          // Điều hướng sang trang khác — trang đích đã có sẵn trong
+          // `lietKeTrangQuanTri()` (mọi page.tsx dưới src/app/(admin)/admin)
+          // nên tự được dò ở đúng lượt của nó; không dò lại ở đây, không
+          // goto lùi (vòng lặp tự page.goto() route kế tiếp).
+          lopNoiDaMo.push(`${routeThat}: bấm nút "${nhanNut}" → điều hướng sang ${page.url()} (dò riêng ở lượt của trang đó)`);
+        }
       }
     }
 

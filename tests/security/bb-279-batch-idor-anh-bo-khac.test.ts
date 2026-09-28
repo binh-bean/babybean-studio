@@ -140,6 +140,20 @@ describe("BB-279: IDOR nhánh batch của POST /api/g/addons (chọn nhiều t�
     await client.query(
       `delete from customers where full_name like 'Fixture BB-279 %' and created_at < now() - interval '6 hours'`,
     );
+    /*
+      BB-296 mục #8 — báo cáo chấm độc lập lần 3: "Fixture BB-279 Album" vẫn
+      hiện trong danh mục bán CHO KHÁCH THẬT trên bb-dev. Dọn theo `id` ở
+      trên chỉ dọn ĐÚNG LƯỢT CHẠY NÀY — một lượt bị ngắt giữa chừng (process
+      bị kill/timeout trước khi tới đây, đã từng xảy ra — xem memory
+      "e2e-qua-tai-khi-agent-chay") để lại đúng hai dòng sản phẩm này VĨNH
+      VIỄN, vì bảng `products` không có dòng dọn rác theo tuổi như
+      `customers` đã có ngay phía trên. Thêm dòng quét rác cùng luật (giờ
+      lớn hơn 6, khớp tiền tố "Fixture BB-279") — không đụng dữ liệu thật vì
+      list_price >= 100000 và mọi sản phẩm thật không mang tiền tố này.
+    */
+    await client.query(
+      `delete from products where name like 'Fixture BB-279 %' and created_at < now() - interval '6 hours'`,
+    );
     await client.end();
   });
 

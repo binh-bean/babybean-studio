@@ -195,11 +195,16 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
     
     // Tấm 2 bỏ chọn (nó đang được chọn nên aria-label là "Bỏ chọn")
     // Dùng getByTestId the-anh cho chắc.
+    // BB-307: mỗi thẻ giờ có HAI nút — nút phủ cả thẻ "Xem ảnh N" (mở màn
+    // xem lớn, thêm khi luoi-anh.tsx dồn onClick bấm-trúng vào đây) và nút
+    // tim tròn nhỏ "Chọn ảnh này"/"Bỏ chọn" ở góc — getByRole("button") suông
+    // khớp cả hai (strict mode). Nêu đúng tên nút tim để bấm đúng chỗ.
+    const nutTim = /^(Chọn ảnh này|Bỏ chọn)$/;
     const cacTheAnh = page.getByTestId("the-anh");
-    await cacTheAnh.nth(1).getByRole("button").click(); // Tấm 2
-    
+    await cacTheAnh.nth(1).getByRole("button", { name: nutTim }).click(); // Tấm 2
+
     // Tấm 3 chọn
-    await cacTheAnh.nth(2).getByRole("button").click(); // Tấm 3
+    await cacTheAnh.nth(2).getByRole("button", { name: nutTim }).click(); // Tấm 3
     
     await expect(dem).toHaveText("2", { timeout: 10_000 });
     

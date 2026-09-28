@@ -12,8 +12,9 @@ export const revalidate = 3600; // Cache for 1 hour since branches don't change 
 
 /**
  * Trang gốc `hauky.babybeanstudio.vn/` — chuyển vào nhóm `(customer)` để dùng
- * chung layout với màn khách (phông Fraunces + bảng màu "cuốn album kỷ niệm",
- * chủ studio duyệt 23/09/2026). Task BB-216.
+ * chung layout với màn khách (bảng màu "cuốn album kỷ niệm", chủ studio duyệt
+ * 23/09/2026). Task BB-216. BB-305 (28/09/2026): phông tiêu đề của layout này
+ * là Playfair Display (Fraunces bị loại hẳn, LUẬT PHÔNG mới).
  */
 export default async function LandingPage() {
   const t = getDictionary("vi");

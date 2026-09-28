@@ -8,15 +8,37 @@ import {
   ChevronRight,
   ArrowUpRight,
   ArrowDownRight,
+  Send,
+  ArrowRight,
+  Paintbrush,
+  Copy,
+  Clock,
+  CalendarClock,
+  Plus,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { bienDongLaTot } from "@/lib/utils/bang-dieu-khien";
+import {
+  bienDongLaTot,
+  chaoTheoBuoi,
+  ngayDayDuVN,
+  xepViecHomNay,
+  loiNhacKhach,
+  type ViecHomNayThoLuoc,
+} from "@/lib/utils/bang-dieu-khien";
+import { THU_TU_HIEN_THI_MUA_THEM } from "@/lib/utils/mua-them-7-ngay";
 import { dongCanXuLy, type CanXuLyTongHop } from "@/lib/utils/can-xu-ly";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
-import { CARD_TITLE_CLASS } from "./page-header";
+import { CARD_TITLE_CLASS, PAGE_TITLE_CLASS } from "./page-header";
+
+/** Màu dải cơ cấu Mua thêm theo ĐÚNG bản vẽ: Ảnh in (mực) · Khung (rêu) · Album (hồng). */
+const MAU_CO_CAU_MUA_THEM: Record<string, string> = {
+  anh_in: "var(--bb-fg)",
+  khung: "var(--bb-moss, var(--bb-accent))",
+  album: "var(--bb-primary)",
+};
 
 type DashboardStats = {
   waitingForSelection: number;
@@ -58,15 +80,68 @@ type ChartData = {
   count: number;
 };
 
+/**
+ * BB-303 (bản vẽ BB-301) — một dòng của khối "Việc hôm nay". Route API
+ * (`src/app/api/admin/dashboard/route.ts`) trả CAMELCASE cho mảng này —
+ * KHÁC `ActionRequiredItem` ở trên (snake_case, giữ nguyên hình dạng thô của
+ * `v_gallery_progress` cho `actionRequired`) — nên khai một kiểu riêng thay
+ * vì kế thừa `ActionRequiredItem`.
+ */
+type ViecHomNayItem = ViecHomNayThoLuoc & {
+  id: string;
+  title: string;
+  customerName: string;
+  branchName: string;
+  status: string;
+  selectedCount: number;
+  includedQuota: number | null;
+  urgency: string;
+  babyName: string | null;
+  packageName: string | null;
+  customerPhone: string | null;
+  coverPhotoId: string | null;
+  sentAt: string | null;
+};
+
+type CoCauMuaThemApi = { nhom: string; ten: string; soMon: number; tongTien: number };
+
+type MuaThem7NgayData = {
+  tongTien: number;
+  chenhLechPhanTram: number | null;
+  soDon: number;
+  soGiaDinh: number;
+  theoNgay: { ngay: string; tong: number }[];
+  coCau: CoCauMuaThemApi[];
+  tu: string | null;
+  den: string | null;
+};
+
+/** Giá trị rỗng an toàn — dùng khi `data.muaThem7Ngay` thiếu (API cũ/giả lập chưa có trường BB-303 này), để một khối phụ thiếu dữ liệu không kéo vỡ cả trang. */
+const RONG_MUA_THEM_7_NGAY: MuaThem7NgayData = {
+  tongTien: 0,
+  chenhLechPhanTram: null,
+  soDon: 0,
+  soGiaDinh: 0,
+  theoNgay: [],
+  coCau: [],
+  tu: null,
+  den: null,
+};
+
+type ChiNhanhMuaThemItem = { branchId: string; branchName: string; tongTien: number };
+
 type DashboardData = {
   stats: DashboardStats;
   soSanhKy: Partial<Record<keyof DashboardStats, SoSanhKy>>;
   tienDoChiNhanh: TienDoChiNhanh[];
   actionRequired: ActionRequiredItem[];
+  viecHomNay: ViecHomNayItem[];
+  muaThem7Ngay: MuaThem7NgayData;
+  theoChiNhanhMuaThem: ChiNhanhMuaThemItem[];
   chartData: ChartData[];
 };
 
-export function Dashboard() {
+export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   const searchParams = useSearchParams();
   const branchId = searchParams?.get("branchId") || "";
 
@@ -86,38 +161,37 @@ export function Dashboard() {
     canhBaoLark?: number;
   } | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  // BB-303 — nâng lên phạm vi component (`useCallback`, không còn khai TRONG
+  // `useEffect`) để nút "Chuyển chỉnh" của khối "Việc hôm nay" gọi lại được
+  // sau khi xác nhận một bộ ảnh, không đợi `branchId` đổi mới tải lại.
+  const loadData = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // BB-303 — `full=1`: trang này THẬT SỰ vẽ "Việc hôm nay"/"Mua thêm 7
+      // ngày", khác lượt gọi nhẹ của sidebar (`admin-layout-shell.tsx`, chỉ
+      // cần `stats.dueSoon`/`overdue` cho huy hiệu) — xem chú thích đầy đủ ở
+      // route.ts (`canDayDu`).
+      const query = branchId ? `?branchId=${branchId}&full=1` : "?full=1";
+      const res = await fetch(`/api/admin/dashboard${query}`, { cache: "no-store" });
+      const result = await res.json();
 
-    async function loadData() {
-      setLoading(true);
-      setError(null);
-      try {
-        const query = branchId ? `?branchId=${branchId}` : "";
-        const res = await fetch(`/api/admin/dashboard${query}`);
-        const result = await res.json();
-
-        if (!active) return;
-
-        if (!res.ok) {
-          setError(result.error?.message || "Lỗi tải dữ liệu");
-        } else {
-          setData(result.data);
-        }
-      } catch (err: unknown) {
-        console.error("Lỗi khi tải bảng điều khiển:", err);
-        if (active) setError("Lỗi kết nối tới máy chủ");
-      } finally {
-        if (active) setLoading(false);
+      if (!res.ok) {
+        setError(result.error?.message || "Lỗi tải dữ liệu");
+      } else {
+        setData(result.data);
       }
+    } catch (err: unknown) {
+      console.error("Lỗi khi tải bảng điều khiển:", err);
+      setError("Lỗi kết nối tới máy chủ");
+    } finally {
+      setLoading(false);
     }
-
-    loadData();
-
-    return () => {
-      active = false;
-    };
   }, [branchId]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   useEffect(() => {
     let active = true;
@@ -175,44 +249,136 @@ export function Dashboard() {
     { key: "deliveredThisMonth", label: "Đã giao tháng này", value: data.stats.deliveredThisMonth, huongTangLaTot: true },
   ];
 
+  // BB-303 (bản vẽ bang-dieu-khien-dien-thoai.html, chú thích): "thẻ số: hàng
+  // CUỘN NGANG… thứ tự đổi so với máy tính — Quá hạn đứng đầu vì trên điện
+  // thoại chỉ thấy 2,5 thẻ." Máy tính giữ thứ tự cũ (Chờ khách chọn trước).
+  // Thứ tự điện thoại ĐÚNG bản vẽ: Quá hạn, Sắp hết hạn, Chờ khách chọn, Chờ
+  // chỉnh ảnh, Đã giao.
+  const THU_TU_KEY_DIEN_THOAI: (typeof stats)[number]["key"][] = [
+    "overdue",
+    "dueSoon",
+    "waitingForSelection",
+    "waitingForRetouch",
+    "deliveredThisMonth",
+  ];
+  const thuTuDienThoai = THU_TU_KEY_DIEN_THOAI.map((k) => stats.find((s) => s.key === k)).filter(
+    (s): s is (typeof stats)[number] => !!s,
+  );
+
   // BB-294 (mục cũ #32): render một lần, dùng lại ở CẢ nhánh trống lẫn nhánh
   // thường — tránh chép tay hai bản dễ lệch nhau.
-  const hangTheSo = (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-      {stats.map((stat, i) => {
-        const soSanh = data.soSanhKy[stat.key];
-        const laTot = soSanh ? bienDongLaTot(soSanh.chenhLechPhanTram, stat.huongTangLaTot) : null;
-        return (
-          <Card key={i}>
-            <CardContent className="p-5 space-y-3">
-              <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--bb-fg-muted)]">
-                {stat.label}
-              </span>
-              <div className="flex items-end justify-between gap-2">
-                <div className="font-display text-[32px] font-normal text-[var(--bb-fg)]">{stat.value}</div>
-                {soSanh && soSanh.chenhLechPhanTram !== null && (
-                  <Badge
-                    // Bản vẽ: chip "so kỳ trước" nền sage NHẠT — chỉ đúng khi biến động
-                    // là TỐT (laTot === true). Biến động xấu vẫn phải nổi bật khác màu
-                    // (variant="default", hồng đất) để CSKH nhận ra ngay — đó là dữ liệu
-                    // thật từ BB-270, không phải trang trí, nên KHÔNG gộp về một màu.
-                    variant={laTot === true ? "soft-accent" : laTot === false ? "default" : "secondary"}
-                    className="gap-0.5 px-1.5 py-0.5"
-                    title={`Kỳ trước: ${soSanh.kyTruoc}`}
-                  >
-                    {soSanh.chenhLechPhanTram >= 0 ? (
-                      <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-                    ) : (
-                      <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
-                    )}
-                    {Math.abs(Math.round(soSanh.chenhLechPhanTram))}%
-                  </Badge>
+  const MotTheSo = ({ stat }: { stat: (typeof stats)[number] }) => {
+    const soSanh = data.soSanhKy[stat.key];
+    const laTot = soSanh ? bienDongLaTot(soSanh.chenhLechPhanTram, stat.huongTangLaTot) : null;
+    return (
+      <Card>
+        <CardContent className="p-5 space-y-3">
+          <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--bb-fg-muted)]">
+            {/* BB-301: chấm san hô CHỈ ở "Sắp hết hạn" và "Quá hạn" — cảnh báo, không trang trí thẻ khác. */}
+            {(stat.key === "dueSoon" || stat.key === "overdue") && (
+              <i aria-hidden="true" className="block h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--bb-danger)]" />
+            )}
+            {stat.label}
+          </span>
+          <div className="flex items-end justify-between gap-2">
+            {/* BB-303 (admin duyệt 28/09/2026): Be Vietnam Pro tabular-nums
+                (`.bb-so`), thay Playfair Display — số oldstyle lệch chân, dễ
+                nhầm "0" với "O" (BB-301 XONG.md mục 2). */}
+            <div
+              className={
+                stat.key === "overdue"
+                  ? "bb-so text-[32px] text-[var(--bb-danger)]"
+                  : "bb-so text-[32px]"
+              }
+            >
+              {stat.value}
+            </div>
+            {soSanh && soSanh.chenhLechPhanTram !== null && (
+              <Badge
+                // Bản vẽ: chip "so kỳ trước" nền sage NHẠT — chỉ đúng khi biến động
+                // là TỐT (laTot === true). Biến động xấu vẫn phải nổi bật khác màu
+                // (variant="default", hồng đất) để CSKH nhận ra ngay — đó là dữ liệu
+                // thật từ BB-270, không phải trang trí, nên KHÔNG gộp về một màu.
+                variant={laTot === true ? "soft-accent" : laTot === false ? "default" : "secondary"}
+                className="gap-0.5 px-1.5 py-0.5"
+                title={`Kỳ trước: ${soSanh.kyTruoc}`}
+              >
+                {soSanh.chenhLechPhanTram >= 0 ? (
+                  <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                ) : (
+                  <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+                {Math.abs(Math.round(soSanh.chenhLechPhanTram))}%
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const hangTheSo = (
+    <>
+      {/* Điện thoại (< sm): cuộn ngang, Quá hạn đứng đầu. */}
+      <div className="flex gap-3 overflow-x-auto pb-1 sm:hidden" role="list" aria-label="Số liệu tổng quan">
+        {thuTuDienThoai.map((stat) => (
+          <div key={stat.key} role="listitem" className="w-[128px] shrink-0">
+            <MotTheSo stat={stat} />
+          </div>
+        ))}
+      </div>
+      {/* Máy tính/máy tính bảng (>= sm): lưới 5 cột, thứ tự gốc. */}
+      <div className="hidden sm:grid sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {stats.map((stat) => (
+          <MotTheSo key={stat.key} stat={stat} />
+        ))}
+      </div>
+    </>
+  );
+
+  // BB-303 (bản vẽ BB-301) — lời chào đầu trang: buổi + thứ/ngày + số việc
+  // hôm nay/đã trễ hạn TÍNH TỪ DỮ LIỆU THẬT (`data.viecHomNay`, xếp bằng
+  // ĐÚNG hàm dùng cho khối "Việc hôm nay" bên dưới) — không phải con số cố
+  // định như trong bản vẽ.
+  const xepHomNay = xepViecHomNay(data.viecHomNay ?? []);
+  const tongViecHomNay = xepHomNay.quaHan.length + xepHomNay.homNay.length;
+  const khoiChao = (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        {/* BB-280: MỘT cỡ tiêu đề trang cố định ở mọi kích thước màn hình
+            (tests/e2e/bb-280-quan-tri.spec.ts đo bằng getComputedStyle ở cả
+            1440×900 lẫn 390×844) — dùng ĐÚNG `PAGE_TITLE_CLASS`, không tự viết
+            cỡ responsive riêng cho lời chào. */}
+        <h1 className={PAGE_TITLE_CLASS}>
+          {chaoTheoBuoi(new Date().getHours())}
+          {hoTen ? `, ${hoTen}` : ""}
+        </h1>
+        <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
+          {ngayDayDuVN(new Date())}
+          {tongViecHomNay > 0 && ` · ${tongViecHomNay} việc cần làm hôm nay`}
+          {xepHomNay.quaHan.length > 0 && (
+            <>
+              {", "}
+              <strong className="font-medium text-[var(--bb-danger)]">
+                {xepHomNay.quaHan.length} việc đã trễ hạn
+              </strong>
+            </>
+          )}
+        </p>
+      </div>
+      {/* BB-303 (bang-dieu-khien.html): nút "+ Tạo bộ ảnh" cạnh lời chào —
+          CÙNG đích/CÙNG kiểu nút với trang Bộ ảnh (`bo-anh-page-header.tsx`),
+          không viết lại luồng tạo bộ ảnh ở đây. Bộ lọc chi nhánh trong bản vẽ
+          KHÔNG thêm ở đây: `BranchSelector` (src/components/features/admin/
+          branch-selector.tsx) đã có sẵn trong dự án nhưng CHƯA được gắn vào
+          bất cứ trang nào — gắn nó là việc rộng hơn phạm vi BB-303 (ảnh hưởng
+          mọi trang quản trị đọc `branchId`), nên chỉ ghi vào bàn giao. */}
+      <Link href="/admin/galleries/create" className="shrink-0">
+        <Button className="bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90" size="sm">
+          <Plus className="mr-1.5 h-4 w-4" />
+          Tạo bộ ảnh
+        </Button>
+      </Link>
     </div>
   );
 
@@ -229,6 +395,7 @@ export function Dashboard() {
     //     mặt nạ mờ mép) để tan vào nền thay vì nổi thành khối kem.
     return (
       <div className="space-y-8">
+        {khoiChao}
         {/* BB-294 (mục cũ #32): hàng thẻ số vẫn hiện khi trống — 0 có NGHĨA
             (chưa có gì cần chọn/sắp hết hạn/quá hạn…), không phải một khối
             biến mất khiến trang trông như hỏng. Không bịa số: đây vẫn là
@@ -264,6 +431,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {khoiChao}
       {/*
         BB-280: chủ studio 27/09/2026 chốt lại tư duy màn Tổng quan — khối
         "Cần xử lý" phải lên ĐẦU trang, trước cả hàng thẻ số. Trước đây nó
@@ -310,7 +478,11 @@ export function Dashboard() {
                           style={{ background: d.mauCham }}
                         />
                         <span className="flex-1 font-medium text-[var(--bb-fg)]">{d.nhan}</span>
-                        <span className="font-mono text-[var(--bb-fg-muted)]">{d.soLuong}</span>
+                        {/* BB-303 (luật phông 28/09/2026): Be Vietnam Pro
+                            tabular-nums thay `font-mono` — nội dung quản trị
+                            chỉ dùng hai phông đã chốt (Playfair Display cho
+                            tiêu đề, Be Vietnam Pro cho phần còn lại kể cả số). */}
+                        <span className="tabular-nums text-[var(--bb-fg-muted)]">{d.soLuong}</span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-[var(--bb-fg-muted)]" aria-hidden="true" />
                       </Link>
                     </li>
@@ -328,6 +500,27 @@ export function Dashboard() {
           kỳ") thì không hiện chip — xem định nghĩa ở route.ts.
           BB-294 (mục cũ #32): `hangTheSo` dùng chung với nhánh trống ở trên. */}
       {hangTheSo}
+
+      {/* BB-303 (bản vẽ BB-301) — "Việc hôm nay" (trái) + "Mua thêm · 7 ngày
+          qua" và "Theo chi nhánh" (phải).
+          Điện thoại (bang-dieu-khien-dien-thoai.html): thứ tự xếp DỌC khác
+          máy tính — "Mua thêm 7 ngày" lên TRƯỚC "Việc hôm nay" (order-*), và
+          "Theo chi nhánh" KHÔNG có trong bản vẽ điện thoại (`hidden lg:block`). */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
+        <div className="order-2 lg:order-1">
+          <ViecHomNayCard items={data.viecHomNay ?? []} onLamMoi={loadData} />
+        </div>
+        <div className="order-1 flex flex-col gap-6 lg:order-2">
+          {/* Chống vỡ trang khi phản hồi API còn thiếu các trường MỚI của
+              BB-303 (ví dụ bản đã lưu đệm/giả lập cũ chưa có
+              muaThem7Ngay/theoChiNhanhMuaThem) — một khối trống hoá ra một
+              khối rỗng, không phải cả trang trắng. */}
+          <MuaThem7NgayCard data={data.muaThem7Ngay ?? RONG_MUA_THEM_7_NGAY} />
+          <div className="hidden lg:block">
+            <TheoChiNhanhMuaThemCard items={data.theoChiNhanhMuaThem ?? []} />
+          </div>
+        </div>
+      </div>
 
       {/*
         `min-w-0` trên hai thẻ con: ô lưới mặc định rộng tối thiểu bằng nội
@@ -426,5 +619,391 @@ export function Dashboard() {
         </Card>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BB-303 (bản vẽ BB-301) — "Việc hôm nay"
+// ---------------------------------------------------------------------------
+
+/** Ảnh bìa nhỏ 40×50 (máy tính) / 36×45 (điện thoại, chỉnh bằng className) — dùng chung với gallery-list.tsx (cùng nguồn `coverPhotoId`). */
+function AnhBiaViec({ coverPhotoId, title }: { coverPhotoId: string | null; title: string }) {
+  if (!coverPhotoId) {
+    return <div aria-hidden="true" className="h-[50px] w-10 shrink-0 rounded-[5px] bg-[var(--bb-surface-2)]" />;
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/api/img/${coverPhotoId}?w=200`}
+      alt=""
+      title={title}
+      loading="lazy"
+      className="h-[50px] w-10 shrink-0 rounded-[5px] object-cover"
+    />
+  );
+}
+
+/** Dòng phụ "Loại buổi · Bé … · Ba mẹ · Chi nhánh", chỉ nối các phần THẬT SỰ có dữ liệu. */
+function dongPhuViec(item: ViecHomNayItem): string {
+  const phan = [item.packageName, item.babyName ? `Bé ${item.babyName}` : null, item.customerName, item.branchName].filter(
+    (v): v is string => !!v,
+  );
+  return phan.join(" · ");
+}
+
+/** Nhãn hạn + có trễ hay không — "Trễ N ngày/giờ" / "hôm nay HH:mm" / "HH:mm" / "dd/mm". */
+function nhanHanViec(item: ViecHomNayItem, now: Date): { text: string; tre: boolean } {
+  if (!item.dueAt) return { text: item.status === "submitted" ? "Cần xử lý" : "—", tre: false };
+  const due = new Date(item.dueAt);
+  if (Number.isNaN(due.getTime())) return { text: "—", tre: false };
+  const chenhLechMs = due.getTime() - now.getTime();
+  if (chenhLechMs < 0) {
+    const gioTre = Math.abs(chenhLechMs) / 3_600_000;
+    if (gioTre < 24) return { text: `Trễ ${Math.max(1, Math.round(gioTre))} giờ`, tre: true };
+    return { text: `Trễ ${Math.round(gioTre / 24)} ngày`, tre: true };
+  }
+  const cungNgay = due.toDateString() === now.toDateString();
+  if (cungNgay) {
+    return { text: due.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }), tre: false };
+  }
+  return { text: due.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }), tre: false };
+}
+
+/** Nút "Làm nhanh" đổi theo trạng thái — bo-anh-danh-sach.png/bang-dieu-khien.html. */
+function NutLamNhanhViec({
+  item,
+  dangXuLy,
+  onChuyenChinh,
+}: {
+  item: ViecHomNayItem;
+  dangXuLy: boolean;
+  onChuyenChinh: () => void;
+}) {
+  const [daChep, setDaChep] = useState(false);
+
+  async function chepLoiNhac() {
+    try {
+      await navigator.clipboard.writeText(
+        loiNhacKhach({ customerName: item.customerName, babyName: item.babyName, title: item.title }),
+      );
+      setDaChep(true);
+      window.setTimeout(() => setDaChep(false), 2000);
+    } catch {
+      // Clipboard API bị chặn — không có gì thêm để làm ở một nút nhỏ.
+    }
+  }
+
+  if (item.status === "submitted") {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 shrink-0 whitespace-nowrap text-xs"
+        disabled={dangXuLy}
+        onClick={onChuyenChinh}
+      >
+        <ArrowRight className="mr-1 h-3.5 w-3.5" /> {dangXuLy ? "Đang chuyển…" : "Chuyển chỉnh"}
+      </Button>
+    );
+  }
+  if (item.status === "in_retouch") {
+    return (
+      <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`}>
+        <Button variant="outline" size="sm" className="h-8 shrink-0 whitespace-nowrap text-xs">
+          <Paintbrush className="mr-1 h-3.5 w-3.5" /> Duyệt/Giao ảnh
+        </Button>
+      </Link>
+    );
+  }
+  if (item.status === "ready" && !item.sentAt) {
+    return (
+      <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`}>
+        <Button variant="outline" size="sm" className="h-8 shrink-0 whitespace-nowrap text-xs">
+          <Copy className="mr-1 h-3.5 w-3.5" /> Chép link
+        </Button>
+      </Link>
+    );
+  }
+  return (
+    <Button variant="outline" size="sm" className="h-8 shrink-0 whitespace-nowrap text-xs" onClick={() => void chepLoiNhac()}>
+      <Send className="mr-1 h-3.5 w-3.5" /> {daChep ? "Đã chép" : "Nhắc khách"}
+    </Button>
+  );
+}
+
+function DongViec({ item, onLamMoi }: { item: ViecHomNayItem; onLamMoi: () => Promise<void> }) {
+  const [now] = useState(() => new Date());
+  const [dangXuLy, setDangXuLy] = useState(false);
+  const han = nhanHanViec(item, now);
+
+  async function chuyenChinh() {
+    setDangXuLy(true);
+    try {
+      const res = await fetch(`/api/admin/galleries/${item.id}/confirm`, { method: "POST" });
+      if (res.ok) await onLamMoi();
+    } finally {
+      setDangXuLy(false);
+    }
+  }
+
+  const IconHan = item.dueAt && new Date(item.dueAt).toDateString() !== now.toDateString() ? CalendarClock : Clock;
+
+  return (
+    <li className="flex items-center gap-3 border-t border-[var(--bb-border)] px-4 py-3 first:border-t-0 sm:px-6">
+      <AnhBiaViec coverPhotoId={item.coverPhotoId} title={item.title} />
+      <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`} className="min-w-0 flex-1 hover:opacity-80">
+        <p className="truncate text-sm font-medium text-[var(--bb-fg)]">{item.title}</p>
+        <p className="truncate text-xs text-[var(--bb-fg-muted)]">{dongPhuViec(item)}</p>
+      </Link>
+      <span
+        className={
+          han.tre
+            ? "flex shrink-0 items-center gap-1 text-xs font-medium tabular-nums text-[var(--bb-danger)]"
+            : "flex shrink-0 items-center gap-1 text-xs tabular-nums text-[var(--bb-fg)]"
+        }
+      >
+        <IconHan className="h-3.5 w-3.5" aria-hidden="true" />
+        {han.text}
+      </span>
+      <NutLamNhanhViec item={item} dangXuLy={dangXuLy} onChuyenChinh={() => void chuyenChinh()} />
+    </li>
+  );
+}
+
+/**
+ * Khối "Việc hôm nay" (BB-303, bang-dieu-khien.html) — nhóm Đã trễ hạn / Hôm
+ * nay / Ngày mai, MỖI DÒNG có ảnh bìa + nút làm nhanh theo trạng thái.
+ *
+ * KHÁC "Cần xử lý ngay" ở trên: khối đó gộp SỐ LƯỢNG theo loại vấn đề (dùng
+ * chung công thức với huy hiệu sidebar, BB-283 — không đụng). Khối này liệt
+ * kê TỪNG BỘ ẢNH theo hạn, phục vụ câu hỏi khác: "hôm nay phải làm gì, theo
+ * thứ tự nào".
+ */
+function ViecHomNayCard({ items, onLamMoi }: { items: ViecHomNayItem[]; onLamMoi: () => Promise<void> }) {
+  const xep = xepViecHomNay(items);
+  const tongSo = xep.quaHan.length + xep.homNay.length + xep.ngayMai.length;
+
+  return (
+    <Card className="flex flex-col overflow-hidden">
+      <CardHeader>
+        <div className="flex items-baseline justify-between gap-2">
+          <CardTitle className={CARD_TITLE_CLASS}>Việc hôm nay</CardTitle>
+          <span className="text-xs text-[var(--bb-fg-muted)]">xếp theo hạn, việc trễ lên đầu</span>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        {tongSo === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-[var(--bb-fg-muted)]">
+            <CheckCircle2 className="h-10 w-10 text-emerald-500/50" />
+            <p className="text-sm">Không có việc nào cần làm hôm nay hoặc ngày mai.</p>
+          </div>
+        ) : (
+          <>
+            {xep.quaHan.length > 0 && (
+              <>
+                <div className="flex h-8 items-center gap-2 bg-[var(--bb-surface-2)] px-4 text-[10.5px] uppercase tracking-wide sm:px-6">
+                  <span className="font-medium text-[var(--bb-danger)]">Đã trễ hạn</span>
+                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{xep.quaHan.length}</span>
+                </div>
+                <ul>
+                  {xep.quaHan.map((item) => (
+                    <DongViec key={item.id} item={item} onLamMoi={onLamMoi} />
+                  ))}
+                </ul>
+              </>
+            )}
+            {xep.homNay.length > 0 && (
+              <>
+                <div className="flex h-8 items-center gap-2 bg-[var(--bb-surface-2)] px-4 text-[10.5px] uppercase tracking-wide sm:px-6">
+                  <span className="font-medium text-[var(--bb-fg)]">Hôm nay</span>
+                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{xep.homNay.length}</span>
+                </div>
+                <ul>
+                  {xep.homNay.map((item) => (
+                    <DongViec key={item.id} item={item} onLamMoi={onLamMoi} />
+                  ))}
+                </ul>
+              </>
+            )}
+            {xep.ngayMai.length > 0 && (
+              <>
+                <div className="flex h-8 items-center gap-2 bg-[var(--bb-surface-2)] px-4 text-[10.5px] uppercase tracking-wide sm:px-6">
+                  <span className="font-medium text-[var(--bb-fg)]">Ngày mai</span>
+                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{xep.ngayMai.length}</span>
+                </div>
+                <ul>
+                  {xep.ngayMai.map((item) => (
+                    <DongViec key={item.id} item={item} onLamMoi={onLamMoi} />
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BB-303 (bản vẽ BB-301) — "Mua thêm · 7 ngày qua" + "Theo chi nhánh"
+// ---------------------------------------------------------------------------
+
+const TEN_THU_NGAN = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"] as const;
+
+function MuaThem7NgayCard({ data }: { data: MuaThem7NgayData }) {
+  const coDon = data.soDon > 0;
+  const maxNgay = Math.max(1, ...data.theoNgay.map((d) => d.tong));
+  const homNayStr = data.theoNgay.length > 0 ? data.theoNgay[data.theoNgay.length - 1]!.ngay : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-baseline justify-between gap-2">
+          <CardTitle className={CARD_TITLE_CLASS}>Mua thêm · 7 ngày qua</CardTitle>
+          {data.tu && data.den && (
+            <span className="whitespace-nowrap text-xs text-[var(--bb-fg-muted)]">
+              {data.tu.split("-").reverse().slice(0, 2).join("/")} – {data.den.split("-").reverse().slice(0, 2).join("/")}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!coDon ? (
+          <p className="text-sm text-[var(--bb-fg-muted)]">Chưa có đơn mua thêm nào trong 7 ngày qua.</p>
+        ) : (
+          <>
+            <div className="flex items-end gap-1.5">
+              <span className="bb-so text-[32px]">
+                {new Intl.NumberFormat("vi-VN").format(data.tongTien)}
+                <small className="ml-1 text-[13px] font-normal text-[var(--bb-fg-muted)]">₫</small>
+              </span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--bb-fg-muted)]">
+              {data.chenhLechPhanTram !== null && (
+                <span
+                  className={
+                    data.chenhLechPhanTram >= 0
+                      ? "inline-flex items-center gap-0.5 font-medium text-[var(--bb-accent)]"
+                      : "inline-flex items-center gap-0.5 font-medium text-[var(--bb-fg-muted)]"
+                  }
+                >
+                  {data.chenhLechPhanTram >= 0 ? (
+                    <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {Math.abs(Math.round(data.chenhLechPhanTram))}%
+                </span>
+              )}
+              <span>so với 7 ngày trước · {data.soDon} đơn từ {data.soGiaDinh} gia đình</span>
+            </div>
+
+            {/* Biểu đồ mini 7 cột */}
+            <div className="mt-4 flex h-16 items-end gap-1.5">
+              {data.theoNgay.map((d) => {
+                const caoPhanTram = Math.max(4, (d.tong / maxNgay) * 100);
+                const laHomNay = d.ngay === homNayStr;
+                const laDinh = d.tong === maxNgay && d.tong > 0;
+                return (
+                  <div
+                    key={d.ngay}
+                    className="flex-1 rounded-t-sm"
+                    style={{
+                      height: `${caoPhanTram}%`,
+                      background: laHomNay ? "var(--bb-fg)" : laDinh ? "var(--bb-moss, var(--bb-accent))" : "#E4D9CC",
+                    }}
+                    title={`${d.ngay}: ${new Intl.NumberFormat("vi-VN").format(d.tong)} ₫`}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-1.5 flex gap-1.5 text-[11px] text-[var(--bb-fg-muted)]">
+              {data.theoNgay.map((d) => (
+                <span
+                  key={d.ngay}
+                  className={d.ngay === homNayStr ? "flex-1 text-center font-medium text-[var(--bb-fg)]" : "flex-1 text-center"}
+                >
+                  {d.ngay === homNayStr ? "Nay" : TEN_THU_NGAN[new Date(d.ngay).getDay()]}
+                </span>
+              ))}
+            </div>
+
+            {/* Cơ cấu theo nhóm sản phẩm */}
+            {data.coCau.length > 0 && (
+              <>
+                <div className="mt-4 flex h-2 overflow-hidden rounded-full">
+                  {THU_TU_HIEN_THI_MUA_THEM.filter((n) => data.coCau.some((c) => c.nhom === n)).map((n) => {
+                    const c = data.coCau.find((x) => x.nhom === n)!;
+                    const rong = Math.max(2, (c.tongTien / data.tongTien) * 100);
+                    return (
+                      <div
+                        key={n}
+                        style={{ width: `${rong}%`, background: MAU_CO_CAU_MUA_THEM[n] }}
+                        title={`${c.ten}: ${new Intl.NumberFormat("vi-VN").format(c.tongTien)} ₫`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="mt-3 flex flex-col gap-2">
+                  {data.coCau.map((c) => (
+                    <div key={c.nhom} className="flex items-center gap-2 text-sm">
+                      <i
+                        aria-hidden="true"
+                        className="block h-2.5 w-2.5 shrink-0 rounded-[3px]"
+                        style={{ background: MAU_CO_CAU_MUA_THEM[c.nhom] }}
+                      />
+                      <span>{c.ten}</span>
+                      <span className="text-xs text-[var(--bb-fg-muted)]">{c.soMon} món</span>
+                      <span className="ml-auto bb-so text-sm">
+                        {new Intl.NumberFormat("vi-VN").format(c.tongTien)} ₫
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TheoChiNhanhMuaThemCard({ items }: { items: ChiNhanhMuaThemItem[] }) {
+  const maxTien = Math.max(1, ...items.map((i) => i.tongTien));
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-baseline justify-between gap-2">
+          <CardTitle className={CARD_TITLE_CLASS}>Theo chi nhánh</CardTitle>
+          <Link href="/admin/bao-cao" className="text-xs text-[var(--bb-fg)] underline underline-offset-2">
+            Mở báo cáo
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.length === 0 ? (
+          <p className="text-sm text-[var(--bb-fg-muted)]">Chưa có tiền mua thêm nào trong 7 ngày qua.</p>
+        ) : (
+          items.map((b) => (
+            <div key={b.branchId} className="flex items-center gap-3 text-sm">
+              <span className="w-28 shrink-0 truncate text-[var(--bb-fg-muted)]" title={b.branchName}>
+                {b.branchName}
+              </span>
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--bb-surface-2)]">
+                <div
+                  className="h-full rounded-full bg-[var(--bb-fg)]"
+                  style={{ width: `${Math.max(2, (b.tongTien / maxTien) * 100)}%` }}
+                />
+              </div>
+              <span className="bb-so w-24 shrink-0 text-right text-sm">
+                {new Intl.NumberFormat("vi-VN").format(b.tongTien)} ₫
+              </span>
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
   );
 }

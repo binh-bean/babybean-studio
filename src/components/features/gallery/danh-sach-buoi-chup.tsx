@@ -18,8 +18,10 @@
  * hình tải lại theo đường cũ. Không có nhánh hiển thị nào mới phía sau: từ
  * giây đó trở đi ba mẹ đang ở đúng màn chọn ảnh vẫn chạy lâu nay.
  *
- * BB-212 — đổi sang ngôn ngữ "cuốn album kỷ niệm" (font-display Fraunces,
- * nền kem, nút viên tròn màu mực). Hành vi giữ nguyên.
+ * BB-212 — đổi sang ngôn ngữ "cuốn album kỷ niệm" (font-display, nền kem, nút
+ * viên tròn màu mực). Hành vi giữ nguyên. BB-305 (28/09/2026): font-display
+ * chuyển từ Fraunces sang Playfair Display (LUẬT PHÔNG mới, Fraunces bị loại
+ * hẳn khỏi hệ thống).
  */
 
 import { useCallback, useEffect, useState } from "react";

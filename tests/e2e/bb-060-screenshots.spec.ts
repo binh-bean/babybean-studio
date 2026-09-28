@@ -85,12 +85,13 @@ test.describe('BB-060: chụp màn hình Bảng điều khiển', () => {
       await dangNhapNhanVien(page, email, password, { sauKhiVao: '**/admin/galleries' });
       await page.goto('/admin');
 
-      // `toBeAttached`, không `toBeVisible`: cái h1 này mang `hidden lg:block`
-      // — cố ý ẩn dưới màn hình rộng (tên màn hiện qua breadcrumb/topbar
-      // riêng ở đó, xem admin-breadcrumb.tsx). Kiểm hiện diện trong DOM là đủ
-      // để biết đã tới đúng trang, không phụ thuộc luật CSS theo từng cỡ máy
-      // mà cả ba lượt chụp (desktop/tablet/mobile) đều phải chạy qua.
-      await expect(page.locator('h1').filter({ hasText: 'Bảng điều khiển' })).toBeAttached({
+      // BB-303 (bản vẽ BB-301, admin duyệt 28/09/2026): tiêu đề tĩnh "Bảng
+      // điều khiển" đổi thành lời chào theo buổi ("Chào buổi sáng/chiều/tối
+      // [, tên nhân viên]") — không còn chuỗi "Bảng điều khiển" trong `<h1>`
+      // (chữ đó vẫn còn ở breadcrumb/topbar, xem admin-breadcrumb.tsx). Kiểm
+      // CÓ một `<h1>` gắn vào DOM là đủ để biết Dashboard đã dựng xong, không
+      // phụ thuộc câu chữ đổi theo giờ trong ngày lúc phép thử chạy.
+      await expect(page.locator('h1').first()).toBeAttached({
         timeout: 30000,
       });
 

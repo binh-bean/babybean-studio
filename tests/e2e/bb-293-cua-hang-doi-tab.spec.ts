@@ -195,6 +195,11 @@ ownIpTest.describe("BB-293 mục #1: đổi tab cửa hàng sau khi thêm giỏ 
     await luoiChon.getByRole("button", { name: "Xong", exact: true }).click();
     await luoiChon.waitFor({ state: "hidden" });
 
+    // BB-296 mục #1 — báo cáo chấm độc lập lần 3: "Xong" chỉ LƯU TẠM lựa
+    // chọn; phải bấm "Thêm vào giỏ" (nút chính đổi tên + hiện giá sau khi
+    // chọn ảnh) mới thật sự ghi dòng giỏ. Xem `cua-hang.tsx`.
+    await cuaHang.getByRole("button", { name: /^Thêm vào giỏ ·/ }).click();
+
     await ownIpExpect
       .poll(async () => cuaHang.locator("footer li").count(), {
         message: "Chưa thấy dòng giỏ sau khi thêm vào giỏ",

@@ -163,16 +163,24 @@ test.describe("BB-295: màn khách — trạng thái đã giao, chân trang", ()
     await expect(page.locator("footer a[href='https://zalo.me/fixture-bb295']")).toBeVisible();
   });
 
-  test("#7 — dòng phụ bìa là ngày chụp dd/mm/yyyy, không ghép tên chi nhánh", async ({ page }) => {
+  test("#7 (SỬA theo BB-298) — bìa Đã giao hiện dấu Đã hoàn thiện và chi nhánh ở dòng phụ", async ({ page }) => {
+    // Fixture của cả file này có status='delivered', nên bìa hiển thị là màn
+    // "Đã giao" (bản vẽ `da-giao-dien-thoai.html`, admin duyệt 28/09/2026),
+    // KHÔNG phải bìa "đang chọn ảnh" mà #7 gốc (BB-295 27/09/2026) từng canh.
+    //
+    // BB-298 dựng đúng bản vẽ mới: dòng phụ của màn Đã giao là
+    // "loại buổi chụp · N ảnh đã chỉnh · CHI NHÁNH" — chi nhánh nay xuất hiện
+    // lại trên bìa (đảo ngược quyết định #7 cũ, vốn chỉ áp cho bìa "đang chọn
+    // ảnh"), và không còn hiện ngày CHỤP (`shootDate`) trên màn này — chỉ có
+    // ngày GIAO (`deliveredAt`) trong dấu "Đã hoàn thiện" nếu có dữ liệu;
+    // fixture này chưa có dòng `deliveries` nên dấu chỉ còn "Đã hoàn thiện"
+    // (không ngày), đúng luật "trường nào không có thì ẩn phần đó".
     await page.setViewportSize(DIEN_THOAI);
     await page.goto(`/g/${maLink}`);
     const bia = page.getByTestId("bia-bo-anh");
     await expect(bia).toBeVisible();
-    // shoot_date '2026-09-12' -> "12/09/2026" (BB-295 mục #7: gạch chéo, không
-    // còn ghép " · " + tên chi nhánh trên cùng dòng — chi nhánh đã dời xuống
-    // chân trang).
-    await expect(bia.getByText("12/09/2026", { exact: true })).toBeVisible();
-    // Tên chi nhánh không còn ghép trên dòng phụ bìa (đã dời xuống chân trang).
-    await expect(bia.getByText(`${NHAN} Chi nhánh`)).toHaveCount(0);
+    await expect(page.getByTestId("dau-da-hoan-thien")).toContainText("Đã hoàn thiện");
+    await expect(page.getByTestId("dau-da-hoan-thien")).not.toContainText("giao ngày");
+    await expect(bia.getByText(`${NHAN} Chi nhánh`, { exact: false })).toBeVisible();
   });
 });

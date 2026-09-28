@@ -20,6 +20,12 @@ export interface BiaBoAnhProps {
   coverHeadline: string | null;
   coverLayout?: string | null;
   tenBe: string | null;
+  /**
+   * BB-298 — "loại buổi chụp" (Thôi nôi, Newborn…), bản vẽ BB-297 (admin
+   * duyệt 28/09/2026). `null`/`undefined` thì bìa ẩn dòng nghiêng dưới tên
+   * bé và câu dự phòng lùi xuống bậc thấp hơn (xem `tinhBiaMacDinh`).
+   */
+  sessionType?: string | null;
   ngayChup: string | null;
   chiNhanh: string;
   loiChao: string | null;
@@ -29,6 +35,28 @@ export interface BiaBoAnhProps {
   hanChot: string | null;
   khoa: boolean;
   /**
+   * BB-298 — link nhắn Zalo/chat của chi nhánh, cho nút viền "Nhắn cho
+   * studio" cạnh nút chính trên bìa máy tính (bản vẽ `bia-may-tinh-tap-chi`).
+   * `null`/`undefined` thì ẩn hẳn nút — chi nhánh chưa cấu hình chat.
+   */
+  chatUrl?: string | null;
+  /**
+   * BB-298 — 4 tấm đầu tiên của bộ, cho dải "Vài khoảnh khắc trong bộ" ở
+   * chân bìa máy tính. `width`/`height` null thì coi ảnh vuông (tỉ lệ 1) —
+   * lưới justified vẫn không cắt ảnh, chỉ không đúng tỉ lệ thật.
+   */
+  anhXemTruoc?: { id: string; width: number | null; height: number | null }[];
+  /**
+   * BB-298 — màn "Đã giao" (bản vẽ `da-giao-may-tinh.html`/`da-giao-dien-thoai.html`,
+   * admin duyệt 28/09/2026 mục 4: "một dấu Đã hoàn thiện"). Bộ ảnh app cho
+   * tải cả bộ (`gallery.options.download === true`) → hiện nút chính "Tải cả
+   * bộ · N ảnh" ngay màn đầu; không thì chỉ còn nút "Xem lại bộ ảnh".
+   */
+  choPhepTai?: boolean;
+  onTaiCaBo?: () => void;
+  /** Ngày giao thật (`review.deliveredAt`) — `null` thì ẩn phần ngày trong dấu "Đã hoàn thiện". */
+  ngayGiao?: string | null;
+  /**
    * BB-287 mục 5 — báo cáo chấm #4: bìa vẫn ghi "Ba mẹ thong thả chọn nhé"
    * kể cả sau khi đã chốt hoặc đã giao ảnh — câu không khớp trạng thái.
    * `gallery.status` cho câu chào MẶC ĐỊNH biết nên nói gì; bỏ trống thì coi
@@ -36,6 +64,14 @@ export interface BiaBoAnhProps {
    */
   trangThai?: string | null;
   onBatDau: () => void;
+  /**
+   * BB-296 mục #2 — báo cáo chấm độc lập lần 3: trình thiết kế bìa quản trị
+   * dùng LẠI component này (đúng yêu cầu "không sáng tác thêm bố cục") để
+   * xem trước, nhưng trước khi admin chọn ảnh, khối ảnh trống trơn — không
+   * biết đang chờ gì. CHỈ prop tuỳ chọn, không set thì hành vi màn khách
+   * (không admin) giữ nguyên y hệt trước — màn khách luôn có `anhBia`.
+   */
+  placeholderChuaCoAnh?: string | null;
 }
 
 function ngayDep(iso: string | null): string | null {
@@ -55,6 +91,48 @@ function conMayNgay(hanChot: string | null): number | null {
   return Math.ceil(ms / 86_400_000);
 }
 
+/** "Ngày 12 tháng 9" — bậc cuối của câu dự phòng khi không có cả tên bé lẫn loại buổi chụp. */
+function ngayThangDep(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return `Ngày ${d.getDate()} tháng ${d.getMonth() + 1}`;
+}
+
+export interface BiaMacDinh {
+  /** Nhãn nhỏ hoa phía trên tên — "Bộ ảnh của" hay chỉ "Bộ ảnh". */
+  eyebrow: string;
+  /** Chữ lớn Playfair — tên bé, loại buổi chụp, hoặc ngày chụp. */
+  title: string;
+  /** Dòng nghiêng dưới tên — loại buổi chụp, "của con", hoặc "của gia đình mình". `null` = không có dòng này. */
+  phuDe: string | null;
+}
+
+/**
+ * BB-298 — câu dự phòng BA BẬC cho bìa (bản vẽ `bia-khong-ten-dien-thoai.html`,
+ * admin duyệt 28/09/2026 mục 2):
+ *   1. Có tên bé → "Bộ ảnh của" / Tên bé / loại buổi chụp (nghiêng).
+ *   2. Không tên bé, CÓ loại buổi chụp → "Bộ ảnh" / Loại buổi chụp / "của con".
+ *   3. Không có cả hai → "Bộ ảnh" / "Ngày {d} tháng {m}" / "của gia đình mình".
+ * Hàm THUẦN (không đọc DOM/props ngoài tham số) để phép thử đơn vị canh đúng
+ * luật rẽ nhánh, không canh chuỗi HTML render ra (AGENTS.md §5a).
+ */
+export function tinhBiaMacDinh(
+  tenBe: string | null,
+  sessionType: string | null | undefined,
+  ngayChup: string | null,
+): BiaMacDinh {
+  const ten = tenBe?.trim();
+  const loai = sessionType?.trim();
+  if (ten) {
+    return { eyebrow: "Bộ ảnh của", title: ten, phuDe: loai || null };
+  }
+  if (loai) {
+    return { eyebrow: "Bộ ảnh", title: loai, phuDe: "của con" };
+  }
+  return { eyebrow: "Bộ ảnh", title: ngayThangDep(ngayChup) || "Khoảnh khắc", phuDe: "của gia đình mình" };
+}
+
 export function BiaBoAnh(props: BiaBoAnhProps) {
   const {
     className,
@@ -62,6 +140,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     coverHeadline,
     coverLayout,
     tenBe,
+    sessionType,
     ngayChup,
     chiNhanh,
     loiChao,
@@ -70,8 +149,14 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     daChon,
     hanChot,
     khoa,
+    chatUrl,
+    anhXemTruoc = [],
+    choPhepTai = false,
+    onTaiCaBo,
+    ngayGiao,
     trangThai,
     onBatDau,
+    placeholderChuaCoAnh,
   } = props;
 
   const [mauChu, setMauChu] = useState<"sang" | "toi">("sang");
@@ -154,7 +239,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     </div>
   );
 
-  const imgEl = anhBia && (
+  const imgEl = anhBia ? (
           <img
       src={`/api/img/${anhBia.id}?w=1600`}
       srcSet={`/api/img/${anhBia.id}?w=800 800w, /api/img/${anhBia.id}?w=1600 1600w`}
@@ -164,13 +249,117 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
       decoding="async"
       className="h-full w-full object-cover object-[50%_30%] lg:object-center motion-safe:animate-[bia-hien_1.2s_ease-out]"
     />
-  );
+  ) : placeholderChuaCoAnh ? (
+    <div className="flex h-full w-full items-center justify-center bg-[#e7d3c6] px-6 text-center text-sm text-[#6b5d4f]">
+      {placeholderChuaCoAnh}
+    </div>
+  ) : null;
 
   const tcClass = mauChu === "sang" ? "text-white" : "text-[#2a2420]";
   const bgOverlay = mauChu === "sang" ? "bg-black/30" : "bg-white/30";
-  const btnClass = mauChu === "sang" 
-    ? "bg-white text-[#2a2420] hover:bg-white/90" 
+  const btnClass = mauChu === "sang"
+    ? "bg-white text-[#2a2420] hover:bg-white/90"
     : "bg-[#2a2420] text-white hover:bg-[#2a2420]/90";
+
+  // ĐÃ GIAO — bản vẽ `da-giao-may-tinh.html`/`da-giao-dien-thoai.html` (admin
+  // duyệt 28/09/2026, XONG.md mục 4: "một dấu Đã hoàn thiện"). Thắng MỌI
+  // `coverLayout` admin đã chọn cho lúc CHƯA giao — bìa lúc đã giao là một
+  // thiết kế cố định, không phải một biến thể của bốn kiểu bìa "đang chọn
+  // ảnh" phía trên.
+  if (trangThai === "delivered") {
+    const ngayGiaoDep = ngayDep(ngayGiao ?? null);
+    const tenHienThi = tenBe?.trim() || "bé";
+    const camOn =
+      loiChao?.trim() ||
+      `"Cảm ơn ba mẹ đã tin Baby Bean giữ lại năm đầu đời của ${tenHienThi}."`;
+
+    return (
+      <section aria-label="Ảnh bìa — đã giao" data-testid="bia-bo-anh" className="w-full bg-[#fbf7f2] text-[#2e2a27]">
+        <div className="mx-auto max-w-[1360px] px-6 pt-8 sm:px-8 lg:grid lg:grid-cols-[760px_minmax(0,1fr)] lg:gap-20 lg:px-10">
+          {/* Bìa nhỏ RÕ MÀU — không dimmed/không nhạt (mục 5 XONG.md). */}
+          <div
+            data-testid="bia-khoi-anh"
+            className="relative h-[300px] w-full overflow-hidden rounded-[4px] bg-[#dcc0ae] sm:h-[360px] lg:h-[540px]"
+          >
+            {anhBia ? (
+              <img
+                src={`/api/img/${anhBia.id}?w=1600`}
+                srcSet={`/api/img/${anhBia.id}?w=800 800w, /api/img/${anhBia.id}?w=1600 1600w`}
+                alt=""
+                decoding="async"
+                className="h-full w-full object-cover"
+              />
+            ) : placeholderChuaCoAnh ? (
+              <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-[#6b5d4f]">
+                {placeholderChuaCoAnh}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-6 lg:mt-10">
+            <span
+              data-testid="dau-da-hoan-thien"
+              className="inline-flex h-[30px] items-center gap-1.5 rounded-full bg-[#e3eee9] px-3.5 text-[13px] font-medium text-[#2f4a40]"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              Đã hoàn thiện{ngayGiaoDep ? ` · giao ngày ${ngayGiaoDep}` : ""}
+            </span>
+
+            <h1 className="mt-5 font-display text-[36px] font-light leading-[1.12] sm:text-[44px] lg:text-[48px]">
+              Ảnh của {tenHienThi}
+              <br />
+              <span>đã sẵn sàng</span>
+            </h1>
+
+            <p className="mt-3.5 text-[15px] text-[#6b6057]">
+              {[sessionType, soAnh > 0 ? `${soAnh.toLocaleString("vi-VN")} ảnh đã chỉnh` : null, chiNhanh]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              {choPhepTai && onTaiCaBo && (
+                <button
+                  type="button"
+                  onClick={onTaiCaBo}
+                  data-testid="nut-tai-ca-bo-bia"
+                  className="inline-flex h-[52px] items-center justify-center gap-2 rounded-full bg-[#2e2a27] px-7 text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
+                >
+                  <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Tải cả bộ{soAnh > 0 ? ` · ${soAnh.toLocaleString("vi-VN")} ảnh` : ""}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onBatDau}
+                className="inline-flex h-[52px] items-center justify-center rounded-full border border-[#2e2a27]/20 px-6 text-[15px] font-medium text-[#2e2a27] transition hover:bg-[#2e2a27]/5"
+              >
+                Xem lại bộ ảnh
+              </button>
+            </div>
+
+            <div className="mt-8 flex items-center gap-4 border-t border-[#e5dcd2] pt-6">
+              <img
+                src="/hanh-trinh/tien-do-da-giao-320.webp"
+                alt=""
+                className="h-16 w-16 shrink-0 rounded-lg object-cover sm:h-20 sm:w-20"
+              />
+              {/* BB-305 — đoạn cảm ơn là nội dung (đoạn văn), không phải
+                  tiêu đề: chuyển khỏi font-display/italic sang Be Vietnam
+                  Pro mặc định theo LUẬT PHÔNG mới. */}
+              <p className="text-[16px] leading-relaxed text-[#4a423b] sm:text-[17px]">{camOn}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (layout === "tap-chi") {
     return (
@@ -240,62 +429,85 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     );
   }
 
-  // ben-canh (default) - cập nhật theo màn bìa chuẩn
+  // ben-canh (default) — BB-298 dựng đúng bản vẽ BB-297 (admin duyệt
+  // 28/09/2026, "Bìa máy tính: B chia đôi tạp chí", `bia-may-tinh-tap-chi`
+  // + `bia-dien-thoai`), SUPERSEDES quyết định BB-289 dưới đây cho layout
+  // "ben-canh": bản vẽ mới của studio cho phép/đòi chữ ĐÈ lên ảnh ở điện
+  // thoại (kiểu tạp chí — tràn toàn màn, lớp tối dần phía dưới, chữ kem) và
+  // ảnh KHÔNG còn letterbox ở máy tính (`object-cover` tràn cột, không phải
+  // `object-contain` với nền kem lấp viền). `tests/e2e/bb-289-theo-ban-ve.spec.ts`
+  // đã được SỬA LẠI theo hướng mới này (mục (3)/(4) đổi hẳn kỳ vọng — xem
+  // ghi chú trong tệp đó) — không phải hồi quy, là bản vẽ mới ghi đè bản cũ,
+  // đúng luật "bản vẽ là luật" (LUAT-DOT-8.md).
   //
-  // BB-289 — admin báo hai lỗi thật trên máy khách, đúng lúc BB-285 (bản vẽ
-  // đã duyệt) đổi hướng NGƯỢC LẠI với BB-258 (26/09/2026: "không chia đôi"):
+  // Ghi chú BB-289 gốc (lịch sử, không còn áp dụng cho layout này):
+  //   (3) Máy tính: từng chốt CHIA ĐÔI object-contain để không cắt ảnh dọc.
+  //   (4) Điện thoại: từng chốt khối chữ KHÔNG được đè ảnh (kiểu thẻ).
+  // Bản vẽ BB-297 đảo ngược cả hai cho ĐÚNG LAYOUT NÀY — các layout tap-chi/
+  // toi-gian/de-cheo phía trên (đè chữ lên ảnh, đo sáng tối tự động) không
+  // đổi gì.
+  const bia = tinhBiaMacDinh(tenBe, sessionType, ngayChup);
+  // `coverHeadline` (BB-215, admin tự viết tiêu đề) vẫn thắng — giữ đúng tên
+  // bé/ngày CHỈ khi studio chưa tự soạn tiêu đề riêng.
+  const tieuDeHienThi = coverHeadline?.trim() || bia.title;
+  const dungTieuDeTuDong = !coverHeadline?.trim();
+
+  // MỘT h1/eyebrow/phụ-đề/nút-chính DUY NHẤT trong DOM, dùng lưới CSS để
+  // CHỒNG chữ lên ảnh ở điện thoại (cùng một ô lưới — `col/row-start-1`) và
+  // TÁCH thành cột riêng ở máy tính. Nhiều phép thử cũ
+  // (`bb-240-man-khach-may-tinh.spec.ts`, `bb-258-bia-tran-thanh-noi.spec.ts`)
+  // đọc `section[aria-label='Ảnh bìa'] h1` ở strict mode (đúng MỘT phần tử) —
+  // dựng hai khối chữ riêng cho hai bề rộng (bản nháp đầu của BB-298) sinh ra
+  // HAI thẻ `<h1>` cùng lúc trong DOM (một `lg:hidden`, một `hidden lg:flex`)
+  // và làm vỡ toàn bộ các phép thử đó dù không cố ý đổi hành vi tại đó. Giữ
+  // đúng MỘT `<h1>`/nút chính, chỉ đổi VỊ TRÍ + MÀU qua `lg:`; các phần NỘI
+  // DUNG thật sự khác nhau giữa hai bề rộng (dòng cuối điện thoại, bộ ba
+  // thông tin + dải ảnh xem trước máy tính) vẫn là hai khối riêng — không có
+  // phép thử cũ nào đọc chúng.
   //
-  //   (3) Máy tính màn ngang: bìa TRÀN TOÀN SECTION rồi cắt theo `object-cover`
-  //       — ảnh chân dung dọc bị cắt đầu/chân trên màn ngang. Bản vẽ
-  //       `babybean-assets/BB-285/bia-may-tinh-chia-doi.png` (+ HTML gốc
-  //       cùng thư mục) chốt CHIA ĐÔI thật: cột trái 42% là khối ảnh hiện
-  //       TRỌN (`object-contain`, nền kem `#e7d3c6` lấp viền thừa — không
-  //       còn cắt), cột phải là khối chữ.
-  //   (4) Điện thoại: khối chữ `absolute inset-x-0 bottom-0` ĐÈ LÊN ảnh —
-  //       ảnh chụp máy thật chủ studio gửi cho thấy chữ trùm lên mặt bé.
-  //       Bản vẽ `dang-chinh-da-giao-dien-thoai.png` dùng đúng kiểu THẺ:
-  //       khối ảnh cao GIỚI HẠN đứng trong dòng chảy, khối chữ nền kem NẰM
-  //       DƯỚI — không bao giờ chồng nhau vì không còn `absolute`.
-  //
-  // Hệ quả: từ nay khối chữ KHÔNG BAO GIỜ đè lên ảnh ở bất kỳ bề rộng nào (kể
-  // cả điện thoại) — bỏ luôn lớp gradient tối và logic đo độ sáng ảnh
-  // (`mauChu`/`tcClass`/`bgOverlay`) cho layout này, vì chữ không còn nằm
-  // trên ảnh để cần đổi màu theo độ sáng — nền kem/chữ mực cố định như bản
-  // vẽ. `mauChu` vẫn tính ở trên vì ba layout kia (tap-chi/toi-gian/de-cheo)
-  // còn đè chữ lên ảnh và cần nó.
-  //
-  // Đo bằng `tests/e2e/bb-289-theo-ban-ve.spec.ts`:
-  //  - (3) tỉ lệ khối hiển thị ảnh ở lg khớp tỉ lệ ảnh gốc ±2% (object-contain
-  //    đảm bảo luôn đúng, không phụ thuộc ảnh dọc/ngang) ở 1440×900, 1280×720.
-  //  - (4) bounding box khối ảnh và khối chữ KHÔNG giao nhau ở 390×844.
-  //
-  // `tests/e2e/bb-240-man-khach-may-tinh.spec.ts` (mép trái h1 bìa = mép trái
-  // lưới ảnh) được VIẾT LẠI cho hướng chia đôi mới — xem ghi chú trong tệp
-  // đó; hai bản đo cũ (BB-253 chia đôi cũ, rồi BB-258 xoá chia đôi) đã đổi
-  // hướng hai lần trong cùng một task này theo đúng chỉ đạo studio.
+  // BB-298 (điều hành, sau khi admin xem bản dựng đầu) — ĐẢO NGƯỢC cột máy
+  // tính so với bản vẽ gốc `bia-may-tinh-tap-chi.html`: ảnh nay đứng CỘT
+  // PHẢI, chữ đứng CỘT TRÁI (bản vẽ gốc là ảnh trái/chữ phải). Số đo và nội
+  // dung giữ nguyên, chỉ đổi thứ tự cột — `lg:grid-cols-[1fr_42%]` thay vì
+  // `[42%_1fr]`, khối ảnh chuyển sang `lg:col-start-2`, khối chữ ở lại
+  // `lg:col-start-1` (mặc định, không cần override). Logo/tin nhắn/chuông
+  // KHÔNG lặp lại bên trong bìa: thanh thương hiệu dùng chung của trang
+  // (`gallery-app.tsx`, đứng NGOÀI/TRÊN toàn bộ khối bìa) đã có logo bên
+  // trái + hai icon bên phải cho máy tính từ trước (BB-278/281) — việc đảo
+  // cột ảnh/chữ bên trong bìa không đụng tới thanh đó, nên không cần thêm
+  // lớp tối/đổi màu cho icon (chúng không nằm trên ảnh). Điện thoại không
+  // đổi gì (ảnh vẫn tràn màn, chữ vẫn đè đáy).
   return (
     <section
       aria-label="Ảnh bìa"
       data-testid="bia-bo-anh"
       className={cn(
-        "@container relative isolate flex w-full flex-col overflow-hidden bg-[#fbf7f2] text-[#2e2a27]",
-        "lg:grid lg:grid-cols-[42%_minmax(0,1fr)] lg:items-stretch",
+        "@container relative isolate grid w-full grid-cols-1 grid-rows-1 overflow-hidden bg-[#fbf7f2] text-[#2e2a27]",
+        "lg:grid-cols-[minmax(0,1fr)_42%] lg:items-stretch",
         className,
       )}
     >
       {/*
-        Khối ảnh — điện thoại/bảng: khối cao GIỚI HẠN trong dòng chảy bình
-        thường (KHÔNG `absolute` — đó là gốc lỗi (4)), object-cover vì đây là
-        một ô ảnh nhỏ như thẻ, cắt nhẹ chấp nhận được. Máy tính (lg): cột
-        trái 42%, cao BẰNG cột chữ bên cạnh (`lg:h-full` trong hàng grid
-        `items-stretch`), `object-contain` trên nền kem đậm hơn để không cắt
-        đầu/chân ảnh dọc — đúng lỗi (3).
+        Khối ảnh — điện thoại: TRÀN TOÀN MÀN (`min-h-[100svh]`), lớp tối dần
+        phía dưới để chữ kem đọc được (bản vẽ `bia-dien-thoai.html`). Máy
+        tính (lg): CỘT PHẢI 42% (đảo so với bản vẽ gốc — chỉ đạo điều hành
+        sau khi xem bản dựng), cao bằng cột chữ, `object-cover` tràn cột —
+        không còn letterbox kem.
       */}
       <div
         data-testid="bia-khoi-anh"
-        className="relative h-[42svh] max-h-[440px] min-h-[260px] w-full shrink-0 bg-[#e7d3c6] lg:h-auto lg:max-h-none lg:min-h-[480px]"
+        // BB-298 (điều hành) — `min-h-[100svh]` đơn thuần cộng dồn với thanh
+        // thương hiệu + chip "Lưu ra màn hình chính" đứng TRÊN bìa (ngoài
+        // component này, trong `gallery-app.tsx`) đẩy nút chính và dòng cuối
+        // xuống dưới mép màn hình thật (bắt được qua ảnh chụp 390×844). Trừ
+        // đúng chiều cao ĐO THẬT của khối phía trên qua biến CSS
+        // `--bb-phan-tren-bia` (gallery-app.tsx đo bằng `ResizeObserver`,
+        // không phải hằng số đoán) — biến thiếu thì `0px` (không đổi hành vi
+        // ở nơi khác dùng lại component này, ví dụ trình thiết kế bìa quản
+        // trị không đặt biến này). Máy tính không đụng, vẫn `lg:min-h-0`.
+        className="relative col-start-1 col-end-2 row-start-1 row-end-2 min-h-[calc(100svh_-_var(--bb-phan-tren-bia,0px))] w-full bg-[#e2c9bb] lg:col-start-2 lg:col-end-3 lg:min-h-0 lg:h-auto"
       >
-        {anhBia && (
+        {anhBia ? (
           <img
             src={`/api/img/${anhBia.id}?w=1600`}
             srcSet={`/api/img/${anhBia.id}?w=800 800w, /api/img/${anhBia.id}?w=1600 1600w`}
@@ -303,86 +515,197 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
             alt=""
             fetchPriority="high"
             decoding="async"
-            className="h-full w-full object-cover object-[50%_30%] lg:object-contain motion-safe:animate-[bia-hien_1.2s_ease-out]"
+            className="h-full w-full object-cover object-[50%_30%] lg:object-center motion-safe:animate-[bia-hien_1.2s_ease-out]"
           />
-        )}
+        ) : placeholderChuaCoAnh ? (
+          <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-[#6b5d4f]">
+            {placeholderChuaCoAnh}
+          </div>
+        ) : null}
+
+        {/* Lớp tối dần — CHỈ điện thoại (bản vẽ `.phu`), máy tính không cần
+            vì chữ đứng ở cột riêng nền kem, không đè ảnh. */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 lg:hidden"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(28,22,18,.28) 0, rgba(28,22,18,0) 120px, rgba(28,22,18,0) 380px, rgba(28,22,18,.58) 640px, rgba(28,22,18,.72) 100%)",
+          }}
+        />
       </div>
 
       {/*
-        Khối chữ — LUÔN trong dòng chảy bình thường, ngay dưới ảnh trên điện
-        thoại, cột phải trên máy tính. Không `absolute`/`inset-x-0 bottom-0`
-        nữa nên không thể chồng lên khối ảnh ở bất kỳ bề rộng nào.
+        Khối chữ — điện thoại: CÙNG Ô LƯỚI với ảnh (chồng lên đáy ảnh, chữ
+        kem — bản vẽ `.chu`). Máy tính: CỘT TRÁI riêng (đảo so với bản vẽ gốc
+        `.phai` — nay là cột 1, không phải cột 2), nền kem, chữ mực, không đè
+        ảnh.
       */}
       <div
         data-testid="bia-khoi-chu"
         className={cn(
-          // BB-289 — bỏ `khach-le-trai-lg` (công thức canh mép trái theo bề
-          // rộng TOÀN TRANG) ở đây: công thức đó dựng cho khối chữ tràn toàn
-          // section (BB-278), không còn đúng nữa khi khối chữ chỉ là MỘT CỘT
-          // trong lưới chia đôi (`lg:grid-cols-[42%_1fr]`) — padding cố định
-          // (`lg:px-10 xl:px-16`) là đúng cho một cột, không cần co theo cqw
-          // toàn trang nữa. `bb-240-man-khach-may-tinh.spec.ts` viết lại theo
-          // hướng này (xem ghi chú trong tệp đó).
-          "relative flex-1 border-t border-[#e5dcd2] bg-[#fbf7f2] px-6 py-7 sm:px-10",
-          "lg:flex lg:flex-col lg:justify-center lg:border-t-0 lg:px-10 lg:py-10 xl:px-16",
+          "relative z-10 col-start-1 col-end-2 row-start-1 row-end-2 self-end px-6 pb-10 text-[#fbf7f2]",
+          "lg:static lg:row-start-1 lg:self-auto lg:flex lg:flex-col lg:justify-center",
+          "lg:bg-[#fbf7f2] lg:px-10 lg:py-10 lg:text-[#2e2a27] xl:px-16",
         )}
       >
-        <div className="max-w-md lg:max-w-2xl">
-          {/*
-            BB-295 mục #7 — báo cáo chấm độc lập: dòng phụ trên bìa từng là
-            "ngày · TÊN CHI NHÁNH", đọc như một nhãn vận hành hơn là lời chào
-            cảm xúc. Chi nhánh đã chuyển hẳn xuống chân trang (`gallery-app.tsx`
-            footer) — dòng này chỉ còn ngày chụp.
-          */}
-          {ngay && (
-            <p className="text-[12px] uppercase tracking-[0.16em] text-[#6b6057]">{ngay}</p>
-          )}
+        <div className="lg:max-w-2xl">
+          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#fbf7f2]/85 lg:text-[#6b6057] lg:tracking-[0.16em]">
+            {bia.eyebrow}
+          </p>
 
-          {/*
-            `text-wrap: balance` — bản vẽ và báo cáo chấm: khi không có tên bé
-            thật, câu mặc định "Khoảnh khắc của con" xuống dòng 2 để mồ côi
-            một chữ ("con"). `balance` chia đều số chữ mỗi dòng thay vì tràn
-            hết dòng 1 rồi rớt một chữ xuống dòng 2.
-          */}
           <h1
-            className="mt-2 font-display text-[40px] font-light leading-[1.02] tracking-[-0.02em] sm:text-[48px] lg:mt-3 lg:text-[44px] xl:text-[52px]"
+            className="mt-3.5 font-display text-[44px] font-light leading-[1] tracking-[-0.01em] sm:text-[52px] lg:mt-4 lg:text-[64px] lg:leading-[0.95] lg:tracking-[-0.02em] xl:text-[84px]"
             style={{ textWrap: "balance" }}
           >
-            {tieuDeBia}
+            {tieuDeHienThi}
           </h1>
+          {/* BB-305 — vẫn Playfair Display (phụ đề đi ngay dưới H1 tên
+              bé/tiêu đề bìa), nhưng bỏ nghiêng: luật mới cấm italic kể cả
+              dòng loại buổi chụp ("Thôi nôi") ở đây. */}
+          {dungTieuDeTuDong && bia.phuDe && (
+            <p className="mt-1.5 font-display text-[26px] leading-[1.2] text-[#fbf7f2]/92 lg:mt-2.5 lg:text-[28px] lg:text-[#4a423b]">
+              {bia.phuDe}
+            </p>
+          )}
 
-          <p className="mt-3 max-w-[22rem] text-[15px] leading-relaxed text-[#4a423b] lg:max-w-2xl lg:text-base">
+          {/* Lời chào — chỉ máy tính (bản vẽ `.loi`); điện thoại không có chỗ, dòng cuối thay thế. */}
+          <p className="mt-5 hidden max-w-[29rem] text-[15px] leading-relaxed text-[#4a423b] lg:block">
             {loiChaoBia}
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-x-2 gap-y-2 text-[14px] text-[#4a423b] lg:mt-5">
-            {hanMuc != null && (
-              <span className="inline-flex h-[36px] items-center gap-1.5 rounded-full border border-[#2e2a27]/15 px-3.5">
-                <Heart className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
-                {hanMuc} tấm trong gói
-              </span>
-            )}
-            {conNgay != null && (
-              <span className="inline-flex h-[36px] items-center gap-1.5 rounded-full border border-[#2e2a27]/15 px-3.5">
-                <Clock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
-                Còn {conNgay} ngày để chọn
-              </span>
-            )}
-            {khoa && (
-              <span className="inline-flex h-[36px] items-center gap-1.5 rounded-full border border-[#2e2a27]/15 px-3.5">
-                <Lock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
-                Đã chốt danh sách
-              </span>
+          {/* Dòng phụ ngày/chi nhánh — CHỈ điện thoại (bản vẽ `.meta`). */}
+          {(ngay || chiNhanh) && (
+            <div className="mt-4.5 flex items-center gap-1.5 text-[13px] text-[#fbf7f2]/85 lg:hidden">
+              {ngay && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Clock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
+                  {ngay}
+                </span>
+              )}
+              {ngay && chiNhanh && <span className="opacity-50">·</span>}
+              {chiNhanh && <span>Chi nhánh {chiNhanh}</span>}
+            </div>
+          )}
+
+          {/* Bộ ba thông tin: Ngày chụp · Chi nhánh · Trong gói — CHỈ máy tính (bản vẽ `.meta`). */}
+          {(ngay || chiNhanh || hanMuc != null) && (
+            <div className="mt-6 hidden flex-wrap gap-x-10 gap-y-3 lg:flex">
+              {ngay && (
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.1em] text-[#8a8078]">Ngày chụp</p>
+                  <p className="mt-1 text-[15px]">{ngay}</p>
+                </div>
+              )}
+              {chiNhanh && (
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.1em] text-[#8a8078]">Chi nhánh</p>
+                  <p className="mt-1 text-[15px]">{chiNhanh}</p>
+                </div>
+              )}
+              {hanMuc != null && (
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.1em] text-[#8a8078]">Trong gói</p>
+                  <p className="mt-1 text-[15px]">
+                    {hanMuc} tấm{hanChot && !khoa ? ` · chọn trước ${ngayDep(hanChot)}` : ""}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {khoa && (
+            <div className="mt-4 hidden items-center gap-1.5 rounded-full border border-[#2e2a27]/15 px-3.5 text-[14px] text-[#4a423b] lg:inline-flex lg:h-[36px]">
+              <Lock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
+              Đã chốt danh sách
+            </div>
+          )}
+
+          {/* Nút chính (bản vẽ `.nut-k`/`.hang .nut`) + "Nhắn cho studio" (chỉ máy tính, bản vẽ `.hang .chip`). */}
+          <div className="mt-6 flex items-center gap-3.5 lg:mt-8">
+            <button
+              type="button"
+              onClick={onBatDau}
+              className="flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#fbf7f2] px-7 text-[15px] font-medium text-[#2e2a27] transition hover:bg-white active:scale-[0.98] lg:w-auto lg:bg-[#2e2a27] lg:text-[#fbf7f2] lg:hover:bg-[#2e2a27]/90"
+            >
+              {nhanNut} <ArrowDown className="h-4 w-4 -rotate-90" aria-hidden="true" />
+            </button>
+            {chatUrl && (
+              <a
+                href={chatUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden h-[52px] items-center justify-center rounded-full border border-[#2e2a27]/20 px-6 text-[15px] font-medium text-[#2e2a27] transition hover:bg-[#2e2a27]/5 lg:inline-flex"
+              >
+                Nhắn cho studio
+              </a>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onBatDau}
-            className="mt-8 inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#2e2a27] px-7 text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98] sm:w-auto lg:mt-7"
-          >
-            {nhanNut}
-          </button>
+          {/* Dòng cuối điện thoại: N ảnh | M tấm trong gói | Chọn trước dd/mm (bản vẽ `.duoi`). */}
+          {(soAnh > 0 || hanMuc != null || conNgay != null) && (
+            <div className="mt-3.5 flex flex-wrap justify-center gap-3 text-center text-[12px] text-[#fbf7f2]/80 lg:hidden">
+              {soAnh > 0 && <span>{soAnh.toLocaleString("vi-VN")} ảnh</span>}
+              {hanMuc != null && (
+                <>
+                  {soAnh > 0 && <span className="opacity-45">|</span>}
+                  <span>{hanMuc} tấm trong gói</span>
+                </>
+              )}
+              {hanChot && !khoa && (
+                <>
+                  <span className="opacity-45">|</span>
+                  <span>Chọn trước {ngayDep(hanChot)}</span>
+                </>
+              )}
+              {khoa && (
+                <>
+                  <span className="opacity-45">|</span>
+                  <span>Đã chốt danh sách</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Dải "Vài khoảnh khắc trong bộ" — CHỈ máy tính (bản vẽ `.dai`). */}
+          {anhXemTruoc.length > 0 && (
+            <div className="mt-9 hidden lg:block">
+              <div className="mb-3 flex items-baseline justify-between">
+                <span className="text-[11px] uppercase tracking-[0.1em] text-[#8a8078]">
+                  Vài khoảnh khắc trong bộ
+                </span>
+                <button
+                  type="button"
+                  onClick={onBatDau}
+                  className="text-[13px] text-[#6b6057] underline underline-offset-[3px] hover:text-[#2e2a27]"
+                >
+                  Xem cả {soAnh.toLocaleString("vi-VN")} ảnh
+                </button>
+              </div>
+              <div className="flex gap-2">
+                {anhXemTruoc.slice(0, 4).map((p) => {
+                  const ti_le = p.width && p.height ? p.width / p.height : 1;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={onBatDau}
+                      aria-label="Xem ảnh này trong lưới"
+                      className="min-w-0 overflow-hidden rounded-[4px] bg-[#e7d3c6]"
+                      style={{ flex: `${ti_le} 1 0`, aspectRatio: ti_le }}
+                    >
+                      <img
+                        src={`/api/img/${p.id}?w=200`}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -20,7 +20,8 @@ export function QuotaDisplay({ includedQuota, extraPrice, selectedCount, classNa
     return (
       <div className={cn("text-sm", className)}>
         <span>Đã chọn: {selectedCount} ảnh</span>
-        <div className="text-muted-foreground mt-1 text-xs italic">
+        {/* BB-305 — bỏ nghiêng theo LUẬT PHÔNG mới. */}
+        <div className="text-muted-foreground mt-1 text-xs">
           (Studio sẽ báo lại số ảnh trong gói)
         </div>
       </div>

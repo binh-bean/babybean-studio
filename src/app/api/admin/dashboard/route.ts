@@ -2,7 +2,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
-import { thangNay, thangTruoc, chenhLechPhanTram } from "@/lib/bao-cao/ky";
+import { thangNay, thangTruoc, chenhLechPhanTram, nNgayGanDay, kyTruocCungDoDai, dinhDangNgayVN, ngayVN } from "@/lib/bao-cao/ky";
 import { locBoAnhThat } from "@/lib/bao-cao/loc-chung";
 import { qua60NgayFileGoc, laKhoaTheoLark } from "@/lib/lark/trang-thai-hau-ky";
 import {
@@ -11,6 +11,16 @@ import {
   tinhTyLeChot,
   type TienDoChiNhanh,
 } from "@/lib/utils/bang-dieu-khien";
+import {
+  tinhTongTienMuaThem,
+  tinhSoDonMuaThem,
+  tinhSoGiaDinhMuaThem,
+  tinhCoCauMuaThem,
+  tinhTheoNgayMuaThem,
+  tinhTheoChiNhanhMuaThem,
+  type DongMuaThem,
+} from "@/lib/utils/mua-them-7-ngay";
+import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
 
 export const runtime = "nodejs";
 
@@ -50,13 +60,40 @@ export async function GET(request: Request): Promise<Response> {
         soSanhKy: {},
         tienDoChiNhanh: [],
         actionRequired: [],
+        viecHomNay: [],
+        muaThem7Ngay: {
+          tongTien: 0,
+          chenhLechPhanTram: null,
+          soDon: 0,
+          soGiaDinh: 0,
+          theoNgay: [],
+          coCau: [],
+          tu: null,
+          den: null,
+        },
+        theoChiNhanhMuaThem: [],
         chartData: [],
       });
     }
 
     const url = new URL(request.url);
     const branchFilter = url.searchParams.get("branchId");
-    
+    /**
+     * BB-303 — `?full=1` phân biệt hai người gọi cùng route này:
+     *   - Sidebar (`admin-layout-shell.tsx`) gọi ở MỌI trang quản trị, mỗi
+     *     lượt chuyển trang, chỉ để lấy `stats.dueSoon`/`overdue` cho huy
+     *     hiệu — không cần "Việc hôm nay" hay "Mua thêm 7 ngày".
+     *   - Trang Bảng điều khiển (`dashboard.tsx`) gọi VỚI `full=1` vì nó thật
+     *     sự vẽ hai khối đó.
+     * Không tách hẳn route: hai khối MỚI này đọc thêm `selections`,
+     * `selection_addons`, `babies`, `packages`, `customers` — đo được thêm
+     * ~2-4s mỗi lượt gọi (bb-dev, tests/e2e/bb-280-quan-tri.spec.ts đo bằng
+     * đồng hồ thật). Route này chạy trên MỌI trang quản trị qua sidebar, nên
+     * trả phần thừa cho lượt gọi không cần là làm chậm TOÀN BỘ khu quản trị,
+     * không chỉ mỗi trang Bảng điều khiển.
+     */
+    const canDayDu = url.searchParams.get("full") === "1";
+
     let branchIds = staff.branchIds;
     if (branchFilter) {
       if (!staff.branchIds.includes(branchFilter)) {
@@ -235,10 +272,228 @@ export async function GET(request: Request): Promise<Response> {
       .in("branch_id", branchIds)
       .or("urgency.eq.due_soon,urgency.eq.overdue,status.eq.submitted")
       .order("due_at", { ascending: true, nullsFirst: false })
-      .limit(10);
+      .limit(20);
     truyVanCanXuLy = locBoAnhThat(truyVanCanXuLy);
     const { data: actionRequired, error: loiCanXuLy } = await truyVanCanXuLy;
     if (loiCanXuLy) throw new Error(`Bảng "Cần xử lý ngay" hỏng: ${loiCanXuLy.message}`);
+
+    // BB-303 — mặc định RỖNG (khớp lượt gọi không mang `full=1`, xem chú
+    // thích ở khai báo `canDayDu`); chỉ tính đủ khi `canDayDu`.
+    type ViecHomNayRow = {
+      id: unknown;
+      title: unknown;
+      customerName: unknown;
+      branchName: unknown;
+      status: unknown;
+      dueAt: unknown;
+      selectedCount: unknown;
+      includedQuota: unknown;
+      urgency: unknown;
+      babyName: string | null;
+      packageName: string | null;
+      customerPhone: string | null;
+      coverPhotoId: string | null;
+      sentAt: string | null;
+    };
+    let viecHomNay: ViecHomNayRow[] = [];
+    let muaThem7Ngay = {
+      tongTien: 0,
+      chenhLechPhanTram: null as number | null,
+      soDon: 0,
+      soGiaDinh: 0,
+      theoNgay: [] as { ngay: string; tong: number }[],
+      coCau: [] as ReturnType<typeof tinhCoCauMuaThem>,
+      tu: null as string | null,
+      den: null as string | null,
+    };
+    let theoChiNhanhMuaThem: ReturnType<typeof tinhTheoChiNhanhMuaThem> = [];
+
+    if (canDayDu) {
+    /**
+     * BB-303 (bản vẽ BB-301, admin duyệt 28/09/2026) — "Việc hôm nay": CÙNG
+     * DÒNG dữ liệu với `actionRequired` ở trên (v_gallery_progress không có
+     * baby/package/cover), thêm bốn trường hiển thị (tên bé, tên gói/"loại
+     * buổi", SĐT khách, ảnh bìa) bằng các truy vấn bổ sung trên chính
+     * `galleries` — không sửa view (đổi hợp đồng chung cần migration, brief
+     * BB-303 cấm).
+     */
+    const idsViecHomNay = (actionRequired ?? []).map((r) => String(r.id));
+    const chiTietBoSung = new Map<
+      string,
+      { babyName: string | null; packageName: string | null; customerPhone: string | null; coverPhotoId: string | null; sentAt: string | null }
+    >();
+    if (idsViecHomNay.length > 0) {
+      const { data: rows, error: loiBoSung } = await admin
+        .from("galleries")
+        .select("id, cover_photo_id, sent_at, customer_id, baby_id, package_id")
+        .in("id", idsViecHomNay);
+      if (loiBoSung) throw new Error(`Chi tiết "Việc hôm nay" hỏng: ${loiBoSung.message}`);
+
+      const babyIds = [...new Set((rows ?? []).map((r) => r.baby_id).filter((v): v is string => !!v))];
+      const packageIds = [...new Set((rows ?? []).map((r) => r.package_id).filter((v): v is string => !!v))];
+      const customerIds = [...new Set((rows ?? []).map((r) => r.customer_id).filter((v): v is string => !!v))];
+
+      const [babyRows, packageRows, customerRows] = await Promise.all([
+        babyIds.length
+          ? admin.from("babies").select("id, nickname, full_name").in("id", babyIds)
+          : Promise.resolve({ data: [] as { id: string; nickname: string | null; full_name: string }[] }),
+        packageIds.length
+          ? admin.from("packages").select("id, name").in("id", packageIds)
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+        customerIds.length
+          ? admin.from("customers").select("id, phone").in("id", customerIds)
+          : Promise.resolve({ data: [] as { id: string; phone: string | null }[] }),
+      ]);
+      const tenBe = new Map((babyRows.data ?? []).map((b) => [String(b.id), b.nickname || b.full_name]));
+      const tenGoi = new Map((packageRows.data ?? []).map((p) => [String(p.id), String(p.name)]));
+      const sdt = new Map((customerRows.data ?? []).map((c) => [String(c.id), c.phone as string | null]));
+
+      const anhBia = await anhBiaTheoBo(
+        admin,
+        (rows ?? []).map((r) => ({ id: String(r.id), coverPhotoId: (r.cover_photo_id as string | null) ?? null })),
+      );
+
+      for (const r of rows ?? []) {
+        const id = String(r.id);
+        chiTietBoSung.set(id, {
+          babyName: r.baby_id ? tenBe.get(String(r.baby_id)) ?? null : null,
+          packageName: r.package_id ? tenGoi.get(String(r.package_id)) ?? null : null,
+          customerPhone: r.customer_id ? sdt.get(String(r.customer_id)) ?? null : null,
+          coverPhotoId: anhBia.get(id) ?? null,
+          sentAt: (r.sent_at as string | null) ?? null,
+        });
+      }
+    }
+    viecHomNay = (actionRequired ?? []).map((r) => {
+      const bs = chiTietBoSung.get(String(r.id));
+      return {
+        id: r.id,
+        title: r.title,
+        customerName: r.customer_name,
+        branchName: r.branch_name,
+        status: r.status,
+        dueAt: r.due_at,
+        selectedCount: r.selected_count,
+        includedQuota: r.included_quota,
+        urgency: r.urgency,
+        babyName: bs?.babyName ?? null,
+        packageName: bs?.packageName ?? null,
+        customerPhone: bs?.customerPhone ?? null,
+        coverPhotoId: bs?.coverPhotoId ?? null,
+        sentAt: bs?.sentAt ?? null,
+      };
+    });
+
+    /**
+     * BB-303 — "Mua thêm · 7 ngày qua" + "Theo chi nhánh": CÙNG ĐỊNH NGHĨA
+     * "tiền mua thêm" với báo cáo "Doanh thu phát sinh"
+     * (src/lib/bao-cao/cac-bao-cao/doanh-thu-phat-sinh.ts) — tổng
+     * quantity*unit_price của `selection_addons` gắn với lượt CHỌN CHÍNH
+     * (`is_primary`) đã CHỐT (`submitted_at` khớp kỳ). Tải 14 ngày gần nhất
+     * (đủ cho kỳ 7 ngày này + kỳ 7 ngày trước để so sánh %), lọc chi
+     * nhánh/Fixture/lưu trữ TRONG JS — giống cách báo cáo kia đã làm (tránh
+     * lọc theo cột của bảng LỒNG NHAU qua PostgREST, xem ghi chú ở
+     * items/route.ts về rủi ro cú pháp `!inner` lồng nhau).
+     */
+    const ky7NgayNay = nNgayGanDay(now, 7);
+    const ky7NgayTruoc = kyTruocCungDoDai(ky7NgayNay);
+
+    interface HangChotGanDay {
+      selectionId: string;
+      branchId: string;
+      customerId: string;
+      ngayVN: string;
+      trongKyNay: boolean;
+    }
+
+    const { data: chotRaw, error: loiChot } = await admin
+      .from("selections")
+      .select("id, submitted_at, galleries!inner(id, branch_id, customer_id, title, status)")
+      .eq("is_primary", true)
+      .gte("submitted_at", ky7NgayTruoc.tu.toISOString())
+      .lt("submitted_at", ky7NgayNay.den.toISOString());
+    if (loiChot) throw new Error(`Truy vấn lượt chốt gần đây hỏng: ${loiChot.message}`);
+
+    type RawChotRow = {
+      id: string;
+      submitted_at: string | null;
+      galleries: { id: string; branch_id: string; customer_id: string; title: string; status: string } | { id: string; branch_id: string; customer_id: string; title: string; status: string }[] | null;
+    };
+    const branchIdSet = new Set(branchIds);
+    const chotGanDay: HangChotGanDay[] = [];
+    for (const raw of (chotRaw ?? []) as RawChotRow[]) {
+      const g = Array.isArray(raw.galleries) ? raw.galleries[0] : raw.galleries;
+      if (!g) continue;
+      if (g.status === "archived") continue;
+      if (g.title.toLowerCase().startsWith("fixture")) continue;
+      if (!branchIdSet.has(g.branch_id)) continue;
+      if (!raw.submitted_at) continue;
+      chotGanDay.push({
+        selectionId: raw.id,
+        branchId: g.branch_id,
+        customerId: g.customer_id,
+        ngayVN: dinhDangNgayVN(new Date(raw.submitted_at)),
+        trongKyNay: new Date(raw.submitted_at).getTime() >= ky7NgayNay.tu.getTime(),
+      });
+    }
+
+    const selectionIdsGanDay = chotGanDay.map((c) => c.selectionId);
+    const { data: addonRaw, error: loiAddon } = selectionIdsGanDay.length
+      ? await admin
+          .from("selection_addons")
+          .select("selection_id, quantity, unit_price, products(kind, material)")
+          .in("selection_id", selectionIdsGanDay)
+      : { data: [] as unknown[], error: null };
+    if (loiAddon) throw new Error(`Truy vấn mua thêm gần đây hỏng: ${loiAddon.message}`);
+
+    type RawAddonRow = {
+      selection_id: string;
+      quantity: number;
+      unit_price: number;
+      products: { kind: string | null; material: string | null } | { kind: string | null; material: string | null }[] | null;
+    };
+    const chotById = new Map(chotGanDay.map((c) => [c.selectionId, c]));
+    const tenChiNhanhMap = new Map(tenChiNhanh.map((b: { id: string; name: string }) => [b.id, b.name]));
+
+    const dongMuaThemNay: DongMuaThem[] = [];
+    const dongMuaThemTruoc: DongMuaThem[] = [];
+    for (const raw of (addonRaw ?? []) as RawAddonRow[]) {
+      const c = chotById.get(raw.selection_id);
+      if (!c) continue;
+      const sp = Array.isArray(raw.products) ? raw.products[0] : raw.products;
+      const dong: DongMuaThem = {
+        ngay: c.ngayVN,
+        branchId: c.branchId,
+        branchName: tenChiNhanhMap.get(c.branchId) ?? "—",
+        selectionId: c.selectionId,
+        customerId: c.customerId,
+        kind: sp?.kind ?? null,
+        material: sp?.material ?? null,
+        quantity: raw.quantity,
+        unitPrice: Number(raw.unit_price),
+      };
+      (c.trongKyNay ? dongMuaThemNay : dongMuaThemTruoc).push(dong);
+    }
+
+    const tongTienMuaThemNay = tinhTongTienMuaThem(dongMuaThemNay);
+    const tongTienMuaThemTruoc = tinhTongTienMuaThem(dongMuaThemTruoc);
+    const cacNgayTrongKy: string[] = [];
+    for (let i = 0; i < 7; i++) cacNgayTrongKy.push(dinhDangNgayVN(ngayVN(ky7NgayNay.tu, i)));
+
+    muaThem7Ngay = {
+      tongTien: tongTienMuaThemNay,
+      chenhLechPhanTram: chenhLechPhanTram(tongTienMuaThemNay, tongTienMuaThemTruoc),
+      soDon: tinhSoDonMuaThem(dongMuaThemNay),
+      soGiaDinh: tinhSoGiaDinhMuaThem(dongMuaThemNay),
+      theoNgay: tinhTheoNgayMuaThem(dongMuaThemNay, cacNgayTrongKy),
+      coCau: tinhCoCauMuaThem(dongMuaThemNay),
+      tu: dinhDangNgayVN(ky7NgayNay.tu),
+      // `ky7NgayNay.den` là NỬA ĐÊM ĐẦU ngày kế tiếp (nửa khoảng [tu, den)) —
+      // lùi lại 1 ngày để hiện đúng NGÀY CUỐI cùng thuộc kỳ ("hôm nay").
+      den: dinhDangNgayVN(ngayVN(ky7NgayNay.den, -1)),
+    };
+    theoChiNhanhMuaThem = tinhTheoChiNhanhMuaThem(dongMuaThemNay);
+    } // if (canDayDu)
 
     const startOfChart = new Date();
     startOfChart.setDate(startOfChart.getDate() - 13);
@@ -297,6 +552,10 @@ export async function GET(request: Request): Promise<Response> {
       },
       tienDoChiNhanh,
       actionRequired: actionRequired || [],
+      // BB-303 (bản vẽ BB-301) — dữ liệu mới cho Bảng điều khiển:
+      viecHomNay,
+      muaThem7Ngay,
+      theoChiNhanhMuaThem,
       chartData,
     });
   } catch (error: unknown) {

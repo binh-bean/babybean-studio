@@ -155,7 +155,12 @@ test.describe("BB-294: màn quản trị — sửa mục thẩm mỹ chấm đ�
     // Thẻ "Mua thêm" hiện đúng 60.000 ₫ — KHÔNG phải "0 ₫" trần (chú ý:
     // "60.000 ₫" tự nó CHỨA chuỗi con "0 ₫" ở cuối, nên không thể dùng
     // `not.toContainText("0 ₫")` — phải khớp đúng dạng số tiền hiện có.
-    const theMuaThem = page.locator("text=Mua thêm").locator("..").locator("..");
+    // BB-307: BB-296 mục #6 thêm khối chi tiết "Mua thêm" (h2) bên dưới —
+    // giờ có HAI chỗ chứa chữ "Mua thêm" trên trang (thẻ số liệu đầu trang +
+    // khối chi tiết), nên `text=Mua thêm` một mình khớp 2 phần tử (strict
+    // mode). `.first()` giữ đúng ý canh cũ: thẻ số liệu đầu trang, đứng
+    // trước trong DOM.
+    const theMuaThem = page.locator("text=Mua thêm").first().locator("..").locator("..");
     await expect(theMuaThem).toContainText("60.000");
     await expect(theMuaThem).not.toContainText(/Mua thêm\s*0\s*₫/);
 
@@ -221,7 +226,9 @@ test.describe("BB-294: màn quản trị — sửa mục thẩm mỹ chấm đ�
     expect(hopTen?.width ?? 0, `bề rộng khối tên = ${hopTen?.width}`).toBeGreaterThan(150);
     // SĐT và tên chi nhánh cùng nằm ở HÀNG DƯỚI tên (không còn cạnh nhau
     // ngang hàng với tên).
-    await expect(theKhach).toContainText("0901000295");
+    // BB-303 (luật phông + khach-hang.png): SĐT giờ hiện nhóm 4-3-3
+    // ("0901 000 295"), không còn liền số — xem formatSdt().
+    await expect(theKhach).toContainText("0901 000 295");
 
     await page.screenshot({ path: `${THU_MUC_ANH}/17-dt-khach-hang-sau.png`, fullPage: true });
   });

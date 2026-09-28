@@ -279,7 +279,14 @@
   --bb-heart: #c4645a;
   --bb-moss: #4f5b45;
   --bb-viewer-bg: #1b1714;
-  --bb-font-display: var(--font-fraunces), "Fraunces", Georgia, serif;
+  /*
+   * BB-305 (28/09/2026) — LUẬT PHÔNG: chỉ Playfair Display (tiêu đề/logo) +
+   * Be Vietnam Pro (mọi nội dung còn lại) trong toàn hệ, không nghiêng.
+   * Trước đây dòng này ghi đè `--bb-font-display` sang Fraunces CHỈ cho màn
+   * khách (khác phông quản trị) — Fraunces bị loại hẳn, nên KHÔNG khai lại
+   * biến này ở đây nữa: màn khách tự kế thừa đúng giá trị Playfair Display
+   * đã khai ở `:root` (dòng ~66), cùng một phông với logo/tiêu đề quản trị.
+   */
 
   --background: var(--bb-bg);
   --foreground: var(--bb-fg);
@@ -383,8 +390,9 @@ body:has(.giao-dien-khach) {
    ảnh nghệ thuật, KHÔNG nằm trong thang này.
 
    H1 40/32 · H2 28 · H3 20 · thân 15 · chú thích 13 · nhãn 11 (hoa, giãn
-   .12em, weight 500). Tiêu đề dùng font-display (Fraunces) NÉT THƯỜNG —
-   không đậm, không nhạt kiểu "light" mảnh như bìa. */
+   .12em, weight 500). Tiêu đề dùng font-display (Playfair Display từ BB-305,
+   trước là Fraunces) NÉT THƯỜNG — không đậm, không nhạt kiểu "light" mảnh
+   như bìa. */
 .giao-dien-khach .kh-h1 {
   font-family: var(--bb-font-display);
   font-weight: 400;
@@ -469,4 +477,54 @@ body:has(.giao-dien-khach) {
 }
 .giao-dien-quan-tri button.text-\[var\(--bb-primary-fg\)\] {
   color: var(--bb-bg) !important;
+}
+
+/*
+ * BB-303 (dựng theo bản vẽ BB-301, admin duyệt 28/09/2026) — mục đang chọn ở
+ * thanh bên quản trị (và hàng đang mở ở bảng Khách hàng) đổi từ nền bạc hà
+ * (--bb-accent-soft, #DFEAE5 — "một màu lạ nằm ngoài bảng màu", báo cáo chấm
+ * độc lập) sang nền be ấm + vạch rêu 3px mép trái. Rêu ở đây (#4F5B45) đậm
+ * hơn hẳn --bb-accent (#7FA99B, xanh ngọc) đang dùng cho biểu đồ/thanh tiến
+ * độ — hai màu khác nhau có chủ đích, không phải lỗi đánh máy.
+ *
+ * Scope trong .giao-dien-quan-tri: không đụng --bb-accent-soft ở màn khách
+ * hay các nơi khác vẫn đang dùng token đó.
+ */
+.giao-dien-quan-tri {
+  --bb-sidebar-active-bg: #ece3d7;
+  --bb-moss: #4f5b45;
+}
+.dark .giao-dien-quan-tri,
+[data-theme="dark"] .giao-dien-quan-tri {
+  --bb-sidebar-active-bg: #3a332c;
+  --bb-moss: #8ca082;
+}
+.bb-muc-on {
+  position: relative;
+}
+.bb-muc-on::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--bb-moss);
+}
+
+/*
+ * BB-303 — MỘT kiểu số cho MỌI thẻ thống kê của quản trị: Be Vietnam Pro 500,
+ * tabular-nums. Quyết định admin duyệt 28/09/2026 (BB-301 XONG.md, mục 2):
+ * "Be Vietnam Pro, tabular-nums ở mọi thẻ và bảng" — thay cho Playfair Display
+ * (số oldstyle, lệch chân, dễ nhầm "0" với "O") từng dùng ở một số thẻ số
+ * (dashboard.tsx, gallery-detail.tsx TheSoLieu).
+ */
+.bb-so {
+  font-family: var(--bb-font-sans);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.01em;
+  color: var(--bb-fg);
+  line-height: 1.1;
 }

@@ -30,9 +30,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Input, Card, Spinner, Badge, Avatar, AvatarFallback } from "@/components/ui";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, formatSdt } from "@/lib/utils/dinh-dang";
 import { mauAvatarStyle } from "@/lib/utils/mau-avatar";
 import { vi } from "@/i18n/vi";
+import { Phone as PhoneIcon, Copy as CopyIcon } from "lucide-react";
 
 const t = vi.admin.khachHang;
 
@@ -45,6 +46,8 @@ interface DongKhach {
   soBoAnh: number;
   boAnhMoiNhat: string | null;
   trungSdtChiNhanhKhac: boolean;
+  /** BB-303 — tên bé đầu tiên của khách, cho dòng phụ "mẹ của Bé …". `null` = chưa có bé nào ghi nhận. */
+  babyName: string | null;
 }
 
 interface Be {
@@ -81,6 +84,8 @@ interface ChiTiet {
     createdAt: string;
     tuLark: boolean;
     truongBiGhiDe: string[];
+    /** BB-303 — tổng tiền mua thêm mọi bộ ảnh của khách (đã chốt). */
+    tongMuaThem: number;
   };
   be: Be[];
   boAnh: BoAnh[];
@@ -140,10 +145,16 @@ export function CustomersManager({
   const anDanhSach = dangMo ? "hidden lg:block" : "";
 
   return (
-    <div className="min-w-0 space-y-5">
-      {/* Ba dòng chữ trước ô tìm trên màn 375px là ba dòng người ta phải
-          vuốt qua mỗi lần mở. Câu gợi ý ngay dưới ô tìm đã đủ dùng. */}
-      <p className="hidden text-sm text-[var(--bb-fg-muted)] sm:block">{t.subtitle}</p>
+    // BB-303 (bản vẽ BB-301, khach-hang.png, admin duyệt 28/09/2026): "bảng
+    // co giãn + ngăn chi tiết 360px BÊN PHẢI" — trước đây hồ sơ nằm NGAY
+    // DƯỚI bảng (full-width), đúng cho điện thoại nhưng không khớp bản vẽ
+    // máy tính. Từ `lg` trở lên tách hai cột bằng CSS Grid; dưới `lg` giữ
+    // đúng hành vi cũ (xếp dọc, hồ sơ thay chỗ danh sách — xem `anDanhSach`).
+    <div className="min-w-0 lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-6">
+      <div className="min-w-0 space-y-5">
+        {/* Ba dòng chữ trước ô tìm trên màn 375px là ba dòng người ta phải
+            vuốt qua mỗi lần mở. Câu gợi ý ngay dưới ô tìm đã đủ dùng. */}
+        <p className="hidden text-sm text-[var(--bb-fg-muted)] sm:block">{t.subtitle}</p>
 
       <div className={`flex flex-wrap items-center gap-2 ${anDanhSach}`}>
         <div className="min-w-0 flex-1 sm:max-w-md">
@@ -207,11 +218,16 @@ export function CustomersManager({
                           chi nhánh chuyển xuống HÀNG DƯỚI, cùng hàng với
                           SĐT/số bộ/ngày. */}
                       <div className="line-clamp-2 break-words font-medium">{k.fullName}</div>
+                      {/* BB-303 (khach-hang.png) — nối khách với bé, khi có dữ liệu thật. */}
+                      {k.babyName && (
+                        <p className="mt-0.5 text-xs text-[var(--bb-fg-muted)]">mẹ của Bé {k.babyName}</p>
+                      )}
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--bb-fg-muted)]">
                         {/* BB-290 (#40): SĐT sans 14px tabular-nums, không
                             còn font-mono — chữ số monospace đọc rời rạc hơn
-                            là cần trên một thẻ danh sách. */}
-                        <span className="select-all text-sm tabular-nums">{k.phone ?? t.chuaCoSdt}</span>
+                            là cần trên một thẻ danh sách.
+                            BB-303: nhóm 4-3-3 ("0901 000 001") thay vì liền số. */}
+                        <span className="select-all text-sm tabular-nums">{formatSdt(k.phone) || t.chuaCoSdt}</span>
                         <span>
                           {k.soBoAnh} {t.cot.soBo.toLowerCase()}
                         </span>
@@ -245,19 +261,36 @@ export function CustomersManager({
                 {items.map((k) => (
                   <tr
                     key={k.id}
-                    className="cursor-pointer border-b border-[var(--bb-border)] hover:bg-[var(--bb-surface-2)]"
+                    className={
+                      // BB-303 (BB-301 XONG.md mục 1, admin duyệt 28/09/2026):
+                      // hàng đang mở dùng ĐÚNG kiểu "nền be + vạch rêu" của
+                      // mục đang chọn trong thanh bên, thay nền bạc hà cũ —
+                      // một luật nhất quán cho "đang chọn" trong toàn quản
+                      // trị. Vạch rêu (`bb-muc-on`) đặt trên Ô ĐẦU (`<td>`),
+                      // không trên `<tr>` — định vị tuyệt đối trên hàng bảng
+                      // không đáng tin cậy bằng trên một ô.
+                      dangMo === k.id
+                        ? "cursor-pointer border-b border-[var(--bb-border)] bg-[var(--bb-sidebar-active-bg)]"
+                        : "cursor-pointer border-b border-[var(--bb-border)] hover:bg-[var(--bb-surface-2)]"
+                    }
                     onClick={() => setDangMo(k.id)}
                   >
-                    <td className="py-2 pr-3">
+                    <td className={dangMo === k.id ? "bb-muc-on py-2 pr-3" : "py-2 pr-3"}>
                       <div className="flex items-center gap-2.5">
                         <Avatar className="h-8 w-8 shrink-0">
                           <AvatarFallback style={mauAvatarStyle(k.id || k.fullName)}>
                             {chuCaiDau(k.fullName)}
                           </AvatarFallback>
                         </Avatar>
-                        <button type="button" className="text-left font-medium hover:underline">
-                          {k.fullName}
-                        </button>
+                        <div className="min-w-0">
+                          <button type="button" className="text-left font-medium hover:underline">
+                            {k.fullName}
+                          </button>
+                          {/* BB-303 (khach-hang.png) — nối khách với bé, khi có dữ liệu thật. */}
+                          {k.babyName && (
+                            <p className="text-xs text-[var(--bb-fg-muted)]">mẹ của Bé {k.babyName}</p>
+                          )}
+                        </div>
                         {k.trungSdtChiNhanhKhac && (
                           <Badge variant="warning" className="align-middle">
                             {t.trungChiNhanhKhac}
@@ -267,9 +300,10 @@ export function CustomersManager({
                     </td>
                     {/* select-all để bôi một phát rồi dán sang Zalo hoặc Lark.
                         BB-290 (#40): sans 14px tabular-nums thay cho font-mono
-                        text-xs — nhỏ hơn hẳn tên (15px) và khó đọc hơn cần. */}
+                        text-xs — nhỏ hơn hẳn tên (15px) và khó đọc hơn cần.
+                        BB-303: nhóm 4-3-3. */}
                     <td className="select-all py-2 pr-3 text-sm tabular-nums">
-                      {k.phone ?? t.chuaCoSdt}
+                      {formatSdt(k.phone) || t.chuaCoSdt}
                     </td>
                     <td className="py-2 pr-3">{k.branchName}</td>
                     <td className="py-2 pr-3 text-right">{k.soBoAnh}</td>
@@ -290,15 +324,22 @@ export function CustomersManager({
         </>
       )}
       </div>
+      </div>
 
+      {/* BB-303 — cột phải 360px, dính lại khi cuộn (bảng có thể dài hơn
+          360px chiều cao của hồ sơ). Dưới `lg` không có `lg:col-start-2` nào
+          để đặt — phần tử xếp NGAY DƯỚI cột trái trong luồng tài liệu bình
+          thường, đúng hành vi cũ trên điện thoại. */}
       {dangMo && (
-        <HoSoKhach
-          id={dangMo}
-          coQuyenSua={coQuyenSua}
-          coQuyenXoa={coQuyenXoa}
-          onDong={() => setDangMo(null)}
-          onDaDoi={() => void tai(tuKhoa.trim())}
-        />
+        <div className="lg:sticky lg:top-4">
+          <HoSoKhach
+            id={dangMo}
+            coQuyenSua={coQuyenSua}
+            coQuyenXoa={coQuyenXoa}
+            onDong={() => setDangMo(null)}
+            onDaDoi={() => void tai(tuKhoa.trim())}
+          />
+        </div>
       )}
     </div>
   );
@@ -490,13 +531,41 @@ function HoSoKhach({
           ) : (
             <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[8rem_1fr]">
               <Dong nhan={t.nhan.fullName} giaTri={ct.khach.fullName} />
-              <Dong nhan={t.nhan.phone} giaTri={ct.khach.phone ?? t.chuaCoSdt} chon />
+              <Dong nhan={t.nhan.phone} giaTri={formatSdt(ct.khach.phone) || t.chuaCoSdt} chon />
               <Dong nhan={t.nhan.email} giaTri={ct.khach.email} />
-              <Dong nhan={t.nhan.zalo} giaTri={ct.khach.zalo} />
+              <Dong nhan={t.nhan.zalo} giaTri={ct.khach.zalo ? formatSdt(ct.khach.zalo) : null} />
               <Dong nhan={t.nhan.address} giaTri={ct.khach.address} />
               <Dong nhan={t.nhan.note} giaTri={ct.khach.note} />
               <Dong nhan={t.cot.chiNhanh} giaTri={ct.khach.branchName} />
             </dl>
+          )}
+
+          {/* BB-303 (khach-hang.png) — "Gọi" mở app điện thoại; "Zalo" CHỈ
+              hiện số để nhân viên tự chép rồi dán vào Zalo (không tự gửi gì —
+              chưa có đường gửi Zalo trong app). Chỉ hiện khi có dữ liệu thật. */}
+          {!dangSua && (ct.khach.phone || ct.khach.zalo) && (
+            <div className="flex flex-wrap gap-2">
+              {ct.khach.phone && (
+                <Button asChild variant="outline" size="sm">
+                  <a href={`tel:${ct.khach.phone}`}>
+                    <PhoneIcon className="mr-1.5 h-4 w-4" /> Gọi
+                  </a>
+                </Button>
+              )}
+              {(ct.khach.zalo || ct.khach.phone) && (
+                <NutChepZalo so={(ct.khach.zalo || ct.khach.phone) as string} />
+              )}
+            </div>
+          )}
+
+          {/* BB-303 — tổng mua thêm mọi bộ ảnh (đã chốt) của khách này. */}
+          {!dangSua && ct.khach.tongMuaThem > 0 && (
+            <p className="text-sm">
+              <span className="text-[var(--bb-fg-muted)]">Tổng mua thêm: </span>
+              <span className="bb-so font-medium">
+                {new Intl.NumberFormat("vi-VN").format(ct.khach.tongMuaThem)} ₫
+              </span>
+            </p>
           )}
 
           {coQuyenSua && !dangSua && (
@@ -634,10 +703,34 @@ function Dong({ nhan, giaTri, chon }: { nhan: string; giaTri: string | null; cho
   return (
     <>
       <dt className="text-[var(--bb-fg-muted)]">{nhan}</dt>
-      <dd className={chon ? "select-all break-words font-mono text-xs" : "break-words"}>
+      {/* BB-303 (luật phông 28/09/2026): tabular-nums (Be Vietnam Pro) thay font-mono — dùng cho SĐT (`chon`). */}
+      <dd className={chon ? "select-all break-words tabular-nums text-xs" : "break-words"}>
         {giaTri ?? "—"}
       </dd>
     </>
+  );
+}
+
+/**
+ * BB-303 (khach-hang.png) — "Zalo chỉ hiện số để chép": KHÔNG có đường gửi
+ * Zalo thật trong app, nên nút này chỉ chép số vào clipboard để nhân viên tự
+ * dán vào Zalo, không mở hay gửi gì thay họ.
+ */
+function NutChepZalo({ so }: { so: string }) {
+  const [daChep, setDaChep] = useState(false);
+  async function chep() {
+    try {
+      await navigator.clipboard.writeText(so);
+      setDaChep(true);
+      window.setTimeout(() => setDaChep(false), 2000);
+    } catch {
+      // Clipboard API bị chặn — không có gì thêm để làm ở một nút nhỏ.
+    }
+  }
+  return (
+    <Button variant="outline" size="sm" onClick={() => void chep()}>
+      <CopyIcon className="mr-1.5 h-4 w-4" /> {daChep ? "Đã chép số Zalo" : `Chép số Zalo (${formatSdt(so)})`}
+    </Button>
   );
 }
 

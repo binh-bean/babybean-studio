@@ -217,6 +217,10 @@ export function PhotoLightbox({
   // không" đổi (để hiện nút "Thu về"), và khi đổi cỡ ảnh nét hơn.
   // -------------------------------------------------------------------
   const mainRef = useRef<HTMLElement | null>(null);
+  // BB-298 — "Ghi chú"/"Đặt in" trong thanh Tim · Ghi chú · Đặt in (máy tính)
+  // đưa mắt/tiêu điểm tới đúng mục đã có sẵn trong cột phải, không dựng lại
+  // một đường lưu thứ hai.
+  const asideRef = useRef<HTMLElement | null>(null);
   const anhHienTaiRef = useRef<HTMLImageElement | null>(null);
   const zoomRef = useRef<TrangThaiPhong>({ scale: 1, x: 0, y: 0 });
   const rafPhongRef = useRef<number | null>(null);
@@ -572,7 +576,14 @@ export function PhotoLightbox({
       role="dialog"
       aria-modal="true"
       aria-label={vi.common.view || "Xem ảnh"}
-      className="fixed inset-0 z-50 flex flex-col justify-between bg-[rgba(251,247,242,0.66)] backdrop-blur-lg text-[#2e2a27] select-none overflow-hidden touch-none"
+      // BB-298 — bản vẽ `xem-lon-may-tinh.html` (admin duyệt 28/09/2026, mục
+      // #5 XONG.md): vùng trái màn xem lớn MÁY TÍNH phải là MỘT MÀU kem
+      // #F3EDE5, KHÔNG "nhoè lưới phía sau" như nền trong mờ + blur cũ (nhìn
+      // xuyên thấy lưới ảnh phía sau bị làm mờ — report chê không tinh tế).
+      // Điện thoại GIỮ NGUYÊN nền trong mờ + blur cũ (bản vẽ của đợt này chỉ
+      // có `xem-lon-may-tinh`, không có bản điện thoại mới) — chỉ ép màu đặc
+      // và bỏ blur từ `lg:` trở lên.
+      className="fixed inset-0 z-50 flex flex-col justify-between bg-[rgba(251,247,242,0.66)] backdrop-blur-lg text-[#2e2a27] select-none overflow-hidden touch-none lg:bg-[#F3EDE5] lg:backdrop-blur-none"
       // Cố ý KHÔNG hiện bàn tay trên nền: con trỏ kế thừa xuống mọi thứ bên
       // trong (tấm ảnh, ô ghi chú), và nền trống chỉ là một dải mỏng quanh
       // ảnh. Xem tests/unit/con-tro-ban-tay.test.ts.
@@ -782,7 +793,11 @@ export function PhotoLightbox({
               goPrev();
             }}
             aria-label={vi.ui.pagination.previous}
-            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/70 hover:text-white transition-all active:scale-90"
+            // BB-298 — bản vẽ: vùng trái máy tính nay nền kem đặc, mũi tên tối
+            // trên nền kem lạc tông; đổi sang viên kem/viền mảnh + icon mực từ
+            // `lg:` (mục ".mui" trong `xem-lon-may-tinh.html`). Điện thoại giữ
+            // nguyên viên tối cũ.
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/70 hover:text-white transition-all active:scale-90 lg:h-12 lg:w-12 lg:bg-[rgba(251,247,242,0.9)] lg:text-[#2e2a27] lg:ring-1 lg:ring-[#e5dcd2] lg:backdrop-blur-none lg:hover:bg-white"
           >
             <ChevronLeft className="h-7 w-7" />
           </button>
@@ -797,7 +812,7 @@ export function PhotoLightbox({
               goNext();
             }}
             aria-label={vi.ui.pagination.next}
-            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/70 hover:text-white transition-all active:scale-90"
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/70 hover:text-white transition-all active:scale-90 lg:bg-[rgba(251,247,242,0.9)] lg:text-[#2e2a27] lg:ring-1 lg:ring-[#e5dcd2] lg:backdrop-blur-none lg:hover:bg-white"
           >
             <ChevronRight className="h-7 w-7" />
           </button>
@@ -821,6 +836,7 @@ export function PhotoLightbox({
         */}
         {(bangSanPham || onLuuGhiChu) && currentPhoto && (
           <aside
+            ref={asideRef}
             className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-[#e5dcd2] bg-[rgba(251,247,242,0.92)] p-4 text-[#2E2A27] backdrop-blur-md lg:block"
             onClick={(e) => e.stopPropagation()}
           >
@@ -991,9 +1007,22 @@ export function PhotoLightbox({
           )}
         </div>
 
-        {/* MÁY TÍNH (`lg`) — chỉ nút tim, ghi chú/sản phẩm đã có cột phải riêng. */}
-        <div className="mx-auto hidden max-w-md lg:block">
-          <div className="flex items-center justify-center">
+        {/*
+          MÁY TÍNH (`lg`) — bản vẽ `xem-lon-may-tinh.html` (admin duyệt
+          28/09/2026, mục #6 XONG.md): thanh Tim · Ghi chú · Đặt in, ba cột
+          đều trong MỘT viên kem, vạch ngăn mảnh giữa các cột — không còn chỉ
+          một nút tim tròn riêng lẻ.
+
+          "Ghi chú" và "Đặt in" không mở tấm trượt riêng như điện thoại — cột
+          phải (`asideRef`) đã hiện sẵn cả hai mục đó ở máy tính, nên hai nút
+          này chỉ đưa mắt/tiêu điểm tới đúng chỗ đã có, không dựng đường lưu
+          thứ hai. Vị trí: trong dòng chảy của `footer` (không `absolute` đè
+          lên ảnh như bản vẽ) — tránh chồng lấn với các phép thử đo khung ảnh
+          hiện có (`bb-289-theo-ban-ve.spec.ts`); nhóm ba nút + vạch ngăn +
+          nhãn dưới icon vẫn đúng bản vẽ.
+        */}
+        <div className="mx-auto hidden max-w-md lg:block lg:pb-2">
+          <div className="mx-auto flex h-[56px] w-fit items-center gap-1 rounded-full border border-[#e5dcd2] bg-[rgba(251,247,242,0.92)] px-2 shadow-[0_10px_28px_-14px_rgba(46,42,39,0.3)]">
             <button
               type="button"
               disabled={isLocked || isMutating}
@@ -1001,17 +1030,51 @@ export function PhotoLightbox({
               aria-label={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
               aria-pressed={isCurrentSelected}
               className={cn(
-                "flex h-[48px] w-[88px] items-center justify-center rounded-full transition-all active:scale-90 touch-manipulation disabled:opacity-40",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2",
-                isCurrentSelected ? "bg-[#C4645A] text-[#2E2A27]" : "bg-[#2e2a27]/85 text-white hover:bg-[#2e2a27]",
+                "flex h-[44px] items-center gap-2 rounded-full px-5 text-[14px] font-medium transition active:scale-95 disabled:opacity-40",
+                isCurrentSelected ? "text-[#C4645A]" : "text-[#2e2a27]",
               )}
             >
               <Heart
-                className="h-6 w-6"
+                className="h-5 w-5"
                 fill={isCurrentSelected ? "currentColor" : "none"}
-                strokeWidth={isCurrentSelected ? 0 : 2}
+                strokeWidth={isCurrentSelected ? 0 : 1.8}
               />
+              Tim
             </button>
+
+            {onLuuGhiChu && (
+              <>
+                <span className="h-[22px] w-px bg-[#e5dcd2]" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    document.getElementById("ghi-chu-anh-ben-phai")?.focus();
+                  }}
+                  aria-label="Ghi chú cho thợ chỉnh ảnh"
+                  className="flex h-[44px] items-center gap-2 rounded-full px-5 text-[14px] font-medium text-[#2e2a27] transition active:scale-95"
+                >
+                  <PenLine className="h-5 w-5" strokeWidth={1.8} />
+                  Ghi chú
+                </button>
+              </>
+            )}
+
+            {bangSanPham && (
+              <>
+                <span className="h-[22px] w-px bg-[#e5dcd2]" aria-hidden="true" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    asideRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  aria-label="Sản phẩm cho tấm ảnh này"
+                  className="flex h-[44px] items-center gap-2 rounded-full px-5 text-[14px] font-medium text-[#2e2a27] transition active:scale-95"
+                >
+                  <Printer className="h-5 w-5" strokeWidth={1.8} />
+                  Đặt in
+                </button>
+              </>
+            )}
           </div>
         </div>
       </footer>

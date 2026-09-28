@@ -93,6 +93,33 @@ export async function GET(
     const { data: chiNhanh } = await admin.from("branches").select("id, name");
     const tenChiNhanh = new Map((chiNhanh ?? []).map((b) => [String(b.id), String(b.name)]));
 
+    /**
+     * BB-303 (bản vẽ BB-301, khach-hang.png) — "tổng mua thêm": tổng
+     * quantity*unit_price của `selection_addons` gắn với lượt CHỌN CHÍNH ĐÃ
+     * CHỐT (is_primary, submitted_at khác null) của TẤT CẢ bộ ảnh khách này —
+     * CÙNG ĐỊNH NGHĨA "tiền mua thêm" với báo cáo Doanh thu phát sinh
+     * (src/lib/bao-cao/cac-bao-cao/doanh-thu-phat-sinh.ts), chỉ khác phạm vi
+     * (một khách, mọi thời gian, thay vì một kỳ báo cáo).
+     */
+    let tongMuaThem = 0;
+    const idsBoAnhThayDuoc = (boAnh ?? []).map((g) => g.id);
+    if (idsBoAnhThayDuoc.length > 0) {
+      const { data: selRows } = await admin
+        .from("selections")
+        .select("id")
+        .in("gallery_id", idsBoAnhThayDuoc)
+        .eq("is_primary", true)
+        .not("submitted_at", "is", null);
+      const selIds = (selRows ?? []).map((s) => s.id);
+      if (selIds.length > 0) {
+        const { data: addonRows } = await admin
+          .from("selection_addons")
+          .select("quantity, unit_price")
+          .in("selection_id", selIds);
+        for (const a of addonRows ?? []) tongMuaThem += Number(a.quantity) * Number(a.unit_price);
+      }
+    }
+
     return ok({
       khach: {
         id: khach.id,
@@ -119,6 +146,8 @@ export async function GET(
          */
         truongBiGhiDe:
           khach.lark_customer_key !== null ? ["fullName", "phone", "note"] : [],
+        // BB-303 — tổng tiền mua thêm mọi bộ ảnh của khách (xem chú thích ở trên).
+        tongMuaThem,
       },
       be: (be ?? []).map((b) => ({
         id: b.id,

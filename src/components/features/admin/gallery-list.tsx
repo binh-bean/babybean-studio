@@ -11,6 +11,8 @@ import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
 import { getContractCodesForGalleries } from "@/app/(admin)/admin/galleries/actions";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
+import { formatSdt } from "@/lib/utils/dinh-dang";
+import { loiNhacKhach } from "@/lib/utils/bang-dieu-khien";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
   Calendar,
@@ -25,7 +27,97 @@ import {
   ChevronDown,
   Eye,
   Copy,
+  Send,
+  ArrowRight,
 } from "lucide-react";
+
+/**
+ * BB-303 (bản vẽ BB-301, bo-anh-danh-sach.png, chú thích): "Làm nhanh theo
+ * trạng thái: Đang chọn/Sắp hết hạn/Quá hạn → Nhắc khách · Đã chốt → Chuyển
+ * sang chỉnh ảnh · Đang chỉnh → Duyệt/Giao ảnh · còn lại → Chép link (mặc
+ * định, xem nút Copy cạnh Eye)."
+ *
+ * "Nhắc khách" ở BẢNG DANH SÁCH chép một câu nhắc CHUNG (không kèm link gửi
+ * khách thật — link đó chỉ khôi phục được qua route chi tiết, tốn một lượt
+ * gọi Lark cho mỗi dòng, không hợp để làm hàng loạt trên cả trang danh sách).
+ * Nhân viên mở bộ ảnh (nút Eye) để lấy link thật nếu cần gửi kèm.
+ */
+function LamNhanh({ item, onCopyLink }: { item: GalleryItem; onCopyLink: () => void }) {
+  const [daChep, setDaChep] = React.useState(false);
+
+  async function chepLoiNhac() {
+    try {
+      await navigator.clipboard.writeText(
+        loiNhacKhach({ customerName: item.customerName, babyName: item.babyName || item.babyFullName, title: item.title }),
+      );
+      setDaChep(true);
+      window.setTimeout(() => setDaChep(false), 2000);
+    } catch {
+      // Trình duyệt chặn Clipboard API (http, quyền) — không có gì để làm
+      // thêm ở một nút icon nhỏ trong bảng; nhân viên mở chi tiết bộ ảnh.
+    }
+  }
+
+  if (item.status === "in_review") {
+    return (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        onClick={() => void chepLoiNhac()}
+        title={daChep ? "Đã chép" : "Chép lời nhắc khách chọn ảnh"}
+        aria-label="Chép lời nhắc"
+      >
+        <Send className="h-4 w-4" />
+      </Button>
+    );
+  }
+
+  if (item.status === "submitted") {
+    return (
+      <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          title="Mở để chuyển sang chỉnh ảnh"
+          aria-label="Chuyển sang chỉnh ảnh"
+        >
+          <ArrowRight className="h-4 w-4" />
+        </Button>
+      </Link>
+    );
+  }
+
+  if (item.status === "in_retouch") {
+    return (
+      <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          title="Mở để duyệt/giao ảnh đã chỉnh"
+          aria-label="Duyệt hoặc giao ảnh"
+        >
+          <Paintbrush className="h-4 w-4" />
+        </Button>
+      </Link>
+    );
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-8 w-8"
+      onClick={onCopyLink}
+      title="Sao chép link"
+      aria-label="Sao chép link"
+    >
+      <Copy className="h-4 w-4" />
+    </Button>
+  );
+}
 
 export interface GalleryItem {
   id: string;
@@ -60,6 +152,26 @@ export interface GalleryItem {
   statusLabel?: string;
   /** Mức cảnh báo từ Lark (`mauCanhBao()`); null = chưa đọc được hoặc không áp dụng. */
   warningColor?: MauCanhBao | null;
+  /**
+   * BB-303 (bản vẽ BB-301, admin duyệt 28/09/2026) — ảnh bìa khách đã chọn,
+   * chưa có thì tấm đầu của bộ (`anhBiaTheoBo()`, route API tính sẵn).
+   * `null` = bộ chưa có ảnh nào (chưa đồng bộ) — ô bìa vẽ màu trơn.
+   */
+  coverPhotoId?: string | null;
+  /** BB-303 — tên gói chụp ("Newborn", "Thôi nôi"…), dùng cho tiêu đề "Loại buổi · Bé …". `null` = chưa gắn gói. */
+  packageName?: string | null;
+}
+
+/**
+ * BB-303 (bo-anh-danh-sach.png): "Newborn · Bé Bin" thay cho mã hợp đồng thô
+ * khi có đủ dữ liệu gói + tên bé; còn thiếu thì lùi về tên bộ ảnh cũ
+ * (`item.title`, thường là mã hợp đồng) — KHÔNG bịa "Loại buổi" hay tên bé.
+ */
+function tieuDeBoAnh(item: GalleryItem): string {
+  const tenBe = item.babyName || item.babyFullName;
+  if (item.packageName && tenBe) return `${item.packageName} · Bé ${tenBe}`;
+  if (tenBe) return `Bé ${tenBe}`;
+  return item.title;
 }
 
 export interface GalleryCounts {
@@ -155,6 +267,32 @@ function formatDateShort(dateStr: string | null | undefined): string {
   } catch {
     return "—";
   }
+}
+
+/**
+ * Ảnh bìa nhỏ 40×50 đầu hàng (BB-303, bo-anh-danh-sach.png) — bìa khách đã
+ * chọn, chưa có thì tấm đầu; `coverPhotoId` null (bộ chưa có ảnh) vẽ ô màu
+ * trơn thay vì gọi `/api/img` với id rỗng.
+ */
+function AnhBiaNho({ coverPhotoId, title }: { coverPhotoId?: string | null; title: string }) {
+  if (!coverPhotoId) {
+    return (
+      <div
+        aria-hidden="true"
+        className="h-[50px] w-10 shrink-0 rounded-[5px] bg-[var(--bb-surface-2)]"
+      />
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/api/img/${coverPhotoId}?w=200`}
+      alt=""
+      title={title}
+      loading="lazy"
+      className="h-[50px] w-10 shrink-0 rounded-[5px] object-cover"
+    />
+  );
 }
 
 function KanbanColumn({
@@ -295,7 +433,9 @@ function KanbanColumn({
                     <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
                       <div className="flex items-center justify-between">
                         <span>{item.customerName}</span>
-                        <span className="font-mono text-[11px]">{item.customerPhone}</span>
+                        {/* BB-303 (luật phông 28/09/2026): Be Vietnam Pro
+                            tabular-nums, không còn `font-mono`. */}
+                        <span className="tabular-nums text-[11px]">{formatSdt(item.customerPhone)}</span>
                       </div>
                       <div className="flex items-center justify-between text-[11px]">
                         <span>{item.branchName}</span>
@@ -573,13 +713,13 @@ export function GalleryList() {
                   <th className="px-4 py-3.5">Tiến độ chọn</th>
                   <th className="px-4 py-3.5">Hạn chốt</th>
                   <th className="px-4 py-3.5 text-center">Trạng thái</th>
-                  <th className="px-4 py-3.5 text-right">Thao tác</th>
+                  {/* BB-303 (bo-anh-danh-sach.png): "Làm nhanh" thay "Thao tác" — cột này giờ đổi theo trạng thái (xem LamNhanh). */}
+                  <th className="px-4 py-3.5 text-right">Làm nhanh</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--bb-border)]">
                 {items.map((item) => {
                   const statusConfig = getStatusBadgeConfig(item.status);
-                  const tenBe = item.babyName || item.babyFullName || null;
                   const tienDoTong = item.includedQuota > 0 ? item.includedQuota : item.selectedCount;
 
                   return (
@@ -587,22 +727,27 @@ export function GalleryList() {
                       key={item.id}
                       className="hover:bg-[var(--bb-surface-2)]/60 transition-colors"
                     >
-                      {/* 1. Bộ ảnh — tên (mã hợp đồng, dán thẳng vào ô tìm Lark
-                          được) trên, tên khách + tên bé dưới. */}
-                      <td className="max-w-[260px] px-4 py-3">
+                      {/* 1. Bộ ảnh — ảnh bìa nhỏ 40×50 (BB-303, LUÔN hiện) +
+                          tiêu đề "Loại buổi · Bé …" trên, tên khách · SĐT
+                          dưới. */}
+                      <td className="max-w-[280px] px-4 py-3">
                         {/* BB-290 lượt 2: chặn bề rộng cột — tên bộ ảnh dài
                             (vd tên Fixture kiểm thử) từng đẩy cả bảng tràn
                             khỏi 1440px, đẩy cột Trạng thái/Thao tác ra ngoài
                             tầm nhìn mà không cuộn ngang. */}
-                        <Link
-                          href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
-                          className="block truncate font-medium text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
-                        >
-                          {item.title}
-                        </Link>
-                        <div className="truncate text-xs text-[var(--bb-fg-muted)]">
-                          {item.customerName}
-                          {tenBe ? ` · bé ${tenBe}` : ""}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <AnhBiaNho coverPhotoId={item.coverPhotoId} title={tieuDeBoAnh(item)} />
+                          <div className="min-w-0">
+                            <Link
+                              href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
+                              className="block truncate font-medium text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
+                            >
+                              {tieuDeBoAnh(item)}
+                            </Link>
+                            <div className="truncate text-xs text-[var(--bb-fg-muted)]">
+                              {item.customerName} · <span className="tabular-nums">{formatSdt(item.customerPhone)}</span>
+                            </div>
+                          </div>
                         </div>
                       </td>
 
@@ -642,7 +787,8 @@ export function GalleryList() {
 
                       {/* 4. Hạn chốt */}
                       <td className="px-4 py-3">
-                        <div className="text-xs font-mono text-[var(--bb-fg-muted)]">
+                        {/* BB-303 (luật phông): tabular-nums thay font-mono. */}
+                        <div className="text-xs tabular-nums text-[var(--bb-fg-muted)]">
                           {formatDateShort(item.dueAt)}
                         </div>
                         {item.urgency === "overdue" && (
@@ -668,7 +814,8 @@ export function GalleryList() {
                         </span>
                       </td>
 
-                      {/* 6. Thao tác */}
+                      {/* 6. Thao tác — Xem chi tiết luôn có, + MỘT nút "Làm
+                          nhanh" đổi theo trạng thái (BB-303, bo-anh-danh-sach.png). */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Link href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}>
@@ -682,16 +829,7 @@ export function GalleryList() {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => copyShareLink(item.id)}
-                            title="Sao chép link"
-                            aria-label="Sao chép link"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </Button>
+                          <LamNhanh item={item} onCopyLink={() => copyShareLink(item.id)} />
                         </div>
                       </td>
                     </tr>
@@ -705,36 +843,37 @@ export function GalleryList() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 lg:hidden">
             {items.map((item) => {
               const statusConfig = getStatusBadgeConfig(item.status);
-              // Cùng luật với bảng: số hoá đơn đứng đầu, tên bé chỉ hiện khi CÓ.
-              const tenBeThe = item.babyName || item.babyFullName || null;
 
               return (
                 <Card
                   key={item.id}
                   className="rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] shadow-sm hover:border-[var(--bb-primary)]/60 transition-all p-4 space-y-3"
                 >
-                  {/* Header thẻ: Tên bộ ảnh trên, nhãn trạng thái XUỐNG DÒNG
-                      DƯỚI (BB-290 #35) — trước đây nhãn nằm góc phải đẩy tên
-                      bộ ảnh xuống tới 5 dòng khi nhãn dài ("Chờ xác nhận"...).
-                      Tên bộ ảnh tối đa 2 dòng (line-clamp), tên khách/chi
-                      nhánh không còn bị cắt "…" vì nhãn không chiếm ngang nữa. */}
-                  <div className="space-y-1.5">
-                    <Link
-                      href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
-                      className="line-clamp-2 font-bold text-base text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
-                    >
-                      {item.title}
-                    </Link>
-                    <p className="text-xs text-[var(--bb-fg-muted)]">
-                      {item.customerName}
-                      {tenBeThe ? ` · bé ${tenBeThe}` : ""}
-                    </p>
-                    <span className="inline-flex items-center gap-1.5">
-                      <ChamCanhBao mau={item.warningColor} />
-                      <Badge variant={statusConfig.variant} className="whitespace-nowrap">
-                        {item.statusLabel ?? statusConfig.label}
-                      </Badge>
-                    </span>
+                  {/* Header thẻ: ảnh bìa nhỏ (BB-303) + Tên bộ ảnh trên, nhãn
+                      trạng thái XUỐNG DÒNG DƯỚI (BB-290 #35) — trước đây nhãn
+                      nằm góc phải đẩy tên bộ ảnh xuống tới 5 dòng khi nhãn dài
+                      ("Chờ xác nhận"...). Tên bộ ảnh tối đa 2 dòng
+                      (line-clamp), tên khách/chi nhánh không còn bị cắt "…" vì
+                      nhãn không chiếm ngang nữa. */}
+                  <div className="flex items-start gap-3">
+                    <AnhBiaNho coverPhotoId={item.coverPhotoId} title={tieuDeBoAnh(item)} />
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <Link
+                        href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
+                        className="line-clamp-2 font-bold text-base text-[var(--bb-fg)] hover:text-[var(--bb-primary)] transition-colors"
+                      >
+                        {tieuDeBoAnh(item)}
+                      </Link>
+                      <p className="text-xs text-[var(--bb-fg-muted)]">
+                        {item.customerName} · <span className="tabular-nums">{formatSdt(item.customerPhone)}</span>
+                      </p>
+                      <span className="inline-flex items-center gap-1.5">
+                        <ChamCanhBao mau={item.warningColor} />
+                        <Badge variant={statusConfig.variant} className="whitespace-nowrap">
+                          {item.statusLabel ?? statusConfig.label}
+                        </Badge>
+                      </span>
+                    </div>
                   </div>
 
                   {/* Thông tin khách hàng & Chi nhánh */}
@@ -743,9 +882,9 @@ export function GalleryList() {
                       <User className="h-3.5 w-3.5 shrink-0 text-[var(--bb-fg-muted)]" />
                       <span className="truncate">{item.customerName}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 font-mono truncate">
+                    <div className="flex items-center gap-1.5 truncate tabular-nums">
                       <Phone className="h-3.5 w-3.5 shrink-0 text-[var(--bb-fg-muted)]" />
-                      <span>{item.customerPhone}</span>
+                      <span>{formatSdt(item.customerPhone)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 truncate col-span-2">
                       <Building2 className="h-3.5 w-3.5 shrink-0 text-[var(--bb-fg-muted)]" />
@@ -797,23 +936,15 @@ export function GalleryList() {
                     )}
                   </div>
 
-                  {/* Nút hành động */}
+                  {/* Nút hành động — Xem bộ ảnh luôn có, + MỘT nút "Làm nhanh"
+                      đổi theo trạng thái (BB-303). */}
                   <div className="flex items-center gap-2 pt-2 border-t border-[var(--bb-border)]/60">
                     <Link href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`} className="flex-1">
                       <Button variant="outline" size="sm" className="w-full text-xs h-8">
                         <Eye className="h-3.5 w-3.5 mr-1" /> Xem bộ ảnh
                       </Button>
                     </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyShareLink(item.id)}
-                      className="text-xs h-8 px-2.5"
-                      title="Chép link"
-                      aria-label="Chép link"
-                    >
-                      <Copy className="h-3.5 w-3.5 mr-1" /> Chép link
-                    </Button>
+                    <LamNhanh item={item} onCopyLink={() => copyShareLink(item.id)} />
                   </div>
                 </Card>
               );

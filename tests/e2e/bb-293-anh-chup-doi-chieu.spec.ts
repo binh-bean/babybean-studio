@@ -121,8 +121,20 @@ ownIpTest.describe("BB-293 vòng 2: ảnh chụp #3 + #11 (gọn)", () => {
     const theAnh = page.getByTestId("the-anh");
     await ownIpExpect(theAnh.first()).toBeVisible();
 
+    // BB-299 kiểm ngược — phát hiện lỗi CÓ SẴN (không do BB-299 gây ra, xác
+    // nhận bằng cách hoàn nguyên toàn bộ patch BB-299 rồi chạy lại: vẫn đỏ)
+    // khi chạy CẢ TỆP: mục "#3" (ở trên) đã thả tim tấm #1 trên CÙNG một bộ
+    // ảnh fixture (`beforeAll` dùng chung một `bc.galleryId` cho mọi test),
+    // nên tới mục "#11" tấm #1 đã SẴN "đã chọn" — vòng lặp bấm mù theo nhãn
+    // `/Chọn ảnh này|Bỏ chọn/` BẤM VÀO NÚT "Bỏ chọn" và tự BỎ chọn tấm đó,
+    // chỉ còn 1/2 tấm thật sự "đã chọn" khi vào màn so sánh. Sửa: kiểm
+    // `aria-pressed` trước, chỉ bấm khi tấm CHƯA được chọn — vá đúng lỗi
+    // (không né bằng cách đợi/thử lại), kiểm ngược: bỏ đoạn if bên dưới quay
+    // về bấm mù → đỏ lại đúng lỗi này.
     for (let i = 0; i < 2; i++) {
-      await theAnh.nth(i).getByRole("button", { name: /Chọn ảnh này|Bỏ chọn/ }).click();
+      const timNut = theAnh.nth(i).getByRole("button", { name: /Chọn ảnh này|Bỏ chọn/ });
+      const daChon = (await timNut.getAttribute("aria-pressed")) === "true";
+      if (!daChon) await timNut.click();
     }
     await page.getByRole("button", { name: "So sánh", exact: true }).click();
     await theAnh.nth(0).click();

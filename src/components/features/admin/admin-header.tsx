@@ -33,7 +33,15 @@ export function AdminHeader({
             </SheetTrigger>
             <SheetContent side="left" className="w-[280px] p-0" aria-describedby={undefined}>
               <SheetTitle className="sr-only">Menu Điều Hướng</SheetTitle>
-              <div className="flex h-16 items-center border-b border-[var(--bb-border)] px-4">
+              <div className="flex h-16 items-center gap-[7px] border-b border-[var(--bb-border)] px-4">
+                {/* BB-306 — logo hạt đậu trước chữ, căn giữa dọc theo chữ. */}
+                <img
+                  data-testid="logo-hat-dau"
+                  src="/brand/logo-hat-dau-64.png"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-[21px] w-[21px] shrink-0"
+                />
                 <span className="font-display text-[18px] tracking-[0.14em] text-[var(--bb-fg)]">BABY BEAN</span>
               </div>
               <div className="overflow-y-auto">
@@ -54,7 +62,19 @@ export function AdminHeader({
           {/* BB-292: "BabyBean" liền chữ khác hẳn thanh bên/Sheet (đều giãn
               chữ "BABY BEAN" serif) — đồng bộ lại, giữ nhỏ + không xuống dòng
               để còn chỗ cho tên màn ngay bên cạnh. */}
-          <span className="font-display whitespace-nowrap tracking-[0.08em] text-[var(--bb-fg)]">BABY BEAN</span>
+          {/* BB-306 — logo hạt đậu trước chữ; `items-center` riêng cho cụm
+              logo+chữ (không dùng `items-baseline` của span cha, ảnh không
+              có baseline chữ để canh theo). */}
+          <span className="inline-flex shrink-0 items-center gap-[6px]">
+            <img
+              data-testid="logo-hat-dau"
+              src="/brand/logo-hat-dau-64.png"
+              alt=""
+              aria-hidden="true"
+              className="h-[18px] w-[18px] shrink-0"
+            />
+            <span className="font-display whitespace-nowrap tracking-[0.08em] text-[var(--bb-fg)]">BABY BEAN</span>
+          </span>
           <span className="truncate text-sm text-[var(--bb-fg-muted)]">
             <span aria-hidden="true">· </span>
             <TenManHinh />

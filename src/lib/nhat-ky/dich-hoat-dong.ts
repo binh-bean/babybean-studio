@@ -86,6 +86,25 @@ function nguoiTuNhanVien(staffFullName: string | null | undefined, actorLabel: s
 export function suyNguoi(dong: DongNhatKyDeDich): string {
   if (dong.actorType === "staff") return nguoiTuNhanVien(dong.staffFullName, dong.actorLabel);
   if (dong.actorType === "system") return "Hệ thống";
+  /*
+    BB-296 mục #7 — báo cáo chấm độc lập lần 3: dòng "Ba mẹ chốt lựa chọn…"
+    hiện người làm là "Ông bà (Mẹ Mai)" dù người chốt là chính ba mẹ. Kiểm
+    ngược `src/app/api/g/submit/route.ts` dòng 102: route CHẶN
+    `session.role !== "owner"` NGAY TỪ ĐẦU — chỉ link CHÍNH (owner) mới chốt
+    được, không có đường nào để link phụ (ông bà) gọi tới đây. Nhưng dòng
+    345 của route đó ghi `actor_label: input.confirmedByName` — TÊN BA MẸ TỰ
+    GÕ vào ô xác nhận lúc chốt, khác hẳn Ý NGHĨA của `actorLabel` ở các
+    action khác (nhãn LINK do CSKH đặt, vd "Ông bà ngoại"). `nguoiTuKhach`
+    so khớp chuỗi đó với whitelist "chính chủ" — tên thật gần như không bao
+    giờ khớp, nên MỌI lượt chốt đều hiện "Ông bà (tên)". Đây là APP GÁN SAI
+    (không phải phép thử đặt tên nhầm) — `selection.submit` LUÔN là chính
+    chủ theo đúng luật của route, nên không đi qua `nguoiTuKhach` mà hiện
+    thẳng "Ba mẹ (tên xác nhận)".
+  */
+  if (dong.action === "selection.submit") {
+    const ten = (dong.actorLabel ?? "").trim();
+    return ten ? `Ba mẹ (${ten})` : "Ba mẹ";
+  }
   return nguoiTuKhach(dong.actorLabel);
 }
 
@@ -126,6 +145,36 @@ const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
     nhom: "khach",
     cau: (m) => {
       const ten = chuoi(m, "productName");
+      return ten ? `Ba mẹ bỏ sản phẩm đặt thêm (${ten})` : "Ba mẹ bỏ sản phẩm đặt thêm";
+    },
+  },
+  /*
+    BB-296 mục #7 — báo cáo chấm độc lập lần 3: dòng thời gian ghi "Thao tác
+    khác" không nói rõ việc gì. Truy ngược `activity_logs` (`/api/g/addons/
+    route.ts`) lộ ra nguyên nhân THẬT — không phải lỗi hiển thị mà là THIẾU
+    HẲN hai mục từ điển: nhánh MUA NHIỀU TẤM CÙNG LÚC (BB-279, "Chọn ảnh" rồi
+    "Thêm vào giỏ" ở cửa hàng — đúng luồng vừa sửa ở mục #1 của đợt này) ghi
+    action `addon.batch_set`/`addon.batch_remove`, KHÁC với `addon.set`/
+    `addon.remove` (mua một tấm từ "Đặt in tấm này") đã có sẵn ở trên. Hai
+    action này chưa từng có trong từ điển — MỌI lượt mua nhiều tấm từ khi có
+    BB-279 (27/09/2026) đều hiện "Thao tác khác" trên dòng thời gian.
+  */
+  "addon.batch_set": {
+    nhom: "khach",
+    cau: (m) => {
+      const ten = chuoi(m, "productName");
+      const soAnh = Array.isArray(m?.["photoIds"]) ? (m!["photoIds"] as unknown[]).length : null;
+      if (ten && soAnh) return `Ba mẹ đặt thêm ${ten} cho ${soAnh} tấm`;
+      if (ten) return `Ba mẹ đặt thêm ${ten}`;
+      return "Ba mẹ đặt thêm sản phẩm cho nhiều tấm";
+    },
+  },
+  "addon.batch_remove": {
+    nhom: "khach",
+    cau: (m) => {
+      const ten = chuoi(m, "productName");
+      const soAnh = Array.isArray(m?.["photoIds"]) ? (m!["photoIds"] as unknown[]).length : null;
+      if (ten && soAnh) return `Ba mẹ bỏ ${ten} khỏi ${soAnh} tấm`;
       return ten ? `Ba mẹ bỏ sản phẩm đặt thêm (${ten})` : "Ba mẹ bỏ sản phẩm đặt thêm";
     },
   },

@@ -258,10 +258,11 @@ export function HuongDanThemManHinh({ mo, onDong }: HuongDanThemManHinhProps) {
           Safari không có sự kiện này).
         */}
         <div className="mt-5 flex justify-center">
+          {/* BB-305 — nút là nội dung, không phải tiêu đề: bỏ font-display. */}
           <button
             type="button"
             onClick={onDong}
-            className="font-display text-sm text-foreground underline underline-offset-4 transition hover:opacity-70"
+            className="text-sm text-foreground underline underline-offset-4 transition hover:opacity-70"
           >
             Đã hiểu
           </button>

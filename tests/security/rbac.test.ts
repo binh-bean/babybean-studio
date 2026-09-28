@@ -49,8 +49,14 @@ describe("Database RLS Policies & Security (BB-020)", () => {
    * người dùng sửa được qua giao diện.
    */
   async function makePhotographerAndCustomer(): Promise<{ photoId: string; custId: string }> {
-    const { rows: branch } = await client.query("SELECT id FROM branches LIMIT 1");
-    if (branch.length === 0) throw new Error("Cần ít nhất một chi nhánh, chạy npm run db:seed");
+    // Chi nhánh NHIỀU BỘ ẢNH NHẤT, có thứ tự. `SELECT id FROM branches LIMIT 1`
+    // không thứ tự từng bốc trúng chi nhánh rỗng (chi nhánh thứ tư, hoặc chi
+    // nhánh Fixture sót) → hai ca photoshop_ctv/retoucher đỏ dù luật quyền đúng.
+    const { rows: branch } = await client.query(
+      `SELECT branch_id AS id FROM galleries WHERE branch_id IS NOT NULL
+        GROUP BY branch_id ORDER BY count(*) DESC, branch_id LIMIT 1`,
+    );
+    if (branch.length === 0) throw new Error("Cần ít nhất một chi nhánh có bộ ảnh, chạy npm run db:seed");
     const branchId = branch[0].id;
 
     const { rows: user } = await client.query(

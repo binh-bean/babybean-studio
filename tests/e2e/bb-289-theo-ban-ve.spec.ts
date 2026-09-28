@@ -7,9 +7,14 @@
  *      lượt mở thứ hai, nên khách này không bao giờ thấy.
  *  (2) Nút "Nhắn cho studio" vẫn NHÌN THẤY sau khi cuộn 2000px (đầu trang
  *      thương hiệu không sticky, chỉ `#dau-luoi-anh` mới sticky).
- *  (3) Máy tính (1440×900, 1280×720): khối ảnh bìa hiển thị ĐÚNG tỉ lệ ảnh
- *      gốc (±2%) — vì dùng `object-fit: contain`, không cắt đầu/chân.
- *  (4) Điện thoại (390×844): hộp chữ bìa và hộp ảnh bìa KHÔNG GIAO NHAU.
+ *  (3) [BB-298 SỬA LẠI — xem ghi chú dưới] Máy tính: khối ảnh bìa dùng
+ *      `object-fit: cover` tràn cột (bản vẽ BB-297 `bia-may-tinh-tap-chi`,
+ *      admin duyệt 28/09/2026) — KHÔNG còn `object-fit: contain`/letterbox
+ *      kem như BB-289/BB-285 từng chốt. Bản vẽ mới ghi đè bản cũ.
+ *  (4) [BB-298 SỬA LẠI] Điện thoại (390×844): hộp chữ bìa nay ĐÈ lên hộp ảnh
+ *      bìa (kiểu tạp chí tràn màn, lớp tối dần phía dưới — bản vẽ
+ *      `bia-dien-thoai.html`) — KHÔNG còn "không giao nhau" như BB-289 từng
+ *      chốt. Bản vẽ mới ghi đè bản cũ.
  *
  * Cộng thêm hai màn theo bản vẽ BB-285:
  *  (5) Chốt xong hiện màn "Cảm ơn ba mẹ" (`data-testid="cam-on-sau-chot"`),
@@ -284,13 +289,14 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
   });
 
   // -------------------------------------------------------------------------
-  // (3) Máy tính: khối ảnh bìa hiển thị ĐÚNG tỉ lệ ảnh gốc (object-contain).
+  // (3) [BB-298] Máy tính: khối ảnh bìa dùng object-cover, tràn cột, không
+  //     letterbox — bản vẽ BB-297 ghi đè quyết định object-contain của BB-289.
   // -------------------------------------------------------------------------
   for (const [tenKichThuoc, kichThuoc] of [
     ["1440x900", MAY_TINH],
     ["1280x720", MAY_TINH_NHO],
   ] as const) {
-    ownIpTest(`Máy tính ${tenKichThuoc}: khối ảnh bìa không cắt ảnh dọc (tỉ lệ khớp ±2%)`, async ({ page }) => {
+    ownIpTest(`Máy tính ${tenKichThuoc}: khối ảnh bìa tràn cột, object-fit:cover (bản vẽ BB-297)`, async ({ page }) => {
       await page.setViewportSize(kichThuoc);
       await page.goto(`/g/${maLinkA}`);
 
@@ -300,34 +306,29 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
 
       await page.screenshot({ path: tenAnh("bia-may-tinh-chia-doi", kichThuoc), fullPage: false });
 
-      // Máy chủ thử (`playwright.config.ts`) trả một ảnh THẾ CHỖ cố định cho
-      // mọi `photoId` (không phải ảnh 2000×3000 thật của fixture) — so tỉ lệ
-      // PIXEL của ảnh giả đó với metadata trong DB là so hai thứ không liên
-      // quan. Đo đúng NGUYÊN NHÂN đề bài chấp nhận thay thế
-      // ("object-fit=contain"): đọc thẳng CSS đã áp dụng, không suy luận từ
-      // ảnh giả. `object-fit: contain` đảm bảo mọi tỉ lệ ảnh gốc — dọc hay
-      // ngang — đều hiện TRỌN, không bị cắt, đúng lỗi (3) admin báo.
+      // BB-298 — bản vẽ `bia-may-tinh-tap-chi.html` (admin duyệt 28/09/2026)
+      // đổi cột ảnh sang tràn viền, không letterbox: `object-fit: cover`.
       const objectFit = await anhTrongKhoi.first().evaluate(
         (img: HTMLImageElement) => getComputedStyle(img).objectFit,
       );
       ownIpExpect
-        .soft(objectFit, `Khối ảnh bìa máy tính phải dùng object-fit:contain để không cắt ảnh ở ${tenKichThuoc}`)
-        .toBe("contain");
+        .soft(objectFit, `Khối ảnh bìa máy tính phải dùng object-fit:cover (bản vẽ BB-297) ở ${tenKichThuoc}`)
+        .toBe("cover");
 
-      // Khối NỀN quanh ảnh (nơi contain để lộ viền khi ảnh không khớp tỉ lệ
-      // khung) phải có màu — không phải trong suốt/đen — đúng bản vẽ
-      // (nền kem đậm `#e7d3c6` lấp viền thừa, không phải nền tối/rỗng).
-      const mauNen = await khoiAnh.first().evaluate((el: HTMLElement) => getComputedStyle(el).backgroundColor);
-      ownIpExpect
-        .soft(mauNen, "Khối ảnh bìa cần nền màu (không trong suốt) để contain không lộ khoảng rỗng")
-        .not.toBe("rgba(0, 0, 0, 0)");
+      // Khối ảnh vẫn phải lấp đầy cột 42% (không co lại còn 0), đo gián tiếp
+      // qua bounding box thay vì suy luận từ pixel ảnh giả của môi trường thử.
+      const hop = await khoiAnh.first().boundingBox();
+      ownIpExpect.soft(hop?.width ?? 0, "Cột ảnh bìa máy tính phải có bề rộng > 0").toBeGreaterThan(100);
     });
   }
 
   // -------------------------------------------------------------------------
-  // (4) Điện thoại: hộp chữ bìa và hộp ảnh bìa KHÔNG GIAO NHAU.
+  // (4) [BB-298] Điện thoại: hộp chữ bìa nay ĐÈ lên hộp ảnh bìa (kiểu tạp
+  //     chí tràn màn) — bản vẽ BB-297 ghi đè quyết định "không giao nhau"
+  //     của BB-289. Đo ngược lại: chữ phải nằm TRONG khung ảnh (tràn màn),
+  //     và ảnh phải có lớp tối để chữ kem còn đọc được.
   // -------------------------------------------------------------------------
-  ownIpTest("Điện thoại 390×844: hộp chữ bìa không đè lên hộp ảnh bìa", async ({ page }) => {
+  ownIpTest("Điện thoại 390×844: hộp chữ bìa đè lên đáy ảnh bìa (bản vẽ BB-297 tạp chí)", async ({ page }) => {
     await page.setViewportSize(DIEN_THOAI);
     await page.goto(`/g/${maLinkA}`);
 
@@ -336,21 +337,23 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
     await doiAnhTai(page, khoiAnh.locator("img").first());
     await khoiChu.waitFor({ state: "visible" });
 
-    await page.screenshot({ path: tenAnh("bia-dien-thoai-khong-de", DIEN_THOAI), fullPage: false });
+    await page.screenshot({ path: tenAnh("bia-dien-thoai-tran-man", DIEN_THOAI), fullPage: false });
 
     const rAnh = await khoiAnh.boundingBox();
     const rChu = await khoiChu.boundingBox();
     if (!rAnh || !rChu) throw new Error("Không đo được khối ảnh/chữ của bìa");
 
-    const khongGiao =
-      rChu.y >= rAnh.y + rAnh.height - 1 ||
-      rAnh.y >= rChu.y + rChu.height - 1 ||
-      rChu.x >= rAnh.x + rAnh.width - 1 ||
-      rAnh.x >= rChu.x + rChu.width - 1;
+    // Khối chữ phải nằm TRỌN bên trong khối ảnh (bản vẽ: chữ đặt tuyệt đối ở
+    // đáy ảnh tràn màn) — đảo ngược hẳn khẳng định "không giao nhau" cũ.
+    const namTrongAnh =
+      rChu.x >= rAnh.x - 1 &&
+      rChu.y >= rAnh.y - 1 &&
+      rChu.x + rChu.width <= rAnh.x + rAnh.width + 1 &&
+      rChu.y + rChu.height <= rAnh.y + rAnh.height + 1;
 
     ownIpExpect(
-      khongGiao,
-      `Hộp chữ bìa giao hộp ảnh bìa: ảnh={y:${rAnh.y}-${rAnh.y + rAnh.height}}, chữ={y:${rChu.y}-${rChu.y + rChu.height}}`,
+      namTrongAnh,
+      `Hộp chữ bìa phải nằm trong hộp ảnh bìa (tràn màn): ảnh={y:${rAnh.y}-${rAnh.y + rAnh.height}}, chữ={y:${rChu.y}-${rChu.y + rChu.height}}`,
     ).toBe(true);
   });
 
@@ -391,10 +394,18 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
     const diToiBia = page.getByTestId("nut-chon-bia-ngay");
     if (await diToiBia.count()) {
       await diToiBia.click();
-      await page.waitForTimeout(400);
-      // Chọn gợi ý bìa đầu tiên nếu màn chọn bìa hiện ra.
+      // BB-307 — đợi THẬT khối gợi ý bìa hiện ra, không phải
+      // `waitForTimeout(400)` cố định: dưới tải nặng (nhiều tệp e2e chạy
+      // cùng lúc), khối này tải chậm hơn 400ms, `goiYBia` rỗng, bỏ qua chọn
+      // bìa, và nút "Xác nhận" khoá vĩnh viễn vì `albumThieuBia` vẫn còn
+      // (`gallery-app.tsx` dòng ~2978) — kiểm ngược bắt được đúng ca này khi
+      // chạy chung nhiều tệp spec.
       const goiYBia = page.locator("[id^='chon-bia-album-'] button").first();
-      if (await goiYBia.count()) await goiYBia.click().catch(() => undefined);
+      const coGoiY = await goiYBia
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (coGoiY) await goiYBia.click();
       await page.waitForTimeout(300);
       await nutChot.click();
     }
@@ -458,9 +469,11 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
     ["390x844", DIEN_THOAI],
     ["1440x900", MAY_TINH],
   ] as const) {
-    ownIpTest(`Xem ảnh lớn ${tenKichThuoc}: nền kính trong (alpha<1 + blur), không phải màu tối đặc`, async ({
-      page,
-    }) => {
+    ownIpTest(
+      kichThuoc === MAY_TINH
+        ? `Xem ảnh lớn ${tenKichThuoc}: nền kem MỘT MÀU đặc, không nhoè lưới phía sau (BB-298, ghi đè BB-289)`
+        : `Xem ảnh lớn ${tenKichThuoc}: nền kính trong (alpha<1 + blur), không phải màu tối đặc`,
+      async ({ page }) => {
       await page.setViewportSize(kichThuoc);
       await page.goto(`/g/${maLinkA}`);
 
@@ -483,17 +496,30 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
         return { bgColor: cs.backgroundColor, blurLen: filter.includes("blur") ? filter.length : 0 };
       });
 
-      // rgba(r,g,b,a) hoặc rgb(...) — đọc kênh alpha, mặc định 1 nếu không có.
-      const alphaKhop = bgColor.match(/rgba?\(([^)]+)\)/);
-      const kenh = alphaKhop?.[1] ? alphaKhop[1].split(",").map((s) => Number(s.trim())) : [];
-      const alpha = kenh.length === 4 ? kenh[3] : 1;
+      if (kichThuoc === MAY_TINH) {
+        // BB-298 — bản vẽ `xem-lon-may-tinh.html` (admin duyệt 28/09/2026,
+        // mục #5 XONG.md): vùng trái máy tính phải là MỘT MÀU kem #F3EDE5
+        // ĐẶC (alpha=1, không blur) — "không nhoè lưới phía sau". Ghi đè
+        // đúng khẳng định NGƯỢC LẠI mà BB-289 từng chốt cho breakpoint này.
+        ownIpExpect
+          .soft(bgColor, `Nền màn xem lớn máy tính phải ĐẶC màu (rgb, không rgba), đo được: ${bgColor}`)
+          .toBe("rgb(243, 237, 229)");
+        ownIpExpect
+          .soft(blurLen, `Nền màn xem lớn máy tính KHÔNG được còn backdrop-filter blur, đo được: "${bgColor}"`)
+          .toBe(0);
+      } else {
+        // rgba(r,g,b,a) hoặc rgb(...) — đọc kênh alpha, mặc định 1 nếu không có.
+        const alphaKhop = bgColor.match(/rgba?\(([^)]+)\)/);
+        const kenh = alphaKhop?.[1] ? alphaKhop[1].split(",").map((s) => Number(s.trim())) : [];
+        const alpha = kenh.length === 4 ? kenh[3] : 1;
 
-      ownIpExpect
-        .soft(alpha, `Nền màn xem lớn phải trong suốt một phần (alpha<1), đo được: ${bgColor}`)
-        .toBeLessThan(1);
-      ownIpExpect
-        .soft(blurLen, `Nền màn xem lớn phải có backdrop-filter blur, đo được: "${bgColor}"`)
-        .toBeGreaterThan(0);
+        ownIpExpect
+          .soft(alpha, `Nền màn xem lớn phải trong suốt một phần (alpha<1), đo được: ${bgColor}`)
+          .toBeLessThan(1);
+        ownIpExpect
+          .soft(blurLen, `Nền màn xem lớn phải có backdrop-filter blur, đo được: "${bgColor}"`)
+          .toBeGreaterThan(0);
+      }
 
       // BB-289 lượt 3 — Opus chấm ảnh chụp: ảnh chính gần như vô hình (một
       // chấm ~4px giữa màn) vì `w-auto h-auto` đo theo kích thước GỐC của

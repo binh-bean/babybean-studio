@@ -38,6 +38,8 @@ import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
+import { nhomSanPham } from "@/lib/products/nhom-san-pham";
+import { formatKichThuoc, formatSdt, formatNgayVN } from "@/lib/utils/dinh-dang";
 /**
  * "27/09" — ngày/tháng KHÔNG kèm năm, dùng riêng cho thẻ "Chốt lúc" (hàng số
  * liệu đầu trang chi tiết bộ ảnh) để khớp bản vẽ quan-tri-chi-tiet.html và
@@ -50,6 +52,23 @@ function formatNgayNgan(input: string): string {
   const ngay = String(d.getDate()).padStart(2, "0");
   const thang = String(d.getMonth() + 1).padStart(2, "0");
   return `${ngay}/${thang}`;
+}
+
+/**
+ * BB-296 mục #6 — tên thân thiện cho một dòng "Mua thêm", cùng luật với
+ * `tenThanThienSanPham` (`components/features/gallery/cua-hang.tsx`, màn
+ * khách): NHÓM + chất liệu, bỏ tiền tố lặp khi chất liệu đã tự nói tên nhóm
+ * ("Khung HQ" không thành "Khung Khung HQ"). Viết lại một bản NHỎ ở đây thay
+ * vì import thẳng từ `cua-hang.tsx` — component đó thuộc màn khách, đang cố
+ * tình giữ nguyên không đụng trong đợt sửa này.
+ */
+const TEN_NHOM_QT: Record<string, string> = { anh_in: "Ảnh in", album: "Album", khung: "Khung" };
+export function tenThanThienMuaThem(kind: string | null, material: string | null, size: string | null): string {
+  const nhom = nhomSanPham(kind, material) ?? "anh_in";
+  const tienTo = TEN_NHOM_QT[nhom] ?? "Sản phẩm";
+  const cl = (material ?? "").trim();
+  const ten = !cl ? tienTo : cl.toLowerCase().startsWith(tienTo.toLowerCase()) ? cl : `${tienTo} ${cl}`;
+  return size ? `${ten} · ${formatKichThuoc(size)}` : ten;
 }
 
 interface Component {
@@ -126,6 +145,11 @@ interface Detail {
   welcomeMessage: string | null;
   babyName: string | null;
   branchName: string | null;
+  /** BB-303 (quan-tri-chi-tiet.png) — tiêu đề "Loại buổi · Bé …" + dòng phụ. */
+  packageName: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  shootDate: string | null;
   /** BB-200 (3/3) — nhãn quản trị đã tính từ trạng thái app + mã Lark. */
   statusLabel?: string;
   /** Mức cảnh báo từ Lark; null = chưa đọc được hoặc không áp dụng. */
@@ -138,6 +162,25 @@ interface Detail {
   canReopen?: boolean;
   /** BB-202 — bìa của mỗi album TRONG GÓI, `fileName: null` = chưa chọn. */
   albumCovers?: Array<{ galleryItemId: string; name: string; fileName: string | null }>;
+  /**
+   * BB-296 mục #6 — báo cáo chấm độc lập lần 3: cột trái trống hoác dưới thẻ
+   * số liệu — không thấy ảnh khách đã chọn, không thấy TỪNG món mua thêm.
+   * Hai mảng này đọc thẳng `selection_items`/`selection_addons` đã có sẵn
+   * (route `items/route.ts`), không đổi schema.
+   */
+  selectedPhotos?: Array<{ photoId: string; fileName: string; note: string | null }>;
+  addonPurchases?: Array<{
+    id: string;
+    productId: string;
+    photoId: string | null;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    productName: string;
+    material: string | null;
+    size: string | null;
+    kind: string | null;
+  }>;
 }
 
 export function GalleryDetail({ galleryId }: { galleryId: string }) {
@@ -574,6 +617,21 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     : null;
 
   const statusBadge = getStatusBadgeConfig(detail.status);
+  // BB-303 (quan-tri-chi-tiet.png) — "Loại buổi · Bé …" thay tên bộ ảnh thô
+  // (thường là mã hợp đồng) khi có đủ dữ liệu; thiếu thì lùi về `detail.title`
+  // — KHÔNG bịa "Loại buổi" hay tên bé.
+  const tieuDe =
+    detail.packageName && detail.babyName
+      ? `${detail.packageName} · Bé ${detail.babyName}`
+      : detail.babyName
+        ? `Bé ${detail.babyName}`
+        : detail.title;
+  const dongPhu = [
+    detail.customerName,
+    detail.customerPhone ? formatSdt(detail.customerPhone) : null,
+    detail.branchName,
+    detail.shootDate ? formatNgayVN(detail.shootDate) : null,
+  ].filter((v): v is string => !!v);
 
   return (
     <div className="flex flex-col gap-5">
@@ -587,7 +645,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               BB-280: bỏ `sm:text-3xl` — thang chữ chung yêu cầu tiêu đề trang
               một cỡ cố định ở mọi kích thước màn hình (docs/07-ui-ux.md).
             */}
-            <h1 className={PAGE_TITLE_CLASS}>{detail.title}</h1>
+            <h1 className={PAGE_TITLE_CLASS}>{tieuDe}</h1>
             <span className="inline-flex items-center gap-1.5">
               {/* Chữ "Trạng thái" giữ lại làm nhãn — tests/e2e/bb-200-nhan-lark.spec.ts
                   đợi đúng chữ này làm mốc "đã tải xong dữ liệu" trước khi kiểm
@@ -606,8 +664,14 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               <Badge variant={statusBadge.variant}>{detail.statusLabel ?? statusBadge.label}</Badge>
             </span>
           </div>
+          {/* BB-303 (quan-tri-chi-tiet.png) — dòng phụ "khách · SĐT · chi
+              nhánh · ngày chụp", chỉ nối các phần THẬT SỰ có dữ liệu. */}
+          {dongPhu.length > 0 && (
+            <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">{dongPhu.join(" · ")}</p>
+          )}
+          {/* BB-303 (luật phông 28/09/2026): tabular-nums thay font-mono. */}
           {detail.contractCodes.length > 0 && (
-            <p className="mt-1 select-all font-mono text-xs text-[var(--bb-fg-muted)]">
+            <p className="mt-1 select-all tabular-nums text-xs text-[var(--bb-fg-muted)]">
               {detail.contractCodes.join(" + ")}
             </p>
           )}
@@ -628,7 +692,12 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             của nó vẫn đứng cạnh ô nhập (RetouchSender, cột trái) — không
             trạng thái nào hiện hai nút mực cùng lúc. */}
         {detail.status === "submitted" && (
-          <div className="flex shrink-0 flex-col items-end gap-2">
+          // BB-303 (bản vẽ BB-301: "bản điện thoại, nút chính ghim đáy") —
+          // trên máy tính nút chính nằm ở đầu trang như cũ (BB-290 lượt 2);
+          // trên điện thoại nó CHUYỂN xuống thanh ghim đáy phía dưới (xem
+          // cuối component) để luôn trong tầm ngón tay cái, không cần cuộn
+          // lên đầu trang — chỉ hiện MỘT bản, không lặp hai nút cùng ý.
+          <div className="hidden shrink-0 flex-col items-end gap-2 lg:flex">
             {detail.outstanding > 0 && (
               <p className="max-w-xs text-right text-xs text-[var(--bb-warning)]">
                 Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>
@@ -745,7 +814,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                   href={detail.driveFolderUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="break-all font-mono text-xs underline"
+                  className="break-all text-xs underline"
                 >
                   {detail.driveFolderUrl}
                 </a>
@@ -884,7 +953,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                   value={linkMoi}
                   onFocus={(e) => e.currentTarget.select()}
                   aria-label="Link gửi khách"
-                  className="mt-2 w-full select-all rounded border border-[var(--bb-border)] p-2 font-mono text-xs"
+                  className="mt-2 w-full select-all rounded border border-[var(--bb-border)] p-2 text-xs"
                 />
               </div>
             ) : (
@@ -970,6 +1039,32 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           />
         </div>
       </div>
+
+      {/* BB-303 (bản vẽ BB-301) — nút chính ghim đáy TRÊN ĐIỆN THOẠI. Chừa
+          chỗ bằng đệm dưới (`pb-24`) trên chính component này thì phải đụng
+          vào layout cha (`admin-layout-shell.tsx`, đã có `p-4 sm:p-6`) — thay
+          vào đó thanh này tự mang nền + viền trên để không đè lên chữ cuối
+          trang, và `scroll-mb` không cần vì trang chỉ dài thêm một chút. */}
+      {detail.status === "submitted" && (
+        <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 border-t border-[var(--bb-border)] bg-[var(--bb-bg)]/95 p-3 backdrop-blur-sm lg:hidden">
+          {detail.outstanding > 0 && (
+            <p className="text-center text-xs text-[var(--bb-warning)]">
+              Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void confirmSubmission()}
+            className="w-full rounded-full bg-[var(--bb-fg)] px-4 py-3 text-sm font-medium text-[var(--bb-bg)] disabled:opacity-40"
+          >
+            Xác nhận và chuyển sang chỉnh ảnh
+          </button>
+        </div>
+      )}
+      {/* Đệm dưới cùng bằng chiều cao thanh ghim, để nội dung cuối trang
+          (Dòng thời gian hoạt động) không bị thanh che mất trên điện thoại. */}
+      {detail.status === "submitted" && <div className="h-24 lg:hidden" aria-hidden="true" />}
     </div>
   );
 }
@@ -1026,6 +1121,108 @@ function KhoiChinh({
           được</strong>. Thêm dòng <em>Edit file</em> bên dưới với số ảnh trong gói, hoặc
           bổ sung bên Lark rồi đồng bộ lại.
         </p>
+      )}
+
+      {/*
+        BB-296 mục #6 — báo cáo chấm độc lập lần 3: "Ảnh khách đã chọn" +
+        "Mua thêm" theo `quan-tri-chi-tiet.png` (khối `.luoi` lưới 6 cột +
+        chip ghi chú). Chỉ hiện khi khách đã chọn ít nhất một tấm — bộ ảnh
+        chưa ai chọn gì thì không có gì để vẽ.
+      */}
+      {(detail.selectedPhotos?.length ?? 0) > 0 && (
+        <section className="rounded-lg border border-[var(--bb-border)] p-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-base font-medium">Ảnh khách đã chọn</h2>
+            <span className="text-xs text-[var(--bb-fg-muted)]">
+              {detail.selectedPhotos!.length} tấm
+              {detail.selectedPhotos!.some((p) => p.note) &&
+                ` · ${detail.selectedPhotos!.filter((p) => p.note).length} ghi chú`}
+            </span>
+          </div>
+          <ul className="mt-3 grid grid-cols-4 gap-2.5 sm:grid-cols-6">
+            {detail.selectedPhotos!.map((p, i) => (
+              <li
+                key={p.photoId}
+                className="overflow-hidden rounded-md border border-[var(--bb-border)]"
+                title={p.note ?? p.fileName}
+              >
+                {/* BB-303 (quan-tri-chi-tiet.png) — "lưới đánh số, huy hiệu
+                    ghi chú": số thứ tự (thứ tự khách chọn, `order_index` từ
+                    route API) góc trên-trái, huy hiệu "✎" góc trên-phải CHỈ
+                    khi có ghi chú — trước đây phải đọc dòng chữ bên dưới mới
+                    biết tấm nào có ghi chú. */}
+                <div className="relative aspect-[4/5] bg-[var(--bb-surface-2)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/img/${p.photoId}?w=200`}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                  <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
+                    {i + 1}
+                  </span>
+                  {p.note && (
+                    <span
+                      role="img"
+                      aria-label="Có ghi chú"
+                      title="Có ghi chú"
+                      className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-[var(--bb-warning)] text-[9px] text-white"
+                    >
+                      ✎
+                    </span>
+                  )}
+                </div>
+                {p.note && (
+                  <p className="truncate px-1.5 py-1 text-[10px] text-[var(--bb-fg-muted)]">
+                    ✎ {p.note}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {(detail.addonPurchases?.length ?? 0) > 0 && (
+        <section className="rounded-lg border border-[var(--bb-border)] p-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-base font-medium">Mua thêm</h2>
+            <span className="text-xs text-[var(--bb-fg-muted)]">
+              {formatCurrencyVND(detail.addonsAmount)}
+            </span>
+          </div>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {detail.addonPurchases!.map((a) => (
+              <li
+                key={a.id}
+                className="flex items-center gap-3 rounded-md border border-[var(--bb-border)] p-2.5"
+              >
+                {a.photoId ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`/api/img/${a.photoId}?w=200`}
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded object-cover"
+                  />
+                ) : (
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded bg-[var(--bb-surface-2)] text-[10px] text-[var(--bb-fg-muted)]">
+                    —
+                  </span>
+                )}
+                <span className="min-w-0 flex-1 text-sm">
+                  {tenThanThienMuaThem(a.kind, a.material, a.size)}
+                  {a.quantity > 1 && (
+                    <span className="text-[var(--bb-fg-muted)]"> ×{a.quantity}</span>
+                  )}
+                </span>
+                <span className="shrink-0 text-sm font-medium">
+                  {formatCurrencyVND(a.totalPrice)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {(detail.dueAmount !== 0 || detail.paidAmount !== 0) && (
@@ -1583,7 +1780,11 @@ function TheSoLieu({
           thẻ. Cho phép `phu` (giờ, đơn vị) rớt xuống dòng dưới thay vì tràn
           ra ngoài — `items-baseline` vẫn giữ hai dòng thẳng theo baseline khi
           đủ chỗ nằm chung một dòng. */}
-      <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0 font-display text-[26px] font-normal leading-tight text-[var(--bb-fg)] [font-variant-numeric:lining-nums_tabular-nums] sm:text-[28px]">
+      {/* BB-303 (admin duyệt 28/09/2026): Be Vietnam Pro tabular-nums
+          (`.bb-so`) thay Playfair Display — MỘT kiểu số duy nhất cho mọi thẻ
+          thống kê quản trị (BB-301 XONG.md mục 2), không còn số oldstyle lệch
+          chân của Playfair. */}
+      <div className="bb-so mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0 text-[26px] leading-tight sm:text-[28px]">
         {canhBao && (
           <span
             role="img"
@@ -1636,7 +1837,7 @@ function DongLinkApp({ diaChi }: { diaChi: string }) {
         value={diaChi}
         onFocus={(e) => e.currentTarget.select()}
         aria-label="Link gửi khách"
-        className="min-w-0 flex-1 rounded border border-[var(--bb-border)] px-2 py-1.5 font-mono text-xs"
+        className="min-w-0 flex-1 rounded border border-[var(--bb-border)] px-2 py-1.5 text-xs"
       />
       <button
         type="button"
@@ -1697,7 +1898,7 @@ function TinhTrangLink({ detail }: { detail: Detail }) {
           {nhan.chu}
         </span>
         <span className="text-[var(--bb-fg-muted)]">
-          mã <span className="font-mono">{link.tokenPrefix ?? "—"}…</span>
+          mã <span className="tabular-nums">{link.tokenPrefix ?? "—"}…</span>
         </span>
       </p>
       {/* BB-201 — link hiện lại được như link Drive (chủ studio 25/09/2026). */}

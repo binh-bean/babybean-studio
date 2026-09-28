@@ -146,10 +146,19 @@ export function BiaBoAnhEditor({
           role="dialog"
           aria-modal="true"
           aria-label="Thiết kế bìa bộ ảnh"
-          className="fixed inset-0 z-50 flex flex-col bg-background md:flex-row overflow-hidden"
+          className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background md:flex-row md:overflow-hidden"
         >
-          {/* Lưới chọn ảnh (trái / trên) */}
-          <div className="flex flex-1 flex-col overflow-y-auto border-r border-border p-4 md:w-1/2">
+          {/*
+            BB-296 mục #2 — báo cáo chấm độc lập lần 3: trên điện thoại, hai
+            nửa (lưới chọn ảnh / xem trước) đều `flex-1` bên trong khung
+            `fixed inset-0` cố định chiều cao — mỗi nửa chỉ còn ~320-400px,
+            lưới ảnh + form bị nhốt trong một ô cuộn riêng cao ngắn, cắt
+            ngang hàng thứ hai. Sửa: bỏ `flex-1` ở NỬA TRÁI trên điện thoại —
+            nó chảy theo chiều cao thật của nội dung, cuộn CHUNG với toàn hộp
+            thoại (`overflow-y-auto` ở khung ngoài). Từ `md` trở lên giữ
+            nguyên bố cục chia đôi, mỗi nửa tự cuộn riêng như cũ.
+          */}
+          <div className="flex flex-col border-b border-border p-4 md:w-1/2 md:flex-1 md:overflow-y-auto md:border-b-0 md:border-r">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Thiết kế bìa</h3>
               <button
@@ -299,7 +308,7 @@ export function BiaBoAnhEditor({
           {/* BB-294 (#9) — nền khung xem trước trước đây `bg-gray-100`
               (#F3F4F6, xám lạnh Tailwind mặc định) lệch hẳn tông kem của
               thương hiệu (#FBF7F2 / `--bb-bg`, xem LUAT-DOT-8.md). */}
-          <div className="relative flex-1 bg-[var(--bb-bg)] dark:bg-gray-900 md:w-1/2 flex flex-col items-center justify-center gap-3 overflow-hidden p-4">
+          <div className="relative shrink-0 bg-[var(--bb-bg)] dark:bg-gray-900 md:w-1/2 md:flex-1 flex flex-col items-center justify-center gap-3 overflow-hidden p-4">
             <div className="flex items-center gap-1 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-white/70 backdrop-blur p-0.5 text-xs">
               <button
                 type="button"
@@ -324,6 +333,18 @@ export function BiaBoAnhEditor({
               style={{
                 containerType: "size",
                 width: thietBiXemTruoc === "may-tinh" ? "100%" : "min(100%, 260px)",
+                // BB-296 mục #2 — báo cáo chấm độc lập lần 3 cũng nói khung
+                // xem trước máy tính có "dải trắng thừa bên phải". Thử nới
+                // `maxWidth` lên 900px lộ ra một lỗi HIỂN THỊ KHÁC (nội dung
+                // bìa tràn ra ngoài khung bo góc ở một số bề rộng cửa sổ —
+                // khả năng do `container-type: size` + `cqw` tính lệch một
+                // nhịp khi đổi kích thước, xem ảnh chụp `test-results` lúc
+                // soát). Không có bản vẽ định con số chính xác, và việc sửa
+                // đúng gốc (đổi hẳn cách quy đổi tỉ lệ, không còn dùng cqw)
+                // vượt phạm vi mục #2 (chỉ nói "bỏ dải trắng thừa", không xin
+                // đổi cơ chế dựng khung xem trước) — GIỮ NGUYÊN 640px an
+                // toàn, chỉ sửa phần chắc chắn của mục #2 (placeholder khi
+                // chưa chọn ảnh, lưới dt không kẹt ô cuộn). Ghi vào bàn giao.
                 maxWidth: thietBiXemTruoc === "may-tinh" ? "640px" : "260px",
                 aspectRatio: thietBiXemTruoc === "may-tinh" ? "16 / 10" : "9 / 19.5",
               }}
@@ -350,6 +371,7 @@ export function BiaBoAnhEditor({
                   hanChot={null}
                   khoa={false}
                   onBatDau={() => {}}
+                  placeholderChuaCoAnh="Chọn một tấm bên trái"
                 />
               </div>
             </div>

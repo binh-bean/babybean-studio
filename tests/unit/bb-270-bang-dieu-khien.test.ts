@@ -194,6 +194,12 @@ function taoBang(rowsGoc: HangGia[]) {
         list = list.slice(0, n);
         return builder;
       },
+      // BB-303 thêm: `anhBiaTheoBo()` (ảnh bìa "Việc hôm nay"/danh sách bộ
+      // ảnh) gọi `.maybeSingle()` sau `.limit(1)` — một dòng hoặc null, đúng
+      // ngữ nghĩa PostgREST thật (không phải mảng).
+      async maybeSingle() {
+        return { data: list.length > 0 ? chonCot(list[0]!, cols) : null, error: null };
+      },
       then(resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) {
         const ketQua = demSo
           ? { data: null, count: list.length, error: null }
@@ -213,11 +219,23 @@ function taoAdminGia(bang: {
   const tuGalleries = taoBang(bang.galleries);
   const tuView = taoBang(bang.v_gallery_progress);
   const tuBranches = taoBang(bang.branches as unknown as HangGia[]);
+  // BB-303 — "Việc hôm nay" (ảnh bìa/tên bé/tên gói/SĐT) và "Mua thêm · 7
+  // ngày qua" (lượt chốt gần đây + addon) đọc thêm các bảng này. Bộ dữ liệu
+  // của các phép thử BB-270 không cần dữ liệu thật ở đây (không có
+  // cover_photo_id/baby_id/customer_id trong fixture của nhóm này) — chỉ cần
+  // KHÔNG NÉM LỖI "bảng không mong đợi" khi route gọi tới, để giữ đúng phép
+  // thử BB-270 đang canh (lọc chi nhánh + loại Fixture ở tienDoChiNhanh),
+  // không phải để canh tính năng BB-303 (đã có phép thử riêng ở
+  // tests/unit/bb-303-*.test.ts).
+  const rongDi = () => taoBang([])();
   return {
     from(ten: string) {
       if (ten === "galleries") return tuGalleries();
       if (ten === "v_gallery_progress") return tuView();
       if (ten === "branches") return tuBranches();
+      if (["photos", "selections", "selection_addons", "babies", "packages", "customers"].includes(ten)) {
+        return rongDi();
+      }
       throw new Error(`bảng không mong đợi: ${ten}`);
     },
   };

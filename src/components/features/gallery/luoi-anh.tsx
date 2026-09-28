@@ -179,8 +179,16 @@ const TheAnh = memo(function TheAnh({
           BB-218 — dấu số 1–4 khi tấm đang được đánh dấu để so sánh. Góc PHẢI
           TRÊN: bên trái đã có dấu sản phẩm in, bên dưới phải là tim.
         */}
+        {/*
+          BB-296 mục #4 — báo cáo chấm độc lập lần 3: vòng số ở GÓC TRÊN bị
+          thanh đầu dính của lưới (sticky, không thuộc phần sở hữu của mục
+          này — xem AGENTS "Không đụng: ... lưới, thanh đầu lưới") che gần
+          hết mỗi khi tấm vừa chọn nằm ngay dưới thanh đầu. Đề bài cho hai
+          lối ra, chọn lối KHÔNG đụng thanh đầu: đặt vòng số ở GÓC DƯỚI —
+          tim đã ẩn khi `soSanhBat` (xem chú thích dưới) nên không tranh chỗ.
+        */}
         {soSanhBat && soSanhThuTu > 0 && (
-          <span className="pointer-events-none absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-[#2a2420] text-[12px] font-semibold text-white shadow-sm">
+          <span className="pointer-events-none absolute bottom-2 right-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-[#2a2420] text-[12px] font-semibold text-white shadow-sm">
             {soSanhThuTu}
           </span>
         )}

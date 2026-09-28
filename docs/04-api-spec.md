@@ -83,6 +83,9 @@ Thông tin album cho phiên hiện tại.
     "status": "in_review",
     "babyName": "Bơ",
     "shootDate": "2026-09-01",
+    // BB-298 — "loại buổi chụp" (Thôi nôi, Newborn…), lấy từ `shoots.concept`.
+    // `null` khi bộ ảnh không gắn buổi chụp hoặc buổi chụp chưa ghi loại.
+    "sessionType": "Thôi nôi",
     "branch": { "name": "BabyBean Quận 1", "hotline": "0901…", "zaloOa": "…" },
     "photoCount": 862,
     "includedQuota": 20,

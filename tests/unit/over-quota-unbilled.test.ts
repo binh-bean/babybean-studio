@@ -90,6 +90,17 @@ describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_
       await client.query("DELETE FROM staff_profiles WHERE id = ANY($1)", [createdStaffIds]);
       await client.query("DELETE FROM auth.users WHERE id = ANY($1)", [createdStaffIds]);
     }
+    /*
+      BB-296 mục #8 — báo cáo chấm độc lập lần 3: sản phẩm tên bắt đầu bằng
+      "Fixture" (vd "Fixture Edit file") lọt vào danh mục bán CHO KHÁCH THẬT
+      trên bb-dev. Dọn theo `id` ở trên chỉ dọn đúng lượt chạy này — một lượt
+      bị ngắt giữa chừng (process bị kill/timeout) để lại các dòng này VĨNH
+      VIỄN vì bảng `products` không có dòng quét rác theo tuổi. Thêm quét rác
+      cùng luật đã dùng cho các bảng khác trong repo (ngưỡng 6 giờ).
+    */
+    await client.query(
+      `DELETE FROM products WHERE name LIKE 'Fixture %' AND created_at < now() - interval '6 hours'`,
+    );
     await client.end();
   });
 

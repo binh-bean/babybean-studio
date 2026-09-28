@@ -100,6 +100,25 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     /**
+     * BB-303 (bản vẽ BB-301, khach-hang.png) — dòng phụ "mẹ của Bé …" để nối
+     * khách với bé. Lấy bé ĐẦU TIÊN theo `birth_date` (bé lớn nhất/sinh sớm
+     * nhất) khi một khách có nhiều bé — cùng thứ tự `/api/admin/customers/:id`
+     * (route chi tiết) đã sắp khi trả cả danh sách bé.
+     */
+    const { data: beRows } = ids.length
+      ? await admin
+          .from("babies")
+          .select("customer_id, nickname, full_name, birth_date")
+          .in("customer_id", ids)
+          .order("birth_date", { ascending: true, nullsFirst: false })
+      : { data: [] as { customer_id: string; nickname: string | null; full_name: string; birth_date: string | null }[] };
+    const beDauTien = new Map<string, string>();
+    for (const b of beRows ?? []) {
+      const k = String(b.customer_id);
+      if (!beDauTien.has(k)) beDauTien.set(k, b.nickname || b.full_name);
+    }
+
+    /**
      * Trùng số điện thoại GIỮA các chi nhánh.
      *
      * Trong một chi nhánh thì không thể trùng — `uq_customers_phone_branch`
@@ -139,6 +158,8 @@ export async function GET(request: Request): Promise<Response> {
           soBoAnh: bo?.so ?? 0,
           boAnhMoiNhat: bo?.moiNhat ?? null,
           trungSdtChiNhanhKhac: (demSo.get(String(k.phone_normalized))?.size ?? 0) > 1,
+          // BB-303 — tên bé đầu tiên, cho dòng phụ "mẹ của Bé …". `null` = khách chưa có bé nào ghi nhận.
+          babyName: beDauTien.get(k.id) ?? null,
         };
       }),
     });

@@ -56,3 +56,113 @@ export function bienDongLaTot(
   const tang = chenhLechPhanTram > 0;
   return chieuTangLaTot ? tang : !tang;
 }
+
+// ---------------------------------------------------------------------------
+// BB-303 — lời chào đầu trang (bản vẽ BB-301: "Chào buổi sáng, Admin")
+// ---------------------------------------------------------------------------
+
+/** "Chào buổi sáng"/"Chào buổi chiều"/"Chào buổi tối" theo giờ hiện tại (0-23). */
+export function chaoTheoBuoi(gio: number): string {
+  if (gio < 11) return "Chào buổi sáng";
+  if (gio < 18) return "Chào buổi chiều";
+  return "Chào buổi tối";
+}
+
+const THU_TRONG_TUAN = [
+  "Chủ Nhật",
+  "Thứ Hai",
+  "Thứ Ba",
+  "Thứ Tư",
+  "Thứ Năm",
+  "Thứ Sáu",
+  "Thứ Bảy",
+] as const;
+
+/** "Thứ Hai, 28/09/2026" theo NGÀY LỊCH của `d` (giờ máy chạy — màn quản trị chỉ dùng trên máy tính/điện thoại của nhân viên tại studio, không cần quy đổi múi giờ VN riêng như báo cáo). */
+export function ngayDayDuVN(d: Date): string {
+  const thu = THU_TRONG_TUAN[d.getDay()];
+  const ngay = String(d.getDate()).padStart(2, "0");
+  const thang = String(d.getMonth() + 1).padStart(2, "0");
+  const nam = d.getFullYear();
+  return `${thu}, ${ngay}/${thang}/${nam}`;
+}
+
+// ---------------------------------------------------------------------------
+// BB-303 — "Việc hôm nay" (bản vẽ BB-301, bang-dieu-khien.html)
+// ---------------------------------------------------------------------------
+/**
+ * Ba nhóm của khối "Việc hôm nay": Đã trễ hạn / Hôm nay / Ngày mai. Việc ĐÃ
+ * CHỐT (status "submitted") luôn cần xử lý NGAY — không có `due_at` thật để so
+ * (khách không có hạn "phải chốt trước giờ nào", họ đã chốt rồi) — xếp thẳng
+ * vào "Hôm nay" theo đúng ví dụ bản vẽ ("Khách đã chốt 15 tấm").
+ *
+ * Việc có `due_at` xa hơn ngày mai (ví dụ hạn tuần sau) KHÔNG thuộc khối này —
+ * bản vẽ chỉ có ba nhóm, không phải "mọi việc còn hạn".
+ */
+export type NhomViecHomNay = "qua_han" | "hom_nay" | "ngay_mai";
+
+export interface ViecHomNayThoLuoc {
+  dueAt: string | null;
+  status: string;
+}
+
+export function nhomViecHomNay(v: ViecHomNayThoLuoc, now: Date = new Date()): NhomViecHomNay | null {
+  if (v.status === "submitted") return "hom_nay";
+  if (!v.dueAt) return null;
+  const due = new Date(v.dueAt);
+  if (Number.isNaN(due.getTime())) return null;
+  if (due.getTime() < now.getTime()) return "qua_han";
+
+  const dauHomNay = new Date(now);
+  dauHomNay.setHours(0, 0, 0, 0);
+  const dauNgayMai = new Date(dauHomNay);
+  dauNgayMai.setDate(dauNgayMai.getDate() + 1);
+  const dauNgayKia = new Date(dauHomNay);
+  dauNgayKia.setDate(dauNgayKia.getDate() + 2);
+
+  if (due.getTime() < dauNgayMai.getTime()) return "hom_nay";
+  if (due.getTime() < dauNgayKia.getTime()) return "ngay_mai";
+  return null;
+}
+
+/**
+ * Xếp một danh sách việc vào ba nhóm, mỗi nhóm SẮP THEO HẠN (bản vẽ: "trễ hạn
+ * tăng dần theo giờ trễ lớn nhất trước, rồi theo giờ hạn"). Việc không có
+ * `dueAt` thật (status "submitted") đứng ĐẦU nhóm "Hôm nay" — cần xử lý ngay,
+ * không có giờ để so.
+ */
+export function xepViecHomNay<T extends ViecHomNayThoLuoc>(
+  items: T[],
+  now: Date = new Date(),
+): { quaHan: T[]; homNay: T[]; ngayMai: T[] } {
+  const ket = { quaHan: [] as T[], homNay: [] as T[], ngayMai: [] as T[] };
+  for (const item of items) {
+    const nhom = nhomViecHomNay(item, now);
+    if (nhom === "qua_han") ket.quaHan.push(item);
+    else if (nhom === "hom_nay") ket.homNay.push(item);
+    else if (nhom === "ngay_mai") ket.ngayMai.push(item);
+  }
+  const gioCua = (v: T): number => (v.dueAt ? new Date(v.dueAt).getTime() : -Infinity);
+  const tangDan = (a: T, b: T) => gioCua(a) - gioCua(b);
+  ket.quaHan.sort(tangDan);
+  ket.homNay.sort(tangDan);
+  ket.ngayMai.sort(tangDan);
+  return ket;
+}
+
+/**
+ * Câu "Chép lời nhắc" dùng chung cho danh sách Bộ ảnh và khối "Việc hôm nay"
+ * của Bảng điều khiển (BB-303) — MỘT câu chữ, không phải mỗi nơi viết một
+ * kiểu. KHÔNG kèm link gửi khách thật: link đó chỉ khôi phục được qua route
+ * chi tiết bộ ảnh (giải mã + có thể cần đọc lại Lark), tốn một lượt gọi riêng
+ * — không hợp để dựng SẴN cho hàng loạt dòng trên một trang danh sách/bảng
+ * điều khiển. Nhân viên mở bộ ảnh để lấy link thật nếu cần gửi kèm.
+ */
+export function loiNhacKhach(input: { customerName: string; babyName?: string | null; title: string }): string {
+  const veBe = input.babyName ? ` của bé ${input.babyName}` : "";
+  return (
+    `Chào ${input.customerName}, ảnh${veBe} đã sẵn sàng để chọn ạ. ` +
+    `Ba/mẹ giúp em chọn ảnh trước hạn nhé ạ. ` +
+    `(Mở bộ ảnh "${input.title}" trong app để lấy lại link gửi khách nếu cần ạ.)`
+  );
+}

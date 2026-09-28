@@ -118,6 +118,18 @@ test.describe("E-6: Ngắt mạng giữa lúc chọn ảnh", () => {
     await expect(chuaLuu).toBeVisible();
     await expect(chuaLuu).toContainText("Chưa lưu");
 
+    // BB-307 — ảnh chứng minh chỉ báo "Chưa lưu" hiện đúng ở 390×844 (khổ ba
+    // mẹ dùng nhiều nhất). Trước bản vá, `data-testid="chua-luu"` chỉ gắn ở
+    // dòng chữ điện thoại (`lg:hidden`) — bị CSS ẩn ở khổ desktop mặc định
+    // của Playwright (1280×720), khiến ca này đỏ dù chỉ báo vẫn HIỆN ĐÚNG
+    // trên điện thoại thật. Chụp lại rồi trả về khổ máy tính để phần còn lại
+    // của ca chạy đúng khổ gốc.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(150);
+    await expect(chuaLuu).toBeVisible();
+    await page.screenshot({ path: "test-results/bb-307/e6-chua-luu-390x844.png", fullPage: false });
+    await page.setViewportSize({ width: 1280, height: 720 });
+
     // Nối mạng lại — hàng chờ tự gửi qua sự kiện 'online', không cần bấm gì.
     await context.setOffline(false);
     await expect(chuaLuu).toBeHidden({ timeout: 15_000 });

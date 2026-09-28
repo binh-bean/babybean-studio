@@ -240,6 +240,36 @@ async function main() {
       await xoa("khách", `delete from customers where id = any($1)`, [cIds]);
     }
 
+    // Chi nhánh do phép thử dựng (tên bắt đầu "Fixture"/"FIXTURE-"). Chi nhánh
+    // thật có tên riêng, không bao giờ mang tiền tố này. Chỉ xoá khi đã hết bộ
+    // ảnh, khách và nhân sự gắn vào — còn dấu vết thì giữ lại và báo, không ép.
+    const { rows: cn } = await client.query(
+      `select id, name from branches where name ilike 'fixture%'`,
+    );
+    for (const c of cn) {
+      const { rows: vet } = await client.query(
+        `select (select count(*) from galleries where branch_id = $1)
+              + (select count(*) from customers where branch_id = $1)
+              + (select count(*) from staff_branches where branch_id = $1) as n`,
+        [c.id],
+      );
+      if (Number(vet[0].n) > 0) {
+        console.log(`   Giữ chi nhánh "${c.name}": còn ${vet[0].n} dòng gắn vào.`);
+        continue;
+      }
+      await client.query("savepoint chi_nhanh_thu");
+      try {
+        await xoa("thông báo của chi nhánh thử", `delete from notifications where branch_id = $1`, [c.id]);
+        await xoa("cài đặt của chi nhánh thử", `delete from settings where branch_id = $1`, [c.id]);
+        await xoa("chi nhánh do phép thử dựng", `delete from branches where id = $1`, [c.id]);
+        await client.query("release savepoint chi_nhanh_thu");
+      } catch (e) {
+        // Một bảng khác còn trỏ vào chi nhánh này — giữ lại, không làm gãy cả lượt dọn.
+        await client.query("rollback to savepoint chi_nhanh_thu");
+        console.log(`   Giữ chi nhánh "${c.name}": ${e.message}`);
+      }
+    }
+
     await client.query("commit");
 
     console.log("\nĐã xoá:");

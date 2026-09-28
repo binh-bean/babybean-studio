@@ -19,7 +19,7 @@ Chủ sở hữu: **DEV-OPS**.
 |---|---|
 | Vercel team | `Binh-Bean` (gói Hobby) |
 | Project | `babybean-studio` |
-| URL production | `https://babybean-studio.vercel.app` — **đang chạy** |
+| URL production | `https://hauky.babybeanstudio.vn` — **đang chạy** (tên cũ `babybean-studio.vercel.app` đã gỡ, báo 404) |
 | Nguồn | GitHub `binh-bean/babybean-studio`, nhánh `main` |
 | Function Region | **Singapore `sin1`** — phải khớp region Supabase, xem §1b |
 

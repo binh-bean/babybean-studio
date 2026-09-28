@@ -268,8 +268,11 @@ test.describe("BB-280: menu quản trị + thang chữ", () => {
     await expect(page.getByRole("link", { name: /Bộ ảnh chưa có ảnh/ })).toContainText("1");
     await expect(page.getByRole("link", { name: /Sắp hết hạn chọn/ })).toContainText("6"); // 4 + 2
 
+    // BB-303 (luật phông 28/09/2026): số dòng đổi từ `.font-mono` sang
+    // `.tabular-nums` (Be Vietnam Pro) — không còn phông đơn cách trong khu
+    // quản trị, xem dashboard.tsx.
     const soCacDong = await dong.evaluateAll((els) =>
-      els.map((el) => Number(el.querySelector(".font-mono")?.textContent?.trim() || "0"))
+      els.map((el) => Number(el.querySelector(".tabular-nums")?.textContent?.trim() || "0"))
     );
     const tongDong = soCacDong.reduce((a, b) => a + b, 0);
     expect(tongDong).toBe(9);
@@ -279,7 +282,18 @@ test.describe("BB-280: menu quản trị + thang chữ", () => {
   test("h1 của PageHeader cùng font-size ở 1440×900 và 390×844, trên mọi trang quản trị", async ({
     page,
   }) => {
-    test.setTimeout(180_000);
+    // BB-303: nới từ 180s lên 240s. Phép thử này đã CHẠM TRẦN cũ ngay trên
+    // nền sạch (đo 28/09/2026: 2,8-2,9 phút/3 phút) — tải 11 trang × 2 cỡ máy
+    // qua bb-dev thật, mỗi trang gọi `/api/admin/dashboard` (huy hiệu sidebar)
+    // + route riêng của trang. BB-303 thêm "Việc hôm nay"/"Mua thêm 7 ngày"
+    // cho ĐÚNG MỘT trang (Bảng điều khiển) — đã tách qua `?full=1` để các
+    // trang còn lại không trả giá (xem `canDayDu` ở route.ts), nhưng lượt gọi
+    // `full=1` của chính trang Bảng điều khiển giờ nặng hơn trước (~1-2s,
+    // đọc thêm selections/selection_addons/babies/packages/customers) — đủ
+    // để một phép thử vốn đã sát trần cũ vượt ngưỡng. Không đổi phép thử đo
+    // GÌ, chỉ đổi NGÂN SÁCH thời gian cho hợp với một trang có thêm việc thật
+    // để làm.
+    test.setTimeout(240_000);
     await dangNhapNhanVien(page, emailOwner, password);
 
     const trang = [

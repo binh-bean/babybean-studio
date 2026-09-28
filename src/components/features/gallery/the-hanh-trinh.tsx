@@ -10,11 +10,17 @@ interface TheHanhTrinhProps {
 }
 
 export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHanhTrinhProps) {
-  // Chỉ hiện khi status từ submitted trở đi (hoặc đã giao, awaiting_approval, in_retouch).
+  // Chỉ hiện khi status từ submitted trở đi (hoặc awaiting_approval, in_retouch).
   // Tuy nhiên, logic này sẽ được quyết định bên gallery-app, nhưng ta cũng kiểm tra ở đây để chắc chắn.
   // `approved` (ba mẹ đã duyệt, chờ in/giao) từng bị bỏ sót ở đây — đúng lúc
   // ba mẹ hay mở lại app nhất để hỏi "bao giờ có ảnh" (Opus soát BB-225).
-  const isPostSubmit = ["submitted", "in_retouch", "awaiting_approval", "approved", "delivered"].includes(status);
+  //
+  // BB-298 — admin duyệt 28/09/2026 (XONG.md mục 4): khi ĐÃ GIAO, thanh 5
+  // bước nhường chỗ cho MỘT dấu "Đã hoàn thiện" ở màn Đã giao (bìa) —
+  // "thanh 5 bước chỉ hiện khi đang làm". Bỏ `"delivered"` khỏi danh sách
+  // hiện thẻ này; component `DaGiaoBia` (gallery-app.tsx) đảm nhiệm việc báo
+  // trạng thái đã giao thay cho thẻ hành trình.
+  const isPostSubmit = ["submitted", "in_retouch", "awaiting_approval", "approved"].includes(status);
   
   if (!isPostSubmit) return null;
 

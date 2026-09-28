@@ -57,7 +57,11 @@ export async function GET(
       // phục link cũ từ cột "Link app". BB-244 thêm cover_layout (kiểu chữ bìa).
       // Cùng luật viết liền một dòng (BB-150, BB-215) — Supabase suy kiểu từ
       // chuỗi literal, nối chuỗi là mất kiểu.
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc, submitted_at")
+      // BB-303 thêm customer_id, shoot_id, package_id: tiêu đề "Loại buổi ·
+      // Bé …" + dòng phụ "khách · SĐT · chi nhánh · ngày chụp"
+      // (quan-tri-chi-tiet.png). Cùng luật viết liền một dòng (BB-150,
+      // BB-215, BB-200) — Supabase suy kiểu từ chuỗi literal, nối chuỗi mất kiểu.
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc, submitted_at, customer_id, shoot_id, package_id")
       .eq("id", galleryId)
       .single();
 
@@ -250,6 +254,68 @@ export async function GET(
       0,
     );
 
+    /*
+      BB-296 mục #6 — báo cáo chấm độc lập lần 3: màn chi tiết chỉ có MỘT con
+      số "Mua thêm X ₫", không thấy khách chọn TẤM NÀO và mua MÓN GÌ cụ thể —
+      cột trái trống hoác dưới thẻ số liệu. Thêm hai khối dữ liệu:
+        - `selectedPhotos`: ảnh khách đã thả tim (mark='selected'), gộp mọi
+          lượt chọn của bộ ảnh (ba mẹ + ông bà nếu có), không trùng tấm.
+        - `addonPurchases`: TỪNG dòng `selection_addons` của lượt chốt CHÍNH,
+          kèm tên/chất liệu/cỡ sản phẩm và tấm ảnh gắn (album không gắn tấm cụ
+          thể nên `photoId` có thể null — đúng nghiệp vụ, không phải thiếu dữ
+          liệu). Không đổi schema, không migration — đọc thẳng hai bảng đã có
+          sẵn (`selection_items`, `selection_addons`) và join `photos`/`products`.
+    */
+    const { data: selectedRows } = await admin
+      .from("selection_items")
+      .select("photo_id, retouch_note, photos(file_name)")
+      .eq("gallery_id", gallery.id)
+      .eq("mark", "selected")
+      .order("order_index", { ascending: true });
+    const selectedPhotoMap = new Map<
+      string,
+      { photoId: string; fileName: string; note: string | null }
+    >();
+    for (const r of selectedRows ?? []) {
+      const pid = r.photo_id as string;
+      if (selectedPhotoMap.has(pid)) continue;
+      const anh = r.photos as unknown as { file_name: string | null } | null;
+      selectedPhotoMap.set(pid, {
+        photoId: pid,
+        fileName: anh?.file_name ?? "",
+        note: (r.retouch_note as string | null) ?? null,
+      });
+    }
+    const selectedPhotos = Array.from(selectedPhotoMap.values());
+
+    const { data: addonPurchaseRows } = primarySel?.id
+      ? await admin
+          .from("selection_addons")
+          .select("id, product_id, photo_id, quantity, unit_price, products(name, material, size, kind)")
+          .eq("selection_id", primarySel.id)
+          .order("created_at", { ascending: true })
+      : { data: [] as never[] };
+    const addonPurchases = (addonPurchaseRows ?? []).map((r) => {
+      const p = r.products as unknown as {
+        name: string | null;
+        material: string | null;
+        size: string | null;
+        kind: string | null;
+      } | null;
+      return {
+        id: r.id as string,
+        productId: r.product_id as string,
+        photoId: (r.photo_id as string | null) ?? null,
+        quantity: Number(r.quantity),
+        unitPrice: Number(r.unit_price),
+        totalPrice: Number(r.unit_price) * Number(r.quantity),
+        productName: p?.name ?? "",
+        material: p?.material ?? null,
+        size: p?.size ?? null,
+        kind: p?.kind ?? null,
+      };
+    });
+
     // BB-215: tên bé cho khối "Bìa bộ ảnh" — cùng cách lấy với /api/g/gallery
     // (nickname ưu tiên hơn họ tên đầy đủ), để chip mẫu chữ và ô xem trước
     // khớp với đúng cái màn khách sẽ thấy.
@@ -261,6 +327,21 @@ export async function GET(
       .select("name")
       .eq("id", gallery.branch_id)
       .maybeSingle();
+
+    // BB-303 (quan-tri-chi-tiet.png) — dòng phụ "khách · SĐT · chi nhánh ·
+    // ngày chụp" + tiêu đề "Loại buổi · Bé …". `package_id` có thể nằm ở
+    // `galleries` hoặc chỉ ở `shoots` (buổi chụp) tuỳ luồng tạo bộ ảnh — thử
+    // cột trên `galleries` trước, thiếu thì lấy từ `shoots`.
+    const [{ data: customer }, { data: shoot }] = await Promise.all([
+      admin.from("customers").select("full_name, phone").eq("id", gallery.customer_id).maybeSingle(),
+      gallery.shoot_id
+        ? admin.from("shoots").select("shoot_date, package_id").eq("id", gallery.shoot_id).maybeSingle()
+        : Promise.resolve({ data: null as { shoot_date: string | null; package_id: string | null } | null }),
+    ]);
+    const packageId = gallery.package_id ?? shoot?.package_id ?? null;
+    const { data: goiChup } = packageId
+      ? await admin.from("packages").select("name").eq("id", packageId).maybeSingle()
+      : { data: null };
 
     return ok({
       galleryId: gallery.id,
@@ -308,6 +389,11 @@ export async function GET(
       coverLayout: gallery.cover_layout ?? null,
       babyName: baby?.nickname || baby?.full_name || null,
       branchName: branch?.name ?? null,
+      // BB-303 — xem chú thích ở phần truy vấn phía trên.
+      packageName: goiChup?.name ?? null,
+      customerName: customer?.full_name ?? null,
+      customerPhone: customer?.phone ?? null,
+      shootDate: shoot?.shoot_date ?? null,
       contractCodes: gallery.lark_contract_codes ?? [],
       extraPhotoPrice: Number(gallery.extra_photo_price ?? 0),
       quotaKnown: summary.quotaKnown,
@@ -334,6 +420,9 @@ export async function GET(
       items: summary.items,
       // BB-202 — khối "Bìa album" ở màn chi tiết.
       albumCovers,
+      // BB-296 mục #6 — xem chú thích ở phần truy vấn phía trên.
+      selectedPhotos,
+      addonPurchases,
     });
   } catch (err) {
     if (err instanceof AuthError) {

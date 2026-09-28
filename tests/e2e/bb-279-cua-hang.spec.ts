@@ -222,14 +222,47 @@ ownIpTest.describe("BB-279: cửa hàng tối giản", () => {
       await luoiChon.getByRole("button", { name: "Xong", exact: true }).click();
       await luoiChon.waitFor({ state: "hidden" });
 
-      // Ba dòng giỏ, cùng sản phẩm, số lượng 2 mỗi dòng.
+      // BB-296 mục #1 — báo cáo chấm độc lập lần 3: "Xong" KHÔNG còn mua
+      // ngay. Ảnh vừa chọn hiện thành hàng thu nhỏ trong ô "Ảnh", nút chính
+      // đổi thành "Thêm vào giỏ · {tiền}" — bấm nút đó mới thật sự ghi vào
+      // giỏ (xem `cua-hang.tsx`, state `anhDaChonTrongLuoi`).
+      await ownIpExpect(cuaHang.getByText("Ảnh · 3 tấm")).toBeVisible();
       const tongDung = bc.unitPrice1 * 2 * 3;
+      const nutThemVaoGio = cuaHang.getByRole("button", { name: `Thêm vào giỏ · ${formatVND(tongDung)}` });
+      await ownIpExpect(nutThemVaoGio).toBeVisible();
+      await page.screenshot({ path: `${THU_MUC_ANH}/3b-anh-da-chon-cho-them-gio.png` });
+
+      await nutThemVaoGio.click();
+
+      // Dòng xác nhận ngắn + ba dòng giỏ, cùng sản phẩm, số lượng 2 mỗi dòng.
+      //
+      // BB-299 mục 4 — dựng lại đúng bản vẽ `cua-hang-sau-them-*.html`:
+      // dòng xác nhận tách "Đã thêm vào giỏ" (tiêu đề) khỏi mô tả ("3 ảnh
+      // {tên sản phẩm} · {tiền}"); giỏ dài hơn 2 món chỉ hiện 2 dòng + "Xem
+      // cả N món ›" (chờ bấm mới hiện đủ).
+      await ownIpExpect(cuaHang.getByRole("status")).toContainText("Đã thêm vào giỏ");
+      await ownIpExpect(cuaHang.getByRole("status")).toContainText("3 ảnh");
       await ownIpExpect
         .poll(async () => cuaHang.locator("footer li").count(), {
-          message: "Chưa thấy đủ 3 dòng giỏ sau khi chọn ảnh",
+          message: "Chưa thấy 2 dòng giỏ đầu tiên (giỏ >2 món chỉ hiện 2 + Xem cả N món)",
+        })
+        .toBe(2);
+      await cuaHang.getByRole("button", { name: /Xem cả 3 món/ }).click();
+      await ownIpExpect
+        .poll(async () => cuaHang.locator("footer li").count(), {
+          message: "Chưa thấy đủ 3 dòng giỏ sau khi bấm Xem cả",
         })
         .toBe(3);
-      await ownIpExpect(cuaHang.getByText(formatVND(tongDung))).toBeVisible();
+      // BB-299 mục 4 — điện thoại có thêm một pill tóm tắt giỏ ("Giỏ · N món
+      // · tiền") LUÔN NẰM TRONG DOM (chỉ ẩn bằng CSS `sm:hidden`) cạnh dòng
+      // tiêu đề danh sách đầy đủ — cùng một số tiền lặp lại ở hai chỗ tại
+      // khổ máy tính đang thử (pill vẫn trong DOM dù `hidden`), nên
+      // `getByText` không còn duy nhất. Lọc thêm `:visible` để chỉ khớp
+      // phần tử THẬT SỰ hiện ở khổ 1440px.
+      await ownIpExpect(cuaHang.getByText(formatVND(tongDung)).and(page.locator(":visible"))).toBeVisible();
+      // Cấu hình đặt lại cho món tiếp theo — ô Ảnh trở lại "+ Chọn ảnh" trống,
+      // không còn hiện "Ảnh · 3 tấm" của lượt vừa mua.
+      await ownIpExpect(cuaHang.getByText("Ảnh · 3 tấm")).toHaveCount(0);
 
       await page.screenshot({ path: `${THU_MUC_ANH}/4-gio-hang-ba-dong.png` });
 

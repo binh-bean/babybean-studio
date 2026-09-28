@@ -123,12 +123,16 @@ test.describe("BB-258: bìa tràn toàn màn + thanh nổi không che tên mục
       // Rộng bằng khung nhìn, trừ thanh cuộn thật (±2px).
       expect(Math.abs(boxBia.width - (vp.w - thanhCuon))).toBeLessThanOrEqual(2);
 
-      // BB-289 — BB-285 (đã duyệt) đổi bìa máy tính sang CHIA ĐÔI THẬT (cột
-      // ảnh trái/cột chữ phải, xem `bia-bo-anh.tsx`), không còn xếp DỌC như
-      // bản BB-278 (chữ dưới ảnh). Bất kỳ giao nhau nào giữa hai khối vẫn là
-      // lỗi — chỉ đổi TRỤC kiểm: giờ đo KHÔNG GIAO theo trục ngang (tiêu đề ở
-      // BÊN PHẢI khối ảnh), không phải trục dọc.
-      expect(boxTieuDe.x).toBeGreaterThanOrEqual(boxKhoiAnh.x + boxKhoiAnh.width - 1);
+      // BB-289 — BB-285 (đã duyệt) đổi bìa máy tính sang CHIA ĐÔI THẬT (xem
+      // `bia-bo-anh.tsx`), không còn xếp DỌC như bản BB-278 (chữ dưới ảnh).
+      // Bất kỳ giao nhau nào giữa hai khối vẫn là lỗi — chỉ đổi TRỤC kiểm:
+      // giờ đo KHÔNG GIAO theo trục ngang, không phải trục dọc.
+      //
+      // BB-298 (điều hành, sau khi admin xem bản dựng) — ĐẢO NGƯỢC cột: ảnh
+      // nay CỘT PHẢI, tiêu đề CỘT TRÁI (ngược bản dựng đầu của BB-298, vốn
+      // nối tiếp hướng BB-289). Đảo chiều bất đẳng thức: tiêu đề phải đứng
+      // TRƯỚC (bên trái) khối ảnh.
+      expect(boxTieuDe.x + boxTieuDe.width).toBeLessThanOrEqual(boxKhoiAnh.x + 1);
     });
   }
 

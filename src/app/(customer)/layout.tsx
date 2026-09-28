@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Fraunces } from "next/font/google";
 
 /**
  * Khung chung cho mọi màn ba mẹ nhìn thấy.
@@ -7,19 +6,13 @@ import { Fraunces } from "next/font/google";
  * OWNER: DEV-FE. Chủ studio duyệt hướng "cuốn album kỷ niệm" ngày 23/09/2026:
  * nền kem, chữ có chân cho tên bé, ảnh lên trước chữ.
  *
- * Phông Fraunces CHỈ nạp ở đây, không nạp ở gốc: màn quản trị không dùng tới,
- * và mỗi phông thêm là thêm một tệp mà điện thoại của CSKH phải tải.
- * Fraunces có bộ chữ tiếng Việt đầy đủ dấu — đã kiểm trong danh mục phông của
- * next/font trước khi chọn.
+ * BB-305 (28/09/2026) — LUẬT PHÔNG mới của admin: chỉ Playfair Display (logo
+ * BABY BEAN, tiêu đề lớn) + Be Vietnam Pro (mọi nội dung còn lại), không
+ * nghiêng, dùng chung cho cả màn khách lẫn quản trị. Phông Fraunces trước đây
+ * CHỈ nạp ở tệp này riêng cho màn khách đã bị loại hẳn: Playfair Display đã
+ * nạp sẵn ở gốc (`src/app/layout.tsx`), nên không cần nạp gì thêm ở đây —
+ * khách tải nhẹ hơn một tệp phông.
  */
-const fraunces = Fraunces({
-  subsets: ["latin", "vietnamese"],
-  weight: ["300", "400", "500"],
-  style: ["normal", "italic"],
-  display: "swap",
-  variable: "--font-fraunces",
-});
-
 export default function CustomerLayout({ children }: { children: ReactNode }) {
-  return <div className={`${fraunces.variable} giao-dien-khach`}>{children}</div>;
+  return <div className="giao-dien-khach">{children}</div>;
 }

@@ -30,8 +30,8 @@
  * ---------------------------------------------------------------------------
  * BB-212 — cùng ngôn ngữ "cuốn album kỷ niệm"
  * ---------------------------------------------------------------------------
- * Font-display Fraunces, nền kem, nút viên tròn màu mực — đồng bộ với
- * `review-panel.tsx` và `cua-hang.tsx`.
+ * Font-display (Playfair Display từ BB-305, trước là Fraunces), nền kem, nút
+ * viên tròn màu mực — đồng bộ với `review-panel.tsx` và `cua-hang.tsx`.
  *
  * ---------------------------------------------------------------------------
  * BB-248 — tranh minh hoạ thay cho khối trống
@@ -459,7 +459,8 @@ export function MoiMuaLanHai({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs text-muted-foreground">Giá tham khảo</p>
-                <p className="font-display text-xl font-medium">{formatCurrencyVND(tongTienThamKhao)}</p>
+                {/* BB-305 — giá tham khảo: bỏ font-display, thêm tabular-nums. */}
+                <p className="text-xl font-medium tabular-nums">{formatCurrencyVND(tongTienThamKhao)}</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
                   CSKH sẽ gọi xác nhận, chưa tính tiền
                 </p>

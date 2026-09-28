@@ -207,8 +207,36 @@ export function BangSanPhamCuaAnh({
         trong bảng màu (#FBF7F2/#2E2A27/#C4645A/#E8A598/#4F5B45/#7FA99B) và
         "nhìn rất sến". Đổi về nền tối #2E2A27 (mực), chữ kem — đúng tông thẻ
         "Xem trên tường" theo hệ thiết kế, không còn amber/rose ngoài bảng.
+        Đúng cho tấm trượt điện thoại (`tong="toi"`, mặc định) — GIỮ NGUYÊN.
+
+        BB-298 — bản vẽ `xem-lon-may-tinh.html` (admin duyệt 28/09/2026): cột
+        phải máy tính đã đổi sang KÍNH SÁNG từ BB-293 (`tong="sang"`), nhưng
+        thẻ NÀY vẫn hard-code nền mực — lạc tông với cả cột, đúng lỗi report
+        chê "không còn thẻ mực đen" (mục #5, XONG.md). Nhánh `sang` dựng đúng
+        `.tuong` trong bản vẽ: thẻ TRẮNG viền mảnh, tranh minh hoạ 56×56 bo
+        góc bên trái (bản vẽ dùng `tien-do-da-giao` làm ảnh minh hoạ chung,
+        không phải ảnh thật của tấm — dùng lại y vậy, không bịa thêm ảnh sản
+        phẩm chưa có), chữ mực/xám, mũi tên xám nhạt.
       */}
-      {onXemTuong && (
+      {onXemTuong && (sang ? (
+        <button
+          type="button"
+          onClick={onXemTuong}
+          className="flex w-full items-center gap-3 rounded-xl bg-white p-2.5 text-left ring-1 ring-[#e5dcd2] transition hover:bg-[#faf7f3]"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- ảnh minh hoạ tĩnh, không cần next/image tối ưu */}
+          <img
+            src="/hanh-trinh/tien-do-da-giao-320.webp"
+            alt=""
+            className="h-14 w-14 shrink-0 rounded-lg object-cover"
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-[#2E2A27]">Xem trên tường nhà mình</span>
+            <span className="block text-[11px] text-[#6b6057]">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
+          </span>
+          <span className="shrink-0 text-base leading-none text-[#8a8078]">→</span>
+        </button>
+      ) : (
         <button
           type="button"
           onClick={onXemTuong}
@@ -220,7 +248,7 @@ export function BangSanPhamCuaAnh({
           </span>
           <span className="shrink-0 text-base leading-none text-[#FBF7F2]">→</span>
         </button>
-      )}
+      ))}
 
       {/* ---------- 1. TRONG GÓI ---------- */}
       {suatTrongGoi.length > 0 && (
