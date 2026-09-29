@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { AdminSidebar } from "./admin-sidebar";
 import { AdminHeader } from "./admin-header";
-import { demSoCanXuLy, type CanXuLyTongHop } from "@/lib/utils/can-xu-ly";
+import { SU_KIEN_VIEC_DOI, tabsChoVai, tongViecCanXuLy, type TabViecCanXuLy } from "@/lib/utils/viec-can-xu-ly-tabs";
 
 export function AdminLayoutShell({
   children,
@@ -18,54 +18,57 @@ export function AdminLayoutShell({
 }) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  // BB-283, điểm 1 (chỉnh lại sau soát 27/09/2026): huy hiệu số cạnh "Việc
-  // cần xử lý" trong sidebar và khối "Cần xử lý ngay" ở Bảng điều khiển PHẢI
-  // ra CÙNG một số — gọi MỘT LẦN khi layout tải (không phải mỗi lần NavLinks
-  // mount, vì component này bọc cả sidebar máy tính lẫn Sheet điện thoại),
-  // gộp hai nguồn qua `demSoCanXuLy()` (src/lib/utils/can-xu-ly.ts) — công
-  // thức DUY NHẤT, `dashboard.tsx` gọi lại đúng hàm này cho khối của nó. Lỗi
-  // thì `null` — ẩn huy hiệu, không chặn menu.
+  // BB-327 (chủ studio 29/09/2026: "menu hiện 208 mà danh sách không có 208
+  // việc"): huy hiệu = TỔNG số dòng của đúng các tab trang "Việc cần xử lý"
+  // hiện cho vai này, đếm bằng đúng route từng tab tải
+  // (src/lib/utils/viec-can-xu-ly-tabs.ts). Bản cũ (BB-283) cộng theo công
+  // thức khối "Cần xử lý ngay" của Bàn làm việc — gồm cả bộ chưa có ảnh, chưa
+  // có hạn mức, Lark báo đỏ/tím — những loại không có tab nào trong trang, nên
+  // số trên menu không bao giờ khớp danh sách. Đếm lại khi một việc vừa được
+  // xử lý (sự kiện SU_KIEN_VIEC_DOI) và khi quay lại cửa sổ. Lỗi thì ẩn.
   const [canXuLyCount, setCanXuLyCount] = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
 
     async function taiSoCanXuLy() {
-      const layTuMot = (url: string) =>
-        fetch(url, { cache: "no-store" })
-          .then((res) => res.json().catch(() => null).then((json) => ({ ok: res.ok, json })))
-          .catch(() => ({ ok: false, json: null }));
-
-      const [canXuLy, dashboard] = await Promise.all([
-        layTuMot("/api/admin/can-xu-ly"),
-        layTuMot("/api/admin/dashboard"),
-      ]);
-      if (!alive) return;
-
-      // Cả hai cùng hỏng thì ẩn hẳn huy hiệu; hỏng MỘT nguồn thì vẫn cộng
-      // được phần còn lại (đúng hơn là ẩn tất) — `demSoCanXuLy` tự coi phần
-      // thiếu là 0.
-      if (!canXuLy.ok && !dashboard.ok) return;
-
-      const merged: CanXuLyTongHop = {
-        driveChuaChiaSe: canXuLy.ok ? canXuLy.json?.data?.driveChuaChiaSe : undefined,
-        chuaCoAnh: canXuLy.ok ? canXuLy.json?.data?.chuaCoAnh : undefined,
-        chuaCoHanMuc: canXuLy.ok ? canXuLy.json?.data?.chuaCoHanMuc : undefined,
-        dueSoon: dashboard.ok ? dashboard.json?.data?.stats?.dueSoon : undefined,
-        overdue: dashboard.ok ? dashboard.json?.data?.stats?.overdue : undefined,
-        canhBaoLark: canXuLy.ok ? canXuLy.json?.data?.canhBaoLark : undefined,
-      };
-      setCanXuLyCount(demSoCanXuLy(merged));
+      const demSo: Partial<Record<TabViecCanXuLy, number>> = {};
+      let coNguonNaoOk = false;
+      await Promise.all(
+        tabsChoVai(role).map(async (tab) => {
+          try {
+            const res = await fetch(tab.api, { cache: "no-store" });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.data) return;
+            coNguonNaoOk = true;
+            demSo[tab.value] = tab.demSo(json.data);
+          } catch {
+            // Một tab hỏng thì coi là 0 — huy hiệu là phụ.
+          }
+        }),
+      );
+      if (!alive || !coNguonNaoOk) return;
+      setCanXuLyCount(tongViecCanXuLy(demSo));
     }
 
-    taiSoCanXuLy().catch(() => {
-      // Huy hiệu là phụ — hỏng thì ẩn, không chặn menu.
-    });
-
+    let lanCuoi = 0;
+    const demLai = () => {
+      lanCuoi = Date.now();
+      void taiSoCanXuLy();
+    };
+    // Quay lại cửa sổ: tối đa một lượt mỗi phút, không dội sáu route mỗi lần bấm qua lại.
+    const khiQuayLai = () => {
+      if (Date.now() - lanCuoi > 60_000) demLai();
+    };
+    demLai();
+    window.addEventListener(SU_KIEN_VIEC_DOI, demLai);
+    window.addEventListener("focus", khiQuayLai);
     return () => {
       alive = false;
+      window.removeEventListener(SU_KIEN_VIEC_DOI, demLai);
+      window.removeEventListener("focus", khiQuayLai);
     };
-  }, []);
+  }, [role]);
 
   return (
     // BB-294 (#19) — `giao-dien-quan-tri` khoanh vùng CSS cho nút chính màu

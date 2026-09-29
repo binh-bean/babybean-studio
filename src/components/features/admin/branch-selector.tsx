@@ -35,12 +35,18 @@ export function BranchSelector() {
         const currentParam = params.get("branchId");
         const stored = localStorage.getItem("bb_admin_selected_branch");
 
+        // BB-327: mặc định "Tất cả chi nhánh" (giá trị rỗng). Bản cũ tự chọn
+        // chi nhánh ĐẦU danh sách trên ô chọn trong khi Bàn làm việc vẫn tải
+        // số liệu của MỌI chi nhánh — ô chọn nói một đằng, số liệu một nẻo.
+        // Chi nhánh đã nhớ từ lần trước thì chọn lại VÀ báo cho trang tải
+        // đúng chi nhánh đó (sự kiện branchChange), không chỉ đổi chữ trên ô.
         if (currentParam && list.some((b) => b.id === currentParam)) {
           setSelected(currentParam);
         } else if (stored && list.some((b) => b.id === stored)) {
           setSelected(stored);
-        } else if (list.length > 0) {
-          setSelected(list[0]?.id ?? "");
+          window.dispatchEvent(new CustomEvent("branchChange", { detail: stored }));
+        } else {
+          setSelected("");
         }
       } catch (err) {
         console.error("Lỗi tải chi nhánh:", err);
@@ -88,6 +94,7 @@ export function BranchSelector() {
         className="h-9 min-h-[36px] w-[180px] text-sm"
         aria-label="Chọn chi nhánh"
       >
+        <option value="">Tất cả chi nhánh</option>
         {branches.map((branch) => (
           <option key={branch.id} value={branch.id}>
             {branch.name}

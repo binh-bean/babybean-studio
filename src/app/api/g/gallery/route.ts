@@ -1,4 +1,4 @@
-import { isSubmittedOrLater, isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { isSubmittedOrLater, isGalleryLocked, maLarkConHieuLuc, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
         branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
         cover_photo_id, cover_headline, cover_layout, download_enabled, notes_enabled, invite_enabled,
-        lark_trang_thai, lark_trang_thai_tu
+        lark_trang_thai, lark_trang_thai_tu, reopened_at
       `)
       .eq("id", session.galleryId)
       .single();
@@ -429,16 +429,19 @@ export async function GET(request: Request) {
       0,
     );
 
+    // BB-327: CSKH mở lại SAU lần cuối Lark đổi trạng thái thì mã Lark cũ
+    // không còn khoá/đè nhãn — xem `maLarkConHieuLuc`.
+    const larkHieuLuc = maLarkConHieuLuc(gallery);
     const tienDo = nhanHienThi(
       gallery.status,
-      gallery.lark_trang_thai,
+      larkHieuLuc,
       (s) => GALLERY_STATUS_LABEL[s] ?? s,
     );
     // BB-285 — luật 60 ngày (docs/21 GĐ1): Lark còn "Đã gửi file gốc" quá 60
     // ngày thì coi là đóng theo quy định — khoá chọn, câu nhẹ nhàng thay vì
     // trang lỗi.
     const quaHan60Ngay = qua60NgayFileGoc(
-      gallery.lark_trang_thai,
+      larkHieuLuc,
       gallery.lark_trang_thai_tu ? new Date(gallery.lark_trang_thai_tu) : null,
       new Date(),
     );
@@ -446,7 +449,7 @@ export async function GET(request: Request) {
     // Lark đã sang "Đã chọn hình" trở lên, hoặc quá hạn 60 ngày, thì khoá dù
     // app còn ghi ready/in_review/submitted. Không trả mã Lark thô cho khách
     // (xem chú thích cũ dưới đây) — chỉ trả boolean đã tính sẵn.
-    const khoaChonTheoLark = isGalleryLocked(gallery.status, gallery.lark_trang_thai) || quaHan60Ngay;
+    const khoaChonTheoLark = isGalleryLocked(gallery.status, larkHieuLuc) || quaHan60Ngay;
 
     // BB-312 — trạng thái "xin mở lại" của CHÍNH bộ ảnh này, để màn khách nói
     // rõ: đang chờ (không cho gửi trùng), đã mở, hay bị từ chối kèm lý do.

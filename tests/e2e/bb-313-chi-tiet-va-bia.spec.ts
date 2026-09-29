@@ -267,7 +267,10 @@ test.describe("BB-313", () => {
     await page.getByText("Trạng thái").first().waitFor({ state: "attached", timeout: 20_000 });
 
     const h1 = page.locator("h1").first();
-    await expect(h1).toHaveText("Bé Bin");
+    // BB-325 ("tên hiển thị" 29/09/2026) THAY luật cũ: tiêu đề quản trị là TÊN MẸ,
+    // tên bé "Bé Bin" xuống dòng thông tin ngay dưới.
+    await expect(h1).toHaveText(`${NHAN} Khách A`);
+    await expect(page.getByText(/Bé Bin/).first()).toBeVisible();
     // Không lặp "Bé Bé" (BB-308 mục #8, vẫn phải đúng sau khi đổi sang tinhTieuDeBoAnhQuanTri).
     await expect(h1).not.toHaveText(/Bé Bé/);
     const fontHo = await h1.evaluate((el) => getComputedStyle(el).fontFamily);

@@ -15,6 +15,13 @@ interface AnhLuoi {
   height: number | null;
 }
 
+/** Tỉ lệ khung của một ô lưới chọn bìa: đúng width/height thật, thiếu thì 2:3. */
+export function tiLeAnh(anh: { width: number | null; height: number | null }): string {
+  const w = anh.width ?? 0;
+  const h = anh.height ?? 0;
+  return w > 0 && h > 0 ? `${w} / ${h}` : "2 / 3";
+}
+
 export function BiaBoAnhEditor({
   galleryId,
   detail,
@@ -216,19 +223,27 @@ export function BiaBoAnhEditor({
             {/* BB-290 (#38): lưới LUÔN hiện, kể cả đang tải — trước đây mục
                 này trống trơn trong lúc `taiLuoi` chạy, trông như bộ ảnh
                 không có tấm nào. Khung xương giữ đúng chỗ cho lưới thật. */}
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {/* BB-326 mục 2 — lưới theo TỈ LỆ THẬT của từng tấm (width/height
+                của Drive), xếp kiểu masonry bằng cột CSS. Trước đây mọi ô ép
+                khung dọc 2:3 nên ảnh ngang bị cắt mất hai bên, chọn bìa như
+                chọn mò. Thiếu kích thước thì lùi về 2:3. */}
+            <div className="columns-3 gap-2 sm:columns-4" data-testid="luoi-chon-bia">
               {dangTaiLuoi && luoi.length === 0
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <div
                       key={i}
-                      className="aspect-[2/3] animate-pulse rounded-md bg-[var(--bb-surface-2)]"
+                      className="mb-2 aspect-[2/3] animate-pulse break-inside-avoid rounded-md bg-[var(--bb-surface-2)]"
                     />
                   ))
                 : luoi.map((anh) => (
                     <button
                       key={anh.id}
+                      type="button"
+                      aria-pressed={anhBiaNhap === anh.id}
+                      aria-label={`Chọn ${anh.fileName} làm bìa`}
                       onClick={() => setAnhBiaNhap(anh.id)}
-                      className={`relative aspect-[2/3] overflow-hidden rounded-md border-2 ${
+                      style={{ aspectRatio: tiLeAnh(anh) }}
+                      className={`relative mb-2 block w-full break-inside-avoid overflow-hidden rounded-md border-2 ${
                         anhBiaNhap === anh.id ? "border-[var(--bb-accent)]" : "border-transparent"
                       }`}
                     >
@@ -236,15 +251,16 @@ export function BiaBoAnhEditor({
                         src={`/api/img/${anh.id}?w=400`}
                         className="h-full w-full object-cover"
                         alt=""
+                        loading="lazy"
                       />
                     </button>
                   ))}
-              {!dangTaiLuoi && luoi.length === 0 && (
-                <p className="col-span-3 sm:col-span-4 py-6 text-center text-xs text-[var(--bb-fg-muted)]">
-                  Bộ ảnh chưa có ảnh nào để chọn làm bìa.
-                </p>
-              )}
             </div>
+            {!dangTaiLuoi && luoi.length === 0 && (
+              <p className="py-6 text-center text-xs text-[var(--bb-fg-muted)]">
+                Bộ ảnh chưa có ảnh nào để chọn làm bìa.
+              </p>
+            )}
             {conTiep && (
               <button
                 onClick={() => void taiLuoi(false)}

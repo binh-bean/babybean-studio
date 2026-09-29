@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { maLarkConHieuLuc } from "@/lib/gallery-status";
 import { dangCheDoChonThem } from "@/lib/gallery/dot-chon";
 import { layTrangThaiDotChoKhach } from "@/lib/gallery/dot-chon-server";
 
@@ -26,7 +27,7 @@ export async function GET(): Promise<Response> {
 
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, status, extra_photo_price, lark_trang_thai")
+      .select("id, status, extra_photo_price, lark_trang_thai, lark_trang_thai_tu, reopened_at")
       .eq("id", session.galleryId)
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
@@ -35,7 +36,7 @@ export async function GET(): Promise<Response> {
       galleryId: session.galleryId,
       selectionId: session.selectionId,
       // Trạng thái app HOẶC Lark đã chốt (BB-285): cùng hàm quyết định với luật khoá.
-      cheDoChonThem: dangCheDoChonThem(gallery.status, gallery.lark_trang_thai),
+      cheDoChonThem: dangCheDoChonThem(gallery.status, maLarkConHieuLuc(gallery)),
       giaMoiAnh: Number(gallery.extra_photo_price ?? 0),
     });
 

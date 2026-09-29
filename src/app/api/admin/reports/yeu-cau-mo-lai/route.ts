@@ -16,6 +16,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { layDanhSachChoXuLyMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
+import { layCacDot } from "@/lib/gallery/dot-chon-server";
 
 export const runtime = "nodejs";
 
@@ -48,9 +49,18 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const admin = createAdminClient();
-    const items = await layDanhSachChoXuLyMoLai(admin, branchIds);
+    const dsCho = await layDanhSachChoXuLyMoLai(admin, branchIds);
+    // BB-327 — nút "Mở lại" ngay trên danh sách cần biết các đợt mua thêm của
+    // từng bộ (cùng dữ liệu route /reopen dùng để quyết định đợt nào mở được).
+    // Danh sách này nhỏ (chỉ yêu cầu CHƯA xử lý), mỗi bộ một lượt đọc nhẹ.
+    const items = await Promise.all(
+      dsCho.map(async (it) => ({
+        ...it,
+        cacDot: (await layCacDot(admin, it.galleryId)).map((d) => ({ soDot: d.soDot, trangThai: d.trangThai })),
+      })),
+    );
 
-    return ok({ items });
+    return ok({ items, canReopen: staff.permissions.includes("galleries:reopen") });
   } catch (err) {
     return failUnexpected(err, requestId);
   }

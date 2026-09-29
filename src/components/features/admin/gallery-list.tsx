@@ -11,8 +11,15 @@ import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
 import { getContractCodesForGalleries } from "@/app/(admin)/admin/galleries/actions";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
-import { formatNgayVN, formatSdt, nhanTienDoChon, tinhTieuDeBoAnhQuanTri, formatSo } from "@/lib/utils/dinh-dang";
-import { loiNhacKhach } from "@/lib/utils/bang-dieu-khien";
+import {
+  formatNgayVN,
+  formatSdt,
+  nhanTienDoChon,
+  tinhTieuDeBoAnhQuanTri,
+  dongThongTinBoAnhQuanTri,
+  formatSo,
+} from "@/lib/utils/dinh-dang";
+import { NutNhacKhach } from "./nut-nhac-khach";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
   Calendar,
@@ -27,7 +34,6 @@ import {
   ChevronDown,
   Eye,
   Copy,
-  Send,
   ArrowRight,
 } from "lucide-react";
 
@@ -52,34 +58,10 @@ function LamNhanh({
   /** BB-311: nút "Sao chép link" giờ gọi API để giải mã link app — có độ trễ mạng. */
   dangChepLink?: boolean;
 }) {
-  const [daChep, setDaChep] = React.useState(false);
-
-  async function chepLoiNhac() {
-    try {
-      await navigator.clipboard.writeText(
-        loiNhacKhach({ customerName: item.customerName, babyName: item.babyName || item.babyFullName, title: item.title }),
-      );
-      setDaChep(true);
-      window.setTimeout(() => setDaChep(false), 2000);
-    } catch {
-      // Trình duyệt chặn Clipboard API (http, quyền) — không có gì để làm
-      // thêm ở một nút icon nhỏ trong bảng; nhân viên mở chi tiết bộ ảnh.
-    }
-  }
-
+  // BB-327: "Nhắc khách" gửi THẬT (chuông + thông báo đẩy) — nút cũ chỉ chép
+  // một câu vào clipboard nên khách không nhận được gì.
   if (item.status === "in_review") {
-    return (
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8"
-        onClick={() => void chepLoiNhac()}
-        title={daChep ? "Đã chép" : "Chép lời nhắc khách chọn ảnh"}
-        aria-label="Chép lời nhắc"
-      >
-        <Send className="h-4 w-4" />
-      </Button>
-    );
+    return <NutNhacKhach galleryId={item.id} gonNho />;
   }
 
   if (item.status === "submitted") {
@@ -180,8 +162,10 @@ export interface GalleryItem {
    * `null` = bộ chưa có ảnh nào (chưa đồng bộ) — ô bìa vẽ màu trơn.
    */
   coverPhotoId?: string | null;
-  /** BB-303 — tên gói chụp ("Newborn", "Thôi nôi"…), dùng cho tiêu đề "Loại buổi · Bé …". `null` = chưa gắn gói. */
+  /** BB-303 — tên gói chụp ("Newborn", "Thôi nôi"…). `null` = chưa gắn gói. */
   packageName?: string | null;
+  /** BB-325 — mã hóa đơn (lark_contract_code). */
+  maHoaDon?: string | null;
 }
 
 /**
@@ -209,6 +193,19 @@ function tieuDeBoAnh(item: GalleryItem): string {
     duPhong: item.title,
   });
   return tieuDe;
+}
+
+/** BB-325 — dòng thông tin dưới tiêu đề: tên bé · SĐT · mã hóa đơn · gói. */
+function thongTinBoAnh(item: GalleryItem): string {
+  const nickname = item.babyName && item.babyName !== item.babyFullName ? item.babyName : null;
+  return dongThongTinBoAnhQuanTri({
+    tieuDe: tieuDeBoAnh(item),
+    babyNickname: nickname,
+    babyFullName: item.babyFullName ?? item.babyName,
+    customerPhone: item.customerPhone,
+    maHoaDon: item.maHoaDon,
+    packageName: item.packageName,
+  });
 }
 
 export interface GalleryCounts {
@@ -440,10 +437,17 @@ function KanbanColumn({
                   <Card
                     className="p-3 bg-[var(--bb-surface)] border border-[var(--bb-border)] rounded-[var(--bb-radius-sm)] shadow-xs group-hover:border-[var(--bb-primary)] group-hover:bg-[var(--bb-surface-2)]/30 transition-all space-y-2 cursor-pointer h-full"
                   >
-                    <div className="font-semibold text-sm text-[var(--bb-fg)] group-hover:text-[var(--bb-primary)] transition-colors">
-                      {item.title}
+                    {/* BB-326 — thẻ Kanban mang ảnh bìa nhỏ như hàng của bảng. */}
+                    <div className="flex items-start gap-2.5">
+                      <AnhBiaNho coverPhotoId={item.coverPhotoId} title={tieuDeBoAnh(item)} />
+                      <div className="min-w-0">
+                        <div className="font-semibold text-sm text-[var(--bb-fg)] group-hover:text-[var(--bb-primary)] transition-colors">
+                          {/* BB-325 — tiêu đề là tên mẹ, như bảng. */}
+                          {tieuDeBoAnh(item)}
+                        </div>
+                        {tenBeCot && <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>}
+                      </div>
                     </div>
-                    {tenBeCot && <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>}
                     <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
                       <div className="flex items-center justify-between">
                         <span>{item.customerName}</span>
@@ -816,7 +820,7 @@ export function GalleryList() {
                               {tieuDeBoAnh(item)}
                             </Link>
                             <div className="truncate text-xs text-[var(--bb-fg-muted)]">
-                              {item.customerName} · <span className="tabular-nums">{formatSdt(item.customerPhone)}</span>
+                              <span className="tabular-nums">{thongTinBoAnh(item)}</span>
                             </div>
                           </div>
                         </div>
@@ -944,7 +948,7 @@ export function GalleryList() {
                         {tieuDeBoAnh(item)}
                       </Link>
                       <p className="text-xs text-[var(--bb-fg-muted)]">
-                        {item.customerName} · <span className="tabular-nums">{formatSdt(item.customerPhone)}</span>
+                        <span className="tabular-nums">{thongTinBoAnh(item)}</span>
                       </p>
                       <span className="inline-flex items-center gap-1.5">
                         <ChamCanhBao mau={item.warningColor} />

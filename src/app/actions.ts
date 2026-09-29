@@ -2,17 +2,23 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { duongNhanTinTuCaiDat } from "@/lib/lien-lac/duong-nhan-tin";
+import { laChiNhanhCongKhai } from "@/lib/utils/chi-nhanh-cong-khai";
 
 export async function getActiveBranches() {
   try {
     const supabase = createAdminClient();
+    // BB-328: loại chi nhánh do phép thử dựng ("Fixture …") ngay trong câu
+    // truy vấn, rồi lọc lại bằng `laChiNhanhCongKhai` (mã FX…/FIXTURE-…).
     const { data: branches } = await supabase
       .from("branches")
-      .select("name, address, hotline")
+      .select("name, address, hotline, code")
       .eq("is_active", true)
+      .not("name", "ilike", "fixture%")
       .order("created_at", { ascending: true });
 
-    return branches || [];
+    return (branches || [])
+      .filter(laChiNhanhCongKhai)
+      .map(({ name, address, hotline }) => ({ name, address, hotline }));
   } catch {
     return [];
   }

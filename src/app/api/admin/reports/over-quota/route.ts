@@ -34,7 +34,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { HINH_THUC_GIAM_GIA, tienConPhaiThuSauGhiCo } from "@/lib/gallery/tien-phat-sinh";
+import { HINH_THUC_GIAM_GIA, tienVuotHanMucConPhaiThu } from "@/lib/gallery/tien-phat-sinh";
 
 export const runtime = "nodejs";
 
@@ -138,6 +138,20 @@ export async function GET(request: Request): Promise<Response> {
       }
     }
 
+    // BB-327: số khách nhìn thấy LÚC CHỐT (cùng số sổ thu tiền + màn chi tiết dùng).
+    const lucChotTheoBo = new Map<string, number>();
+    if (rowsTyped.length > 0) {
+      const { data: selRows, error: selErr } = await admin
+        .from("selections")
+        .select("gallery_id, snapshot_extra_amount")
+        .eq("is_primary", true)
+        .in("gallery_id", rowsTyped.map((r) => r.gallery_id));
+      if (selErr) throw selErr;
+      for (const s of selRows ?? []) {
+        if (s.snapshot_extra_amount !== null) lucChotTheoBo.set(String(s.gallery_id), Number(s.snapshot_extra_amount));
+      }
+    }
+
     const items = rowsTyped.map((r) => ({
       galleryId: r.gallery_id,
       customerName: tenTheoBo.get(r.gallery_id)?.customerName ?? null,
@@ -154,10 +168,11 @@ export async function GET(request: Request): Promise<Response> {
       unbilledCount: r.unbilled_count,
       extraPhotoPrice: Number(r.extra_photo_price ?? 0),
       // Số theo ảnh (view) trừ mọi khoản đã ghi có; giữ hai phần để màn hình nói rõ đã trừ gì.
-      unbilledAmount: tienConPhaiThuSauGhiCo(
-        Number(r.unbilled_amount ?? 0),
-        (daThuTheoBo.get(r.gallery_id)?.daThu ?? 0) + (daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0),
-      ),
+      unbilledAmount: tienVuotHanMucConPhaiThu({
+        tienTheoAnh: Number(r.unbilled_amount ?? 0),
+        tienLucChot: lucChotTheoBo.get(r.gallery_id),
+        daGhiCo: (daThuTheoBo.get(r.gallery_id)?.daThu ?? 0) + (daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0),
+      }),
       daThu: daThuTheoBo.get(r.gallery_id)?.daThu ?? 0,
       giamGia: daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0,
     }))

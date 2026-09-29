@@ -379,7 +379,7 @@ test.describe("BB-308: màn quản trị — menu ⋯, bộ chọn chi nhánh, a
     await expect(page.getByRole("heading", { name: "Không có quyền" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Huỷ" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Lưu thay đổi|Đang lưu/ })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Về bảng điều khiển" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Về Bàn làm việc" })).toBeVisible();
 
     await page.screenshot({ path: `${THU_MUC_ANH}/5-mt-cai-dat-khong-co-quyen.png`, fullPage: true });
 

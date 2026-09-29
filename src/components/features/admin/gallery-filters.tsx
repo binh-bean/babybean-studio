@@ -351,10 +351,10 @@ export function GalleryFilters({
               size="sm"
               onClick={() => onChange({ viewMode: "kanban" })}
               className="h-8 px-3 text-xs"
-              aria-label="Xem dạng Kanban"
+              aria-label="Xem theo trạng thái"
             >
               <Kanban className="h-3.5 w-3.5 sm:mr-1" />
-              <span className="hidden sm:inline">Bảng việc</span>
+              <span className="hidden sm:inline">Theo trạng thái</span>
             </Button>
           </div>
 

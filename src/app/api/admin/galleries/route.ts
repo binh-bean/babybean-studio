@@ -23,6 +23,9 @@ import { CreateGallerySchema, GetGalleriesQuerySchema } from "./schema";
 import { nhanHienThi, mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-hau-ky";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
+import { docDongHauKy, LoiTraLark, duoiSoDienThoai } from "@/lib/lark/tra-hau-ky";
+import { boAnhTheoDongLark, boAnhTheoThuMuc } from "@/lib/gallery/bo-anh-da-co";
+import { timHoacTaoGoiLark } from "@/lib/gallery/goi-chup-lark";
 
 export const runtime = "nodejs";
 
@@ -72,6 +75,71 @@ export async function POST(request: Request): Promise<Response> {
     requirePermission(staff, "galleries:write");
     requireBranch(staff, input.branchId);
 
+    // 3b. BB-325 — đọc LẠI dòng Hậu Kỳ từ Lark (không tin dữ liệu trình duyệt).
+    // Mọi thông tin khách/bé/gói/ngày chụp/mã hóa đơn lấy từ đây.
+    let dong;
+    try {
+      dong = await docDongHauKy(input.larkHaukyRecordId);
+    } catch (err) {
+      if (err instanceof LoiTraLark) return fail("INTERNAL", err.message);
+      throw err;
+    }
+    if (!dong) {
+      return fail("NOT_FOUND", "Không đọc được dòng Hậu Kỳ này bên Lark — tra lại mã hóa đơn và số điện thoại.");
+    }
+    const duoiSdt = duoiSoDienThoai(dong.soDienThoai);
+    if (!dong.tenMe || !duoiSdt || !dong.maHoaDon) {
+      return fail(
+        "INVALID_INPUT",
+        "Dòng Hậu Kỳ bên Lark còn thiếu tên khách, số điện thoại hoặc mã hóa đơn. Bổ sung bên Lark rồi tra lại.",
+      );
+    }
+    if (!dong.goiChup) {
+      return fail("INVALID_INPUT", "Dòng Hậu Kỳ bên Lark chưa có Gói chụp. Bổ sung bên Lark rồi tra lại.");
+    }
+
+    const admin = createAdminClient();
+    const daCoTheoLark = await boAnhTheoDongLark(admin, dong.recordId);
+    if (daCoTheoLark) {
+      return fail("CONFLICT", `Dòng Hậu Kỳ ${dong.maHoaDon} đã có bộ ảnh "${daCoTheoLark.tieuDe}".`, {
+        boAnhDaCo: daCoTheoLark,
+      });
+    }
+    const daCoTheoThuMuc = await boAnhTheoThuMuc(admin, driveFolderId);
+    if (daCoTheoThuMuc) {
+      return fail("CONFLICT", `Thư mục Google Drive này đã được gắn với bộ ảnh "${daCoTheoThuMuc.tieuDe}".`, {
+        boAnhDaCo: daCoTheoThuMuc,
+      });
+    }
+
+    // Khách: một SĐT một khách trong một chi nhánh (uq_customers_phone_branch).
+    // Trước BB-325 thuật sĩ luôn gửi `newCustomer` — khách cũ quay lại chụp là
+    // đụng ràng buộc duy nhất và nhận nhầm câu "thư mục Drive đã được gắn".
+    const { data: khachCu } = await admin
+      .from("customers")
+      .select("id")
+      .eq("branch_id", input.branchId)
+      .like("phone_normalized", `%${duoiSdt}`)
+      .limit(1)
+      .maybeSingle();
+    const customerId = (khachCu as { id: string } | null)?.id ?? null;
+
+    let babyId: string | null = null;
+    if (customerId && dong.tenBe) {
+      const { data: beCu } = await admin
+        .from("babies")
+        .select("id")
+        .eq("customer_id", customerId)
+        .eq("full_name", dong.tenBe)
+        .limit(1)
+        .maybeSingle();
+      babyId = (beCu as { id: string } | null)?.id ?? null;
+    }
+
+    // Gói chính = mục ĐẦU của ô "Gói chụp" (các mục sau là dịch vụ thêm: "Thêm set chụp"…).
+    const goiChinh = dong.goiChup.split(",")[0]?.trim() || dong.goiChup;
+    const packageId = await timHoacTaoGoiLark(admin, goiChinh, dong.tongFileEdit);
+
     // 4. Mutate & Log (in a single database transaction) -------------------
     // Generate 22-character Base62 token. Only store sha256 hash in database.
     const token = generateBase62Token(22);
@@ -85,14 +153,16 @@ export async function POST(request: Request): Promise<Response> {
 
     const { data: result, error: rpcError } = await supabase.rpc("create_gallery_bundle", {
       p_branch_id: input.branchId,
-      p_customer_id: input.customerId || null,
-      p_new_customer: input.newCustomer || null,
-      p_baby_id: input.babyId || null,
-      p_new_baby: input.newBaby || null,
-      p_package_id: input.packageId,
+      p_customer_id: customerId,
+      p_new_customer: customerId ? null : { fullName: dong.tenMe, phone: dong.soDienThoai },
+      p_baby_id: babyId,
+      p_new_baby: !babyId && dong.tenBe ? { fullName: dong.tenBe } : null,
+      p_package_id: packageId,
       p_photographer_id: input.photographerId || null,
-      p_shoot_date: input.shootDate || null,
-      p_title: input.title,
+      p_shoot_date: dong.ngayChup,
+      // Tên thô của bộ = mã hóa đơn (chỉ là dự phòng khi thiếu tên người, xem
+      // tinhTieuDeBoAnhQuanTri) — cùng quy ước với bộ đồng bộ từ Lark.
+      p_title: dong.maHoaDon,
       p_drive_folder_id: driveFolderId,
       p_drive_folder_url: input.driveUrl,
       p_drive_folder_name: null,
@@ -114,11 +184,16 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     if (rpcError) {
-      // Handle unique violation (e.g. drive folder already linked to active gallery)
+      // Unique violation: thư mục Drive (đã tra ở trên, đây là ca hai người bấm
+      // cùng lúc) hoặc SĐT khách trùng trong chi nhánh.
       if (rpcError.code === "23505") {
+        const trung = await boAnhTheoThuMuc(admin, driveFolderId);
         return fail(
           "CONFLICT",
-          "Thư mục Google Drive này đã được gắn với một bộ ảnh khác đang hoạt động",
+          trung
+            ? `Thư mục Google Drive này đã được gắn với bộ ảnh "${trung.tieuDe}".`
+            : "Dữ liệu bị trùng (khách hàng hoặc thư mục Drive) — tải lại trang rồi thử lại.",
+          trung ? { boAnhDaCo: trung } : undefined,
         );
       }
       if (rpcError.message.includes("CUSTOMER_NOT_FOUND")) {
@@ -131,6 +206,25 @@ export async function POST(request: Request): Promise<Response> {
         return fail("INVALID_INPUT", "maxSelection không được nhỏ hơn số lượng ảnh miễn phí");
       }
       return failUnexpected(rpcError, requestId);
+    }
+
+    // BB-325 — neo bộ vào dòng Hậu Kỳ: Link app của bộ này ghi về ĐÚNG dòng đó
+    // (yêu cầu "đi về đâu"). `lark_contract_codes[1]` phải bằng
+    // `lark_contract_code` (chk_contract_code_first, 0028).
+    const galleryIdMoi = (result as { gallery_id: string }).gallery_id;
+    {
+      const { error: loiNeo } = await admin
+        .from("galleries")
+        .update({
+          lark_hauky_record_id: dong.recordId,
+          lark_contract_code: dong.maHoaDon,
+          lark_contract_codes: [dong.maHoaDon],
+        })
+        .eq("id", galleryIdMoi);
+      if (loiNeo) {
+        console.error(JSON.stringify({ evt: "gallery_create_lark_link_failed", requestId, galleryId: galleryIdMoi, loi: loiNeo.message }));
+        return fail("INTERNAL", "Đã tạo bộ ảnh nhưng chưa gắn được dòng Lark — mở bộ ảnh và gắn lại.", { galleryId: galleryIdMoi });
+      }
     }
 
     // BB-183: Cập nhật hạn sử dụng của link vừa tạo theo cấu hình (mặc định 60 ngày)
@@ -172,8 +266,9 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json(
       {
         data: {
-          galleryId: (result as { gallery_id: string }).gallery_id,
+          galleryId: galleryIdMoi,
           shareUrl,
+          lark: { recordId: dong.recordId, maHoaDon: dong.maHoaDon, linkLark: dong.linkLark },
         },
       },
       {
@@ -302,18 +397,20 @@ export async function GET(request: Request): Promise<Response> {
     const idsTrangNay = rawItems.map((raw) => String((raw as Record<string, unknown>).id));
     const coverMap = new Map<string, string | null>();
     const packageNameMap = new Map<string, string | null>();
+    const maHoaDonMap = new Map<string, string | null>();
     const boCoLink = new Set<string>();
     let traLinkDuoc = true;
     if (idsTrangNay.length > 0) {
       const { data: biaRows, error: loiBia } = await admin
         .from("galleries")
-        .select("id, cover_photo_id, package_id")
+        .select("id, cover_photo_id, package_id, lark_contract_code")
         .in("id", idsTrangNay);
       if (loiBia) {
         console.error(JSON.stringify({ evt: "galleries_list_cover_lookup_failed", requestId, loi: loiBia.message }));
       } else {
         for (const r of biaRows ?? []) {
           coverMap.set(String(r.id), (r.cover_photo_id as string | null) ?? null);
+          maHoaDonMap.set(String(r.id), (r.lark_contract_code as string | null) ?? null);
           packageNameMap.set(String(r.id), (r.package_id as string | null) ?? null); // tạm giữ package_id, đổi thành tên bên dưới
         }
         const packageIds = [...new Set([...packageNameMap.values()].filter((v): v is string => !!v))];
@@ -370,6 +467,8 @@ export async function GET(request: Request): Promise<Response> {
         // ở danh sách/chi tiết bộ ảnh (bo-anh-danh-sach.png). `null` khi bộ
         // ảnh không gắn gói (hợp đồng cũ trước khi có packages, hoặc lỗi tra).
         packageName: packageNameMap.get(String(item.id)) ?? null,
+        // BB-325 — mã hóa đơn cho dòng thông tin "tên bé · SĐT · mã hóa đơn · gói".
+        maHoaDon: maHoaDonMap.get(String(item.id)) ?? null,
         // BB-320 (Link app): true khi bộ có link chưa thu hồi (hoặc không tra được — xem trên).
         coLinkApp: traLinkDuoc ? boCoLink.has(String(item.id)) : true,
       };

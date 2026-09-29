@@ -169,6 +169,8 @@ export interface DongChoXuLyMoLai {
   requestedAt: string;
   lyDo: string | null;
   lanThu: number;
+  /** BB-327 — đợt khách nói muốn đổi (null nếu không nói), để nút "Mở lại" ngay trên danh sách chọn sẵn đúng đợt. */
+  dotXin: number | null;
 }
 
 /**
@@ -283,6 +285,7 @@ export async function layDanhSachChoXuLyMoLai(
         requestedAt: gui.created_at,
         lyDo: layChuoi(gui.metadata, "lyDo"),
         lanThu: lanTheoBo.get(id) ?? 1,
+        dotXin: layDot(gui.metadata),
       };
     })
     .filter((v): v is DongChoXuLyMoLai => v !== null)

@@ -6,6 +6,8 @@ import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-lin
 import { driveFetch, DriveAccessDeniedError } from "@/lib/drive/client";
 import { listImageFiles } from "@/lib/drive/list-files";
 import { PreviewGallerySchema } from "./schema";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { boAnhTheoThuMuc } from "@/lib/gallery/bo-anh-da-co";
 
 export const runtime = "nodejs";
 
@@ -42,6 +44,20 @@ export async function POST(request: Request): Promise<Response> {
         return fail("INVALID_INPUT", err.message);
       }
       return fail("INVALID_INPUT", "Link Google Drive không hợp lệ");
+    }
+
+    // BB-325 — thư mục đã gắn với một bộ ảnh (đồng bộ từ Lark hoặc tạo tay):
+    // nói rõ BỘ NÀO và cho mở bộ đó, thay vì để tới bước cuối mới chặn bằng một
+    // câu không giải thích. Tra trước khi gọi Drive — không tốn hạn mức Drive.
+    const daCo = await boAnhTheoThuMuc(createAdminClient(), folderId);
+    if (daCo) {
+      return fail(
+        "CONFLICT",
+        daCo.tuLark
+          ? `Thư mục này đã có bộ ảnh "${daCo.tieuDe}" (đồng bộ từ Lark). Mở bộ đó để làm tiếp, không cần tạo mới.`
+          : `Thư mục này đã được gắn với bộ ảnh "${daCo.tieuDe}".`,
+        { boAnhDaCo: daCo },
+      );
     }
 
     const ctx = { requestId, folderId };

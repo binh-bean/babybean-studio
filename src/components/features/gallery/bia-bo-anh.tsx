@@ -282,7 +282,12 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
       alt=""
       fetchPriority="high"
       decoding="async"
-      className="h-full w-full object-cover object-[50%_30%] lg:object-center motion-safe:animate-[bia-hien_1.2s_ease-out]"
+      // BB-326 mục 2 — `lg:` hỏi VIEWPORT: trong trình thiết kế bìa quản trị
+      // (màn máy tính ≥1024px) khung ĐIỆN THOẠI 390px vẫn ăn `object-center`,
+      // nên ảnh bị cắt khác hẳn điện thoại thật của khách (`50% 30%`). Mọi bố
+      // cục đều bọc `@container`, nên hỏi bề rộng KHUNG (`@[64rem]:`) — màn
+      // khách y nguyên (khung = viewport), khung xem trước thì khớp khách.
+      className="h-full w-full object-cover object-[50%_30%] @[64rem]:object-center motion-safe:animate-[bia-hien_1.2s_ease-out]"
     />
   ) : placeholderChuaCoAnh ? (
     <div className="flex h-full w-full items-center justify-center bg-[#e7d3c6] px-6 text-center text-sm text-[#6b5d4f]">

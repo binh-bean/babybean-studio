@@ -7,36 +7,21 @@
 
 import { z } from "zod";
 
+/**
+ * BB-325 — tạo bộ ảnh PHẢI neo vào một dòng Hậu Kỳ bên Lark
+ * (`larkHaukyRecordId`, tra bằng /api/admin/galleries/tra-lark). Tên mẹ, SĐT,
+ * tên bé, gói chụp, ngày chụp, mã hóa đơn: MÁY CHỦ tự đọc lại từ Lark, không
+ * nhận từ trình duyệt — hết đường gõ tay thông tin bịa. Trình duyệt chỉ gửi
+ * chi nhánh, thợ chụp, link Drive và luật chọn.
+ */
 export const CreateGallerySchema = z
   .object({
     branchId: z.string().uuid("branchId phải là UUID hợp lệ"),
-    customerId: z.string().uuid("customerId phải là UUID hợp lệ").optional(),
-    newCustomer: z
-      .object({
-        fullName: z.string().min(1, "Họ tên khách hàng không được để trống"),
-        phone: z.string().min(1, "Số điện thoại không được để trống"),
-        zalo: z.string().optional(),
-      })
-      .optional(),
-    babyId: z.string().uuid("babyId phải là UUID hợp lệ").optional(),
-    newBaby: z
-      .object({
-        fullName: z.string().min(1, "Tên bé không được để trống"),
-        birthDate: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày sinh phải theo định dạng YYYY-MM-DD")
-          .optional()
-          .or(z.literal("")),
-      })
-      .optional(),
-    packageId: z.string().uuid("packageId phải là UUID hợp lệ"),
+    larkHaukyRecordId: z
+      .string({ required_error: "Cần tra và chọn dòng Hậu Kỳ bên Lark trước khi tạo bộ ảnh" })
+      .trim()
+      .min(1, "Cần tra và chọn dòng Hậu Kỳ bên Lark trước khi tạo bộ ảnh"),
     photographerId: z.string().uuid("photographerId phải là UUID hợp lệ").optional().nullable(),
-    shootDate: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, "Ngày chụp phải theo định dạng YYYY-MM-DD")
-      .optional()
-      .nullable(),
-    title: z.string().min(1, "Tên bộ ảnh không được để trống"),
     driveUrl: z.string().min(1, "Link Google Drive không được để trống"),
     includedQuota: z.number().int().nonnegative().optional(),
     extraPhotoPrice: z.number().nonnegative().optional(),
@@ -52,10 +37,6 @@ export const CreateGallerySchema = z
         invite: z.boolean().default(true),
       })
       .default({}),
-  })
-  .refine((data) => data.customerId || data.newCustomer, {
-    message: "Cần cung cấp customerId hoặc newCustomer",
-    path: ["customerId"],
   })
   .refine(
     (data) =>

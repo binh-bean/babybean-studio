@@ -506,7 +506,7 @@ export const vi = {
       disconnected: "Mất kết nối, thử lại giúp."
     },
     dashboard: {
-      title: "Bảng điều khiển",
+      title: "Bàn làm việc",
       pendingSelection: "Chờ khách chọn",
       expiringSoon: "Sắp hết hạn",
       overdue: "Quá hạn",
@@ -526,7 +526,8 @@ export const vi = {
       // BB-290 lượt 2: "Bộ ảnh" theo H1 của quan-tri-bo-anh-bang.png — "Danh
       // sách bộ ảnh" cũ dài hơn cần, và trang chỉ có một H1 nên không lẫn với
       // trang nào khác.
-      title: "Bộ ảnh",
+      // BB-326: MỘT tên "Quản lý bộ ảnh" cho menu, H1 và breadcrumb (anh 29/09).
+      title: "Quản lý bộ ảnh",
       searchPlaceholder: "Tìm theo tên bé, tên khách, số điện thoại…",
       searchClear: "Xoá từ khoá tìm kiếm",
       searchOpen: "Tìm bộ ảnh",
@@ -585,6 +586,24 @@ export const vi = {
       copyLinkCta: "Sao chép link app",
       copyMessageCta: "Sao chép tin nhắn mẫu",
       sampleMessage: "BabyBean Studio xin chào ba mẹ bé {babyName}! Dạ em gửi link chọn ảnh buổi chụp của bé ạ: {link}. Mã PIN là 4 số cuối SĐT ba mẹ nhé. Hạn chốt ảnh là ngày {deadline}. Ba mẹ cần hỗ trợ gì cứ nhắn em nha!",
+      // BB-325 — tạo bộ ảnh neo vào dòng Hậu Kỳ bên Lark.
+      larkTitle: "Tra dòng Hậu Kỳ bên Lark",
+      larkDesc: "Nhập mã hóa đơn và số điện thoại khách. Thông tin bộ ảnh lấy từ Lark, không gõ tay.",
+      invoiceCode: "Mã hóa đơn / hợp đồng",
+      invoiceHint: "Dạng HD_YYYYMMDD#NN",
+      lookupLark: "Tra Lark",
+      lookingUpLark: "Đang tra Lark…",
+      larkFound: "Thông tin từ Lark",
+      larkPickOne: "Có nhiều dòng Hậu Kỳ khớp — chọn đúng buổi chụp:",
+      motherName: "Tên mẹ",
+      openLarkRow: "Mở dòng trên Lark",
+      openGallery: "Mở bộ ảnh",
+      alreadyHasGallery: "Dòng Hậu Kỳ này đã có bộ ảnh",
+      folderHasGallery: "Bộ ảnh đang dùng thư mục này",
+      folderFromLark: "Bộ này đã được đồng bộ từ Lark — mở để làm tiếp, không cần tạo mới.",
+      needLark: "Tra và chọn dòng Hậu Kỳ bên Lark để tiếp tục.",
+      linkedLarkRow: "Bộ ảnh đã gắn với dòng Hậu Kỳ {code} bên Lark. Link app sẽ ghi về đúng dòng này khi tạo/gửi link ở trang bộ ảnh.",
+      emptyValue: "(Lark để trống)",
     },
     detail: {
       tabOverview: "Tổng quan",
@@ -636,7 +655,9 @@ export const vi = {
   },
   landing: {
     studioName: "BabyBean Studio",
-    tagline: "Nơi lưu giữ từng khoảnh khắc đáng yêu của con, gói ghém thành một cuốn album để dành",
+    // BB-328: câu này thành tiêu đề lớn (Playfair) của trang gốc — ngắn lại
+    // cho vừa 2 dòng trên điện thoại.
+    tagline: "Nơi lưu giữ từng khoảnh khắc đáng yêu của con",
     branchesHeading: "Các chi nhánh",
     lostBefore: "Ảnh của bé được gửi qua ",
     lostStrong: "link riêng",
@@ -644,10 +665,14 @@ export const vi = {
     // 24/09/2026: câu cũ bảo "gọi theo số ở dưới" trong khi cả 3 chi nhánh
     // chưa điền hotline — dưới đó không có số nào.
     lostAfter: ". Chưa nhận được hoặc link không mở được, ba mẹ gọi giúp bên mình theo số ở dưới nhé.",
-    lostAfterNhanTin: ". Chưa nhận được hoặc link không mở được, ba mẹ nhắn tin cho studio ở nút phía dưới nhé.",
+    lostAfterNhanTin: ". Chưa nhận được hoặc link không mở được, ba mẹ nhắn cho studio nhé.",
     lostAfterChiNhanh: ". Chưa nhận được hoặc link không mở được, ba mẹ liên hệ chi nhánh đã chụp giúp bên mình nhé.",
     messageCta: "Nhắn tin cho studio",
     loginCta: "Nhân viên đăng nhập",
+    // BB-328: lối vào thứ hai cho nhân viên ở cuối trang.
+    staffTitle: "Nhân viên studio",
+    staffHint: "Đăng nhập để quản lý bộ ảnh",
+    footer: "© BabyBean Studio",
   },
   errorPages: {
     notFoundTitle: "Không tìm thấy trang",

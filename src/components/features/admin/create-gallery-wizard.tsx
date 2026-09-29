@@ -16,9 +16,12 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Button, Input, Select, Card, Spinner, Checkbox } from "@/components/ui";
 import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
+import { formatNgayVN, formatSdt } from "@/lib/utils/dinh-dang";
+import { dinhDangNghin, docSoNghin } from "@/lib/utils/so-tien-nhap";
 
 const w = vi.admin.wizard;
 
@@ -49,12 +52,68 @@ interface Options {
 interface ResultData {
   galleryId: string;
   shareUrl: string;
+  lark?: { recordId: string; maHoaDon: string; linkLark: string | null };
+}
+
+/** BB-325 — bộ ảnh đã có trong app (trả từ API khi trùng thư mục / dòng Lark). */
+interface BoAnhDaCo {
+  id: string;
+  tieuDe: string;
+  thongTin: string;
+  tuLark: boolean;
+}
+
+/** BB-325 — một dòng Hậu Kỳ bên Lark (xem src/lib/lark/tra-hau-ky.ts). */
+interface DongHauKy {
+  recordId: string;
+  maHoaDon: string;
+  tenMe: string;
+  soDienThoai: string;
+  tenBe: string;
+  goiChup: string;
+  ngayChup: string | null;
+  tongFileEdit: number | null;
+  linkLark: string | null;
+  boAnhDaCo: BoAnhDaCo | null;
 }
 
 /** Lỗi Drive kèm hướng dẫn từng bước, không phải lỗi kỹ thuật. */
 interface FieldError {
   message: string;
   howToFix?: string[];
+  /** BB-325 — bộ ảnh đang giữ thư mục / dòng Lark này, để mở thẳng. */
+  boAnhDaCo?: BoAnhDaCo;
+}
+
+/** BB-325 — thẻ "đã có bộ ảnh X" kèm link mở bộ đó. */
+function TheBoAnhDaCo({ bo, nhan }: { bo: BoAnhDaCo; nhan: string }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-[var(--bb-surface)] px-3 py-2 text-[var(--bb-fg)]">
+      <div className="min-w-0">
+        <p className="text-xs text-[var(--bb-fg-muted)]">{nhan}</p>
+        <p className="truncate font-medium">{bo.tieuDe}</p>
+        {bo.thongTin && <p className="truncate text-xs tabular-nums text-[var(--bb-fg-muted)]">{bo.thongTin}</p>}
+      </div>
+      <Link
+        href={`/admin/galleries/${encodeURIComponent(bo.id)}`}
+        className="shrink-0 text-sm font-medium text-[var(--bb-primary)] underline underline-offset-2"
+      >
+        {w.openGallery} →
+      </Link>
+    </div>
+  );
+}
+
+/** Một ô thông tin chỉ đọc lấy từ Lark. */
+function OLark({ nhan, giaTri }: { nhan: string; giaTri: string | null | undefined }) {
+  return (
+    <div>
+      <dt className="text-xs text-[var(--bb-fg-muted)]">{nhan}</dt>
+      <dd className={giaTri ? "text-sm text-[var(--bb-fg)]" : "text-sm italic text-[var(--bb-fg-muted)]"}>
+        {giaTri || w.emptyValue}
+      </dd>
+    </div>
+  );
 }
 
 export function CreateGalleryWizard() {
@@ -67,13 +126,13 @@ export function CreateGalleryWizard() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
 
   const [branchId, setBranchId] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [babyName, setBabyName] = useState("");
-  const [shootDate, setShootDate] = useState("");
   const [photographerId, setPhotographerId] = useState("");
-  const [packageId, setPackageId] = useState("");
-  const [larkContractCode, setLarkContractCode] = useState("");
+  // BB-325 — thông tin khách/bé/gói KHÔNG gõ tay nữa: tra dòng Hậu Kỳ bên Lark.
+  const [maHoaDon, setMaHoaDon] = useState("");
+  const [sdtTra, setSdtTra] = useState("");
+  const [dangTra, setDangTra] = useState(false);
+  const [cacDong, setCacDong] = useState<DongHauKy[]>([]);
+  const [dongChon, setDongChon] = useState<DongHauKy | null>(null);
 
   const [quota, setQuota] = useState(20);
   const [extraPrice, setExtraPrice] = useState(50000);
@@ -110,15 +169,38 @@ export function CreateGalleryWizard() {
     void loadOptions();
   }, [loadOptions]);
 
-  // Chọn gói thì lấy luôn hạn mức và giá ảnh thêm của gói đó làm mặc định,
-  // người tạo bộ ảnh vẫn sửa đè được cho từng trường hợp.
+  // BB-325 — chọn dòng Lark thì lấy "Tổng file edit" làm số ảnh trong gói.
+  // Giá ảnh thêm KHÔNG lấy theo gói nữa: bảng `packages` cũ là dữ liệu mẫu
+  // ("Gói Cao cấp" 40.000đ) — giá mặc định là số trong Cài đặt (50.000đ).
   useEffect(() => {
-    const pkg = options?.packages.find((p) => p.id === packageId);
-    if (pkg) {
-      setQuota(pkg.includedQuota);
-      setExtraPrice(pkg.extraPhotoPrice);
+    if (dongChon?.tongFileEdit) setQuota(dongChon.tongFileEdit);
+  }, [dongChon]);
+
+  async function traLark() {
+    setDangTra(true);
+    setError(null);
+    setCacDong([]);
+    setDongChon(null);
+    try {
+      const res = await fetch("/api/admin/galleries/tra-lark", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maHoaDon, soDienThoai: sdtTra }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setError({ message: body?.error?.message ?? "Không tra được Lark" });
+        return;
+      }
+      const ds = (body.data?.dong ?? []) as DongHauKy[];
+      setCacDong(ds);
+      if (ds.length === 1) setDongChon(ds[0] ?? null);
+    } catch {
+      setError({ message: "Không kết nối được máy chủ." });
+    } finally {
+      setDangTra(false);
     }
-  }, [packageId, options]);
+  }
 
   async function checkDrive() {
     setChecking(true);
@@ -135,6 +217,7 @@ export function CreateGalleryWizard() {
         setError({
           message: body?.error?.message ?? "Không đọc được thư mục",
           howToFix: body?.error?.details?.howToFix,
+          boAnhDaCo: body?.error?.details?.boAnhDaCo,
         });
         return;
       }
@@ -158,14 +241,9 @@ export function CreateGalleryWizard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           branchId,
-          newCustomer: { fullName: customerName, phone: customerPhone },
-          newBaby: babyName ? { fullName: babyName } : undefined,
-          packageId,
+          larkHaukyRecordId: dongChon?.recordId,
           photographerId: photographerId || null,
-          shootDate: shootDate || null,
-          title: babyName ? `${babyName} — ${preview?.folderName ?? ""}`.trim() : preview?.folderName,
           driveUrl,
-          larkContractCode: larkContractCode.trim() || undefined,
           includedQuota: quota,
           extraPhotoPrice: extraPrice,
           dueAt: dueAt.toISOString(),
@@ -174,7 +252,10 @@ export function CreateGalleryWizard() {
       });
       const body = await res.json();
       if (!res.ok) {
-        setError({ message: body?.error?.message ?? "Không tạo được bộ ảnh" });
+        setError({
+          message: body?.error?.message ?? "Không tạo được bộ ảnh",
+          boAnhDaCo: body?.error?.details?.boAnhDaCo,
+        });
         return;
       }
       setResult(body.data);
@@ -186,16 +267,12 @@ export function CreateGalleryWizard() {
     }
   }
 
-  const packagesForBranch = (options?.packages ?? []).filter(
-    (p) => p.branchId === null || p.branchId === branchId,
-  );
   const photographersForBranch = (options?.photographers ?? []).filter(
     (p) => p.branchIds.length === 0 || p.branchIds.includes(branchId),
   );
 
   const canLeaveStep1 = preview !== null;
-  const canLeaveStep2 =
-    branchId !== "" && customerName.trim() !== "" && customerPhone.trim() !== "" && packageId !== "";
+  const canLeaveStep2 = branchId !== "" && dongChon !== null && !dongChon.boAnhDaCo;
 
   // --- Bước 4: kết quả ------------------------------------------------------
 
@@ -208,6 +285,23 @@ export function CreateGalleryWizard() {
           <code className="break-all text-sm text-[var(--bb-fg)]">{result.shareUrl}</code>
         </div>
 
+        {/* BB-325 ("đi về đâu") — nói rõ link này gắn với dòng Lark nào. */}
+        {result.lark && (
+          <p className="text-sm text-[var(--bb-fg-muted)]">
+            {w.linkedLarkRow.replace("{code}", result.lark.maHoaDon)}{" "}
+            {result.lark.linkLark && (
+              <a
+                href={result.lark.linkLark}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-[var(--bb-primary)] underline underline-offset-2"
+              >
+                {w.openLarkRow}
+              </a>
+            )}
+          </p>
+        )}
+
         <div className="flex flex-wrap justify-center gap-2">
           <Button
             onClick={() => {
@@ -216,6 +310,12 @@ export function CreateGalleryWizard() {
             }}
           >
             {copied ? w.copied : w.copyLinkCta}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => window.location.assign(`/admin/galleries/${encodeURIComponent(result.galleryId)}`)}
+          >
+            {w.openGallery}
           </Button>
           <Button variant="outline" onClick={() => window.location.assign("/admin/galleries")}>
             {w.backToList}
@@ -255,6 +355,12 @@ export function CreateGalleryWizard() {
           className="space-y-2 rounded-[var(--bb-radius-sm)] border border-[var(--bb-danger)] bg-[var(--bb-surface-2)] px-4 py-3 text-sm text-[var(--bb-danger)]"
         >
           <p>{error.message}</p>
+          {error.boAnhDaCo && (
+            <TheBoAnhDaCo
+              bo={error.boAnhDaCo}
+              nhan={error.boAnhDaCo.tuLark ? w.folderFromLark : w.folderHasGallery}
+            />
+          )}
           {error.howToFix && (
             <ol className="list-decimal space-y-1 pl-5 text-[var(--bb-fg)]">
               {error.howToFix.map((s) => (
@@ -333,85 +439,126 @@ export function CreateGalleryWizard() {
         )}
 
         {step === 2 && (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={w.branch} required>
-              <Select value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-                <option value="">{w.choose}</option>
-                {(options?.branches ?? []).map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+          <div className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label={w.branch} required>
+                <Select value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                  <option value="">{w.choose}</option>
+                  {(options?.branches ?? []).map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
 
-            <Field label={w.packageSelect} required>
-              <Select
-                value={packageId}
-                onChange={(e) => setPackageId(e.target.value)}
-                disabled={branchId === ""}
-              >
-                <option value="">{w.choose}</option>
-                {packagesForBranch.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field label={w.customerTitle} required>
-              <Input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Nguyễn Thị Mai"
-              />
-            </Field>
-
-            <Field label={w.customerPhone} required>
-              <Input
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                inputMode="tel"
-                placeholder="0901234567"
-              />
-            </Field>
-
-            <Field label={w.babyName}>
-              <Input value={babyName} onChange={(e) => setBabyName(e.target.value)} />
-            </Field>
-
-            <Field label={w.shootDate}>
-              <Input type="date" value={shootDate} onChange={(e) => setShootDate(e.target.value)} />
-            </Field>
-
-            <Field label={w.photographer}>
-              <Select
-                value={photographerId}
-                onChange={(e) => setPhotographerId(e.target.value)}
-                disabled={branchId === ""}
-              >
-                <option value="">{w.choose}</option>
-                {photographersForBranch.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            {/* @ts-expect-error: DEV-UI cần thêm larkContractCode vào vi.ts (BB-110) */}
-            <Field label={w.larkContractCode || "Mã hợp đồng Lark"} hint="Dạng HD_YYYYMMDD#NN">
-              <Input
-                value={larkContractCode}
-                onChange={(e) => setLarkContractCode(e.target.value)}
-                placeholder="HD_20260901#01"
-              />
-            </Field>
-
-            <div className="sm:col-span-2">
-              <RequiredLegend />
+              <Field label={w.photographer}>
+                <Select
+                  value={photographerId}
+                  onChange={(e) => setPhotographerId(e.target.value)}
+                  disabled={branchId === ""}
+                >
+                  <option value="">{w.choose}</option>
+                  {photographersForBranch.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
             </div>
+
+            {/* BB-325 — thông tin khách lấy từ dòng Hậu Kỳ bên Lark, không gõ tay. */}
+            <div className="space-y-3 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] p-4">
+              <div>
+                <p className="font-medium text-[var(--bb-fg)]">{w.larkTitle}</p>
+                <p className="text-xs text-[var(--bb-fg-muted)]">{w.larkDesc}</p>
+              </div>
+              <form
+                className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void traLark();
+                }}
+              >
+                <Field label={w.invoiceCode} hint={w.invoiceHint} required>
+                  <Input
+                    name="maHoaDon"
+                    value={maHoaDon}
+                    onChange={(e) => setMaHoaDon(e.target.value)}
+                    placeholder="HD_20260901#01"
+                    spellCheck={false}
+                  />
+                </Field>
+                <Field label={w.customerPhone} required>
+                  <Input
+                    name="soDienThoai"
+                    value={sdtTra}
+                    onChange={(e) => setSdtTra(e.target.value)}
+                    inputMode="tel"
+                    placeholder="0901234567"
+                  />
+                </Field>
+                <Button
+                  type="submit"
+                  disabled={dangTra || maHoaDon.trim() === "" || sdtTra.trim() === ""}
+                  className="sm:mt-6"
+                >
+                  {dangTra ? w.lookingUpLark : w.lookupLark}
+                </Button>
+              </form>
+
+              {cacDong.length > 1 && (
+                <fieldset className="space-y-2">
+                  <legend className="text-sm text-[var(--bb-fg)]">{w.larkPickOne}</legend>
+                  {cacDong.map((d) => (
+                    <label key={d.recordId} className="flex items-center gap-2 text-sm text-[var(--bb-fg)]">
+                      <input
+                        type="radio"
+                        name="dongLark"
+                        checked={dongChon?.recordId === d.recordId}
+                        onChange={() => setDongChon(d)}
+                      />
+                      <span className="tabular-nums">
+                        {d.maHoaDon} · {d.goiChup || "—"} · {d.ngayChup ? formatNgayVN(d.ngayChup) : "—"}
+                        {d.tenBe ? ` · ${d.tenBe}` : ""}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+
+              {dongChon && (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-[var(--bb-fg)]">{w.larkFound}</p>
+                  <dl className="grid gap-3 sm:grid-cols-3">
+                    <OLark nhan={w.motherName} giaTri={dongChon.tenMe} />
+                    <OLark nhan={w.babyName} giaTri={dongChon.tenBe} />
+                    <OLark nhan={w.customerPhone} giaTri={formatSdt(dongChon.soDienThoai)} />
+                    <OLark nhan={w.invoiceCode} giaTri={dongChon.maHoaDon} />
+                    <OLark nhan={w.packageSelect} giaTri={dongChon.goiChup} />
+                    <OLark nhan={w.shootDate} giaTri={dongChon.ngayChup ? formatNgayVN(dongChon.ngayChup) : null} />
+                  </dl>
+                  {dongChon.linkLark && (
+                    <a
+                      href={dongChon.linkLark}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block text-sm font-medium text-[var(--bb-primary)] underline underline-offset-2"
+                    >
+                      {w.openLarkRow} ↗
+                    </a>
+                  )}
+                  {dongChon.boAnhDaCo && <TheBoAnhDaCo bo={dongChon.boAnhDaCo} nhan={w.alreadyHasGallery} />}
+                </div>
+              )}
+
+              {!dongChon && cacDong.length === 0 && (
+                <p className="text-xs text-[var(--bb-fg-muted)]">{w.needLark}</p>
+              )}
+            </div>
+
+            <RequiredLegend />
           </div>
         )}
 
@@ -427,12 +574,12 @@ export function CreateGalleryWizard() {
             </Field>
 
             <Field label={w.extraPrice} required>
+              {/* BB-325 — dấu chấm ngăn nghìn ("50.000"): type=number không hiện được. */}
               <Input
-                type="number"
-                min={0}
-                step={1000}
-                value={extraPrice}
-                onChange={(e) => setExtraPrice(Number(e.target.value))}
+                name="giaAnhThem"
+                inputMode="numeric"
+                value={dinhDangNghin(extraPrice)}
+                onChange={(e) => setExtraPrice(docSoNghin(e.target.value))}
               />
             </Field>
 

@@ -174,7 +174,7 @@ test.describe("BB-280: menu quản trị + thang chữ", () => {
 
     // Vẫn thấy việc của mình: Bộ ảnh, và "Việc cần xử lý" (chỉ tab Ảnh vượt
     // hạn mức bên trong — hai tab kia bị khoá, giữ nguyên luật cũ).
-    await expect(page.getByRole("link", { name: "Bộ ảnh" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Quản lý bộ ảnh" })).toBeVisible();
     await page.getByRole("link", { name: "Việc cần xử lý" }).click();
     await page.waitForURL("**/admin/viec-can-xu-ly*");
     await expect(page.getByRole("tab", { name: /Ảnh vượt hạn mức/ })).toBeVisible();

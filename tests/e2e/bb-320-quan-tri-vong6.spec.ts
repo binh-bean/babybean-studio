@@ -60,8 +60,8 @@ async function mo(browser: Browser, baseURL: string, vai: "ql" | "owner", k: Kt,
 }
 
 const TRANG_CO_TIEU_DE: [string, string, "ql" | "owner"][] = [
-  ["Bảng điều khiển", "/admin", "ql"],
-  ["Bộ ảnh", "/admin/galleries", "ql"],
+  ["Bàn làm việc", "/admin", "ql"],
+  ["Quản lý bộ ảnh", "/admin/galleries", "ql"],
   ["Khách hàng", "/admin/customers", "ql"],
   ["Việc cần xử lý", "/admin/viec-can-xu-ly", "ql"],
   ["Báo cáo", "/admin/bao-cao", "ql"],

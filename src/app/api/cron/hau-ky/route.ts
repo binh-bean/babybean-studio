@@ -24,6 +24,7 @@ import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
 import { nhacThongBaoChuaDoc } from "@/lib/thong-bao/nhac-chua-doc";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { kiemTraLaiCacBoLoi, type KetQuaKiemTraLaiNhieu } from "@/lib/drive/kiem-tra-lai-loi";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -40,7 +41,17 @@ function duocPhep(request: Request): boolean {
   return khoa.some((k) => header === `Bearer ${k}`);
 }
 
+/**
+ * BB-326 mục 5 — phần kiểm lại bộ lỗi Drive chỉ chạy khi lượt này còn ít nhất
+ * chừng này thời gian trước trần 60s; dừng hẳn ở mốc `HET_GIO_KIEM_LAI_MS`.
+ */
+const HET_GIO_KIEM_LAI_MS = 50_000;
+const TOI_THIEU_CON_LAI_MS = 8_000;
+/** Trần số bộ lỗi kiểm lại mỗi sáng — 76 bộ thật (29/09) xoay vòng trong 2 sáng. */
+const GIOI_HAN_KIEM_LAI_CRON = 40;
+
 async function chay(request: Request) {
+  const batDauLuc = Date.now();
   if (!duocPhep(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { LARK_APP_ID, LARK_APP_SECRET, LARK_BASE_APP_TOKEN, SUPABASE_DB_URL } = process.env;
@@ -107,6 +118,27 @@ async function chay(request: Request) {
         );
       }
 
+      // BB-326 mục 5 — bộ ảnh lỗi Drive tự lành: nhân viên bật chia sẻ xong
+      // thì sáng hôm sau lỗi tự xoá, không cần ai bấm. Gói Hobby chỉ có hai
+      // cron nên gửi nhờ vào lượt này; hỏng thì ghi log, không kéo cron đỏ.
+      let kiemLaiLoi: KetQuaKiemTraLaiNhieu | { boQua: string } | { loi: string };
+      const hetGioLuc = batDauLuc + HET_GIO_KIEM_LAI_MS;
+      if (hetGioLuc - Date.now() < TOI_THIEU_CON_LAI_MS) {
+        kiemLaiLoi = { boQua: "Hết giờ trong lượt này" };
+      } else {
+        try {
+          kiemLaiLoi = await kiemTraLaiCacBoLoi(createAdminClient(), {
+            branchIds: null,
+            gioiHan: GIOI_HAN_KIEM_LAI_CRON,
+            hetGioLuc,
+            requestId: `cron-hau-ky-${batDauLuc}`,
+          });
+        } catch (err) {
+          kiemLaiLoi = { loi: err instanceof Error ? err.message : String(err) };
+          console.error(JSON.stringify({ evt: "cron.hau_ky.kiem_lai_loi_hong", lyDo: kiemLaiLoi.loi }));
+        }
+      }
+
       const ketQua = {
         banGhiLark: doc.size,
         ...ghi,
@@ -114,6 +146,7 @@ async function chay(request: Request) {
         nhac,
         nhacChuaDoc,
         dongBo,
+        kiemLaiLoi,
       };
       console.info(JSON.stringify({ evt: "cron.hau_ky.xong", ...ketQua }));
       return NextResponse.json({ data: ketQua });

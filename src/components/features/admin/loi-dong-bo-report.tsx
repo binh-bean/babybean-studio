@@ -61,8 +61,12 @@ interface TomTat {
   truncated: boolean;
 }
 
-/** Trạng thái của nút Thử lại từng bộ, chỉ sống trong phiên xem này. */
-type TrangThaiThuLai = "da-gui" | "that-bai";
+/**
+ * Trạng thái của nút Kiểm tra lại từng bộ, chỉ sống trong phiên xem này.
+ * BB-326: đường kiểm lại chờ kết quả thật (không còn "đã gửi yêu cầu" chạy
+ * nền), nên nói được "hết lỗi" hay "vẫn lỗi" ngay.
+ */
+type TrangThaiThuLai = "het-loi" | "van-loi" | "that-bai";
 
 /**
  * Số yêu cầu đồng bộ gửi đi cùng lúc.
@@ -71,7 +75,7 @@ type TrangThaiThuLai = "da-gui" | "that-bai";
  * lúc thì Drive trả 429 và biến một lỗi quyền chia sẻ thành hai loại lỗi chồng
  * lên nhau — lúc đó không ai lần ra được cái nào là nguyên nhân gốc.
  */
-const SONG_SONG = 4;
+const SONG_SONG = 2;
 
 /** Chờ trước khi tự tải lại. Đủ cho những thư mục nhỏ kịp xong. */
 const CHO_TRUOC_KHI_TAI_LAI_MS = 5000;
@@ -84,6 +88,8 @@ export function LoiDongBoReport() {
   const [dangThuLai, setDangThuLai] = React.useState<Set<string>>(new Set());
   const [ketQua, setKetQua] = React.useState<Record<string, TrangThaiThuLai>>({});
   const [loiThuLai, setLoiThuLai] = React.useState<string | null>(null);
+  const [dangKiemTatCa, setDangKiemTatCa] = React.useState(false);
+  const [ketQuaTatCa, setKetQuaTatCa] = React.useState<string | null>(null);
 
   const taiDanhSach = React.useCallback(async () => {
     try {
@@ -128,15 +134,22 @@ export function LoiDongBoReport() {
     async function chayMotLan() {
       for (let id = hangDoi.shift(); id; id = hangDoi.shift()) {
         let thanhCong = false;
+        let hetLoiBo = false;
         try {
-          const res = await fetch(`/api/admin/galleries/${id}/sync`, { method: "POST" });
+          const res = await fetch(`/api/admin/galleries/kiem-tra-lai-loi`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ galleryId: id }),
+          });
+          const json = await res.json().catch(() => null);
           thanhCong = res.ok;
+          hetLoiBo = res.ok && json?.data?.hetLoi === true;
         } catch {
           thanhCong = false;
         }
         if (!thanhCong) soLoi += 1;
 
-        const ketQuaBo: TrangThaiThuLai = thanhCong ? "da-gui" : "that-bai";
+        const ketQuaBo: TrangThaiThuLai = !thanhCong ? "that-bai" : hetLoiBo ? "het-loi" : "van-loi";
         setKetQua((truoc) => ({ ...truoc, [id]: ketQuaBo }));
         setDangThuLai((truoc) => {
           const sau = new Set(truoc);
@@ -157,6 +170,35 @@ export function LoiDongBoReport() {
     // Tải lại để bộ nào đã lành thì biến khỏi danh sách. Bộ nào còn hỏng sẽ
     // hiện lại với lý do mới — và lý do mới đó mới là thứ đáng đọc.
     window.setTimeout(() => void taiDanhSach(), CHO_TRUOC_KHI_TAI_LAI_MS);
+    // BB-326: kết quả đã là thật (đường kiểm lại chờ xong mới trả), mốc chờ
+    // chỉ để người bấm kịp đọc chữ "Đã hết lỗi" trước khi dòng biến mất.
+  }
+
+  /** BB-326 — "Kiểm tra lại tất cả lỗi": một lượt phía máy chủ, trả số trước/sau. */
+  async function kiemTraLaiTatCa() {
+    setDangKiemTatCa(true);
+    setKetQuaTatCa(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/kiem-tra-lai-loi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setKetQuaTatCa(json?.error?.message ?? "Không kiểm tra lại được.");
+      } else {
+        const d = json.data;
+        setKetQuaTatCa(
+          `Đã kiểm ${formatSo(d.daKiem)} bộ: ${formatSo(d.hetLoi)} bộ hết lỗi, ${formatSo(d.vanLoi)} bộ vẫn lỗi. ` +
+            `Còn ${formatSo(d.loiSau)} bộ lỗi (trước là ${formatSo(d.loiTruoc)}).` +
+            (d.conChuaKiem ? " Còn bộ chưa tới lượt — bấm lại để kiểm tiếp." : ""),
+        );
+      }
+      await taiDanhSach();
+    } finally {
+      setDangKiemTatCa(false);
+    }
   }
 
   if (loading) return <p className="text-sm text-[var(--bb-fg-muted)]">Đang tải báo cáo…</p>;
@@ -176,13 +218,26 @@ export function LoiDongBoReport() {
           <h2 className={CARD_TITLE_CLASS}>Bộ ảnh tải từ Drive bị lỗi</h2>
           <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
             Những bộ ảnh chưa kéo được ảnh từ Google Drive về. Sửa nguyên nhân bên
-            Drive trước, rồi bấm Thử lại.
+            Drive trước, rồi bấm Kiểm tra lại. Mỗi sáng 08:00 app cũng tự kiểm lại.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void taiDanhSach()}>
-          Tải lại danh sách
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => void taiDanhSach()}>
+            Tải lại danh sách
+          </Button>
+          {summary.galleryCount > 0 && (
+            <Button size="sm" disabled={dangKiemTatCa} onClick={() => void kiemTraLaiTatCa()}>
+              {dangKiemTatCa ? "Đang kiểm tra…" : "Kiểm tra lại tất cả lỗi"}
+            </Button>
+          )}
+        </div>
       </header>
+
+      {ketQuaTatCa && (
+        <p role="status" data-testid="ket-qua-kiem-lai-tat-ca" className="rounded-md border border-[var(--bb-border)] p-3 text-sm">
+          {ketQuaTatCa}
+        </p>
+      )}
 
       <section className="grid grid-cols-2 gap-3 sm:max-w-md">
         <Stat label="Bộ ảnh đang lỗi" value={formatSo(summary.galleryCount)} />
@@ -228,7 +283,7 @@ export function LoiDongBoReport() {
                 onClick={() => void thuLai(g.items)}
                 disabled={g.items.some((i) => dangThuLai.has(i.galleryId))}
               >
-                Thử lại tất cả ({formatSo(g.count)})
+                Kiểm tra lại cả nhóm ({formatSo(g.count)})
               </Button>
             </div>
 
@@ -340,18 +395,21 @@ function TrangThaiNut({
   onClick: () => void;
 }) {
   if (dangChay) {
-    return <span className="text-xs text-[var(--bb-fg-muted)]">Đang gửi…</span>;
+    return <span className="text-xs text-[var(--bb-fg-muted)]">Đang kiểm tra…</span>;
   }
-  if (ketQua === "da-gui") {
-    return <span className="text-xs text-[var(--bb-fg-muted)]">Đã gửi yêu cầu</span>;
+  if (ketQua === "het-loi") {
+    return <span className="text-xs text-[var(--bb-success)]">Đã hết lỗi</span>;
   }
   return (
     <span className="inline-flex items-center gap-2">
       {ketQua === "that-bai" && (
         <span className="text-xs text-[var(--bb-danger)]">Gửi không được</span>
       )}
+      {ketQua === "van-loi" && (
+        <span className="text-xs text-[var(--bb-danger)]">Vẫn lỗi</span>
+      )}
       <Button variant="outline" size="sm" onClick={onClick}>
-        Thử lại
+        Kiểm tra lại
       </Button>
     </span>
   );

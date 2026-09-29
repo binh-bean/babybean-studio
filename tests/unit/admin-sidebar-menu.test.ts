@@ -21,7 +21,7 @@ describe("BB-280: navGroups — bốn nhóm, đúng thứ tự", () => {
 
   it("Vận hành có đúng ba mục: Bộ ảnh, Khách hàng, Việc cần xử lý", () => {
     const vanHanh = navGroups.find((g) => g.key === "van-hanh")!;
-    expect(vanHanh.items.map((i) => i.name)).toEqual(["Bộ ảnh", "Khách hàng", "Việc cần xử lý"]);
+    expect(vanHanh.items.map((i) => i.name)).toEqual(["Quản lý bộ ảnh", "Khách hàng", "Việc cần xử lý"]);
   });
 
   it("Hệ thống gộp Nhân sự & vai trò thành MỘT mục trỏ về /admin/staff (không còn /admin/roles riêng)", () => {

@@ -75,13 +75,13 @@ export const navGroups: NavGroup[] = [
   {
     key: "tong-quan",
     label: "Tổng quan",
-    items: [{ name: "Bảng điều khiển", href: "/admin", icon: LayoutDashboard, ready: true }],
+    items: [{ name: "Bàn làm việc", href: "/admin", icon: LayoutDashboard, ready: true }],
   },
   {
     key: "van-hanh",
     label: "Vận hành",
     items: [
-      { name: "Bộ ảnh", href: "/admin/galleries", icon: Images, ready: true },
+      { name: "Quản lý bộ ảnh", href: "/admin/galleries", icon: Images, ready: true },
       {
         name: "Khách hàng",
         href: "/admin/customers",

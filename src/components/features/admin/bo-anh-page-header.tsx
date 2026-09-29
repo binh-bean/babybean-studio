@@ -60,7 +60,7 @@ export function BoAnhPageHeader() {
 
   return (
     <PageHeader
-      title="Bộ ảnh"
+      title={vi.admin.galleries.title}
       description={moTa}
       actions={
         <Link href="/admin/galleries/create">

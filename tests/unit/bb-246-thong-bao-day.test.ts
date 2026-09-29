@@ -209,7 +209,7 @@ describe("BB-246: guiThongBaoBoAnh — thiếu khoá VAPID", () => {
 
     await expect(
       guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n", loai: "test" }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ daVaoChuong: true, soMayNhanDay: 0 }); // BB-327: trả kết quả, vẫn không ném
 
     expect(webpushGia.sendNotification).not.toHaveBeenCalled();
     expect(ghiNhan.update).toEqual([]);
@@ -226,7 +226,7 @@ describe("BB-246: guiThongBaoBoAnh — thiếu khoá VAPID", () => {
 
     await expect(
       guiThongBaoBoAnh(client, "gallery-123", { tieuDe: "t", noiDung: "n", loai: "test" }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({ daVaoChuong: false, soMayNhanDay: 0 }); // BB-327: không ném, báo thật là chưa gửi được
 
     expect(banGhiLoi).toHaveBeenCalled();
     banGhiLoi.mockRestore();

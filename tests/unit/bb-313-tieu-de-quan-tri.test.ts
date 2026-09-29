@@ -14,7 +14,9 @@ import { describe, it, expect } from "vitest";
 import { tinhTieuDeBoAnhQuanTri } from "@/lib/utils/dinh-dang";
 
 describe("BB-313 mục 1: tinhTieuDeBoAnhQuanTri — tên đứng trước, mã hợp đồng chỉ khi hết tên", () => {
-  it("có tên bé (nickname) + loại buổi → 'Loại buổi · Bé Tên', không phải mã hợp đồng", () => {
+  // BB-325 (chỉ đạo "tên hiển thị" 29/09/2026) THAY luật "tên bé làm tiêu đề":
+  // tiêu đề quản trị là TÊN MẸ; tên bé/gói xuống dòng thông tin. Ba ca đầu sửa theo.
+  it("có tên mẹ → tiêu đề là TÊN MẸ, không ghép gói chụp, không phải mã hợp đồng", () => {
     const r = tinhTieuDeBoAnhQuanTri({
       packageName: "Newborn",
       babyNickname: "Bin",
@@ -22,10 +24,10 @@ describe("BB-313 mục 1: tinhTieuDeBoAnhQuanTri — tên đứng trước, mã 
       customerName: "Nguyễn Thị Mai",
       duPhong: "HD_20260911#5087",
     });
-    expect(r).toEqual({ tieuDe: "Newborn · Bé Bin", laMaHopDong: false });
+    expect(r).toEqual({ tieuDe: "Nguyễn Thị Mai", laMaHopDong: false });
   });
 
-  it("có tên bé nhưng KHÔNG có loại buổi → chỉ tên bé", () => {
+  it("có tên bé và tên mẹ, không có gói → vẫn là tên mẹ", () => {
     const r = tinhTieuDeBoAnhQuanTri({
       packageName: null,
       babyNickname: "Bin",
@@ -33,21 +35,21 @@ describe("BB-313 mục 1: tinhTieuDeBoAnhQuanTri — tên đứng trước, mã 
       customerName: "Nguyễn Thị Mai",
       duPhong: "HD_20260911#5087",
     });
-    expect(r).toEqual({ tieuDe: "Bé Bin", laMaHopDong: false });
+    expect(r).toEqual({ tieuDe: "Nguyễn Thị Mai", laMaHopDong: false });
   });
 
-  it("mất nickname → HỌ TÊN ĐẦY ĐỦ NGUYÊN VẸN, không thêm 'Bé ' (đúng tinhTenBiaTuDuLieu)", () => {
+  it("không có tên mẹ, mất nickname → HỌ TÊN BÉ ĐẦY ĐỦ NGUYÊN VẸN, không thêm 'Bé '", () => {
     const r = tinhTieuDeBoAnhQuanTri({
       packageName: null,
       babyNickname: null,
       babyFullName: "Nguyễn Văn An",
-      customerName: "Nguyễn Thị Mai",
+      customerName: null,
       duPhong: "HD_20260911#5087",
     });
     expect(r).toEqual({ tieuDe: "Nguyễn Văn An", laMaHopDong: false });
   });
 
-  it("không có tên bé (cả nickname lẫn họ tên đầy đủ) → lùi về TÊN KHÁCH, không phải mã hợp đồng", () => {
+  it("không có tên bé (cả nickname lẫn họ tên đầy đủ) → TÊN KHÁCH, không phải mã hợp đồng", () => {
     const r = tinhTieuDeBoAnhQuanTri({
       packageName: null,
       babyNickname: null,

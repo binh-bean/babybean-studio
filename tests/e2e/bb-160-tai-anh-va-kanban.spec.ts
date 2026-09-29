@@ -230,7 +230,7 @@ test.describe("BB-160: Tải ảnh và Kanban", () => {
     await page.goto("/admin/galleries");
     
     // Đổi view sang Kanban, bằng cách bấm nút Kanban (chờ selector cho Tab List)
-    const kanbanTab = page.locator('button[aria-label="Xem dạng Kanban"]');
+    const kanbanTab = page.locator('button[aria-label="Xem theo trạng thái"]');
     await kanbanTab.click();
 
     // Xác nhận cột "Lỗi tải ảnh" xuất hiện

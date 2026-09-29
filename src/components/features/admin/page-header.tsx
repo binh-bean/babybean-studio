@@ -22,7 +22,11 @@ import type { ReactNode } from "react";
 import { cn } from "@/components/ui/utils";
 import { layerMoVuong } from "@/lib/utils/tranh-tan-nen";
 
-export const PAGE_TITLE_CLASS = "font-display text-[30px] font-normal text-[var(--bb-fg)]";
+// BB-326 mục 6 — Playfair 30px không khai `line-height`/`letter-spacing` nên
+// ăn theo thân trang: dấu tiếng Việt ("Bảo Thơ") chạm mép trên, chữ khít nhau.
+// Ghim dòng 1.25 và giãn chữ rất nhẹ cho mọi H1 quản trị.
+export const PAGE_TITLE_CLASS =
+  "font-display text-[30px] font-normal leading-[1.25] tracking-[0.005em] text-[var(--bb-fg)]";
 export const PAGE_DESCRIPTION_CLASS = "text-sm text-[var(--bb-fg-muted)]";
 /**
  * BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — khi tiêu đề trang không còn tên
@@ -80,7 +84,7 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5">
           <h1 className={titleClassName ?? PAGE_TITLE_CLASS}>{title}</h1>
           {titleAddon}
         </div>
@@ -133,7 +137,7 @@ export function KhongCoQuyen({ mota }: { mota: string }) {
         href="/admin"
         className="mt-6 inline-flex h-10 items-center rounded-[var(--bb-radius-sm)] bg-[var(--bb-fg)] px-4 text-sm font-medium text-white hover:opacity-90"
       >
-        Về bảng điều khiển
+        Về Bàn làm việc
       </a>
     </main>
   );

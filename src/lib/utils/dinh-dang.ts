@@ -389,12 +389,48 @@ export function tinhTieuDeBoAnhQuanTri(input: {
   /** Mã hợp đồng/tên bộ ảnh thô — dùng khi KHÔNG có tên bé lẫn tên khách. */
   duPhong: string;
 }): TieuDeBoAnhQuanTri {
-  const ten = tinhTenBiaTuDuLieu(input.babyNickname, input.babyFullName) || input.customerName?.trim() || "";
-  if (ten) {
-    const goi = input.packageName?.trim();
-    return { tieuDe: goi ? `${goi} · ${ten}` : ten, laMaHopDong: false };
-  }
+  // BB-325 (chỉ đạo "tên hiển thị" 29/09/2026, THAY luật BB-313 "tên bé làm
+  // tiêu đề quản trị"): tiêu đề màn QUẢN TRỊ là TÊN MẸ (tên khách). Tên bé,
+  // SĐT, mã hóa đơn, gói chụp xuống dòng thông tin (`dongThongTinBoAnhQuanTri`).
+  // Màn KHÁCH vẫn gọi tên bé (`tinhTenBiaTuDuLieu`) — không đổi ở đây.
+  // Không ghép gói chụp vào tiêu đề nữa: "Gói Cao cấp · Constance Downing"
+  // (lỗi.JPG) đọc như tên gói, không phải tên người.
+  const ten = tenMeThat(input.customerName) || tinhTenBiaTuDuLieu(input.babyNickname, input.babyFullName) || "";
+  if (ten) return { tieuDe: ten, laMaHopDong: false };
   return { tieuDe: input.duPhong, laMaHopDong: true };
+}
+
+/**
+ * Tên khách THẬT, hay chuỗi rỗng khi đó là tên che "KH · <mã>" do đồng bộ Lark
+ * sinh ra ở môi trường không được nhận tên thật (sync-retouch.ts) — tên che
+ * không phải tên người, không được làm tiêu đề.
+ */
+export function tenMeThat(customerName: string | null | undefined): string {
+  const t = customerName?.trim() ?? "";
+  return /^KH\s*·/.test(t) ? "" : t;
+}
+
+/**
+ * BB-325 — dòng thông tin dưới tiêu đề bộ ảnh ở màn quản trị:
+ * "tên bé · số điện thoại · mã hóa đơn · gói chụp", chỉ nối phần CÓ dữ liệu.
+ * Tên bé đã đứng làm tiêu đề (bộ không có tên mẹ) thì không lặp lại.
+ */
+export function dongThongTinBoAnhQuanTri(input: {
+  tieuDe?: string | null;
+  babyNickname?: string | null;
+  babyFullName?: string | null;
+  customerPhone?: string | null;
+  maHoaDon?: string | null;
+  packageName?: string | null;
+}): string {
+  const tenBe = tinhTenBiaTuDuLieu(input.babyNickname, input.babyFullName);
+  const phan = [
+    tenBe && tenBe !== input.tieuDe ? tenBe : null,
+    input.customerPhone ? formatSdt(input.customerPhone) : null,
+    input.maHoaDon?.trim() && input.maHoaDon.trim() !== input.tieuDe ? input.maHoaDon.trim() : null,
+    input.packageName?.trim() || null,
+  ];
+  return phan.filter((v): v is string => !!v).join(" · ");
 }
 
 /**

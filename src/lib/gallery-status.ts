@@ -91,6 +91,35 @@ export function isGalleryLocked(status: string, larkMa?: string | null): boolean
 }
 
 /**
+ * BB-327 — mã trạng thái Lark CÒN HIỆU LỰC để khoá chọn ảnh.
+ *
+ * Lỗi chủ studio báo 29/09/2026: CSKH bấm "Mở lại" cho một bộ đang
+ * `in_retouch` (Lark đã ở "Đã chọn hình" từ trước), app chuyển về `in_review`
+ * — nhưng luật khoá theo Lark của BB-285 vẫn thấy giai đoạn ≥ 2 nên khách
+ * KHÔNG tick/bỏ tick được, và màn khách còn rơi vào chế độ "Chọn thêm ảnh".
+ * Đo trên bb-dev: bộ anh thử lúc 18:46 có `reopened_at` 29/09 trong khi
+ * `lark_trang_thai_tu` là 16/09.
+ *
+ * Luật: lần MỞ LẠI có chủ ý của CSKH (`reopened_at`) xảy ra SAU lần cuối Lark
+ * đổi trạng thái (`lark_trang_thai_tu`) thì thắng — trạng thái Lark cũ không
+ * còn khoá. Lark đổi trạng thái lần nữa SAU khi mở lại (vd. sang "Đang làm")
+ * thì Lark lại có hiệu lực. Trả `null` nghĩa là "coi như không có khoá Lark".
+ */
+export function maLarkConHieuLuc(g: {
+  lark_trang_thai?: string | null;
+  lark_trang_thai_tu?: string | Date | null;
+  reopened_at?: string | Date | null;
+}): string | null {
+  const ma = g.lark_trang_thai ?? null;
+  if (!ma || !g.reopened_at) return ma;
+  const moLai = new Date(g.reopened_at).getTime();
+  if (Number.isNaN(moLai)) return ma;
+  const larkTu = g.lark_trang_thai_tu ? new Date(g.lark_trang_thai_tu).getTime() : NaN;
+  if (Number.isNaN(larkTu) || moLai >= larkTu) return null;
+  return ma;
+}
+
+/**
  * Khách đã chốt chọn ảnh — dùng để quyết định hiển thị con số đã chụp lại
  * (snapshot) thay vì đếm sống.
  *

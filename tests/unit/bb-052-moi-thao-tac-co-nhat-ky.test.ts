@@ -73,6 +73,8 @@ const NGOAI_LE: Record<string, string> = {
     "da_doc_luc đã là bản ghi đó, cùng lý lẽ với g/thong-bao ở trên.",
   "admin/galleries/preview":
     "Chỉ đọc thử một thư mục Drive rồi trả về, không ghi gì.",
+  "admin/galleries/tra-lark":
+    "BB-325 — chỉ ĐỌC bảng Hậu Kỳ bên Lark (tra theo mã hóa đơn + SĐT) rồi trả về, không ghi gì.",
   "auth/session":
     "Cấp lại phiên đăng nhập. Lượt vào bằng link khách đã có gallery.auth ở auth/gallery.",
   "auth/logout": "Xoá cookie phiên, không đụng dữ liệu nghiệp vụ.",

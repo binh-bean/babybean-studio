@@ -170,9 +170,12 @@ test.describe("BB-257: Cần xử lý trước khi gửi khách", () => {
     const dongFixture = nhom.locator("table tbody tr", { hasText: `${NHAN} Bộ lỗi Drive` }).first();
     await expect(dongFixture).toBeVisible();
 
-    const nutThuLai = dongFixture.getByRole("button", { name: "Thử lại" });
+    // BB-326: nút đổi tên "Kiểm tra lại" và chờ kết quả THẬT — thư mục giả
+    // không đọc được nên dòng phải báo "Vẫn lỗi" (không còn "Đã gửi yêu cầu").
+    const nutThuLai = dongFixture.getByRole("button", { name: "Kiểm tra lại" });
     await expect(nutThuLai).toBeEnabled();
     await nutThuLai.click();
+    await expect(dongFixture.getByText("Vẫn lỗi")).toBeVisible({ timeout: 30_000 });
 
     // Chờ lượt thử lại chạy xong (gọi Drive thật với thư mục GIẢ + 5s chờ chủ
     // động của UI trước khi tải lại), rồi đọc lại đúng lý do lỗi tiếng Việt —

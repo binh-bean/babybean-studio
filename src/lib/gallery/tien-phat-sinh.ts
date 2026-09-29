@@ -112,3 +112,25 @@ export function cauBaoSauDoiHanMuc(input: {
 export function tienConPhaiThuSauGhiCo(tienChuaThuTheoAnh: number, daGhiCo: number): number {
   return Math.max(0, tienChuaThuTheoAnh - Math.max(0, daGhiCo));
 }
+
+/**
+ * BB-327 — số còn phải thu của MỘT bộ trong danh sách "Ảnh vượt hạn mức".
+ *
+ * Chủ studio 29/09/2026: bộ đã xác nhận thanh toán vẫn nằm trong danh sách.
+ * Nguyên nhân: danh sách tính "phải thu" theo ảnh vượt × giá ảnh HIỆN TẠI
+ * (view `v_over_quota_unbilled`), còn màn chi tiết + sổ thu tiền tính theo số
+ * khách NHÌN THẤY LÚC CHỐT (`snapshot_extra_amount`). Giá ảnh thêm đổi (vd
+ * 40.000 → 50.000) hoặc hạn mức đổi sau khi chốt là hai con số lệch nhau: CSKH
+ * thu đủ theo số lúc chốt, chi tiết báo "đã thu đủ", danh sách vẫn đòi phần
+ * chênh. Nay danh sách dùng CÙNG số với sổ thu: số lúc chốt khi có (> 0); chưa
+ * chốt hoặc lúc chốt chưa biết hạn mức (0) thì mới lùi về số theo ảnh.
+ */
+export function tienVuotHanMucConPhaiThu(p: {
+  tienTheoAnh: number;
+  tienLucChot: number | null | undefined;
+  daGhiCo: number;
+}): number {
+  const lucChot = Number(p.tienLucChot ?? 0);
+  const phaiThu = Number.isFinite(lucChot) && lucChot > 0 ? lucChot : p.tienTheoAnh;
+  return tienConPhaiThuSauGhiCo(phaiThu, p.daGhiCo);
+}

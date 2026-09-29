@@ -14,6 +14,8 @@
  */
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button, Input, Spinner } from "@/components/ui";
@@ -126,10 +128,85 @@ function LoginForm() {
       >
         {busy ? vi.admin.login.loggingIn : vi.admin.login.submit}
       </Button>
+    </form>
+  );
+}
 
-      <p className="text-center text-xs text-[var(--bb-fg-muted)]">
-        Quên mật khẩu? Nhờ admin đặt lại giúp.
+/**
+ * BB-327 — "Quên mật khẩu?" bấm được: nhân viên gõ tên tài khoản/email, app
+ * gửi yêu cầu tới admin (Việc cần xử lý → tab Quên mật khẩu), admin đặt lại
+ * ở Nhân sự. Câu trả lời LUÔN giống nhau — không lộ tài khoản có hay không.
+ * Nằm NGOÀI form đăng nhập (form lồng form là HTML sai).
+ */
+function QuenMatKhau() {
+  const [mo, setMo] = useState(false);
+  const [taiKhoan, setTaiKhoan] = useState("");
+  const [dangGui, setDangGui] = useState(false);
+  const [thongBao, setThongBao] = useState<string | null>(null);
+
+  async function gui(e: React.FormEvent) {
+    e.preventDefault();
+    setDangGui(true);
+    try {
+      const res = await fetch("/api/auth/quen-mat-khau", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier: taiKhoan }),
+      });
+      const json = await res.json().catch(() => null);
+      setThongBao(json?.data?.message ?? json?.error?.message ?? "Không gửi được, thử lại giúp.");
+    } catch {
+      setThongBao("Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.");
+    } finally {
+      setDangGui(false);
+    }
+  }
+
+  if (!mo) {
+    return (
+      <p className="mt-4 text-center text-xs text-[var(--bb-fg-muted)]">
+        <button
+          type="button"
+          onClick={() => setMo(true)}
+          className="underline underline-offset-2 hover:text-[var(--bb-fg)]"
+        >
+          Quên mật khẩu?
+        </button>
       </p>
+    );
+  }
+
+  return (
+    <form onSubmit={gui} className="mt-5 space-y-3 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] p-4">
+      <p className="text-sm font-medium text-[var(--bb-fg)]">Quên mật khẩu</p>
+      {thongBao ? (
+        <p role="status" data-testid="thong-bao-quen-mat-khau" className="text-sm text-[var(--bb-fg-muted)]">
+          {thongBao}
+        </p>
+      ) : (
+        <>
+          <label className="block">
+            <span className="mb-1 block text-xs text-[var(--bb-fg-muted)]">
+              Nhập tên tài khoản hoặc email — admin sẽ nhận yêu cầu và đặt lại giúp bạn.
+            </span>
+            <Input
+              name="taiKhoanQuenMatKhau"
+              value={taiKhoan}
+              onChange={(e) => setTaiKhoan(e.target.value)}
+              required
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="ten.dang.nhap"
+            />
+          </label>
+          <Button type="submit" variant="outline" disabled={dangGui || taiKhoan.trim().length === 0} className="w-full rounded-full">
+            {dangGui ? "Đang gửi…" : "Gửi yêu cầu cho admin"}
+          </Button>
+        </>
+      )}
+      <button type="button" onClick={() => { setMo(false); setThongBao(null); }} className="block w-full text-center text-xs text-[var(--bb-fg-muted)] underline">
+        Quay lại đăng nhập
+      </button>
     </form>
   );
 }
@@ -178,6 +255,13 @@ export default function LoginPage() {
 
       <div className="flex w-full flex-col items-center justify-center px-4 py-12 md:w-1/2">
         <div className="w-full max-w-sm">
+          <Link
+            href="/"
+            className="mb-8 inline-flex items-center gap-1.5 text-[13px] text-[var(--bb-fg-muted)] transition-colors hover:text-[var(--bb-fg)]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
+            Về trang chủ
+          </Link>
           {/* BB-290 (#29): MỘT logo chữ duy nhất cho toàn hệ — "BABY BEAN"
               giãn chữ, không còn "BabyBean Studio" Playfair đậm khác hẳn
               thanh bên quản trị (admin-sidebar.tsx) và màn khách. */}
@@ -194,7 +278,9 @@ export default function LoginPage() {
             />
             <span>BABY BEAN</span>
           </h1>
-          <p className="mt-1 text-center text-sm text-[var(--bb-fg-muted)]">
+          {/* BB-328 — chạm nhẹ cùng kiểu trang gốc mới: nhãn chữ hoa giãn
+              (Be Vietnam Pro) thay câu phụ thường, và lối quay về trang chủ. */}
+          <p className="mt-2 text-center text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--bb-fg-muted)]">
             Đăng nhập dành cho nhân viên
           </p>
           <Suspense
@@ -206,6 +292,7 @@ export default function LoginPage() {
           >
             <LoginForm />
           </Suspense>
+          <QuenMatKhau />
         </div>
       </div>
     </main>

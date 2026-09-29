@@ -139,10 +139,13 @@ export async function guiPushToiBoAnh(
   galleryId: string,
   noiDung: { tieuDe: string; noiDung: string },
   thongBaoId: string | null,
-): Promise<void> {
+): Promise<number> {
+  // BB-327: trả SỐ MÁY đã gửi đẩy thành công — nút "Nhắc khách" cần nói thật
+  // với CSKH là tin tới chuông thôi hay tới cả điện thoại của khách.
+  let soMayOk = 0;
   try {
     const vapid = docKhoaVapid();
-    if (!vapid) return; // Chưa cấu hình khoá — tính năng tự tắt êm.
+    if (!vapid) return 0; // Chưa cấu hình khoá — tính năng tự tắt êm.
 
     webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey);
 
@@ -152,7 +155,7 @@ export async function guiPushToiBoAnh(
       .eq("gallery_id", galleryId);
 
     if (error) throw error;
-    if (!dsDangKy || dsDangKy.length === 0) return;
+    if (!dsDangKy || dsDangKy.length === 0) return 0;
 
     const payload = JSON.stringify({
       galleryId,
@@ -171,6 +174,7 @@ export async function guiPushToiBoAnh(
             },
             payload,
           );
+          soMayOk += 1;
 
           const { error: upErr } = await client
             .from("push_dang_ky")
@@ -195,6 +199,15 @@ export async function guiPushToiBoAnh(
   } catch (err) {
     ghiLoi(galleryId, err);
   }
+  return soMayOk;
+}
+
+/** BB-327 — kết quả một lượt gửi: đã vào chuông chưa, tới bao nhiêu máy. */
+export interface KetQuaGuiThongBao {
+  /** Đã ghi được vào hộp thư (chuông) của khách. */
+  daVaoChuong: boolean;
+  /** Số trình duyệt/điện thoại nhận thông báo đẩy thành công. */
+  soMayNhanDay: number;
 }
 
 /**
@@ -208,7 +221,8 @@ export async function guiThongBaoBoAnh(
   client: SupabaseClient,
   galleryId: string,
   noiDung: NoiDungThongBao,
-): Promise<void> {
+): Promise<KetQuaGuiThongBao> {
   const thongBaoId = await ghiHopThu(client, galleryId, noiDung);
-  await guiPushToiBoAnh(client, galleryId, noiDung, thongBaoId);
+  const soMayNhanDay = await guiPushToiBoAnh(client, galleryId, noiDung, thongBaoId);
+  return { daVaoChuong: thongBaoId !== null, soMayNhanDay };
 }

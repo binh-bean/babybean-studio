@@ -380,7 +380,11 @@ export async function GET(
       than = dong.map((d) => d.file_name).join("\r\n");
     }
 
-    await ghiNhatKy({
+    // BB-327: `?hien=1` = khung chữ hiện thẳng trong trang chi tiết (tự tải mỗi
+    // lần mở trang). Không ghi nhật ký cho lượt đó — ghi thì Dòng thời gian của
+    // bộ ảnh đầy "đã xuất danh sách" chỉ vì có người mở trang ra xem.
+    const chiHienTrongApp = new URL(request.url).searchParams.get("hien") === "1";
+    if (!chiHienTrongApp) await ghiNhatKy({
       actorType: "staff",
       actorId: staff.staffId,
       branchId: String(gallery.branch_id),

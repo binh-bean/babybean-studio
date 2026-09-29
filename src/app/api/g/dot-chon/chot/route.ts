@@ -31,6 +31,7 @@ import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { maLarkConHieuLuc } from "@/lib/gallery-status";
 import { dangCheDoChonThem } from "@/lib/gallery/dot-chon";
 import { chotDotChon, layCacDot } from "@/lib/gallery/dot-chon-server";
 import { ChotDotChonSchema } from "./schema";
@@ -59,12 +60,12 @@ export async function POST(request: Request): Promise<Response> {
     const admin = createAdminClient();
     const { data: gallery, error: gErr } = await admin
       .from("galleries")
-      .select("id, branch_id, customer_id, title, status, extra_photo_price, lark_trang_thai")
+      .select("id, branch_id, customer_id, title, status, extra_photo_price, lark_trang_thai, lark_trang_thai_tu, reopened_at")
       .eq("id", session.galleryId)
       .single();
     if (gErr || !gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
 
-    if (!dangCheDoChonThem(gallery.status, gallery.lark_trang_thai)) {
+    if (!dangCheDoChonThem(gallery.status, maLarkConHieuLuc(gallery))) {
       return fail(
         "CONFLICT",
         "Studio chưa xác nhận đợt chọn đầu, ba mẹ cứ chọn và chốt ở màn chọn ảnh như bình thường nhé",

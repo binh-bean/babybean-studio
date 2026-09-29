@@ -295,6 +295,8 @@ export async function GET(request: Request): Promise<Response> {
       babyFullName: string | null;
       packageName: string | null;
       customerPhone: string | null;
+      /** BB-325 — mã hóa đơn (lark_contract_code) cho dòng thông tin. */
+      maHoaDon?: string | null;
       coverPhotoId: string | null;
       sentAt: string | null;
       /** BB-312 — xem `forceHomNay`/`waitingReopen` ở `bang-dieu-khien.ts`/`dashboard.tsx`. */
@@ -331,6 +333,7 @@ export async function GET(request: Request): Promise<Response> {
         babyFullName: string | null;
         packageName: string | null;
         customerPhone: string | null;
+        maHoaDon: string | null;
         coverPhotoId: string | null;
         sentAt: string | null;
       }
@@ -338,7 +341,7 @@ export async function GET(request: Request): Promise<Response> {
     if (idsViecHomNay.length > 0) {
       const { data: rows, error: loiBoSung } = await admin
         .from("galleries")
-        .select("id, cover_photo_id, sent_at, customer_id, baby_id, package_id")
+        .select("id, cover_photo_id, sent_at, customer_id, baby_id, package_id, lark_contract_code")
         .in("id", idsViecHomNay);
       if (loiBoSung) throw new Error(`Chi tiết "Việc hôm nay" hỏng: ${loiBoSung.message}`);
 
@@ -376,6 +379,7 @@ export async function GET(request: Request): Promise<Response> {
           babyFullName: be?.full_name ?? null,
           packageName: r.package_id ? tenGoi.get(String(r.package_id)) ?? null : null,
           customerPhone: r.customer_id ? sdt.get(String(r.customer_id)) ?? null : null,
+          maHoaDon: (r.lark_contract_code as string | null) ?? null,
           coverPhotoId: anhBia.get(id) ?? null,
           sentAt: (r.sent_at as string | null) ?? null,
         });
@@ -397,6 +401,7 @@ export async function GET(request: Request): Promise<Response> {
         babyFullName: bs?.babyFullName ?? null,
         packageName: bs?.packageName ?? null,
         customerPhone: bs?.customerPhone ?? null,
+        maHoaDon: bs?.maHoaDon ?? null,
         coverPhotoId: bs?.coverPhotoId ?? null,
         sentAt: bs?.sentAt ?? null,
       };

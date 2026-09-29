@@ -453,6 +453,8 @@ export async function GET(
       // tương tự, đừng gộp lại.
       sessionType: shoot?.concept ?? null,
       contractCodes: gallery.lark_contract_codes ?? [],
+      // BB-325 — bộ đã neo vào dòng Hậu Kỳ chưa (false = Link app không biết ghi về đâu).
+      coDongLark: !!gallery.lark_hauky_record_id,
       extraPhotoPrice: Number(gallery.extra_photo_price ?? 0),
       quotaKnown: summary.quotaKnown,
       includedQuota: summary.includedQuota,

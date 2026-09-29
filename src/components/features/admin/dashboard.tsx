@@ -22,12 +22,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BranchSelector } from "./branch-selector";
+import { NutNhacKhach } from "./nut-nhac-khach";
 import {
   bienDongLaTot,
   chaoTheoBuoi,
   ngayDayDuVN,
   xepViecHomNay,
-  loiNhacKhach,
   type ViecHomNayThoLuoc,
 } from "@/lib/utils/bang-dieu-khien";
 import { THU_TU_HIEN_THI_MUA_THEM } from "@/lib/utils/mua-them-7-ngay";
@@ -37,8 +37,8 @@ import {
   formatGioVN,
   formatKhoangNgayVN,
   formatNgayVN,
-  tinhTenBiaTuDuLieu,
   tinhTieuDeBoAnhQuanTri,
+  dongThongTinBoAnhQuanTri,
   formatSo,
   formatTien,
 } from "@/lib/utils/dinh-dang";
@@ -119,6 +119,8 @@ type ViecHomNayItem = ViecHomNayThoLuoc & {
   babyFullName: string | null;
   packageName: string | null;
   customerPhone: string | null;
+  /** BB-325 — mã hóa đơn cho dòng thông tin (route dashboard trả kèm). */
+  maHoaDon?: string | null;
   coverPhotoId: string | null;
   sentAt: string | null;
   /**
@@ -231,7 +233,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
         setData(result.data);
       }
     } catch (err: unknown) {
-      console.error("Lỗi khi tải bảng điều khiển:", err);
+      console.error("Lỗi khi tải Bàn làm việc:", err);
       setError("Lỗi kết nối tới máy chủ");
     } finally {
       setLoading(false);
@@ -266,7 +268,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     return (
       <div className="p-8">
         <div className="rounded-lg bg-destructive/10 p-4 text-destructive border border-destructive/20">
-          <p className="font-semibold">Không thể tải bảng điều khiển</p>
+          <p className="font-semibold">Không thể tải Bàn làm việc</p>
           <p className="text-sm">{error}</p>
         </div>
       </div>
@@ -675,12 +677,18 @@ function AnhBiaViec({ coverPhotoId, title }: { coverPhotoId: string | null; titl
  * hàm dùng chung, dinh-dang.ts) thay vì gọi `tenGoiBe()` vô điều kiện: mất
  * nickname thì hiện HỌ TÊN ĐẦY ĐỦ NGUYÊN VẸN, không thêm "Bé ".
  */
-function dongPhuViec(item: ViecHomNayItem): string {
-  const tenBe = tinhTenBiaTuDuLieu(item.babyNickname, item.babyFullName);
-  const phan = [item.packageName, tenBe || null, item.customerName, item.branchName].filter(
-    (v): v is string => !!v,
-  );
-  return phan.join(" · ");
+function dongPhuViec(item: ViecHomNayItem, tieuDe: string): string {
+  // BB-325 ("tên hiển thị" 29/09/2026) — tiêu đề là TÊN MẸ; dòng phụ:
+  // tên bé · SĐT · mã hóa đơn · gói (dùng chung `dongThongTinBoAnhQuanTri`) · chi nhánh.
+  const thongTin = dongThongTinBoAnhQuanTri({
+    tieuDe,
+    babyNickname: item.babyNickname,
+    babyFullName: item.babyFullName,
+    customerPhone: item.customerPhone,
+    maHoaDon: item.maHoaDon,
+    packageName: item.packageName,
+  });
+  return [thongTin, item.branchName].filter((v): v is string => !!v).join(" · ");
 }
 
 /** Nhãn hạn + có trễ hay không — "Trễ N ngày/giờ" / "HH:mm" (hôm nay) / "dd/mm/yyyy". */
@@ -739,24 +747,6 @@ function NutLamNhanhViec({
   dangXuLy: boolean;
   onChuyenChinh: () => void;
 }) {
-  const [daChep, setDaChep] = useState(false);
-
-  async function chepLoiNhac() {
-    try {
-      await navigator.clipboard.writeText(
-        loiNhacKhach({
-          customerName: item.customerName,
-          babyName: tinhTenBiaTuDuLieu(item.babyNickname, item.babyFullName) || null,
-          title: item.title,
-        }),
-      );
-      setDaChep(true);
-      window.setTimeout(() => setDaChep(false), 2000);
-    } catch {
-      // Clipboard API bị chặn — không có gì thêm để làm ở một nút nhỏ.
-    }
-  }
-
   // BB-312 — yêu cầu "xin mở lại" không đi qua "Chuyển chỉnh"/"Duyệt-giao" cũ
   // (đó là hai việc khác hẳn); nút riêng mở đúng bộ ảnh, nơi có khối nổi bật
   // để xử lý (`YeuCauMoLaiBanner`).
@@ -800,11 +790,9 @@ function NutLamNhanhViec({
       </Link>
     );
   }
-  return (
-    <Button variant="outline" size="sm" className="h-8 shrink-0 whitespace-nowrap text-xs" onClick={() => void chepLoiNhac()}>
-      <Send className="mr-1 h-3.5 w-3.5" /> {daChep ? "Đã chép" : "Nhắc khách"}
-    </Button>
-  );
+  // BB-327: gửi THẬT tới khách (chuông + thông báo đẩy), không còn chỉ chép
+  // câu vào clipboard — xem nut-nhac-khach.tsx.
+  return <NutNhacKhach galleryId={item.id} />;
 }
 
 function DongViec({ item, onLamMoi }: { item: ViecHomNayItem; onLamMoi: () => Promise<void> }) {
@@ -845,7 +833,7 @@ function DongViec({ item, onLamMoi }: { item: ViecHomNayItem; onLamMoi: () => Pr
         <p className={`truncate text-sm font-medium text-[var(--bb-fg)]${laMaHopDong ? " tabular-nums" : ""}`}>
           {tieuDe}
         </p>
-        <p className="truncate text-xs text-[var(--bb-fg-muted)]">{dongPhuViec(item)}</p>
+        <p className="truncate text-xs text-[var(--bb-fg-muted)]">{dongPhuViec(item, tieuDe)}</p>
       </Link>
       <span
         className={

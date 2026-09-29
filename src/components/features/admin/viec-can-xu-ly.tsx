@@ -34,94 +34,14 @@ import { LinkSapHetHanReport } from "./link-sap-het-han-report";
 import { OverQuotaReport } from "./over-quota-report";
 import { YeuCauMoLaiReport } from "./yeu-cau-mo-lai-report";
 import { KhachMuaThemReport } from "./dot-chon-admin";
+import { QuenMatKhauReport } from "./quen-mat-khau-report";
 import { formatSo } from "@/lib/utils/dinh-dang";
+import { SU_KIEN_VIEC_DOI, TABS_VIEC_CAN_XU_LY, tabsChoVai as locTabTheoVai, type TabViecCanXuLy } from "@/lib/utils/viec-can-xu-ly-tabs";
 
-type TabValue =
-  | "loi-dong-bo"
-  | "link-sap-het-han"
-  | "over-quota"
-  | "yeu-cau-mo-lai"
-  | "khach-mua-them";
-
-interface DinhNghiaTab {
-  value: TabValue;
-  label: string;
-  api: string;
-  /**
-   * Vai bị chặn XEM tab này. Giữ nguyên đúng luật hiển thị của ba menu cũ —
-   * BB-280 chỉ sắp lại chỗ đặt, không đổi ai xem được gì.
-   */
-  hiddenForRoles?: string[];
-  /** Đếm số việc từ đáp trả JSON của `api`. */
-  demSo: (data: unknown) => number;
-}
-
-const TABS: DinhNghiaTab[] = [
-  {
-    value: "loi-dong-bo",
-    label: "Bộ ảnh lỗi tải",
-    api: "/api/admin/reports/loi-dong-bo",
-    hiddenForRoles: ["photoshop_ctv"],
-    demSo: (data) => {
-      const d = data as { summary?: { galleryCount?: number } } | null;
-      return d?.summary?.galleryCount ?? 0;
-    },
-  },
-  {
-    value: "link-sap-het-han",
-    label: "Link sắp hết hạn",
-    api: "/api/admin/reports/link-sap-het-han",
-    hiddenForRoles: ["photoshop_ctv"],
-    demSo: (data) => {
-      const d = data as { items?: unknown[] } | null;
-      return d?.items?.length ?? 0;
-    },
-  },
-  {
-    value: "over-quota",
-    label: "Ảnh vượt hạn mức",
-    api: "/api/admin/reports/over-quota",
-    // Không hiddenForRoles: menu cũ cho MỌI vai thấy mục này, kể cả
-    // photoshop_ctv — giữ nguyên.
-    demSo: (data) => {
-      const d = data as { items?: unknown[] } | null;
-      return d?.items?.length ?? 0;
-    },
-  },
-  {
-    // BB-312 — cùng nguồn với huy hiệu "Cần xử lý ngay"
-    // (src/lib/utils/can-xu-ly.ts → choMoLai), một công thức, một chỗ (BB-283).
-    value: "yeu-cau-mo-lai",
-    label: "Yêu cầu mở lại",
-    api: "/api/admin/reports/yeu-cau-mo-lai",
-    hiddenForRoles: ["photoshop_ctv"],
-    demSo: (data) => {
-      const d = data as { items?: unknown[] } | null;
-      return d?.items?.length ?? 0;
-    },
-  },
-  {
-    // BB-321 — đợt mua thêm khách đã chốt, chờ CSKH xác nhận/từ chối. Cùng nguồn
-    // với huy hiệu "Cần xử lý ngay" (src/lib/utils/can-xu-ly.ts → choDotChon).
-    value: "khach-mua-them",
-    label: "Khách mua thêm",
-    api: "/api/admin/reports/dot-chon-cho-xac-nhan",
-    hiddenForRoles: ["photoshop_ctv"],
-    demSo: (data) => {
-      const d = data as { items?: unknown[]; viecDot1?: unknown[] } | null;
-      return (d?.items?.length ?? 0) + (d?.viecDot1?.length ?? 0);
-    },
-  },
-];
+type TabValue = TabViecCanXuLy;
 
 function laTabHopLe(v: string | null): v is TabValue {
-  return (
-    v === "loi-dong-bo" ||
-    v === "link-sap-het-han" ||
-    v === "over-quota" ||
-    v === "yeu-cau-mo-lai" ||
-    v === "khach-mua-them"
-  );
+  return TABS_VIEC_CAN_XU_LY.some((t) => t.value === v);
 }
 
 export function ViecCanXuLy({ role }: { role?: string }) {
@@ -129,7 +49,10 @@ export function ViecCanXuLy({ role }: { role?: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const tabsChoVai = TABS.filter((tab) => !(role && tab.hiddenForRoles?.includes(role)));
+  // BB-327: định nghĩa tab + cách đếm dùng CHUNG với huy hiệu menu
+  // (admin-layout-shell.tsx) — số trên menu luôn bằng tổng số trên các tab.
+  const [khongCoQuyenQuenMk, setKhongCoQuyenQuenMk] = useState(false);
+  const tabsChoVai = locTabTheoVai(role).filter((t) => !(t.value === "quen-mat-khau" && khongCoQuyenQuenMk));
   const tabParam = searchParams.get("tab");
   const macDinh = tabsChoVai[0]?.value ?? "over-quota";
   const active: TabValue =
@@ -139,21 +62,27 @@ export function ViecCanXuLy({ role }: { role?: string }) {
 
   useEffect(() => {
     let alive = true;
-    for (const tab of tabsChoVai) {
-      fetch(tab.api, { cache: "no-store" })
-        .then((res) => res.json().catch(() => null).then((json) => ({ ok: res.ok, json })))
-        .then(({ ok, json }) => {
-          if (!alive || !ok || !json?.data) return;
-          setDemSo((truoc) => ({ ...truoc, [tab.value]: tab.demSo(json.data) }));
-        })
-        .catch(() => {
-          // Đếm là phụ — hỏng thì thôi, không chặn tab chạy.
-        });
+    function demLai() {
+      for (const tab of locTabTheoVai(role)) {
+        fetch(tab.api, { cache: "no-store" })
+          .then((res) => res.json().catch(() => null).then((json) => ({ ok: res.ok, json })))
+          .then(({ ok, json }) => {
+            if (!alive || !ok || !json?.data) return;
+            if (tab.value === "quen-mat-khau" && json.data.coQuyen === false) setKhongCoQuyenQuenMk(true);
+            setDemSo((truoc) => ({ ...truoc, [tab.value]: tab.demSo(json.data) }));
+          })
+          .catch(() => {
+            // Đếm là phụ — hỏng thì thôi, không chặn tab chạy.
+          });
+      }
     }
+    demLai();
+    // BB-327: xử lý xong một việc (mở lại, từ chối…) thì đếm lại ngay.
+    window.addEventListener(SU_KIEN_VIEC_DOI, demLai);
     return () => {
       alive = false;
+      window.removeEventListener(SU_KIEN_VIEC_DOI, demLai);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- danh sách tab theo vai, không đổi trong một phiên
   }, [role]);
 
   const onChange = useCallback(
@@ -169,7 +98,7 @@ export function ViecCanXuLy({ role }: { role?: string }) {
     <div className="space-y-6">
       <PageHeader
         title="Việc cần xử lý"
-        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại, khách mua thêm chờ xác nhận."
+        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại, khách mua thêm chờ xác nhận, nhân viên quên mật khẩu."
       />
       <Tabs value={active} onValueChange={onChange}>
         {/* BB-318: hàng tab xuống dòng thay vì tràn ngang — trên 390px bốn tab không vừa một hàng, và bấm tab từng làm CẢ TRANG trượt sang bên. */}
@@ -211,6 +140,11 @@ export function ViecCanXuLy({ role }: { role?: string }) {
         {tabsChoVai.some((t) => t.value === "khach-mua-them") && (
           <TabsContent value="khach-mua-them">
             <KhachMuaThemReport />
+          </TabsContent>
+        )}
+        {tabsChoVai.some((t) => t.value === "quen-mat-khau") && (
+          <TabsContent value="quen-mat-khau" className="mt-6">
+            <QuenMatKhauReport />
           </TabsContent>
         )}
       </Tabs>

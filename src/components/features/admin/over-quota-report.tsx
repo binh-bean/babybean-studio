@@ -30,7 +30,7 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import Link from "next/link";
 import { CARD_TITLE_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
-import { formatNgayVN, tinhTenBiaTuDuLieu, formatSo } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, tinhTenBiaTuDuLieu, tinhTieuDeBoAnhQuanTri, formatSo } from "@/lib/utils/dinh-dang";
 
 interface ReportItem {
   galleryId: string;
@@ -226,9 +226,15 @@ export function OverQuotaReport() {
  * bộ ảnh thô (mã hợp đồng), không bịa tên.
  */
 function BoAnhCell({ it }: { it: ReportItem }) {
+  // BB-325 ("tên hiển thị" 29/09/2026) — dòng chính là TÊN MẸ, tên bé xuống dòng phụ.
   const tenBe = tinhTenBiaTuDuLieu(it.babyNickname, it.babyFullName);
-  const chinh = tenBe || it.customerName || it.galleryTitle;
-  const phu = tenBe && it.customerName ? it.customerName : null;
+  const { tieuDe: chinh } = tinhTieuDeBoAnhQuanTri({
+    babyNickname: it.babyNickname,
+    babyFullName: it.babyFullName,
+    customerName: it.customerName,
+    duPhong: it.galleryTitle,
+  });
+  const phu = tenBe && tenBe !== chinh ? tenBe : null;
   return (
     <div className="min-w-0">
       <Link

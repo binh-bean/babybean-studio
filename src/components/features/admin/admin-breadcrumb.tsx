@@ -11,8 +11,8 @@ const LA_MA = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getBreadcrumbName(path: string, cha?: string) {
   if (LA_MA.test(path)) return cha === "galleries" ? "Chi tiết bộ ảnh" : "Chi tiết";
-  if (path === "admin") return "Bảng điều khiển";
-  if (path === "galleries") return "Quản lý Bộ ảnh";
+  if (path === "admin") return "Bàn làm việc";
+  if (path === "galleries") return "Quản lý bộ ảnh";
   if (path === "customers") return "Khách hàng";
   if (path === "settings") return "Cài đặt";
   // BB-280: /admin/staff giờ là trang gộp "Nhân sự & vai trò" (hai tab); giữ

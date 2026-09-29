@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isGalleryLocked } from "@/lib/gallery-status";
+import { isGalleryLocked, maLarkConHieuLuc } from "@/lib/gallery-status";
 import { canSelectMore, type QuotaRules } from "@/lib/selection/quota";
 import type { GallerySession, SelectionPatchRequest, SelectionPatchResponse, ErrorCode } from "@/types/domain";
 
@@ -15,7 +15,7 @@ export async function patchSelection(
   const [galleryResult, linkResult, quotaResult] = await Promise.all([
     supabase
       .from("galleries")
-      .select("status, included_quota, extra_photo_price, max_selection, allow_extra, lark_trang_thai")
+      .select("status, included_quota, extra_photo_price, max_selection, allow_extra, lark_trang_thai, lark_trang_thai_tu, reopened_at")
       .eq("id", session.galleryId)
       .single(),
     supabase
@@ -50,7 +50,8 @@ export async function patchSelection(
   */
   // BB-285: Lark đã sang "Đã chọn hình" trở lên thì khoá luôn, dù app còn ghi
   // ready/in_review/submitted — xem gallery-status.ts.
-  if (isGalleryLocked(gallery.status, gallery.lark_trang_thai)) {
+  // BB-327: CSKH mở lại SAU lần cuối Lark đổi trạng thái thì Lark cũ không còn khoá.
+  if (isGalleryLocked(gallery.status, maLarkConHieuLuc(gallery))) {
     // BB-223: cùng lý do — bỏ câu tiếng Anh, để DEFAULT_MESSAGE lo.
     return { error: { code: "GALLERY_LOCKED" } };
   }

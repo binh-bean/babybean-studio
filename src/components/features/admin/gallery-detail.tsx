@@ -30,6 +30,7 @@ import { getStatusBadgeConfig } from "./gallery-list";
 // BB-312 — khối nổi bật "khách xin mở lại". Component RIÊNG (không viết
 // thẳng vào tệp này): một đội khác đang sửa `gallery-detail.tsx` cùng đợt
 // này — xem chú thích ở chỗ gắn bên dưới và ở đầu file component.
+import { DanhSachAnhChon } from "./danh-sach-anh-chon";
 import { YeuCauMoLaiBanner, type ReopenRequestChiTiet } from "./yeu-cau-mo-lai-banner";
 import { DotChonQuanTri, GhiChuChotDot1, type ChotDot1View, type DotQuanTriView } from "./dot-chon-admin";
 import { PageHeader, PAGE_TITLE_FALLBACK_CLASS } from "./page-header";
@@ -48,13 +49,14 @@ import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import { nhomSanPham } from "@/lib/products/nhom-san-pham";
+import { GanDongLark } from "./gan-dong-lark";
 import {
   formatGioVN,
   formatKichThuoc,
   formatNgayGioVN,
   formatNgayVN,
-  formatSdt,
   tinhTieuDeBoAnhQuanTri,
+  dongThongTinBoAnhQuanTri,
   formatSo,
   formatTien,
 } from "@/lib/utils/dinh-dang";
@@ -170,6 +172,8 @@ interface Detail {
   title: string;
   status: string;
   contractCodes: string[];
+  /** BB-325 — false = bộ chưa gắn dòng Hậu Kỳ bên Lark. */
+  coDongLark?: boolean;
   extraPhotoPrice: number;
   quotaKnown: boolean;
   includedQuota: number | null;
@@ -470,6 +474,33 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     }
   }
 
+  /**
+   * BB-326 mục 5 — bộ đang lỗi Drive: kiểm lại NGAY (chờ kết quả), khác
+   * `dongBoLai` chạy nền. Drive đọc được thì lỗi được xoá và ảnh kéo về luôn.
+   */
+  async function kiemTraLai() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/kiem-tra-lai-loi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ galleryId }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setNotice(json?.error?.message ?? "Không kiểm tra lại được.");
+      } else if (json?.data?.hetLoi) {
+        setNotice(`Đã đọc được thư mục — hết lỗi, kéo về ${formatSo(json.data.soAnh ?? 0)} ảnh.`);
+      } else {
+        setNotice(`Vẫn chưa đọc được thư mục: ${json?.data?.loi ?? "không rõ lý do"}.`);
+      }
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   /** CSKH chuyển thư mục ảnh đã chỉnh cho khách: in_retouch → chờ khách duyệt. */
   async function sendRetouched(url: string) {
     setBusy(true);
@@ -749,9 +780,18 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     customerName: detail.customerName,
     duPhong: detail.title,
   });
+  // BB-325 ("tên hiển thị" 29/09/2026) — tiêu đề là TÊN MẸ; dòng phụ: tên bé ·
+  // SĐT · mã hóa đơn · gói (`dongThongTinBoAnhQuanTri`), rồi chi nhánh · ngày chụp.
   const dongPhu = [
-    detail.customerName,
-    detail.customerPhone ? formatSdt(detail.customerPhone) : null,
+    dongThongTinBoAnhQuanTri({
+      tieuDe,
+      babyNickname: detail.babyNickname,
+      babyFullName: detail.babyFullName,
+      customerPhone: detail.customerPhone,
+      // Mã hóa đơn đã có dòng riêng kèm nút chép ngay dưới (data-testid dong-ma-hop-dong) — không in hai lần.
+      maHoaDon: null,
+      packageName: detail.packageName,
+    }),
     detail.branchName,
     detail.shootDate ? formatNgayVN(detail.shootDate) : null,
   ].filter((v): v is string => !!v);
@@ -997,6 +1037,43 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                 : "chưa đồng bộ lần nào"}
             </p>
 
+            {/* BB-326 mục 3 — anh không thấy nút đồng bộ: BB-308 dời hết vào
+                menu ⋯ nên bộ 0 ảnh trông như "không làm gì được". Nút nằm
+                ngay tại thẻ; bộ đang lỗi thì nút đọc là "Kiểm tra lại". Menu ⋯
+                vẫn giữ các mục cũ. */}
+            {!dangSuaThuMuc && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="nut-dong-bo-drive"
+                  disabled={busy || !detail.driveFolderUrl}
+                  onClick={() => void (detail.syncError ? kiemTraLai() : dongBoLai())}
+                  className={
+                    detail.photoCount === 0 || detail.syncError
+                      ? "rounded-md bg-[var(--bb-fg)] px-3 py-2 text-sm text-[var(--bb-bg)] disabled:opacity-40"
+                      : "rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
+                  }
+                >
+                  {detail.syncError
+                    ? "Kiểm tra lại"
+                    : detail.photoCount === 0
+                      ? "Đồng bộ ảnh từ Drive"
+                      : "Đồng bộ lại"}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setThuMucMoi(detail.driveFolderUrl ?? "");
+                    setDangSuaThuMuc(true);
+                  }}
+                  className="text-xs text-[var(--bb-fg-muted)] underline disabled:opacity-40"
+                >
+                  {detail.driveFolderUrl ? "Đổi thư mục" : "Gắn thư mục"}
+                </button>
+              </div>
+            )}
+
             {/* BB-308 (bản vẽ BB-301 admin duyệt) — "Đồng bộ lại" và "Đổi
                 thư mục" chuyển vào menu ⋯ ở đầu trang; thẻ này giờ CHỈ còn
                 thông tin (mã thư mục, số ảnh, lần đồng bộ). Form đổi thư mục
@@ -1039,6 +1116,9 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           <section className="rounded-lg border border-[var(--bb-border)] p-4">
             {/* BB-320: nhãn "Link app" (trước là "Link khách") — cùng tên với cột bên Lark. */}
             <h2 className="text-base font-medium">Link app</h2>
+
+            {/* BB-325 ("đi về đâu") — bộ chưa gắn dòng Hậu Kỳ: nói lý do, cho gắn trước. */}
+            {detail.coDongLark === false && <GanDongLark galleryId={galleryId} onDone={load} />}
 
             {/* Kết quả ghi sang Lark của lần tạo link VỪA RỒI (chỉ hiện sau khi bấm tạo). */}
             {linkMoi && (
@@ -1093,35 +1173,9 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           {detail.selectedCount > 0 && (
             <section id="xuat-danh-sach" className="scroll-mt-6 rounded-lg border border-[var(--bb-border)] p-4">
               <h2 className="text-base font-medium">{vi.admin.export.title}</h2>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <a
-                  href={`/api/admin/galleries/${galleryId}/export`}
-                  download
-                  title={vi.admin.export.formatLightroom}
-                  className="flex h-10 items-center justify-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-2 text-center text-xs hover:bg-[var(--bb-surface-2)]"
-                >
-                  Lightroom
-                </a>
-                <a
-                  href={`/api/admin/galleries/${galleryId}/export?format=csv`}
-                  download
-                  title={vi.admin.export.formatCsv}
-                  className="flex h-10 items-center justify-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-2 text-center text-xs hover:bg-[var(--bb-surface-2)]"
-                >
-                  Excel
-                </a>
-                <a
-                  href={`/api/admin/galleries/${galleryId}/export?format=chi-tiet`}
-                  download
-                  title={vi.admin.export.formatChiTiet}
-                  className="flex h-10 items-center justify-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-2 text-center text-xs hover:bg-[var(--bb-surface-2)]"
-                >
-                  Văn bản
-                </a>
-              </div>
-              <p className="mt-2 text-[11px] leading-snug text-[var(--bb-fg-muted)]">
-                Lightroom: danh sách tên file · Excel: kèm ghi chú · Văn bản: chi tiết cho CSKH
-              </p>
+              {/* BB-327 (chủ studio 29/09): hiện CHỮ ngay trong app + nút Chép, chỉ
+                  ảnh đã chọn — không cần tải tệp nữa. */}
+              <DanhSachAnhChon galleryId={galleryId} soAnh={detail.selectedCount} />
             </section>
           )}
 
@@ -2303,12 +2357,28 @@ function TinhTrangLink({
   const link = detail.shareLink;
 
   if (!link) {
+    // BB-326 mục 3 — nút tạo link ngay tại thẻ (trước chỉ có trong menu ⋯).
+    // Bộ 0 ảnh thì chưa tạo được link: câu nhắc chỉ sang nút đồng bộ ở thẻ
+    // "Thư mục ảnh gốc" ngay phía trên.
     return (
-      <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
-        {detail.photoCount === 0
-          ? "Chưa có ảnh nào. Đồng bộ ảnh từ Drive xong rồi hãy tạo link."
-          : "Chưa có link nào cho bộ ảnh này."}
-      </p>
+      <div className="mt-1 space-y-2">
+        <p className="text-sm text-[var(--bb-fg-muted)]">
+          {detail.photoCount === 0
+            ? "Chưa có ảnh nào. Bấm đồng bộ ở thẻ Thư mục ảnh gốc phía trên, xong rồi tạo link."
+            : "Chưa có link nào cho bộ ảnh này."}
+        </p>
+        {detail.photoCount > 0 && (
+          <button
+            type="button"
+            data-testid="nut-tao-link-app"
+            disabled={busy}
+            onClick={onTaoLink}
+            className="rounded-md bg-[var(--bb-fg)] px-3 py-2 text-sm text-[var(--bb-bg)] disabled:opacity-40"
+          >
+            Tạo link app
+          </button>
+        )}
+      </div>
     );
   }
 
