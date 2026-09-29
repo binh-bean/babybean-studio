@@ -11,7 +11,9 @@ import { chanLh3TrenTrinhDuyet } from "./helpers/mock-lh3-trinh-duyet";
 
 const DT = { width: 390, height: 844 };
 const MT = { width: 1440, height: 900 };
-const CAU_HAN_MUC = "Studio đang cập nhật số ảnh trong gói.";
+// BB-319 K-D2 đổi lời: "gói của ba mẹ" (lời khách), thả tim thì thêm câu nói rõ tim chưa lưu.
+const CAU_HAN_MUC = "Studio đang cập nhật gói của ba mẹ.";
+const CAU_HAN_MUC_TIM = `${CAU_HAN_MUC} Tim này chưa được lưu.`;
 
 let d: DuLieuDanhGia5;
 test.setTimeout(120_000);
@@ -120,16 +122,16 @@ test("K-g: hạn mức chưa biết — nút mờ + aria-disabled, MỘT câu �
   await page.locator('button[aria-label="Chọn ảnh này"]').first().click();
   const tb = page.getByTestId("thong-bao-trang-thai");
   await expect(tb).toBeVisible();
-  const chu = (await tb.innerText()).replace(/\s+/g, " ").replace("✕", "").trim();
-  expect(chu).toBe(CAU_HAN_MUC);
-  expect(chu.split(" ").length).toBeLessThanOrEqual(12);
+  const chu = (await page.getByTestId("thong-bao-trang-thai-chu").innerText()).replace(/\s+/g, " ").trim();
+  expect(chu).toBe(CAU_HAN_MUC_TIM);
+  for (const cau of chu.split(/(?<=\.)\s+/)) expect(cau.split(" ").length).toBeLessThanOrEqual(12);
   expect(chu).not.toMatch(/CSKH|liên hệ/);
   await page.waitForTimeout(400);
   const tbHop = (await tb.boundingBox())!;
   const dau = (await page.locator("#dau-luoi-anh").boundingBox())!;
   expect(tbHop.y, "thông báo che hàng chip lọc").toBeGreaterThanOrEqual(dau.y + dau.height - 1);
   // Bấm nút Chốt khi bị chặn: cùng một câu, không mở hộp chốt.
-  await tb.getByRole("button").click();
+  await tb.getByRole("button", { name: "Đóng" }).click();
   await nut.click({ force: true }); // aria-disabled: Playwright coi là không bấm được, khách thật vẫn bấm
   await expect(tb).toContainText(CAU_HAN_MUC);
   await expect(page.getByRole("heading", { name: /Chốt ảnh cho/ })).toHaveCount(0);

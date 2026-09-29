@@ -21,6 +21,7 @@
 import React from "react";
 import { cn } from "@/components/ui/utils";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
 export interface AnhTrongLuoiChon {
   id: string;
@@ -107,7 +108,7 @@ export function ChonAnhNhieuTam({
               !locTatCa ? "bg-white text-foreground shadow-sm" : "text-foreground/60",
             )}
           >
-            ♡ Đã thả tim · {anhDaThaTim.length}
+            ♡ Đã thả tim · {formatSo(anhDaThaTim.length)}
           </button>
           <button
             type="button"
@@ -117,7 +118,7 @@ export function ChonAnhNhieuTam({
               locTatCa ? "bg-white text-foreground shadow-sm" : "text-foreground/60",
             )}
           >
-            Tất cả · {tatCaAnh.length}
+            Tất cả · {formatSo(tatCaAnh.length)}
           </button>
         </div>
       </div>
@@ -173,8 +174,8 @@ export function ChonAnhNhieuTam({
       <footer className="pointer-events-none absolute inset-x-4 bottom-[18px] sm:inset-x-8">
         <div className="pointer-events-auto flex h-[52px] items-center justify-between rounded-full border border-[var(--bb-border)] bg-[rgba(251,247,242,0.92)] pl-5 pr-1.5 shadow-[0_6px_24px_-8px_rgba(46,42,39,0.25)] backdrop-blur-[8px]">
           {/* BB-305 — thanh đếm "Đã chọn N tấm" là nội dung: bỏ font-display, tabular-nums cho số. */}
-          <p className="text-[17px] font-medium tabular-nums text-foreground">
-            Đã chọn {daChon.size} tấm
+          <p className="text-[16px] font-medium tabular-nums text-foreground">
+            Đã chọn {formatSo(daChon.size)} tấm
           </p>
           <button
             type="button"

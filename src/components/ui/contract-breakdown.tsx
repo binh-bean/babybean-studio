@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cn } from "./utils";
 import { vi } from "../../i18n";
+import { formatTien } from "@/lib/utils/dinh-dang";
 
 export interface ContractChildItem {
   id?: string;
@@ -35,11 +36,9 @@ export interface ContractBreakdownProps extends React.HTMLAttributes<HTMLDivElem
   emptyMessage?: string;
 }
 
+/** BB-324: MỘT cách viết tiền cho mọi màn — gọi `formatTien` ("12.500.000 ₫"). */
 export function formatCurrencyVND(amount: number): string {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-  }).format(amount);
+  return formatTien(amount);
 }
 
 /**

@@ -131,7 +131,7 @@ test.describe("BB-259: Dòng thời gian hoạt động", () => {
     const chuoiVanBan = await khoi.innerText();
     const viTriTien = chuoiVanBan.indexOf("Nhân viên ghi nhận thu 500.000đ");
     const viTriChot = chuoiVanBan.indexOf("Ba mẹ chốt lựa chọn 12 tấm");
-    const viTriLink = chuoiVanBan.indexOf("Nhân viên tạo link gửi khách");
+    const viTriLink = chuoiVanBan.indexOf("Nhân viên tạo link app");
     expect(viTriTien).toBeGreaterThanOrEqual(0);
     expect(viTriChot).toBeGreaterThan(viTriTien);
     expect(viTriLink).toBeGreaterThan(viTriChot);

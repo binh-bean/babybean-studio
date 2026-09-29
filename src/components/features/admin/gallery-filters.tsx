@@ -1,12 +1,11 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { vi } from "@/i18n";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Table2, Kanban, Plus, X, SlidersHorizontal } from "lucide-react";
+import { Search, Table2, Kanban, X, SlidersHorizontal } from "lucide-react";
 
 export interface GalleryFilterState {
   branchId: string;
@@ -359,26 +358,8 @@ export function GalleryFilters({
             </Button>
           </div>
 
-          {/*
-            Trên điện thoại nút này chỉ còn dấu cộng: đo ở 375px, cả cụm
-            Bảng/Kanban + nút chữ đầy đủ dài 383px, tức thò 8px khỏi mép phải.
-            Chữ vẫn còn cho trình đọc màn hình qua `aria-label`.
-          */}
-          {/* BB-290 lượt 2: từ `lg`, nút "+ Tạo bộ ảnh" đã có ở PageHeader
-              (BoAnhPageHeader, theo quan-tri-bo-anh-bang.png) — giữ nút này
-              chỉ để dùng dưới `lg`, tránh hai nút Tạo trùng nhau xếp chồng
-              trên màn rộng. */}
-          <Link href="/admin/galleries/create" className="lg:hidden">
-            <Button
-              variant="default"
-              className="h-9 px-3 sm:px-4"
-              aria-label={vi.admin.galleries.createGalleryCta}
-              title={vi.admin.galleries.createGalleryCta}
-            >
-              <Plus className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">{vi.admin.galleries.createGalleryCta}</span>
-            </Button>
-          </Link>
+          {/* BB-320 (Q-N1): nút "+ Tạo bộ ảnh" nay LUÔN ở khối tiêu đề trang (BoAnhPageHeader,
+              cả điện thoại lẫn máy tính) — không còn nút "+" thứ hai ở hàng bộ lọc. */}
         </div>
       </div>
     </div>

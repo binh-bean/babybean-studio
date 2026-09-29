@@ -137,7 +137,8 @@ ownIpTest.describe("BB-310 mục 3: Đã giao — không còn thẻ/nút/thanh t
       await ownIpExpect(page.getByText("Yêu cầu sửa lại")).toHaveCount(0);
 
       await page.locator("#dau-luoi-anh").scrollIntoViewIfNeeded();
-      await page.getByText("ảnh đã chỉnh").first().waitFor({ state: "visible" });
+      // BB-319: dòng phụ bìa đã giao không còn "N ảnh đã chỉnh" (số ảnh nằm trên nút Tải cả bộ) — đợi lưới ảnh.
+      await page.getByTestId("the-anh").first().waitFor({ state: "visible" });
 
       // Mục 3d — không còn dòng "Chưa có tấm nào trong cuốn này" (đã giao
       // xong, không còn gì "chưa" cả).

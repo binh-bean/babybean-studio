@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
 export interface MenuTaiAnhProps {
   soAnh: number;
@@ -107,7 +108,7 @@ export function MenuTaiAnh({ soAnh, dungLuong, soDaChon, onTaiDaChon, onTaiCaBo 
             <span>
               Tải cả bộ
               <span className="block text-xs text-muted-foreground">
-                {soAnh.toLocaleString("vi-VN")} ảnh · {dungLuong} · ảnh gốc
+                {formatSo(soAnh)} ảnh · {dungLuong} · ảnh gốc
               </span>
             </span>
           </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { formatNgayGioVN } from "@/lib/utils/dinh-dang";
+import { formatNgayGioVN, formatSo } from "@/lib/utils/dinh-dang";
 import Link from "next/link";
 import { getDictionary } from "@/i18n";
 import { Select } from "@/components/ui";
@@ -133,7 +133,7 @@ export function NhatKyReport() {
         </p>
       ) : (
         <div className="flex flex-col gap-2">
-          <p className="text-sm text-[var(--bb-fg-muted)]">{t.summary.replace("{total}", String(total))}</p>
+          <p className="text-sm text-[var(--bb-fg-muted)]">{t.summary.replace("{total}", formatSo(total))}</p>
 
           {/*
             Dưới `lg` thì mỗi dòng là một thẻ, không phải một hàng bảng.

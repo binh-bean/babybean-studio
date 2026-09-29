@@ -51,7 +51,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const jsonBody = await readJsonBody(request);
-    const body = (jsonBody.ok ? jsonBody.data : null) as { lyDo?: string } | null;
+    const body = (jsonBody.ok ? jsonBody.data : null) as { lyDo?: string; soDot?: unknown } | null;
     const lyDo = (body?.lyDo ?? "").trim();
     if (lyDo.length === 0) {
       return fail("INVALID_INPUT", "Ba mẹ ghi giúp em muốn sửa gì, để bên mình xem có kịp không");
@@ -59,6 +59,13 @@ export async function POST(request: Request): Promise<Response> {
     if (lyDo.length > MAX_LY_DO) {
       return fail("INVALID_INPUT", `Lời nhắn tối đa ${MAX_LY_DO} ký tự`);
     }
+
+    // BB-321 — khách nói rõ muốn đổi ĐỢT nào (1 = ảnh trong gói, ≥ 2 = đợt mua
+    // thêm). Tuỳ chọn: không gửi thì CSKH chọn đợt khi mở lại.
+    const soDot =
+      typeof body?.soDot === "number" && Number.isInteger(body.soDot) && body.soDot >= 1 && body.soDot <= 999
+        ? body.soDot
+        : null;
 
     const admin = createAdminClient();
     const { data: gallery } = await admin
@@ -100,7 +107,7 @@ export async function POST(request: Request): Promise<Response> {
       entityType: "gallery",
       entityId: String(gallery.id),
       galleryId: String(gallery.id),
-      metadata: { lyDo, trangThaiLucXin: gallery.status },
+      metadata: { lyDo, trangThaiLucXin: gallery.status, ...(soDot !== null ? { soDot } : {}) },
     });
 
     // Báo vào nhóm Lark của chi nhánh. Không có nhóm thì dòng nhật ký ở trên
@@ -112,7 +119,7 @@ export async function POST(request: Request): Promise<Response> {
         galleryId: String(gallery.id),
         galleryTitle: String(gallery.title),
         trangThai: GALLERY_STATUS_LABEL[gallery.status] ?? gallery.status,
-        lyDo,
+        lyDo: soDot !== null && soDot >= 2 ? `[Đợt ${soDot}] ${lyDo}` : lyDo,
       },
     });
 

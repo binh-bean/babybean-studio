@@ -28,6 +28,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Camera, ChevronRight, AlertCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/components/ui/utils";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
 export interface BuoiChupTomTat {
   id: string;
@@ -71,7 +72,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
       }
       setDanhSach((json?.data?.buoiChup ?? []) as BuoiChupTomTat[]);
     } catch {
-      setLoi("Không kết nối được, ba mẹ kiểm tra giúp đường mạng rồi thử lại");
+      setLoi("Không kết nối được. Ba mẹ kiểm tra mạng rồi thử lại nhé.");
     } finally {
       setDangTai(false);
     }
@@ -136,8 +137,8 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
         </div>
         <h1 className="font-display text-2xl font-light">Album đang được chuẩn bị</h1>
         <p className="mb-6 mt-2 text-sm text-muted-foreground">
-          Studio đang sắp ảnh buổi chụp của bé. Ba mẹ mở lại link này sau một chút giúp nhé,
-          link không hết hạn đâu ạ.
+          Studio đang sắp ảnh buổi chụp của bé. Ba mẹ mở lại link này sau ít phút nhé.
+          Link không hết hạn đâu ạ.
         </p>
         <button
           type="button"
@@ -152,14 +153,14 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+      <div className="mx-auto max-w-2xl px-6 py-8 sm:py-12">
         <header className="mb-6 sm:mb-8">
-          <h1 className="font-display text-3xl font-light tracking-tight sm:text-4xl">
+          <h1 className="kh-h1 font-light tracking-tight">
             Album của bé
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Ba mẹ chọn buổi chụp muốn xem ạ. Link này là của riêng gia đình mình và không hết hạn,
-            ba mẹ lưu lại để xem ảnh bất cứ lúc nào.
+            Ba mẹ chọn buổi chụp muốn xem ạ. Link này là của riêng gia đình mình.
+            Link không hết hạn, ba mẹ lưu lại để xem nhé.
           </p>
         </header>
 
@@ -212,7 +213,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       {ngay ? `Chụp ngày ${ngay}` : "Chưa ghi ngày chụp"}
                       {" · "}
-                      {buoi.soAnh} ảnh
+                      {formatSo(buoi.soAnh)} ảnh
                     </p>
                     <p className="mt-1 text-xs text-moss">{buoi.nhanTrangThai}</p>
                   </div>

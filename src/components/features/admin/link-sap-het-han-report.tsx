@@ -30,8 +30,9 @@
 import React from "react";
 import Link from "next/link";
 import { CARD_TITLE_CLASS } from "./page-header";
+import { TheSoLieu } from "./the-so-lieu";
 import { Badge } from "@/components/ui/badge";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
 
 interface Item {
   shareLinkId: string;
@@ -95,7 +96,7 @@ export function LinkSapHetHanReport() {
     <div className="flex flex-col gap-6">
       {/* BB-280: tiêu đề cấp trang chuyển sang PageHeader của /admin/viec-can-xu-ly. */}
       <header>
-        <h2 className={CARD_TITLE_CLASS}>Link gửi khách sắp hết hạn</h2>
+        <h2 className={CARD_TITLE_CLASS}>Link app sắp hết hạn</h2>
         <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
           Hạn đếm từ <strong>ngày cấp link</strong>, không phải ngày chụp. Hết hạn thì ba
           mẹ bấm vào thấy trang báo hết hạn — và không ai được báo trước, nên bảng này là
@@ -125,15 +126,15 @@ export function LinkSapHetHanReport() {
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat
             label="Đã hết hạn"
-            value={String(tong.daChet)}
+            value={formatSo(tong.daChet)}
             emphasis
             hint="ba mẹ đang không vào được"
           />
-          <Stat label="Chết trong 7 ngày" value={String(tong.trong7Ngay)} />
-          <Stat label="Tổng trong bảng" value={String(tong.tatCa)} />
+          <Stat label="Chết trong 7 ngày" value={formatSo(tong.trong7Ngay)} />
+          <Stat label="Tổng trong bảng" value={formatSo(tong.tatCa)} />
           <Stat
             label="Khách chưa mở lần nào"
-            value={String(tong.chuaAiMo)}
+            value={formatSo(tong.chuaAiMo)}
             hint="cả bộ có thể chưa ai trong nhà nhìn thấy"
           />
         </section>
@@ -193,7 +194,7 @@ export function LinkSapHetHanReport() {
                 <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-xs text-[var(--bb-fg-muted)]">
                   <span className="select-all font-mono">{it.contractCode ?? "—"}</span>
                   <span>
-                    đã mở {it.viewCount} lần · hạn {ngay(it.expiresAt)}
+                    đã mở {formatSo(it.viewCount)} lần · hạn {ngay(it.expiresAt)}
                   </span>
                 </div>
               </li>
@@ -250,7 +251,7 @@ export function LinkSapHetHanReport() {
                   <td className="select-all py-2 pr-3 font-mono text-xs">
                     {it.contractCode ?? "—"}
                   </td>
-                  <td className="py-2 pr-3 text-right">{it.viewCount}</td>
+                  <td className="py-2 pr-3 text-right">{formatSo(it.viewCount)}</td>
                   <td className="py-2 pr-3">{ngay(it.expiresAt)}</td>
                 </tr>
               ))}
@@ -270,24 +271,9 @@ export function LinkSapHetHanReport() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  hint,
-  emphasis,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <div className="rounded-lg border border-[var(--bb-border)] p-3">
-      <div className="text-xs text-[var(--bb-fg-muted)]">{label}</div>
-      <div className={emphasis ? "mt-1 text-lg font-semibold" : "mt-1 text-lg"}>{value}</div>
-      {hint && <div className="mt-1 text-xs text-[var(--bb-fg-muted)]">{hint}</div>}
-    </div>
-  );
+/** BB-320 (Q-N2): thẻ số dùng chung với mọi màn quản trị (the-so-lieu.tsx). */
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string; emphasis?: boolean }) {
+  return <TheSoLieu label={label} value={value} ghiChu={hint} />;
 }
 
 function Th({ children, className }: { children: React.ReactNode; className?: string }) {

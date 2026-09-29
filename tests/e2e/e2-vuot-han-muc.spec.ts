@@ -1,4 +1,5 @@
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 
@@ -105,7 +106,7 @@ test.describe("E-2: Vượt hạn mức", () => {
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
 
     await page.fill("#confirm-name-input", "Mẹ Bean");
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
     await page.getByRole("button", { name: "Xác nhận" }).click();
 
     // Kiểm tra DB lưu 2 ảnh phụ

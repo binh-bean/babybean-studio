@@ -31,7 +31,7 @@
 import React from "react";
 import { cn } from "@/components/ui/utils";
 import { conThieuAnh, type HangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
-import { formatKichThuoc } from "@/lib/utils/dinh-dang";
+import { tenKemSoLuong } from "@/lib/utils/dinh-dang";
 
 export interface DongSanPhamIn extends HangInTrongGoi {
   /** Ảnh đã xếp vào dòng hàng này. */
@@ -81,11 +81,12 @@ export function loiTrangThai(dong: DongSanPhamIn, khoa: boolean): { chu: string;
     };
   }
 
+  // BB-319 (luật 4) — "suất" là chữ nội bộ của hợp đồng; khách đếm bằng TẤM.
   return {
     chu: thieu
       ? khoa
-        ? `${dong.quantity - daCo}/${dong.quantity} suất chưa gán ảnh`
-        : `Còn ${dong.quantity - daCo}/${dong.quantity} suất chưa chọn ảnh`
+        ? `Có ${daCo}/${dong.quantity} tấm`
+        : `Còn thiếu ${dong.quantity - daCo} tấm`
       : `Đủ ${dong.quantity} tấm`,
     thieu,
   };
@@ -107,8 +108,9 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false }: TomT
       <p className="mt-1 text-sm text-muted-foreground">
         {/* BB-287 mục 5 — "bảng bên phải" sai trên điện thoại (không có bảng
             bên phải ở đó). Đổi thành thao tác đúng trên MỌI thiết bị. */}
-        Những thứ này ba mẹ đã trả tiền trong hợp đồng rồi. Bấm vào một tấm ảnh để
-        xem lớn, rồi bấm biểu tượng khung để chọn tấm đó in ra sản phẩm nào.
+        {/* BB-319 K-D2 — câu ngắn (≤ 12 chữ) thay cho một câu 25 chữ; gọi đúng tên nút
+            "Đặt in" ở màn xem lớn (không có "biểu tượng khung" nào để bấm). */}
+        Ba mẹ đã trả tiền cho những món này. Mở một tấm ảnh, bấm “Đặt in” để chọn.
       </p>
 
       <ul className="mt-3 space-y-2">
@@ -117,12 +119,7 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false }: TomT
           return (
             <li key={d.galleryItemId} className="rounded-lg border border-[var(--bb-border)] p-3">
               <div className="flex items-baseline justify-between gap-3">
-                <p className="text-sm font-medium">
-                  {formatKichThuoc(d.name)}
-                  {d.quantity > 1 && (
-                    <span className="ml-1.5 text-xs text-muted-foreground">×{d.quantity}</span>
-                  )}
-                </p>
+                <p className="text-sm font-medium">{tenKemSoLuong(d.name, d.quantity)}</p>
                 <p
                   className={cn(
                     "shrink-0 text-xs",

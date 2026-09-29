@@ -221,7 +221,7 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
         {soChuaDoc > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#C4645A] px-1 text-[10px] font-semibold leading-none text-white"
+            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#C4645A] px-1 text-[11px] font-semibold leading-none text-white"
           >
             {soChuaDoc > 9 ? "9+" : soChuaDoc}
           </span>
@@ -272,7 +272,7 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
 
             {goiIosThemManHinh && (
               <p className="mb-3 rounded-lg bg-[var(--bb-surface-2)] p-2 text-xs text-muted-foreground">
-                Thêm app ra màn hình chính để nhận thông báo ngay khi có tin mới.
+                Lưu app ra màn hình chính để nhận tin mới ngay.
               </p>
             )}
 

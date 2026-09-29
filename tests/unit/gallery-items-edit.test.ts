@@ -116,8 +116,11 @@ describe("BB-103: CSKH sửa dòng hàng", () => {
     expect(rows[0].quantity).toBe(5);
   });
 
-  it("4. Bộ ảnh khách ĐÃ CHỐT thì không sửa được nữa", async () => {
-    const galleryId = await makeGallery("submitted");
+  // BB-320 (chủ dự án, 29/09/2026) ĐỔI LUẬT: khách đã chốt VẪN sửa được (ca thật: khách
+  // vượt hạn mức rồi chốt, CSKH tăng Edit file 15 → 17) — chỉ bộ LƯU TRỮ mới khoá. Ca
+  // "bộ đã chốt sửa được" nằm ở bb-320-giam-gia-va-sua-dong-hang.test.ts.
+  it("4. Bộ ảnh đã LƯU TRỮ thì không sửa được nữa", async () => {
+    const galleryId = await makeGallery("archived");
     asCs();
 
     const res = await POST(req({ productId: editFileProductId, quantity: 3 }), params(galleryId));

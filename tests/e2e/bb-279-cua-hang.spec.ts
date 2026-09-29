@@ -259,7 +259,9 @@ ownIpTest.describe("BB-279: cửa hàng tối giản", () => {
       // khổ máy tính đang thử (pill vẫn trong DOM dù `hidden`), nên
       // `getByText` không còn duy nhất. Lọc thêm `:visible` để chỉ khớp
       // phần tử THẬT SỰ hiện ở khổ 1440px.
-      await ownIpExpect(cuaHang.getByText(formatVND(tongDung)).and(page.locator(":visible"))).toBeVisible();
+      // BB-319: dòng "Đã thêm vào giỏ" nay hiện SAU khi lưu xong nên còn trên màn lúc này, và cũng
+      // mang tổng tiền — kiểm đúng tiêu đề giỏ (một định dạng "Giỏ · N món · tiền" cho hai khổ).
+      await ownIpExpect(cuaHang.getByText(`Giỏ · 3 món · ${formatVND(tongDung)}`).and(page.locator(":visible"))).toBeVisible();
       // Cấu hình đặt lại cho món tiếp theo — ô Ảnh trở lại "+ Chọn ảnh" trống,
       // không còn hiện "Ảnh · 3 tấm" của lượt vừa mua.
       await ownIpExpect(cuaHang.getByText("Ảnh · 3 tấm")).toHaveCount(0);
@@ -277,7 +279,8 @@ ownIpTest.describe("BB-279: cửa hàng tối giản", () => {
 
       const nutDatInTamNay = lightbox.getByRole("button", { name: /Ảnh in và ảnh phóng/ });
       await ownIpExpect(nutDatInTamNay).toBeVisible();
-      await ownIpExpect(nutDatInTamNay.getByText(/Đang đặt 2/)).toBeVisible();
+      // BB-319 (luật 5): nhãn giỏ một dạng `nhanTrangThaiGio` — "Trong giỏ · N" (chưa gửi đơn).
+      await ownIpExpect(nutDatInTamNay.getByText(/Trong giỏ · 2/)).toBeVisible();
       await page.screenshot({ path: `${THU_MUC_ANH}/5-xem-lon-dat-in-tam-nay.png` });
 
       await nutDatInTamNay.click();

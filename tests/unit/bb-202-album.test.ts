@@ -429,7 +429,9 @@ describe("BB-202 D. Cơ sở dữ liệu thật — bìa album (bb-dev)", () => 
     const resDu = await postSubmit(
       new Request("http://localhost/api/g/submit", {
         method: "POST",
-        body: JSON.stringify({ confirmedByName: "Fixture BB-202", agreed: true }),
+        // BB-321 — fixture chọn THIẾU so với hạn mức: chủ studio 29/09 bắt buộc đồng ý
+        // "ảnh studio chọn dùm" (không có đường chốt thiếu mà không nhờ).
+        body: JSON.stringify({ confirmedByName: "Fixture BB-202", agreed: true, dongYAnhStudioChon: true }),
       }),
     );
     expect(resDu.status).toBe(200);

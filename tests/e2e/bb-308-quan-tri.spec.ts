@@ -182,7 +182,10 @@ test.describe("BB-308: màn quản trị — menu ⋯, bộ chọn chi nhánh, a
     await expect(page.getByRole("button", { name: "Đổi thư mục" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Chuẩn bị ảnh bìa" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Gia hạn/ })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Tạo link mới|Tạo link gửi khách/ })).toHaveCount(0);
+    // BB-320: link CŨ không khôi phục được có MỘT nút "Tạo link mới" ngay trong thẻ Link app
+    // (chủ dự án yêu cầu, có chú thích riêng) — đó là nút duy nhất được phép trần; mọi nút khác vẫn phải nằm trong menu ⋯.
+    const soNutTrongThe = await page.getByTestId("link-cu-khong-khoi-phuc").getByRole("button").count();
+    await expect(page.getByRole("button", { name: /Tạo link mới|Tạo link app/ })).toHaveCount(soNutTrongThe);
 
     await page.screenshot({ path: `${THU_MUC_ANH}/1-mt-chi-tiet-menu-dong.png`, fullPage: true });
 
@@ -224,7 +227,7 @@ test.describe("BB-308: màn quản trị — menu ⋯, bộ chọn chi nhánh, a
     // này không tạo lượt chọn nên thẻ đó không áp dụng ở đây).
     await expect(page.getByRole("heading", { name: "Bìa bộ ảnh" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Thư mục ảnh gốc" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Link khách" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Link app" })).toBeVisible();
 
     // Màn "chi tiết" -> chụp thêm khổ điện thoại (390×844) theo yêu cầu bàn giao.
     await page.setViewportSize({ width: 390, height: 844 });

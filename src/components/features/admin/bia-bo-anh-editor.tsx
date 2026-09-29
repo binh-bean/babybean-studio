@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { MAU_CHU_BIA, dienMau } from "@/lib/gallery/mau-chu-bia";
 import { X } from "lucide-react";
+import { CARD_TITLE_CLASS } from "./page-header";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { tinhTenBiaTuDuLieu } from "@/lib/utils/dinh-dang";
 
@@ -199,7 +200,8 @@ export function BiaBoAnhEditor({
           */}
           <div className="flex flex-col border-b border-border p-4 md:w-1/2 md:flex-1 md:overflow-y-auto md:border-b-0 md:border-r">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Thiết kế bìa</h3>
+              {/* BB-320 (Q-N1): tiêu đề hộp thoại Playfair như mọi tiêu đề khác của quản trị, không phải sans đậm. */}
+              <h3 className={CARD_TITLE_CLASS}>Thiết kế bìa</h3>
               <button
                 type="button"
                 onClick={() => setMoEditor(false)}

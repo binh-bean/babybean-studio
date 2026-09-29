@@ -1,6 +1,17 @@
 /**
  * POST /api/admin/galleries/[id]/reopen — mở lại cho khách chọn tiếp.
  *
+ * BB-321 — ba thay đổi so với bản BB-122:
+ *   1. Mở lại được cả ở `in_retouch` (trước đây chỉ `expired`/`submitted`, nên
+ *      khi khách xin mở lại lúc đã sang hậu kỳ, CSKH chỉ có nút "Từ chối" — lỗi
+ *      chủ studio báo 29/09/2026). Danh sách trạng thái nằm MỘT chỗ:
+ *      `laTrangThaiMoLaiDuoc` (src/lib/gallery/dot-chon.ts), banner/form/menu
+ *      quản trị dùng chung với route này.
+ *   2. Nhận thêm `dot` (số đợt cần mở): đợt 1 = luồng cũ; đợt ≥ 2 = trả ảnh của
+ *      đợt mua thêm đó về cho khách chọn lại, KHÔNG đụng trạng thái bộ ảnh (hậu
+ *      kỳ của đợt 1 vẫn chạy). Không truyền thì lấy đợt khoá gần nhất.
+ *   3. `delivered` KHÔNG mở lại: khách muốn thêm thì mua đợt mới.
+ *
  * OWNER: PM. Task BB-122.
  * Spec: docs/16 mục 4b
  *
@@ -16,12 +27,15 @@
  * ai ghi. Route này ghi chúng.
  *
  * ---------------------------------------------------------------------------
- * Chỉ mở lại được từ hai trạng thái
+ * Mở lại được từ ba trạng thái (BB-321)
  * ---------------------------------------------------------------------------
- * 'expired' (hết hạn) và 'submitted' (khách chốt rồi nhưng muốn đổi ý, CSKH
- * chưa xác nhận). KHÔNG mở từ 'in_retouch' trở đi: lúc đó người chỉnh ảnh đã
- * làm theo danh sách cũ, mở ra thì công đã bỏ vào những ảnh khách vừa bỏ chọn.
- * Muốn đổi ở giai đoạn đó thì đi đường yêu cầu sửa.
+ * 'expired' (hết hạn), 'submitted' (khách chốt nhưng CSKH chưa xác nhận) và
+ * 'in_retouch'. Ở 'in_retouch' người chỉnh ảnh có thể đã làm theo danh sách cũ —
+ * mở ra thì công đã bỏ vào những ảnh khách vừa bỏ chọn — nên MÀN HÌNH phải hiện
+ * cảnh báo trước khi bấm; nhưng chặn hẳn là làm hỏng doanh thu: khách xin mở lại
+ * mà CSKH không có nút nào để mở (lỗi chủ studio báo 29/09/2026). Từ
+ * 'awaiting_approval' trở đi (đã chỉnh xong) không mở lại chọn ảnh: đi đường
+ * yêu cầu sửa ảnh đã chỉnh, hoặc mua đợt mới.
  *
  * ---------------------------------------------------------------------------
  * Bắt buộc ghi lý do
@@ -37,14 +51,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { guiThongBaoBoAnh } from "@/lib/thong-bao/gui-day";
+import { luaChonMoLai } from "@/lib/gallery/dot-chon";
+import { layCacDot, traDotVeChoKhach } from "@/lib/gallery/dot-chon-server";
 
 export const runtime = "nodejs";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-
-/** Chỉ hai trạng thái này. Xem ghi chú đầu file. */
-const REOPENABLE = ["expired", "submitted"];
 
 const MAX_REASON = 500;
 
@@ -65,7 +78,7 @@ export async function POST(
     if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
 
     const jsonBody = await readJsonBody(request);
-    const body = (jsonBody.ok ? jsonBody.data : null) as { reason?: string } | null;
+    const body = (jsonBody.ok ? jsonBody.data : null) as { reason?: string; dot?: unknown } | null;
     const reason = (body?.reason ?? "").trim();
     if (reason.length === 0) {
       return fail("INVALID_INPUT", "Ghi giúp lý do mở lại, để sau này còn tra được");
@@ -84,14 +97,43 @@ export async function POST(
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     requireBranch(staff, gallery.branch_id);
 
-    if (!REOPENABLE.includes(gallery.status)) {
-      return fail(
-        "INVALID_INPUT",
-        gallery.status === "in_review" || gallery.status === "ready"
-          ? "Bộ ảnh đang mở, khách vẫn chọn được."
-          : "Bộ ảnh đã qua bước chỉnh ảnh, không mở lại chọn ảnh được. " +
-              "Cần sửa thì đi đường yêu cầu sửa ảnh đã chỉnh.",
-      );
+    const cacDot = await layCacDot(admin, galleryId);
+    const lua = luaChonMoLai(gallery.status, cacDot);
+    if (!lua.duoc) return fail("INVALID_INPUT", lua.lyDoKhong ?? "Bộ ảnh này chưa mở lại được");
+
+    const dotYeuCau =
+      body?.dot === undefined || body?.dot === null ? lua.dotMacDinh : Number(body.dot);
+    if (!Number.isInteger(dotYeuCau) || !lua.cacDot.some((d) => d.soDot === dotYeuCau)) {
+      return fail("INVALID_INPUT", "Đợt cần mở lại không hợp lệ hoặc chưa được chốt");
+    }
+
+    // Đợt mua thêm (≥ 2): trả ảnh của đúng đợt đó về cho khách, giữ nguyên bộ ảnh.
+    if (dotYeuCau >= 2) {
+      const dot = cacDot.find((d) => d.soDot === dotYeuCau)!;
+      await traDotVeChoKhach(admin, dot, {
+        trangThai: "da_mo_lai",
+        lyDo: reason,
+        nhanVienId: staff.staffId,
+      });
+      await ghiNhatKy({
+        actorType: "staff",
+        actorId: staff.staffId,
+        branchId: gallery.branch_id,
+        // CÙNG tên hành động với mở lại đợt 1: `layTrangThaiXinMoLai` (BB-312) coi
+        // "yêu cầu xin mở lại" là ĐÃ XỬ LÝ khi thấy đúng dòng `gallery.reopen`.
+        // Đặt tên riêng thì banner vẫn báo "đang chờ" sau khi CSKH đã mở đợt.
+        action: "gallery.reopen",
+        entityType: "gallery",
+        entityId: galleryId,
+        galleryId,
+        metadata: { soDot: dotYeuCau, tuTrangThai: gallery.status, lyDo: reason },
+      });
+      await guiThongBaoBoAnh(admin, galleryId, {
+        tieuDe: `Studio đã mở lại đợt ${dotYeuCau}`,
+        noiDung: "Ba mẹ chọn lại ảnh của đợt này nhé.",
+        loai: "reopen_da_mo",
+      });
+      return ok({ status: gallery.status, soDot: dotYeuCau, reopenedAt: new Date().toISOString() });
     }
 
     const now = new Date().toISOString();
@@ -140,7 +182,7 @@ export async function POST(
       entityType: "gallery",
       entityId: galleryId,
       galleryId,
-      metadata: { tuTrangThai: gallery.status, lyDo: reason, hanMoi },
+      metadata: { tuTrangThai: gallery.status, lyDo: reason, hanMoi, soDot: 1 },
     });
 
     // BB-312: báo khách qua chuông + đẩy — KHÔNG qua Lark (đó là kênh
@@ -152,7 +194,7 @@ export async function POST(
       loai: "reopen_da_mo",
     });
 
-    return ok({ status: "in_review", reopenedAt: now, dueAt: hanMoi });
+    return ok({ status: "in_review", soDot: 1, reopenedAt: now, dueAt: hanMoi });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền mở lại bộ ảnh");
     return failUnexpected(err, requestId);

@@ -29,6 +29,7 @@
  * cho BB-310 mục 6/7 (bìa không in họ tên đầy đủ cỡ chữ lớn).
  */
 import { test as ownIpTest, expect as ownIpExpect } from "./helpers/ip-rieng-moi-ca";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
@@ -252,7 +253,7 @@ ownIpTest.describe("BB-310 mục 2: Hộp chốt — chữ khớp luật, chọn
     await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Ba mẹ Fixture 310");
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
 
     // Mục 2 — chữ nhắc bìa album phải RÕ RÀNG là bắt buộc, không đứng lẫn
     // với chữ "để sau cũng được" của mục sản phẩm thiếu ảnh (khác nhau).
@@ -280,7 +281,7 @@ ownIpTest.describe("BB-310 mục 2: Hộp chốt — chữ khớp luật, chọn
     await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Ba mẹ Fixture 310");
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
 
     await ownIpExpect(
       page.getByTestId("ly-do-khoa-nut-chot"),

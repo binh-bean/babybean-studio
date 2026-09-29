@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function AdminGalleriesPage() {
   return (
-    <div className="space-y-4 lg:space-y-6">
+    <div className="space-y-6">
       {/*
         Trên điện thoại, tên màn đã nằm ngay cạnh chữ BabyBean ở thanh trên
         cùng (xem `admin-header.tsx`), nên tiêu đề to ở đây là dòng thứ hai nói

@@ -1,3 +1,4 @@
+import { formatSo } from "@/lib/utils/dinh-dang";
 /**
  * Mẫu chữ điền sẵn cho ảnh bìa bộ ảnh — tiêu đề + lời.
  *
@@ -138,7 +139,7 @@ export function dienMau(
     tenBe: du.tenBe,
     chiNhanh: du.chiNhanh,
     thangNam,
-    soAnh: soAnh != null ? soAnh.toLocaleString("vi-VN") : null,
+    soAnh: soAnh != null ? formatSo(soAnh) : null,
   };
 
   function dien(mauChu: string): string | null {

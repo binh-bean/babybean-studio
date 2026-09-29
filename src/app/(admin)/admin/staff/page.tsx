@@ -13,7 +13,6 @@ import { redirect } from "next/navigation";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { NhanSuVaiTro } from "@/components/features/admin/nhan-su-vai-tro";
 import { KhongCoQuyen } from "@/components/features/admin/page-header";
-import { vi } from "@/i18n/vi";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +26,8 @@ export default async function StaffPage() {
   }
 
   if (role !== "owner" && role !== "admin") {
-    // BB-318 (Q-e): gọi đúng tên vai như màn Nhân sự hiện (`vi.admin.staff.roles`), không tự gõ lại.
-    const { owner, admin } = vi.admin.staff.roles;
-    return <KhongCoQuyen mota={`Chỉ vai ${owner} và ${admin} mới xem được mục nhân sự.`} />;
+    // BB-320 (Q11, quyết định của giám đốc): đúng một câu, không liệt kê hai tên vai.
+    return <KhongCoQuyen mota="Chỉ Admin mới xem được mục này." />;
   }
 
   return (

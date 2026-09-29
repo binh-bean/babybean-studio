@@ -27,7 +27,6 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 test.describe("BB-245: mời mua lần hai", () => {
   let pg: Client;
   let coBang = false;
-  let spGanAnh = "";
 
   // Ba bộ ảnh riêng, mỗi bộ một khách/link/selection.
   const bo = {
@@ -74,13 +73,6 @@ test.describe("BB-245: mời mua lần hai", () => {
     const { rows: bangKiem } = await pg.query(`select to_regclass('public.yeu_cau_mua_them') as bang`);
     coBang = bangKiem[0]?.bang !== null;
 
-    const { rows: sp } = await pg.query(
-      `select id from products
-        where is_active and list_price is not null and price_confidence >= 0.8 and price_samples >= 5
-          and (material ilike 'khung%' or kind = 'print')
-        order by list_price limit 1`,
-    );
-    spGanAnh = sp[0]?.id ?? "";
 
     // A. approved, 0 vòng sửa.
     {
@@ -140,63 +132,21 @@ test.describe("BB-245: mời mua lần hai", () => {
     await pg.end();
   });
 
-  test("bộ đã DUYỆT, không vòng sửa: thẻ mời hiện, chọn sản phẩm + ảnh, gửi được", async ({ page }) => {
-    if (!spGanAnh) test.skip(true, "Không có sản phẩm gắn-ảnh đủ điều kiện bán trong bb-dev — bỏ qua ca này.");
-
+  test("BB-321: bộ đã DUYỆT — thẻ 'Mời mua lần hai' đã NGHỈ, thay bằng 'Chọn thêm ảnh' (mua theo đợt)", async ({ page }) => {
+    /*
+      BB-321 gộp hai đường mua làm một: ba mẹ mua thêm qua "Chọn thêm ảnh" (đợt
+      chọn, có xác nhận của CSKH) — không còn gửi "yêu cầu mua thêm" riêng. Ca cũ
+      (thẻ mời → Gửi yêu cầu cho studio → dòng yeu_cau_mua_them) đã bỏ; luồng
+      mới nằm ở tests/e2e/bb-321-dot-chon.spec.ts. Ca này chỉ canh: thẻ CŨ không
+      còn, thẻ MỚI có.
+    */
+    const cho = page.waitForResponse((r) => r.url().includes("/api/g/gallery") && r.status() === 200);
     await page.goto(`/g/${bo.approved.maLink}`);
+    await cho;
 
-    const theMoi = page.getByText("Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?");
-    await expect(theMoi).toBeVisible();
-
-    await page.getByRole("button", { name: "Xem thêm" }).click();
-
-    const manChon = page.getByRole("heading", { name: "Mua thêm sau khi duyệt" });
-    await expect(manChon).toBeVisible();
-    await expect(page.getByText("CSKH sẽ gọi xác nhận, chưa tính tiền")).toBeVisible();
-
-    // Nhóm "Khung ảnh" hoặc "Ảnh in và ảnh phóng" — bấm nhóm nào có sản phẩm
-    // của mình (đã chốt bằng spGanAnh ở SQL, nhưng giao diện lọc theo nhóm).
-    for (const nhom of ["Khung ảnh", "Ảnh in và ảnh phóng"]) {
-      const nutNhom = page.getByRole("button", { name: nhom, exact: true });
-      await nutNhom.click();
-      const nutChonAnh = page.getByRole("button", { name: "Chọn ảnh" }).first();
-      if ((await nutChonAnh.count()) > 0) {
-        await nutChonAnh.click();
-        break;
-      }
-    }
-
-    // Chọn tấm ảnh trong lưới đã chọn của màn mua thêm.
-    const tamAnh = page.getByAltText("BB245_A_001.jpg");
-    await expect(tamAnh).toBeVisible();
-    await tamAnh.click();
-
-    const nutGui = page.getByRole("button", { name: "Gửi yêu cầu cho studio" });
-    await expect(nutGui).toBeEnabled();
-    await nutGui.click();
-
-    if (!coBang) {
-      // Bảng `yeu_cau_mua_them` (migration 0072) chưa áp lên môi trường chạy
-      // thử này — route ghi sẽ lỗi (500) vì bảng không tồn tại. Đây KHÔNG
-      // phải lỗi của màn hình; dừng lại đúng chỗ và ghi rõ lý do, chờ Opus áp.
-      test.info().annotations.push({
-        type: "skip-db-check",
-        description: "Bảng yeu_cau_mua_them (migration 0072) chưa áp — bỏ qua kiểm gửi/DB, chờ Opus áp.",
-      });
-      return;
-    }
-
-    // BB-249: danh sách "đã gửi" hiện trạng thái thân thiện theo từng dòng
-    // (moi -> "Đã gửi, studio sẽ gọi sớm") thay vì một câu chung chung.
-    await expect(page.getByText("Đã gửi, studio sẽ gọi sớm")).toBeVisible();
-
-    const { rows } = await pg.query(
-      "select product_id, photo_id, so_luong, trang_thai from yeu_cau_mua_them where gallery_id = $1",
-      [bo.approved.galleryId],
-    );
-    expect(rows.length).toBeGreaterThanOrEqual(1);
-    expect(rows[0].photo_id).toBe(bo.approved.anh);
-    expect(rows[0].trang_thai).toBe("moi");
+    await expect(page.getByTestId("chon-them-anh")).toBeVisible();
+    await expect(page.getByText("Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Gửi yêu cầu cho studio" })).toHaveCount(0);
   });
 
   test("bộ đã DUYỆT nhưng CÓ vòng xin sửa: không có thẻ mời", async ({ page }) => {
@@ -214,7 +164,7 @@ test.describe("BB-245: mời mua lần hai", () => {
     await page.goto(`/g/${bo.coVongSua.maLink}`);
     await cho;
     await page.waitForTimeout(500);
-    await expect(page.getByText("Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?")).toHaveCount(0);
+    await expect(page.getByText("Ba mẹ ưng bộ ảnh? In tấm yêu thích lên khung nhé.")).toHaveCount(0);
   });
 
   test("bộ đang 'in_retouch': không có thẻ mời (chưa hề duyệt)", async ({ page }) => {
@@ -223,6 +173,6 @@ test.describe("BB-245: mời mua lần hai", () => {
     await page.goto(`/g/${maLink}`);
     await cho;
     await page.waitForTimeout(500);
-    await expect(page.getByText("Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?")).toHaveCount(0);
+    await expect(page.getByText("Ba mẹ ưng bộ ảnh? In tấm yêu thích lên khung nhé.")).toHaveCount(0);
   });
 });

@@ -29,6 +29,7 @@
  */
 
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 import type { Page } from "@playwright/test";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
@@ -417,7 +418,7 @@ test.describe("BB-305: LUẬT PHÔNG màn khách (Playfair Display + Be Vietnam 
     await page.locator('button[aria-label="Chọn ảnh này"]').first().click();
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Mẹ Bean");
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
 
     await khongCoFraunces(page, "cảm ơn sau chốt 1440×900", async () => {
       await page.getByRole("button", { name: "Xác nhận" }).click();

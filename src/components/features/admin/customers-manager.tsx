@@ -30,7 +30,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Input, Card, Spinner, Badge, Avatar, AvatarFallback } from "@/components/ui";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
-import { formatNgayVN, formatSdt, tenGoiBe } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, formatSdt, tenGoiBe, formatSo, formatTien } from "@/lib/utils/dinh-dang";
 import { mauAvatarStyle } from "@/lib/utils/mau-avatar";
 import { vi } from "@/i18n/vi";
 import { Phone as PhoneIcon, Copy as CopyIcon } from "lucide-react";
@@ -150,12 +150,11 @@ export function CustomersManager({
     // DƯỚI bảng (full-width), đúng cho điện thoại nhưng không khớp bản vẽ
     // máy tính. Từ `lg` trở lên tách hai cột bằng CSS Grid; dưới `lg` giữ
     // đúng hành vi cũ (xếp dọc, hồ sơ thay chỗ danh sách — xem `anDanhSach`).
-    <div className="min-w-0 lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-6">
+    // BB-320 (Q-S2): chỉ chia cột 360px khi có hồ sơ đang mở — chưa mở thì bảng
+    // trải hết bề rộng nội dung, không chừa một cột trống bên phải.
+    <div className={dangMo ? "min-w-0 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6" : "min-w-0"}>
       <div className="min-w-0 space-y-5">
-        {/* Ba dòng chữ trước ô tìm trên màn 375px là ba dòng người ta phải
-            vuốt qua mỗi lần mở. Câu gợi ý ngay dưới ô tìm đã đủ dùng. */}
-        <p className="hidden text-sm text-[var(--bb-fg-muted)] sm:block">{t.subtitle}</p>
-
+        {/* Mô tả trang nay nằm trong PageHeader (BB-320) — ở đây chỉ còn ô tìm và câu gợi ý. */}
       <div className={`flex flex-wrap items-center gap-2 ${anDanhSach}`}>
         <div className="min-w-0 flex-1 sm:max-w-md">
           <label htmlFor="tim-khach" className="sr-only">
@@ -232,7 +231,7 @@ export function CustomersManager({
                             BB-303: nhóm 4-3-3 ("0901 000 001") thay vì liền số. */}
                         <span className="select-all text-sm tabular-nums">{formatSdt(k.phone) || t.chuaCoSdt}</span>
                         <span>
-                          {k.soBoAnh} {t.cot.soBo.toLowerCase()}
+                          {formatSo(k.soBoAnh)} {t.cot.soBo.toLowerCase()}
                         </span>
                         {k.branchName && <span>{k.branchName}</span>}
                         {k.boAnhMoiNhat && <span>{ngay(k.boAnhMoiNhat)}</span>}
@@ -254,10 +253,10 @@ export function CustomersManager({
               <thead>
                 <tr className="border-b border-[var(--bb-border)] text-left">
                   <th className="py-2 pr-3 font-medium">{t.cot.ten}</th>
-                  <th className="py-2 pr-3 font-medium">{t.cot.sdt}</th>
-                  <th className="py-2 pr-3 font-medium">{t.cot.chiNhanh}</th>
-                  <th className="py-2 pr-3 text-right font-medium">{t.cot.soBo}</th>
-                  <th className="py-2 pr-3 font-medium">{t.cot.ganNhat}</th>
+                  <th className="whitespace-nowrap py-2 pr-3 font-medium">{t.cot.sdt}</th>
+                  <th className="whitespace-nowrap py-2 pr-3 font-medium">{t.cot.chiNhanh}</th>
+                  <th className="whitespace-nowrap py-2 pr-3 text-right font-medium">{t.cot.soBo}</th>
+                  <th className="whitespace-nowrap py-2 pr-3 font-medium">{t.cot.ganNhat}</th>
                 </tr>
               </thead>
               <tbody>
@@ -306,12 +305,12 @@ export function CustomersManager({
                         BB-290 (#40): sans 14px tabular-nums thay cho font-mono
                         text-xs — nhỏ hơn hẳn tên (15px) và khó đọc hơn cần.
                         BB-303: nhóm 4-3-3. */}
-                    <td className="select-all py-2 pr-3 text-sm tabular-nums">
+                    <td className="select-all whitespace-nowrap py-2 pr-3 text-sm tabular-nums">
                       {formatSdt(k.phone) || t.chuaCoSdt}
                     </td>
                     <td className="py-2 pr-3">{k.branchName}</td>
-                    <td className="py-2 pr-3 text-right">{k.soBoAnh}</td>
-                    <td className="py-2 pr-3">{k.boAnhMoiNhat ? ngay(k.boAnhMoiNhat) : "—"}</td>
+                    <td className="py-2 pr-3 text-right tabular-nums">{formatSo(k.soBoAnh)}</td>
+                    <td className="whitespace-nowrap py-2 pr-3 tabular-nums">{k.boAnhMoiNhat ? ngay(k.boAnhMoiNhat) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -322,7 +321,7 @@ export function CustomersManager({
               chi nhánh chỉ có đúng ngần này khách. */}
           {tong > items.length && (
             <p className="text-xs text-[var(--bb-fg-muted)]">
-              {t.conNua.replace("{n}", String(items.length)).replace("{tong}", String(tong))}
+              {t.conNua.replace("{n}", formatSo(items.length)).replace("{tong}", formatSo(tong))}
             </p>
           )}
         </>
@@ -567,7 +566,7 @@ function HoSoKhach({
             <p className="text-sm">
               <span className="text-[var(--bb-fg-muted)]">Tổng mua thêm: </span>
               <span className="bb-so font-medium">
-                {new Intl.NumberFormat("vi-VN").format(ct.khach.tongMuaThem)} ₫
+                {formatTien(ct.khach.tongMuaThem)}
               </span>
             </p>
           )}
@@ -671,7 +670,7 @@ function HoSoKhach({
                     </span>
                     <span className="text-xs text-[var(--bb-fg-muted)]">{ngay(g.createdAt)}</span>
                     <span className="ml-auto shrink-0 text-xs text-[var(--bb-fg-muted)]">
-                      {g.photoCount} ảnh
+                      {formatSo(g.photoCount)} ảnh
                     </span>
                   </li>
                 ))}

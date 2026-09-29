@@ -43,38 +43,47 @@ export const PAGE_TITLE_FALLBACK_CLASS = "bb-so text-[30px]";
  */
 export const CARD_TITLE_CLASS = "font-display text-[18px] font-normal text-[var(--bb-fg)]";
 
+/**
+ * MỘT khối tiêu đề trang cho MỌI màn quản trị, máy tính lẫn điện thoại
+ * (BB-320, Q-N1): H1 Playfair + mô tả + nút chính bên phải, rồi đường kẻ ngang.
+ * Thứ tự luôn là tiêu đề → mô tả → đường kẻ; mô tả nằm TRONG khối này chứ không
+ * ở component con bên dưới (vòng 6 thấy đường kẻ nằm giữa H1 và mô tả ở Khách
+ * hàng/Cài đặt).
+ *
+ * Bỏ `hideOnMobile` (BB-290): tên màn từng chỉ hiện ở thanh trên cùng trên điện
+ * thoại, khiến 3 màn thiếu H1. Nay H1 luôn có, thanh trên cùng chỉ còn logo.
+ */
 export function PageHeader({
   title,
   description,
   actions,
+  titleAddon,
+  titleClassName,
   className,
-  hideOnMobile = false,
 }: {
   title: ReactNode;
   description?: ReactNode;
-  /** Nút hành động chính của trang — luôn đứng bên phải tiêu đề trên màn rộng. */
+  /** Nút hành động chính của trang — bên phải trên màn rộng, xuống dòng dưới mô tả trên điện thoại. */
   actions?: ReactNode;
+  /** Nhãn nhỏ đứng cạnh H1 (vd trạng thái bộ ảnh). */
+  titleAddon?: ReactNode;
+  /** Thay lớp chữ của H1 — chỉ dùng khi tiêu đề là MÃ/SỐ (PAGE_TITLE_FALLBACK_CLASS, BB-313). */
+  titleClassName?: string;
   className?: string;
-  /**
-   * Ẩn khối này dưới `lg` — dùng cho các màn mà thanh trên cùng
-   * (`admin-header.tsx`/`TenManHinh`) đã in tên màn ngay cạnh chữ BabyBean,
-   * nên in lại tiêu đề to ngay bên dưới là một dòng thứ hai nói cùng một điều.
-   * Quyết định của chủ studio 22/09/2026, áp dụng lại nguyên vẹn ở BB-280.
-   */
-  hideOnMobile?: boolean;
 }) {
   return (
     <div
+      data-testid="khoi-tieu-de-trang"
       className={cn(
-        // Bản vẽ (.tde): vạch mảnh dưới tiêu đề, cách 24px — áp đồng loạt cho
-        // mọi màn quản trị dùng PageHeader (BB-283, điểm 3).
-        "flex flex-col gap-3 border-b border-[var(--bb-border)] pb-6 sm:flex-row sm:items-end sm:justify-between",
-        hideOnMobile && "hidden lg:flex",
+        "flex flex-col gap-4 border-b border-[var(--bb-border)] pb-6 sm:flex-row sm:items-end sm:justify-between",
         className
       )}
     >
       <div className="min-w-0">
-        <h1 className={PAGE_TITLE_CLASS}>{title}</h1>
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <h1 className={titleClassName ?? PAGE_TITLE_CLASS}>{title}</h1>
+          {titleAddon}
+        </div>
         {description && <p className={cn("mt-1", PAGE_DESCRIPTION_CLASS)}>{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}

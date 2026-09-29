@@ -39,6 +39,7 @@ import { DriveAccessDeniedError } from "@/lib/drive/client";
 import { GetCanXuLyQuerySchema } from "./schema";
 import { CANH_BAO_LARK } from "@/lib/lark/trang-thai-hau-ky";
 import { layDanhSachChoXuLyMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
+import { layDanhSachChoXacNhanDot, layDanhSachViecDot1 } from "@/lib/gallery/dot-chon-server";
 
 export const runtime = "nodejs";
 
@@ -188,12 +189,21 @@ export async function GET(request: Request): Promise<Response> {
     // không lệch giữa huy hiệu và trang chi tiết (BB-283).
     const choMoLaiPromise = layDanhSachChoXuLyMoLai(admin, targetBranchIds);
 
-    const [resDrive, resRong, resHanMuc, resCanhBao, choMoLai] = await Promise.all([
+    // 4f. BB-321 — đợt mua thêm khách đã chốt, đang chờ CSKH xác nhận. Cùng
+    // công thức với tab "Khách mua thêm" (/admin/viec-can-xu-ly).
+    const choDotChonPromise = layDanhSachChoXacNhanDot(admin, targetBranchIds);
+
+    // 4g. BB-321 — đợt 1: khách nhờ studio chọn thêm ảnh / còn sản phẩm in chưa chọn ảnh.
+    const viecDot1Promise = layDanhSachViecDot1(admin, targetBranchIds);
+
+    const [resDrive, resRong, resHanMuc, resCanhBao, choMoLai, choDotChon, viecDot1] = await Promise.all([
       qDrive,
       qRong,
       qChuaCoHanMuc,
       qCanhBao,
       choMoLaiPromise,
+      choDotChonPromise,
+      viecDot1Promise,
     ]);
 
     if (resDrive.error) return failUnexpected(resDrive.error, requestId);
@@ -227,6 +237,8 @@ export async function GET(request: Request): Promise<Response> {
       chuaCoHanMuc: chuaCoHanMuc.map(chuyenHang),
       canhBaoLark: resCanhBao.count ?? 0,
       choMoLai: choMoLai.length,
+      choDotChon: choDotChon.length,
+      choStudioChon: viecDot1.length,
     });
   } catch (err) {
     if (err instanceof AuthError) {

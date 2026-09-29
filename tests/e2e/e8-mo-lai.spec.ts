@@ -1,4 +1,5 @@
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
@@ -150,7 +151,7 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
     // Chốt
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Mẹ Bean A");
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
     await page.getByRole("button", { name: "Xác nhận" }).click();
 
     await expect
@@ -166,6 +167,11 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
 
     // Mở bộ ảnh A
     await nvPage.goto(`/admin/galleries/${galleryA}`);
+
+    // BB-308 gom "Mở lại cho khách chọn" vào menu "Thao tác khác" (⋯).
+    await nvPage.getByText("Trạng thái").first().waitFor({ timeout: 30_000 });
+    await nvPage.getByRole("button", { name: "Thao tác khác" }).first().click();
+    await nvPage.getByText("Mở lại cho khách chọn", { exact: true }).first().click();
     
     // Nút mở lại cho khách chọn bị khoá khi chưa có lý do
     const xacNhanMoLai = nvPage.getByRole('button', { name: /^Mở lại cho khách chọn$/i, exact: true });
@@ -186,8 +192,11 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
     });
 
     // Nhật ký
-    const { rows: logs } = await client.query("select * from activity_logs where entity_id=$1 and action='gallery.reopen'", [galleryA]);
-    expect(logs.length).toBeGreaterThan(0);
+    // Nhật ký ghi SAU khi đổi trạng thái — chờ, không đọc một lần.
+    await expect.poll(async () => {
+      const { rows: logs } = await client.query("select 1 from activity_logs where entity_id=$1 and action='gallery.reopen'", [galleryA]);
+      return logs.length;
+    }, { timeout: 10_000 }).toBeGreaterThan(0);
 
     // 3. Khách mở link A lại
     await page.goto(`/g/${maLinkA}`);
@@ -214,7 +223,7 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
     const tenInput = page.locator("#confirm-name-input");
     if (await tenInput.isVisible()) {
       await tenInput.fill("Mẹ Bean A sửa");
-      await page.getByRole("checkbox").setChecked(true, { force: true });
+      await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
     }
     await page.getByRole("button", { name: "Xác nhận" }).click();
     
@@ -227,6 +236,11 @@ test.describe("E-8: Mở lại cho khách chọn tiếp", () => {
 
     // 4. Lặp lại cho bộ B (expired)
     await nvPage.goto(`/admin/galleries/${galleryB}`);
+
+    // BB-308 gom "Mở lại cho khách chọn" vào menu "Thao tác khác" (⋯).
+    await nvPage.getByText("Trạng thái").first().waitFor({ timeout: 30_000 });
+    await nvPage.getByRole("button", { name: "Thao tác khác" }).first().click();
+    await nvPage.getByText("Mở lại cho khách chọn", { exact: true }).first().click();
     
     await nvPage.getByLabel(/Lý do/i).fill("Fixture BB-231 gia hạn");
     const xacNhanMoLaiB = nvPage.getByRole('button', { name: /^Mở lại cho khách chọn$/i, exact: true });

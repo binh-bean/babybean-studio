@@ -34,7 +34,8 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { CARD_TITLE_CLASS } from "./page-header";
-import { formatNgayGioVN } from "@/lib/utils/dinh-dang";
+import { TheSoLieu } from "./the-so-lieu";
+import { formatNgayGioVN, formatSo } from "@/lib/utils/dinh-dang";
 
 interface LoiItem {
   galleryId: string;
@@ -184,10 +185,10 @@ export function LoiDongBoReport() {
       </header>
 
       <section className="grid grid-cols-2 gap-3 sm:max-w-md">
-        <Stat label="Bộ ảnh đang lỗi" value={String(summary.galleryCount)} />
+        <Stat label="Bộ ảnh đang lỗi" value={formatSo(summary.galleryCount)} />
         <Stat
           label="Số lý do khác nhau"
-          value={String(summary.reasonCount)}
+          value={formatSo(summary.reasonCount)}
           hint={
             summary.reasonCount === 1 && summary.galleryCount > 1
               ? "cùng một nguyên nhân"
@@ -198,7 +199,7 @@ export function LoiDongBoReport() {
 
       {summary.truncated && (
         <p className="rounded-md border border-[var(--bb-border)] p-3 text-sm">
-          Danh sách đang hiện tối đa <strong>{summary.galleryCount}</strong> bộ. Có thể
+          Danh sách đang hiện tối đa <strong>{formatSo(summary.galleryCount)}</strong> bộ. Có thể
           còn bộ khác chưa hiện — xử lý bớt rồi tải lại để xem tiếp.
         </p>
       )}
@@ -219,7 +220,7 @@ export function LoiDongBoReport() {
               <div>
                 <h2 className="font-medium">{g.reason}</h2>
                 <p className="mt-0.5 text-sm text-[var(--bb-fg-muted)]">
-                  {g.count} bộ ảnh cùng lý do này
+                  {formatSo(g.count)} bộ ảnh cùng lý do này
                 </p>
               </div>
               <Button
@@ -227,7 +228,7 @@ export function LoiDongBoReport() {
                 onClick={() => void thuLai(g.items)}
                 disabled={g.items.some((i) => dangThuLai.has(i.galleryId))}
               >
-                Thử lại tất cả ({g.count})
+                Thử lại tất cả ({formatSo(g.count)})
               </Button>
             </div>
 
@@ -356,14 +357,9 @@ function TrangThaiNut({
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="rounded-lg border border-[var(--bb-border)] p-3">
-      <div className="text-xs text-[var(--bb-fg-muted)]">{label}</div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
-      {hint && <div className="mt-1 text-xs text-[var(--bb-fg-muted)]">{hint}</div>}
-    </div>
-  );
+/** BB-320 (Q-N2): thẻ số dùng chung với mọi màn quản trị (the-so-lieu.tsx). */
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string; emphasis?: boolean }) {
+  return <TheSoLieu label={label} value={value} ghiChu={hint} />;
 }
 
 function Th({ children, className }: { children: React.ReactNode; className?: string }) {

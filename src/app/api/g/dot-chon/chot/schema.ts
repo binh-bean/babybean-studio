@@ -1,0 +1,32 @@
+import { z } from "zod";
+
+/** Một dòng sản phẩm khách bỏ vào đợt — cùng hình dạng với `/api/g/mua-them`. */
+const DongSanPhamSchema = z.object({
+  productId: z.string().uuid("productId phải là UUID hợp lệ"),
+  photoId: z.string().uuid("photoId phải là UUID hợp lệ").nullish(),
+  soLuong: z
+    .number({ required_error: "soLuong là bắt buộc" })
+    .int("soLuong phải là số nguyên")
+    .min(1, "soLuong tối thiểu 1")
+    .max(20, "soLuong tối đa 20 — nhiều hơn thì ba mẹ nhắn thẳng CSKH giúp em"),
+});
+
+export const ChotDotChonSchema = z.object({
+  /** Tên người bấm chốt — cùng luật với nút Chốt đợt 1 (BB-276: có trần). */
+  tenNguoiChot: z
+    .string()
+    .trim()
+    .min(1, "Vui lòng nhập tên người xác nhận")
+    .max(200, "Tên tối đa 200 ký tự"),
+  /**
+   * Ô tick "Tôi biết nếu chưa chọn ảnh in, thời gian nhận ảnh sẽ lâu hơn timeline".
+   * BẮT BUỘC (true) khi có sản phẩm in/album chưa gắn ảnh; máy chủ tự đếm và từ chối
+   * nếu thiếu, không tin giao diện.
+   */
+  bietAnhInChamHon: z.boolean().optional(),
+  /** Ảnh CHỌN THÊM ở đợt này. Rỗng được nếu chỉ mua sản phẩm. Trần 500 để chặn body khổng lồ. */
+  photoIds: z.array(z.string().uuid("photoId phải là UUID hợp lệ")).max(500).default([]),
+  items: z.array(DongSanPhamSchema).max(30, "Mỗi đợt tối đa 30 dòng sản phẩm").default([]),
+});
+
+export type ChotDotChonInput = z.infer<typeof ChotDotChonSchema>;

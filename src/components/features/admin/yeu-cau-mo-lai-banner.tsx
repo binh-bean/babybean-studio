@@ -15,22 +15,22 @@
  * `gallery-detail.tsx` biết gì thêm về logic bên trong.
  *
  * ---------------------------------------------------------------------------
- * "Mở lại cho khách" chỉ hoạt động ở hai trạng thái
+ * BB-321 — "Mở lại cho khách" LUÔN có nút chạy được ở nơi trạng thái cho phép
  * ---------------------------------------------------------------------------
- * Route `/reopen` (đã có từ BB-122) chỉ đảo trạng thái từ `expired`/`submitted`
- * — KHÔNG mở được từ `in_retouch` trở đi (công của thợ chỉnh ảnh đã đổ vào
- * danh sách cũ, xem chú thích đầu file route đó). Ba mẹ có thể xin mở lại ở
- * BẤT KỲ trạng thái đã khoá nào (route `/api/g/xin-sua-lai` cho phép), nên nút
- * "Mở lại cho khách" ở đây CHỈ hiện khi trạng thái thật sự mở được — các
- * trường hợp còn lại chỉ còn "Từ chối" kèm lý do, và CSKH tự xử lý ngoài app
- * nếu thật sự cần mở (giới hạn có sẵn của hệ thống, không phải phạm vi task
- * này để sửa).
+ * Chủ studio báo 29/09/2026: khách xin mở lại mà CSKH không có nút mở, chỉ có
+ * "Từ chối". Nguyên nhân: nút chỉ hiện ở `expired`/`submitted`. Nay dùng chung
+ * `luaChonMoLai` (src/lib/gallery/dot-chon.ts) với route `/reopen`:
+ *   · `submitted`, `expired`, `in_retouch` → có nút; ở `in_retouch` có cảnh báo
+ *     hậu kỳ có thể đã chỉnh và ô chọn ĐỢT cần mở (mặc định đợt khoá gần nhất);
+ *   · `delivered` và các trạng thái còn lại → KHÔNG nút chết: banner giải thích
+ *     vì sao, và khách muốn thêm ảnh thì mua đợt mới (mục "Chọn thêm ảnh").
  */
 
 "use client";
 
 import React from "react";
 import { formatGioVN, formatNgayVN } from "@/lib/utils/dinh-dang";
+import { luaChonMoLai, type DotTomTat } from "@/lib/gallery/dot-chon";
 
 export interface ReopenRequestChiTiet {
   trangThai: "khong_co" | "cho_xu_ly" | "da_mo" | "bi_tu_choi";
@@ -39,9 +39,9 @@ export interface ReopenRequestChiTiet {
   lyDoTuChoi: string | null;
   lucXuLy: string | null;
   lanThu: number;
+  /** BB-321 — đợt khách nói muốn đổi (nếu có). */
+  dotXin?: number | null;
 }
-
-const TRANG_THAI_MO_LAI_DUOC = new Set(["expired", "submitted"]);
 
 function gioNgay(iso: string): string {
   const d = new Date(iso);
@@ -54,14 +54,19 @@ export function YeuCauMoLaiBanner({
   status,
   canReopen,
   reopenRequest,
+  cacDot = [],
   onDone,
 }: {
   galleryId: string;
   status: string;
   canReopen: boolean;
   reopenRequest: ReopenRequestChiTiet | null | undefined;
+  /** BB-321 — các đợt mua thêm (từ 2) của bộ ảnh, để hiện ô chọn đợt cần mở lại. */
+  cacDot?: ReadonlyArray<DotTomTat>;
   onDone: () => void | Promise<void>;
 }) {
+  const lua = luaChonMoLai(status, cacDot);
+  const [dotChon, setDotChon] = React.useState<number>(lua.dotMacDinh);
   const [dangMo, setDangMo] = React.useState(false);
   const [dangTuChoi, setDangTuChoi] = React.useState(false);
   const [lyDoMo, setLyDoMo] = React.useState("");
@@ -77,11 +82,20 @@ export function YeuCauMoLaiBanner({
     setLyDoMo("");
     setLyDoTuChoi("");
     setLoi(null);
+    // Khách nói rõ đợt nào thì chọn sẵn đợt đó (nếu còn mở lại được); không thì đợt gần nhất.
+    const dotKhach = reopenRequest?.dotXin;
+    setDotChon(
+      dotKhach && luaChonMoLai(status, cacDot).cacDot.some((d) => d.soDot === dotKhach)
+        ? dotKhach
+        : luaChonMoLai(status, cacDot).dotMacDinh,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ đặt lại khi yêu cầu đổi
   }, [reopenRequest?.lucGuiGanNhat]);
 
   if (!reopenRequest || reopenRequest.trangThai !== "cho_xu_ly") return null;
 
-  const coTheMoTrucTiep = TRANG_THAI_MO_LAI_DUOC.has(status);
+  const coTheMoTrucTiep = lua.duoc;
+  const dotHopLe = lua.cacDot.some((d) => d.soDot === dotChon) ? dotChon : lua.dotMacDinh;
 
   async function xacNhanMo() {
     setBusy(true);
@@ -90,7 +104,7 @@ export function YeuCauMoLaiBanner({
       const res = await fetch(`/api/admin/galleries/${galleryId}/reopen`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: lyDoMo.trim() }),
+        body: JSON.stringify({ reason: lyDoMo.trim(), dot: dotHopLe }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
@@ -148,6 +162,35 @@ export function YeuCauMoLaiBanner({
         </p>
       ) : dangMo ? (
         <div className="mt-3">
+          {lua.canhBao && (
+            <p
+              data-testid="canh-bao-mo-lai-hau-ky"
+              className="mb-2 rounded-md border border-[var(--bb-warning)] bg-[var(--bb-warning)]/10 p-2.5 text-sm"
+            >
+              {lua.canhBao}
+            </p>
+          )}
+          {lua.cacDot.length > 1 && (
+            <div className="mb-2">
+              <label className="text-xs text-[var(--bb-fg-muted)]" htmlFor="dot-mo-lai">
+                Mở lại đợt nào
+              </label>
+              <select
+                id="dot-mo-lai"
+                name="dotMoLai"
+                value={dotHopLe}
+                onChange={(e) => setDotChon(Number(e.target.value))}
+                disabled={busy}
+                className="mt-1 w-full rounded border border-[var(--bb-border)] bg-[var(--bb-bg)] p-2 text-sm"
+              >
+                {lua.cacDot.map((d) => (
+                  <option key={d.soDot} value={d.soDot}>
+                    {d.nhan}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <label className="text-xs text-[var(--bb-fg-muted)]" htmlFor="ly-do-mo-lai">
             Lý do mở lại (khách sẽ không thấy dòng này, chỉ để tra lại sau)
           </label>
@@ -229,9 +272,8 @@ export function YeuCauMoLaiBanner({
               Mở lại cho khách
             </button>
           ) : (
-            <p className="text-xs text-[var(--bb-fg-muted)]">
-              Bộ ảnh đã qua bước chỉnh ảnh — nút mở lại tự động không dùng được ở trạng thái này.
-              Xử lý thủ công rồi bấm Từ chối kèm lý do nếu không mở được.
+            <p data-testid="giai-thich-khong-mo-lai" className="text-xs text-[var(--bb-fg-muted)]">
+              {lua.lyDoKhong} Bấm &ldquo;Từ chối&rdquo; kèm lời nhắn để khách biết cách làm tiếp.
             </p>
           )}
           <button

@@ -15,6 +15,7 @@
  * Fixture BB-202 (dữ liệu giả — AGENTS.md §6), dọn theo ĐÚNG id đã tạo.
  */
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 
@@ -230,7 +231,7 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     // vẫn kích hoạt input qua ngữ nghĩa `<label>` chuẩn của trình duyệt —
     // đây chỉ là cách Playwright định vị theo role, dùng `force` để bấm
     // thẳng vào input thay vì đợi nó "nhận được sự kiện chuột".
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
     // BB-295 mục #6 — báo cáo chấm độc lập: hai hộp đỏ trùng ý gộp thành
     // một lời nhắc dịu ("Còn thiếu ảnh bìa album") với một nút "Chọn bìa
     // ngay" (trước là "Ba mẹ chưa chọn ảnh bìa cho:" + "Đi tới chọn bìa").
@@ -263,7 +264,7 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Mẹ Bean BB-202");
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
     // BB-310 mục 2 — chọn bìa xong mở lại hộp chốt phải thấy NGAY hộp đã hết
     // khoá (cập nhật lạc quan tại chỗ, không chờ tải lại toàn bộ — xem
     // `chonBiaAlbum` ở `gallery-app.tsx`).

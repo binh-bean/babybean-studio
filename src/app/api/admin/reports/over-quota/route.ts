@@ -34,6 +34,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { HINH_THUC_GIAM_GIA, tienConPhaiThuSauGhiCo } from "@/lib/gallery/tien-phat-sinh";
 
 export const runtime = "nodejs";
 
@@ -89,8 +90,59 @@ export async function GET(request: Request): Promise<Response> {
       unbilled_amount: string | number | null;
     };
 
-    const items = ((rows ?? []) as unknown as Row[]).map((r) => ({
+    const rowsTyped = (rows ?? []) as unknown as Row[];
+
+    // BB-320 (Q-D2): CSKH phải biết GỌI AI để thu tiền — view chỉ có mã hợp đồng,
+    // không có tên bé/khách. Tra thêm tên theo đúng các bộ ảnh vừa lấy (ba lượt
+    // nhỏ theo id, không truy vấn nặng). Tra hỏng thì để trống — dòng vẫn hiện, chỉ thiếu tên.
+    const tenTheoBo = new Map<string, { customerName: string | null; babyNickname: string | null; babyFullName: string | null }>();
+    if (rowsTyped.length > 0) {
+      const { data: boRows } = await admin
+        .from("galleries")
+        .select("id, customer_id, baby_id")
+        .in("id", rowsTyped.map((r) => r.gallery_id));
+      const customerIds = [...new Set((boRows ?? []).map((b) => b.customer_id as string | null).filter((v): v is string => !!v))];
+      const babyIds = [...new Set((boRows ?? []).map((b) => b.baby_id as string | null).filter((v): v is string => !!v))];
+      const [{ data: khachRows }, { data: beRows }] = await Promise.all([
+        customerIds.length > 0 ? admin.from("customers").select("id, full_name").in("id", customerIds) : Promise.resolve({ data: [] }),
+        babyIds.length > 0 ? admin.from("babies").select("id, full_name, nickname").in("id", babyIds) : Promise.resolve({ data: [] }),
+      ]);
+      const khach = new Map((khachRows ?? []).map((k) => [String(k.id), String(k.full_name)]));
+      const be = new Map(
+        (beRows ?? []).map((b) => [String(b.id), { full: (b.full_name as string | null) ?? null, nick: (b.nickname as string | null) ?? null }]),
+      );
+      for (const b of boRows ?? []) {
+        const beCuaBo = b.baby_id ? be.get(String(b.baby_id)) : undefined;
+        tenTheoBo.set(String(b.id), {
+          customerName: b.customer_id ? khach.get(String(b.customer_id)) ?? null : null,
+          babyNickname: beCuaBo?.nick ?? null,
+          babyFullName: beCuaBo?.full ?? null,
+        });
+      }
+    }
+
+    // BB-320: tiền ĐÃ GHI CÓ cho từng bộ (tiền thu + phần giảm giá) — báo cáo "chưa thu
+    // tiền" phải trừ cả hai, nếu không bộ đã thu đủ vẫn nằm mãi trong danh sách đòi tiền.
+    const daThuTheoBo = new Map<string, { daThu: number; giamGia: number }>();
+    if (rowsTyped.length > 0) {
+      const { data: thuRows, error: thuErr } = await admin
+        .from("gallery_payments")
+        .select("gallery_id, amount, payment_method")
+        .in("gallery_id", rowsTyped.map((r) => r.gallery_id));
+      if (thuErr) throw thuErr;
+      for (const t of thuRows ?? []) {
+        const cu = daThuTheoBo.get(String(t.gallery_id)) ?? { daThu: 0, giamGia: 0 };
+        if (t.payment_method === HINH_THUC_GIAM_GIA) cu.giamGia += Number(t.amount);
+        else cu.daThu += Number(t.amount);
+        daThuTheoBo.set(String(t.gallery_id), cu);
+      }
+    }
+
+    const items = rowsTyped.map((r) => ({
       galleryId: r.gallery_id,
+      customerName: tenTheoBo.get(r.gallery_id)?.customerName ?? null,
+      babyNickname: tenTheoBo.get(r.gallery_id)?.babyNickname ?? null,
+      babyFullName: tenTheoBo.get(r.gallery_id)?.babyFullName ?? null,
       galleryTitle: r.gallery_title,
       branchName: r.branch_name,
       contractCode: r.lark_contract_code,
@@ -101,8 +153,16 @@ export async function GET(request: Request): Promise<Response> {
       addonCount: r.addon_count,
       unbilledCount: r.unbilled_count,
       extraPhotoPrice: Number(r.extra_photo_price ?? 0),
-      unbilledAmount: Number(r.unbilled_amount ?? 0),
-    }));
+      // Số theo ảnh (view) trừ mọi khoản đã ghi có; giữ hai phần để màn hình nói rõ đã trừ gì.
+      unbilledAmount: tienConPhaiThuSauGhiCo(
+        Number(r.unbilled_amount ?? 0),
+        (daThuTheoBo.get(r.gallery_id)?.daThu ?? 0) + (daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0),
+      ),
+      daThu: daThuTheoBo.get(r.gallery_id)?.daThu ?? 0,
+      giamGia: daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0,
+    }))
+      // Thu đủ (hoặc giảm đủ) rồi thì không còn "chưa thu" — bỏ khỏi danh sách đòi tiền.
+      .filter((i) => i.unbilledAmount > 0);
 
     // Đếm bộ ảnh CHƯA BIẾT hạn mức, cùng phạm vi chi nhánh.
     //

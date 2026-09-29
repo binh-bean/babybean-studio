@@ -23,7 +23,7 @@
 
 import React from "react";
 import { Badge } from "@/components/ui/badge";
-import { formatNgayGioVN } from "@/lib/utils/dinh-dang";
+import { formatNgayGioVN, formatSo } from "@/lib/utils/dinh-dang";
 
 interface Dong {
   id: string;
@@ -139,7 +139,7 @@ export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
 
   return (
     <section className="rounded-lg border border-[var(--bb-border)] p-4">
-      <h2 className="text-base font-medium">Yêu cầu mua thêm ({items.length})</h2>
+      <h2 className="text-base font-medium">Yêu cầu mua thêm ({formatSo(items.length)})</h2>
       <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
         Ba mẹ gửi sau khi đã duyệt ảnh. Chưa tính vào hợp đồng — gọi lại chốt giá và thanh toán.
       </p>

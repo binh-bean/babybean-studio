@@ -20,7 +20,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Input, Select, Badge, Card, Spinner, EmptyState, Avatar, AvatarFallback, Switch, Checkbox } from "@/components/ui";
 import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
 
 /** Chữ cái đầu để làm avatar — bản vẽ quan-tri-nhan-su.webp dùng chữ cái đầu
  * tên, không dùng ảnh chân dung. */
@@ -72,7 +72,14 @@ function branchSummary(row: StaffRow, branches: Branch[]): string {
   return row.branchIds.map((id) => branches.find((b) => b.id === id)?.name ?? "?").join(", ");
 }
 
-export function StaffManager() {
+export function StaffManager({
+  showForm,
+  onShowFormChange,
+}: {
+  /** Form "Thêm nhân viên" đang mở hay không — nút mở nằm ở PageHeader (nhan-su-vai-tro.tsx). */
+  showForm: boolean;
+  onShowFormChange: (mo: boolean) => void;
+}) {
   const [rows, setRows] = useState<StaffRow[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [assignableRoles, setAssignableRoles] = useState<string[]>([]);
@@ -81,9 +88,12 @@ export function StaffManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const setShowForm = onShowFormChange;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // BB-320 (Q9): lý do "không xoá được" chỉ hiện khi người dùng thật sự bấm Xoá
+  // — trước đây dòng chữ đỏ nằm cố định trên mọi thẻ nhân viên có nhật ký.
+  const [lyDoXoaMo, setLyDoXoaMo] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -213,19 +223,20 @@ export function StaffManager() {
       >
         {t.resetPassword}
       </Button>
-      {!row.deleteReason ? (
-        <Button
-          variant="danger"
-          size="sm"
-          disabled={busyId === row.id}
-          onClick={() => destroy(row)}
-        >
-          Xoá
-        </Button>
-      ) : (
-        <div className="mt-1 flex min-w-0 max-w-full flex-col text-xs text-[var(--bb-danger)] sm:max-w-[200px] sm:text-right">
+      <Button
+        variant="danger"
+        size="sm"
+        disabled={busyId === row.id}
+        // Tài khoản có nhật ký: nút vẫn bấm được — bấm thì hiện LÝ DO không xoá được (không xoá gì cả).
+        data-xoa-bi-chan={row.deleteReason ? "true" : undefined}
+        onClick={() => (row.deleteReason ? setLyDoXoaMo(lyDoXoaMo === row.id ? null : row.id) : destroy(row))}
+      >
+        Xoá
+      </Button>
+      {row.deleteReason && lyDoXoaMo === row.id && (
+        <p role="status" className="basis-full text-xs text-[var(--bb-fg-muted)]">
           {row.deleteReason}
-        </div>
+        </p>
       )}
     </>
   );
@@ -252,15 +263,6 @@ export function StaffManager() {
 
   return (
     <div className="space-y-6">
-      {/*
-        BB-280: tiêu đề "Nhân sự" và mô tả phụ chuyển sang PageHeader của
-        trang gộp /admin/staff (xem nhan-su-vai-tro.tsx) — ở đây chỉ còn nút
-        hành động, để khỏi in tiêu đề hai lần.
-      */}
-      <div className="flex justify-end">
-        <Button onClick={() => setShowForm((v) => !v)}>{t.addButton}</Button>
-      </div>
-
       {error && (
         <div
           role="alert"
@@ -386,7 +388,7 @@ export function StaffManager() {
               ).map(([nhan, soLuong]) => (
                 <li key={nhan} className="flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate text-[var(--bb-fg)]">{nhan}</span>
-                  <Badge variant="secondary">{soLuong}</Badge>
+                  <Badge variant="secondary">{formatSo(soLuong)}</Badge>
                 </li>
               ))}
             </ul>

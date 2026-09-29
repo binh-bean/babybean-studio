@@ -107,7 +107,7 @@ export function MoiNguoiThan() {
       await navigator.clipboard.writeText(linkVuaTao.diaChi);
       setDaSaoChep(true);
     } catch {
-      setLoi("Không sao chép được, ba mẹ bôi đen và chép tay giúp em nhé");
+      setLoi("Chưa sao chép được. Ba mẹ bôi đen rồi chép tay nhé.");
     }
   }
 
@@ -169,8 +169,8 @@ export function MoiNguoiThan() {
           <p className="kh-h3">Mời ông bà cùng xem</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {dangHoatDong.length > 0
-              ? `Đã mời ${dangHoatDong.length} người — ông bà chỉ xem và mua thêm, không chọn ảnh.`
-              : "Gửi link riêng cho ông bà xem ảnh, không cần chọn hộ ba mẹ."}
+              ? `Đã mời ${dangHoatDong.length} người. Ông bà xem và mua thêm, không chọn ảnh.`
+              : "Gửi link riêng để ông bà cùng xem ảnh."}
           </p>
         </div>
         <button
@@ -188,11 +188,11 @@ export function MoiNguoiThan() {
 
       {mo && (
         <div className="fixed inset-0 z-50 flex flex-col bg-background">
-          <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-8">
+          <header className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 sm:px-8">
             <div>
               <h2 className="kh-h2">Mời ông bà cùng xem</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Ông bà xem được ảnh và gửi yêu cầu mua thêm — không chọn ảnh, không thấy tiền của ba mẹ.
+                Ông bà xem ảnh và gửi yêu cầu mua thêm. Không chọn ảnh, không thấy tiền của ba mẹ.
               </p>
             </div>
             <button
@@ -204,7 +204,7 @@ export function MoiNguoiThan() {
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-8">
+          <div className="flex-1 overflow-y-auto px-6 py-4 sm:px-8">
             {loi && (
               <p className="mb-3 rounded-xl bg-heart/10 p-3 text-xs text-heart">{loi}</p>
             )}
@@ -234,7 +234,7 @@ export function MoiNguoiThan() {
                   </button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Chép giúp em ngay — link chỉ hiện được đúng một lần này thôi ạ.
+                  Ba mẹ chép ngay nhé. Link chỉ hiện một lần này thôi.
                 </p>
               </div>
             )}

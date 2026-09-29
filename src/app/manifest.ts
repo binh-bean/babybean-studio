@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "BabyBean Studio",
-    short_name: "BabyBean",
+    name: "Baby Bean Studio",
+    short_name: "Baby Bean",
     description: "Cổng xem và chọn ảnh dành cho ba mẹ tại BabyBean Studio",
     start_url: "/",
     display: "standalone",

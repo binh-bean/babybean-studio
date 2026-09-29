@@ -14,7 +14,7 @@
  * Nguồn dữ liệu từng chỉ số (đọc trước khi đổi)
  * ---------------------------------------------------------------------------
  * CSKH (đọc theo NGƯỜI BẤM NÚT — `activity_logs.actor_id`):
- *  - "Link gửi khách": `activity_logs.action = 'share_link.created'`
+ *  - "Link app": `activity_logs.action = 'share_link.created'`
  *    (`src/app/api/admin/galleries/[id]/share-link/route.ts`).
  *  - "Xác nhận chuyển chỉnh": `activity_logs.action = 'gallery.retouch_sent'`
  *    — đây là lúc CSKH bấm "đã gửi bản chỉnh cho khách"
@@ -163,6 +163,8 @@ async function thuTienTheoCskh(ctx: NguCanhBaoCao, tu: Date, den: Date): Promise
   const { data, error } = await ctx.client
     .from("gallery_payments")
     .select("confirmed_by, galleries!inner(branch_id, title, status, editor_id)")
+    // BB-320: dòng "giảm giá" không phải một "khoản thu ghi nhận".
+    .neq("payment_method", "giam_gia")
     .gte("confirmed_at", tu.toISOString())
     .lt("confirmed_at", den.toISOString());
   if (error) throw error;
@@ -362,7 +364,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
   }
 
   const theSo: TheSoBaoCao[] = [
-    theSoCoSanh("Tổng link gửi khách", tongGuiLink, "link", chiSoKyTruoc?.guiLink),
+    theSoCoSanh("Tổng link app", tongGuiLink, "link", chiSoKyTruoc?.guiLink),
     theSoCoSanh("Tổng xác nhận chuyển chỉnh", tongXacNhan, "lượt", chiSoKyTruoc?.xacNhanChuyen),
     theSoCoSanh("Tổng khoản thu ghi nhận", tongThuTien, "khoản", chiSoKyTruoc?.thuTien),
     theSoCoSanh("Tổng mua thêm đã xử lý", tongMuaThem, "yêu cầu", chiSoKyTruoc?.muaThem),
@@ -377,7 +379,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
     bang: {
       cot: [
         "Nhân viên",
-        "Link gửi khách",
+        "Link app",
         "Xác nhận chuyển chỉnh",
         "Khoản thu ghi nhận",
         "Mua thêm đã xử lý",
@@ -400,7 +402,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
     ghiChu: [
       GHI_CHU_LOAI_TRU,
       "Đã loại nhân viên thử (tên bắt đầu \"Fixture\" hoặc email @demo.babybean.vn) khỏi bảng.",
-      "\"Tổng thao tác\" = Link gửi khách + Xác nhận chuyển chỉnh + Khoản thu ghi nhận + Mua thêm đã xử lý + Bộ gửi bản chỉnh. \"Vòng khách xin sửa\" và \"Trung vị nhận → gửi\" là chỉ số chất lượng, không cộng vào cột này.",
+      "\"Tổng thao tác\" = Link app + Xác nhận chuyển chỉnh + Khoản thu ghi nhận + Mua thêm đã xử lý + Bộ gửi bản chỉnh. \"Vòng khách xin sửa\" và \"Trung vị nhận → gửi\" là chỉ số chất lượng, không cộng vào cột này.",
       "\"Trung vị nhận → gửi\" chỉ tính trên bộ có mốc `gallery.confirm_retouch` (chuyển vào chỉnh sửa qua route xác nhận) — bộ nhập tay/di trú dữ liệu cũ không có mốc này bị loại khỏi mẫu tính, không tính là 0.",
       "Một nhân viên vừa làm CSKH vừa đứng tên chỉnh ảnh (`editor_id`) thì các chỉ số của cả hai vai được cộng vào cùng một dòng.",
     ],

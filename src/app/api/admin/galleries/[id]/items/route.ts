@@ -7,6 +7,7 @@
 
 import { randomUUID, createHash } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
+import { HINH_THUC_GIAM_GIA } from "@/lib/gallery/tien-phat-sinh";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { giaiMaMaLink, maHoaMaLink } from "@/lib/auth/ma-link";
 import { docMaLinkAppTuLark } from "@/lib/lark/khoi-phuc-link-app";
@@ -21,6 +22,7 @@ import { nhanHienThi, mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
+import { layChiTietDotQuanTri, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
 
 export const runtime = "nodejs";
 
@@ -202,6 +204,13 @@ export async function GET(
     // (`YeuCauMoLaiBanner`) đọc field này.
     const reopenRequest = await layTrangThaiXinMoLai(admin, gallery.id);
 
+    // BB-321 — ảnh theo từng ĐỢT chọn (đợt 1 + các đợt mua thêm). Rỗng khi chưa
+    // có đợt nào ≥ 2 hoặc chưa áp migration 0077 — khối "Đợt chọn" tự ẩn.
+    const dotChon = await layChiTietDotQuanTri(admin, gallery.id);
+
+    // BB-321 — cờ lúc chốt đợt 1: khách nhờ studio chọn thêm N ảnh / biết ảnh in sẽ chậm hơn.
+    const chotDot1 = await layThongTinChotDot1(admin, gallery.id);
+
     // Link thư mục ảnh đã chỉnh gần nhất, để màn hình điền sẵn khi gửi lại.
     const { data: delivery } = await admin
       .from("deliveries")
@@ -233,11 +242,16 @@ export async function GET(
         .eq("gallery_id", gallery.id)
         .eq("is_primary", true)
         .maybeSingle(),
-      admin.from("gallery_payments").select("amount").eq("gallery_id", gallery.id),
+      admin.from("gallery_payments").select("amount, payment_method").eq("gallery_id", gallery.id),
     ]);
 
     const dueAmount = Number(primarySel?.snapshot_extra_amount ?? 0);
+    // `paidAmount` = mọi khoản GHI CÓ cho khách (tiền thu + phần giảm giá) — số còn thiếu tính trên tổng này.
     const paidAmount = (payRows ?? []).reduce((t, r) => t + Number(r.amount), 0);
+    // BB-320: riêng phần giảm giá (dòng `giam_gia`), để màn hình tách "đã thu" khỏi "giảm".
+    const discountAmount = (payRows ?? [])
+      .filter((r) => r.payment_method === HINH_THUC_GIAM_GIA)
+      .reduce((t, r) => t + Number(r.amount), 0);
 
     // BB-294 (#2) — thẻ "Mua thêm" ở hàng số liệu đầu trang trước đây hiện
     // `dueAmount` (snapshot_extra_amount = tiền VƯỢT HẠN MỨC ảnh, không phải
@@ -370,10 +384,14 @@ export async function GET(
       dueAmount,
       addonsAmount,
       paidAmount,
+      discountAmount,
       outstanding: dueAmount - paidAmount,
       revisions: revisions ?? [],
       // BB-312 — xem chú thích ở phần truy vấn phía trên.
       reopenRequest,
+      // BB-321 — xem chú thích ở phần truy vấn phía trên.
+      dotChon,
+      chotDot1,
       catalog: catalog ?? [],
       finalDriveUrl: delivery?.final_drive_url ?? null,
       // Thư mục ảnh GỐC — khác hẳn finalDriveUrl ở trên (ảnh ĐÃ CHỈNH gửi khách
@@ -455,6 +473,8 @@ export async function GET(
             revokedAt: link.revoked_at ?? null,
             // null = chưa có bản mã (link tạo trước BB-201) hoặc không có quyền.
             diaChi: diaChiLink,
+            // BB-320: phân biệt "link cũ không khôi phục được" với "người xem không có quyền gửi link".
+            coQuyenGuiLink: staff.permissions.includes("galleries:share"),
           }
         : null,
       items: summary.items,
@@ -495,14 +515,20 @@ export async function GET(
  * ---------------------------------------------------------------------------
  * Chốt xong là khoá
  * ---------------------------------------------------------------------------
- * Bộ ảnh đã ở trạng thái submitted trở đi thì không sửa dòng hàng nữa. Lúc
- * khách bấm chốt, BB-114 đã chụp lại con số họ nhìn thấy; sửa dòng hàng sau đó
- * làm hai bên nhớ hai con số khác nhau, và bên thiệt luôn là khách.
+ * BB-320 (chủ dự án, 29/09/2026) ĐỔI LUẬT: CSKH thêm/sửa/xoá dòng hàng được ở
+ * MỌI trạng thái, chỉ trừ "lưu trữ" (archived). Ca thật: khách chọn vượt hạn mức
+ * rồi chốt, CSKH muốn tăng Edit file 15 → 17 — luật cũ chặn đúng lúc cần sửa nhất.
  *
- * Cùng luật với patch_selection_batch — xem docs/16 mục 4.
+ * Điều KHÔNG đổi: `selections.snapshot_extra_amount` — con số khách đã nhìn thấy
+ * lúc bấm chốt (BB-114) — vẫn đứng nguyên, vì khách trả theo số đó (xem chú thích
+ * ở payments/route.ts). Sửa dòng hàng chỉ đổi hạn mức HIỆN TẠI; màn quản trị hiện
+ * cả hai số cạnh nhau. Mỗi lần sửa vẫn ghi nhật ký kèm hạn mức trước/sau.
+ *
+ * (Luật của phía KHÁCH — patch_selection_batch, /api/g/* — không đổi: khách chốt
+ * xong vẫn không tự sửa được lựa chọn của mình.)
  */
 
-const LOCKED_STATUSES = ["submitted", "in_retouch", "delivered", "archived"];
+const KHOA_SUA_DONG_HANG = ["archived"];
 
 /** Lấy bộ ảnh, kiểm quyền và kiểm khoá. Trả về null kèm lý do nếu không được. */
 type EditableGallery =
@@ -529,11 +555,11 @@ async function loadEditableGallery(galleryId: string): Promise<EditableGallery> 
   if (!gallery) return { error: fail("NOT_FOUND", "Không tìm thấy bộ ảnh") } as const;
   requireBranch(staff, gallery.branch_id);
 
-  if (LOCKED_STATUSES.includes(gallery.status)) {
+  if (KHOA_SUA_DONG_HANG.includes(gallery.status)) {
     return {
       error: fail(
         "GALLERY_LOCKED",
-        "Khách đã chốt bộ ảnh này. Không sửa được dòng hàng nữa.",
+        "Bộ ảnh đã lưu trữ. Không sửa được dòng hàng nữa.",
       ),
     } as const;
   }

@@ -39,8 +39,8 @@ export default async function CustomersPage() {
       danh sách xuống thêm gần 100px trên một màn cao 812px. Cùng luật với màn
       Quản lý bộ ảnh, theo yêu cầu của chủ studio 22/09/2026.
     */
-    <div className="min-w-0 space-y-4 lg:space-y-6">
-      <PageHeader title={vi.admin.khachHang.title} hideOnMobile className="mb-0" />
+    <div className="min-w-0 space-y-6">
+      <PageHeader title={vi.admin.khachHang.title} description={vi.admin.khachHang.subtitle} />
       <CustomersManager
         coQuyenSua={permissions.includes("customers:write")}
         coQuyenXoa={permissions.includes("customers:delete")}

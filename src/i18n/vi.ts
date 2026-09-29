@@ -17,7 +17,7 @@ export const vi = {
     saving: "Đang lưu…",
     saved: "Đã lưu",
     unsaved: "Chưa lưu",
-    offline: "Mất kết nối — lựa chọn của ba mẹ được giữ và sẽ lưu khi có mạng",
+    offline: "Mất kết nối. Ảnh ba mẹ chọn sẽ tự lưu khi có mạng",
     error: "Đã xảy ra lỗi",
     delete: "Xoá",
     edit: "Chỉnh sửa",
@@ -78,10 +78,10 @@ export const vi = {
     },
     pwa: {
       installTitle: "Cài đặt ứng dụng BabyBean",
-      installDesc: "Thêm BabyBean vào màn hình chính để ba mẹ mở xem và chọn ảnh cho bé tiện lợi hơn.",
+      installDesc: "Lưu BabyBean ra màn hình chính để mở ảnh nhanh hơn.",
       installCta: "Thêm vào màn hình chính",
       installLater: "Để sau",
-      iosInstructions: "Để thêm vào màn hình chính: chạm vào biểu tượng Chia sẻ ở thanh dưới rồi chọn 'Thêm vào MH chính'.",
+      iosInstructions: "Chạm nút Chia sẻ ở thanh dưới. Rồi chọn 'Thêm vào MH chính'.",
     },
     contractBreakdown: {
       title: "Thành phần hợp đồng",
@@ -165,7 +165,7 @@ export const vi = {
     photoMissing: "Ảnh này không còn khả dụng, ba mẹ liên hệ studio giúp em nhé",
     emptyFilter: "Chưa có ảnh nào trong mục này",
     preparing: "Bộ ảnh đang được chuẩn bị. Studio sẽ báo ba mẹ khi sẵn sàng.",
-    offlineBanner: "Mất kết nối — lựa chọn của ba mẹ được giữ và sẽ lưu khi có mạng.",
+    offlineBanner: "Mất kết nối. Ảnh ba mẹ chọn sẽ tự lưu khi có mạng.",
 
     lightbox: {
       closeAria: "Đóng xem ảnh lớn",
@@ -186,7 +186,8 @@ export const vi = {
     noteLocked: "Bộ ảnh đã chốt nên không sửa ghi chú được nữa",
     downloadThis: "Tải ảnh này về máy",
     quotaInline: "đã chọn",
-    messageStudio: "Nhắn cho studio",
+    // BB-319 — MỘT nhãn cho việc nhắn tin (bìa, chân trang, thông báo hạn mức, dải xin mở lại).
+    messageStudio: "Nhắn studio",
     /**
      * BB-240 — thay "Thành phần hợp đồng / Tổng cộng 0 ₫" (dữ liệu nội bộ,
      * dòng "Edit file", tiền hợp đồng) bằng một dòng ba mẹ dùng được: biết
@@ -227,7 +228,7 @@ export const vi = {
       anChiTiet: "Ẩn chi tiết",
       xemLonAnhBe: "Xem lớn ảnh của bé",
       dongXemLon: "Đóng xem lớn",
-      thamKhaoKhung: "Mẫu khung chỉ để tham khảo — CSKH sẽ tư vấn mẫu thật khi chốt đơn.",
+      thamKhaoKhung: "Mẫu khung chỉ để tham khảo. Studio tư vấn mẫu thật khi chốt đơn.",
       moTaChatLieu: {
         "Gỗ": "In trên nền gỗ tự nhiên, vân gỗ hiện rõ ở viền — ấm và mộc.",
         "Cavas/Kim tuyến": "In trên vải canvas có vân vải nhẹ — cảm giác như tranh vẽ.",
@@ -581,7 +582,7 @@ export const vi = {
       allowInvite: "Cho phép chia sẻ link mời người thân",
       successTitle: "Tạo bộ ảnh thành công!",
       linkReady: "Link chọn ảnh của bé đã sẵn sàng để gửi cho ba mẹ.",
-      copyLinkCta: "Sao chép link gửi khách",
+      copyLinkCta: "Sao chép link app",
       copyMessageCta: "Sao chép tin nhắn mẫu",
       sampleMessage: "BabyBean Studio xin chào ba mẹ bé {babyName}! Dạ em gửi link chọn ảnh buổi chụp của bé ạ: {link}. Mã PIN là 4 số cuối SĐT ba mẹ nhé. Hạn chốt ảnh là ngày {deadline}. Ba mẹ cần hỗ trợ gì cứ nhắn em nha!",
     },

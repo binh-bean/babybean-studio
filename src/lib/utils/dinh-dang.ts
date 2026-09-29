@@ -74,12 +74,144 @@ export function formatKhoangNgayVN(
 }
 
 /**
+ * BB-324 — MỘT cách viết số cho mọi màn (quản trị + khách): dấu chấm phân
+ * cách hàng nghìn kiểu Việt Nam ("1.234", "12.500.000"), phần lẻ sau dấu phẩy
+ * ("12,5"). Anh: "số liệu là số đều phân định hàng nghìn, không để liền".
+ *
+ * Tự dựng chuỗi, không nhờ `Intl`/`toLocaleString`: kết quả của hai thứ đó
+ * tuỳ bộ dữ liệu ICU của máy (máy chủ Node, trình duyệt cũ có thể in
+ * "1,234" hoặc "1234"). Không dùng cho SĐT, mã hợp đồng, năm, ngày, id —
+ * những thứ đó không phải số lượng.
+ *
+ * `null`/`undefined`/không phải số → chuỗi rỗng (nơi gọi tự quyết hiện gì).
+ */
+export function formatSo(n: number | null | undefined, soLe = 0): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "";
+  const am = n < 0;
+  const [nguyen, le] = Math.abs(n).toFixed(Math.max(0, soLe)).split(".");
+  const nhom = (nguyen ?? "0").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const leGon = le?.replace(/0+$/, "");
+  return `${am ? "-" : ""}${nhom}${leGon ? `,${leGon}` : ""}`;
+}
+
+/**
+ * BB-324 — số tiền: "12.500.000 ₫" (làm tròn tới đồng, khoảng trắng không ngắt
+ * dòng trước "₫" để ký hiệu không rơi xuống dòng riêng).
+ */
+export function formatTien(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "";
+  return `${formatSo(Math.round(n))} ₫`;
+}
+
+/**
  * Chuẩn hoá kích thước in ("10x15", "10 x 15", "10×15") về một dạng duy nhất
  * "10×15" — dấu nhân đúng kiểu in ấn, không phải chữ "x" của bàn phím.
  */
 export function formatKichThuoc(input: string | null | undefined): string {
   if (!input) return "";
   return input.replace(/(\d)\s*[xX]\s*(\d)/g, "$1×$2");
+}
+
+/**
+ * BB-319 (luật 1) — tên sản phẩm kèm số lượng, MỘT cách viết cho mọi chỗ màn
+ * khách: "UV 10×15 ×3" (kích thước qua `formatKichThuoc`, số lượng "×N" liền số,
+ * bỏ "×1"). Trước bản vá có ba cách: "UV 10x15 ×3", "UV 10×15 × 3", "×3" xuống dòng.
+ */
+export function tenKemSoLuong(ten: string, soLuong = 1): string {
+  const t = formatKichThuoc(ten.trim());
+  return soLuong > 1 ? `${t} ×${soLuong}` : t;
+}
+
+const TIEN_TO_NHOM_SAN_PHAM: Record<string, string> = { anh_in: "Ảnh in", album: "Album", khung: "Khung" };
+
+/**
+ * BB-319 (luật 1 + 5) — MỘT tên hiển thị cho một sản phẩm ở MỌI chỗ màn khách
+ * nhắc tới nó (tiêu đề cửa hàng, dòng giỏ, thông báo "Đã thêm vào giỏ", dòng
+ * "Trong giỏ" ở màn xem lớn, hộp chốt): nhóm + chất liệu + kích thước —
+ * "Ảnh in UV 10×15". Trước bản vá cùng một món hiện ba tên: "Ảnh in UV" (tiêu
+ * đề), "UV 10×15" (giỏ), "3 ảnh Ảnh in UV" (thông báo).
+ *
+ * Thiếu nhóm/chất liệu (món không còn trong danh mục đang bán) thì rơi về tên
+ * gốc đã chuẩn hoá ký hiệu kích thước.
+ */
+export function tenSanPhamChoKhach(sp: {
+  name: string;
+  nhom?: string | null;
+  material?: string | null;
+  size?: string | null;
+}): string {
+  // Tên nội bộ Lark của file ảnh chỉnh bán thêm ("Edit file") — khách đọc bằng lời của khách.
+  if (/^edit file$/i.test(sp.name.trim())) return "Ảnh chỉnh thêm";
+  const tienTo = sp.nhom ? TIEN_TO_NHOM_SAN_PHAM[sp.nhom] : undefined;
+  const chatLieu = sp.material?.trim();
+  if (!tienTo || !chatLieu) return formatKichThuoc(sp.name.trim());
+  const dau = chatLieu.toLowerCase().startsWith(tienTo.toLowerCase()) ? chatLieu : `${tienTo} ${chatLieu}`;
+  return sp.size ? `${dau} ${formatKichThuoc(sp.size)}` : dau;
+}
+
+/**
+ * BB-319 (luật 5, K-D1) — nhãn trạng thái của món trong giỏ phải nói ĐÚNG sự
+ * thật: mới thêm vào giỏ (đơn chưa gửi) là "Trong giỏ"; chỉ khi ba mẹ đã chốt
+ * gửi đơn mới là "Đã đặt mua". Vòng 6 bắt "Đã đặt mua" hiện lúc món mới nằm
+ * trong giỏ, trong khi cửa hàng cùng lúc ghi "Đang đặt 3" — ba cách nói cho
+ * một trạng thái. Mọi nơi hiện trạng thái giỏ gọi hàm này.
+ */
+export function nhanTrangThaiGio(donDaGui: boolean): "Đã đặt mua" | "Trong giỏ" {
+  return donDaGui ? "Đã đặt mua" : "Trong giỏ";
+}
+
+/**
+ * BB-319 — dòng chi nhánh trên bìa: "Chi nhánh Pasteur". Tên đã tự có chữ
+ * "chi nhánh" (dữ liệu nhập kiểu "Chi nhánh Q1", hay tên mẫu "… Chi nhánh") thì
+ * không ghép thêm lần nữa — tránh "Chi nhánh … Chi nhánh".
+ */
+export function dongChiNhanh(ten: string | null | undefined): string {
+  const t = (ten ?? "").trim();
+  if (!t) return "";
+  return /chi nhánh/i.test(t) ? t : `Chi nhánh ${t}`;
+}
+
+/**
+ * BB-319 (K-N1) — MỘT chỗ duy nhất đổi ký hiệu kích thước trong TÊN sản phẩm
+ * ("UV 10x15", "Album (Ultra HD) 15x21") sang "×" cho MỌI chỗ màn khách hiện tên.
+ * Dữ liệu trong cơ sở dữ liệu / từ Lark KHÔNG bị đổi: chỉ bản sao trong bộ nhớ
+ * của trình duyệt. Cột `size` giữ nguyên ("10x15") vì mã khác dùng nó làm khoá
+ * so khớp; nơi hiện cột `size` đã đi qua `formatKichThuoc`.
+ *
+ * Chỉ động vào `name` của các mảng sản phẩm mà máy chủ trả cho màn khách, nên
+ * mọi phép so sánh `name === name` giữa các mảng đó vẫn đúng (cùng một phép đổi).
+ */
+export function chuanHoaKyHieuKichThuocTrongGallery<
+  T extends {
+    contract?: { items: Array<{ name: string; components: Array<{ name: string }> }> };
+    albumBia?: Array<{ name: string }>;
+    addons?: {
+      items: Array<{ name: string }>;
+      catalogue?: Array<{ name: string }>;
+    };
+  },
+>(g: T): T {
+  const doiTen = <X extends { name: string }>(x: X): X => ({ ...x, name: formatKichThuoc(x.name) });
+  return {
+    ...g,
+    contract: g.contract
+      ? {
+          ...g.contract,
+          items: g.contract.items.map((it) => ({
+            ...doiTen(it),
+            components: it.components.map(doiTen),
+          })),
+        }
+      : g.contract,
+    albumBia: g.albumBia?.map(doiTen),
+    addons: g.addons
+      ? {
+          ...g.addons,
+          items: g.addons.items.map(doiTen),
+          catalogue: g.addons.catalogue?.map(doiTen),
+        }
+      : g.addons,
+  };
 }
 
 /**
@@ -146,6 +278,48 @@ export function tinhTenBiaTuDuLieu(
   return hoTenDayDu?.trim() || "";
 }
 
+/** Tên dưới biểu tượng màn hình chính khi bộ ảnh không có tên bé. */
+export const TEN_NGAN_MAC_DINH = "Baby Bean";
+/** Android/iOS cắt tên dưới biểu tượng ở khoảng 12 ký tự. */
+const TOI_DA_TEN_NGAN = 12;
+
+function doDai(s: string): number {
+  return [...s.normalize("NFC")].length;
+}
+
+/**
+ * BB-324 — tên ngắn dưới biểu tượng màn hình chính (manifest `short_name`,
+ * `apple-mobile-web-app-title`, `<title>` trang khách). Cùng nguồn
+ * `tinhTenBiaTuDuLieu`:
+ *  - có biệt danh → "Bé Xoài";
+ *  - chỉ có họ tên → "Bé" + 1–2 chữ CUỐI (tên gọi), giữ trọn chữ, ≤ 12 ký tự:
+ *    "Nguyễn Ngọc Bảo An" → "Bé Bảo An", "Trần Thị Khánh Linh" → "Bé Linh";
+ *  - không có tên → "Baby Bean".
+ * Trước bản vá: `tenBe.slice(0, 12)` cắt ngang chữ ("Nguyễn Ngọc ").
+ * Không bao giờ cắt giữa một chữ — tên một chữ quá dài để hệ điều hành tự cắt.
+ */
+export function tenNganManHinhChinh(
+  nickname: string | null | undefined,
+  hoTenDayDu: string | null | undefined,
+): string {
+  const ten = tinhTenBiaTuDuLieu(nickname, hoTenDayDu).normalize("NFC");
+  if (!ten) return TEN_NGAN_MAC_DINH;
+  const coBietDanh = !!nickname?.trim();
+  if (coBietDanh && doDai(ten) <= TOI_DA_TEN_NGAN) return ten;
+
+  // Bỏ chữ "Bé" có sẵn ở đầu, lấy chữ theo thứ tự ưu tiên: biệt danh giữ chữ
+  // ĐẦU ("Bé Bin Béo Ú" → "Bé Bin Béo"), họ tên giữ chữ CUỐI (tên gọi).
+  const chu = ten.split(/\s+/).filter(Boolean);
+  if (chu[0]?.toLowerCase() === "bé") chu.shift();
+  if (chu.length === 0) return ten;
+  for (let n = Math.min(2, chu.length); n >= 1; n--) {
+    const phan = coBietDanh ? chu.slice(0, n) : chu.slice(-n);
+    const ketQua = `Bé ${phan.join(" ")}`;
+    if (doDai(ketQua) <= TOI_DA_TEN_NGAN || n === 1) return ketQua;
+  }
+  return ten;
+}
+
 export interface CoChuTieuDeBia {
   /** px ở khổ điện thoại (< 640px). */
   mobile: number;
@@ -165,13 +339,17 @@ export interface CoChuTieuDeBia {
  * dùng cho tên ngắn ("Bé Na") — tên càng dài, bậc càng nhỏ. Hàm THUẦN để
  * phép thử đơn vị canh đúng ngưỡng, không đọc DOM đo chữ thật (canvas đo
  * chữ không chạy được trong Vitest `environment: node`).
+ *
+ * BB-319 (luật 3, một thang chữ) — mọi bậc lấy ĐÚNG giá trị của thang chữ màn
+ * khách (`tokens.css`, khối "THANG CHỮ"): 28 · 32 · 36 · 40 · 44 · 48 · 56 · 64 · 72 · 84.
+ * Bản cũ có 27/38/46/52/54/68 — cỡ lẻ nằm ngoài thang, mỗi độ dài tên một cỡ riêng.
  */
 export function coChuTieuDeBia(tieuDe: string): CoChuTieuDeBia {
   const n = tieuDe.trim().length;
-  if (n <= 10) return { mobile: 44, sm: 52, lg: 64, xl: 84 };
-  if (n <= 16) return { mobile: 38, sm: 44, lg: 54, xl: 68 };
-  if (n <= 22) return { mobile: 32, sm: 38, lg: 46, xl: 56 };
-  return { mobile: 27, sm: 32, lg: 38, xl: 46 };
+  if (n <= 10) return { mobile: 44, sm: 56, lg: 64, xl: 84 };
+  if (n <= 16) return { mobile: 36, sm: 44, lg: 56, xl: 72 };
+  if (n <= 22) return { mobile: 32, sm: 40, lg: 48, xl: 56 };
+  return { mobile: 28, sm: 32, lg: 40, xl: 48 };
 }
 
 export interface TieuDeBoAnhQuanTri {
@@ -256,4 +434,39 @@ export function cauNhacThieuAnh(tenSanPham: string, soThieu: number, laAlbum = f
   return laAlbum
     ? `${ten} chưa có ảnh, bổ sung sau được.`
     : `${ten} còn thiếu ${Math.max(1, soThieu)} ảnh, bổ sung sau được.`;
+}
+
+/**
+ * BB-320 (Ghi nhận vòng 6: "40 ảnh đã chỉnh" so với "12/12") — hai con số ĐẾM
+ * HAI THỨ KHÁC NHAU và phải có nhãn nói rõ:
+ *
+ *  - "12/12" = số tấm khách đã CHỌN / số tấm nằm trong gói (hạn mức) — đếm trên
+ *    danh sách chọn (`selections`).
+ *  - "40 ảnh" = số ảnh CÓ TRONG BỘ (thư mục ảnh đã chỉnh giao khách) — đếm trên
+ *    bảng `photos`, không liên quan tới số đã chọn.
+ *
+ * Hàm này dựng nhãn cho con số thứ nhất: luôn kèm đơn vị "tấm", và khi chưa biết
+ * hạn mức (`?`) thì nói thẳng thay vì để "0/?" trơ trọi.
+ */
+export function nhanTienDoChon(input: { selectedCount: number; includedQuota: number }): {
+  /** Chuỗi ngắn hiển thị trong bảng/thẻ: "12/12 tấm" hoặc "3 tấm". */
+  ngan: string;
+  /** Giải thích đầy đủ cho tooltip/đọc màn hình. */
+  giaiThich: string;
+  quotaKnown: boolean;
+} {
+  const chon = Math.max(0, Math.trunc(input.selectedCount));
+  const quota = Math.trunc(input.includedQuota);
+  if (quota > 0) {
+    return {
+      ngan: `${formatSo(chon)}/${formatSo(quota)} tấm`,
+      giaiThich: `Khách đã chọn ${formatSo(chon)} trên ${formatSo(quota)} tấm trong gói`,
+      quotaKnown: true,
+    };
+  }
+  return {
+    ngan: `${formatSo(chon)} tấm`,
+    giaiThich: `Khách đã chọn ${formatSo(chon)} tấm — chưa rõ hạn mức trong gói`,
+    quotaKnown: false,
+  };
 }

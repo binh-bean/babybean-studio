@@ -5,7 +5,9 @@
  * Kịch bản: nhân viên `cs` mở chi tiết bộ Fixture có 1 yêu cầu `moi`.
  *   1. Bấm "Đã gọi khách" -> DB chuyển `da_lien_he`.
  *   2. Bấm "Đã chốt" -> DB chuyển `da_chot`, nút biến mất (trạng thái cuối).
- *   3. Màn khách của bộ đó hiện "Đã chốt đơn".
+ *   3. Phía khách: từ BB-321 thẻ "Mời mua lần hai" (từng hiện "Đã chốt đơn") đã
+ *      nghỉ với ba mẹ — bộ hiện lối "Chọn thêm ảnh", còn yêu cầu cũ vẫn đọc được
+ *      qua GET /api/g/mua-them với đúng trạng thái `da_chot` (BB-323 cập nhật).
  *
  * Dữ liệu: chỉ tạo dòng "Fixture BB-249 …", dọn sạch ở afterAll theo đúng
  * thứ tự khoá ngoại — AGENTS.md §6 (bb-dev là dữ liệu thật của studio).
@@ -165,9 +167,26 @@ test.describe("BB-249: CSKH đổi trạng thái yêu cầu mua thêm", () => {
     await expect(page.getByRole("button", { name: "Đã gọi khách" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Huỷ" })).toHaveCount(0);
 
-    // 4. Màn khách của đúng bộ này hiện "Đã chốt đơn", không lộ nút CSKH.
+    // 4. Phía khách. BB-323 — bản cũ đòi màn khách hiện "Đã chốt đơn" trên thẻ
+    //    "Mời mua lần hai". BB-321 đã NGHỈ thẻ đó với ba mẹ (docs/21 mục "Đường
+    //    'mua thêm' cũ (BB-245) — đã nghỉ với ba mẹ"; brief BB-321 mục A.6: gộp
+    //    về MỘT đường mua là "Chọn thêm ảnh", dữ liệu `yeu_cau_mua_them` cũ vẫn
+    //    đọc được). Nên nay canh đúng hai điều đó:
+    //    a) bộ đã duyệt hiện lối mua MỚI "Chọn thêm ảnh", không lộ nút của CSKH;
+    //    b) yêu cầu cũ vẫn đọc được từ phiên khách, đúng trạng thái CSKH vừa chốt.
     const khachPage = await context.newPage();
+    const choBoAnh = khachPage.waitForResponse((r) => r.url().includes("/api/g/gallery") && r.status() === 200);
     await khachPage.goto(`/g/${maLink}`);
-    await expect(khachPage.getByText("Đã chốt đơn")).toBeVisible({ timeout: 15_000 });
+    await choBoAnh;
+    await expect(khachPage.getByTestId("chon-them-anh")).toBeVisible({ timeout: 15_000 });
+    await expect(khachPage.getByRole("button", { name: "Đã gọi khách" })).toHaveCount(0);
+
+    const docLai = await khachPage.evaluate(async () => {
+      const res = await fetch("/api/g/mua-them", { cache: "no-store" });
+      return { status: res.status, body: await res.json() };
+    });
+    expect(docLai.status).toBe(200);
+    const dong = (docLai.body?.data?.items ?? []).find((i: { id: string }) => i.id === yeuCauId);
+    expect(dong?.trangThai, "Yêu cầu mua thêm cũ vẫn đọc được từ phiên khách, đúng trạng thái mới nhất").toBe("da_chot");
   });
 });

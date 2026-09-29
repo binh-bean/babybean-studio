@@ -245,11 +245,12 @@ muted (`PAGE_DESCRIPTION_CLASS`), không phải chữ phụ 12px — đây là c
 thích trang làm gì, cần đọc được dễ hơn một ghi chú nhỏ.
 
 `src/components/features/admin/page-header.tsx` xuất ba thứ:
-- `<PageHeader title description actions hideOnMobile />` — dùng khi tiêu đề
-  đứng một mình đầu trang, có thể kèm mô tả và nút hành động bên phải.
-- `PAGE_TITLE_CLASS` — dùng khi tiêu đề phải nằm cạnh thứ khác không hợp bố
-  cục mặc định của `PageHeader` (ví dụ nhãn trạng thái cạnh tiêu đề ở Chi
-  tiết bộ ảnh, hoặc cột điều hướng của Báo cáo điều hành).
+- `<PageHeader title description actions titleAddon />` — MỘT khối tiêu đề cho mọi
+  màn quản trị (BB-320): H1 Playfair 30px, mô tả ngay dưới H1, đường kẻ dưới
+  mô tả, nút chính bên phải (điện thoại: xuống dưới mô tả). `titleAddon` là nhãn
+  nhỏ cạnh H1 (trạng thái bộ ảnh).
+- `PAGE_TITLE_CLASS` — lớp chữ của H1, dùng nội bộ `PageHeader` (đừng tự viết
+  `<h1>` riêng ở trang quản trị).
 - `CARD_TITLE_CLASS` — dùng cho `<h2>`/`<h3>` viết tay thay vì qua component
   `<Card>`, để hai cách viết ra cùng một cỡ.
 
@@ -257,9 +258,15 @@ thích trang làm gì, cần đọc được dễ hơn một ghi chú nhỏ.
 hàng, Việc cần xử lý, Báo cáo điều hành, Chi nhánh, Nhân sự & vai trò, Cài
 đặt, Nhật ký thao tác.
 
-`hideOnMobile` giữ lại quyết định của chủ studio 22/09/2026: dưới `lg`, thanh
-trên cùng (`admin-header.tsx`) đã in tên màn cạnh chữ BabyBean, nên in lại
-tiêu đề to ngay dưới là một dòng thứ hai nói cùng một điều.
+BB-320 bỏ `hideOnMobile` (quyết định 22/09/2026 cũ): H1 luôn hiện ở cả điện
+thoại lẫn máy tính; thanh trên cùng của điện thoại chỉ còn logo, không in tên
+màn lần thứ hai.
+
+**Thẻ số liệu** (`the-so-lieu.tsx`, `TheSoLieu`): MỘT kiểu duy nhất — nhãn thường
+12px một dòng phía trên, số Be Vietnam Pro 28px (26px trên điện thoại), đơn vị
+và ghi chú nhỏ cùng dòng cơ sở. Không nhãn IN HOA, không số 18px/32px lẻ. Công
+tắc/ô tích đang bật trong quản trị dùng rêu `--bb-moss` (tokens.css), không dùng
+hồng đất.
 
 ## 5. Thư viện component
 

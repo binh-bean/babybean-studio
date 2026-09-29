@@ -58,6 +58,18 @@ export interface CanXuLyTongHop {
    * đang chờ trên toàn chi nhánh.
    */
   choMoLai?: number;
+  /**
+   * BB-321 — `GET /api/admin/can-xu-ly` → data.choDotChon: số ĐỢT mua thêm khách
+   * đã chốt và đang chờ CSKH xác nhận/từ chối (src/lib/gallery/dot-chon-server.ts).
+   * Là doanh thu — không để nằm im.
+   */
+  choDotChon?: number;
+  /**
+   * BB-321 — `GET /api/admin/can-xu-ly` → data.choStudioChon: số bộ ảnh mà khách
+   * NHỜ studio chọn thêm ảnh (đợt 1 chốt thiếu) hoặc chốt khi còn sản phẩm in
+   * chưa chọn ảnh — CSKH phải làm, không để nằm im.
+   */
+  choStudioChon?: number;
 }
 
 /**
@@ -75,7 +87,9 @@ export function demSoCanXuLy(d: CanXuLyTongHop | null | undefined): number {
     (d.dueSoon ?? 0) +
     (d.overdue ?? 0) +
     (d.canhBaoLark ?? 0) +
-    (d.choMoLai ?? 0)
+    (d.choMoLai ?? 0) +
+    (d.choDotChon ?? 0) +
+    (d.choStudioChon ?? 0)
   );
 }
 
@@ -143,6 +157,20 @@ export function dongCanXuLy(d: CanXuLyTongHop | null | undefined): DongCanXuLy[]
       soLuong: d.choMoLai ?? 0,
       mauCham: "var(--bb-warning)",
       href: "/admin/viec-can-xu-ly?tab=yeu-cau-mo-lai",
+    },
+    {
+      key: "cho-dot-chon",
+      nhan: "Khách mua thêm chờ xác nhận",
+      soLuong: d.choDotChon ?? 0,
+      mauCham: "var(--bb-urgent)",
+      href: "/admin/viec-can-xu-ly?tab=khach-mua-them",
+    },
+    {
+      key: "cho-studio-chon",
+      nhan: "Khách nhờ studio chọn ảnh / còn in chưa chọn ảnh",
+      soLuong: d.choStudioChon ?? 0,
+      mauCham: "var(--bb-urgent)",
+      href: "/admin/viec-can-xu-ly?tab=khach-mua-them",
     },
   ];
   return tatCa.filter((dong) => dong.soLuong > 0);

@@ -396,7 +396,8 @@ ownIpTest.describe("BB-298: bìa (bản vẽ BB-297), đã giao, xem lớn máy 
       await ownIpExpect(page.getByTestId("nut-tai-ca-bo-bia")).toBeVisible();
       await ownIpExpect(bia.getByText("Xem lại bộ ảnh", { exact: true })).toBeVisible();
       await ownIpExpect(bia.getByText(`${NHAN} Sinh nhật`, { exact: false })).toBeVisible();
-      await ownIpExpect(bia.getByText("4 ảnh đã chỉnh", { exact: false })).toBeVisible();
+      // BB-319: số ảnh nằm trên nút tải (không lặp ở dòng phụ, không gọi ảnh gốc là "đã chỉnh").
+      await ownIpExpect(page.getByTestId("nut-tai-ca-bo-bia")).toContainText("Tải cả bộ · 4 ảnh");
 
       // Thanh 5 bước (Đã chốt/Đang chỉnh/Duyệt ảnh/In-nhận ảnh/Đã giao) không
       // còn hiện khi đã giao — thay bằng dấu "Đã hoàn thiện" ở trên.

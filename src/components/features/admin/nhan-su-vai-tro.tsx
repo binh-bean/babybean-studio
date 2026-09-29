@@ -12,9 +12,10 @@
  * đề hai lần.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "./page-header";
 import { StaffManager } from "./staff-manager";
 import { RolesManager } from "./roles-manager";
@@ -32,6 +33,9 @@ export function NhanSuVaiTro() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const active: TabValue = laTabHopLe(tabParam) ? tabParam : "nhan-su";
+  // BB-320 (Q-N1): nút chính "Thêm nhân viên" đứng trong khối tiêu đề như mọi
+  // màn khác; state mở form nằm ở đây để StaffManager và nút dùng chung.
+  const [moFormNhanVien, setMoFormNhanVien] = useState(false);
 
   const onChange = useCallback(
     (value: string) => {
@@ -47,6 +51,11 @@ export function NhanSuVaiTro() {
       <PageHeader
         title="Nhân sự & vai trò"
         description={active === "vai-tro" ? vi.admin.vaiTro.subtitle : vi.admin.staff.subtitle}
+        actions={
+          active === "nhan-su" ? (
+            <Button onClick={() => setMoFormNhanVien((v) => !v)}>{vi.admin.staff.addButton}</Button>
+          ) : undefined
+        }
       />
       <Tabs value={active} onValueChange={onChange}>
         <TabsList>
@@ -57,10 +66,10 @@ export function NhanSuVaiTro() {
             Vai trò
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="nhan-su">
-          <StaffManager />
+        <TabsContent value="nhan-su" className="mt-6">
+          <StaffManager showForm={moFormNhanVien} onShowFormChange={setMoFormNhanVien} />
         </TabsContent>
-        <TabsContent value="vai-tro">
+        <TabsContent value="vai-tro" className="mt-6">
           <RolesManager />
         </TabsContent>
       </Tabs>

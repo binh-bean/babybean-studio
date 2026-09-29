@@ -401,6 +401,36 @@ Danh sách nằm ở `src/lib/payment-methods.ts`, **một chỗ duy nhất** �
 màn hình cùng lấy từ đó. Bài học sáu bản chép tay ở mục 4b còn mới; không lặp
 lại với danh sách thứ hai.
 
+### Giảm giá % (BB-320, chủ dự án chốt 29.09.2026)
+
+Ô "Giảm giá %" (0–100) trong form ghi nhận. Số tiền gợi ý = **còn thiếu × (1 −
+%/100), làm tròn nghìn đồng**; màn hình hiện rõ "Giảm X% = −Y ₫ · khách trả Z ₫".
+Công thức duy nhất nằm ở `tinhGiamGia` (`src/lib/gallery/tien-phat-sinh.ts`) —
+màn hình dùng để gợi ý, route dùng để ghi, không hai bên tính hai kiểu; máy chủ
+**tự tính** phần giảm trên số còn thiếu hiện tại, không tin số tiền trình duyệt
+gửi.
+
+Phần giảm là **một dòng riêng** trong sổ: `payment_method = 'giam_gia'`, số
+dương (ghi có cho khách), có người ghi (`confirmed_by`) và lý do (bắt buộc, lưu
+trong `note`, kèm "Giảm X% —"). Không cần cột hay migration mới. Dòng giảm và
+dòng thu (nếu có) vào sổ bằng **một câu insert**. Hệ quả:
+
+- Số còn thiếu về đúng 0 khi khách trả nốt phần sau giảm.
+- Báo cáo doanh thu: dòng giảm giá **không** là tiền thu ("Đã thu" loại nó ra;
+  "Còn phải thu" vẫn trừ nó). Báo cáo Hiệu suất nhân viên cũng không đếm nó là
+  một "khoản thu ghi nhận".
+- Báo cáo "vượt hạn mức, chưa thu tiền" trừ cả tiền đã thu lẫn phần giảm; thu/giảm
+  đủ thì bộ rời khỏi danh sách đòi tiền.
+
+### Sửa dòng hàng khi khách đã chốt (BB-320)
+
+CSKH thêm/sửa/xoá dòng hàng được ở **mọi trạng thái trừ `archived`** (trước đây
+`submitted` trở đi bị chặn — đúng lúc CSKH cần tăng Edit file 15 → 17 sau khi
+khách vượt hạn mức rồi chốt). `snapshot_extra_amount` **không đổi** — số khách đã
+nhìn thấy. Màn chi tiết hiện cạnh nhau: số lúc chốt và số **theo hạn mức hiện
+tại** (`tinhPhatSinhTheoHanMuc`); mỗi lần sửa vẫn ghi nhật ký kèm hạn mức
+trước/sau. Luật của phía khách (`/api/g/*`) không đổi.
+
 ---
 
 ## 6c. CTV thời vụ chỉ thấy việc của mình

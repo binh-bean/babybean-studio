@@ -90,6 +90,8 @@ describe("BB-184 · link không treo sang bộ ảnh khác", () => {
    */
   it("3. Khung link chỉ hiện khi thật sự có link của lần tạo này", () => {
     const mã = doc("src/components/features/admin/gallery-detail.tsx");
-    expect(mã.includes("{linkMoi ? (")).toBe(true);
+    // BB-320: khung kết quả lần tạo link nay là `{linkMoi && (` (ô địa chỉ + nút "Chép link" luôn
+    // hiện ở TinhTrangLink, còn dòng "đã ghi sang Lark" chỉ hiện khi có link của lần tạo này).
+    expect(mã.includes("{linkMoi && (")).toBe(true);
   });
 });

@@ -37,7 +37,7 @@ describe("BB-259 — dich-hoat-dong.ts (hàm thuần)", () => {
   it("dịch từng action phổ biến ra đúng câu", () => {
     expect(dichHoatDong("share_link.created")).toEqual({
       nhom: "nhan_vien",
-      cau: "Nhân viên tạo link gửi khách",
+      cau: "Nhân viên tạo link app",
     });
     expect(dichHoatDong("gallery.retouch_sent")).toEqual({
       nhom: "nhan_vien",
@@ -357,7 +357,7 @@ describe("GET /api/admin/galleries/[id]/dong-thoi-gian (BB-259, dùng Fixture th
     expect(items[0]!.nguoi).toBe("Fixture BB-259 Nhân viên");
     expect(items[0]!.nhom).toBe("tien");
 
-    const dongLinkCu = items.find((i) => i.cau === "Nhân viên tạo link gửi khách");
+    const dongLinkCu = items.find((i) => i.cau === "Nhân viên tạo link app");
     expect(dongLinkCu).toBeDefined();
     expect(dongLinkCu?.nguoi).toBe("Fixture BB-259 Nhân viên");
   });

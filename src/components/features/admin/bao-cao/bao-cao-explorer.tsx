@@ -21,7 +21,9 @@ import { Spinner } from "@/components/ui/spinner";
 import { BieuDoSvg } from "./bieu-do-svg";
 import type { KetQuaBaoCao } from "@/lib/bao-cao/loai";
 import { CAC_KY_DUNG_SAN, dinhDangNgayVN, kyTuMaDungSan, type MaKyDungSan } from "@/lib/bao-cao/ky";
-import { PAGE_TITLE_CLASS, CARD_TITLE_CLASS } from "../page-header";
+import { PageHeader, CARD_TITLE_CLASS } from "../page-header";
+import { TheSoLieu } from "../the-so-lieu";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
 interface MucBaoCao {
   ma: string;
@@ -150,13 +152,11 @@ export function BaoCaoExplorer() {
   }, [kyPreset, tuTuyChon, denTuyChon]);
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+    <div className="flex flex-col gap-6">
+      {/* BB-320 (Q-N1): cùng khối tiêu đề trang với mọi màn quản trị — trước đây H1 nằm trong cột trái cạnh danh sách báo cáo. */}
+      <PageHeader title="Báo cáo" description="Bộ báo cáo điều hành — chọn một báo cáo để xem chi tiết." />
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       <aside className="shrink-0 lg:w-72">
-        <h1 className={PAGE_TITLE_CLASS}>Báo cáo</h1>
-        <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
-          Bộ báo cáo điều hành — chọn một báo cáo để xem chi tiết.
-        </p>
-
         {loiDanhSach && <p className="mt-4 text-sm text-[var(--bb-danger)]">{loiDanhSach}</p>}
         {!danhSach && !loiDanhSach && (
           <div className="mt-4 flex items-center gap-2 text-sm text-[var(--bb-fg-muted)]">
@@ -164,7 +164,7 @@ export function BaoCaoExplorer() {
           </div>
         )}
 
-        <nav className="mt-4 flex flex-col gap-4">
+        <nav className="flex flex-col gap-4">
           {[...nhomHoa.entries()].map(([nhom, items]) => (
             <div key={nhom}>
               <div className="px-1 text-xs font-semibold uppercase tracking-wide text-[var(--bb-fg-muted)]">
@@ -178,7 +178,7 @@ export function BaoCaoExplorer() {
                       onClick={() => capNhatUrl({ ma: b.ma })}
                       className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
                         b.ma === maDangChon
-                          ? "bg-[var(--bb-primary)]/20 font-medium text-[var(--bb-fg)]"
+                          ? "bb-muc-on bg-[var(--bb-sidebar-active-bg)] font-medium text-[var(--bb-fg)]"
                           : "text-[var(--bb-fg-muted)] hover:bg-[var(--bb-surface-2)]"
                       }`}
                       title={b.moTa}
@@ -218,6 +218,7 @@ export function BaoCaoExplorer() {
           />
         )}
       </section>
+      </div>
     </div>
   );
 }
@@ -430,10 +431,8 @@ function NoiDungBaoCao({
 
       {!dangTai && !loi && ketQua && (
         <>
-          {/* BB-290 (#41): lưới 5 cột từ `xl` để năm thẻ số liệu (kỳ có so
-              sánh) căn đều một hàng, thay vì bốn cột để thẻ thứ năm rơi lẻ
-              xuống hàng hai. */}
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          {/* BB-320 (Q-N2): tối đa 3 cột để nhãn thẻ số không bị cắt/gãy dòng; thẻ số dùng chung TheSoLieu. */}
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {ketQua.theSo.map((t) => (
               <TheSoCard key={t.nhan} theSo={t} />
             ))}
@@ -475,36 +474,24 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
 
 function TheSoCard({ theSo }: { theSo: KetQuaBaoCao["theSo"][number] }) {
   const co = typeof theSo.chenhLechPhanTram === "number";
-  const tang = co && (theSo.chenhLechPhanTram as number) > 0;
-  const giam = co && (theSo.chenhLechPhanTram as number) < 0;
-
+  // "Khách đang chọn ảnh (hiện tại)" → nhãn "Khách đang chọn ảnh" + ghi chú "hiện tại":
+  // phần trong ngoặc là điều kiện đo, không phải tên số liệu (BB-320, Q-N2).
+  const khop = /^(.*?)\s*\((.+)\)$/.exec(theSo.nhan);
+  const nhan = khop ? khop[1]! : theSo.nhan;
+  const ghiChuNhan = khop ? khop[2]! : null;
+  const ghiChuSoKy = co
+    ? `${(theSo.chenhLechPhanTram as number) > 0 ? "▲" : (theSo.chenhLechPhanTram as number) < 0 ? "▼" : ""} ${formatSo(Math.abs(theSo.chenhLechPhanTram as number), 1)}% so kỳ trước`.trim()
+    : null;
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="text-xs text-[var(--bb-fg-muted)]">{theSo.nhan}</div>
-        {/* BB-308 (vòng 4, mục #7 báo cáo chấm 28/09/2026) — số liệu Báo cáo
-            vẫn dùng Playfair Display ("O bộ" nhìn như chữ, số oldstyle lệch
-            chân), trái quyết định số 2 admin đã duyệt ở BB-301
-            (babybean-assets/BB-301/XONG.md): "Số liệu: Be Vietnam Pro,
-            tabular-nums ở mọi thẻ và bảng". `.bb-so` (tokens.css) là ĐÚNG
-            token đã dùng cho mọi thẻ số quản trị khác (gallery-detail.tsx,
-            dashboard.tsx) — dùng lại, không tự định nghĩa cỡ lẻ mới. */}
-        <div className="bb-so mt-1 text-2xl">
-          {theSo.giaTri}
-          {theSo.donVi && <span className="ml-1 text-sm font-normal text-[var(--bb-fg-muted)]">{theSo.donVi}</span>}
-        </div>
-        {co && (
-          <div
-            className={`mt-1 flex items-center gap-1 text-xs font-medium ${
-              tang ? "text-[var(--bb-success)]" : giam ? "text-[var(--bb-danger)]" : "text-[var(--bb-fg-muted)]"
-            }`}
-          >
-            {tang ? <ArrowUp className="h-3 w-3" /> : giam ? <ArrowDown className="h-3 w-3" /> : null}
-            {Math.abs(theSo.chenhLechPhanTram as number).toFixed(1)}% so kỳ trước
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <TheSoLieu
+      testId="the-so-bao-cao"
+      label={nhan}
+      title={theSo.nhan}
+      // BB-324: số có dấu chấm hàng nghìn ("12.500.000"), tiền đi với "₫".
+      value={typeof theSo.giaTri === "number" ? formatSo(theSo.giaTri, 1) : String(theSo.giaTri)}
+      phu={theSo.donVi === "đ" ? "₫" : (theSo.donVi ?? undefined)}
+      ghiChu={[ghiChuNhan, ghiChuSoKy].filter(Boolean).join(" · ") || undefined}
+    />
   );
 }
 
@@ -572,7 +559,7 @@ function BangSapXep({ bang }: { bang: NonNullable<KetQuaBaoCao["bang"]> }) {
                     key={j}
                     className={`py-2 pr-3 ${typeof o === "number" ? "text-right tabular-nums" : ""}`}
                   >
-                    {o ?? "—"}
+                    {typeof o === "number" ? formatSo(o, 1) : (o ?? "—")}
                   </td>
                 ))}
               </tr>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { AdminBreadcrumb, TenManHinh } from "./admin-breadcrumb";
+import { AdminBreadcrumb } from "./admin-breadcrumb";
 import { Menu } from "lucide-react";
 import { Sheet, SheetTrigger, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,9 @@ export function AdminHeader({
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[280px] p-0" aria-describedby={undefined}>
+            {/* BB-320 (Q12): Sheet dựng qua portal ra <body>, NGOÀI .giao-dien-quan-tri — thiếu lớp này thì
+                --bb-sidebar-active-bg/--bb-moss không có giá trị và mục đang mở không tô nền lẫn vạch rêu. */}
+            <SheetContent side="left" className="giao-dien-quan-tri w-[280px] p-0" aria-describedby={undefined}>
               <SheetTitle className="sr-only">Menu Điều Hướng</SheetTitle>
               <div className="flex h-16 items-center gap-[7px] border-b border-[var(--bb-border)] px-4">
                 {/* BB-306 — logo hạt đậu trước chữ, căn giữa dọc theo chữ. */}
@@ -54,9 +56,9 @@ export function AdminHeader({
         {/* Breadcrumb for desktop */}
         <AdminBreadcrumb />
         {/*
-          Trên điện thoại thanh này chỉ có nút menu, chữ BabyBean và nút thoát —
-          giữa trống một mảng, trong khi tên màn đang xem lại chiếm hẳn một dòng
-          bên dưới. Nay tên màn nằm luôn ở đây.
+          Trên điện thoại thanh này chỉ có nút menu, chữ BabyBean và nút thoát.
+          BB-320: tên màn KHÔNG còn ở đây — mọi màn nay có H1 ngay đầu trang
+          (PageHeader), in hai lần là nói cùng một điều hai chỗ.
         */}
         <span className="flex min-w-0 items-baseline gap-1.5 sm:hidden">
           {/* BB-292: "BabyBean" liền chữ khác hẳn thanh bên/Sheet (đều giãn
@@ -74,10 +76,6 @@ export function AdminHeader({
               className="h-[18px] w-[18px] shrink-0"
             />
             <span className="font-display whitespace-nowrap tracking-[0.08em] text-[var(--bb-fg)]">BABY BEAN</span>
-          </span>
-          <span className="truncate text-sm text-[var(--bb-fg-muted)]">
-            <span aria-hidden="true">· </span>
-            <TenManHinh />
           </span>
         </span>
       </div>

@@ -169,6 +169,7 @@ describe("BB-188 — mở khoá link cũ không đổi địa chỉ", () => {
     const res = await moLaiLink(body(), params(boTrong));
     expect(res.status).toBe(404);
     const json = await res.json();
-    expect(json.error.message).toContain("T\u1ea1o link g\u1eedi kh\u00e1ch");
+    // BB-320: nh\u00e3n \u0111\u1ed5i "T\u1ea1o link g\u1eedi kh\u00e1ch" -> "T\u1ea1o link app" (ch\u1ee7 d\u1ef1 \u00e1n: m\u1ecdi nh\u00e3n qu\u1ea3n tr\u1ecb g\u1ecdi l\u00e0 "Link app").
+    expect(json.error.message).toContain("T\u1ea1o link app");
   });
 });

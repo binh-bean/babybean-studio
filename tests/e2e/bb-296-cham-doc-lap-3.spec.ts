@@ -162,6 +162,11 @@ ownIpTest.describe("BB-296 mục #1: cửa hàng — chọn ảnh rồi Thêm v�
         ownIpTest.skip(true, "bb-dev hiện không có sản phẩm ảnh in đủ điều kiện bán.");
         return;
       }
+      // BB-319 — mỗi khổ bắt đầu từ bộ SẠCH: ca máy tính chạy trước để lại 2 tim + 2 dòng giỏ,
+      // ca điện thoại bấm lại tim là BỎ chọn, rồi mua cho ảnh chưa chọn → máy chủ từ chối. Trước đây
+      // ca này vẫn xanh chỉ vì "Đã thêm vào giỏ" hiện cả khi máy chủ từ chối (lỗi đã vá ở cua-hang).
+      await pg.query("delete from selection_addons where selection_id in (select id from selections where gallery_id=$1)", [c.galleryId]);
+      await pg.query("delete from selection_items where gallery_id = $1", [c.galleryId]);
       await page.setViewportSize({ width: kho.w, height: kho.h });
       await page.goto(`/g/${c.maLink}`);
       await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
@@ -224,7 +229,8 @@ ownIpTest.describe("BB-296 mục #1: cửa hàng — chọn ảnh rồi Thêm v�
       if (kho.ten === "dt") {
         await ownIpExpect(cuaHang.getByRole("button", { name: /^Giỏ · 2 món/ })).toBeVisible();
       } else {
-        await ownIpExpect(cuaHang.getByText(/^Giỏ của ba mẹ · 2 món/)).toBeVisible();
+        // BB-319: máy tính dùng CÙNG lời với viên giỏ điện thoại ("Giỏ · N món · tiền").
+        await ownIpExpect(cuaHang.getByText(/^Giỏ · 2 món/).and(page.locator(":visible"))).toBeVisible();
       }
       await page.screenshot({ path: `${CHUP}/1-${kho.ten}-sau-them-gio-xac-nhan.png` });
     });

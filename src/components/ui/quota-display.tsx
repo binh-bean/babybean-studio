@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "./utils";
+import { formatSo, formatTien } from "@/lib/utils/dinh-dang";
 
 interface QuotaDisplayProps {
   includedQuota: number | null | undefined;
@@ -35,15 +36,15 @@ export function QuotaDisplay({ includedQuota, extraPrice, selectedCount, classNa
   return (
     <div className={cn("text-sm", className)}>
       <div className="font-medium">
-        Đã chọn: {selectedCount} / {includedQuota} ảnh
+        Đã chọn: {formatSo(selectedCount)} / {formatSo(includedQuota)} ảnh
       </div>
       
       {isExceeded && (
         <div className="text-destructive mt-1 font-medium text-xs sm:text-sm">
-          Vượt {extraCount} ảnh
+          Vượt {formatSo(extraCount)} ảnh
           {/* Nếu có giá, báo tiền */}
           {(extraPrice ?? 0) > 0 ? (
-            <span> - phụ phí {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(extraCount * extraPrice!)}</span>
+            <span> - phụ phí {formatTien(extraCount * extraPrice!)}</span>
           ) : null}
         </div>
       )}

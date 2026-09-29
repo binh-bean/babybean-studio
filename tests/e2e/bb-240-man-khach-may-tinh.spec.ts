@@ -210,7 +210,8 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // Vietnam Pro theo LUẬT PHÔNG mới); chọn bằng data-testid thay vì lớp
     // phông để không phụ thuộc việc màn khách đang dùng phông gì.
     const tenChiNhanh = footer.getByTestId("chan-trang-ten-chi-nhanh");
-    const nutNhan = footer.getByRole("link", { name: "Nhắn cho studio" });
+    // BB-319: một nhãn nhắn tin cho cả màn khách — "Nhắn studio".
+    const nutNhan = footer.getByRole("link", { name: "Nhắn studio" });
 
     if ((await nutNhan.count()) > 0) {
       const boxTen = (await tenChiNhanh.boundingBox())!;

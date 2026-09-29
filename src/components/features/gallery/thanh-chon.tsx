@@ -93,7 +93,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
   // theo bề rộng qua CSS, không nhân đôi thẻ `data-testid`.
   const dongPhu =
     hanMuc == null
-      ? "Chờ hạn mức"
+      ? "Gói đang cập nhật"
       : vuot
         ? `Thêm ${formatCurrencyVND(tienThem)}`
         : hanMuc - daChon > 0
@@ -101,7 +101,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
           : "Đủ trong gói";
   const dongPhuChip =
     hanMuc == null
-      ? "Chờ hạn mức"
+      ? "Gói đang cập nhật"
       : vuot
         ? `Thêm ${formatCurrencyVND(tienThem)}`
         : hanMuc - daChon > 0
@@ -112,7 +112,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
     <div
       data-testid="thanh-noi"
       className={cn(
-        "pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(12px,env(safe-area-inset-bottom))] transition-all duration-300 ease-out",
+        "pointer-events-none fixed inset-x-0 bottom-0 z-30 px-6 pb-[max(12px,env(safe-area-inset-bottom))] transition-all duration-300 ease-out",
         an
           ? "translate-y-[calc(100%+env(safe-area-inset-bottom)+16px)] opacity-0"
           : "translate-y-0 opacity-100",
@@ -200,7 +200,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
               <span
                 data-testid="huy-hieu-gio"
                 aria-hidden="true"
-                className="absolute -right-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-[#2E2A27] px-1 text-[10px] font-semibold text-[#FBF7F2]"
+                className="absolute -right-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-[#2E2A27] px-1 text-[11px] font-semibold text-[#FBF7F2]"
               >
                 {muaThem.soMon}
               </span>

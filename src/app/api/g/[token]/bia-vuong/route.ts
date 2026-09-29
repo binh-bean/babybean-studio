@@ -29,6 +29,17 @@ function parseSize(value: string | null): IconSize | null {
   return (ICON_SIZES as readonly number[]).includes(n) ? (n as IconSize) : null;
 }
 
+/** Logo Baby Bean (hạt đậu) đúng cỡ — dùng khi bộ ảnh chưa có bìa hoặc không cắt được bìa. */
+const LOGO_THEO_CO: Record<IconSize, string> = {
+  180: "/apple-touch-icon.png",
+  192: "/icons/icon-192.png",
+  512: "/icons/icon-512.png",
+};
+
+function veLogo(request: Request, size: IconSize): Response {
+  return Response.redirect(new URL(LOGO_THEO_CO[size], request.url), 302);
+}
+
 export async function GET(
   request: Request,
   context: { params: Promise<{ token: string }> },
@@ -41,12 +52,16 @@ export async function GET(
     if (!size) return fail("INVALID_INPUT", "Cỡ biểu tượng không hợp lệ");
 
     const boAnh = await xacThucTokenBoAnh(token);
-    if (!boAnh || !boAnh.coverDriveFileId) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
+    if (!boAnh) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
+    // BB-324 — chưa chọn bìa: logo Baby Bean, không lấy một ảnh bất kỳ.
+    if (!boAnh.coverDriveFileId || !boAnh.coverPhotoId) return veLogo(request, size);
 
     const supabase = createAdminClient();
-    // Đệm theo GALLERY, không theo token: cấp lại link (mã mới) cho cùng một
-    // bộ ảnh thì vẫn dùng chung một icon đã cắt sẵn, không cắt lại từ đầu.
-    const cachePath = `icon/${boAnh.galleryId}/${size}.jpg`;
+    // Đệm theo GALLERY + ẢNH BÌA, không theo token: cấp lại link (mã mới) cho
+    // cùng một bộ ảnh vẫn dùng chung icon đã cắt sẵn. BB-324 — có id ảnh bìa
+    // trong đường dẫn: trước bản vá khoá chỉ là `icon/<gallery>/<cỡ>.jpg`, đổi
+    // bìa ở màn thiết kế bìa xong icon VẪN là ảnh cũ mãi mãi.
+    const cachePath = `icon/${boAnh.galleryId}/${boAnh.coverPhotoId}-${size}.jpg`;
     const storage = supabase.storage.from("thumbnails");
 
     const { data: cachedBlob } = await storage.download(cachePath);
@@ -78,26 +93,12 @@ export async function GET(
       );
       if (res.ok) buffer = await res.arrayBuffer();
     } catch {
-      // thử tiếp bản không cắt bên dưới
+      // rơi xuống logo bên dưới
     }
 
-    // Cắt vuông không có kết quả (ví dụ file quá lớn/định dạng lạ) thì thà
-    // trả ảnh CHƯA cắt còn hơn không có icon nào — màn hình chính lệch tỉ lệ
-    // đỡ tệ hơn không cài được app.
-    if (!buffer) {
-      try {
-        const res = await driveFetch(
-          `https://lh3.googleusercontent.com/d/${boAnh.coverDriveFileId}=w${size}`,
-          {},
-          ctx,
-        );
-        if (res.ok) buffer = await res.arrayBuffer();
-      } catch {
-        // hết cách, rơi xuống DRIVE_UNAVAILABLE bên dưới
-      }
-    }
-
-    if (!buffer) return fail("DRIVE_UNAVAILABLE", "Không tải được ảnh bìa");
+    // BB-324 — cắt vuông không được thì trả LOGO, không trả ảnh chưa cắt:
+    // ảnh chữ nhật làm icon vuông bị hệ điều hành chèn viền/lệch tỉ lệ.
+    if (!buffer) return veLogo(request, size);
 
     // BB-311 P0: hai chốt độc lập giống `/api/img`, trước khi ghi vào bộ đệm
     // DÙNG CHUNG (xem `src/lib/kiem-thu.ts`, `src/lib/drive/kiem-tra-anh.ts`).

@@ -78,12 +78,13 @@ describe("BB-310 mục 7: tinhTenBiaTuDuLieu — còn nickname dùng tên gọi,
 });
 
 describe("BB-310 mục 7: coChuTieuDeBia — cỡ chữ co theo độ dài, không tràn quá 2 dòng", () => {
-  it("tên ngắn ('Bé Na', 5 ký tự) → giữ nguyên bậc gốc 44/52/64/84", () => {
-    expect(coChuTieuDeBia("Bé Na")).toEqual({ mobile: 44, sm: 52, lg: 64, xl: 84 });
+  it("tên ngắn ('Bé Na', 5 ký tự) → giữ nguyên bậc gốc 44/56/64/84", () => {
+    // BB-319 (luật 3): mọi bậc nằm trên thang chữ màn khách — 52 → 56.
+    expect(coChuTieuDeBia("Bé Na")).toEqual({ mobile: 44, sm: 56, lg: 64, xl: 84 });
   });
 
   it("đúng ngưỡng 10 ký tự vẫn ở bậc gốc", () => {
-    expect(coChuTieuDeBia("0123456789")).toEqual({ mobile: 44, sm: 52, lg: 64, xl: 84 });
+    expect(coChuTieuDeBia("0123456789")).toEqual({ mobile: 44, sm: 56, lg: 64, xl: 84 });
   });
 
   it("11 ký tự đã rơi xuống bậc kế tiếp (nhỏ hơn bậc gốc)", () => {
@@ -94,7 +95,8 @@ describe("BB-310 mục 7: coChuTieuDeBia — cỡ chữ co theo độ dài, khô
   it("họ tên đầy đủ 5 chữ dài (vd 'Nguyễn Thị Minh Ngọc Hân', 24 ký tự) → bậc nhỏ nhất", () => {
     const ten = "Nguyễn Thị Minh Ngọc Hân";
     expect(ten.length).toBeGreaterThan(22);
-    expect(coChuTieuDeBia(ten)).toEqual({ mobile: 27, sm: 32, lg: 38, xl: 46 });
+    // BB-319 (luật 3): 27/38/46 là cỡ lẻ ngoài thang chữ → 28/40/48.
+    expect(coChuTieuDeBia(ten)).toEqual({ mobile: 28, sm: 32, lg: 40, xl: 48 });
   });
 
   it("cỡ chữ giảm ĐƠN ĐIỆU khi tên dài dần (không bao giờ tên dài hơn lại có cỡ lớn hơn)", () => {

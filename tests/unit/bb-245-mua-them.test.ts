@@ -197,7 +197,7 @@ describe("BB-245 (2): POST /api/g/mua-them", () => {
     expect(res.status).toBe(400);
   });
 
-  it("sản phẩm nhóm gắn ảnh với photoId hợp lệ → ghi được (bỏ qua nếu bảng 0072 chưa áp)", async () => {
+  it("BB-321: ba mẹ (owner) KHÔNG còn gửi được yêu cầu mua thêm — 409 hướng sang 'Chọn thêm ảnh', không ghi gì", async () => {
     if (!coBang) {
       console.warn("[BB-245] Bỏ qua: bảng yeu_cau_mua_them chưa có — chờ Opus áp 0072.");
       return;
@@ -205,15 +205,20 @@ describe("BB-245 (2): POST /api/g/mua-them", () => {
     if (!spGanAnh) return;
     phien();
     const res = await goi({ items: [{ productId: spGanAnh, soLuong: 2, photoId: anh1 }] });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
     const json = await res.json();
-    expect(json.data.items).toHaveLength(1);
-    expect(json.data.items[0].soLuong).toBe(2);
-    expect(json.data.items[0].trangThai).toBe("moi");
+    expect(json.error.message).toContain("Chọn thêm ảnh");
 
+    // Không có dòng nào được ghi cho bộ ảnh này.
+    const { rows } = await client.query(
+      "select count(*)::int n from yeu_cau_mua_them where gallery_id = $1",
+      [galleryId],
+    );
+    expect(rows[0].n).toBe(0);
+
+    // GET vẫn đọc được dữ liệu cũ (ở đây rỗng) — đường đọc không bị nghỉ theo.
     const getRes = await xemYeuCau();
-    const getJson = await getRes.json();
-    expect(getJson.data.items.length).toBeGreaterThanOrEqual(1);
+    expect(getRes.status).toBe(200);
   });
 
   it("bộ ảnh CÓ vòng xin sửa → 409, không ghi (bỏ qua nếu bảng 0072 chưa áp)", async () => {

@@ -11,7 +11,7 @@ import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
 import { getContractCodesForGalleries } from "@/app/(admin)/admin/galleries/actions";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
-import { formatNgayVN, formatSdt, tinhTieuDeBoAnhQuanTri } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, formatSdt, nhanTienDoChon, tinhTieuDeBoAnhQuanTri, formatSo } from "@/lib/utils/dinh-dang";
 import { loiNhacKhach } from "@/lib/utils/bang-dieu-khien";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
@@ -49,7 +49,7 @@ function LamNhanh({
 }: {
   item: GalleryItem;
   onCopyLink: () => void;
-  /** BB-311: nút "Sao chép link" giờ gọi API để giải mã link khách — có độ trễ mạng. */
+  /** BB-311: nút "Sao chép link" giờ gọi API để giải mã link app — có độ trễ mạng. */
   dangChepLink?: boolean;
 }) {
   const [daChep, setDaChep] = React.useState(false);
@@ -114,15 +114,23 @@ function LamNhanh({
     );
   }
 
+  // BB-320 (Link app): bộ CHƯA có link thì nút mờ + chú thích lý do, không để bấm rồi mới báo lỗi.
+  const chuaCoLink = item.coLinkApp === false;
   return (
     <Button
       variant="ghost"
       size="icon"
       className="h-8 w-8"
       onClick={onCopyLink}
-      disabled={dangChepLink}
-      title={dangChepLink ? "Đang lấy link…" : "Sao chép link"}
-      aria-label={dangChepLink ? "Đang lấy link khách" : "Sao chép link"}
+      disabled={dangChepLink || chuaCoLink}
+      title={
+        chuaCoLink
+          ? "Chưa có link app — mở bộ ảnh để tạo link trước"
+          : dangChepLink
+            ? "Đang lấy link app…"
+            : "Sao chép link app"
+      }
+      aria-label={dangChepLink ? "Đang lấy link app" : "Sao chép link app"}
     >
       {dangChepLink ? <Spinner size="sm" /> : <Copy className="h-4 w-4" />}
     </Button>
@@ -140,6 +148,8 @@ export interface GalleryItem {
   photographerName: string | null;
   editorName: string | null;
   cskhName: string | null;
+  /** BB-320: bộ có link app chưa thu hồi — false thì nút "Chép link" mờ đi. Thiếu trường (API cũ) coi như có. */
+  coLinkApp?: boolean;
   shootDate: string | null;
   totalPhotos: number;
   selectedCount: number;
@@ -403,7 +413,7 @@ function KanbanColumn({
           )}
         </div>
         <Badge variant="secondary" className="text-xs px-2 py-0.5">
-          {totalCount}
+          {formatSo(totalCount)}
         </Badge>
       </div>
 
@@ -447,7 +457,7 @@ function KanbanColumn({
                       </div>
                     </div>
                     <div className="flex items-center justify-between pt-1 border-t border-[var(--bb-border)]/50 text-xs">
-                      <span className="font-medium text-[var(--bb-primary)]">{item.progress}</span>
+                      <span className="font-medium tabular-nums text-[var(--bb-fg)]">{nhanTienDoChon(item).ngan}</span>
                       {item.dueAt && (
                         <span className="text-[11px] text-[var(--bb-fg-muted)] flex items-center gap-1">
                           <Clock className="h-3 w-3" />
@@ -669,7 +679,7 @@ export function GalleryList() {
 
       if (!res.ok || !body?.data) {
         setCopyNotice(
-          body?.error?.message ?? "Không lấy được link khách. Vui lòng thử lại.",
+          body?.error?.message ?? "Không lấy được link app. Vui lòng thử lại.",
         );
         return;
       }
@@ -679,15 +689,15 @@ export function GalleryList() {
 
       try {
         await navigator.clipboard.writeText(shareUrl);
-        setCopyNotice("Đã chép link khách vào bộ nhớ tạm.");
+        setCopyNotice("Đã chép link app vào bộ nhớ tạm.");
       } catch {
         // Trình duyệt chặn Clipboard API (http, quyền) — link đã lấy được,
         // chỉ là không tự chép vào clipboard được.
-        setCopyNotice("Lấy được link khách nhưng trình duyệt chặn chép tự động. Thử lại hoặc mở chi tiết bộ ảnh.");
+        setCopyNotice("Lấy được link app nhưng trình duyệt chặn chép tự động. Thử lại hoặc mở chi tiết bộ ảnh.");
       }
     } catch (err) {
       console.error("Lỗi khi lấy link khách:", err);
-      setCopyNotice("Không lấy được link khách — kiểm tra kết nối mạng.");
+      setCopyNotice("Không lấy được link app — kiểm tra kết nối mạng.");
     } finally {
       setCopyingId(null);
       window.setTimeout(() => setCopyNotice(null), 4000);
@@ -769,13 +779,13 @@ export function GalleryList() {
             <table className="w-full text-left text-sm border-collapse">
               <thead className="bg-[var(--bb-surface-2)] border-b border-[var(--bb-border)] text-xs font-semibold text-[var(--bb-fg-muted)] uppercase tracking-wider">
                 <tr>
-                  <th className="px-4 py-3.5">Bộ ảnh</th>
-                  <th className="px-4 py-3.5">Chi nhánh</th>
-                  <th className="px-4 py-3.5">Tiến độ chọn</th>
-                  <th className="px-4 py-3.5">Hạn chốt</th>
-                  <th className="px-4 py-3.5 text-center">Trạng thái</th>
+                  <th className="whitespace-nowrap px-4 py-3.5">Bộ ảnh</th>
+                  <th className="whitespace-nowrap px-4 py-3.5">Chi nhánh</th>
+                  <th className="whitespace-nowrap px-4 py-3.5">Tiến độ chọn</th>
+                  <th className="whitespace-nowrap px-4 py-3.5">Hạn chốt</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-center">Trạng thái</th>
                   {/* BB-303 (bo-anh-danh-sach.png): "Làm nhanh" thay "Thao tác" — cột này giờ đổi theo trạng thái (xem LamNhanh). */}
-                  <th className="px-4 py-3.5 text-right">Làm nhanh</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-right">Làm nhanh</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--bb-border)]">
@@ -835,12 +845,16 @@ export function GalleryList() {
                               ariaLabel={`Tiến độ chọn của ${item.title}: ${item.progress}`}
                             />
                           </div>
-                          <span className="text-xs font-medium text-[var(--bb-fg)] whitespace-nowrap">
-                            {item.progress}
+                          {/* BB-320: kèm đơn vị "tấm" — "12/12" trơ trọi dễ đọc nhầm thành số ảnh trong bộ. */}
+                          <span
+                            className="text-xs font-medium tabular-nums text-[var(--bb-fg)] whitespace-nowrap"
+                            title={nhanTienDoChon(item).giaiThich}
+                          >
+                            {nhanTienDoChon(item).ngan}
                           </span>
                           {item.extraCount > 0 && (
                             <span className="text-[11px] text-[var(--bb-danger)] whitespace-nowrap">
-                              (+{item.extraCount})
+                              (+{formatSo(item.extraCount)})
                             </span>
                           )}
                         </div>
@@ -963,12 +977,12 @@ export function GalleryList() {
                       <Calendar className="h-3.5 w-3.5" />
                       <span>{formatDate(item.shootDate)}</span>
                     </div>
-                    <div className="font-semibold text-[var(--bb-fg)]">
-                      Đã chọn:{" "}
-                      <span className="text-[var(--bb-primary)]">{item.progress}</span>
+                    <div className="font-semibold text-[var(--bb-fg)]" title={nhanTienDoChon(item).giaiThich}>
+                      {/* BB-320: số chọn màu MỰC (không phải hồng đất — trông như lỗi), kèm đơn vị "tấm". */}
+                      Đã chọn <span className="tabular-nums">{nhanTienDoChon(item).ngan}</span>
                       {item.extraCount > 0 && (
                         <span className="text-[var(--bb-danger)] ml-1">
-                          (+{item.extraCount})
+                          (+{formatSo(item.extraCount)})
                         </span>
                       )}
                     </div>

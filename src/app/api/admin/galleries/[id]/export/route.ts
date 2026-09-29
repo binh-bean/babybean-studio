@@ -35,6 +35,7 @@ import { fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { laLoiThieuCot, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
 
 export const runtime = "nodejs";
 
@@ -97,11 +98,13 @@ async function xuatChiTiet(
     gallery: { id: string; title: string | null; customer_id: string | null; baby_id: string | null };
     luotChon: { id: string; general_note: string | null; submitted_at: string | null; submitted_by_name: string | null };
     dong: DongAnh[];
+    /** BB-321 — có mặt thì tệp CHỈ chứa ảnh của đợt này (thợ chỉnh ảnh làm ảnh mua thêm). */
+    dot: number | null;
     /** BB-202 — tên (các) album mà mỗi ảnh (theo photo_id) đang làm bìa. */
     tenAlbumBiaTheoAnh: Map<string, string[]>;
   },
 ): Promise<string> {
-  const { gallery, luotChon, dong, tenAlbumBiaTheoAnh } = ctx;
+  const { gallery, luotChon, dong, tenAlbumBiaTheoAnh, dot } = ctx;
   const itemIds = dong.map((d) => d.selection_item_id).filter((v): v is string => Boolean(v));
   const photoIds = dong.map((d) => d.photo_id).filter((v): v is string => Boolean(v));
 
@@ -178,6 +181,19 @@ async function xuatChiTiet(
   dongViet.push(`Ngày chốt: ${ngayVi(luotChon.submitted_at)}`);
   dongViet.push(`Người xác nhận: ${luotChon.submitted_by_name ?? "(chưa rõ)"}`);
   if (luotChon.general_note) dongViet.push(`Ghi chú chung: ${luotChon.general_note}`);
+  if (dot !== null) dongViet.push(`CHỈ ẢNH ĐỢT ${dot} (không gồm ảnh các đợt khác)`);
+  // BB-321 — hai việc khách giao cho studio lúc chốt đợt 1: thợ chỉnh ảnh phải biết.
+  const chot1 = await layThongTinChotDot1(admin, gallery.id);
+  if (chot1.nhoStudioChonThem > 0) {
+    dongViet.push(
+      `Khách NHỜ STUDIO CHỌN THÊM ${chot1.nhoStudioChonThem} ảnh (đã đồng ý với ảnh studio chọn dùm, không đổi lại)`,
+    );
+  }
+  if (chot1.soSanPhamInChuaAnh > 0) {
+    dongViet.push(
+      `Còn ${chot1.soSanPhamInChuaAnh} sản phẩm in chưa chọn ảnh (khách đã biết nhận ảnh sẽ lâu hơn timeline)`,
+    );
+  }
   dongViet.push(`Số ảnh đã chọn: ${dong.length}`);
   dongViet.push("");
   dongViet.push("=".repeat(60));
@@ -215,6 +231,21 @@ export async function GET(
     const formatParam = new URL(request.url).searchParams.get("format");
     const dinhDang =
       formatParam === "csv" ? "csv" : formatParam === "chi-tiet" ? "chi-tiet" : "txt";
+
+    /**
+     * BB-321 — `?dot=N`: chỉ xuất ảnh của đợt N. Đợt 1 = ảnh trong gói; đợt ≥ 2 =
+     * ảnh khách mua thêm. Để thợ chỉnh ảnh làm ĐÚNG những tấm mới, không phải dò
+     * trong danh sách cả bộ. Không truyền = mọi đợt, như cũ.
+     */
+    const dotParam = new URL(request.url).searchParams.get("dot");
+    let dot: number | null = null;
+    if (dotParam !== null && dotParam !== "") {
+      dot = Number(dotParam);
+      if (!Number.isInteger(dot) || dot < 1 || dot > 999) {
+        return fail("INVALID_INPUT", "Số đợt không hợp lệ");
+      }
+    }
+
     const admin = createAdminClient();
 
     const { data: gallery } = await admin
@@ -236,14 +267,22 @@ export async function GET(
       return fail("INVALID_INPUT", "Bộ ảnh chưa có lượt chọn nào của khách chính");
     }
 
-    const { data, error } = await admin
+    let truyVanAnh = admin
       .from("selection_items")
       .select(
         "id, photo_id, order_index, retouch_note, is_favorite, photos(file_name, sort_index, subfolder)",
       )
       .eq("selection_id", luotChon.id)
       .eq("mark", "selected");
-    if (error) throw error;
+    if (dot !== null) truyVanAnh = truyVanAnh.eq("dot", dot);
+    const { data, error } = await truyVanAnh;
+    if (error) {
+      // Cột `dot` (migration 0077) chưa có mà vẫn đòi lọc theo đợt: báo rõ, không 500.
+      if (dot !== null && laLoiThieuCot(error)) {
+        return fail("CONFLICT", "Chưa lọc được theo đợt — hệ thống chưa cập nhật đợt chọn ảnh");
+      }
+      throw error;
+    }
 
     /**
      * Sắp theo thứ tự ảnh trong thư mục, không theo thứ tự khách bấm.
@@ -316,7 +355,7 @@ export async function GET(
     let than: string;
 
     if (dinhDang === "chi-tiet") {
-      than = await xuatChiTiet(admin, { gallery, luotChon, dong, tenAlbumBiaTheoAnh });
+      than = await xuatChiTiet(admin, { gallery, luotChon, dong, tenAlbumBiaTheoAnh, dot });
     } else if (dinhDang === "csv") {
       than = [
         // BB-202: cột "bia_album" — tên (các) album mà ảnh này đang làm bìa,
@@ -349,7 +388,7 @@ export async function GET(
       entityType: "gallery",
       entityId: galleryId,
       galleryId,
-      metadata: { dinhDang, soAnh: dong.length },
+      metadata: { dinhDang, soAnh: dong.length, ...(dot !== null ? { dot } : {}) },
     });
 
     /**
@@ -359,7 +398,7 @@ export async function GET(
      * hiện ra ở mọi cửa sổ chọn file. Mã bộ ảnh là đủ để tra ngược.
      */
     const duoiTep = dinhDang === "csv" ? "csv" : "txt";
-    const hauTo = dinhDang === "chi-tiet" ? "-chi-tiet" : "";
+    const hauTo = (dinhDang === "chi-tiet" ? "-chi-tiet" : "") + (dot !== null ? `-dot-${dot}` : "");
     const tenTep = `bo-anh-${galleryId.slice(0, 8)}${hauTo}.${duoiTep}`;
 
     return new Response(than, {

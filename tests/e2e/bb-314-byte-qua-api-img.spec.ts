@@ -123,9 +123,21 @@ test.describe("BB-314: byte qua /api/img và số lượt 302 trên lưới khá
     let soLuot302 = 0;
     let soLuot200 = 0;
     let byteThatQuaApiImg = 0;
+    let soLuotAnhLonQuaProxy = 0;
     page.on("response", async (res: PwResponse) => {
       if (!res.url().includes("/api/img/")) return;
+      // BB-323 — chỉ tính ảnh CỠ LƯỚI (w ≤ 800), đúng phạm vi bản vá BB-314
+      // (`nenDieuHuongLh3`: w ≤ 800 mới điều hướng). Ảnh lớn (bìa máy tính
+      // `?w=1600`, xem lớn) ĐI QUA PROXY THEO THIẾT KẾ. Trước BB-316, máy giả Drive
+      // trả JPEG 1×1 nên một tấm bìa qua proxy chỉ vài trăm byte và lọt ngưỡng
+      // 5 000 B; từ BB-316 máy giả trả JPEG trung tính 60–135 KB (giống thật), một
+      // tấm bìa 1600 là ~82 KB — phép thử đỏ dù lưới vẫn 302 đủ. Tách riêng ra.
+      const w = Number(new URL(res.url()).searchParams.get("w") ?? "0");
       const status = res.status();
+      if (w > 800) {
+        if (status === 200) soLuotAnhLonQuaProxy += 1;
+        return;
+      }
       if (status === 302) {
         soLuot302 += 1;
         return;
@@ -161,8 +173,8 @@ test.describe("BB-314: byte qua /api/img và số lượt 302 trên lưới khá
 
     // eslint-disable-next-line no-console
     console.log(
-      `[BB-314][byte] /api/img 302=${soLuot302} | /api/img 200=${soLuot200} | ` +
-        `byte thật qua Vercel=${byteThatQuaApiImg}B`,
+      `[BB-314][byte] lưới (w≤800): /api/img 302=${soLuot302} | /api/img 200=${soLuot200} | ` +
+        `byte thật qua Vercel=${byteThatQuaApiImg}B | ảnh lớn qua proxy (w>800, theo thiết kế)=${soLuotAnhLonQuaProxy}`,
     );
 
     // ĐÂY là toàn bộ ý nghĩa của phép thử: phần lớn (thực tế mọi) lượt xin

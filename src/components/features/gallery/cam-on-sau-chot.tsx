@@ -40,13 +40,15 @@ import { Check } from "lucide-react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
 
-/** Dòng trạng thái số tấm — tách hàm thuần để phép thử đơn vị canh được
- *  đúng LUẬT, không phải canh chuỗi HTML render ra (AGENTS.md §5a mục 4). */
-export function trangThaiSoTam(soTamDaChon: number, hanMuc: number | null): string | null {
-  if (hanMuc == null) return null;
-  if (soTamDaChon === hanMuc) return "Đủ gói";
-  if (soTamDaChon < hanMuc) return `${soTamDaChon}/${hanMuc} tấm`;
-  return `${soTamDaChon}/${hanMuc} · thêm ${soTamDaChon - hanMuc} tấm`;
+/**
+ * BB-319 (K9, Ghi nhận) — MỘT dòng nói đủ "đã chọn bao nhiêu / gói có bao nhiêu",
+ * thay cho hai chỗ lặp số ("6 tấm ảnh chỉnh sửa" + "6/20 tấm") mà không nói 20 là gì.
+ */
+export function dongSoTamCamOn(soTamDaChon: number, hanMuc: number | null): string {
+  if (hanMuc == null) return `Đã chọn ${soTamDaChon} tấm`;
+  if (soTamDaChon === hanMuc) return `Đã chọn ${soTamDaChon} tấm, đủ gói`;
+  if (soTamDaChon < hanMuc) return `Đã chọn ${soTamDaChon} / ${hanMuc} tấm trong gói`;
+  return `Đã chọn ${soTamDaChon} / ${hanMuc} tấm, thêm ${soTamDaChon - hanMuc} tấm`;
 }
 
 export interface CamOnSauChotProps {
@@ -70,8 +72,6 @@ export function CamOnSauChot({
   tienMuaThem,
   onXemTienDo,
 }: CamOnSauChotProps) {
-  const trangThaiTam = trangThaiSoTam(soTamDaChon, hanMuc);
-
   return (
     <div
       data-testid="cam-on-sau-chot"
@@ -122,8 +122,7 @@ export function CamOnSauChot({
 
       <div className="mt-6 w-full rounded-2xl border border-border bg-surface px-4 text-left">
         <div className="flex h-[46px] items-center gap-3 text-[15px]">
-          <span>{soTamDaChon} tấm ảnh chỉnh sửa</span>
-          {trangThaiTam && <span className="ml-auto text-[13px] text-muted-foreground">{trangThaiTam}</span>}
+          <span data-testid="cam-on-dong-so-tam">{dongSoTamCamOn(soTamDaChon, hanMuc)}</span>
         </div>
         {coBia != null && (
           <div className="flex h-[46px] items-center gap-3 border-t border-[#f0e9e0] text-[15px]">
@@ -149,7 +148,7 @@ export function CamOnSauChot({
         <button
           type="button"
           onClick={onXemTienDo}
-          className="h-[50px] w-full rounded-full bg-[#2e2a27] text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
+          className="h-[52px] w-full rounded-full bg-[#2e2a27] text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
         >
           Xem tiến độ
         </button>

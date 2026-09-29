@@ -27,6 +27,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
 interface DuLieuCanXuLy {
   driveChuaChiaSe: unknown[];
@@ -74,7 +75,7 @@ export function CanXuLy() {
       />
       <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--bb-danger)]" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">
-        <strong className="font-medium">{tongSo}</strong> bộ cần xử lý trước khi gửi khách
+        <strong className="font-medium">{formatSo(tongSo)}</strong> bộ cần xử lý trước khi gửi khách
       </span>
       <span className="shrink-0 font-medium text-[var(--bb-fg)] underline underline-offset-2">
         Xem

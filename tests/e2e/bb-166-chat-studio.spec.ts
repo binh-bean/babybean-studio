@@ -149,7 +149,7 @@ test.describe("BB-166: nút 'Nhắn cho studio'", () => {
    * tính, ẩn/hiện bằng CSS theo bề rộng màn hình, không phải gỡ khỏi DOM.
    */
   const nutNhanTin = (page: import("@playwright/test").Page) =>
-    page.locator("#dau-luoi-anh").getByRole("link", { name: "Nhắn cho studio" }).filter({ visible: true });
+    page.locator("#dau-luoi-anh").getByRole("link", { name: "Nhắn studio" }).filter({ visible: true });
 
   test("hiện khi có cấu hình hợp lệ, ẩn khi trống/sai/thiếu, vẫn hiện khi đã chốt", async ({ page }) => {
     // 1. Cấu hình hợp lệ -> nút hiện, đúng href/target/rel.

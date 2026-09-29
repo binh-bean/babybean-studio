@@ -34,7 +34,7 @@
  */
 
 import React, { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Heart, Printer } from "lucide-react";
+import { Heart, Lock, Printer } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { chonCoAnhTheoO } from "@/lib/utils/chon-co-anh";
 import { vi } from "@/i18n";
@@ -70,6 +70,13 @@ interface TheAnhProps {
   soSanhBat: boolean;
   /** Thứ tự 1–4 trong danh sách so sánh; 0 = tấm này chưa được đánh dấu. */
   soSanhThuTu: number;
+  /**
+   * BB-321 — màn "Chọn thêm ảnh · Đợt N": số đợt đã chốt tấm này (1, 2, …);
+   * 0 = tấm chưa thuộc đợt nào. > 0 thì KHÔNG có tim: huy hiệu khoá "Đợt N"
+   * đứng đúng chỗ tim (bản vẽ BB-321 anh duyệt 29/09/2026) — một dấu duy nhất,
+   * không có nút bấm giả. Giá trị đơn — LUẬT 2 đầu tệp.
+   */
+  dotKhoa: number;
   /** Vị trí trong lưới. Thiếu (nhánh dự phòng) thì thẻ tự xếp theo dòng chảy. */
   x?: number;
   y?: number;
@@ -89,6 +96,7 @@ const TheAnh = memo(function TheAnh({
   soSanPham,
   soSanhBat,
   soSanhThuTu,
+  dotKhoa,
   x,
   y,
   w,
@@ -191,7 +199,7 @@ const TheAnh = memo(function TheAnh({
           bằng tim đặc terracotta + lớp phủ ấm 6% để vẫn nhận ra tấm đã chọn
           cả khi tim nằm ngoài vùng nhìn (ảnh dài, đã cuộn qua tim).
         */}
-        {daChon && (
+        {daChon && dotKhoa === 0 && (
           <span className="pointer-events-none absolute inset-0 rounded-[4px] bg-[#c4645a]/[0.06]" />
         )}
 
@@ -242,7 +250,23 @@ const TheAnh = memo(function TheAnh({
           độ so sánh; màn SO SÁNH THẬT (`so-sanh-anh.tsx`, dải điều khiển dưới
           ảnh) vẫn giữ tim riêng của nó, không đụng ở đây.
         */}
-        {(!khoa || daChon) && !soSanhBat && (
+        {/*
+          BB-321 — tấm đã chốt ở đợt trước (màn "Chọn thêm ảnh · Đợt N"): huy
+          hiệu khoá "Đợt N" THAY CHỖ tim, cùng góc dưới phải — mỗi ô chỉ một
+          dấu, và không có nút nào trông bấm được mà bấm không ăn thua.
+        */}
+        {dotKhoa > 0 && !soSanhBat && (
+          <span
+            data-testid="huy-hieu-khoa"
+            aria-label={`Ảnh ${thuTu + 1} đã chốt đợt ${dotKhoa}`}
+            className="pointer-events-none absolute bottom-2 right-2 z-10 flex h-[26px] items-center gap-1 rounded-full bg-[#fffdf9]/92 pl-2 pr-2.5 text-[11.5px] font-medium text-[#2a2420] shadow-sm"
+          >
+            <Lock className="h-[13px] w-[13px]" strokeWidth={1.8} aria-hidden="true" />
+            Đợt {dotKhoa}
+          </span>
+        )}
+
+        {(!khoa || daChon) && !soSanhBat && dotKhoa === 0 && (
           <button
             type="button"
             disabled={khoa || dangGui}
@@ -299,6 +323,12 @@ export interface LuoiAnhProps {
   soSanhBat: boolean;
   /** photoId -> thứ tự 1–4 trong danh sách so sánh. Thiếu khoá nghĩa là 0. */
   soSanhTheoAnh: Map<string, number>;
+  /**
+   * BB-321 — photoId -> số đợt đã chốt tấm đó (màn "Chọn thêm ảnh"). Thiếu
+   * prop hoặc thiếu khoá nghĩa là 0 (không khoá riêng) — lưới chính không
+   * truyền, hành vi y như cũ.
+   */
+  dotKhoaTheoAnh?: Map<string, number>;
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
   onToggleSoSanh: (photo: PhotoPublic) => void;
@@ -317,6 +347,7 @@ export function LuoiAnh({
   soSanPhamTheoAnh,
   soSanhBat,
   soSanhTheoAnh,
+  dotKhoaTheoAnh,
   onToggle,
   onOpen,
   onToggleSoSanh,
@@ -329,7 +360,8 @@ export function LuoiAnh({
   const [rongMan, setRongMan] = useState(doMan);
   const [rongKhung, setRongKhung] = useState(() => {
     const w = doMan();
-    return w === 0 ? 0 : w - (w >= 1024 ? 48 : 12);
+    // Trừ đúng lề hai bên của khung lưới (gallery-app: `px-2` = 8px điện thoại, `lg:px-10` = 40px).
+    return w === 0 ? 0 : w - (w >= 1024 ? 80 : 16);
   });
   const [caoMan, setCaoMan] = useState(() => (typeof window === "undefined" ? 800 : window.innerHeight));
   const [bac, setBac] = useState(0);
@@ -414,6 +446,7 @@ export function LuoiAnh({
               soSanPham={soSanPhamTheoAnh.get(photo.id) ?? 0}
               soSanhBat={soSanhBat}
               soSanhThuTu={soSanhTheoAnh.get(photo.id) ?? 0}
+              dotKhoa={dotKhoaTheoAnh?.get(photo.id) ?? 0}
               onToggle={onToggle}
               onOpen={onOpen}
               onToggleSoSanh={onToggleSoSanh}
@@ -436,6 +469,7 @@ export function LuoiAnh({
                 soSanPham={soSanPhamTheoAnh.get(photo.id) ?? 0}
                 soSanhBat={soSanhBat}
                 soSanhThuTu={soSanhTheoAnh.get(photo.id) ?? 0}
+                dotKhoa={dotKhoaTheoAnh?.get(photo.id) ?? 0}
                 x={vt.x}
                 y={vt.y}
                 w={vt.w}

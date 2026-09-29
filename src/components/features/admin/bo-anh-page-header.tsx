@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { PageHeader } from "./page-header";
 import { vi } from "@/i18n/vi";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
 export function BoAnhPageHeader() {
   const [moTa, setMoTa] = useState<string | null>(null);
@@ -47,7 +48,7 @@ export function BoAnhPageHeader() {
         // các trạng thái còn lại (kể cả đã giao) vẫn coi là bộ đang chạy trong
         // hệ thống, khớp con số "48 bộ đang mở" trên bản vẽ.
         const dangMo = Math.max(0, (counts.all ?? 0) - (counts.archived ?? 0));
-        setMoTa(`${dangMo} bộ đang mở · ${branches.length} chi nhánh`);
+        setMoTa(`${formatSo(dangMo)} bộ đang mở · ${formatSo(branches.length)} chi nhánh`);
       } catch {
         // Dòng phụ là phần đánh bóng — hỏng thì ẩn, không báo lỗi ra trang.
       }
@@ -61,8 +62,6 @@ export function BoAnhPageHeader() {
     <PageHeader
       title="Bộ ảnh"
       description={moTa}
-      hideOnMobile
-      className="mb-0"
       actions={
         <Link href="/admin/galleries/create">
           <Button className="bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90" size="sm">

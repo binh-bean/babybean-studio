@@ -1,4 +1,5 @@
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
@@ -138,7 +139,7 @@ test.describe("E-3: Ghi chú", () => {
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
 
     await page.fill("#confirm-name-input", "Mẹ Bean");
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
     await page.fill("#customer-note-input", "Làm màu vintage giúp em nhé");
     await page.getByRole("button", { name: "Xác nhận" }).click();
 

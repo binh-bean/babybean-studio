@@ -215,7 +215,7 @@ ownIpTest.describe("BB-312: khách xin mở lại — phản hồi cả hai phí
     await ownIpExpect(nutYeuCau).toBeVisible({ timeout: 20_000 });
     await nutYeuCau.click();
 
-    await page.getByPlaceholder(/em muốn đổi tấm số 12/).fill(`${NHAN} lần 1 — đổi tấm bìa`);
+    await page.getByPlaceholder(/đổi tấm số 12/).fill(`${NHAN} lần 1 — đổi tấm bìa`);
     await page.getByRole("button", { name: "Gửi cho studio" }).click();
 
     const daiTrangThaiKhach = page.getByTestId("yeu-cau-mo-lai-trang-thai");
@@ -282,7 +282,7 @@ ownIpTest.describe("BB-312: khách xin mở lại — phản hồi cả hai phí
     await cuonQuaBia(page);
     await page.getByRole("button", { name: "Yêu cầu sửa lại" }).click();
     await ownIpExpect(page.getByText(/Lần trước studio phản hồi/)).toBeVisible();
-    await page.getByPlaceholder(/em muốn đổi tấm số 12/).fill(`${NHAN} lần 2 — vậy đổi bìa được không ạ`);
+    await page.getByPlaceholder(/đổi tấm số 12/).fill(`${NHAN} lần 2 — vậy đổi bìa được không ạ`);
     await page.getByRole("button", { name: "Gửi cho studio" }).click();
     await ownIpExpect(
       page.getByRole("button", { name: /Đã gửi yêu cầu · lần 2/ }),

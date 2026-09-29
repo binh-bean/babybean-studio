@@ -1,3 +1,4 @@
+import { formatSo } from "@/lib/utils/dinh-dang";
 /**
  * Dịch một dòng `activity_logs` thành câu tiếng Việt dễ đọc cho khối "Dòng
  * thời gian hoạt động" ở màn chi tiết bộ ảnh quản trị.
@@ -52,7 +53,7 @@ function chuoi(metadata: Record<string, unknown> | null | undefined, key: string
 }
 
 function formatVND(n: number): string {
-  return `${new Intl.NumberFormat("vi-VN").format(Math.round(n))}đ`;
+  return `${formatSo(Math.round(n))}đ`;
 }
 
 const TEN_TRANG_THAI_MUA_THEM: Record<string, string> = {
@@ -101,7 +102,7 @@ export function suyNguoi(dong: DongNhatKyDeDich): string {
     chủ theo đúng luật của route, nên không đi qua `nguoiTuKhach` mà hiện
     thẳng "Ba mẹ (tên xác nhận)".
   */
-  if (dong.action === "selection.submit") {
+  if (dong.action === "selection.submit" || dong.action === "selection.round_submit") {
     const ten = (dong.actorLabel ?? "").trim();
     return ten ? `Ba mẹ (${ten})` : "Ba mẹ";
   }
@@ -111,13 +112,20 @@ export function suyNguoi(dong: DongNhatKyDeDich): string {
 type HamDich = (metadata: Record<string, unknown> | null | undefined) => string;
 
 const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
-  "share_link.created": { nhom: "nhan_vien", cau: () => "Nhân viên tạo link gửi khách" },
+  "share_link.created": { nhom: "nhan_vien", cau: () => "Nhân viên tạo link app" },
   "share_link.reopened": { nhom: "nhan_vien", cau: () => "Nhân viên mở khoá lại link cũ" },
   "gallery.retouch_sent": { nhom: "nhan_vien", cau: () => "Nhân viên gửi ảnh đã chỉnh cho khách" },
   "gallery.confirm_retouch": { nhom: "nhan_vien", cau: () => "Nhân viên bắt đầu hậu kỳ ảnh" },
   "gallery.review_approved": { nhom: "khach", cau: () => "Ba mẹ duyệt ảnh đã chỉnh" },
   "gallery.review_revise": { nhom: "khach", cau: () => "Ba mẹ yêu cầu chỉnh sửa lại" },
-  "gallery.reopen": { nhom: "nhan_vien", cau: () => "Nhân viên mở lại bộ ảnh" },
+  "gallery.reopen": {
+    nhom: "nhan_vien",
+    // BB-321 — mở lại đợt mua thêm ghi cùng action kèm `soDot` (≥ 2).
+    cau: (m) => {
+      const dot = so(m, "soDot");
+      return dot !== null && dot >= 2 ? `Nhân viên mở lại đợt ${dot}` : "Nhân viên mở lại bộ ảnh";
+    },
+  },
   "gallery.reopen_requested": { nhom: "khach", cau: () => "Ba mẹ xin mở lại bộ ảnh để sửa" },
   // BB-312 — CSKH từ chối yêu cầu mở lại kèm lý do. Lý do là trường tự do
   // (nhân viên gõ tay) nên KHÔNG ghép vào câu — cùng luật ghi ở đầu tệp.
@@ -219,6 +227,31 @@ const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
     cau: (m) => {
       const n = so(m, "selectedCount");
       return n !== null ? `Ba mẹ chốt lựa chọn ${n} tấm` : "Ba mẹ chốt lựa chọn ảnh";
+    },
+  },
+  // BB-321 — đợt chọn thêm ảnh. Lý do từ chối là trường tự do (nhân viên gõ) nên
+  // KHÔNG ghép vào câu — cùng luật ghi ở đầu tệp.
+  "selection.round_submit": {
+    nhom: "khach",
+    cau: (m) => {
+      const dot = so(m, "soDot");
+      const n = so(m, "soAnh");
+      if (dot !== null && n !== null) return `Ba mẹ chốt đợt ${dot} (${n} tấm)`;
+      return dot !== null ? `Ba mẹ chốt đợt ${dot}` : "Ba mẹ chốt một đợt chọn thêm";
+    },
+  },
+  "selection.round_confirm": {
+    nhom: "nhan_vien",
+    cau: (m) => {
+      const dot = so(m, "soDot");
+      return dot !== null ? `Nhân viên xác nhận đợt ${dot}` : "Nhân viên xác nhận một đợt chọn thêm";
+    },
+  },
+  "selection.round_reject": {
+    nhom: "nhan_vien",
+    cau: (m) => {
+      const dot = so(m, "soDot");
+      return dot !== null ? `Nhân viên từ chối đợt ${dot}` : "Nhân viên từ chối một đợt chọn thêm";
     },
   },
   "gallery.cover.change": { nhom: "nhan_vien", cau: () => "Nhân viên đổi bìa bộ ảnh" },

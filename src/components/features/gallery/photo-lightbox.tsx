@@ -21,8 +21,11 @@ import {
   TI_LE_NHO_NHAT,
   type TrangThaiPhong,
 } from "@/lib/gallery/phong-anh";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
 export interface PhotoLightboxProps {
+  /** BB-319 (Ghi nhận K4/K5) — tên bé, hiện nhỏ dưới số thứ tự: xem lớn vẫn "gọi tên bé". */
+  tenBe?: string | null;
   photos: PhotoPublic[];
   initialIndex: number;
   onClose: () => void;
@@ -64,6 +67,13 @@ export interface PhotoLightboxProps {
    * không bị ép phải biết về tính năng so sánh.
    */
   onSoSanh?: (photo: PhotoPublic) => void;
+  /**
+   * BB-321 — màn "Chọn thêm ảnh · Đợt N": tấm đã chốt ở đợt trước KHÔNG bỏ
+   * chọn được, dù bộ ảnh không khoá chung (`isLocked = false` để tấm chưa chọn
+   * vẫn thả tim được). Trả `true` thì nút tim của RIÊNG tấm đó bị khoá. Thiếu
+   * prop này thì hành vi y như cũ.
+   */
+  khoaTimAnh?: (photo: PhotoPublic) => boolean;
 }
 
 /**
@@ -92,6 +102,7 @@ export interface PhotoLightboxProps {
  *    trong DOM, giải phóng toàn bộ ảnh khác để không phình bộ nhớ với bộ 1.235 tấm.
  */
 export function PhotoLightbox({
+  tenBe,
   photos,
   initialIndex,
   onClose,
@@ -105,7 +116,7 @@ export function PhotoLightbox({
   bangSanPham,
   banner,
   dungCho,
-  
+  khoaTimAnh,
 }: PhotoLightboxProps) {
   /**
    * Tấm trượt từ dưới lên trên điện thoại: bảng sản phẩm hoặc ô ghi chú.
@@ -569,6 +580,8 @@ export function PhotoLightbox({
   // Lượt thả tim của tấm này còn đang gửi thì chưa có dòng chọn trên máy chủ —
   // ghi chú gửi lúc này bị từ chối. Khoá ô ghi chú tới khi tim lưu xong.
   const isMutating = mutatingIds.has(currentPhoto.id);
+  // BB-321 — tấm đã chốt ở đợt trước: tim đứng yên (xem `khoaTimAnh`).
+  const timBiKhoa = isLocked || (khoaTimAnh?.(currentPhoto) ?? false);
   const nhanDungCho = dungCho?.(currentPhoto) ?? [];
 
   return (
@@ -610,7 +623,8 @@ export function PhotoLightbox({
           biết `BB289A_0001.jpg` nghĩa là gì, CSKH đối chiếu bằng số thứ tự
           hoặc công cụ nội bộ, không qua màn khách.
       */}
-      <header className="relative z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-start px-4 py-4">
+      {/* BB-319 (luật 2) — 13px + vùng chạm 44px: NÉT biểu tượng Đóng/Tải đứng đúng lề 24px như mọi màn khách. */}
+      <header className="relative z-20 grid shrink-0 grid-cols-[1fr_auto_1fr] items-start px-[13px] py-4">
         <div className="flex justify-start">
           <button
             type="button"
@@ -642,10 +656,15 @@ export function PhotoLightbox({
               cách THẬT trong span giữa để chữ vẫn đọc được bằng screen reader
               lẫn bằng phép thử tìm chữ.
             */}
-            <span className="tabular-nums font-medium">{currentIndex + 1}</span>
+            <span className="tabular-nums font-medium">{formatSo(currentIndex + 1)}</span>
             <span className="mx-1 text-[#6b6057]"> / </span>
-            <span className="text-[#6b6057]">{total}</span>
+            <span className="text-[#6b6057]">{formatSo(total)}</span>
           </div>
+          {tenBe && (
+            <span data-testid="xem-lon-ten-be" className="mt-1 max-w-full truncate text-[12px] text-[#6b6057]">
+              {tenBe}
+            </span>
+          )}
         </div>
 
         <div className="flex justify-end">
@@ -716,7 +735,8 @@ export function PhotoLightbox({
               key={photo.id}
               ref={isCurrent ? truotHienTaiRef : undefined}
               className={cn(
-                "absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none p-2 sm:p-4",
+                // BB-319 — máy tính: thanh Tim/Ghi chú/Đặt in nổi ở đáy vùng ảnh (xem <footer>), chừa đáy 84px để không đè ảnh.
+                "absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none p-2 sm:p-4 lg:pb-[84px]",
                 isCurrent ? "opacity-100 z-10" : "opacity-0 z-0 transition-transform duration-200 ease-out"
               )}
               style={{
@@ -761,7 +781,10 @@ export function PhotoLightbox({
                 // trên nền. Bỏ bóng đổ từ `lg:` — ảnh đặt thẳng trên nền kem,
                 // không có khung nổi nào bao quanh. Điện thoại giữ nguyên
                 // (bóng đổ hợp lý hơn trên nền tràn màn không có viền khác).
-                className="w-full h-full object-contain select-none shadow-2xl lg:shadow-none pointer-events-auto cursor-zoom-in"
+                // BB-319 — bỏ bóng đổ ở CẢ điện thoại: bóng vẽ quanh TRỌN khung <img> (không
+                // phải quanh phần ảnh thật khi object-contain), thành một "tấm" sáng có dải
+                // trống trên/dưới ảnh ngang (vòng 5 + 6 đều ghi nhận). Ảnh nằm thẳng trên nền kem.
+                className="w-full h-full object-contain select-none pointer-events-auto cursor-zoom-in"
                 style={
                   isCurrent
                     ? {
@@ -807,7 +830,7 @@ export function PhotoLightbox({
               e.stopPropagation();
               datLaiPhong(true);
             }}
-            className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[12.5px] text-white/90 backdrop-blur-md active:scale-95"
+            className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[13px] text-white/90 backdrop-blur-md active:scale-95"
           >
             <Minimize2 className="h-3.5 w-3.5" aria-hidden="true" />
             Thu về
@@ -939,7 +962,10 @@ export function PhotoLightbox({
       <footer
         // BB-310 mục 4 — cùng nền kem đặc như gốc (không còn kính mờ trên
         // điện thoại), xem ghi chú ở nền gốc phía trên.
-        className="relative z-20 shrink-0 border-t border-[#e5dcd2] bg-[#F3EDE5] pb-[max(10px,env(safe-area-inset-bottom))] lg:border-0 lg:bg-transparent lg:px-4 lg:pt-2"
+        // BB-319 — máy tính: thanh đáy NỔI trên đáy cột ảnh (absolute, chừa đúng bề rộng cột
+        // phải `w-72`), để cột phải chạy trọn chiều cao màn — không còn một tấm dừng lơ lửng
+        // ở y≈818 với dải trống bên dưới (K4/K5 máy tính).
+        className="relative z-20 shrink-0 border-t border-[#e5dcd2] bg-[#F3EDE5] pb-[max(10px,env(safe-area-inset-bottom))] lg:absolute lg:bottom-0 lg:left-0 lg:right-72 lg:border-0 lg:bg-transparent lg:px-4 lg:pt-2"
         onClick={(e) => e.stopPropagation()}
       >
         {nhanDungCho.length > 0 && (
@@ -965,7 +991,7 @@ export function PhotoLightbox({
         >
           <button
             type="button"
-            disabled={isLocked || isMutating}
+            disabled={timBiKhoa || isMutating}
             onClick={() => onToggleHeart(currentPhoto)}
             aria-label={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
             aria-pressed={isCurrentSelected}
@@ -1017,7 +1043,7 @@ export function PhotoLightbox({
           )}
         </div>
 
-        <div className={cn("mx-auto max-w-md overflow-hidden px-4 transition-all duration-300 lg:hidden", tamMo === "ghi-chu" ? "max-h-[150px] pb-3 opacity-100" : "max-h-0 opacity-0")}>
+        <div className={cn("mx-auto max-w-md overflow-hidden px-6 transition-all duration-300 lg:hidden", tamMo === "ghi-chu" ? "max-h-[150px] pb-3 opacity-100" : "max-h-0 opacity-0")}>
           {onLuuGhiChu && (
             <input
               id="ghi-chu-anh"
@@ -1057,7 +1083,7 @@ export function PhotoLightbox({
           <div className="mx-auto flex h-[56px] w-fit items-center gap-1 rounded-full border border-[#e5dcd2] bg-[rgba(251,247,242,0.92)] px-2 shadow-[0_10px_28px_-14px_rgba(46,42,39,0.3)]">
             <button
               type="button"
-              disabled={isLocked || isMutating}
+              disabled={timBiKhoa || isMutating}
               onClick={() => onToggleHeart(currentPhoto)}
               aria-label={isCurrentSelected ? vi.gallery.deselect : vi.gallery.select}
               aria-pressed={isCurrentSelected}
@@ -1146,7 +1172,7 @@ export function PhotoLightbox({
             // `bangSanPham` gọi với `tong="sang"` (đã có sẵn ở
             // `bang-san-pham-cua-anh.tsx`, dựng cho đúng trường hợp nền
             // sáng này) thay vì mặc định `tong="toi"`.
-            className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#FBF7F2] px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-[#2E2A27] shadow-2xl animate-in slide-in-from-bottom-8"
+            className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#FBF7F2] px-6 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-[#2E2A27] shadow-2xl animate-in slide-in-from-bottom-8"
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#2E2A27]/15" aria-hidden="true" />
             {/*

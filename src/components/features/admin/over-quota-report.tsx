@@ -27,12 +27,18 @@
 
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import Link from "next/link";
 import { CARD_TITLE_CLASS } from "./page-header";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { TheSoLieu } from "./the-so-lieu";
+import { formatNgayVN, tinhTenBiaTuDuLieu, formatSo } from "@/lib/utils/dinh-dang";
 
 interface ReportItem {
   galleryId: string;
   galleryTitle: string;
+  /** BB-320 (Q-D2): tên để CSKH biết gọi ai — bé trước, rồi khách. */
+  customerName: string | null;
+  babyNickname: string | null;
+  babyFullName: string | null;
   branchName: string;
   contractCode: string | null;
   shootDate: string | null;
@@ -41,7 +47,10 @@ interface ReportItem {
   overCount: number;
   addonCount: number;
   unbilledCount: number;
+  /** Đã TRỪ tiền đã thu và phần giảm giá (BB-320). */
   unbilledAmount: number;
+  daThu?: number;
+  giamGia?: number;
 }
 
 interface ReportSummary {
@@ -95,18 +104,15 @@ export function OverQuotaReport() {
         </p>
       </header>
 
+      {/* BB-320 (Q-N2): cùng thẻ số với mọi màn quản trị. */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Bộ ảnh" value={String(summary.galleryCount)} />
-        <Stat label="Ảnh chưa thu" value={String(summary.unbilledPhotoCount)} />
-        <Stat
-          label="Tiền chưa thu"
-          value={formatCurrencyVND(summary.totalUnbilledAmount)}
-          emphasis
-        />
-        <Stat
+        <TheSoLieu label="Bộ ảnh" value={formatSo(summary.galleryCount)} />
+        <TheSoLieu label="Ảnh chưa thu" value={formatSo(summary.unbilledPhotoCount)} />
+        <TheSoLieu label="Tiền chưa thu" value={formatCurrencyVND(summary.totalUnbilledAmount)} chuNho />
+        <TheSoLieu
           label="Chưa rõ hạn mức"
-          value={String(summary.missingQuotaCount)}
-          hint="không nằm trong số tiền bên cạnh"
+          value={formatSo(summary.missingQuotaCount)}
+          ghiChu="không nằm trong số tiền bên cạnh"
         />
       </section>
 
@@ -117,7 +123,7 @@ export function OverQuotaReport() {
         {summary.missingQuotaCount > 0 && (
           <>
             {" "}
-            Hiện có <strong>{summary.missingQuotaCount}</strong> bộ chưa rõ hạn mức —
+            Hiện có <strong>{formatSo(summary.missingQuotaCount)}</strong> bộ chưa rõ hạn mức —
             bổ sung dòng <em>Edit file</em> bên Lark thì chúng sẽ vào báo cáo.
           </>
         )}
@@ -140,8 +146,9 @@ export function OverQuotaReport() {
                 key={it.galleryId}
                 className="rounded-lg border border-[var(--bb-border)] p-3 text-sm"
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="select-all font-mono text-xs">{it.contractCode ?? "—"}</span>
+                <BoAnhCell it={it} />
+                <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="select-all text-xs tabular-nums">{it.contractCode ?? "—"}</span>
                   <span className="text-xs text-[var(--bb-fg-muted)]">
                     {it.branchName} · {formatDate(it.shootDate)}
                   </span>
@@ -150,15 +157,18 @@ export function OverQuotaReport() {
                   <span className="text-[var(--bb-fg-muted)]">Hạn mức</span>
                   <span className="text-right">{it.quota ?? "—"}</span>
                   <span className="text-[var(--bb-fg-muted)]">Đã chọn</span>
-                  <span className="text-right">{it.selectedCount}</span>
+                  <span className="text-right">{formatSo(it.selectedCount)}</span>
                   <span className="text-[var(--bb-fg-muted)]">Đã mua thêm</span>
-                  <span className="text-right">{it.addonCount}</span>
+                  <span className="text-right">{formatSo(it.addonCount)}</span>
                   <span className="text-[var(--bb-fg-muted)]">Chưa thu</span>
-                  <span className="text-right font-medium">{it.unbilledCount}</span>
+                  <span className="text-right font-medium">{formatSo(it.unbilledCount)}</span>
                 </div>
                 <div className="mt-2 flex items-baseline justify-between border-t border-[var(--bb-border)] pt-2">
-                  <span className="text-xs text-[var(--bb-fg-muted)]">Thành tiền</span>
-                  <span className="font-medium">{formatCurrencyVND(it.unbilledAmount)}</span>
+                  <span className="text-xs text-[var(--bb-fg-muted)]">Còn phải thu</span>
+                  <span className="text-right">
+                    <span className="font-medium">{formatCurrencyVND(it.unbilledAmount)}</span>
+                    <TruCu it={it} />
+                  </span>
                 </div>
               </li>
             ))}
@@ -168,6 +178,7 @@ export function OverQuotaReport() {
           <table className="w-full min-w-[46rem] border-collapse text-sm">
             <thead>
               <tr className="border-b border-[var(--bb-border)] text-left">
+                <Th>Bộ ảnh</Th>
                 <Th>Mã hợp đồng</Th>
                 <Th>Chi nhánh</Th>
                 <Th>Ngày chụp</Th>
@@ -175,24 +186,28 @@ export function OverQuotaReport() {
                 <Th className="text-right">Đã chọn</Th>
                 <Th className="text-right">Đã mua thêm</Th>
                 <Th className="text-right">Chưa thu</Th>
-                <Th className="text-right">Thành tiền</Th>
+                <Th className="text-right">Còn phải thu</Th>
               </tr>
             </thead>
             <tbody>
               {items.map((it) => (
                 <tr key={it.galleryId} className="border-b border-[var(--bb-border)]">
+                  <td className="py-2 pr-3">
+                    <BoAnhCell it={it} />
+                  </td>
                   {/* select-all để CSKH bôi đen một phát rồi dán vào ô tìm kiếm bên Lark */}
-                  <td className="select-all py-2 pr-3 font-mono text-xs">
+                  <td className="select-all whitespace-nowrap py-2 pr-3 text-xs tabular-nums">
                     {it.contractCode ?? "—"}
                   </td>
                   <td className="py-2 pr-3">{it.branchName}</td>
                   <td className="py-2 pr-3">{formatDate(it.shootDate)}</td>
                   <td className="py-2 pr-3 text-right">{it.quota ?? "—"}</td>
-                  <td className="py-2 pr-3 text-right">{it.selectedCount}</td>
-                  <td className="py-2 pr-3 text-right">{it.addonCount}</td>
-                  <td className="py-2 pr-3 text-right font-medium">{it.unbilledCount}</td>
+                  <td className="py-2 pr-3 text-right">{formatSo(it.selectedCount)}</td>
+                  <td className="py-2 pr-3 text-right">{formatSo(it.addonCount)}</td>
+                  <td className="py-2 pr-3 text-right font-medium">{formatSo(it.unbilledCount)}</td>
                   <td className="py-2 text-right font-medium">
                     {formatCurrencyVND(it.unbilledAmount)}
+                    <TruCu it={it} />
                   </td>
                 </tr>
               ))}
@@ -205,28 +220,41 @@ export function OverQuotaReport() {
   );
 }
 
-function Stat({
-  label,
-  value,
-  hint,
-  emphasis,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  emphasis?: boolean;
-}) {
+/**
+ * BB-320 (Q-D2): ô "Bộ ảnh" — tên bé (họ tên đầy đủ nếu không có biệt danh) và
+ * tên khách, là liên kết mở thẳng chi tiết bộ. Không có cả hai thì rơi về tên
+ * bộ ảnh thô (mã hợp đồng), không bịa tên.
+ */
+function BoAnhCell({ it }: { it: ReportItem }) {
+  const tenBe = tinhTenBiaTuDuLieu(it.babyNickname, it.babyFullName);
+  const chinh = tenBe || it.customerName || it.galleryTitle;
+  const phu = tenBe && it.customerName ? it.customerName : null;
   return (
-    <div className="rounded-lg border border-[var(--bb-border)] p-3">
-      <div className="text-xs text-[var(--bb-fg-muted)]">{label}</div>
-      <div className={emphasis ? "mt-1 text-lg font-semibold" : "mt-1 text-lg"}>{value}</div>
-      {hint && <div className="mt-1 text-xs text-[var(--bb-fg-muted)]">{hint}</div>}
+    <div className="min-w-0">
+      <Link
+        href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}
+        data-testid="mo-bo-anh"
+        className="block truncate font-medium text-[var(--bb-fg)] hover:underline"
+      >
+        {chinh}
+      </Link>
+      {phu && <div className="truncate text-xs text-[var(--bb-fg-muted)]">{phu}</div>}
     </div>
   );
 }
 
+/** BB-320: nói rõ số này đã trừ những gì — tiền đã thu và phần giảm giá. */
+function TruCu({ it }: { it: ReportItem }) {
+  const phan = [
+    it.daThu ? `đã thu ${formatCurrencyVND(it.daThu)}` : null,
+    it.giamGia ? `giảm giá ${formatCurrencyVND(it.giamGia)}` : null,
+  ].filter(Boolean);
+  if (phan.length === 0) return null;
+  return <span className="block text-xs font-normal text-[var(--bb-fg-muted)]">đã trừ {phan.join(" · ")}</span>;
+}
+
 function Th({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <th className={`py-2 pr-3 font-medium ${className ?? ""}`}>{children}</th>;
+  return <th className={`whitespace-nowrap py-2 pr-3 font-medium ${className ?? ""}`}>{children}</th>;
 }
 
 function formatDate(value: string | null): string {

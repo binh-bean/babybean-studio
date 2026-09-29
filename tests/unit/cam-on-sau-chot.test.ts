@@ -1,33 +1,33 @@
 /**
- * BB-289 lượt 2 — luật "Đủ gói" ở màn Cảm ơn (`cam-on-sau-chot.tsx`).
+ * Dòng số tấm ở màn Cảm ơn (`cam-on-sau-chot.tsx`).
  *
- * Admin báo trên app thật: gói 10 tấm, mới chọn 1 tấm mà màn Cảm ơn ghi
- * "1 tấm ảnh chỉnh sửa · Đủ gói" — SAI, vì bản trước so `soTamDaChon >
- * hanMuc` (chỉ bắt ca VƯỢT), không bắt ca THIẾU (mặc định rơi vào "Đủ gói").
+ * BB-289 lượt 2 — gói 10 tấm, mới chọn 1 tấm mà màn Cảm ơn từng ghi "Đủ gói"
+ * (bản cũ chỉ so `soTamDaChon > hanMuc`, ca THIẾU rơi vào "Đủ gói").
+ * BB-319 (K9) — hai chỗ lặp số ("6 tấm ảnh chỉnh sửa" + "6/20 tấm") gộp thành MỘT
+ * dòng nói rõ 20 là số tấm trong gói.
  *
- * Kiểm ngược (AGENTS.md §5a): hoàn nguyên `trangThaiSoTam` về
- * `soTamDaChon > hanMuc ? "+X ngoài gói" : "Đủ gói"` thì ca "thiếu" (1/10)
- * dưới đây ĐỎ (mong "1/10 tấm", nhận "Đủ gói") — đã tự chạy tay, dán ở báo
- * cáo bàn giao.
+ * Kiểm ngược (AGENTS.md §5a): đổi `<` thành `<=` ở nhánh thiếu trong
+ * `dongSoTamCamOn` thì ca 9/10 ĐỎ; đổi nhánh thiếu về "Đủ gói" thì ca 1/10 ĐỎ.
  */
 import { describe, it, expect } from "vitest";
-import { trangThaiSoTam } from "@/components/features/gallery/cam-on-sau-chot";
+import { dongSoTamCamOn } from "@/components/features/gallery/cam-on-sau-chot";
 
-describe("BB-289: trangThaiSoTam — dòng trạng thái số tấm ở màn Cảm ơn", () => {
-  it("thiếu (đã chọn < hạn mức): hiện N/hạn mức, KHÔNG phải Đủ gói", () => {
-    expect(trangThaiSoTam(1, 10)).toBe("1/10 tấm");
-    expect(trangThaiSoTam(9, 10)).toBe("9/10 tấm");
+describe("dongSoTamCamOn — một dòng số tấm ở màn Cảm ơn", () => {
+  it("thiếu (đã chọn < hạn mức): Đã chọn N / M tấm trong gói, KHÔNG phải đủ gói", () => {
+    expect(dongSoTamCamOn(1, 10)).toBe("Đã chọn 1 / 10 tấm trong gói");
+    expect(dongSoTamCamOn(6, 20)).toBe("Đã chọn 6 / 20 tấm trong gói");
+    expect(dongSoTamCamOn(9, 10)).toBe("Đã chọn 9 / 10 tấm trong gói");
   });
 
-  it("đúng (đã chọn = hạn mức): Đủ gói", () => {
-    expect(trangThaiSoTam(10, 10)).toBe("Đủ gói");
+  it("đúng (đã chọn = hạn mức): đủ gói", () => {
+    expect(dongSoTamCamOn(10, 10)).toBe("Đã chọn 10 tấm, đủ gói");
   });
 
-  it("vượt (đã chọn > hạn mức): N/hạn mức · thêm X tấm", () => {
-    expect(trangThaiSoTam(12, 10)).toBe("12/10 · thêm 2 tấm");
+  it("vượt (đã chọn > hạn mức): nói số tấm thêm", () => {
+    expect(dongSoTamCamOn(12, 10)).toBe("Đã chọn 12 / 10 tấm, thêm 2 tấm");
   });
 
-  it("không biết hạn mức (quotaKnown=false): không hiện dòng trạng thái", () => {
-    expect(trangThaiSoTam(5, null)).toBeNull();
+  it("không biết hạn mức: chỉ nói số đã chọn, không bịa số gói", () => {
+    expect(dongSoTamCamOn(5, null)).toBe("Đã chọn 5 tấm");
   });
 });

@@ -46,6 +46,11 @@ export interface XinMoLaiChiTiet {
   lucXuLy: string | null;
   /** Tổng số lần khách đã xin mở lại, MỌI THỜI ĐIỂM — cho câu "lần thứ N". */
   lanThu: number;
+  /**
+   * BB-321 — đợt chọn khách muốn đổi (1 = ảnh trong gói, ≥ 2 = đợt mua thêm);
+   * null nếu khách không nói rõ. CSKH dùng để chọn sẵn đợt khi bấm "Mở lại".
+   */
+  dotXin: number | null;
 }
 
 const RONG: XinMoLaiChiTiet = {
@@ -55,11 +60,17 @@ const RONG: XinMoLaiChiTiet = {
   lyDoTuChoi: null,
   lucXuLy: null,
   lanThu: 0,
+  dotXin: null,
 };
 
 interface HangHoatDongTho {
   created_at: string;
   metadata: Record<string, unknown> | null;
+}
+
+function layDot(m: Record<string, unknown> | null | undefined): number | null {
+  const v = m?.soDot;
+  return typeof v === "number" && Number.isInteger(v) && v >= 1 ? v : null;
 }
 
 function layChuoi(m: Record<string, unknown> | null | undefined, khoa: string): string | null {
@@ -121,6 +132,7 @@ export async function layTrangThaiXinMoLai(
       lyDoTuChoi: null,
       lucXuLy: null,
       lanThu: lanThu ?? 0,
+      dotXin: layDot(y!.metadata),
     };
   }
   if (moiNhat === mocT) {
@@ -131,6 +143,7 @@ export async function layTrangThaiXinMoLai(
       lyDoTuChoi: layChuoi(t!.metadata, "lyDo"),
       lucXuLy: t!.created_at,
       lanThu: lanThu ?? 0,
+      dotXin: layDot(y?.metadata),
     };
   }
   // moiNhat === mocM — CSKH đã mở lại (không nhất thiết bắt nguồn từ yêu cầu
@@ -142,6 +155,7 @@ export async function layTrangThaiXinMoLai(
     lyDoTuChoi: null,
     lucXuLy: m!.created_at,
     lanThu: lanThu ?? 0,
+    dotXin: layDot(y?.metadata),
   };
 }
 

@@ -19,6 +19,7 @@ import {
   BarChart3
 } from "lucide-react";
 import { demSoCanXuLy } from "@/lib/utils/can-xu-ly";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
 // Re-export — BB-283: công thức đếm giờ sống ở src/lib/utils/can-xu-ly.ts
 // (dùng chung với dashboard.tsx), giữ tên xuất ở đây để không phải sửa nơi
@@ -247,7 +248,7 @@ export function NavLinks({
                           data-testid="badge-viec-can-xu-ly"
                           className="ml-auto rounded-full bg-[var(--bb-danger)] px-2 py-0.5 text-[11px] font-medium leading-none text-white tabular-nums"
                         >
-                          {huyHieu}
+                          {formatSo(huyHieu)}
                         </span>
                       )}
                     </span>

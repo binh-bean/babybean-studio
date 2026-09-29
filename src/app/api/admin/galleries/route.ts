@@ -302,6 +302,8 @@ export async function GET(request: Request): Promise<Response> {
     const idsTrangNay = rawItems.map((raw) => String((raw as Record<string, unknown>).id));
     const coverMap = new Map<string, string | null>();
     const packageNameMap = new Map<string, string | null>();
+    const boCoLink = new Set<string>();
+    let traLinkDuoc = true;
     if (idsTrangNay.length > 0) {
       const { data: biaRows, error: loiBia } = await admin
         .from("galleries")
@@ -323,6 +325,23 @@ export async function GET(request: Request): Promise<Response> {
           }
         } else {
           for (const galleryId of packageNameMap.keys()) packageNameMap.set(galleryId, null);
+        }
+      }
+      // BB-320 (mục 3, Link app): bộ nào ĐÃ có link còn hiệu lực — nút "Chép link" ở
+      // cột Làm nhanh mờ đi (kèm chú thích) với bộ chưa có link, thay vì bấm rồi mới
+      // nhận lỗi. Một truy vấn theo đúng các id của trang này. Tra hỏng thì coi như
+      // CÓ link (không khoá nhầm nút): việc chép vẫn tự báo lỗi nếu thật sự không có.
+      {
+        const { data: linkRows, error: loiLink } = await admin
+          .from("share_links")
+          .select("gallery_id")
+          .in("gallery_id", idsTrangNay)
+          .is("revoked_at", null);
+        if (loiLink) {
+          traLinkDuoc = false;
+          console.error(JSON.stringify({ evt: "galleries_list_link_lookup_failed", requestId, loi: loiLink.message }));
+        } else {
+          for (const l of linkRows ?? []) boCoLink.add(String(l.gallery_id));
         }
       }
       const anhBia = await anhBiaTheoBo(
@@ -351,6 +370,8 @@ export async function GET(request: Request): Promise<Response> {
         // ở danh sách/chi tiết bộ ảnh (bo-anh-danh-sach.png). `null` khi bộ
         // ảnh không gắn gói (hợp đồng cũ trước khi có packages, hoặc lỗi tra).
         packageName: packageNameMap.get(String(item.id)) ?? null,
+        // BB-320 (Link app): true khi bộ có link chưa thu hồi (hoặc không tra được — xem trên).
+        coLinkApp: traLinkDuoc ? boCoLink.has(String(item.id)) : true,
       };
     });
 

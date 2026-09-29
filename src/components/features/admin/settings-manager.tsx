@@ -167,8 +167,6 @@ export function SettingsManager() {
   return (
     // Đệm dưới cùng để thanh lưu dính đáy không đè lên ô nhập cuối cùng.
     <div className="space-y-6 pb-20">
-      <p className="text-sm text-[var(--bb-fg-muted)]">{t.subtitle}</p>
-
       {loi && (
         <div
           role="alert"

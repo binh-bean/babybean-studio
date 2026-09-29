@@ -157,7 +157,7 @@ function KhoiMotAlbum({
 
       {anhDaThaTim.length === 0 ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          Ba mẹ thả tim chọn vài tấm ảnh trước, rồi mới chọn được ảnh bìa cho album này.
+          Thả tim vài tấm trước, rồi chọn một tấm làm bìa.
         </p>
       ) : (
         <>
@@ -190,7 +190,7 @@ function KhoiMotAlbum({
                     className="aspect-square w-full object-cover"
                   />
                   {dangLaBia && (
-                    <span className="absolute right-1 top-1 flex items-center gap-0.5 rounded-full bg-moss px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    <span className="absolute right-1 top-1 flex items-center gap-0.5 rounded-full bg-moss px-1.5 py-0.5 text-[11px] font-bold text-white">
                       <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />
                       Bìa
                     </span>
@@ -257,8 +257,9 @@ export function ChonBiaAlbum({
       <div>
         <h3 className="kh-h2">Chọn ảnh bìa album</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Gói của ba mẹ có {albums.length > 1 ? `${albums.length} cuốn album` : "một cuốn album"} —
-          mỗi cuốn cần một ảnh bìa, chọn trong những tấm ba mẹ đã thả tim.
+          {/* BB-319 (luật 4) — hai câu ngắn thay một câu 21 chữ. */}
+          Gói của ba mẹ có {albums.length > 1 ? `${albums.length} cuốn album` : "một cuốn album"}. Chọn bìa
+          trong những tấm đã thả tim.
         </p>
       </div>
       {albums.map((album) => (

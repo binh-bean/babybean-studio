@@ -300,7 +300,8 @@ vết nếu CSKH thắc mắc "sao không thấy tin"). Lượt quét lại hằ
 |---|---|---|---|---|---|
 | `selection.submitted` — khách chốt ảnh (kèm mua thêm lúc chọn) | Khách→Studio | Lark (nhóm chi nhánh) | Không | Gửi | Gửi — nay có thêm dòng "Mua thêm lúc chọn" nếu có |
 | `gallery.reopen_requested` — khách xin mở lại | Khách→Studio | Lark | Không | Gửi | Gửi (không đổi) |
-| `mua_them.yeu_cau` — mua thêm SAU khi đã duyệt | Khách→Studio | Lark | Không | Gửi | Gửi (không đổi) |
+| `mua_them.yeu_cau` — ông bà (link viewer) gửi yêu cầu mua thêm | Khách→Studio | Lark | Không | Gửi | Gửi (không đổi; ba mẹ đã chuyển sang `selection.round_submitted`, BB-321) |
+| `selection.round_submitted` — khách chốt một ĐỢT chọn thêm ảnh (**mới**, BB-321) | Khách→Studio | Lark | Không | (chưa có) | Gửi |
 | `review.approved` — khách duyệt, chuyển in (**mới**) | Khách→Studio | Lark | Không | (chưa có) | Gửi |
 | `review.changes_requested` — khách xin sửa kèm ghi chú (**mới**) | Khách→Studio | Lark | Không | (chưa có) | Gửi |
 | `hau_ky.nhac` — nhắc mốc hậu kỳ (CSKH/quản lý/nhóm) | Nội bộ | Lark | **Có** | Gửi | **Tắt mặc định** |
@@ -323,3 +324,77 @@ riêng. Hàm dựng thẻ (`dungThe` trong `notify.ts`) đã chừa sẵn nhánh
 `cacTam` (từng tấm + ghi chú riêng, cắt ở 20 tấm rồi "và n tấm khác") cho một
 ADR sau này nếu studio muốn ghi chú theo từng tấm — cần thêm bảng/route mới,
 không phải việc của BB-284.
+
+---
+
+## Đợt chọn thêm ảnh (BB-321, chủ studio chốt 29/09/2026)
+
+**Luật (luật doanh thu — app không được cản đường mua):** khách chốt đợt 1
+(đủ ảnh cho gói/hoá đơn) và CSKH đã xác nhận (`in_retouch`) thì ảnh đợt 1 khoá;
+muốn đổi phải xin mở lại. Còn **mua thêm ở đợt 2, 3…** thì khách vẫn chọn ảnh
+và chốt từng đợt riêng, **không cần yêu cầu mở lại**.
+
+### Vòng đời một đợt (đợt ≥ 2)
+
+```
+khách chọn ảnh + sản phẩm  →  "Chốt đợt N"  →  cho_xac_nhan  (ảnh KHOÁ ngay)
+       cho_xac_nhan  ──CSKH Xác nhận──►  da_xac_nhan   (ảnh khoá chính thức)
+       cho_xac_nhan  ──CSKH Từ chối (lý do)──►  tu_choi      (ảnh trả về khách, khách đọc lý do)
+       da_xac_nhan   ──CSKH Mở lại (đợt N)──►   da_mo_lai    (ảnh trả về khách)
+```
+
+- Đợt 1 **không có** dòng ở `selection_rounds`: đó là lượt chọn + chốt cũ. Bảng
+  mới (migration `0077-dot-chon-anh.sql`) chỉ chứa đợt từ 2; cột `dot` (mặc
+  định 1) trên `selection_items`/`selection_addons` cho biết dòng thuộc đợt nào.
+- Đợt bị từ chối / mở lại thì **dòng ảnh và sản phẩm bị xoá**, ảnh trở về "chưa
+  chọn"; bản chụp còn ở `anh_ids`/`san_pham` để màn khách điền sẵn khi chọn lại.
+  Khách chốt lại thành một đợt **mới** (số đợt luôn tăng, không dùng lại số cũ).
+- Khách chốt đợt N+1 được ngay cả khi đợt N còn chờ xác nhận.
+- Tiền chụp lúc chốt: `tinhTienDot` (`src/lib/gallery/dot-chon.ts`). **Từ đợt 2,
+  mọi ảnh mới tính tiền TỪ ẢNH ĐẦU TIÊN** (chủ studio 29/09/2026); phần gói còn
+  trống ở đợt 1 KHÔNG dùng được ở đợt 2. Giá mỗi ảnh thêm là
+  `galleries.extra_photo_price`.
+- Chế độ "Chọn thêm ảnh" mở khi CSKH đã chốt: bộ ảnh ở `in_retouch` trở đi, HOẶC
+  Lark đã ở "Đã chọn hình" trở đi (`khoaChonTheoLark`) dù app còn
+  ready/in_review/submitted — cùng hàm `laKhoaTheoLark` của luật khoá BB-285.
+- Không đẩy đợt lên bản ghi Lark thật. Tin Lark `selection.round_submitted` báo
+  số đợt/số ảnh/tiền/link; CSKH cập nhật hợp đồng bên Lark bằng tay (có thể sửa
+  "Thành phần hợp đồng" trong app — BB-313 — ví dụ nâng Edit file 15 → 16).
+
+### Chỗ CSKH thấy và xử lý
+
+- Thẻ **"Khách mua thêm đợt N: X ảnh · Y ₫"** (Xác nhận / Từ chối (lý do)) ở đầu
+  trang chi tiết bộ ảnh và ở tab **Khách mua thêm** của `/admin/viec-can-xu-ly`
+  (cùng huy hiệu "Cần xử lý ngay").
+- Khối "Đợt chọn" liệt kê ảnh THEO ĐỢT; nút **"Tải danh sách chỉ đợt N"** =
+  `GET /api/admin/galleries/[id]/export?dot=N` để thợ chỉnh ảnh làm đúng ảnh mới.
+
+### Nút "Mở lại" của CSKH
+
+| Trạng thái bộ ảnh | Mở lại | Ghi chú |
+|---|---|---|
+| `submitted`, `expired` | Có (đợt 1) | Như cũ |
+| `in_retouch` | **Có** (mới) | Cảnh báo "Hậu kỳ có thể đã bắt đầu chỉnh…"; chọn đợt cần mở (mặc định đợt khoá gần nhất). Mở đợt ≥ 2 KHÔNG đổi trạng thái bộ ảnh |
+| `delivered` | **Không** | Banner giải thích: khách muốn thêm thì mua đợt mới — không có nút chết |
+| `awaiting_approval`, `approved` | Không | Đi đường yêu cầu sửa ảnh đã chỉnh, hoặc mua đợt mới |
+
+Nguồn duy nhất của bảng này: `luaChonMoLai` (`src/lib/gallery/dot-chon.ts`) — route
+`/reopen`, banner, form và menu quản trị cùng gọi.
+
+### Đường "mua thêm" cũ (BB-245) — đã nghỉ với ba mẹ
+
+`POST /api/g/mua-them` của ba mẹ trả 409 hướng sang "Chọn thêm ảnh"; thẻ "Mời mua
+lần hai" thay bằng thẻ "Chọn thêm ảnh". Ông bà (link viewer, BB-254) vẫn gửi
+yêu cầu "CSKH gọi lại" qua đường cũ; dữ liệu `yeu_cau_mua_them` cũ vẫn đọc được
+(GET + khối "Yêu cầu mua thêm" ở quản trị).
+
+### Hai ô tick khi chốt (chủ studio 29/09/2026)
+
+| Tình huống | Ô tick bắt buộc | Cờ lưu | Báo CSKH |
+|---|---|---|---|
+| Đợt 1 chọn THIẾU so với hạn mức và khách **nhờ studio chọn bổ sung** | "Tôi đồng ý với ảnh studio chọn dùm và không đổi lại" (`dongYAnhStudioChon`) | `selections.nho_studio_chon_them` (số ảnh, máy chủ tự tính) + `dong_y_anh_studio_chon` | Lark "Khách nhờ studio chọn thêm N ảnh"; Việc cần xử lý; khối nổi ở chi tiết bộ ảnh; đầu tệp xuất chi tiết |
+| Chốt (đợt 1 và mọi đợt) còn **sản phẩm in chưa gắn ảnh** (suất ảnh in/khung chưa xếp đủ, album chưa bìa/ruột, hàng mua thêm chưa chọn ảnh) | "Tôi biết nếu chưa chọn ảnh in, thời gian nhận ảnh sẽ lâu hơn timeline" (`bietAnhInChamHon`) | `selections.so_san_pham_in_chua_anh` + `biet_anh_in_cham_hon` (đợt 1); cùng hai cột trên `selection_rounds` (đợt ≥2) | Lark "Còn N sản phẩm in chưa chọn ảnh"; Việc cần xử lý; chi tiết bộ ảnh |
+
+API chốt (`/api/g/submit` đợt 1, `/api/g/dot-chon/chot` đợt ≥2) **từ chối 400** nếu
+thiếu cờ trong các trường hợp trên (máy chủ tự đếm, không tin giao diện). Album
+trong gói đã có bìa tính là có ảnh (bìa vốn bắt buộc từ BB-202).

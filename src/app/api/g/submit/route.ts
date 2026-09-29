@@ -22,6 +22,8 @@ import { SubmitSelectionSchema } from "./schema";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
+import { kiemTraNhoStudioChon, kiemTraSanPhamInChuaAnh } from "@/lib/gallery/dot-chon";
+import { demSanPhamInChuaGanAnh, laLoiThieuCot } from "@/lib/gallery/dot-chon-server";
 
 export const runtime = "nodejs";
 
@@ -181,6 +183,25 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const selected = selectedCount || 0;
+
+    // 5b. BB-321 — hai ô tick của chủ studio (29/09/2026). Máy chủ tự kiểm, không tin giao diện.
+    //   · chọn THIẾU so với hạn mức → BẮT BUỘC tick "đồng ý ảnh studio chọn dùm". Chủ studio
+    //     chốt: chọn thiếu chỉ có HAI đường — "Chọn tiếp" cho đủ, hoặc đồng ý studio chọn dùm;
+    //     KHÔNG có đường thứ ba (chốt thiếu mà không nhờ). Có cờ đồng ý thì máy chủ TỰ ghi
+    //     lời nhờ (`nho_studio_chon_them` = số ảnh thiếu), không cần giao diện gửi riêng;
+    //   · còn sản phẩm in chưa gắn ảnh → phải tick "biết chưa chọn ảnh in thì nhận ảnh chậm hơn".
+    const soAnhThieu = Math.max(0, includedQuota - selected);
+    const kiemNho = kiemTraNhoStudioChon({
+      soAnhThieu,
+      nho: soAnhThieu > 0,
+      dongY: input.dongYAnhStudioChon === true,
+    });
+    if (!kiemNho.ok) return fail(kiemNho.code, kiemNho.message, kiemNho.chiTiet);
+
+    const soInChuaAnh = await demSanPhamInChuaGanAnh(admin, session.galleryId, session.selectionId);
+    const kiemIn = kiemTraSanPhamInChuaAnh({ soChuaAnh: soInChuaAnh, biet: input.bietAnhInChamHon === true });
+    if (!kiemIn.ok) return fail(kiemIn.code, kiemIn.message, kiemIn.chiTiet);
+
     const extraCount = Math.max(0, selected - includedQuota);
     const extraAmount = extraCount * Number(gallery.extra_photo_price);
     const submittedAt = new Date().toISOString();
@@ -213,11 +234,37 @@ export async function POST(request: Request): Promise<Response> {
     if (input.generalNote !== undefined) {
       selectionUpdate.general_note = input.generalNote;
     }
+    // Chỉ ghi các cột BB-321 khi có gì để ghi — chốt bình thường không đụng cột mới,
+    // nên chưa áp migration 0077 thì nút Chốt của mọi khách khác vẫn chạy.
+    if (kiemNho.soNho > 0) {
+      selectionUpdate.nho_studio_chon_them = kiemNho.soNho;
+      selectionUpdate.dong_y_anh_studio_chon = true;
+    }
+    if (soInChuaAnh > 0) {
+      selectionUpdate.so_san_pham_in_chua_anh = soInChuaAnh;
+      selectionUpdate.biet_anh_in_cham_hon = true;
+    }
 
-    const { error: updateSelectionError } = await admin
+    let { error: updateSelectionError } = await admin
       .from("selections")
       .update(selectionUpdate)
       .eq("id", session.selectionId);
+
+    // Migration 0077 CHƯA áp (môi trường thử): bốn cột ghi nhận lời nhờ/ô tick chưa có.
+    // Khách đã tick đủ — không được chặn nút Chốt vì thiếu cột; ghi phần còn lại, báo log
+    // để người áp migration thấy. Sau khi áp 0077 nhánh này không bao giờ chạy.
+    const COT_BB321 = ["nho_studio_chon_them", "dong_y_anh_studio_chon", "so_san_pham_in_chua_anh", "biet_anh_in_cham_hon"];
+    if (updateSelectionError && laLoiThieuCot(updateSelectionError) && COT_BB321.some((c) => c in selectionUpdate)) {
+      console.error("[BB-321] Chưa áp migration 0077 — bỏ các cột đồng ý khi chốt đợt 1", {
+        requestId,
+        selection: String(session.selectionId).slice(0, 8),
+      });
+      for (const c of COT_BB321) delete selectionUpdate[c];
+      ({ error: updateSelectionError } = await admin
+        .from("selections")
+        .update(selectionUpdate)
+        .eq("id", session.selectionId));
+    }
 
     if (updateSelectionError) {
       throw updateSelectionError;
@@ -335,6 +382,9 @@ export async function POST(request: Request): Promise<Response> {
         // chữ đó (bẫy đã canh ở BB-200/BB-245, xem lark/notify.ts).
         biaAlbumTen,
         cacMonMuaThem,
+        // BB-321 — khoá tránh chữ "anh" (locBoAnh cắt theo tên khoá).
+        nhoStudioSoTam: kiemNho.soNho,
+        soMonInThieuTam: soInChuaAnh,
       },
     });
 
@@ -352,6 +402,8 @@ export async function POST(request: Request): Promise<Response> {
         includedQuota,
         extraCount,
         extraAmount,
+        ...(kiemNho.soNho > 0 ? { nhoStudioChonThem: kiemNho.soNho } : {}),
+        ...(soInChuaAnh > 0 ? { soSanPhamInChuaAnh: soInChuaAnh } : {}),
       },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);

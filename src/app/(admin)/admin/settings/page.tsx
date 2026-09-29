@@ -41,8 +41,8 @@ export default async function AdminSettingsPage() {
     // trang dùng `max-w-6xl` (1152px, rộng hơn cột nên nằm sát lề, không bị
     // căn giữa). Đổi về `max-w-6xl` — bề rộng tối đa DÙNG CHUNG cho mọi
     // trang quản trị.
-    <main className="mx-auto min-w-0 max-w-6xl">
-      <PageHeader title={vi.admin.caiDat.title} hideOnMobile />
+    <main className="mx-auto min-w-0 max-w-6xl space-y-6">
+      <PageHeader title={vi.admin.caiDat.title} description={vi.admin.caiDat.subtitle} />
       <SettingsManager />
     </main>
   );

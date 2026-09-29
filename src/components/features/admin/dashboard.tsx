@@ -39,8 +39,11 @@ import {
   formatNgayVN,
   tinhTenBiaTuDuLieu,
   tinhTieuDeBoAnhQuanTri,
+  formatSo,
+  formatTien,
 } from "@/lib/utils/dinh-dang";
-import { CARD_TITLE_CLASS, PAGE_TITLE_CLASS } from "./page-header";
+import { CARD_TITLE_CLASS, PageHeader } from "./page-header";
+import { TheSoLieu } from "./the-so-lieu";
 
 /** Màu dải cơ cấu Mua thêm theo ĐÚNG bản vẽ: Ảnh in (mực) · Khung (rêu) · Album (hồng). */
 const MAU_CO_CAU_MUA_THEM: Record<string, string> = {
@@ -282,34 +285,21 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   // BB-294 (mục cũ #32): khai báo TRƯỚC nhánh trống — hàng thẻ số vẫn phải
   // hiện khi `totalGalleries === 0` (mọi giá trị đúng là 0, không phải ẩn
   // hẳn khối số liệu như trước, xem báo cáo độc lập #32).
+  // BB-320 (Q-N2): MỘT thứ tự cho mọi khổ màn — việc gấp đứng trước (Quá hạn,
+  // Sắp hết hạn, Chờ khách chọn, Chờ chỉnh ảnh, Đã giao). Trước đây máy tính bắt
+  // đầu bằng "Chờ khách chọn", điện thoại bắt đầu bằng "Quá hạn".
   const stats: {
     key: keyof DashboardStats;
     label: string;
     value: number;
     huongTangLaTot: boolean;
   }[] = [
-    { key: "waitingForSelection", label: "Chờ khách chọn", value: data.stats.waitingForSelection, huongTangLaTot: false },
-    { key: "dueSoon", label: "Sắp hết hạn", value: data.stats.dueSoon, huongTangLaTot: false },
     { key: "overdue", label: "Quá hạn", value: data.stats.overdue, huongTangLaTot: false },
+    { key: "dueSoon", label: "Sắp hết hạn", value: data.stats.dueSoon, huongTangLaTot: false },
+    { key: "waitingForSelection", label: "Chờ khách chọn", value: data.stats.waitingForSelection, huongTangLaTot: false },
     { key: "waitingForRetouch", label: "Chờ chỉnh ảnh", value: data.stats.waitingForRetouch, huongTangLaTot: false },
     { key: "deliveredThisMonth", label: "Đã giao tháng này", value: data.stats.deliveredThisMonth, huongTangLaTot: true },
   ];
-
-  // BB-303 (bản vẽ bang-dieu-khien-dien-thoai.html, chú thích): "thẻ số: hàng
-  // CUỘN NGANG… thứ tự đổi so với máy tính — Quá hạn đứng đầu vì trên điện
-  // thoại chỉ thấy 2,5 thẻ." Máy tính giữ thứ tự cũ (Chờ khách chọn trước).
-  // Thứ tự điện thoại ĐÚNG bản vẽ: Quá hạn, Sắp hết hạn, Chờ khách chọn, Chờ
-  // chỉnh ảnh, Đã giao.
-  const THU_TU_KEY_DIEN_THOAI: (typeof stats)[number]["key"][] = [
-    "overdue",
-    "dueSoon",
-    "waitingForSelection",
-    "waitingForRetouch",
-    "deliveredThisMonth",
-  ];
-  const thuTuDienThoai = THU_TU_KEY_DIEN_THOAI.map((k) => stats.find((s) => s.key === k)).filter(
-    (s): s is (typeof stats)[number] => !!s,
-  );
 
   // BB-294 (mục cũ #32): render một lần, dùng lại ở CẢ nhánh trống lẫn nhánh
   // thường — tránh chép tay hai bản dễ lệch nhau.
@@ -317,84 +307,56 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     const soSanh = data.soSanhKy[stat.key];
     const laTot = soSanh ? bienDongLaTot(soSanh.chenhLechPhanTram, stat.huongTangLaTot) : null;
     return (
-      <Card>
-        <CardContent className="p-4 sm:p-5 space-y-3">
-          <span
-            className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--bb-fg-muted)]"
-            // BB-318 (Q-d): con số này gồm cả bộ "Sẵn sàng gửi khách" (chưa mở link) lẫn bộ
-            // "Khách đang chọn ảnh"; báo cáo Tiến độ chọn ảnh chỉ đếm nhóm sau.
-            title={
-              stat.key === "waitingForSelection"
-                ? "Gồm bộ Sẵn sàng gửi khách và bộ Khách đang chọn ảnh. Báo cáo Tiến độ chọn ảnh chỉ đếm nhóm sau."
-                : undefined
-            }
-          >
-            {/* BB-301: chấm san hô CHỈ ở "Sắp hết hạn" và "Quá hạn" — cảnh báo, không trang trí thẻ khác. */}
-            {(stat.key === "dueSoon" || stat.key === "overdue") && (
-              <i aria-hidden="true" className="block h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--bb-danger)]" />
-            )}
-            {stat.label}
-          </span>
-          <div className="flex items-end justify-between gap-2">
-            {/* BB-303 (admin duyệt 28/09/2026): Be Vietnam Pro tabular-nums
-                (`.bb-so`), thay Playfair Display — số oldstyle lệch chân, dễ
-                nhầm "0" với "O" (BB-301 XONG.md mục 2). */}
-            <div
-              className={
-                stat.key === "overdue"
-                  ? "bb-so text-[32px] text-[var(--bb-danger)]"
-                  : "bb-so text-[32px]"
-              }
+      <TheSoLieu
+        testId="the-so-bang-dieu-khien"
+        className="h-full"
+        // Ghi nhận vòng 6 (Q10 "Đang chọn 0" vs Q2 "Chờ khách chọn 3"): nói NGAY trên thẻ vì sao số này lớn hơn số ở Báo cáo.
+        ghiChu={stat.key === "waitingForSelection" ? "gồm cả bộ chưa gửi link" : undefined}
+        label={stat.label}
+        value={formatSo(stat.value)}
+        // BB-320 (Q-N2): cùng MỘT thành phần thẻ số với Chi tiết bộ ảnh, Việc cần xử lý, Báo cáo.
+        canhBao={stat.key === "dueSoon" || stat.key === "overdue"}
+        giaTriMau={stat.key === "overdue" && stat.value > 0 ? "danger" : undefined}
+        // BB-318 (Q-d): con số này gồm cả bộ "Sẵn sàng gửi khách" (chưa mở link) lẫn bộ
+        // "Khách đang chọn ảnh"; báo cáo Tiến độ chọn ảnh chỉ đếm nhóm sau.
+        title={
+          stat.key === "waitingForSelection"
+            ? "Gồm bộ Sẵn sàng gửi khách và bộ Khách đang chọn ảnh. Báo cáo Tiến độ chọn ảnh chỉ đếm nhóm sau."
+            : undefined
+        }
+        gocPhai={
+          soSanh && soSanh.chenhLechPhanTram !== null ? (
+            <Badge
+              // Chip "so kỳ trước": sage nhạt khi biến động TỐT, hồng đất khi xấu (dữ liệu thật BB-270, không gộp một màu).
+              variant={laTot === true ? "soft-accent" : laTot === false ? "default" : "secondary"}
+              className="gap-0.5 px-1.5 py-0.5"
+              title={`Kỳ trước: ${soSanh.kyTruoc}`}
             >
-              {stat.value}
-            </div>
-            {soSanh && soSanh.chenhLechPhanTram !== null && (
-              <Badge
-                // Bản vẽ: chip "so kỳ trước" nền sage NHẠT — chỉ đúng khi biến động
-                // là TỐT (laTot === true). Biến động xấu vẫn phải nổi bật khác màu
-                // (variant="default", hồng đất) để CSKH nhận ra ngay — đó là dữ liệu
-                // thật từ BB-270, không phải trang trí, nên KHÔNG gộp về một màu.
-                variant={laTot === true ? "soft-accent" : laTot === false ? "default" : "secondary"}
-                className="gap-0.5 px-1.5 py-0.5"
-                title={`Kỳ trước: ${soSanh.kyTruoc}`}
-              >
-                {soSanh.chenhLechPhanTram >= 0 ? (
-                  <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-                ) : (
-                  <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
-                )}
-                {Math.abs(Math.round(soSanh.chenhLechPhanTram))}%
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              {soSanh.chenhLechPhanTram >= 0 ? (
+                <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+              ) : (
+                <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
+              )}
+              {Math.abs(Math.round(soSanh.chenhLechPhanTram))}%
+            </Badge>
+          ) : undefined
+        }
+      />
     );
   };
 
   const hangTheSo = (
-    <>
-      {/* Điện thoại (< sm): lưới 2 cột, Quá hạn đứng đầu. BB-318 (Q-a): bản cũ
-          là hàng cuộn ngang thẻ rộng 128px — thẻ thứ ba bị cắt ("CHỜ KHA CHỌN"),
-          người chấm đọc đó là thẻ tràn mép. Thẻ cuối (Đã giao) một mình một hàng. */}
-      <div className="grid grid-cols-2 gap-3 sm:hidden" role="list" aria-label="Số liệu tổng quan">
-        {thuTuDienThoai.map((stat, i) => (
-          <div
-            key={stat.key}
-            role="listitem"
-            className={i === thuTuDienThoai.length - 1 && thuTuDienThoai.length % 2 === 1 ? "col-span-2 min-w-0" : "min-w-0"}
-          >
-            <MotTheSo stat={stat} />
-          </div>
-        ))}
-      </div>
-      {/* Máy tính/máy tính bảng (>= sm): lưới 5 cột, thứ tự gốc. */}
-      <div className="hidden sm:grid sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {stats.map((stat) => (
-          <MotTheSo key={stat.key} stat={stat} />
-        ))}
-      </div>
-    </>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5" role="list" aria-label="Số liệu tổng quan">
+      {stats.map((stat, i) => (
+        <div
+          key={stat.key}
+          role="listitem"
+          className={i === stats.length - 1 && stats.length % 2 === 1 ? "col-span-2 min-w-0 sm:col-span-1" : "min-w-0"}
+        >
+          <MotTheSo stat={stat} />
+        </div>
+      ))}
+    </div>
   );
 
   // BB-303 (bản vẽ BB-301) — lời chào đầu trang: buổi + thứ/ngày + số việc
@@ -403,47 +365,40 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   // định như trong bản vẽ.
   const xepHomNay = xepViecHomNay(data.viecHomNay ?? []);
   const tongViecHomNay = xepHomNay.quaHan.length + xepHomNay.homNay.length;
+  // BB-320 (Q-N1): lời chào dùng CHÍNH khối tiêu đề trang chung (PageHeader) —
+  // H1 Playfair + mô tả + nút chính bên phải, như mọi màn quản trị khác.
+  // BB-303 (bang-dieu-khien.html): nút "+ Tạo bộ ảnh" cạnh lời chào, CÙNG đích
+  // với trang Bộ ảnh. BB-308: bộ chọn chi nhánh (`BranchSelector`) đứng cạnh nút
+  // này, tự ẩn khi nhân viên chỉ phụ trách một chi nhánh.
   const khoiChao = (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        {/* BB-280: MỘT cỡ tiêu đề trang cố định ở mọi kích thước màn hình
-            (tests/e2e/bb-280-quan-tri.spec.ts đo bằng getComputedStyle ở cả
-            1440×900 lẫn 390×844) — dùng ĐÚNG `PAGE_TITLE_CLASS`, không tự viết
-            cỡ responsive riêng cho lời chào. */}
-        <h1 className={PAGE_TITLE_CLASS}>
-          {chaoTheoBuoi(new Date().getHours())}
-          {hoTen ? `, ${hoTen}` : ""}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
+    <PageHeader
+      title={`${chaoTheoBuoi(new Date().getHours())}${hoTen ? `, ${hoTen}` : ""}`}
+      description={
+        <>
           {ngayDayDuVN(new Date())}
-          {tongViecHomNay > 0 && ` · ${tongViecHomNay} việc cần làm hôm nay`}
+          {tongViecHomNay > 0 && ` · ${formatSo(tongViecHomNay)} việc cần làm hôm nay`}
           {xepHomNay.quaHan.length > 0 && (
             <>
               {", "}
               <strong className="font-medium text-[var(--bb-danger)]">
-                {xepHomNay.quaHan.length} việc đã trễ hạn
+                {formatSo(xepHomNay.quaHan.length)} việc đã trễ hạn
               </strong>
             </>
           )}
-        </p>
-      </div>
-      {/* BB-303 (bang-dieu-khien.html): nút "+ Tạo bộ ảnh" cạnh lời chào —
-          CÙNG đích/CÙNG kiểu nút với trang Bộ ảnh (`bo-anh-page-header.tsx`),
-          không viết lại luồng tạo bộ ảnh ở đây.
-          BB-308: bộ chọn chi nhánh (`BranchSelector`) giờ đứng CẠNH nút này,
-          đúng bản vẽ — trước đây có sẵn trong dự án nhưng chưa gắn vào trang
-          nào (BB-303 chỉ ghi nhận vào bàn giao). Tự ẩn khi nhân viên chỉ phụ
-          trách một chi nhánh (xem `branch-selector.tsx`). */}
-      <div className="flex shrink-0 items-center gap-2">
-        <BranchSelector />
-        <Link href="/admin/galleries/create">
-          <Button className="bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90" size="sm">
-            <Plus className="mr-1.5 h-4 w-4" />
-            Tạo bộ ảnh
-          </Button>
-        </Link>
-      </div>
-    </div>
+        </>
+      }
+      actions={
+        <>
+          <BranchSelector />
+          <Link href="/admin/galleries/create">
+            <Button className="bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90" size="sm">
+              <Plus className="mr-1.5 h-4 w-4" />
+              Tạo bộ ảnh
+            </Button>
+          </Link>
+        </>
+      }
+    />
   );
 
   if (data.stats.totalGalleries === 0) {
@@ -458,7 +413,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     //     tranh nay nằm thẳng trên nền thẻ, kèm `layerMoNgang` (multiply +
     //     mặt nạ mờ mép) để tan vào nền thay vì nổi thành khối kem.
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         {khoiChao}
         {/* BB-294 (mục cũ #32): hàng thẻ số vẫn hiện khi trống — 0 có NGHĨA
             (chưa có gì cần chọn/sắp hết hạn/quá hạn…), không phải một khối
@@ -494,7 +449,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   const maxChartValue = Math.max(1, ...data.chartData.map(d => d.count));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {khoiChao}
       {/*
         BB-280: chủ studio 27/09/2026 chốt lại tư duy màn Tổng quan — khối
@@ -519,15 +474,19 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
         const dong = dongCanXuLy(merged);
         return (
           <Card className="flex flex-col overflow-hidden min-w-0">
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle className={CARD_TITLE_CLASS}>Cần xử lý ngay</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 p-0">
               {dong.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-muted-foreground space-y-4 py-12">
-                  <CheckCircle2 className="w-12 h-12 text-emerald-500/50" />
-                  <p>Tuyệt vời! Không có bộ ảnh nào cần xử lý gấp.</p>
-                </div>
+                // BB-320 (Q-S1): trạng thái trống gọn MỘT dòng, tích rêu của hệ, lề trong 24px như dòng có việc.
+                <p
+                  data-testid="can-xu-ly-ngay-trong"
+                  className="flex items-center gap-2.5 px-6 pb-4 text-sm text-[var(--bb-fg-muted)]"
+                >
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--bb-moss)]" aria-hidden="true" />
+                  Không có cảnh báo nào cần xử lý.
+                </p>
               ) : (
                 <ul data-testid="can-xu-ly-ngay-rows">
                   {dong.map((d) => (
@@ -546,7 +505,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
                             tabular-nums thay `font-mono` — nội dung quản trị
                             chỉ dùng hai phông đã chốt (Playfair Display cho
                             tiêu đề, Be Vietnam Pro cho phần còn lại kể cả số). */}
-                        <span className="tabular-nums text-[var(--bb-fg-muted)]">{d.soLuong}</span>
+                        <span className="tabular-nums text-[var(--bb-fg-muted)]">{formatSo(d.soLuong)}</span>
                         <ChevronRight className="h-4 w-4 shrink-0 text-[var(--bb-fg-muted)]" aria-hidden="true" />
                       </Link>
                     </li>
@@ -592,7 +551,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
         nên nó đẩy cả cột rộng 653px trên màn 375px — đo thật ngày 21/09/2026:
         bảng điều khiển phải kéo ngang mới đọc được trên điện thoại.
       */}
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Biểu đồ cột */}
         <Card className="min-w-0">
           <CardHeader>
@@ -620,7 +579,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
                       style={{ height: `${Math.max(heightPercent, 2)}%` }}
                     >
                       <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold bg-background shadow-sm border px-1.5 py-0.5 rounded">
-                        {d.count}
+                        {formatSo(d.count)}
                       </div>
                     </div>
                     <div className="text-[10px] text-muted-foreground whitespace-nowrap -rotate-45 origin-top-left mt-2 pl-1">
@@ -730,7 +689,7 @@ function nhanHanViec(item: ViecHomNayItem, now: Date): { text: string; tre: bool
   // việc đã dồn lại bao nhiêu lượt, thay vì im lặng như "Cần xử lý" chung
   // chung của các dòng thiếu `dueAt` khác.
   if (item.waitingReopen) return { text: `Xin lần ${item.waitingReopen.lanThu}`, tre: true };
-  if (!item.dueAt) return { text: item.status === "submitted" ? "Cần xử lý" : "—", tre: false };
+  if (!item.dueAt) return { text: item.status === "submitted" ? "Chờ duyệt" : "—", tre: false };
   const due = new Date(item.dueAt);
   if (Number.isNaN(due.getTime())) return { text: "—", tre: false };
   const chenhLechMs = due.getTime() - now.getTime();
@@ -944,7 +903,7 @@ function ViecHomNayCard({ items, onLamMoi }: { items: ViecHomNayItem[]; onLamMoi
                 (locChip === "tat_ca" ? "bg-[var(--bb-fg)] text-[var(--bb-bg)]" : "bg-transparent")
               }
             >
-              Tất cả <span className="ml-1 tabular-nums">{items.length}</span>
+              Tất cả <span className="ml-1 tabular-nums">{formatSo(items.length)}</span>
             </TabsTrigger>
             <TabsTrigger
               value="nhac_khach"
@@ -969,8 +928,9 @@ function ViecHomNayCard({ items, onLamMoi }: { items: ViecHomNayItem[]; onLamMoi
       </CardHeader>
       <CardContent className="p-0">
         {tongSo === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-12 text-center text-[var(--bb-fg-muted)]">
-            <CheckCircle2 className="h-10 w-10 text-emerald-500/50" />
+          // BB-320 (Q-S1): trống gọn một dòng, tích rêu — không còn khối cao ~260px.
+          <div className="flex items-center gap-2.5 px-6 pb-5 text-[var(--bb-fg-muted)]">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--bb-moss)]" aria-hidden="true" />
             <p className="text-sm">
               {/* BB-308 — items.length > 0 nhưng itemsLoc rỗng nghĩa là chỉ đang
                   lọc hết theo chip, không phải "hết việc" — hai câu khác nghĩa
@@ -986,7 +946,7 @@ function ViecHomNayCard({ items, onLamMoi }: { items: ViecHomNayItem[]; onLamMoi
               <>
                 <div className="flex h-8 items-center gap-2 bg-[var(--bb-surface-2)] px-4 text-[10.5px] uppercase tracking-wide sm:px-6">
                   <span className="font-medium text-[var(--bb-danger)]">Đã trễ hạn</span>
-                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{xep.quaHan.length}</span>
+                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{formatSo(xep.quaHan.length)}</span>
                 </div>
                 <ul>
                   {xep.quaHan.map((item) => (
@@ -999,7 +959,7 @@ function ViecHomNayCard({ items, onLamMoi }: { items: ViecHomNayItem[]; onLamMoi
               <>
                 <div className="flex h-8 items-center gap-2 bg-[var(--bb-surface-2)] px-4 text-[10.5px] uppercase tracking-wide sm:px-6">
                   <span className="font-medium text-[var(--bb-fg)]">Hôm nay</span>
-                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{xep.homNay.length}</span>
+                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{formatSo(xep.homNay.length)}</span>
                 </div>
                 <ul>
                   {xep.homNay.map((item) => (
@@ -1012,7 +972,7 @@ function ViecHomNayCard({ items, onLamMoi }: { items: ViecHomNayItem[]; onLamMoi
               <>
                 <div className="flex h-8 items-center gap-2 bg-[var(--bb-surface-2)] px-4 text-[10.5px] uppercase tracking-wide sm:px-6">
                   <span className="font-medium text-[var(--bb-fg)]">Ngày mai</span>
-                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{xep.ngayMai.length}</span>
+                  <span className="tabular-nums text-[var(--bb-fg-muted)]">{formatSo(xep.ngayMai.length)}</span>
                 </div>
                 <ul>
                   {xep.ngayMai.map((item) => (
@@ -1056,7 +1016,7 @@ function MuaThem7NgayCard({ data }: { data: MuaThem7NgayData }) {
           <>
             <div className="flex items-end gap-1.5">
               <span className="bb-so text-[32px]">
-                {new Intl.NumberFormat("vi-VN").format(data.tongTien)}
+                {formatSo(data.tongTien)}
                 <small className="ml-1 text-[13px] font-normal text-[var(--bb-fg-muted)]">₫</small>
               </span>
             </div>
@@ -1094,7 +1054,7 @@ function MuaThem7NgayCard({ data }: { data: MuaThem7NgayData }) {
                       height: `${caoPhanTram}%`,
                       background: laHomNay ? "var(--bb-fg)" : laDinh ? "var(--bb-moss, var(--bb-accent))" : "#E4D9CC",
                     }}
-                    title={`${d.ngay}: ${new Intl.NumberFormat("vi-VN").format(d.tong)} ₫`}
+                    title={`${d.ngay}: ${formatTien(d.tong)}`}
                   />
                 );
               })}
@@ -1121,7 +1081,7 @@ function MuaThem7NgayCard({ data }: { data: MuaThem7NgayData }) {
                       <div
                         key={n}
                         style={{ width: `${rong}%`, background: MAU_CO_CAU_MUA_THEM[n] }}
-                        title={`${c.ten}: ${new Intl.NumberFormat("vi-VN").format(c.tongTien)} ₫`}
+                        title={`${c.ten}: ${formatTien(c.tongTien)}`}
                       />
                     );
                   })}
@@ -1135,9 +1095,9 @@ function MuaThem7NgayCard({ data }: { data: MuaThem7NgayData }) {
                         style={{ background: MAU_CO_CAU_MUA_THEM[c.nhom] }}
                       />
                       <span>{c.ten}</span>
-                      <span className="text-xs text-[var(--bb-fg-muted)]">{c.soMon} món</span>
+                      <span className="text-xs text-[var(--bb-fg-muted)]">{formatSo(c.soMon)} món</span>
                       <span className="ml-auto bb-so text-sm">
-                        {new Intl.NumberFormat("vi-VN").format(c.tongTien)} ₫
+                        {formatTien(c.tongTien)}
                       </span>
                     </div>
                   ))}
@@ -1179,7 +1139,7 @@ function TheoChiNhanhMuaThemCard({ items }: { items: ChiNhanhMuaThemItem[] }) {
                 />
               </div>
               <span className="bb-so w-24 shrink-0 text-right text-sm">
-                {new Intl.NumberFormat("vi-VN").format(b.tongTien)} ₫
+                {formatTien(b.tongTien)}
               </span>
             </div>
           ))

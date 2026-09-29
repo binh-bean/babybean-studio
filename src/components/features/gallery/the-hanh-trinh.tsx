@@ -95,7 +95,7 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
                 />
                 <span 
                   className={cn(
-                    "absolute top-6 w-max text-[10px] font-medium sm:text-[11px] transition-colors",
+                    "absolute top-6 w-max text-[11px] font-medium transition-colors",
                     daQua || dangHienTai ? "text-[#2E2A27]" : "text-[#2E2A27]/50"
                   )}
                 >

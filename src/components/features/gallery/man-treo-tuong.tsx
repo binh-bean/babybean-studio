@@ -875,7 +875,7 @@ export function ManTreoTuong({
 
         {coVua.length === 0 && (
           <p className="text-xs text-bb-fg-muted">
-            Phòng này chưa có cỡ nào vừa mảng tường — ba mẹ thử đổi phòng khác nhé.
+            Phòng này chưa có cỡ vừa tường. Ba mẹ thử phòng khác nhé.
           </p>
         )}
 
@@ -913,7 +913,7 @@ export function ManTreoTuong({
                       className="h-8 w-8 rounded-md object-cover"
                       draggable={false}
                     />
-                    <span className="text-[10px] font-medium text-bb-fg">{m.ten}</span>
+                    <span className="text-[11px] font-medium text-bb-fg">{m.ten}</span>
                   </button>
                 ))}
               </div>

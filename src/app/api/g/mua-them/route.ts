@@ -4,6 +4,11 @@
  *
  * OWNER: DEV-BE. Task BB-245.
  *
+ * BB-321 — POST của BA MẸ (owner/co_editor/suggester) đã NGHỈ: trả 409 hướng
+ * sang "Chọn thêm ảnh" (`/api/g/dot-chon`), để không còn hai đường mua song
+ * song. POST của ÔNG BÀ (viewer, BB-254) và GET (đọc dữ liệu cũ) giữ nguyên.
+ * Phần mô tả dưới đây về "cửa sổ của ba mẹ" là lịch sử.
+ *
  * ---------------------------------------------------------------------------
  * Vì sao route này KHÔNG dùng `/api/g/addons`
  * ---------------------------------------------------------------------------
@@ -57,7 +62,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateYeuCauMuaThemSchema } from "./schema";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
-import { duocMoiMuaLanHai } from "@/lib/gallery/moi-mua-lan-hai-rules";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -177,22 +181,6 @@ export async function POST(request: Request): Promise<Response> {
           "Bộ ảnh này không còn mở để gửi yêu cầu mua thêm",
         );
       }
-    } else {
-      // 2b. Cửa sổ của BA MẸ — giữ NGUYÊN luật BB-245: đã DUYỆT và không có
-      // vòng xin sửa nào. Dùng chung `duocMoiMuaLanHai` với màn khách.
-      const { count: soVongSua, error: roundsError } = await admin
-        .from("revision_requests")
-        .select("id", { count: "exact", head: true })
-        .eq("gallery_id", session.galleryId);
-
-      if (roundsError) throw roundsError;
-
-      if (!duocMoiMuaLanHai(gallery.status, soVongSua ?? 0)) {
-        return fail(
-          "CONFLICT",
-          "Chỉ gửi được yêu cầu mua thêm khi bộ ảnh đã duyệt và không có yêu cầu sửa nào",
-        );
-      }
     }
 
     // 3. Sản phẩm phải thuộc danh mục bộ ảnh đang được bán — cùng ba luật tiền
@@ -260,6 +248,27 @@ export async function POST(request: Request): Promise<Response> {
         soLuong: item.soLuong,
         ghiChu: item.ghiChu?.trim() || null,
       });
+    }
+
+    // 3b. BB-321 — ĐÃ NGHỈ với ba mẹ. Trước đây ba mẹ gửi "yêu cầu mua thêm"
+    // (không cộng tiền, CSKH gọi lại chốt giá) khi bộ ảnh đã duyệt và không có
+    // vòng sửa. Nay ba mẹ mua thêm qua "Chọn thêm ảnh" (`/api/g/dot-chon`): chọn
+    // ảnh + sản phẩm theo từng ĐỢT, có tiền, có xác nhận của CSKH, có trong danh
+    // sách "Việc cần xử lý" — giữ luôn đường này là để HAI đường mua song song,
+    // dễ gửi trùng và không cái nào là sổ sách thật.
+    //
+    // Chọn "nghỉ" thay vì "gộp": gộp nghĩa là ép bảng `yeu_cau_mua_them` sang mô
+    // hình đợt, mà đường này không có ảnh mới, không có tiền, còn ông bà (viewer)
+    // vẫn cần đúng cơ chế "gửi yêu cầu, CSKH gọi lại" của nó. Dữ liệu cũ vẫn ĐỌC
+    // được (GET + khối "Yêu cầu mua thêm" ở quản trị).
+    //
+    // Đặt SAU khâu kiểm sản phẩm (bước 3) để body sai hình dạng vẫn nhận 400 như
+    // trước — chỉ body hợp lệ mới gặp 409 hướng sang đường mới.
+    if (session.role !== "viewer") {
+      return fail(
+        "CONFLICT",
+        'Ba mẹ mua thêm ở mục "Chọn thêm ảnh" giúp em nhé — chọn ảnh, sản phẩm rồi chốt đợt, studio sẽ xác nhận',
+      );
     }
 
     // 4. Chống spam: đếm dòng 'moi' đang có, cộng thêm lượt này không được vượt.

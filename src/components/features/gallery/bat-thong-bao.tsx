@@ -206,7 +206,7 @@ export function BatThongBao({ galleryId, status, onMoHuongDanLuuApp }: BatThongB
         className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
       >
         <BellRing className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        Thêm app ra màn hình chính để nhận thông báo khi ảnh chỉnh xong
+        Lưu app ra màn hình chính để nhận tin khi ảnh xong
       </button>
     );
   }

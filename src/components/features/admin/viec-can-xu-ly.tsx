@@ -33,8 +33,15 @@ import { LoiDongBoReport } from "./loi-dong-bo-report";
 import { LinkSapHetHanReport } from "./link-sap-het-han-report";
 import { OverQuotaReport } from "./over-quota-report";
 import { YeuCauMoLaiReport } from "./yeu-cau-mo-lai-report";
+import { KhachMuaThemReport } from "./dot-chon-admin";
+import { formatSo } from "@/lib/utils/dinh-dang";
 
-type TabValue = "loi-dong-bo" | "link-sap-het-han" | "over-quota" | "yeu-cau-mo-lai";
+type TabValue =
+  | "loi-dong-bo"
+  | "link-sap-het-han"
+  | "over-quota"
+  | "yeu-cau-mo-lai"
+  | "khach-mua-them";
 
 interface DinhNghiaTab {
   value: TabValue;
@@ -93,11 +100,27 @@ const TABS: DinhNghiaTab[] = [
       return d?.items?.length ?? 0;
     },
   },
+  {
+    // BB-321 — đợt mua thêm khách đã chốt, chờ CSKH xác nhận/từ chối. Cùng nguồn
+    // với huy hiệu "Cần xử lý ngay" (src/lib/utils/can-xu-ly.ts → choDotChon).
+    value: "khach-mua-them",
+    label: "Khách mua thêm",
+    api: "/api/admin/reports/dot-chon-cho-xac-nhan",
+    hiddenForRoles: ["photoshop_ctv"],
+    demSo: (data) => {
+      const d = data as { items?: unknown[]; viecDot1?: unknown[] } | null;
+      return (d?.items?.length ?? 0) + (d?.viecDot1?.length ?? 0);
+    },
+  },
 ];
 
 function laTabHopLe(v: string | null): v is TabValue {
   return (
-    v === "loi-dong-bo" || v === "link-sap-het-han" || v === "over-quota" || v === "yeu-cau-mo-lai"
+    v === "loi-dong-bo" ||
+    v === "link-sap-het-han" ||
+    v === "over-quota" ||
+    v === "yeu-cau-mo-lai" ||
+    v === "khach-mua-them"
   );
 }
 
@@ -146,7 +169,7 @@ export function ViecCanXuLy({ role }: { role?: string }) {
     <div className="space-y-6">
       <PageHeader
         title="Việc cần xử lý"
-        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại."
+        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại, khách mua thêm chờ xác nhận."
       />
       <Tabs value={active} onValueChange={onChange}>
         {/* BB-318: hàng tab xuống dòng thay vì tràn ngang — trên 390px bốn tab không vừa một hàng, và bấm tab từng làm CẢ TRANG trượt sang bên. */}
@@ -158,7 +181,7 @@ export function ViecCanXuLy({ role }: { role?: string }) {
                 {/* BB-294 (mục cũ #39) — số huy hiệu sans tabular, không xô lệch khi đổi số. */}
                 {typeof demSo[tab.value] === "number" && demSo[tab.value]! > 0 && (
                   <Badge variant="outline" className="tabular-nums">
-                    {demSo[tab.value]}
+                    {formatSo(demSo[tab.value])}
                   </Badge>
                 )}
               </span>
@@ -166,23 +189,28 @@ export function ViecCanXuLy({ role }: { role?: string }) {
           ))}
         </TabsList>
         {tabsChoVai.some((t) => t.value === "loi-dong-bo") && (
-          <TabsContent value="loi-dong-bo">
+          <TabsContent value="loi-dong-bo" className="mt-6">
             <LoiDongBoReport />
           </TabsContent>
         )}
         {tabsChoVai.some((t) => t.value === "link-sap-het-han") && (
-          <TabsContent value="link-sap-het-han">
+          <TabsContent value="link-sap-het-han" className="mt-6">
             <LinkSapHetHanReport />
           </TabsContent>
         )}
         {tabsChoVai.some((t) => t.value === "over-quota") && (
-          <TabsContent value="over-quota">
+          <TabsContent value="over-quota" className="mt-6">
             <OverQuotaReport />
           </TabsContent>
         )}
         {tabsChoVai.some((t) => t.value === "yeu-cau-mo-lai") && (
-          <TabsContent value="yeu-cau-mo-lai">
+          <TabsContent value="yeu-cau-mo-lai" className="mt-6">
             <YeuCauMoLaiReport />
+          </TabsContent>
+        )}
+        {tabsChoVai.some((t) => t.value === "khach-mua-them") && (
+          <TabsContent value="khach-mua-them">
+            <KhachMuaThemReport />
           </TabsContent>
         )}
       </Tabs>

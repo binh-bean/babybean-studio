@@ -62,6 +62,7 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { duocMoiMuaLanHai } from "@/lib/gallery/moi-mua-lan-hai-rules";
 import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
+import { formatKichThuoc, tenSanPhamChoKhach } from "@/lib/utils/dinh-dang";
 
 export interface MonTrongDanhMuc {
   productId: string;
@@ -172,7 +173,7 @@ export function MoiMuaLanHai({
   async function guiYeuCau() {
     if (gio.length === 0) return;
     if (thieuThongTinNguoiMua) {
-      setLoi("Ba mẹ cho em xin tên và số điện thoại (10 số) để studio gọi lại giúp em nhé");
+      setLoi("Cho em xin tên và số điện thoại (10 số) nhé.");
       return;
     }
     setDangGui(true);
@@ -231,7 +232,7 @@ export function MoiMuaLanHai({
           ))}
         </ul>
         <p className="text-xs text-muted-foreground">
-          CSKH sẽ liên hệ để báo giá và thanh toán, ba mẹ chưa cần làm gì thêm ạ.
+          Studio sẽ gọi báo giá. Ba mẹ chưa cần làm gì thêm ạ.
         </p>
       </div>
     );
@@ -262,7 +263,7 @@ export function MoiMuaLanHai({
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-start justify-center text-left">
           <p className="kh-h3 text-[#2E2A27]">
-            {tieuDe ?? "Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?"}
+            {tieuDe ?? "Ba mẹ ưng bộ ảnh? In tấm yêu thích lên khung nhé."}
           </p>
           <p className="mt-1.5 text-[13px] text-[#2E2A27]/60">
             {moTa ?? "Khung, ảnh in, album — studio gọi lại báo giá, chưa tính tiền."}
@@ -278,8 +279,8 @@ export function MoiMuaLanHai({
       </div>
 
       {mo && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background">
-          <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-8">
+        <div data-testid="man-mua-them-sau-duyet" className="fixed inset-0 z-50 flex flex-col bg-background">
+          <header className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 sm:px-8">
             <div>
               <h2 className="kh-h2">
                 {tieuDe ?? "Mua thêm sau khi duyệt"}
@@ -297,7 +298,7 @@ export function MoiMuaLanHai({
             </button>
           </header>
 
-          <nav className="flex gap-2 overflow-x-auto border-b border-border px-5 py-3 sm:px-8">
+          <nav className="flex gap-2 overflow-x-auto border-b border-border px-6 py-3 sm:px-8">
             {THU_TU_NHOM.map((nhom) => (
               <button
                 key={nhom}
@@ -318,7 +319,7 @@ export function MoiMuaLanHai({
             ))}
           </nav>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4 sm:px-8">
+          <div className="flex-1 overflow-y-auto px-6 py-4 sm:px-8">
             {/* Tranh minh hoạ của nhóm đang xem (BB-248), cạnh tiêu đề nhóm. */}
             <div className="mb-3 flex items-center gap-3">
               <TranhNho ten={tranhCuaSanPham(nhomDangXem, null, "")} kichThuoc={72} />
@@ -329,7 +330,7 @@ export function MoiMuaLanHai({
 
             {theoNhom.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Nhóm này chưa có sản phẩm nào đang bán. Ba mẹ nhắn CSKH giúp em nhé.
+                Nhóm này chưa có sản phẩm nào đang bán. Ba mẹ nhắn studio giúp em nhé.
               </p>
             ) : (
               <ul className="grid gap-3 sm:grid-cols-2">
@@ -343,10 +344,10 @@ export function MoiMuaLanHai({
                         <div className="flex min-w-0 items-start gap-3">
                           {laCanvas && <TranhNho ten={tranhSanPham} kichThuoc={56} />}
                           <div className="min-w-0">
-                          <p className="text-sm font-medium">{m.name}</p>
+                          <p className="text-sm font-medium">{tenSanPhamChoKhach(m)}</p>
                           <p className="mt-1 text-sm font-semibold">{formatCurrencyVND(m.unitPrice)}</p>
                           <p className="mt-0.5 text-xs text-muted-foreground">
-                            {[m.size, m.material].filter(Boolean).join(" · ")} · giá tham khảo
+                            {[m.size ? formatKichThuoc(m.size) : null, m.material].filter(Boolean).join(" · ")} · giá tham khảo
                           </p>
                           {gio.some((d) => d.productId === m.productId) && (
                             <p className="mt-1.5 text-xs font-medium text-moss">
@@ -382,7 +383,7 @@ export function MoiMuaLanHai({
                           ) : (
                             <>
                               <p className="mb-2 text-xs text-muted-foreground">
-                                Chọn tấm cần in {m.name}:
+                                Chọn tấm cần in {tenSanPhamChoKhach(m)}:
                               </p>
                               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                                 {anhDaChon.map((a) => {
@@ -424,7 +425,7 @@ export function MoiMuaLanHai({
             )}
           </div>
 
-          <footer className="border-t border-border bg-surface px-5 py-4 sm:px-8">
+          <footer className="border-t border-border bg-surface px-6 py-4 sm:px-8">
             {loi && <p className="mb-2 text-xs text-heart">{loi}</p>}
 
             {/*
@@ -462,7 +463,7 @@ export function MoiMuaLanHai({
                 {/* BB-305 — giá tham khảo: bỏ font-display, thêm tabular-nums. */}
                 <p className="text-xl font-medium tabular-nums">{formatCurrencyVND(tongTienThamKhao)}</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  CSKH sẽ gọi xác nhận, chưa tính tiền
+                  Studio sẽ gọi xác nhận, chưa tính tiền
                 </p>
               </div>
               <button

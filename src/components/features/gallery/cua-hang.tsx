@@ -63,7 +63,7 @@ import {
   type SanPhamCuaHang,
 } from "@/lib/products/cau-hinh-cua-hang";
 import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
-import { formatKichThuoc } from "@/lib/utils/dinh-dang";
+import { formatKichThuoc, nhanTrangThaiGio, tenKemSoLuong, tenSanPhamChoKhach } from "@/lib/utils/dinh-dang";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { ChonAnhNhieuTam, type AnhTrongLuoiChon } from "./chon-anh-nhieu-tam";
 
@@ -82,6 +82,8 @@ export interface DongDaMua {
 }
 
 export interface CuaHangProps {
+  /** BB-319 K-D1 — đơn đã gửi chưa: chưa gửi thì món chỉ "Trong giỏ", đã gửi mới "Đã đặt mua". */
+  donDaGui?: boolean;
   mo: boolean;
   onDong: () => void;
   danhMuc: SanPhamCuaHang[];
@@ -103,15 +105,27 @@ export interface CuaHangProps {
    * Promise để component `await` xong xuôi mới hiện banner (xem
    * `nutHanhDong`).
    */
-  onMua: (productId: string, soLuong: number, photoId: string | null) => void | Promise<void>;
-  /** BB-279 — mua một sản phẩm gắn ảnh cho NHIỀU tấm cùng lúc (nhánh batch). */
-  onMuaNhieu?: (productId: string, soLuong: number, photoIds: string[]) => void | Promise<void>;
+  onMua: (productId: string, soLuong: number, photoId: string | null) => void | boolean | Promise<void | boolean>;
+  /**
+   * BB-279 — mua một sản phẩm gắn ảnh cho NHIỀU tấm cùng lúc (nhánh batch).
+   *
+   * BB-319 (luật 5) — trả `false` khi máy chủ TỪ CHỐI: cửa hàng không hiện
+   * "Đã thêm vào giỏ". Trước bản vá nơi gọi bọc `void …` nên hàm trả ngay
+   * `undefined` — thông báo hiện TRƯỚC khi lưu xong (giỏ bên dưới còn số cũ,
+   * vòng 6: "Đã thêm 3 ảnh" cạnh "Giỏ · 1 món"), và vẫn hiện khi lưu hỏng.
+   */
+  onMuaNhieu?: (productId: string, soLuong: number, photoIds: string[]) => void | boolean | Promise<void | boolean>;
   /**
    * BB-279 — đường thứ hai: mở cửa hàng thẳng vào đúng nhóm này với tấm đang
    * xem đã chọn sẵn ("Đặt in tấm này" từ màn xem ảnh lớn).
    */
   presetPhotoId?: string | null;
   presetNhom?: NhomSanPham | null;
+  /**
+   * BB-321 — một dòng phụ dưới tiêu đề, vd "Tính vào đợt 2" khi cửa hàng mở từ
+   * màn "Chọn thêm ảnh · Đợt N" (bản vẽ anh duyệt 29/09/2026). Thiếu = như cũ.
+   */
+  phuDe?: string | null;
 }
 
 function chipButton(dangChon: boolean) {
@@ -136,8 +150,9 @@ const NHAN_TAB: Record<NhomSanPham, string> = {
  * `SanPhamCuaHang` (đồng bộ từ Lark) chưa có trường mô tả riêng. */
 function moTaSanPham(sp: SanPhamCuaHang | null): string {
   if (!sp) return "Chọn kích thước và chất liệu còn bán bên dưới.";
-  const phan = [sp.material, sp.size ? `${sp.size} cm` : null].filter(Boolean);
-  return phan.length > 0 ? phan.join(" · ") : "In ảnh chất lượng cao, giao tận nơi.";
+  // BB-319 — chất liệu đã nằm trong tên ở dòng trên ("Ảnh in UV"), dòng này chỉ nói khổ.
+  if (sp.size) return `Khổ ${formatKichThuoc(sp.size)} cm`;
+  return sp.material ?? "In ảnh chất lượng cao, giao tận nơi.";
 }
 
 /**
@@ -161,6 +176,8 @@ const TIEN_TO_NHOM: Record<NhomSanPham, string> = {
  */
 export function tenThanThienSanPham(nhom: NhomSanPham, sp: SanPhamCuaHang | null): string {
   const tienTo = TIEN_TO_NHOM[nhom];
+  // BB-319 — tên nội bộ "Edit file" không lên màn khách (cùng luật `tenSanPhamChoKhach`).
+  if (sp && /^edit file$/i.test(sp.name.trim())) return tenSanPhamChoKhach(sp);
   if (!sp?.material) return tienTo;
   const chatLieu = sp.material.trim();
   if (chatLieu.toLowerCase().startsWith(tienTo.toLowerCase())) return chatLieu;
@@ -168,6 +185,7 @@ export function tenThanThienSanPham(nhom: NhomSanPham, sp: SanPhamCuaHang | null
 }
 
 export function CuaHang({
+  donDaGui = false,
   mo,
   onDong,
   danhMuc,
@@ -181,6 +199,7 @@ export function CuaHang({
   onMuaNhieu,
   presetPhotoId,
   presetNhom,
+  phuDe,
 }: CuaHangProps) {
   const nhomMacDinh = THU_TU_NHOM[0] as NhomSanPham;
   const nhomKhaDung = React.useMemo(() => nhomCoHang(danhMuc), [danhMuc]);
@@ -229,7 +248,7 @@ export function CuaHang({
    */
   const [thongBaoDaThem, setThongBaoDaThem] = React.useState<{
     text: string;
-    hoanTac: (() => void | Promise<void>) | null;
+    hoanTac: (() => unknown) | null;
   } | null>(null);
   /**
    * BB-310 mục 1 — hai cờ BUSY CỤC BỘ, tách khỏi `dangLuu` (cờ TOÀN CỤC của
@@ -344,6 +363,12 @@ export function CuaHang({
 
   // Nút hành động chính của tấm/thẻ đáy — ba nhánh y hệt logic BB-279 cũ,
   // chỉ gom vào thanh đáy dính thay vì nằm giữa nội dung cuộn.
+  /** BB-319 — tên hiển thị DUY NHẤT của một món (tiêu đề, giỏ, thông báo, xem lớn, hộp chốt). */
+  const tenMon = (productId: string, tenGoc: string) => {
+    const sp = danhMuc.find((m) => m.productId === productId);
+    return sp ? tenSanPhamChoKhach(sp) : tenSanPhamChoKhach({ name: tenGoc });
+  };
+
   const nutHanhDong = !sanPham ? null : !sanPham.canGanAnh ? (
     <button
       type="button"
@@ -361,9 +386,11 @@ export function CuaHang({
         const truoc = daDat(sanPham.productId);
         setDangGuiThem(true);
         try {
-          await onMua(sanPham.productId, truoc + soLuong, null);
+          // BB-319 (luật 5) — chỉ báo "Đã thêm vào giỏ" khi máy chủ ĐÃ lưu (`false` = lỗi, đã báo riêng).
+          const ok = await onMua(sanPham.productId, truoc + soLuong, null);
+          if (ok === false) return;
           setThongBaoDaThem({
-            text: `${soLuong} ${tenThanThienSanPham(nhomDangXem, sanPham)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong)}`,
+            text: `${tenKemSoLuong(tenSanPhamChoKhach(sanPham), soLuong)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong)}`,
             hoanTac: () => onMua(sanPham.productId, truoc, null),
           });
         } finally {
@@ -380,12 +407,13 @@ export function CuaHang({
       disabled={khoa || dangGuiThem}
       onClick={async () => {
         setDangGuiThem(true);
+        let ok: boolean | void = undefined;
         try {
-          await onMuaNhieu?.(sanPham.productId, soLuong, [presetPhotoId as string]);
+          ok = await onMuaNhieu?.(sanPham.productId, soLuong, [presetPhotoId as string]);
         } finally {
           setDangGuiThem(false);
         }
-        onDong();
+        if (ok !== false) onDong();
       }}
       className="h-11 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
     >
@@ -401,9 +429,12 @@ export function CuaHang({
         const anhVuaThem = anhDaChonTrongLuoi.map((a) => a.id);
         setDangGuiThem(true);
         try {
-          await onMuaNhieu?.(sanPham.productId, soLuong, anhVuaThem);
+          // BB-319 (luật 5) — "Đã thêm vào giỏ" chỉ hiện SAU khi máy chủ lưu xong và giỏ đã tải lại,
+          // nên dòng giỏ bên dưới đếm đúng số món ngay lúc thông báo hiện.
+          const ok = await onMuaNhieu?.(sanPham.productId, soLuong, anhVuaThem);
+          if (ok === false) return;
           setThongBaoDaThem({
-            text: `${anhVuaThem.length} ảnh ${tenThanThienSanPham(nhomDangXem, sanPham)} · ${formatCurrencyVND(sanPham.unitPrice * soLuong * anhVuaThem.length)}`,
+            text: `${tenSanPhamChoKhach(sanPham)} · ${anhVuaThem.length} ảnh · ${formatCurrencyVND(sanPham.unitPrice * soLuong * anhVuaThem.length)}`,
             // BB-299 mục 4 — "Hoàn tác" xoá ĐÚNG món vừa thêm, dùng API mua
             // thêm có sẵn (đặt số lượng 0 cho đúng các photoId vừa thêm — cùng
             // đường "Xoá" của từng dòng giỏ ở đáy hộp, xem `<footer>` dưới).
@@ -465,10 +496,13 @@ export function CuaHang({
         {/* Tay nắm — chỉ điện thoại, bản vẽ 40×4px. */}
         <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-[var(--bb-border)] sm:hidden" />
 
-        <header className="flex shrink-0 items-center justify-between gap-3 px-5 pb-2 pt-2.5 sm:px-7 sm:pt-6">
-          <h2 className="kh-h2 text-foreground">
-            Mua thêm sản phẩm
-          </h2>
+        <header className="flex shrink-0 items-center justify-between gap-3 px-6 pb-2 pt-2.5 sm:px-7 sm:pt-6">
+          <div className="min-w-0">
+            <h2 className="kh-h2 text-foreground">
+              Mua thêm sản phẩm
+            </h2>
+            {phuDe && <p className="mt-0.5 text-[13px] text-muted-foreground">{phuDe}</p>}
+          </div>
           <button
             type="button"
             aria-label="Đóng"
@@ -482,7 +516,7 @@ export function CuaHang({
         {/* Tab theo nhóm — chỉ hiện nhóm đang có hàng. Nhãn NGẮN một dòng
             (NHAN_TAB) để không gãy dòng ở 390px — xem BB-282 ở đầu tệp. */}
         {nhomKhaDung.length > 0 && (
-          <div className="flex shrink-0 justify-center px-5 pb-4 sm:px-7">
+          <div className="flex shrink-0 justify-center px-6 pb-4 sm:px-7">
             <nav className="flex w-full max-w-[400px] rounded-full bg-[var(--bb-surface-2)] p-1">
               {nhomKhaDung.map((nhom) => (
                 <button
@@ -509,10 +543,10 @@ export function CuaHang({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto px-5 sm:px-7">
+        <div className="flex-1 overflow-y-auto px-6 sm:px-7">
           {nhomKhaDung.length === 0 ? (
             <p className="py-6 text-sm text-muted-foreground">
-              Cửa hàng chưa có sản phẩm nào đang bán. Ba mẹ nhắn CSKH giúp em nhé.
+              Cửa hàng chưa có sản phẩm nào đang bán. Ba mẹ nhắn studio giúp em nhé.
             </p>
           ) : (
             <div className="mx-auto max-w-xl pb-6">
@@ -532,8 +566,8 @@ export function CuaHang({
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{moTaSanPham(sanPham)}</p>
                   {daDat(sanPham?.productId ?? "") > 0 && (
-                    <p className="mt-0.5 text-[12px] font-medium text-[var(--bb-heart,#C4645A)]">
-                      Đang đặt {daDat(sanPham?.productId ?? "")}
+                    <p data-testid="nhan-gio-san-pham" className="mt-0.5 text-[12px] font-medium text-[var(--bb-heart,#C4645A)]">
+                      {nhanTrangThaiGio(donDaGui)} · {daDat(sanPham?.productId ?? "")}
                     </p>
                   )}
                 </div>
@@ -556,7 +590,8 @@ export function CuaHang({
                       quá vài chip); từ `sm` trở lên đủ rộng nên quay lại
                       xuống dòng bình thường.
                     */}
-                    <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+                    {/* BB-319 — mép phải mờ dần trên điện thoại: báo còn chip để cuộn (vòng 5 ghi nhận chip cụt ở mép). */}
+                    <div className="-mx-6 flex gap-2 overflow-x-auto px-6 pb-1 [mask-image:linear-gradient(to_right,#000_calc(100%-40px),transparent)] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 sm:[mask-image:none]">
                       {dsKichThuoc.map((kt) => (
                         <button
                           key={kt}
@@ -705,7 +740,7 @@ export function CuaHang({
                           // Không được chứa cụm con "chọn ảnh" — đổi hẳn cách
                           // nói, không chỉ thêm chữ quanh nó.
                           aria-label="Thêm ảnh vào tấm này"
-                          className="flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[10px] border-[1.5px] border-dashed border-[var(--bb-border)] text-center text-[10px] leading-tight text-muted-foreground transition hover:bg-surface-2 disabled:opacity-40"
+                          className="flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-[10px] border-[1.5px] border-dashed border-[var(--bb-border)] text-center text-[11px] leading-tight text-muted-foreground transition hover:bg-surface-2 disabled:opacity-40"
                         >
                           <span aria-hidden className="text-sm leading-none">+</span>
                           <span aria-hidden>Chọn ảnh</span>
@@ -718,7 +753,7 @@ export function CuaHang({
 
               {!sanPham && (
                 <p className="mt-3.5 rounded-xl bg-[var(--bb-surface-2)] px-3.5 py-3 text-sm text-foreground/70">
-                  Tổ hợp này studio chưa mở bán, ba mẹ nhắn CSKH giúp em nhé.
+                  Loại này studio chưa bán. Ba mẹ nhắn studio giúp em nhé.
                 </p>
               )}
             </div>
@@ -738,7 +773,7 @@ export function CuaHang({
                tiền · Xem giỏ ›"; máy tính: danh sách đầy đủ, tối đa 2 món +
                "Xem cả N món ›" khi dài hơn).
         */}
-        <footer className="shrink-0 border-t border-[var(--bb-border)] bg-background px-5 py-3.5 sm:px-7">
+        <footer className="shrink-0 border-t border-[var(--bb-border)] bg-background px-6 py-3.5 sm:px-7">
           {/* BB-299 mục 4 — dòng xác nhận tint sage + Hoàn tác, tự ẩn 6s (xem effect ở trên). */}
           {thongBaoDaThem && (
             <div
@@ -808,8 +843,9 @@ export function CuaHang({
 
               {/* Máy tính — luôn hiện; điện thoại — chỉ hiện khi bấm mở pill trên. */}
               <div className={cn(moGioMobile ? "block" : "hidden", "sm:block")}>
+              {/* BB-319 — cùng một lời với viên giỏ điện thoại ("Giỏ · N món · tiền"), không hai cách gọi. */}
               <p className="mb-2 hidden text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:block">
-                Giỏ của ba mẹ · {daMua.length} món · {formatCurrencyVND(tongTien)}
+                Giỏ · {daMua.length} món · {formatCurrencyVND(tongTien)}
               </p>
               <ul className="space-y-1.5">
                 {(xemHetGio ? daMua : daMua.slice(0, 2)).map((d) => (
@@ -826,8 +862,10 @@ export function CuaHang({
                       />
                     )}
                     <span className="min-w-0 flex-1 text-[13px] leading-snug">
-                      <span className="block truncate">{formatKichThuoc(d.name)}</span>
-                      <span className="block text-[12px] text-muted-foreground">×{d.quantity}</span>
+                      <span className="block truncate">{tenMon(d.productId, d.name)}</span>
+                      <span className="block text-[12px] text-muted-foreground">
+                        {nhanTrangThaiGio(donDaGui)} · ×{d.quantity}
+                      </span>
                     </span>
                     <span className="shrink-0 text-[14px] font-medium">{formatCurrencyVND(d.totalPrice)}</span>
                     <button
@@ -858,7 +896,7 @@ export function CuaHang({
                 <button
                   type="button"
                   onClick={() => setXemHetGio(true)}
-                  className="mt-1.5 text-[12.5px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                  className="mt-1.5 text-[12px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
                 >
                   Xem cả {daMua.length} món ›
                 </button>

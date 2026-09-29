@@ -183,6 +183,8 @@ async function daThuTrongKy(ctx: NguCanhBaoCao, tu: Date, den: Date): Promise<Ha
   const { data, error } = await ctx.client
     .from("gallery_payments")
     .select("gallery_id, amount, confirmed_at, galleries!inner(id, branch_id, title, status)")
+    // BB-320: dòng "giảm giá" KHÔNG phải tiền thu — loại khỏi "Đã thu" (vẫn tính ở tongDaThuTheoGallery, vì nó giảm khoản còn phải thu).
+    .neq("payment_method", "giam_gia")
     .gte("confirmed_at", tu.toISOString())
     .lt("confirmed_at", den.toISOString());
   if (error) throw error;

@@ -57,6 +57,7 @@
  * không lặp lại ở đây.
  */
 import { test as ownIpTest, expect as ownIpExpect } from "./helpers/ip-rieng-moi-ca";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
@@ -412,14 +413,29 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
     if (await oTenXacNhan.count()) {
       await oTenXacNhan.fill(`${NHAN} Khách B`);
     }
-    const oDongY = page.locator('input[type="checkbox"]').first();
-    if ((await oDongY.count()) && !(await oDongY.isChecked())) {
-      await oDongY.setChecked(true, { force: true });
-    }
+    // BB-323 — BB-321 (chủ studio 29/09/2026) thêm hai ô BẮT BUỘC vào hộp chốt
+    // đợt 1, đứng TRƯỚC ô chung "Tôi xác nhận…": chọn thiếu hạn mức (bộ B chọn
+    // 1/10) → "đồng ý studio chọn dùm"; còn sản phẩm in chưa có ảnh (album) →
+    // "biết nhận ảnh chậm hơn". Bản cũ tick `input[type=checkbox]` ĐẦU TIÊN —
+    // nay đó là ô của khối A, ô chung và ô khối B còn trống nên nút Xác nhận
+    // khoá mãi. Dùng chung helper mà BB-321 đã dùng cho e1/e2/e3/bb-310….
+    await tickHopChotDot1(page);
 
     const nutXacNhan = page.getByRole("button", { name: "Xác nhận" });
     if (await nutXacNhan.count()) {
+      // BB-323 — mốc 5 giây tính từ lúc MÁY CHỦ trả lời chốt, không phải từ cú
+      // bấm. `/api/g/submit` đi ~25 lượt hỏi Supabase nối tiếp; từ máy dev (Việt
+      // Nam → Supabase, 110–460 ms mỗi lượt) mất 3,4–5,4 giây, nên mốc tính từ cú
+      // bấm đỏ/xanh theo độ trễ mạng chứ không theo hành vi (đo 29/09: cùng mã,
+      // 3405 ms xanh, 5366 ms đỏ). Điều ca này canh là "chốt xong thì màn Cảm ơn
+      // hiện, không rơi về trang trắng Đang tải" — tính từ lúc chốt xong mới đúng.
+      const choChot = page.waitForResponse(
+        (r) => r.url().includes("/api/g/submit") && r.request().method() === "POST",
+        { timeout: 30_000 },
+      );
       await nutXacNhan.click();
+      const phanHoiChot = await choChot;
+      ownIpExpect(phanHoiChot.status(), "Máy chủ phải nhận chốt (200)").toBe(200);
 
       // -------- (5) màn Cảm ơn thay "Đang tải…" --------
       const camOn = page.getByTestId("cam-on-sau-chot");
@@ -432,7 +448,8 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
 
       // BB-289 lượt 2 — số liệu ĐÚNG LUẬT: gói 10 tấm (fixture B), mới chọn
       // 1 tấm → "1/10 tấm", TUYỆT ĐỐI không phải "Đủ gói" (lỗi admin báo).
-      await ownIpExpect(camOn.getByText("1/10 tấm")).toBeVisible();
+      // BB-319 (Ghi nhận K9): MỘT dòng "Đã chọn N / M tấm trong gói" thay hai chỗ lặp số.
+      await ownIpExpect(camOn.getByText("Đã chọn 1 / 10 tấm trong gói")).toBeVisible();
       await ownIpExpect(camOn.getByText("Đủ gói")).toHaveCount(0);
 
       // Nhãn ngày chốt thật (hôm nay), không phải ngày bịa.

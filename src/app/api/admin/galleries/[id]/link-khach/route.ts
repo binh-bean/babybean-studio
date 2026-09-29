@@ -164,7 +164,7 @@ export async function GET(
     if (err instanceof AuthError) {
       return fail(
         err.code,
-        err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : "Không có quyền lấy link khách",
+        err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : "Không có quyền lấy link app",
       );
     }
     return failUnexpected(err, requestId);

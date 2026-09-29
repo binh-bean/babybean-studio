@@ -25,11 +25,17 @@ const badgeVariants = cva(
           "bg-[var(--bb-surface-2)] text-[var(--bb-fg-muted)]",
         success:
           "bg-[var(--bb-success)]/15 text-[color-mix(in_srgb,var(--bb-success)_70%,black)]",
-        /* Cảnh báo dùng tông đất nung của hệ (--bb-danger), không dùng cam. */
+        /* Cảnh báo dùng tông đất nung của hệ (--bb-danger), không dùng cam.
+           BB-323 (axe, bb-277): chữ --bb-danger THUẦN trên nền --bb-danger/10
+           chỉ đạt 3,97:1 ở cỡ 12px ("Khách đang chọn ảnh", chi tiết bộ ảnh) —
+           dưới ngưỡng 4,5 của WCAG AA. Chữ nay pha 70% --bb-danger + 30%
+           --bb-fg (cùng cách pha của biến thể `default`, không thêm màu mới):
+           trên nền trang --bb-bg đạt 5,58:1 (/10) và 5,23:1 (/15); ca xấu
+           nhất — nền /15 trên thẻ --bb-surface-2 — vẫn 4,82:1 (trước: 3,44). */
         warning:
-          "bg-[var(--bb-danger)]/10 text-[var(--bb-danger)]",
+          "bg-[var(--bb-danger)]/10 text-[color-mix(in_srgb,var(--bb-danger)_70%,var(--bb-fg))]",
         danger:
-          "bg-[var(--bb-danger)]/15 text-[var(--bb-danger)]",
+          "bg-[var(--bb-danger)]/15 text-[color-mix(in_srgb,var(--bb-danger)_70%,var(--bb-fg))]",
       },
     },
     defaultVariants: {

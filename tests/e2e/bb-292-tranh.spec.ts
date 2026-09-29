@@ -58,6 +58,7 @@ import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 
 const THU_MUC_ANH = "test-results/bb-292";
 fs.mkdirSync(THU_MUC_ANH, { recursive: true });
@@ -284,12 +285,20 @@ test.describe("BB-292: gắn 5 tranh mới + trả nợ BB-289/290", () => {
     if (await oTenXacNhan.count()) {
       await oTenXacNhan.fill(`${NHAN} Khách chốt`);
     }
-    const oDongY = page.locator('input[type="checkbox"]').first();
-    if ((await oDongY.count()) && !(await oDongY.isChecked())) {
-      await oDongY.setChecked(true, { force: true });
-    }
+    // BB-323 — từ BB-321 (chủ studio 29/09/2026) hộp chốt đợt 1 có thêm ô BẮT BUỘC
+    // đứng TRƯỚC ô chung (chọn thiếu hạn mức → "đồng ý studio chọn dùm"; còn sản
+    // phẩm in chưa có ảnh → "biết nhận ảnh chậm hơn"). Tick `checkbox` ĐẦU TIÊN như
+    // bản cũ chỉ trúng ô khối A, nút Xác nhận khoá mãi. Dùng helper chung.
+    await tickHopChotDot1(page);
 
+    // Mốc chờ màn Cảm ơn tính từ lúc MÁY CHỦ trả lời chốt (xem bb-289: /api/g/submit
+    // từ máy dev mất 3,4–5,4 s vì ~25 lượt hỏi Supabase nối tiếp).
+    const choChot = page.waitForResponse(
+      (r) => r.url().includes("/api/g/submit") && r.request().method() === "POST",
+      { timeout: 30_000 },
+    );
     await page.getByRole("button", { name: "Xác nhận" }).click();
+    ownIpExpect((await choChot).status(), "Máy chủ phải nhận chốt (200)").toBe(200);
 
     const camOn = page.getByTestId("cam-on-sau-chot");
     await ownIpExpect(camOn).toBeVisible({ timeout: 10_000 });

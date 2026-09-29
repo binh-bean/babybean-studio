@@ -29,10 +29,11 @@ export async function GET(
   if (!boAnh) return KHONG_TIM_THAY;
 
   const scope = `/g/${token}`;
-  const ten = boAnh.tenBe ? `Ảnh của bé ${boAnh.tenBe}` : "BabyBean";
-  // Android cắt bớt short_name khi hiện dưới icon màn hình chính; 12 ký tự là
-  // đủ cho tên bé một, hai chữ mà không tràn dòng.
-  const tenNgan = boAnh.tenBe ? boAnh.tenBe.slice(0, 12) : "BabyBean";
+  // BB-324 — tên dưới biểu tượng: "Bé Xoài" / "Bé Bảo An" / "Baby Bean"
+  // (`tenNganManHinhChinh`, ≤ 12 ký tự, không cắt giữa chữ). Trước bản vá là
+  // `tenBe.slice(0, 12)` ("Nguyễn Ngọc ") và "BabyBean" viết liền.
+  const tenNgan = boAnh.tenNgan;
+  const ten = boAnh.tenBe ? `${tenNgan} · Baby Bean` : "Baby Bean Studio";
 
   const manifest = {
     name: ten,
@@ -61,8 +62,8 @@ export async function GET(
             purpose: "any",
           },
         ]
-      : // Bộ ảnh chưa có tấm nào (đang đồng bộ Drive) — dùng tạm logo chung
-        // thay vì icon rỗng.
+      : // Bộ ảnh chưa có bìa (chưa chọn / đang đồng bộ Drive) — logo Baby Bean,
+        // không bao giờ lấy một ảnh bất kỳ (BB-324).
         [
           { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
           { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

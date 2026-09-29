@@ -35,7 +35,7 @@ import React from "react";
 import { cn } from "@/components/ui/utils";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
-import { formatKichThuoc } from "@/lib/utils/dinh-dang";
+import { formatKichThuoc, nhanTrangThaiGio } from "@/lib/utils/dinh-dang";
 
 export interface SuatTrongGoi {
   galleryItemId: string;
@@ -67,6 +67,12 @@ export interface AlbumDaMua {
   coAnhNay: boolean;
   /** Tổng số ảnh đã đưa vào album này. */
   soAnh: number;
+  /**
+   * BB-319 K-D1 — `false` khi dòng mua thêm KHÔNG phải album (vd. "UV 10×15 ×3"
+   * đặt cả lô chưa gắn ảnh): nó không được nằm dưới nhãn ALBUM mà xuống mục
+   * "Mua thêm". Bỏ trống = album (giữ hành vi cũ).
+   */
+  laAlbum?: boolean;
 }
 
 /**
@@ -95,6 +101,11 @@ export interface BangSanPhamCuaAnhProps {
   /** Album ba mẹ ĐÃ mua thêm — mỗi cái nhận nhiều ảnh. */
   albumDaMua: AlbumDaMua[];
   monMuaThem: MonMuaThem[];
+  /**
+   * BB-319 K-D1 — đơn đã GỬI chưa. Chưa gửi thì món chỉ "Trong giỏ"; chỉ khi đã
+   * gửi mới được nói "Đã đặt mua". Nhãn phải khớp trạng thái thật.
+   */
+  donDaGui?: boolean;
   /** Tấm đang xem đã được ba mẹ chọn chưa — chưa chọn thì chưa đặt in được. */
   anhDaChon: boolean;
   khoa: boolean;
@@ -139,6 +150,7 @@ export function BangSanPhamCuaAnh({
   albumTrongGoi,
   albumDaMua,
   monMuaThem,
+  donDaGui = false,
   albumBanDuoc,
   anhDaChon,
   khoa,
@@ -185,10 +197,14 @@ export function BangSanPhamCuaAnh({
   if (!anhDaChon) {
     return (
       <p className={cn("text-xs leading-relaxed", T.chuMoHon)}>
-        Ba mẹ thả tim chọn tấm này trước, rồi mới đặt in được.
+        Thả tim chọn tấm này trước, rồi mới đặt in được.
       </p>
     );
   }
+
+  const nhanGio = nhanTrangThaiGio(donDaGui);
+  const albumThat = albumDaMua.filter((a) => a.laAlbum !== false);
+  const gioLe = albumDaMua.filter((a) => a.laAlbum === false);
 
   const theoNhom = (nhom: NhomSanPham) => monMuaThem.filter((m) => m.nhom === nhom);
   const daDatTrongNhom = (nhom: NhomSanPham) =>
@@ -284,8 +300,8 @@ export function BangSanPhamCuaAnh({
                         {sp.coAnhNay
                           ? "Đang chọn tấm này"
                           : conTrong > 0
-                            ? `Còn ${conTrong} suất`
-                            : "Đã dùng hết suất"}
+                            ? `Còn ${conTrong} tấm`
+                            : "Đã đủ tấm"}
                       </span>
                     </span>
                     <span className="shrink-0 text-base leading-none">
@@ -300,7 +316,7 @@ export function BangSanPhamCuaAnh({
       )}
 
       {/* ---------- 2. ALBUM ---------- */}
-      {(albumTrongGoi.length > 0 || albumDaMua.length > 0 || albumBanDuoc.length > 0) && (
+      {(albumTrongGoi.length > 0 || albumThat.length > 0 || albumBanDuoc.length > 0) && (
         <section>
           <h3 className={cn("kh-eyebrow mb-1.5", T.chuMoNhat)}>
             Album
@@ -340,7 +356,7 @@ export function BangSanPhamCuaAnh({
                       {al.name}
                       <span
                         className={cn(
-                          "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-normal",
+                          "ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-normal",
                           sang ? "bg-[#2E2A27]/[0.08] text-[#6b6057]" : "bg-white/15 text-white/70",
                         )}
                       >
@@ -366,7 +382,7 @@ export function BangSanPhamCuaAnh({
               bấm được — route `/api/g/placements` cũng đã từ chối luồng này
               (409) nếu có nơi nào còn gọi tới.
             */}
-            {albumDaMua.map((al) => (
+            {albumThat.map((al) => (
               <li
                 key={al.addonId}
                 className={cn("flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs", T.theNenTinh)}
@@ -374,7 +390,9 @@ export function BangSanPhamCuaAnh({
                 <span className="min-w-0">
                   <span className="block font-medium">{al.name}</span>
                   <span className={cn("block", T.chuMo)}>
-                    Đã đặt mua — studio sẽ trao đổi với ba mẹ về ảnh và bìa
+                    {donDaGui
+                      ? "Đã đặt mua. Studio sẽ trao đổi với ba mẹ về ảnh và bìa."
+                      : "Trong giỏ. Chốt xong, studio sẽ trao đổi về ảnh và bìa."}
                   </span>
                 </span>
               </li>
@@ -463,7 +481,7 @@ export function BangSanPhamCuaAnh({
                   <span className="min-w-0">
                     <span className="block font-medium">{TEN_NHOM[nhom]}</span>
                     <span className={cn("block", T.chuMo)}>
-                      {daDat > 0 ? `Đang đặt ${daDat}` : `từ ${formatCurrencyVND(giaThapNhat)}`}
+                      {daDat > 0 ? `${nhanGio} · ${daDat}` : `từ ${formatCurrencyVND(giaThapNhat)}`}
                     </span>
                   </span>
                   <span className="shrink-0 text-base leading-none">›</span>
@@ -548,6 +566,29 @@ export function BangSanPhamCuaAnh({
           </div>
         )}
       </section>
+
+      {/*
+        BB-319 K-D1 — món trong giỏ KHÔNG gắn với tấm đang xem (đặt cả lô, không phải
+        album) có mục RIÊNG, tiêu đề là đúng trạng thái giỏ ("Trong giỏ" / "Đã đặt mua"):
+        không nằm dưới nhãn ALBUM, cũng không nằm dưới "Mua thêm cho tấm này" (dễ đọc
+        thành "3 tấm UV này là của ảnh đang xem").
+      */}
+      {gioLe.length > 0 && (
+        <section data-testid="gio-trong-xem-lon">
+          <h3 className={cn("kh-eyebrow mb-1.5", T.chuMoNhat)}>{nhanGio}</h3>
+          <ul className="space-y-1">
+            {gioLe.map((g) => (
+              <li
+                key={g.addonId}
+                data-testid="dong-gio-le"
+                className={cn("rounded-xl px-3 py-2 text-xs font-medium", T.theNenTinh)}
+              >
+                {g.name}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

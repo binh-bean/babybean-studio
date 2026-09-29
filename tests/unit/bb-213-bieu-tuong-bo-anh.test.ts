@@ -80,10 +80,17 @@ describe("BB-213: manifest và icon riêng theo /g/<token>", () => {
     );
     bo = g[0].id;
 
+    // BB-324 — tấm ĐẦU (sort_index 1) KHÔNG phải bìa; bìa đã chọn là tấm thứ
+    // hai. Icon phải cắt từ đúng tấm bìa, không từ tấm đầu.
     await client.query(
       `insert into photos (gallery_id, drive_file_id, file_name, mime_type, sort_index, status)
-       values ($1,$2,'bia.jpg','image/jpeg',1,'active')`,
-      [bo, `fixture-bb213-file-${runId}`],
+       values ($1,$2,'dau.jpg','image/jpeg',1,'active'), ($1,$3,'bia.jpg','image/jpeg',2,'active')`,
+      [bo, `fixture-bb213-dau-${runId}`, `fixture-bb213-file-${runId}`],
+    );
+    await client.query(
+      `update galleries set cover_photo_id =
+         (select id from photos where gallery_id = $1 and file_name = 'bia.jpg') where id = $1`,
+      [bo],
     );
 
     tokenDung = taoTokenTran();
@@ -119,6 +126,7 @@ describe("BB-213: manifest và icon riêng theo /g/<token>", () => {
 
   afterAll(async () => {
     await client.query("delete from share_links where gallery_id = $1", [bo]);
+    await client.query("update galleries set cover_photo_id = null where id = $1", [bo]);
     await client.query("delete from photos where gallery_id = $1", [bo]);
     await client.query("delete from galleries where id = $1", [bo]);
     await client.query("delete from babies where id = $1", [be]);
@@ -168,7 +176,9 @@ describe("BB-213: manifest và icon riêng theo /g/<token>", () => {
       const body = await res.json();
       expect(body.start_url).toBe(`/g/${tokenDung}`);
       expect(body.scope).toBe(`/g/${tokenDung}`);
-      expect(body.name).toBe("Ảnh của bé Bé Bo");
+      // BB-324: trước là "Ảnh của bé Bé Bo" (lặp "bé") và short_name cắt 12 ký tự.
+      expect(body.name).toBe("Bé Bo · Baby Bean");
+      expect(body.short_name).toBe("Bé Bo");
       expect(body.display).toBe("standalone");
       expect(body.background_color).toBe("#f7f2eb");
 
@@ -183,6 +193,16 @@ describe("BB-213: manifest và icon riêng theo /g/<token>", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toBe("image/jpeg");
       expect(res.headers.get("Cache-Control")).toContain("private");
+    });
+
+    it("BB-324 — icon cắt vuông giữa từ ĐÚNG ảnh bìa đã chọn, không phải tấm đầu", async () => {
+      const spy = vi.mocked(driveClient.driveFetch);
+      spy.mockClear();
+      const res = await goiIcon(tokenDung, "180");
+      expect(res.status).toBe(200);
+      const urls = spy.mock.calls.map((c) => String(c[0]));
+      expect(urls).toEqual([`https://lh3.googleusercontent.com/d/fixture-bb213-file-${runId}=w180-h180-c`]);
+      expect(urls.join()).not.toContain(`fixture-bb213-dau-${runId}`);
     });
 
     it("cỡ icon không nằm trong danh sách cho phép thì bị từ chối", async () => {

@@ -166,7 +166,7 @@ export function ReviewPanel({
           </p>
           {status === "in_retouch" && review.rounds.some((r) => !r.resolved) && (
             <p className="mt-1 text-xs text-muted-foreground">
-              Studio đang sửa theo yêu cầu của ba mẹ, xong sẽ gửi lại link mới.
+              Studio đang sửa theo yêu cầu. Xong sẽ gửi lại link mới.
             </p>
           )}
         </div>
@@ -222,7 +222,7 @@ export function ReviewPanel({
       {showDecide && writing && (
         <div className="space-y-2">
           <label htmlFor="revision-note" className="block text-xs text-muted-foreground">
-            Ba mẹ ghi giúp cần sửa gì, càng rõ càng nhanh (ví dụ: ảnh số 3 sáng quá).
+            Ba mẹ ghi cần sửa gì, càng rõ càng nhanh. Ví dụ: ảnh số 3 sáng quá.
           </label>
           <textarea
             id="revision-note"

@@ -241,11 +241,21 @@ export async function POST(
       Lark như cũ; chỉ là màn quản trị không hiện lại được link này — ghi log
       để biết, không ném.
     */
+    let luuDiaChiDuoc = true;
     {
-      const { error: maErr } = await admin
-        .from("share_link_ma")
-        .insert({ share_link_id: link.id, ma_hoa: maHoaMaLink(ma) });
+      // BB-320: mã hoá có thể ném (thiếu APP_SECRET) — bắt lại, không để 500 làm CSKH mất link vừa tạo.
+      let loiLuu: string | null = null;
+      try {
+        const { error: insErr } = await admin
+          .from("share_link_ma")
+          .insert({ share_link_id: link.id, ma_hoa: maHoaMaLink(ma) });
+        if (insErr) loiLuu = insErr.message;
+      } catch (err) {
+        loiLuu = err instanceof Error ? err.message : String(err);
+      }
+      const maErr = loiLuu ? { message: loiLuu } : null;
       if (maErr) {
+        luuDiaChiDuoc = false;
         console.error(
           JSON.stringify({ evt: "share_link_ma.insert_failed", requestId, shareLinkId: link.id, lyDo: maErr.message }),
         );
@@ -387,6 +397,8 @@ export async function POST(
       // được, dán tay giúp" — hai câu dẫn tới hai việc khác hẳn nhau, nên
       // không gộp thành một dòng chung chung được.
       daGhiLark: lark.ghiDuoc,
+      // BB-320: false = app KHÔNG lưu được địa chỉ (ghi share_link_ma hỏng) — màn CSKH phải cảnh báo chép ngay.
+      luuDiaChiDuoc,
       lyDoKhongGhiLark: lark.ghiDuoc ? null : (lark.lyDo ?? null),
       // Địa chỉ ĐÃ ghi sang Lark, chỉ có khi ghi được.
       //

@@ -136,16 +136,27 @@ describe("BB-122: mở lại bộ ảnh và cổng khoá chốt", () => {
     expect(await getStatus()).toBe("expired");
   });
 
-  it("3. Đã qua bước chỉnh ảnh -> KHÔNG mở lại chọn ảnh", async () => {
-    // Người chỉnh ảnh đã làm theo danh sách cũ. Mở ra thì công đã bỏ vào
-    // những ảnh khách vừa bỏ chọn.
+  it("3. Đã chỉnh xong / chờ duyệt / chuyển in / đã giao -> KHÔNG mở lại chọn ảnh (và câu trả lời giải thích, không chỉ 'lỗi')", async () => {
+    // BB-321: 'in_retouch' đã TÁCH khỏi nhóm này (xem ca 3b). Còn lại vẫn không mở
+    // lại được: đã chỉnh xong thì ảnh trong danh sách đã thành sản phẩm; khách
+    // muốn thêm thì mua đợt mới.
     asCs();
-    for (const s of ["in_retouch", "awaiting_approval", "approved", "delivered"]) {
+    for (const s of ["awaiting_approval", "approved", "delivered"]) {
       await setStatus(s);
       const res = await reopen(body({ reason: "thử mở" }), params());
       expect(res.status, `trạng thái ${s}`).toBe(400);
+      const json = await res.json();
+      expect(json.error.message, `trạng thái ${s}`).toMatch(/đợt mới|chỉnh xong|đã giao/);
       expect(await getStatus()).toBe(s);
     }
+  });
+
+  it("3b. BB-321: 'in_retouch' MỞ LẠI ĐƯỢC (lỗi chủ studio báo 29/09 — khách xin mở lại mà CSKH không có nút)", async () => {
+    asCs();
+    await setStatus("in_retouch");
+    const res = await reopen(body({ reason: "Khách xin đổi ảnh đã chốt" }), params());
+    expect(res.status).toBe(200);
+    expect(await getStatus()).toBe("in_review");
   });
 
   it("4. Khách chốt rồi đổi ý, CSKH chưa xác nhận -> mở lại được", async () => {

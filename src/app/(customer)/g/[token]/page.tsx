@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { GalleryApp } from "@/components/features/gallery/gallery-app";
 import { xacThucTokenBoAnh } from "@/lib/auth/xac-thuc-token-bo-anh";
+import { TEN_NGAN_MAC_DINH } from "@/lib/utils/dinh-dang";
 
 interface PageProps {
   params: Promise<{ token: string }>;
@@ -18,18 +19,29 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { token } = await params;
   const boAnh = await xacThucTokenBoAnh(token);
+  // BB-324 — MỘT tên ngắn cho mọi chỗ hệ điều hành đọc khi "Thêm vào màn hình
+  // chính": iOS lấy `apple-mobile-web-app-title` (rồi tới `<title>`), Android
+  // lấy `short_name` của manifest. "Bé Xoài" / "Bé Bảo An" / "Baby Bean".
+  // `absolute`: không ghép đuôi "| BabyBean Studio" của layout gốc vào.
+  const tenNgan = boAnh?.tenNgan ?? TEN_NGAN_MAC_DINH;
 
   return {
-    title: boAnh?.tenBe ? `Ảnh của bé ${boAnh.tenBe}` : "Chọn ảnh buổi chụp | BabyBean Studio",
+    title: { absolute: tenNgan },
     robots: { index: false, follow: false },
     manifest: `/api/g/${token}/manifest.webmanifest`,
-    icons: boAnh?.coverDriveFileId
-      ? {
-          apple: [
-            { url: `/api/g/${token}/bia-vuong?w=180`, sizes: "180x180", type: "image/jpeg" },
-          ],
-        }
-      : undefined,
+    // Chỉ `title`. Next mặc định `capable: true` (thêm thẻ mobile-web-app-capable)
+    // — tắt đi: cách mở app đã do `display` của manifest quyết định (BB-213).
+    appleWebApp: { title: tenNgan, capable: false },
+    // BB-324 — iOS KHÔNG đọc icon trong manifest: thiếu `apple-touch-icon`
+    // thì nó CHỤP MÀN HÌNH trang làm icon (vài ảnh bất kỳ của lưới). Luôn khai
+    // báo: ảnh bìa đã chọn cắt vuông giữa, chưa có bìa thì logo Baby Bean.
+    icons: {
+      apple: [
+        boAnh?.coverDriveFileId
+          ? { url: `/api/g/${token}/bia-vuong?w=180`, sizes: "180x180", type: "image/jpeg" }
+          : { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      ],
+    },
   };
 }
 

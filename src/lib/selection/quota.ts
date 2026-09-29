@@ -10,6 +10,7 @@
  */
 
 import type { SelectionCounts } from "@/types/domain";
+import { formatSo, formatTien } from "@/lib/utils/dinh-dang";
 
 export interface QuotaRules {
   includedQuota: number;
@@ -87,15 +88,12 @@ export function canSelectMore(
 
 /** Vietnamese summary for the sticky selection bar. */
 export function formatQuotaSummary(state: QuotaState): string {
-  const base = `Đã chọn ${state.selectedCount}/${state.includedQuota}`;
+  const base = `Đã chọn ${formatSo(state.selectedCount)}/${formatSo(state.includedQuota)}`;
   if (state.extraCount === 0) return base;
-  return `${base} · thêm ${state.extraCount} ảnh = ${formatVnd(state.extraAmount)}`;
+  return `${base} · thêm ${formatSo(state.extraCount)} ảnh = ${formatVnd(state.extraAmount)}`;
 }
 
+/** BB-324: MỘT cách viết tiền cho mọi màn — gọi `formatTien` ("12.500.000 ₫"). */
 export function formatVnd(amount: number): string {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
-    maximumFractionDigits: 0,
-  }).format(amount);
+  return formatTien(amount);
 }

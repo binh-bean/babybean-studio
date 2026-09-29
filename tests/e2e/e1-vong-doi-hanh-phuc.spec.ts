@@ -30,6 +30,7 @@
  */
 
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
@@ -174,7 +175,7 @@ test.describe("E-1: vòng đời hạnh phúc", () => {
     // theo role rồi bấm thẳng vào input nên bị `<span>` chặn — cần `force`.
     // Dùng `setChecked` (không phải `click`) để giữ đúng tính chất KHÔNG ĐỔI
     // của `.check()` cũ: bấm lại khi đã tích rồi không được bỏ tích.
-    await page.getByRole("checkbox").setChecked(true, { force: true });
+    await tickHopChotDot1(page); // BB-321: ô chung + ô bắt buộc khi chọn thiếu / còn ảnh in chưa có ảnh
     await page.fill("#customer-note-input", "Cả bộ làm tông sáng giúp em");
     await page.getByRole("button", { name: "Xác nhận" }).click();
 

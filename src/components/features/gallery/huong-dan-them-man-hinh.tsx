@@ -73,7 +73,7 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
         buoc: [
           {
             bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: "Chạm dấu ba chấm (⋮) hoặc biểu tượng chia sẻ ở góc màn hình",
+            chu: "Chạm dấu ba chấm (⋮) hoặc nút chia sẻ ở góc",
           },
           {
             bieuTuong: <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />,
@@ -81,7 +81,7 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
           },
           {
             bieuTuong: <SquarePlus className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: "Mở lại link đó trong Safari/Chrome rồi làm theo hướng dẫn lưu app",
+            chu: "Mở link trong Safari/Chrome rồi lưu app như hướng dẫn",
           },
         ],
         nutCaiTrucTiep: false,
@@ -89,21 +89,21 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
     case "ios-safari":
       return {
         tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Ba mẹ mở link này nhanh hơn ở lần sau, như một app riêng.",
+        moTa: "Lần sau ba mẹ mở nhanh hơn, như một app riêng.",
         buoc: [buocChiaSe, buocThemMH],
         nutCaiTrucTiep: false,
       };
     case "ios-khac":
       return {
         tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Trình duyệt này trên iPhone dùng chung nút Chia sẻ để lưu app ra màn hình chính.",
+        moTa: "Trên iPhone, ba mẹ lưu app bằng nút Chia sẻ.",
         buoc: [buocChiaSe, buocThemMH],
         nutCaiTrucTiep: false,
       };
     case "samsung-internet":
       return {
         tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Ba mẹ mở link này nhanh hơn ở lần sau, như một app riêng.",
+        moTa: "Lần sau ba mẹ mở nhanh hơn, như một app riêng.",
         buoc: [
           {
             bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
@@ -119,7 +119,7 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
     case "android-chrome":
       return {
         tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Ba mẹ mở link này nhanh hơn ở lần sau, như một app riêng.",
+        moTa: "Lần sau ba mẹ mở nhanh hơn, như một app riêng.",
         buoc: [
           {
             bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
@@ -153,7 +153,7 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
     default:
       return {
         tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Ba mẹ mở bằng Safari hoặc Chrome để lưu app ra màn hình chính nhé.",
+        moTa: "Ba mẹ mở bằng Safari hoặc Chrome để lưu app nhé.",
         buoc: [],
         nutCaiTrucTiep: false,
       };

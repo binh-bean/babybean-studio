@@ -393,6 +393,29 @@ body:has(.giao-dien-khach) {
   font-weight: 500;
 }
 
+/* ---------------------------------------------------------------------------
+   BB-319 — SÁU LUẬT HIỂN THỊ MÀN KHÁCH (theo LỚP lỗi, không theo từng chỗ).
+   Canh bằng `tests/e2e/bb-319-luat-lop-khach.spec.ts` trên 24 khung chấm điểm
+   + các khung phụ; hằng số dùng chung ở `tests/e2e/helpers/luat-khach.ts`.
+
+   1. Kích thước: chỉ "×" (10×15). Tên/kích thước sản phẩm luôn đi qua
+      `formatKichThuoc` / `tenKemSoLuong` / `tenSanPhamChoKhach` (dinh-dang.ts).
+   2. Lề: điện thoại nội dung 24px (`px-6`), lưới ảnh 8px (`px-2`, khe 4);
+      máy tính một lề trang 40px (`lg:px-10`) cho bìa, thanh dính, lưới, chân trang.
+   3. Hệ: một nút chính (mực #2E2A27, viên tròn); tiêu đề Playfair nét thường,
+      không nghiêng; nhãn nhỏ viết HOA; mọi cỡ chữ nằm trên THANG dưới đây.
+   4. Lời: mỗi câu ≤ 12 chữ; không chữ nội bộ (hạn mức, suất, CSKH, Edit file).
+   5. Tiền & giỏ: "Trong giỏ" khi chưa gửi đơn, "Đã đặt mua" chỉ khi đã gửi
+      (`nhanTrangThaiGio`); tiền luôn "N.NNN ₫" (`formatCurrencyVND`).
+   6. Tên bé: một nguồn `tinhTenBiaTuDuLieu` — biệt danh, không có thì họ tên đầy đủ.
+
+   THANG CHỮ ĐẦY ĐỦ (px), mở rộng sáu bậc BB-287 ở trên cho nhãn/nút/số:
+   11 nhãn hoa · 12 chú thích nhỏ · 13 chú thích · 14 nút/chip · 15 thân ·
+   16 thân lớn · 18 · 20 H3 · 22 số đếm · 24 · 28 H2 · 32 · 36 · 40 H1 ·
+   44 · 48 · 56 · 64 · 72 · 84 (tiêu đề bìa, `coChuTieuDeBia`). Không cỡ lẻ
+   (10, 12.5, 17, 27…).
+   --------------------------------------------------------------------------- */
+
 @media (min-width: 1024px) {
   /*
     !important có chủ đích: hai lớp này phải thắng các lớp `px-*`/`inset-*`
@@ -459,6 +482,18 @@ body:has(.giao-dien-khach) {
 [data-theme="dark"] .giao-dien-quan-tri {
   --bb-sidebar-active-bg: #3a332c;
   --bb-moss: #8ca082;
+}
+/*
+ * BB-320 (Q-S1) — công tắc và ô tích đang BẬT trong quản trị dùng rêu của hệ
+ * (--bb-moss), không phải hồng đất (--bb-primary): hồng đất là màu chip cảnh
+ * báo, nên công tắc "Trạng thái" bật trông như một lỗi (vòng 6, Q3/Q9). Nhắm
+ * đúng cặp input.peer + span kế bên của Switch/Checkbox, chỉ trong khung quản
+ * trị — màn khách giữ nguyên.
+ */
+.giao-dien-quan-tri input.peer:checked + span {
+  background-color: var(--bb-moss);
+  border-color: var(--bb-moss);
+  color: #fff;
 }
 .bb-muc-on {
   position: relative;

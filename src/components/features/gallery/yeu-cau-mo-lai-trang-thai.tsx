@@ -15,7 +15,7 @@
 "use client";
 
 import React from "react";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { formatGioVN, formatNgayVN } from "@/lib/utils/dinh-dang";
 
 export interface ReopenRequestTrangThai {
   trangThai: "khong_co" | "cho_xu_ly" | "da_mo" | "bi_tu_choi";
@@ -29,8 +29,8 @@ export interface ReopenRequestTrangThai {
 function gioNgay(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const gio = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-  return `${gio} · ${formatNgayVN(iso)}`;
+  // BB-319 — cùng một định dạng giờ/ngày với mọi chỗ khác (`dinh-dang.ts`).
+  return `${formatGioVN(d)} · ${formatNgayVN(d)}`;
 }
 
 export function YeuCauMoLaiTrangThai({
@@ -45,7 +45,7 @@ export function YeuCauMoLaiTrangThai({
   if (!reopenRequest || reopenRequest.trangThai === "khong_co") return null;
 
   const lienHe = zaloOa
-    ? { nhan: "Nhắn cho studio", href: `https://zalo.me/${zaloOa}` }
+    ? { nhan: "Nhắn studio", href: `https://zalo.me/${zaloOa}` }
     : hotline
       ? { nhan: "Gọi cho studio", href: `tel:${hotline}` }
       : null;

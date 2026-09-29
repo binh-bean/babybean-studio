@@ -87,7 +87,7 @@ export async function POST(
     if (!link) {
       return fail(
         "NOT_FOUND",
-        "Bộ ảnh này chưa từng có link nào nên không có gì để mở khoá. Bấm Tạo link gửi khách.",
+        "Bộ ảnh này chưa từng có link nào nên không có gì để mở khoá. Bấm Tạo link app.",
       );
     }
 

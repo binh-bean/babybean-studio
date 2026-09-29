@@ -40,12 +40,13 @@ describe("BB-310 mục 3: loiTrangThai — album rỗng KHÔNG còn chữ 'Chưa
   it("ảnh in thiếu suất, ĐÃ KHOÁ → bỏ chữ 'Còn'/'chọn ảnh' (đã qua lúc chọn), vẫn nói đúng số liệu", () => {
     const r = loiTrangThai(dongAnhIn(2, [{ id: "p1", fileName: "a.jpg" }]), true);
     expect(r.thieu).toBe(true);
-    expect(r.chu).toBe("1/2 suất chưa gán ảnh");
+    // BB-319 (luật 4): "suất" là chữ nội bộ — nói bằng số tấm của khách.
+    expect(r.chu).toBe("Có 1/2 tấm");
   });
 
-  it("ảnh in thiếu suất, CHƯA khoá → giữ nguyên câu cũ 'Còn N/M suất chưa chọn ảnh'", () => {
+  it("ảnh in thiếu, CHƯA khoá → 'Còn thiếu N tấm' (BB-319: không dùng chữ nội bộ 'suất')", () => {
     const r = loiTrangThai(dongAnhIn(2, [{ id: "p1", fileName: "a.jpg" }]), false);
-    expect(r.chu).toBe("Còn 1/2 suất chưa chọn ảnh");
+    expect(r.chu).toBe("Còn thiếu 1 tấm");
   });
 
   it("ảnh in đủ suất → 'Đủ N tấm' giữ nguyên dù khoá hay không", () => {

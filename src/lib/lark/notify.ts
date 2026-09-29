@@ -70,6 +70,12 @@ export type LarkEvent =
   | "gallery.sent"
   | "gallery.first_view"
   | "selection.submitted"
+  /**
+   * BB-321 — khách chốt một ĐỢT chọn thêm (đợt 2, 3, …) sau khi đợt 1 đã được
+   * xác nhận. CSKH xác nhận/từ chối trong app rồi tự cập nhật hợp đồng bên Lark
+   * bằng tay (chủ studio: không đẩy đợt lên bản ghi Lark thật).
+   */
+  | "selection.round_submitted"
   | "gallery.due_soon"
   | "gallery.overdue"
   | "gallery.sync_error"
@@ -331,6 +337,33 @@ export function dungThe(
     const elements: Record<string, unknown>[] = [{ tag: "div", fields: truong }];
 
     /*
+      BB-321 — đợt 1 chốt THIẾU ảnh so với hạn mức và khách NHỜ studio chọn bổ
+      sung (đã tick đồng ý không đổi lại), và/hoặc còn sản phẩm in chưa chọn ảnh
+      (khách đã tick biết ảnh sẽ lâu hơn timeline). Hai việc CSKH phải làm, nên
+      thẻ nói thẳng ra. Khoá tránh chữ "anh": `nhoStudioSoTam`, `soMonInThieuTam`.
+    */
+    const nhoStudio = so(p.nhoStudioSoTam);
+    const inThieu = so(p.soMonInThieuTam);
+    if (nhoStudio > 0) {
+      elements.push({
+        tag: "div",
+        text: {
+          tag: "lark_md",
+          content: `**Khách nhờ studio chọn thêm ${nhoStudio} ảnh** — khách đã đồng ý với ảnh studio chọn dùm và không đổi lại.`,
+        },
+      });
+    }
+    if (inThieu > 0) {
+      elements.push({
+        tag: "div",
+        text: {
+          tag: "lark_md",
+          content: `**Còn ${inThieu} sản phẩm in chưa chọn ảnh** — khách đã biết nhận ảnh sẽ lâu hơn timeline.`,
+        },
+      });
+    }
+
+    /*
       BB-202 — dòng "Bìa album": tên tệp (không đuôi, xem submit/route.ts).
       Mảng rỗng (gói không có album, hoặc bảng album_covers chưa áp) thì
       không thêm dòng nào — không bịa ra thông tin cho gói không mua album.
@@ -381,11 +414,86 @@ export function dungThe(
       card: {
         header: {
           // Đỏ khi có phụ thu: đó là dòng CSKH phải xử lý, không chỉ để biết.
-          template: thua > 0 ? "orange" : "green",
+          template: thua > 0 || nhoStudio > 0 || inThieu > 0 ? "orange" : "green",
           title: {
             tag: "plain_text",
-            content: thua > 0 ? "Khách chốt ảnh — CÓ PHỤ THU" : "Khách đã chốt ảnh",
+            content:
+              thua > 0
+                ? "Khách chốt ảnh — CÓ PHỤ THU"
+                : nhoStudio > 0
+                  ? "Khách chốt ảnh — NHỜ STUDIO CHỌN THÊM"
+                  : "Khách đã chốt ảnh",
           },
+        },
+        elements,
+      },
+    };
+  }
+
+  /**
+   * BB-321 — khách chốt một đợt chọn thêm. Thẻ CAM: có tiền phát sinh cần CSKH
+   * xác nhận trong app rồi cập nhật hợp đồng bên Lark.
+   *
+   * Khoá payload tránh chữ "anh" (`locBoAnh()` cắt theo TÊN KHOÁ): `soTam`,
+   * `soTamTinhTien`, `phuThuTam` — KHÔNG `soAnh`/`tienAnh`; `cacMon` — không
+   * `danhSach`. Không có đường link nào trong payload: nút mở bộ ảnh dựng tại
+   * đây từ `galleryId`.
+   */
+  if (event === "selection.round_submitted") {
+    const soDot = so(p.soDot);
+    const truong = [
+      o("Bộ ảnh", chu(p.galleryTitle)),
+      o("Đợt", `Đợt ${soDot}`),
+      o("Số ảnh", `${so(p.soTam)} ảnh`),
+      o("Tổng tiền", tien(p.tongTien)),
+    ];
+    if (so(p.soTamTinhTien) > 0) {
+      truong.push(o("Ảnh phụ thu", `${so(p.soTamTinhTien)} ảnh · ${tien(p.phuThuTam)}`));
+    }
+    if (so(p.tienSanPham) > 0) truong.push(o("Sản phẩm", tien(p.tienSanPham)));
+    if (so(p.soMonInThieuTam) > 0) {
+      truong.push(o("Còn thiếu ảnh in", `Còn ${so(p.soMonInThieuTam)} sản phẩm in chưa chọn ảnh`));
+    }
+    truong.push(o("Khách", chu(p.customerName ?? p.nguoiChot)));
+    if (p.customerPhone) truong.push(o("Điện thoại", chu(p.customerPhone)));
+
+    const elements: Record<string, unknown>[] = [{ tag: "div", fields: truong }];
+
+    const mon = Array.isArray(p.cacMon) ? (p.cacMon as Record<string, unknown>[]) : [];
+    if (mon.length > 0) {
+      const dong = mon.slice(0, 20).map((m) => `• ${chu(m.ten)} ×${so(m.soLuong)}`);
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: ["**Mua thêm:**", ...dong].join("\n") },
+      });
+    }
+    elements.push({
+      tag: "div",
+      text: {
+        tag: "lark_md",
+        content: "CSKH xác nhận hoặc từ chối đợt này trong app, rồi cập nhật hợp đồng bên Lark.",
+      },
+    });
+    if (diaChiAdmin) {
+      elements.push({
+        tag: "action",
+        actions: [
+          {
+            tag: "button",
+            text: { tag: "plain_text", content: "Mở bộ ảnh" },
+            type: "primary",
+            url: diaChiAdmin,
+          },
+        ],
+      });
+    }
+
+    return {
+      msg_type: "interactive",
+      card: {
+        header: {
+          template: "orange",
+          title: { tag: "plain_text", content: `Khách mua thêm — đợt ${soDot}` },
         },
         elements,
       },

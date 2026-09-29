@@ -146,6 +146,9 @@ export const THU_TU_XOA = [
   "selection_addons",
   "selection_ops",
   "selection_items",
+  // BB-321: đợt chọn thêm ảnh (0077). Tham chiếu selections/galleries nên phải
+  // đứng TRƯỚC selections. Chưa áp 0077 thì bảng không có, bị bỏ qua tự nhiên.
+  "selection_rounds",
   "gallery_payments",
   "selections",
   "share_links",

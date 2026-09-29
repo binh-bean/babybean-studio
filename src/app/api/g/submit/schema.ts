@@ -13,6 +13,20 @@ export const SubmitSelectionSchema = z.object({
     errorMap: () => ({ message: "Bạn cần đồng ý với điều khoản chốt ảnh" }),
   }),
   generalNote: z.string().max(1000, "Ghi chú tối đa 1000 ký tự").optional(),
+  /**
+   * BB-321 — chốt đợt 1 khi còn THIẾU ảnh so với hạn mức, khách nhờ studio chọn
+   * bổ sung. Máy chủ tự tính số ảnh nhờ (không tin số khách gửi) và bỏ qua nếu
+   * không còn thiếu.
+   */
+  nhoStudioChonThem: z.boolean().optional(),
+  /**
+   * Ô tick "Tôi đồng ý với ảnh studio chọn dùm và không đổi lại" — BẮT BUỘC khi còn thiếu
+   * ảnh so với hạn mức (chủ studio 29/09/2026: không có đường chốt thiếu mà không nhờ).
+   * Có cờ này thì máy chủ tự ghi lời nhờ; `nhoStudioChonThem` chỉ còn để tương thích.
+   */
+  dongYAnhStudioChon: z.boolean().optional(),
+  /** Ô tick "Tôi biết nếu chưa chọn ảnh in, thời gian nhận ảnh sẽ lâu hơn timeline" — bắt buộc khi còn sản phẩm in chưa gắn ảnh. */
+  bietAnhInChamHon: z.boolean().optional(),
 });
 
 export type SubmitSelectionInput = z.infer<typeof SubmitSelectionSchema>;
