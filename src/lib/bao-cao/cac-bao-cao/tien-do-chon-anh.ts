@@ -7,9 +7,12 @@
  * Định nghĩa từng số (đọc trước khi đổi)
  * ---------------------------------------------------------------------------
  * - "Đã gửi link": số bộ có `sent_at` rơi trong kỳ đang xem.
- * - "Đang chọn": ảnh chụp NGAY LÚC XEM báo cáo — số bộ đang ở trạng thái
- *   `in_review`, không giới hạn theo kỳ (một bộ gửi tháng trước, khách còn
- *   đang chọn tháng này, vẫn phải hiện ở đây).
+ * - "Khách đang chọn ảnh" (trước BB-318 gọi là "Đang chọn"): ảnh chụp NGAY LÚC
+ *   XEM báo cáo — số bộ đang ở trạng thái `in_review`, không giới hạn theo kỳ
+ *   (một bộ gửi tháng trước, khách còn đang chọn tháng này, vẫn phải hiện ở
+ *   đây). KHÁC thẻ "Chờ khách chọn" của Bảng điều khiển: thẻ đó đếm cả bộ
+ *   `ready` (sẵn sàng gửi, khách chưa mở link). Cả hai bỏ các bộ mà Lark cho
+ *   thấy không còn chờ khách (`conChoKhachChonTheoLark`, BB-285/BB-318).
  * - "Đã chốt": số bộ có `submitted_at` rơi trong kỳ đang xem.
  * - Trung vị thời gian gửi → chốt: tính trên các bộ ĐÃ CHỐT TRONG KỲ mà có cả
  *   `sent_at` lẫn `submitted_at` — bộ chưa từng gửi qua app (nhập tay/di trú
@@ -21,6 +24,14 @@
 import type { NguCanhBaoCao, KetQuaBaoCao, DinhNghiaBaoCao, TheSoBaoCao } from "../loai";
 import { locBoAnhThat, GHI_CHU_LOAI_TRU } from "../loc-chung";
 import { chenhLechPhanTram, chiaMoc, nhanMoc, trungVi } from "../ky";
+import { conChoKhachChonTheoLark } from "@/lib/gallery/cho-khach-chon";
+
+interface HangDon {
+  id: string;
+  branch_id: string;
+  lark_trang_thai: string | null;
+  lark_trang_thai_tu: string | null;
+}
 
 interface HangGon {
   id: string;
@@ -29,19 +40,18 @@ interface HangGon {
   submitted_at: string | null;
 }
 
-interface HangDon {
-  id: string;
-  branch_id: string;
-}
-
 async function demTheoBranch(
   ctx: NguCanhBaoCao,
   ap: (q: ReturnType<typeof baseQuery>) => ReturnType<typeof baseQuery>,
+  /** true = bỏ bộ mà Lark cho thấy không còn chờ khách chọn (chỉ áp cho số "hiện tại"). */
+  chiConChoKhach = false,
 ): Promise<{ tong: number; theoChiNhanh: Map<string, number> }> {
   const q = ap(baseQuery(ctx));
   const { data, error } = await q;
   if (error) throw error;
-  const rows = (data ?? []) as HangDon[];
+  const homNay = new Date();
+  // BB-318: cùng luật Lark với thẻ "Chờ khách chọn" của Bảng điều khiển.
+  const rows = ((data ?? []) as HangDon[]).filter((r) => !chiConChoKhach || conChoKhachChonTheoLark(r, homNay));
   const theoChiNhanh = new Map<string, number>();
   for (const r of rows) {
     theoChiNhanh.set(r.branch_id, (theoChiNhanh.get(r.branch_id) ?? 0) + 1);
@@ -50,7 +60,7 @@ async function demTheoBranch(
 }
 
 function baseQuery(ctx: NguCanhBaoCao) {
-  let q = ctx.client.from("galleries").select("id, branch_id");
+  let q = ctx.client.from("galleries").select("id, branch_id, lark_trang_thai, lark_trang_thai_tu");
   q = locBoAnhThat(q);
   if (ctx.chiNhanhIds) q = q.in("branch_id", ctx.chiNhanhIds);
   return q;
@@ -76,12 +86,14 @@ async function chotTrongKyChiTiet(ctx: NguCanhBaoCao, tu: Date, den: Date) {
 }
 
 async function dangChonHienTai(ctx: NguCanhBaoCao) {
-  return demTheoBranch(ctx, (q) => q.eq("status", "in_review"));
+  return demTheoBranch(ctx, (q) => q.eq("status", "in_review"), true);
 }
 
 async function quaHanHienTai(ctx: NguCanhBaoCao, now: Date) {
-  return demTheoBranch(ctx, (q) =>
-    q.lt("due_at", now.toISOString()).in("status", ["ready", "in_review"]),
+  return demTheoBranch(
+    ctx,
+    (q) => q.lt("due_at", now.toISOString()).in("status", ["ready", "in_review"]),
+    true,
   );
 }
 
@@ -129,7 +141,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
       kyTruoc: guiLinkKyTruoc?.tong,
       chenhLechPhanTram: guiLinkKyTruoc ? chenhLechPhanTram(guiLink.tong, guiLinkKyTruoc.tong) : undefined,
     },
-    { nhan: "Đang chọn (hiện tại)", giaTri: dangChon.tong, donVi: "bộ" },
+    { nhan: "Khách đang chọn ảnh (hiện tại)", giaTri: dangChon.tong, donVi: "bộ" },
     {
       nhan: "Đã chốt",
       giaTri: chotChiTiet.length,
@@ -165,7 +177,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
   return {
     theSo,
     bang: {
-      cot: ["Chi nhánh", "Đã gửi link", "Đang chọn", "Đã chốt", "Quá hạn chưa chốt"],
+      cot: ["Chi nhánh", "Đã gửi link", "Khách đang chọn ảnh", "Đã chốt", "Quá hạn chưa chốt"],
       dong: bangDong,
     },
     bieuDo: {
@@ -175,7 +187,8 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
     },
     ghiChu: [
       GHI_CHU_LOAI_TRU,
-      "\"Đang chọn\" và \"Quá hạn chưa chốt\" là số tại THỜI ĐIỂM XEM báo cáo, không giới hạn theo kỳ lọc.",
+      "\"Khách đang chọn ảnh\" và \"Quá hạn chưa chốt\" là số tại THỜI ĐIỂM XEM báo cáo, không giới hạn theo kỳ lọc.",
+      "Thẻ \"Chờ khách chọn\" ở Bảng điều khiển đếm thêm cả bộ \"Sẵn sàng gửi khách\" (khách chưa mở link), nên số đó thường lớn hơn số ở đây.",
     ],
   };
 }
@@ -183,7 +196,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
 export const tienDoChonAnh: DinhNghiaBaoCao = {
   ma: "tien-do-chon-anh",
   ten: "Tiến độ chọn ảnh",
-  moTa: "Số bộ đã gửi link / đang chọn / đã chốt, thời gian trung vị gửi → chốt, và số bộ quá hạn.",
+  moTa: "Số bộ đã gửi link / khách đang chọn ảnh / đã chốt, thời gian gửi đến chốt, và số bộ quá hạn.",
   nhom: "van-hanh",
   quyen: "reports:operations",
   boLoc: { kySoSanh: true },

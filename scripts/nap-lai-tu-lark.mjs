@@ -272,6 +272,8 @@ export function kiemTraDieuKienXoa({
     );
   }
 
+  const ma = maDuAn(urlKetNoi);
+
   if (!sanLuuGanNhat) {
     loi.push("Chưa có bản sao lưu nào. Chạy `--sao-luu <thư-mục>` trước.");
   } else {
@@ -282,9 +284,22 @@ export function kiemTraDieuKienXoa({
           `${gioAnToanBanSaoLuu} giờ. Chạy lại \`--sao-luu <thư-mục>\` trước khi xoá.`,
       );
     }
+    // BB-315 (cố vấn CV-01, lỗi S4): tệp mốc sao lưu KHÔNG ghi mã dự án, nên
+    // một bản sao lưu của MÔI TRƯỜNG KHÁC (bb-dev khi đang xoá bb-prod, hoặc
+    // ngược lại — đúng kịch bản docs/26 §13: dọn bb-dev 3 ngày sau khi cắt
+    // sang bb-prod) vẫn "trẻ hơn 24 giờ" nên qua được điều kiện ở trên. Chỉ so
+    // khi CẢ HAI bên đều có mã (bản sao lưu cũ, ghi trước BB-315, không có
+    // trường `maDuAn` — không chặn ngược những bản sao lưu đó, chỉ chặn khi
+    // đã đo được rõ ràng là LỆCH).
+    if (sanLuuGanNhat.maDuAn && ma && sanLuuGanNhat.maDuAn !== ma) {
+      loi.push(
+        `Bản sao lưu gần nhất là của môi trường khác (mã dự án "${sanLuuGanNhat.maDuAn}"), ` +
+          `không phải môi trường đang xoá (mã dự án "${ma}"). Chạy lại ` +
+          "`--sao-luu <thư-mục>` TRÊN ĐÚNG môi trường đang xoá trước khi tiếp tục.",
+      );
+    }
   }
 
-  const ma = maDuAn(urlKetNoi);
   if (ma === MA_BB_DEV && !coCoThatSuLaBbDev) {
     loi.push(
       "SUPABASE_URL đang trỏ vào bb-dev — dữ liệu THẬT của studio (xem " +
@@ -344,8 +359,19 @@ export async function demBang(client, danhSachBang) {
   return ket;
 }
 
-/** Xuất toàn bộ dữ liệu của các bảng ra JSON, một tệp một bảng, kèm tổng số. */
-export async function xuatSaoLuu(client, danhSachBang, thuMucDich) {
+/**
+ * Xuất toàn bộ dữ liệu của các bảng ra JSON, một tệp một bảng, kèm tổng số.
+ *
+ * `maDuAnHienTai` (BB-315, cố vấn CV-01, lỗi S4) — mã dự án của cơ sở dữ liệu
+ * ĐANG được sao lưu, ghi vào `tong-so-dong.json`. Không có trường này thì
+ * `--xoa` không phân biệt được một bản sao lưu vừa tạo của MÔI TRƯỜNG NÀY với
+ * một bản sao lưu (dù mới) của một môi trường KHÁC — đúng kịch bản `docs/26`
+ * §13: dọn bb-dev vài ngày sau khi cắt sang bb-prod, hai môi trường đều có
+ * bản sao lưu "trẻ" trong cùng khung giờ. Tham số tuỳ chọn để không phá vỡ
+ * lời gọi cũ (bản sao lưu không truyền mã dự án vẫn ghi được, chỉ là không
+ * có trường này — `kiemTraDieuKienXoa` bỏ qua kiểm tra khi thiếu, xem ở đó).
+ */
+export async function xuatSaoLuu(client, danhSachBang, thuMucDich, maDuAnHienTai) {
   fs.mkdirSync(thuMucDich, { recursive: true });
   const demTheoBang = {};
   for (const bang of danhSachBang) {
@@ -355,6 +381,7 @@ export async function xuatSaoLuu(client, danhSachBang, thuMucDich) {
   }
   const tongKet = {
     thoiDiem: new Date().toISOString(),
+    maDuAn: maDuAnHienTai,
     tongSoDong: Object.values(demTheoBang).reduce((a, b) => a + b, 0),
     demTheoBang,
   };
@@ -722,7 +749,7 @@ async function main() {
         console.error("Dừng lại — sửa THU_TU_XOA trong scripts/nap-lai-tu-lark.mjs trước.");
         process.exit(2);
       }
-      const tong = await xuatSaoLuu(client, xoa, kt.duong);
+      const tong = await xuatSaoLuu(client, xoa, kt.duong, maDuAn(dbUrl));
       // Nối bước sao lưu với bước xoá: ghi tệp mốc vào thư mục MẶC ĐỊNH mà
       // --xoa tra cứu, bất kể admin vừa chọn --sao-luu vào đâu. Không có
       // bước này, --xoa sẽ không "nhìn thấy" bản sao lưu vừa tạo trừ khi

@@ -61,7 +61,7 @@ const TabsList = React.forwardRef<
     ref={ref}
     role="tablist"
     className={cn(
-      "inline-flex h-11 items-center justify-center rounded-[var(--bb-radius-sm)] bg-[var(--bb-surface-2)] p-1 text-[var(--bb-fg-muted)]",
+      "inline-flex h-11 max-w-full items-center justify-start overflow-x-auto rounded-[var(--bb-radius-sm)] bg-[var(--bb-surface-2)] p-1 text-[var(--bb-fg-muted)]",
       className
     )}
     {...props}
@@ -90,7 +90,7 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
           context?.onValueChange(value);
         }}
         className={cn(
-          "inline-flex items-center justify-center whitespace-nowrap rounded-[calc(var(--bb-radius-sm)-2px)] px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none min-h-[36px]",
+          "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-[calc(var(--bb-radius-sm)-2px)] px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none min-h-[36px]",
           active
             ? "bg-[var(--bb-surface)] text-[var(--bb-fg)] shadow-xs"
             : "text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg)]",

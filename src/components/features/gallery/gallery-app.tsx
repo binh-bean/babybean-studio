@@ -84,7 +84,7 @@ const SoSanhAnh = dynamic(() => import("@/components/features/gallery/so-sanh-an
 });
 import { Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
-import { formatNgayVN, tinhTenBiaTuDuLieu } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, tinhTenBiaTuDuLieu, tieuDeHopChot, cauYeuCauBiaAlbum, cauNhacThieuAnh } from "@/lib/utils/dinh-dang";
 import { layerMoVuong } from "@/lib/utils/tranh-tan-nen";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { buildHeartPayload, buildGhiChuPayload } from "@/lib/selection/heart-payload";
@@ -259,12 +259,32 @@ interface GalleryApiResponse {
 // Bảng số đo hiệu năng của BB-131 đi cùng nó sang đó.
 // ---------------------------------------------------------------------------
 
+/** BB-317 K-g — MỘT câu duy nhất khi hạn mức chưa biết (≤ 12 chữ), dùng cho cả thông báo lẫn thẻ trên lưới. */
+const CAU_CHUA_CO_HAN_MUC = "Studio đang cập nhật số ảnh trong gói.";
+
 export function GalleryApp({ token }: GalleryAppProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [error, setError] = useState<{ code: string; message: string } | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  /**
+   * BB-317 K-g — thông báo nổi KHÔNG được che hàng chip lọc. Thanh dính
+   * `#dau-luoi-anh` (logo + chip) đang nằm ở đầu màn thì thông báo trượt xuống
+   * NGAY DƯỚI nó; thanh chưa tới đầu màn (bìa còn trong khung nhìn) thì giữ vị
+   * trí cũ ở mép trên. Đo lúc thông báo hiện, không đoán chiều cao.
+   */
+  const [thongBaoTop, setThongBaoTop] = useState(16);
+  useEffect(() => {
+    if (!statusMessage) return;
+    const el = document.getElementById("dau-luoi-anh");
+    if (!el) {
+      setThongBaoTop(16);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    setThongBaoTop(r.top < window.innerHeight * 0.5 && r.bottom > 0 ? Math.round(r.bottom) + 12 : 16);
+  }, [statusMessage]);
 
   /**
    * Phiên đang là link gắn theo KHÁCH và chưa chọn buổi chụp nào (BB-130).
@@ -815,7 +835,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       }
 
       if (!gallery?.quotaKnown) {
-        setStatusMessage("Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH.");
+        setStatusMessage(CAU_CHUA_CO_HAN_MUC);
         return;
       }
 
@@ -880,7 +900,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           const msg = json?.error?.message;
 
           if (code === "QUOTA_UNKNOWN") {
-            setStatusMessage("Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH.");
+            setStatusMessage(CAU_CHUA_CO_HAN_MUC);
           } else if (code === "QUOTA_EXCEEDED") {
             setStatusMessage(
               gallery?.maxSelection
@@ -1242,6 +1262,24 @@ export function GalleryApp({ token }: GalleryAppProps) {
     () =>
       hangInTrongGoi.filter((sp) => conThieuAnh(sp, demAnhTrongDongHang(sp.galleryItemId))),
     [hangInTrongGoi, demAnhTrongDongHang],
+  );
+
+  /**
+   * BB-317 K-e — mỗi sản phẩm in còn thiếu ảnh MỘT dòng nhắc, kèm số ảnh thiếu.
+   * Album chưa có bìa đã có dòng YÊU CẦU riêng (bìa là bắt buộc) nên không lặp
+   * lại ở đây; cuốn album đã có bìa mà chưa có ảnh nào vẫn được nhắc như thường.
+   */
+  const dongNhacThieuAnh = useMemo(
+    () =>
+      sanPhamThieuAnh
+        .filter((sp) => !albumThieuBia.some((a) => a.galleryItemId === sp.galleryItemId))
+        .map((sp) => ({
+          galleryItemId: sp.galleryItemId,
+          name: sp.name,
+          soThieu: Math.max(1, sp.quantity - demAnhTrongDongHang(sp.galleryItemId)),
+          nhom: sp.nhom,
+        })),
+    [sanPhamThieuAnh, albumThieuBia, demAnhTrongDongHang],
   );
 
   /**
@@ -1662,10 +1700,16 @@ export function GalleryApp({ token }: GalleryAppProps) {
     Nút chính của thanh đáy — cùng một câu hỏi "bước tiếp theo là gì" mà
     đầu trang cũ trả lời, nay chỉ trả lời ở MỘT chỗ.
   */
+  // BB-317 K-g — hạn mức chưa biết: nút "Chốt danh sách" trông như bị khoá và
+  // bấm ra đúng MỘT câu giải thích, không mở hộp chốt (chưa chọn được tấm nào).
+  const chotBiChan = !isLocked && !gallery.quotaKnown;
   const nutChinh = !duocChot
     ? null
     : !isLocked
-    ? { nhan: vi.gallery.submitCta, onClick: () => setShowSubmitModal(true) }
+    ? {
+        nhan: vi.gallery.submitCta,
+        onClick: () => (chotBiChan ? setStatusMessage(CAU_CHUA_CO_HAN_MUC) : setShowSubmitModal(true)),
+      }
     : daChotChoXacNhan
       ? // Đã chốt, CSKH chưa xác nhận: mở lại là việc của chính ba mẹ.
         { nhan: "Chọn thêm ảnh", onClick: () => setMoKhoaChon(true) }
@@ -1711,7 +1755,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
     <div className="min-h-[100dvh] bg-background pb-28 text-foreground">
       {/* Thông báo trạng thái */}
       {statusMessage && (
-        <div className="fixed left-4 right-4 top-4 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl bg-[#2a2420] p-4 text-[#fffdf9] shadow-lg animate-in fade-in slide-in-from-top-4">
+        <div
+          data-testid="thong-bao-trang-thai"
+          style={{ top: thongBaoTop }}
+          className="fixed left-4 right-4 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl bg-[#2a2420] p-4 text-[#fffdf9] shadow-lg animate-in fade-in slide-in-from-top-4"
+        >
           <div className="flex items-center gap-2 text-sm">
             <Info className="h-5 w-5 shrink-0 opacity-80" />
             <span>{statusMessage}</span>
@@ -1870,12 +1918,6 @@ export function GalleryApp({ token }: GalleryAppProps) {
         "Lưu ra màn hình chính" phía trên nữa là thừa. Điện thoại GIỮ NGUYÊN
         (chip vẫn đúng chỗ, đúng lý do — xem `loi-goi-y-luu-app.tsx`).
       */}
-      <div className="flex justify-center border-b border-[#e5dcd2] bg-[#fbf7f2] px-4 py-2 empty:hidden sm:px-6 sm:py-2.5 lg:hidden">
-        <LoiGoiYLuuApp
-          daChon={selectionCounts.selectedCount}
-          onXemCachLuu={() => setMoHuongDanLuuApp(true)}
-        />
-      </div>
       </div>
 
       {/* MÀN 1 — ẢNH BÌA (tràn toàn màn, xem BB-258) */}
@@ -1905,6 +1947,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
           ngayGiao={gallery.review?.deliveredAt ?? null}
           trangThai={gallery.status}
           onBatDau={cuonToiLuoi}
+        />
+      </div>
+
+      {/*
+        BB-317 K-b — chip "Lưu ra màn hình chính" (điện thoại) rời khỏi vùng
+        bìa: nằm NGAY DƯỚI dải kem của bìa, không còn dính mép trên ảnh. Ảnh bìa
+        sạch, chip vẫn hiện đúng chỗ, đúng lý do (xem `loi-goi-y-luu-app.tsx`).
+      */}
+      <div className="flex justify-center bg-[#fbf7f2] px-4 pb-4 empty:hidden sm:px-6 lg:hidden">
+        <LoiGoiYLuuApp
+          daChon={selectionCounts.selectedCount}
+          onXemCachLuu={() => setMoHuongDanLuuApp(true)}
         />
       </div>
 
@@ -1998,22 +2052,34 @@ export function GalleryApp({ token }: GalleryAppProps) {
               </a>
             )}
           </div>
-          {/* BB-306 — logo hạt đậu trước chữ, testid dời sang khối bọc (xem ghi chú ở thanh-thuong-hieu phía trên). */}
-          <span
-            data-testid="ten-thuong-hieu-dinh"
-            className="inline-flex items-center gap-[6px] justify-self-center"
-          >
-            <img
-              data-testid="logo-hat-dau"
-              src="/brand/logo-hat-dau-64.png"
-              alt=""
-              aria-hidden="true"
-              className="h-[18px] w-[18px] shrink-0"
-            />
-            <span className="font-display text-[16px] uppercase tracking-[0.2em] text-[#2e2a27]">
-              Baby Bean
+          {/* BB-306 — logo hạt đậu trước chữ, testid dời sang khối bọc (xem ghi chú ở thanh-thuong-hieu phía trên).
+              BB-317 (Cảm xúc) — tên bé đứng NGAY DƯỚI logo, chữ nhỏ Be Vietnam Pro (nội dung; Playfair chỉ
+              cho logo/tên lớn): thanh dính điện thoại gọi tên bé như bản máy tính, không chen vào hàng logo. */}
+          <div className="flex min-w-0 flex-col items-center justify-self-center">
+            <span
+              data-testid="ten-thuong-hieu-dinh"
+              className="inline-flex items-center gap-[6px]"
+            >
+              <img
+                data-testid="logo-hat-dau"
+                src="/brand/logo-hat-dau-64.png"
+                alt=""
+                aria-hidden="true"
+                className="h-[18px] w-[18px] shrink-0"
+              />
+              <span className="font-display text-[16px] uppercase tracking-[0.2em] text-[#2e2a27]">
+                Baby Bean
+              </span>
             </span>
-          </span>
+            {tenBeHienThi && (
+              <span
+                data-testid="ten-be-thanh-dinh"
+                className="mt-0.5 max-w-[190px] truncate text-[12px] leading-none text-muted-foreground"
+              >
+                {tenBeHienThi}
+              </span>
+            )}
+          </div>
           <div className="flex items-center justify-self-end">
             <ChuongThongBao galleryId={gallery.id} status={gallery.status} />
           </div>
@@ -2322,26 +2388,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
           {/* Hạn mức CHƯA BIẾT (quotaKnown = false) */}
           {!gallery.quotaKnown && !isLocked && duocChon && (
-            <div className="flex items-start gap-3 rounded-2xl border border-[#e7cf9f] bg-[#fbf3e2] p-4 text-[#5c4413]">
-              <AlertTriangle className="mt-0.5 h-[18px] w-[18px] shrink-0" />
-              <div className="text-sm">
-                <p className="font-medium">Studio sẽ báo lại số ảnh trong gói</p>
-                {/*
-                  Nói ĐÚNG điều app làm: khi chưa có hạn mức, thả tim bị chặn
-                  (handleToggleHeart trả về câu "vui lòng liên hệ CSKH"). Bảo ba
-                  mẹ "cứ thả tim" ở đây là hứa một việc app không cho làm.
-                */}
-                <p className="mt-0.5 text-[13px] leading-relaxed opacity-90">
-                  CSKH đang cập nhật số ảnh chỉnh sửa của gói. Ba mẹ xem ảnh trước nhé — bên mình mở
-                  chọn ảnh ngay khi xong
-                  {gallery.branch.hotline ? (
-                    <>
-                      , cần gấp thì gọi <span className="font-medium">{gallery.branch.hotline}</span>
-                    </>
-                  ) : null}
-                  .
-                </p>
-              </div>
+            <div
+              data-testid="the-chua-co-han-muc"
+              className="flex items-center gap-3 rounded-2xl border border-[#e7cf9f] bg-[#fbf3e2] p-4 text-[#5c4413]"
+            >
+              <AlertTriangle className="h-[18px] w-[18px] shrink-0" />
+              {/* BB-317 K-g — MỘT câu, không kèm "liên hệ CSKH" (studio tự báo lại). */}
+              <p className="text-sm font-medium">{CAU_CHUA_CO_HAN_MUC}</p>
             </div>
           )}
         </div>
@@ -2561,6 +2614,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               : null
           }
           soChuaGui={hangChoTim.soChuaGui}
+          nutChinhBiChan={chotBiChan}
         />
         )
       )}
@@ -2804,8 +2858,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
             <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" aria-hidden="true" />
 
             <div className="overflow-y-auto px-6 pb-6 pt-4 sm:p-7">
-              <h3 className="kh-h2">
-                {vi.gallery.submitConfirmTitle}
+              <h3 className="kh-h2 text-balance">
+                {tieuDeHopChot(tenBeHienThi) || vi.gallery.submitConfirmTitle}
               </h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                 {vi.gallery.submitConfirm}
@@ -2993,25 +3047,22 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 (thiếu bìa album); việc chỉ nhắc (thiếu ảnh sản phẩm) đứng
                 chung khối nhưng không có nút riêng, không tô đỏ.
               */}
-              {(albumThieuBia.length > 0 || sanPhamThieuAnh.length > 0) && (
+              {/*
+                BB-317 K-e — MỘT luật cho MỖI sản phẩm, hai dòng riêng, đều gọi
+                tên sản phẩm và ≤ 12 chữ: (1) bìa album là YÊU CẦU (nút Xác
+                nhận khoá), (2) sản phẩm in thiếu ảnh chỉ là LỜI NHẮC. Câu 25
+                chữ cũ ("chọn luôn thì… để sau cũng được, CSKH sẽ hỏi lại") bị
+                bỏ vì đứng ngay dưới "để xác nhận" nghe như hai luật ngược nhau.
+              */}
+              {(albumThieuBia.length > 0 || dongNhacThieuAnh.length > 0) && (
                 <div
                   data-testid="loi-nhac-hop-chot"
-                  className="mt-3 rounded-2xl bg-[#F3E6DC] p-3.5 text-xs text-[#2a2420]"
+                  className="mt-3 space-y-2 rounded-2xl bg-[#F3E6DC] p-3.5 text-xs text-[#2a2420]"
                 >
                   {albumThieuBia.length > 0 && (
                     <div className="flex items-center justify-between gap-3">
-                      {/*
-                        BB-310 mục 2 — báo cáo chấm độc lập vòng 4: câu cũ
-                        "Còn thiếu ảnh bìa album" đứng ngay trên câu "để sau
-                        cũng được, CSKH sẽ hỏi lại" (dành cho sản phẩm thiếu
-                        ảnh, KHÔNG chặn) — đọc liền hai câu trong cùng một
-                        khối, ba mẹ hiểu nhầm bìa album cũng "để sau được".
-                        Quy tắc GIỮ NGUYÊN (bìa album vẫn BẮT BUỘC), chỉ đổi
-                        chữ cho rõ ràng, khớp với chữ dưới nút Xác nhận.
-                      */}
-                      <p className="font-medium">
-                        Chọn một tấm làm bìa cuốn album để xác nhận
-                        {albumThieuBia.length > 1 ? ` (${albumThieuBia.length} cuốn)` : ""}
+                      <p data-testid="ly-do-khoa-nut-chot" className="font-medium">
+                        {cauYeuCauBiaAlbum(albumThieuBia.map((a) => a.name))}
                       </p>
                       <button
                         type="button"
@@ -3031,12 +3082,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
                       </button>
                     </div>
                   )}
-                  {sanPhamThieuAnh.length > 0 && (
-                    <p className={cn("leading-relaxed text-[#4a423b]", albumThieuBia.length > 0 && "mt-2")}>
-                      Còn {sanPhamThieuAnh.length} sản phẩm chưa đủ ảnh — chọn luôn thì bên mình
-                      làm nhanh hơn, để sau cũng được, CSKH sẽ hỏi lại.
+                  {dongNhacThieuAnh.map((dong) => (
+                    <p key={dong.galleryItemId} data-testid="nhac-thieu-anh-san-pham" className="leading-relaxed text-[#4a423b]">
+                      {cauNhacThieuAnh(dong.name, dong.soThieu, dong.nhom === "album")}
                     </p>
-                  )}
+                  ))}
                 </div>
               )}
 
@@ -3114,11 +3164,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   lại chỉ hiện khi KHÔNG có lý do bìa, để không đọc hai câu
                   cùng lúc).
                 */}
-                {!submitting && albumThieuBia.length > 0 && (
-                  <p data-testid="ly-do-khoa-nut-chot" className="text-xs text-muted-foreground">
-                    Chọn một tấm làm bìa cuốn album để xác nhận
-                  </p>
-                )}
+                {/* BB-317 K-e — lý do thiếu bìa đã nằm ở khối nhắc phía trên (một dòng, có tên
+                    sản phẩm); không nhắc lần hai dưới nút. */}
                 {!submitting && albumThieuBia.length === 0 && tenXacNhan.trim().length === 0 && (
                   <p data-testid="ly-do-khoa-nut-chot" className="text-xs text-muted-foreground">
                     Điền tên người xác nhận để tiếp tục

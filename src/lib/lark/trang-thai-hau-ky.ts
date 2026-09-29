@@ -92,14 +92,14 @@ const KHACH_THEO_GIAI_DOAN: Record<number, string> = {
 };
 
 const QUAN_TRI_THEO_GIAI_DOAN: Record<number, string> = {
-  2: "Đã chọn hình · chờ chỉnh sửa",
+  2: "Đã chọn ảnh · chờ chỉnh sửa",
   3: "Đang chỉnh sửa",
-  4: "Leader đang kiểm hình",
+  4: "Leader đang kiểm ảnh",
   5: "Đã gửi khách duyệt",
   6: "Đang sửa theo yêu cầu",
   7: "Đã chốt, chờ in",
   8: "Đã gửi in",
-  9: "Hình đã về, chờ giao",
+  9: "Ảnh đã về, chờ giao",
   10: "Đã giao",
   11: "Đã chăm sóc khách",
 };

@@ -18,7 +18,8 @@ const buttonVariants = cva(
         ghost:
           "text-[var(--bb-fg)] hover:bg-[var(--bb-surface-2)] hover:text-[var(--bb-fg)]",
         danger:
-          "bg-[var(--bb-danger)] text-[var(--bb-danger-fg)] shadow hover:opacity-90",
+          /* BB-318 (Q-b): nút xoá cùng kiểu viền như các nút phụ khác, chữ đất nung (--bb-danger) — không còn nút đặc đỏ. */
+          "border border-[var(--bb-border)] bg-transparent text-[var(--bb-danger)] hover:bg-[var(--bb-danger)]/10",
         link:
           "text-[var(--bb-primary)] underline-offset-4 hover:underline",
       },

@@ -221,6 +221,11 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
     // cũng "chưa có"). Đợi ô Thống kê "Trạng thái" — thứ luôn xuất hiện sau
     // khi tải xong — rồi mới kiểm phần đáng lẽ phải vắng mặt.
     await expect(page.getByText("Trạng thái").first()).toBeVisible({ timeout: CHO_TAI });
+    // BB-308 gom "Mở lại cho khách chọn" vào menu "Thao tác khác" (⋯); form
+    // chỉ hiện sau khi bấm mục đó. Vai không có quyền: menu không có mục này.
+    const menuPg = page.getByRole("button", { name: "Thao tác khác" }).first();
+    if (await menuPg.count()) await menuPg.click();
+    await expect(page.getByText("Mở lại cho khách chọn", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Mở lại cho khách chọn tiếp")).toHaveCount(0);
 
     // Vai cs — CÓ galleries:reopen, trong một trang riêng (phiên khác).
@@ -228,6 +233,9 @@ test.describe("BB-200: nhãn trạng thái hậu kỳ từ Lark", () => {
     await dangNhapNhanVien(csPage, emailCs, password);
 
     await csPage.goto(`/admin/galleries/${galleryC}`);
+    await expect(csPage.getByText("Trạng thái").first()).toBeVisible({ timeout: CHO_TAI });
+    await csPage.getByRole("button", { name: "Thao tác khác" }).first().click();
+    await csPage.getByText("Mở lại cho khách chọn", { exact: true }).click();
     await expect(csPage.getByText("Mở lại cho khách chọn tiếp")).toBeVisible();
   });
 });

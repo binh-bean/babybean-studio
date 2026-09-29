@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button, Input, Select, Badge, Card, Spinner, EmptyState, Avatar, AvatarFallback, Switch, Checkbox } from "@/components/ui";
 import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 
 /** Chữ cái đầu để làm avatar — bản vẽ quan-tri-nhan-su.webp dùng chữ cái đầu
  * tên, không dùng ảnh chân dung. */
@@ -60,11 +61,7 @@ const roleLabel = (role: string) => (t.roles as Record<string, string>)[role] ??
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
+  return formatNgayVN(iso) || "—";
 }
 
 /** Owner và admin thấy mọi chi nhánh nên không cần liệt kê tên. */
@@ -226,7 +223,7 @@ export function StaffManager() {
           Xoá
         </Button>
       ) : (
-        <div className="flex flex-col text-xs text-amber-600/80 max-w-[200px] mt-1 text-right">
+        <div className="mt-1 flex min-w-0 max-w-full flex-col text-xs text-[var(--bb-danger)] sm:max-w-[200px] sm:text-right">
           {row.deleteReason}
         </div>
       )}
@@ -297,7 +294,7 @@ export function StaffManager() {
       {rows.length === 0 ? (
         <EmptyState title={t.emptyTitle} description={t.emptyBody} />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-[1fr_240px]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_240px]">
           {/*
             Bản vẽ quan-tri-nhan-su.webp: lưới thẻ, không phải bảng — mỗi
             nhân viên một thẻ trắng viền mảnh, avatar chữ cái đầu, vai trò và
@@ -306,11 +303,11 @@ export function StaffManager() {
             kiểu điều khiển). Một lưới duy nhất cho mọi cỡ màn hình — bỏ bản
             bảng riêng + bản thẻ riêng cũ vì giờ cả hai đều là thẻ.
           */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:col-start-1 2xl:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:col-start-1 2xl:grid-cols-3">
             {rows.map((row) => (
               <Card
                 key={row.id}
-                className={`flex flex-col gap-4 p-5 ${row.isActive ? "" : "opacity-60"}`}
+                className={`flex min-w-0 flex-col gap-4 p-5 ${row.isActive ? "" : "opacity-60"}`}
               >
                 <div className="flex items-start gap-3">
                   <Avatar className="h-11 w-11 shrink-0">

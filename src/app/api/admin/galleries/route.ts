@@ -20,7 +20,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
 import { CreateGallerySchema, GetGalleriesQuerySchema } from "./schema";
-import { nhanHienThi, mauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
+import { nhanHienThi, mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-hau-ky";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
 
@@ -342,6 +342,10 @@ export async function GET(request: Request): Promise<Response> {
         ...rest,
         statusLabel: nhanHienThi(status, larkTrangThai, (s) => GALLERY_STATUS_LABEL[s] ?? s).quanTri,
         warningColor: mauCanhBao(larkCanhBao),
+        /** BB-318: tên GỐC trên Lark, để màn quản trị hiện trong tooltip khi nhãn app đã đổi chữ ("hình" → "ảnh"). */
+        larkTenTrangThai: larkTrangThai
+          ? (TRANG_THAI_LARK as Record<string, { ten: string }>)[larkTrangThai as string]?.ten ?? null
+          : null,
         coverPhotoId: coverMap.get(String(item.id)) ?? null,
         // BB-303 — "Loại buổi" (tên gói chụp) cho tiêu đề "Loại buổi · Bé …"
         // ở danh sách/chi tiết bộ ảnh (bo-anh-danh-sach.png). `null` khi bộ

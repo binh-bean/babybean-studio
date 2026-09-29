@@ -22,6 +22,8 @@
  */
 
 import React from "react";
+import { Badge } from "@/components/ui/badge";
+import { formatNgayGioVN } from "@/lib/utils/dinh-dang";
 
 interface Dong {
   id: string;
@@ -44,12 +46,12 @@ const NHAN_TRANG_THAI: Record<string, string> = {
   huy: "Đã huỷ",
 };
 
-/** Màu nhãn trạng thái — dùng token có sẵn trong src/styles/tokens.css. */
-const MAU_TRANG_THAI: Record<string, { bg: string; fg: string }> = {
-  moi: { bg: "var(--bb-warning)", fg: "var(--bb-warning-fg)" },
-  da_lien_he: { bg: "var(--bb-accent)", fg: "var(--bb-accent-fg)" },
-  da_chot: { bg: "var(--bb-success)", fg: "var(--bb-success-fg)" },
-  huy: { bg: "var(--bb-danger)", fg: "var(--bb-danger-fg)" },
+/** Kiểu huy hiệu (BB-318: dùng `Badge` chung — nền nhạt, chữ đậm cùng tông). */
+const KIEU_TRANG_THAI: Record<string, "default" | "accent" | "success" | "danger"> = {
+  moi: "default",
+  da_lien_he: "accent",
+  da_chot: "success",
+  huy: "danger",
 };
 
 /** Chuyển hợp lệ — khớp với `CHUYEN_HOP_LE` ở route PATCH. Chỉ để quyết định
@@ -143,7 +145,7 @@ export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
       </p>
       <ul className="mt-3 flex flex-col gap-2">
         {items.map((d) => {
-          const mau = MAU_TRANG_THAI[d.trangThai] ?? { bg: "var(--bb-border)", fg: "var(--bb-fg)" };
+          const kieu = KIEU_TRANG_THAI[d.trangThai] ?? "outline";
           const nuts = NUT_THEO_TRANG_THAI[d.trangThai] ?? [];
           return (
             <li key={d.id} className="rounded-md border border-[var(--bb-border)] p-3 text-sm">
@@ -152,15 +154,10 @@ export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
                   <strong>{d.productName ?? "—"}</strong> ×{d.soLuong}
                   {d.photoFileName ? ` · ${d.photoFileName}` : ""}
                 </span>
-                <span
-                  className="rounded-full px-2 py-0.5 text-xs font-medium"
-                  style={{ backgroundColor: mau.bg, color: mau.fg }}
-                >
-                  {NHAN_TRANG_THAI[d.trangThai] ?? d.trangThai}
-                </span>
+                <Badge variant={kieu}>{NHAN_TRANG_THAI[d.trangThai] ?? d.trangThai}</Badge>
               </div>
               <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-                {new Date(d.createdAt).toLocaleString("vi-VN")}
+                {formatNgayGioVN(d.createdAt)}
               </p>
               {/*
                 BB-254 — yêu cầu gửi từ link ông bà/người thân, không phải ba

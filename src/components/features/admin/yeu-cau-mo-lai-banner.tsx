@@ -30,7 +30,7 @@
 "use client";
 
 import React from "react";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { formatGioVN, formatNgayVN } from "@/lib/utils/dinh-dang";
 
 export interface ReopenRequestChiTiet {
   trangThai: "khong_co" | "cho_xu_ly" | "da_mo" | "bi_tu_choi";
@@ -46,8 +46,7 @@ const TRANG_THAI_MO_LAI_DUOC = new Set(["expired", "submitted"]);
 function gioNgay(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const gio = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-  return `${gio} · ${formatNgayVN(iso)}`;
+  return `${formatGioVN(d)} · ${formatNgayVN(iso)}`;
 }
 
 export function YeuCauMoLaiBanner({
@@ -127,7 +126,7 @@ export function YeuCauMoLaiBanner({
   return (
     <section
       data-testid="yeu-cau-mo-lai-banner"
-      className="rounded-lg border border-[var(--bb-warning)] bg-[var(--bb-warning)]/10 p-4"
+      className="rounded-lg border border-[var(--bb-danger)] bg-[var(--bb-danger)]/10 p-4"
     >
       <p className="text-sm font-medium text-[var(--bb-fg)]">
         Ba mẹ xin mở lại để sửa

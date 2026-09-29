@@ -18,6 +18,7 @@
 import React, { useEffect, useState } from "react";
 import { ShoppingBag } from "lucide-react";
 import { cn } from "@/components/ui/utils";
+import { Button } from "@/components/ui/button";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { vi } from "@/i18n";
 
@@ -61,6 +62,8 @@ export interface ThanhChonProps {
    * vì ba mẹ cần biết NGAY có thao tác chưa tới được máy chủ.
    */
   soChuaGui?: number;
+  /** BB-317 K-g — nút chính đang bị chặn (hạn mức chưa biết): làm mờ + aria-disabled. */
+  nutChinhBiChan?: boolean;
   /**
    * BB-258 — chủ studio 26/09/2026: thanh này đang che tên mục/thanh lọc khi
    * bìa còn cao. `GalleryApp` tính lúc nào nên ẩn (bìa còn trong khung nhìn,
@@ -73,7 +76,7 @@ export interface ThanhChonProps {
 }
 
 
-export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0, an = false }: ThanhChonProps) {
+export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0, nutChinhBiChan = false, an = false }: ThanhChonProps) {
 
   const vuot = soTamThem > 0;
   const canhBao = vuot || soChuaGui > 0;
@@ -138,14 +141,16 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
       */}
       <div
         className={cn(
-          "mx-auto flex h-12 max-w-[520px] items-center gap-2 rounded-full border border-[#e5dcd2] bg-[#FBF7F2]/92 pl-5 pr-2 text-[#2E2A27] shadow-lg backdrop-blur-md lg:h-11 lg:max-w-[420px]",
+          // BB-317 K-a — viên RỘNG THEO NỘI DUNG trên máy tính (`lg:w-fit`, bỏ trần 420px):
+          // số đếm không bao giờ bị cắt thành "17 / 15 t…", viên phụ không giành chỗ của số.
+          "mx-auto flex h-12 max-w-[520px] items-center gap-2 rounded-full border border-[#e5dcd2] bg-[#FBF7F2]/92 pl-5 pr-2 text-[#2E2A27] shadow-lg backdrop-blur-md lg:h-11 lg:w-fit lg:max-w-full",
           an ? "pointer-events-none" : "pointer-events-auto",
         )}>
-        <div className="min-w-0 flex-1 leading-tight">
+        <div className="min-w-0 flex-1 leading-tight lg:min-w-max lg:flex-none">
           {/* BB-305 — thanh chọn "3 / 15 tấm" là một con số nội dung, không
               phải tiêu đề: bỏ font-display (Fraunces cũ/Playfair mới), dùng
               Be Vietnam Pro + tabular-nums cho số đếm không nhảy độ rộng. */}
-          <p className="truncate text-[22px] font-medium leading-none tabular-nums lg:text-[16px]">
+          <p className="whitespace-nowrap text-[22px] font-medium leading-none tabular-nums lg:text-[16px]">
             <span data-testid="dem-da-chon">{daChon}</span>
             {hanMuc != null && (
               <>
@@ -168,7 +173,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
         {/* Từ lg: viên be nhỏ riêng cạnh số đếm, đúng bản vẽ máy tính. */}
         <span
           className={cn(
-            "hidden shrink-0 truncate rounded-full bg-[#efe7dc] px-2.5 py-1 text-[12px] lg:inline-block",
+            "hidden shrink-0 whitespace-nowrap rounded-full bg-[#efe7dc] px-2.5 py-1 text-[12px] lg:inline-block",
             canhBao ? "font-medium text-[#9C4A41]" : "text-[#6b6057]",
           )}
           data-testid={hienChuaLuuMayTinh ? "chua-luu" : undefined}
@@ -204,14 +209,24 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
         )}
 
         {nutChinh && (
-          <button
+          <Button
             type="button"
+            size="sm"
             onClick={nutChinh.onClick}
-            // BB-305 — nút "Chốt danh sách" là nội dung: bỏ font-display.
-            className="h-9 shrink-0 rounded-full bg-[#E8A598] px-4 text-[14px] font-medium text-[#2E2A27] transition hover:bg-[#E8A598]/85 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FBF7F2]"
+            // BB-317 K-c — MỘT màu nút chính (mực, cùng "Xác nhận"/"Tải cả bộ"):
+            // hồng đất chỉ dành cho trái tim và trạng thái đã chọn.
+            // K-g — hạn mức chưa biết thì nút TRÔNG như bị khoá (mờ,
+            // aria-disabled) nhưng vẫn bấm được: bấm ra đúng một câu giải thích
+            // (handleSubmit ở gallery-app), không im lặng.
+            aria-disabled={nutChinhBiChan || undefined}
+            className={cn(
+              // Biến thể MẶC ĐỊNH của Button (bg-primary = mực ở màn khách); chỉ chỉnh cỡ cho vừa viên nổi.
+              "h-9 min-h-0 shrink-0 rounded-full px-4 text-[14px] shadow-none hover:opacity-90",
+              nutChinhBiChan && "opacity-45 hover:opacity-45",
+            )}
           >
             {nutChinh.nhan}
-          </button>
+          </Button>
         )}
       </div>
     </div>

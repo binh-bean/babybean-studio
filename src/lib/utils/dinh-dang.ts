@@ -21,6 +21,58 @@ export function formatNgayVN(input: string | Date): string {
   return `${ngay}/${thang}/${nam}`;
 }
 
+function hai(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function docNgay(input: string | Date | null | undefined): Date | null {
+  if (input === null || input === undefined || input === "") return null;
+  if (typeof input === "string") {
+    // "yyyy-mm-dd" trần là NGÀY LỊCH, không phải một thời điểm UTC — dựng theo giờ máy để không lệch ngày.
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
+  const d = typeof input === "string" ? new Date(input) : input;
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * BB-318 (Q-c, báo cáo chấm vòng 5) — giờ:phút "09:43". Cùng giờ máy với
+ * `formatNgayVN`. Chuỗi rỗng khi không đọc được.
+ */
+export function formatGioVN(input: string | Date | null | undefined): string {
+  const d = docNgay(input);
+  return d ? `${hai(d.getHours())}:${hai(d.getMinutes())}` : "";
+}
+
+/**
+ * BB-318 (Q-c) — ngày kèm giờ: "28/09/2026 09:43". Trước bản vá quản trị có
+ * ba cách viết ("9/9/2026", "28/09 09:43", "28/9/2026, 09:43:12") cho cùng một
+ * loại thông tin. Chuỗi rỗng khi không đọc được.
+ */
+export function formatNgayGioVN(input: string | Date | null | undefined): string {
+  const d = docNgay(input);
+  return d ? `${formatNgayVN(d)} ${formatGioVN(d)}` : "";
+}
+
+/**
+ * BB-318 (Q-c) — khoảng ngày: cùng năm thì "23/09 – 29/09/2026"; khác năm thì
+ * "28/12/2025 – 03/01/2026". Nhận Date hoặc chuỗi ISO / "yyyy-mm-dd". Thiếu một
+ * đầu hoặc không đọc được thì trả chuỗi rỗng.
+ */
+export function formatKhoangNgayVN(
+  tu: string | Date | null | undefined,
+  den: string | Date | null | undefined,
+): string {
+  const a = docNgay(tu);
+  const b = docNgay(den);
+  if (!a || !b) return "";
+  if (a.getFullYear() === b.getFullYear()) {
+    return `${hai(a.getDate())}/${hai(a.getMonth() + 1)} – ${formatNgayVN(b)}`;
+  }
+  return `${formatNgayVN(a)} – ${formatNgayVN(b)}`;
+}
+
 /**
  * Chuẩn hoá kích thước in ("10x15", "10 x 15", "10×15") về một dạng duy nhất
  * "10×15" — dấu nhân đúng kiểu in ấn, không phải chữ "x" của bàn phím.
@@ -165,4 +217,43 @@ export function tinhTieuDeBoAnhQuanTri(input: {
     return { tieuDe: goi ? `${goi} · ${ten}` : ten, laMaHopDong: false };
   }
   return { tieuDe: input.duPhong, laMaHopDong: true };
+}
+
+/**
+ * BB-317 (Cảm xúc, vòng 5) — tiêu đề hộp "Chốt danh sách" gọi TÊN BÉ:
+ * "Chốt ảnh cho bé Nguyễn Ngọc Bảo An" (họ tên đầy đủ khi không có nickname,
+ * cùng nguồn `tinhTenBiaTuDuLieu`). Tên đã tự có "Bé " ở đầu ("Bé Mít") thì
+ * không thêm lần nữa — "Chốt ảnh cho Bé Mít". Không có tên trả chuỗi rỗng để
+ * nơi gọi rơi về tiêu đề chung.
+ */
+export function tieuDeHopChot(tenBe: string | null | undefined): string {
+  const ten = (tenBe ?? "").trim();
+  if (!ten) return "";
+  const tuDau = ten.split(/\s+/)[0] ?? "";
+  return tuDau.toLowerCase() === "bé" ? `Chốt ảnh cho ${ten}` : `Chốt ảnh cho bé ${ten}`;
+}
+
+/**
+ * BB-317 K-e — dòng YÊU CẦU trong hộp chốt: bìa album là bắt buộc, nút Xác nhận
+ * khoá tới khi chọn xong. Gọi đúng tên sản phẩm, ≤ 12 chữ ở trường hợp một
+ * cuốn; nhiều cuốn thì nêu cuốn đầu rồi đếm phần còn lại.
+ */
+export function cauYeuCauBiaAlbum(tenAlbum: readonly string[]): string {
+  const [dau, ...con] = tenAlbum.map((t) => t.trim()).filter(Boolean);
+  if (!dau) return "Chọn ảnh bìa album để chốt.";
+  return con.length === 0
+    ? `Chọn ảnh bìa cho ${dau} để chốt.`
+    : `Chọn ảnh bìa cho ${dau} và ${con.length} album nữa để chốt.`;
+}
+
+/**
+ * BB-317 K-e — dòng LỜI NHẮC cho sản phẩm in còn thiếu ảnh (không chặn chốt):
+ * "Ảnh in 15×21 còn thiếu 1 ảnh, bổ sung sau được." Cuốn album rỗng không có
+ * "số ảnh thiếu" rõ ràng nên nói "chưa có ảnh".
+ */
+export function cauNhacThieuAnh(tenSanPham: string, soThieu: number, laAlbum = false): string {
+  const ten = tenSanPham.trim() || "Sản phẩm";
+  return laAlbum
+    ? `${ten} chưa có ảnh, bổ sung sau được.`
+    : `${ten} còn thiếu ${Math.max(1, soThieu)} ảnh, bổ sung sau được.`;
 }

@@ -14,7 +14,7 @@
 import React from "react";
 import Link from "next/link";
 import { CARD_TITLE_CLASS } from "./page-header";
-import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { formatGioVN, formatNgayVN } from "@/lib/utils/dinh-dang";
 
 interface DongYeuCau {
   galleryId: string;
@@ -27,11 +27,7 @@ interface DongYeuCau {
   lanThu: number;
 }
 
-function gioPhut(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-}
+const gioPhut = formatGioVN;
 
 export function YeuCauMoLaiReport() {
   const [loading, setLoading] = React.useState(true);
@@ -83,7 +79,7 @@ export function YeuCauMoLaiReport() {
             <li key={it.galleryId}>
               <Link
                 href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}
-                className="block rounded-lg border border-[var(--bb-warning)]/40 bg-[var(--bb-warning)]/5 p-3 text-sm hover:bg-[var(--bb-warning)]/10"
+                className="block rounded-lg border border-[var(--bb-danger)]/40 bg-[var(--bb-danger)]/5 p-3 text-sm hover:bg-[var(--bb-danger)]/10"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-medium text-[var(--bb-fg)]">{it.title}</span>

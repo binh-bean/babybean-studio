@@ -41,7 +41,7 @@ import pg from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { docTepEnv } from "./lib/doc-tep-env.mjs";
 import { inMoiTruong, kiemTraMoiTruongChoPhep } from "./lib/moi-truong.mjs";
-import { MOC, doMoc, danhSachMigrationCanAp } from "./migrate-prod.mjs";
+import { MOC, doMoc, danhSachMigrationCanAp, layTenDaApChiDoc, tepConThieu } from "./migrate-prod.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const GOC_REPO = path.resolve(__dirname, "..");
@@ -161,22 +161,42 @@ async function main() {
       }
     }
 
-    // --- chín mốc migration --------------------------------------------------
+    // --- chín mốc migration (THAM KHẢO — không còn là nguồn quyết định) ------
+    // BB-315 (cố vấn CV-01, lỗi chặn C1): chín mốc chỉ canh 0045-0050. Trước
+    // đây "đích còn thiếu" của công cụ này ĐỌC THEO chín mốc — cùng lỗi khiến
+    // migrate-prod.mjs từng thoát "không có gì phải vá" dù 0051-0075 chưa áp.
+    // Nay giữ chín mốc để CHẨN ĐOÁN (cấu trúc cụ thể), còn "còn thiếu" THẬT SỰ
+    // đọc từ bảng theo dõi `schema_migrations` — đúng cơ chế migrate-prod.mjs
+    // dùng để quyết định áp gì.
     const [mocNguon, mocDich] = await Promise.all([doMoc(pgNguon), doMoc(pgDich)]);
     const soMoc = soSanhMoc(mocNguon, mocDich);
-    console.log("\nChín mốc migration (nguồn vs đích):");
+    console.log("\nChín mốc migration (nguồn vs đích) — CHẨN ĐOÁN, không phải danh sách còn thiếu:");
     for (const s of soMoc) {
       console.log(`  ${s.dichThieu ? "THIẾU" : "OK   "} ${s.ten.padEnd(38)} nguồn=${s.nguon}  đích=${s.dich}`);
     }
     const soMocThieu = soMoc.filter((s) => s.dichThieu);
 
-    // --- danh sách tệp ứng viên (thông tin, KHÔNG phải xác nhận theo từng tệp) --
+    // --- danh sách tệp CÒN THIẾU THẬT SỰ — cùng cơ chế migrate-prod.mjs dùng --
+    // BB-315 lượt 3 (cố vấn CV-01): CHỈ ĐỌC bảng theo dõi của ĐÍCH
+    // (`layTenDaApChiDoc`, không tự tạo bảng — công cụ này hứa "chỉ đọc", nên
+    // không được âm thầm ghi lên bất kỳ bên nào, kể cả nguồn). Không còn so
+    // với "nguồn" nữa: không ai chạy migrate-prod lên bb-dev, nên bảng theo
+    // dõi của nguồn (nếu có) không nói lên điều gì đáng tin — cột đó đã bỏ.
     const dsMigration = danhSachMigrationCanAp();
+    const trangThaiDich = await layTenDaApChiDoc(pgDich);
     console.log(
-      `\nDanh sách tệp migrate-prod --thuc-thi SẼ áp lên đích nếu chạy (đọc trực ` +
-        `tiếp từ db/migrations/, không phải mảng gõ tay — luôn khớp thư mục thật):`,
+      `\nTệp migration ĐÍCH CÒN THIẾU (đọc bảng schema_migrations của đích — ` +
+        `đúng danh sách \`npm run db:migrate:prod -- --thuc-thi\` SẼ áp):`,
     );
-    for (const t of dsMigration) console.log(`  ${t}`);
+    let dichConThieu;
+    if (!trangThaiDich.tonTai) {
+      console.log("  Đích CHƯA có bảng theo dõi schema_migrations — coi như thiếu TOÀN BỘ dãy (chưa lượt migrate-prod nào chạy qua đây).");
+      dichConThieu = dsMigration;
+    } else {
+      dichConThieu = tepConThieu(dsMigration, trangThaiDich.daAp);
+      if (dichConThieu.length === 0) console.log("  (không tệp nào — đích đã áp đủ)");
+    }
+    for (const t of dichConThieu) console.log(`  ${t}`);
 
     // --- Storage: bucket + policy --------------------------------------------
     const adminNguon = taoAdminStorage(bienNguon, "nguồn");
@@ -210,11 +230,11 @@ async function main() {
 
     // --- tổng kết --------------------------------------------------------------
     console.log("\n--- Tổng kết ---");
-    console.log(`Mốc migration đích còn thiếu : ${soMocThieu.length}/${MOC.length}`);
-    console.log(`Tệp migration ứng viên       : ${dsMigration.length}`);
-    console.log(`Bucket đích còn thiếu        : ${soBucket.thieuODich.length}`);
-    console.log(`Policy Storage đích còn thiếu: ${soChinhSach.thieuODich.length}`);
-    if (soMocThieu.length === 0 && soBucket.thieuODich.length === 0 && soChinhSach.thieuODich.length === 0) {
+    console.log(`Tệp migration đích còn thiếu  : ${dichConThieu.length}/${dsMigration.length} (nguồn sự thật: schema_migrations)`);
+    console.log(`Mốc cấu trúc đích chưa đạt (chẩn đoán): ${soMocThieu.length}/${MOC.length}`);
+    console.log(`Bucket đích còn thiếu         : ${soBucket.thieuODich.length}`);
+    console.log(`Policy Storage đích còn thiếu : ${soChinhSach.thieuODich.length}`);
+    if (dichConThieu.length === 0 && soBucket.thieuODich.length === 0 && soChinhSach.thieuODich.length === 0) {
       console.log("\nĐích đã khớp nguồn ở mọi mốc đo được.");
     } else {
       console.log(

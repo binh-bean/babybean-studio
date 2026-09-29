@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { formatNgayGioVN } from "@/lib/utils/dinh-dang";
 import Link from "next/link";
 import { getDictionary } from "@/i18n";
 import { Select } from "@/components/ui";
@@ -158,7 +159,7 @@ export function NhatKyReport() {
                     )}
                   </span>
                   <span className="text-xs text-[var(--bb-fg-muted)]">
-                    {new Date(it.createdAt).toLocaleString("vi-VN")}
+                    {formatNgayGioVN(it.createdAt)}
                   </span>
                 </div>
                 <div className="mt-1 font-mono text-xs">{it.action}</div>
@@ -198,7 +199,7 @@ export function NhatKyReport() {
                 {items.map((it) => (
                   <tr key={it.id} className="border-b border-[var(--bb-border)]">
                     <td className="py-2 pl-3 pr-3 whitespace-nowrap">
-                      {new Date(it.createdAt).toLocaleString("vi-VN")}
+                      {formatNgayGioVN(it.createdAt)}
                     </td>
                     <td className="py-2 pr-3">
                       <div className="font-medium">

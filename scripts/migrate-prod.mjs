@@ -252,6 +252,69 @@ export function inBang(tieuDe, ketQua) {
   }
 }
 
+// ============================================================================
+// BB-315 (cố vấn CV-01, lỗi chặn C1) — theo dõi TỆP đã áp, không chỉ đo cấu
+// trúc bằng chín mốc.
+//
+// Chín mốc ở trên chỉ canh 0045–0050 — chạy đúng runbook cũ trên bb-prod (đã
+// có 0045–0050 từ 21/09) sẽ báo "chín mốc đều OK" rồi THOÁT, và 0051→0075
+// không bao giờ được áp. Bảng `public.schema_migrations` (xem migration mới
+// `0076-bang-theo-doi-migration-da-ap.sql` — VIẾT nhưng KHÔNG áp trong phạm
+// vi sửa lỗi này) cho một nguồn sự thật khác: đúng tên tệp nào đã chạy thành
+// công trên CHÍNH cơ sở dữ liệu này.
+// ============================================================================
+
+/** Câu SQL y hệt trong 0076 — lặp lại có chủ đích, xem ghi chú đầu tệp migration đó. */
+const SQL_BANG_THEO_DOI = `
+create table if not exists public.schema_migrations (
+  ten    text primary key,
+  ap_luc timestamptz not null default now()
+);
+`;
+
+/**
+ * Đảm bảo bảng theo dõi tồn tại — chạy NGAY ĐẦU mỗi lượt, không đợi tới lúc
+ * dãy áp chạy tới số 0076. Idempotent, không cần giao dịch riêng.
+ */
+export async function damBaoBangTheoDoi(client) {
+  await client.query(SQL_BANG_THEO_DOI);
+}
+
+/** Tên các tệp đã áp thành công trên CHÍNH cơ sở dữ liệu đang nối, đọc từ bảng theo dõi. */
+export async function layTenDaAp(client) {
+  await damBaoBangTheoDoi(client);
+  const { rows } = await client.query(`select ten from public.schema_migrations`);
+  return new Set(rows.map((r) => r.ten));
+}
+
+/**
+ * BB-315 lượt 3 (cố vấn CV-01) — biến thể CHỈ ĐỌC của `layTenDaAp()`, KHÔNG
+ * tự tạo bảng theo dõi. Dùng cho `so-sanh-migration.mjs`: công cụ đó tự nhận
+ * là "chỉ đọc" (`db:so-migration`), nhưng gọi `layTenDaAp()` thẳng lên CẢ
+ * NGUỒN LẪN ĐÍCH lại âm thầm CHẠY `create table if not exists` trên nguồn —
+ * một lệnh ghi trong một công cụ hứa chỉ đọc, kể cả khi nguồn là bb-dev (nơi
+ * không ai chạy `migrate-prod` nên bảng đó sẽ mãi rỗng, làm cột "nguồn" của
+ * lượt so sánh vô nghĩa).
+ *
+ * Trả `{ tonTai: false }` nếu bảng chưa tồn tại — không đoán, không tạo.
+ */
+export async function layTenDaApChiDoc(client) {
+  const { rows } = await client.query(
+    `select count(*)::int n from pg_tables where schemaname = 'public' and tablename = 'schema_migrations'`,
+  );
+  if (rows[0].n === 0) return { tonTai: false, daAp: new Set() };
+  const { rows: tenRows } = await client.query(`select ten from public.schema_migrations`);
+  return { tonTai: true, daAp: new Set(tenRows.map((r) => r.ten)) };
+}
+
+/**
+ * Tệp nào trong `dayDayDu` CHƯA có trong `daApSet` — logic thuần, phép thử
+ * dùng thẳng không cần kết nối gì.
+ */
+export function tepConThieu(dayDayDu, daApSet) {
+  return dayDayDu.filter((t) => !daApSet.has(t));
+}
+
 async function main() {
   const dbUrl = process.env.SUPABASE_DB_URL;
   if (!dbUrl) {
@@ -279,25 +342,34 @@ async function main() {
   console.log(`Đang giữ: ${dem.bo_anh} bộ ảnh, ${dem.nhan_su} nhân sự.`);
 
   const truoc = await doMoc(client);
-  inBang("TRƯỚC KHI VÁ", truoc);
+  inBang("TRƯỚC KHI VÁ (chín mốc — chỉ để THAM KHẢO, không quyết định áp gì)", truoc);
 
   const thieu = truoc.filter((k) => !k.dat);
-  if (thieu.length === 0 && !epAp) {
-    console.log("\nKhông có gì phải vá — chín mốc đều khớp bb-dev.");
-    console.log("Vừa thêm migration mới vào DAY? Chạy lại kèm --ep-ap.");
+  if (thieu.length) {
+    console.log(`\n${thieu.length}/9 mốc chưa đạt. Hậu quả nếu cắt sang mà chưa vá:`);
+    for (const k of thieu) console.log(`  · ${k.moc.hong}`);
+  } else {
+    console.log("\nChín mốc đều khớp bb-dev — nhưng đây chỉ là 9 điểm đo, không phải toàn bộ dãy migration.");
+  }
+
+  // BB-315 (lỗi chặn C1): quyết định áp gì dựa vào BẢNG THEO DÕI TỆP ĐÃ ÁP,
+  // không dựa vào chín mốc — chín mốc chỉ canh 0045–0050, và trước đây khiến
+  // script thoát "không có gì phải vá" ngay cả khi 0051–0075 chưa hề chạy.
+  const daAp = await layTenDaAp(client);
+  const dayThatSu = epAp ? DAY : tepConThieu(DAY, daAp);
+
+  if (dayThatSu.length === 0) {
+    console.log(`\nKhông có gì phải vá — cả ${DAY.length} tệp trong dãy (${TU_TEP} trở lên) đã có trong bảng theo dõi.`);
+    console.log("Vừa thêm migration mới? Nó tự nằm trong dãy (đọc động từ db/migrations/) — không cần --ep-ap trừ khi muốn CHẠY LẠI cả những tệp đã ghi nhận.");
     await client.end();
     process.exit(0);
   }
-  if (thieu.length === 0) {
-    console.log("\nChín mốc đều xanh, nhưng --ep-ap nên vẫn áp cả dãy.");
-  }
 
-  console.log(`\n${thieu.length} mốc chưa đạt. Hậu quả nếu cắt sang mà chưa vá:`);
-  for (const k of thieu) console.log(`  · ${k.moc.hong}`);
+  console.log(`\n${dayThatSu.length}/${DAY.length} tệp CHƯA có trong bảng theo dõi — đây mới là danh sách SẼ áp:`);
+  for (const t of dayThatSu) console.log(`  ${t}`);
 
   if (!thucThi) {
-    console.log(`\nChế độ SOI — chưa ghi gì cả. Sẽ áp ${DAY.length} tệp, theo thứ tự:`);
-    for (const t of DAY) console.log(`  ${t}`);
+    console.log(`\nChế độ SOI — chưa ghi gì cả.`);
     console.log(`\nMuốn áp thật: chạy lại kèm --thuc-thi.`);
     await client.end();
     process.exit(0);
@@ -326,7 +398,7 @@ async function main() {
     }
   }
 
-  for (const ten of DAY) {
+  for (const ten of dayThatSu) {
     const duong = path.join(goc, "db", "migrations", ten);
     if (!fs.existsSync(duong)) {
       console.error(`Không thấy ${ten}. Dừng ở đây; những tệp trước đã áp xong.`);
@@ -338,13 +410,20 @@ async function main() {
     try {
       await client.query("begin");
       await client.query(sql);
+      // Ghi vào bảng theo dõi TRONG CÙNG giao dịch với chính tệp đó: tệp gãy
+      // thì cả hai cùng hoàn nguyên (không ghi nhận "đã áp" một tệp thật ra
+      // đã rollback); tệp thành công thì cả hai cùng commit.
+      await client.query(
+        `insert into public.schema_migrations (ten) values ($1) on conflict (ten) do nothing`,
+        [ten],
+      );
       await client.query("commit");
       console.log("xong");
     } catch (e) {
       await client.query("rollback");
       console.log("GÃY");
       console.error(`\n${ten} không áp được: ${e.message}`);
-      console.error("Đã hoàn nguyên đúng tệp này. Những tệp trước đó vẫn giữ nguyên.");
+      console.error("Đã hoàn nguyên đúng tệp này. Những tệp trước đó vẫn giữ nguyên (đã ghi vào bảng theo dõi).");
       await client.end();
       process.exit(1);
     }

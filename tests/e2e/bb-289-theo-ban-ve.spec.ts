@@ -323,12 +323,14 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
   }
 
   // -------------------------------------------------------------------------
-  // (4) [BB-298] Điện thoại: hộp chữ bìa nay ĐÈ lên hộp ảnh bìa (kiểu tạp
-  //     chí tràn màn) — bản vẽ BB-297 ghi đè quyết định "không giao nhau"
-  //     của BB-289. Đo ngược lại: chữ phải nằm TRONG khung ảnh (tràn màn),
-  //     và ảnh phải có lớp tối để chữ kem còn đọc được.
+  // (4) [BB-317 K-b, giám đốc quyết 29/09/2026] Điện thoại: ảnh bìa SẠCH (không
+  //     chữ, không nút, không lớp tối) chiếm ~62% màn; khối chữ + nút nằm ở dải
+  //     kem BÊN DƯỚI, giống bìa máy tính (ảnh và cột chữ tách riêng). Bản BB-298
+  //     từng đòi chữ ĐÈ đáy ảnh (kiểu tạp chí) — ĐẢO NGƯỢC có chủ đích: chữ đè
+  //     lên người bé là lỗi P1 của người chấm vòng 5. Đây là thay đổi đã duyệt,
+  //     không phải hồi quy.
   // -------------------------------------------------------------------------
-  ownIpTest("Điện thoại 390×844: hộp chữ bìa đè lên đáy ảnh bìa (bản vẽ BB-297 tạp chí)", async ({ page }) => {
+  ownIpTest("Điện thoại 390×844: ảnh bìa sạch ~62% màn, khối chữ nằm ở dải kem bên dưới", async ({ page }) => {
     await page.setViewportSize(DIEN_THOAI);
     await page.goto(`/g/${maLinkA}`);
 
@@ -337,24 +339,20 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
     await doiAnhTai(page, khoiAnh.locator("img").first());
     await khoiChu.waitFor({ state: "visible" });
 
-    await page.screenshot({ path: tenAnh("bia-dien-thoai-tran-man", DIEN_THOAI), fullPage: false });
+    await page.screenshot({ path: tenAnh("bia-dien-thoai-anh-sach", DIEN_THOAI), fullPage: false });
 
     const rAnh = await khoiAnh.boundingBox();
     const rChu = await khoiChu.boundingBox();
     if (!rAnh || !rChu) throw new Error("Không đo được khối ảnh/chữ của bìa");
 
-    // Khối chữ phải nằm TRỌN bên trong khối ảnh (bản vẽ: chữ đặt tuyệt đối ở
-    // đáy ảnh tràn màn) — đảo ngược hẳn khẳng định "không giao nhau" cũ.
-    const namTrongAnh =
-      rChu.x >= rAnh.x - 1 &&
-      rChu.y >= rAnh.y - 1 &&
-      rChu.x + rChu.width <= rAnh.x + rAnh.width + 1 &&
-      rChu.y + rChu.height <= rAnh.y + rAnh.height + 1;
-
     ownIpExpect(
-      namTrongAnh,
-      `Hộp chữ bìa phải nằm trong hộp ảnh bìa (tràn màn): ảnh={y:${rAnh.y}-${rAnh.y + rAnh.height}}, chữ={y:${rChu.y}-${rChu.y + rChu.height}}`,
-    ).toBe(true);
+      rChu.y,
+      `Khối chữ phải bắt đầu dưới đáy ảnh: ảnh={y:${rAnh.y}-${rAnh.y + rAnh.height}}, chữ từ y=${rChu.y}`,
+    ).toBeGreaterThanOrEqual(rAnh.y + rAnh.height - 1);
+    ownIpExpect(rAnh.height / DIEN_THOAI.height).toBeGreaterThan(0.5);
+    ownIpExpect(rAnh.height / DIEN_THOAI.height).toBeLessThan(0.66);
+    // Không lớp tối phủ lên ảnh (lớp gradient cũ của kiểu tạp chí).
+    await ownIpExpect(khoiAnh.locator("div[aria-hidden='true']")).toHaveCount(0);
   });
 
   // -------------------------------------------------------------------------

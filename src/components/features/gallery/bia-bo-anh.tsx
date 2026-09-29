@@ -285,11 +285,17 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
 
     return (
       <section aria-label="Ảnh bìa — đã giao" data-testid="bia-bo-anh" className="w-full bg-[#fbf7f2] text-[#2e2a27]">
-        <div className="mx-auto max-w-[1360px] px-6 pt-8 sm:px-8 lg:grid lg:grid-cols-[760px_minmax(0,1fr)] lg:gap-20 lg:px-10">
+        {/*
+          BB-317 K-d — CÙNG LƯỚI BÌA với màn đầu (K1) và màn đang chỉnh (K10):
+          máy tính chia hai cột `[1fr | 42%]`, ẢNH Ở CỘT PHẢI tràn mép, chữ ở cột
+          trái; điện thoại giữ ảnh trên, chữ dưới. Trước đây ảnh nằm TRÁI trong
+          khung 760px nên hai màn cùng một bộ ảnh đổi phía ảnh khi chuyển trạng thái.
+        */}
+        <div className="lg:grid lg:min-h-[640px] lg:grid-cols-[minmax(0,1fr)_42%] lg:items-stretch">
           {/* Bìa nhỏ RÕ MÀU — không dimmed/không nhạt (mục 5 XONG.md). */}
           <div
             data-testid="bia-khoi-anh"
-            className="relative h-[300px] w-full overflow-hidden rounded-[4px] bg-[#dcc0ae] sm:h-[360px] lg:h-[540px]"
+            className="relative mx-6 mt-8 h-[300px] overflow-hidden rounded-[4px] bg-[#dcc0ae] sm:mx-8 sm:h-[360px] lg:col-start-2 lg:row-start-1 lg:m-0 lg:h-auto lg:rounded-none"
           >
             {anhBia ? (
               <img
@@ -306,7 +312,8 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
             ) : null}
           </div>
 
-          <div className="mt-6 lg:mt-10">
+          <div className="mt-6 px-6 sm:px-8 lg:col-start-1 lg:row-start-1 lg:mt-0 lg:flex lg:flex-col lg:justify-center lg:px-10 lg:py-10 xl:px-16">
+           <div className="lg:max-w-2xl">
             <span
               data-testid="dau-da-hoan-thien"
               className="inline-flex h-[30px] items-center gap-1.5 rounded-full bg-[#e3eee9] px-3.5 text-[13px] font-medium text-[#2f4a40]"
@@ -365,6 +372,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                   Pro mặc định theo LUẬT PHÔNG mới. */}
               <p className="text-[16px] leading-relaxed text-[#4a423b] sm:text-[17px]">{camOn}</p>
             </div>
+           </div>
           </div>
         </div>
       </section>
@@ -550,8 +558,12 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
         aria-label="Ảnh bìa"
         data-testid="bia-bo-anh"
         className={cn(
-          "relative isolate grid w-full grid-cols-1 grid-rows-1 overflow-hidden bg-[#fbf7f2] text-[#2e2a27]",
-          "@[64rem]:grid-cols-[minmax(0,1fr)_42%] @[64rem]:items-stretch",
+          // BB-317 K-b — điện thoại: CỘT DỌC hai khối (ảnh sạch phía trên, dải kem chứa chữ +
+          // nút phía dưới), y hệt cách máy tính tách ảnh và cột chữ. Ảnh nhận PHẦN CÒN LẠI của
+          // màn sau khi trừ khối chữ (tối đa ~62% màn), nên tên/loại buổi chụp dài thì ảnh co
+          // lại chứ nút chính không bị đẩy xuống dưới mép màn. Máy tính: một hàng, hai cột.
+          "relative isolate flex min-h-[calc(var(--bb-bia-khung-cao,100svh)-var(--bb-phan-tren-bia,0px))] w-full flex-col overflow-hidden bg-[#fbf7f2] text-[#2e2a27]",
+          "@[64rem]:grid @[64rem]:min-h-0 @[64rem]:grid-cols-[minmax(0,1fr)_42%] @[64rem]:grid-rows-1 @[64rem]:items-stretch",
           className,
         )}
       >
@@ -597,7 +609,9 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           // khách không đặt biến này — điện thoại rơi về `100svh` y như cũ,
           // máy tính rơi về `0px` (tức `min-h-0` y như cũ) — không đổi hành vi
           // màn khách ở cả hai bề rộng.
-          className="relative col-start-1 col-end-2 row-start-1 row-end-2 min-h-[calc(var(--bb-bia-khung-cao,100svh)_-_var(--bb-phan-tren-bia,0px))] w-full bg-[#e2c9bb] @[64rem]:col-start-2 @[64rem]:col-end-3 @[64rem]:min-h-[var(--bb-bia-khung-cao,0px)] @[64rem]:h-auto"
+          // BB-317 K-b — điện thoại: ảnh chiếm ~62% chiều cao màn (không chữ, không nút,
+          // không lớp tối), phần còn lại là dải kem của khối chữ bên dưới.
+          className="relative min-h-[220px] w-full max-h-[calc(var(--bb-bia-khung-cao,100svh)*0.62)] flex-1 basis-0 bg-[#e2c9bb] @[64rem]:col-start-2 @[64rem]:col-end-3 @[64rem]:h-auto @[64rem]:max-h-none @[64rem]:min-h-[var(--bb-bia-khung-cao,0px)] @[64rem]:flex-none @[64rem]:basis-auto"
         >
           {anhBia ? (
             <img
@@ -607,24 +621,13 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
               alt=""
               fetchPriority="high"
               decoding="async"
-              className="h-full w-full object-cover object-[50%_30%] @[64rem]:object-center motion-safe:animate-[bia-hien_1.2s_ease-out]"
+              className="absolute inset-0 h-full w-full object-cover object-[50%_30%] @[64rem]:object-center motion-safe:animate-[bia-hien_1.2s_ease-out]"
             />
           ) : placeholderChuaCoAnh ? (
-            <div className="flex h-full w-full items-center justify-center px-6 text-center text-sm text-[#6b5d4f]">
+            <div className="absolute inset-0 flex items-center justify-center px-6 text-center text-sm text-[#6b5d4f]">
               {placeholderChuaCoAnh}
             </div>
           ) : null}
-
-          {/* Lớp tối dần — CHỈ điện thoại (bản vẽ `.phu`), máy tính không cần
-              vì chữ đứng ở cột riêng nền kem, không đè ảnh. */}
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 @[64rem]:hidden"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(28,22,18,.28) 0, rgba(28,22,18,0) 120px, rgba(28,22,18,0) 380px, rgba(28,22,18,.58) 640px, rgba(28,22,18,.72) 100%)",
-            }}
-          />
         </div>
 
         {/*
@@ -636,13 +639,14 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
         <div
           data-testid="bia-khoi-chu"
           className={cn(
-            "relative z-10 col-start-1 col-end-2 row-start-1 row-end-2 self-end px-6 pb-10 text-[#fbf7f2]",
-            "@[64rem]:static @[64rem]:row-start-1 @[64rem]:self-auto @[64rem]:flex @[64rem]:flex-col @[64rem]:justify-center",
-            "@[64rem]:bg-[#fbf7f2] @[64rem]:px-10 @[64rem]:py-10 @[64rem]:text-[#2e2a27] @[80rem]:px-16",
+            // BB-317 K-b — điện thoại: dải kem RIÊNG dưới ảnh (hàng 2), chữ mực — không đè ảnh nữa.
+            "relative z-10 shrink-0 bg-[#fbf7f2] px-6 pb-6 pt-5 text-[#2e2a27]",
+            "@[64rem]:static @[64rem]:col-start-1 @[64rem]:row-start-1 @[64rem]:row-end-2 @[64rem]:flex @[64rem]:flex-col @[64rem]:justify-center",
+            "@[64rem]:px-10 @[64rem]:py-10 @[80rem]:px-16",
           )}
         >
           <div className="@[64rem]:max-w-2xl">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#fbf7f2]/85 @[64rem]:text-[#6b6057] @[64rem]:tracking-[0.16em]">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[#6b6057] @[64rem]:tracking-[0.16em]">
               {bia.eyebrow}
             </p>
 
@@ -670,19 +674,26 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                 bé/tiêu đề bìa), nhưng bỏ nghiêng: luật mới cấm italic kể cả
                 dòng loại buổi chụp ("Thôi nôi") ở đây. */}
             {dungTieuDeTuDong && bia.phuDe && (
-              <p className="mt-1.5 font-display text-[26px] leading-[1.2] text-[#fbf7f2]/92 @[64rem]:mt-2.5 @[64rem]:text-[28px] @[64rem]:text-[#4a423b]">
+              <p className="mt-1.5 font-display text-[24px] leading-[1.2] text-[#4a423b] @[64rem]:mt-2.5 @[64rem]:text-[28px]">
                 {bia.phuDe}
               </p>
             )}
 
-            {/* Lời chào — chỉ máy tính (bản vẽ `.loi`); điện thoại không có chỗ, dòng cuối thay thế. */}
-            <p className="mt-5 hidden max-w-[29rem] text-[15px] leading-relaxed text-[#4a423b] @[64rem]:block">
+            {/* Lời chào — máy tính luôn hiện (bản vẽ `.loi`). BB-317 K-f: điện thoại chỉ hiện khi bộ ảnh
+                đang KHOÁ, để dòng trạng thái "Studio đang chỉnh ảnh của …" có mặt ở cả hai khổ. */}
+            <p
+              data-testid="bia-loi-chao"
+              className={cn(
+                "mt-3 max-w-[29rem] text-[14px] leading-relaxed text-[#4a423b] @[64rem]:mt-5 @[64rem]:block @[64rem]:text-[15px]",
+                khoa ? "block" : "hidden",
+              )}
+            >
               {loiChaoBia}
             </p>
 
             {/* Dòng phụ ngày/chi nhánh — CHỈ điện thoại (bản vẽ `.meta`). */}
             {(ngay || chiNhanh) && (
-              <div className="mt-4.5 flex items-center gap-1.5 text-[13px] text-[#fbf7f2]/85 @[64rem]:hidden">
+              <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[13px] text-[#6b6057] @[64rem]:hidden">
                 {ngay && (
                   <span className="inline-flex items-center gap-1.5">
                     <Clock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
@@ -732,7 +743,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
               <button
                 type="button"
                 onClick={onBatDau}
-                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#fbf7f2] px-7 text-[15px] font-medium text-[#2e2a27] transition hover:bg-white active:scale-[0.98] @[64rem]:w-auto @[64rem]:bg-[#2e2a27] @[64rem]:text-[#fbf7f2] @[64rem]:hover:bg-[#2e2a27]/90"
+                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#2e2a27] px-7 text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98] @[64rem]:w-auto"
               >
                 {nhanNut} <ArrowDown className="h-4 w-4 -rotate-90" aria-hidden="true" />
               </button>
@@ -750,7 +761,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
 
             {/* Dòng cuối điện thoại: N ảnh | M tấm trong gói | Chọn trước dd/mm (bản vẽ `.duoi`). */}
             {(soAnh > 0 || hanMuc != null || conNgay != null) && (
-              <div className="mt-3.5 flex flex-wrap justify-center gap-3 text-center text-[12px] text-[#fbf7f2]/80 @[64rem]:hidden">
+              <div className="mt-3.5 flex flex-wrap justify-center gap-3 text-center text-[12px] text-[#6b6057] @[64rem]:hidden">
                 {soAnh > 0 && <span>{soAnh.toLocaleString("vi-VN")} ảnh</span>}
                 {hanMuc != null && (
                   <>

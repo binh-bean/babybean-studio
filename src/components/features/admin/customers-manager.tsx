@@ -504,7 +504,7 @@ function HoSoKhach({
       ) : !ct ? null : (
         <>
           {ct.khach.truongBiGhiDe.length > 0 && (
-            <p className="rounded-lg border border-[var(--bb-warning)] bg-[var(--bb-warning)]/10 px-3 py-2 text-sm">
+            <p className="rounded-lg border border-[var(--bb-danger)] bg-[var(--bb-danger)]/10 px-3 py-2 text-sm">
               {t.canhBaoLark}
             </p>
           )}

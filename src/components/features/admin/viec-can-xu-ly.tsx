@@ -146,10 +146,11 @@ export function ViecCanXuLy({ role }: { role?: string }) {
     <div className="space-y-6">
       <PageHeader
         title="Việc cần xử lý"
-        description="Ba hàng đợi CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức."
+        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại."
       />
       <Tabs value={active} onValueChange={onChange}>
-        <TabsList>
+        {/* BB-318: hàng tab xuống dòng thay vì tràn ngang — trên 390px bốn tab không vừa một hàng, và bấm tab từng làm CẢ TRANG trượt sang bên. */}
+        <TabsList className="h-auto flex-wrap justify-start gap-1">
           {tabsChoVai.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value} data-testid={`tab-${tab.value}`}>
               <span className="flex items-center gap-1.5">

@@ -24,7 +24,7 @@ describe("nhanHienThi — luồng docs/19 mục 3", () => {
   it("CSKH xác nhận, Lark còn 'Đã chọn hình': khách thấy 'đã được ghi nhận yêu cầu', không phải đang chỉnh", () => {
     const n = nhanHienThi("in_retouch", DA_CHON, nhanApp);
     expect(n.khach).toBe("Bộ ảnh đã được ghi nhận yêu cầu");
-    expect(n.quanTri).toBe("Đã chọn hình · chờ chỉnh sửa");
+    expect(n.quanTri).toBe("Đã chọn ảnh · chờ chỉnh sửa");
     expect(n.khach).not.toMatch(/chỉnh sửa/i);
   });
 

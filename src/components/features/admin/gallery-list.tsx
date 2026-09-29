@@ -11,7 +11,7 @@ import { GalleryFilters, type GalleryFilterState } from "./gallery-filters";
 import { getContractCodesForGalleries } from "@/app/(admin)/admin/galleries/actions";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
-import { formatSdt, tinhTieuDeBoAnhQuanTri } from "@/lib/utils/dinh-dang";
+import { formatNgayVN, formatSdt, tinhTieuDeBoAnhQuanTri } from "@/lib/utils/dinh-dang";
 import { loiNhacKhach } from "@/lib/utils/bang-dieu-khien";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
@@ -162,6 +162,8 @@ export interface GalleryItem {
   statusLabel?: string;
   /** Mức cảnh báo từ Lark (`mauCanhBao()`); null = chưa đọc được hoặc không áp dụng. */
   warningColor?: MauCanhBao | null;
+  /** BB-318: tên trạng thái GỐC trên Lark, hiện trong tooltip của huy hiệu (nhãn app dùng chữ "ảnh"). */
+  larkTenTrangThai?: string | null;
   /**
    * BB-303 (bản vẽ BB-301, admin duyệt 28/09/2026) — ảnh bìa khách đã chọn,
    * chưa có thì tấm đầu của bộ (`anhBiaTheoBo()`, route API tính sẵn).
@@ -265,33 +267,10 @@ function ChamCanhBao({ mau }: { mau: MauCanhBao | null | undefined }) {
   );
 }
 
+/** BB-318 (Q-c): MỘT cách viết ngày — dd/mm/yyyy — dùng hàm chung (dinh-dang.ts). */
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const day = d.getDate().toString().padStart(2, "0");
-    const month = (d.getMonth() + 1).toString().padStart(2, "0");
-    const year = d.getFullYear();
-    return `${day}/${month}/${year}`;
-  } catch {
-    return dateStr;
-  }
-}
-
-/** BB-290 (#33): hạn chốt trong bảng rút gọn chỉ cần dd/mm, theo
- * quan-tri-bo-anh-bang.png — năm không cần thiết ở một cột đã hẹp lại. */
-function formatDateShort(dateStr: string | null | undefined): string {
-  if (!dateStr) return "—";
-  try {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "—";
-    const day = d.getDate().toString().padStart(2, "0");
-    const month = (d.getMonth() + 1).toString().padStart(2, "0");
-    return `${day}/${month}`;
-  } catch {
-    return "—";
-  }
+  return formatNgayVN(dateStr) || dateStr;
 }
 
 /**
@@ -860,7 +839,7 @@ export function GalleryList() {
                             {item.progress}
                           </span>
                           {item.extraCount > 0 && (
-                            <span className="text-[11px] text-[var(--bb-warning)] whitespace-nowrap">
+                            <span className="text-[11px] text-[var(--bb-danger)] whitespace-nowrap">
                               (+{item.extraCount})
                             </span>
                           )}
@@ -871,7 +850,7 @@ export function GalleryList() {
                       <td className="px-4 py-3">
                         {/* BB-303 (luật phông): tabular-nums thay font-mono. */}
                         <div className="text-xs tabular-nums text-[var(--bb-fg-muted)]">
-                          {formatDateShort(item.dueAt)}
+                          {formatDate(item.dueAt)}
                         </div>
                         {item.urgency === "overdue" && (
                           <span className="inline-flex items-center text-[10px] text-[var(--bb-danger)] font-medium whitespace-nowrap">
@@ -879,7 +858,7 @@ export function GalleryList() {
                           </span>
                         )}
                         {item.urgency === "due_soon" && (
-                          <span className="inline-flex items-center text-[10px] text-[var(--bb-warning)] font-medium whitespace-nowrap">
+                          <span className="inline-flex items-center text-[10px] text-[var(--bb-danger)] font-medium whitespace-nowrap">
                             <Clock className="h-3 w-3 mr-0.5" /> Sắp hết
                           </span>
                         )}
@@ -890,7 +869,7 @@ export function GalleryList() {
                       <td className="px-4 py-3 text-center">
                         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                           <ChamCanhBao mau={item.warningColor} />
-                          <Badge variant={statusConfig.variant} className="whitespace-nowrap">
+                          <Badge variant={statusConfig.variant} className="whitespace-nowrap" title={item.larkTenTrangThai ? `Trên Lark: ${item.larkTenTrangThai}` : undefined}>
                             {item.statusLabel ?? statusConfig.label}
                           </Badge>
                         </span>
@@ -955,7 +934,7 @@ export function GalleryList() {
                       </p>
                       <span className="inline-flex items-center gap-1.5">
                         <ChamCanhBao mau={item.warningColor} />
-                        <Badge variant={statusConfig.variant} className="whitespace-nowrap">
+                        <Badge variant={statusConfig.variant} className="whitespace-nowrap" title={item.larkTenTrangThai ? `Trên Lark: ${item.larkTenTrangThai}` : undefined}>
                           {item.statusLabel ?? statusConfig.label}
                         </Badge>
                       </span>
@@ -988,7 +967,7 @@ export function GalleryList() {
                       Đã chọn:{" "}
                       <span className="text-[var(--bb-primary)]">{item.progress}</span>
                       {item.extraCount > 0 && (
-                        <span className="text-[var(--bb-warning)] ml-1">
+                        <span className="text-[var(--bb-danger)] ml-1">
                           (+{item.extraCount})
                         </span>
                       )}

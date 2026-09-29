@@ -33,7 +33,13 @@ import {
 import { THU_TU_HIEN_THI_MUA_THEM } from "@/lib/utils/mua-them-7-ngay";
 import { dongCanXuLy, type CanXuLyTongHop } from "@/lib/utils/can-xu-ly";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
-import { tinhTenBiaTuDuLieu, tinhTieuDeBoAnhQuanTri } from "@/lib/utils/dinh-dang";
+import {
+  formatGioVN,
+  formatKhoangNgayVN,
+  formatNgayVN,
+  tinhTenBiaTuDuLieu,
+  tinhTieuDeBoAnhQuanTri,
+} from "@/lib/utils/dinh-dang";
 import { CARD_TITLE_CLASS, PAGE_TITLE_CLASS } from "./page-header";
 
 /** Màu dải cơ cấu Mua thêm theo ĐÚNG bản vẽ: Ảnh in (mực) · Khung (rêu) · Album (hồng). */
@@ -312,8 +318,17 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     const laTot = soSanh ? bienDongLaTot(soSanh.chenhLechPhanTram, stat.huongTangLaTot) : null;
     return (
       <Card>
-        <CardContent className="p-5 space-y-3">
-          <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--bb-fg-muted)]">
+        <CardContent className="p-4 sm:p-5 space-y-3">
+          <span
+            className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--bb-fg-muted)]"
+            // BB-318 (Q-d): con số này gồm cả bộ "Sẵn sàng gửi khách" (chưa mở link) lẫn bộ
+            // "Khách đang chọn ảnh"; báo cáo Tiến độ chọn ảnh chỉ đếm nhóm sau.
+            title={
+              stat.key === "waitingForSelection"
+                ? "Gồm bộ Sẵn sàng gửi khách và bộ Khách đang chọn ảnh. Báo cáo Tiến độ chọn ảnh chỉ đếm nhóm sau."
+                : undefined
+            }
+          >
             {/* BB-301: chấm san hô CHỈ ở "Sắp hết hạn" và "Quá hạn" — cảnh báo, không trang trí thẻ khác. */}
             {(stat.key === "dueSoon" || stat.key === "overdue") && (
               <i aria-hidden="true" className="block h-[7px] w-[7px] shrink-0 rounded-full bg-[var(--bb-danger)]" />
@@ -359,10 +374,16 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
 
   const hangTheSo = (
     <>
-      {/* Điện thoại (< sm): cuộn ngang, Quá hạn đứng đầu. */}
-      <div className="flex gap-3 overflow-x-auto pb-1 sm:hidden" role="list" aria-label="Số liệu tổng quan">
-        {thuTuDienThoai.map((stat) => (
-          <div key={stat.key} role="listitem" className="w-[128px] shrink-0">
+      {/* Điện thoại (< sm): lưới 2 cột, Quá hạn đứng đầu. BB-318 (Q-a): bản cũ
+          là hàng cuộn ngang thẻ rộng 128px — thẻ thứ ba bị cắt ("CHỜ KHA CHỌN"),
+          người chấm đọc đó là thẻ tràn mép. Thẻ cuối (Đã giao) một mình một hàng. */}
+      <div className="grid grid-cols-2 gap-3 sm:hidden" role="list" aria-label="Số liệu tổng quan">
+        {thuTuDienThoai.map((stat, i) => (
+          <div
+            key={stat.key}
+            role="listitem"
+            className={i === thuTuDienThoai.length - 1 && thuTuDienThoai.length % 2 === 1 ? "col-span-2 min-w-0" : "min-w-0"}
+          >
             <MotTheSo stat={stat} />
           </div>
         ))}
@@ -549,11 +570,11 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
           Điện thoại (bang-dieu-khien-dien-thoai.html): thứ tự xếp DỌC khác
           máy tính — "Mua thêm 7 ngày" lên TRƯỚC "Việc hôm nay" (order-*), và
           "Theo chi nhánh" KHÔNG có trong bản vẽ điện thoại (`hidden lg:block`). */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
-        <div className="order-2 lg:order-1">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <div className="order-2 min-w-0 lg:order-1">
           <ViecHomNayCard items={data.viecHomNay ?? []} onLamMoi={loadData} />
         </div>
-        <div className="order-1 flex flex-col gap-6 lg:order-2">
+        <div className="order-1 flex min-w-0 flex-col gap-6 lg:order-2">
           {/* Chống vỡ trang khi phản hồi API còn thiếu các trường MỚI của
               BB-303 (ví dụ bản đã lưu đệm/giả lập cũ chưa có
               muaThem7Ngay/theoChiNhanhMuaThem) — một khối trống hoá ra một
@@ -703,7 +724,7 @@ function dongPhuViec(item: ViecHomNayItem): string {
   return phan.join(" · ");
 }
 
-/** Nhãn hạn + có trễ hay không — "Trễ N ngày/giờ" / "hôm nay HH:mm" / "HH:mm" / "dd/mm". */
+/** Nhãn hạn + có trễ hay không — "Trễ N ngày/giờ" / "HH:mm" (hôm nay) / "dd/mm/yyyy". */
 function nhanHanViec(item: ViecHomNayItem, now: Date): { text: string; tre: boolean } {
   // BB-312 — không có "hạn giao" thật; "lần N" nói rõ hơn cho CSKH đây là
   // việc đã dồn lại bao nhiêu lượt, thay vì im lặng như "Cần xử lý" chung
@@ -720,9 +741,9 @@ function nhanHanViec(item: ViecHomNayItem, now: Date): { text: string; tre: bool
   }
   const cungNgay = due.toDateString() === now.toDateString();
   if (cungNgay) {
-    return { text: due.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }), tre: false };
+    return { text: formatGioVN(due), tre: false };
   }
-  return { text: due.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" }), tre: false };
+  return { text: formatNgayVN(due), tre: false };
 }
 
 /**
@@ -1021,12 +1042,10 @@ function MuaThem7NgayCard({ data }: { data: MuaThem7NgayData }) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <CardTitle className={CARD_TITLE_CLASS}>Mua thêm · 7 ngày qua</CardTitle>
           {data.tu && data.den && (
-            <span className="whitespace-nowrap text-xs text-[var(--bb-fg-muted)]">
-              {data.tu.split("-").reverse().slice(0, 2).join("/")} – {data.den.split("-").reverse().slice(0, 2).join("/")}
-            </span>
+            <span className="text-xs text-[var(--bb-fg-muted)]">{formatKhoangNgayVN(data.tu, data.den)}</span>
           )}
         </div>
       </CardHeader>

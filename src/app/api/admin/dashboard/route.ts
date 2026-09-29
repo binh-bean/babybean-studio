@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
 import { thangNay, thangTruoc, chenhLechPhanTram, nNgayGanDay, kyTruocCungDoDai, dinhDangNgayVN, ngayVN } from "@/lib/bao-cao/ky";
 import { locBoAnhThat } from "@/lib/bao-cao/loc-chung";
-import { qua60NgayFileGoc, laKhoaTheoLark } from "@/lib/lark/trang-thai-hau-ky";
+import { conChoKhachChonTheoLark } from "@/lib/gallery/cho-khach-chon";
 import {
   TRANG_THAI_DANG_HOAT_DONG,
   TRANG_THAI_DA_CHOT,
@@ -231,13 +231,7 @@ export async function GET(request: Request): Promise<Response> {
     const homNay = new Date();
     const waitingForSelection = (
       (choChonRows.data ?? []) as { lark_trang_thai: string | null; lark_trang_thai_tu: string | null }[]
-    ).filter((g) => {
-      if (laKhoaTheoLark(g.lark_trang_thai)) return false;
-      if (qua60NgayFileGoc(g.lark_trang_thai, g.lark_trang_thai_tu ? new Date(g.lark_trang_thai_tu) : null, homNay)) {
-        return false;
-      }
-      return true;
-    }).length;
+    ).filter((g) => conChoKhachChonTheoLark(g, homNay)).length;
 
     // BB-270: tiến độ theo chi nhánh — chỉ những chi nhánh nhân viên này được
     // xem (`branchIds` đã áp `staff.branchIds`/`system:superuser` ở trên).

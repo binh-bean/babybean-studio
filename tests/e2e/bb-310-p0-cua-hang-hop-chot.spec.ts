@@ -258,11 +258,13 @@ ownIpTest.describe("BB-310 mục 2: Hộp chốt — chữ khớp luật, chọn
     // với chữ "để sau cũng được" của mục sản phẩm thiếu ảnh (khác nhau).
     // Chữ này lặp lại đúng nguyên văn ở CẢ khối nhắc lẫn dòng lý do khoá nút
     // (cố ý, để nhất quán) — `.first()` để không vỡ strict mode.
-    await ownIpExpect(page.getByText("Chọn một tấm làm bìa cuốn album để xác nhận").first()).toBeVisible();
+    // BB-317 K-e — MỘT dòng yêu cầu gọi đúng tên sản phẩm, ≤ 12 chữ, không còn câu lặp dưới nút.
+    const dongYeuCau = page.getByTestId("ly-do-khoa-nut-chot");
+    await ownIpExpect(dongYeuCau).toBeVisible();
+    await ownIpExpect(dongYeuCau).toHaveText(/^Chọn ảnh bìa cho .+ để chốt\.$/);
     await ownIpExpect(page.getByRole("button", { name: "Xác nhận" })).toBeDisabled();
-    await ownIpExpect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText(
-      "Chọn một tấm làm bìa cuốn album để xác nhận",
-    );
+    // BB-317 (Cảm xúc) — tiêu đề hộp chốt gọi tên bé (họ tên đầy đủ khi không nickname).
+    await ownIpExpect(page.getByRole("heading", { name: "Chốt ảnh cho bé Nguyễn Minh An" })).toBeVisible();
 
     await page.screenshot({ path: `${THU_MUC_ANH}/2-hop-chot-khoa.png` });
     await page.screenshot({ path: `${CHUP}/2-hop-chot-khoa.png` });
@@ -281,7 +283,7 @@ ownIpTest.describe("BB-310 mục 2: Hộp chốt — chữ khớp luật, chọn
     await page.getByRole("checkbox").setChecked(true, { force: true });
 
     await ownIpExpect(
-      page.getByText("Chọn một tấm làm bìa cuốn album để xác nhận"),
+      page.getByTestId("ly-do-khoa-nut-chot"),
       "Hộp chốt vẫn khoá ngay sau khi chọn bìa — đúng lỗi báo cáo mục 2 (3,8–7,6 giây)",
     ).toHaveCount(0);
     await ownIpExpect(page.getByRole("button", { name: "Xác nhận" })).toBeEnabled();

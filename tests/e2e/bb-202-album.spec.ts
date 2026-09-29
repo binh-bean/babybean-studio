@@ -240,13 +240,11 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     // chặn) làm ba mẹ hiểu nhầm bìa album cũng để sau được. Đổi chữ rõ ràng
     // hơn, GIỮ NGUYÊN quy tắc (bìa album vẫn bắt buộc). Chữ này lặp lại ở cả
     // khối nhắc lẫn dòng lý do khoá nút (cố ý) — `.first()` tránh strict mode.
-    await expect(page.getByText("Chọn một tấm làm bìa cuốn album để xác nhận").first()).toBeVisible();
+    // BB-317 K-e — dòng yêu cầu gọi đúng tên sản phẩm (một dòng, không lặp dưới nút).
+    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText(/^Chọn ảnh bìa cho .+ để chốt\.$/);
     // Nút Xác nhận phải bị khoá lại — không cho chốt khi còn thiếu bìa — và
     // lý do khoá phải hiện ngay dưới nút (BB-295 mục #6).
     await expect(page.getByRole("button", { name: "Xác nhận" })).toBeDisabled();
-    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText(
-      "Chọn một tấm làm bìa cuốn album để xác nhận",
-    );
 
     await page.getByTestId("nut-chon-bia-ngay").click();
 
@@ -269,7 +267,7 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     // BB-310 mục 2 — chọn bìa xong mở lại hộp chốt phải thấy NGAY hộp đã hết
     // khoá (cập nhật lạc quan tại chỗ, không chờ tải lại toàn bộ — xem
     // `chonBiaAlbum` ở `gallery-app.tsx`).
-    await expect(page.getByText("Chọn một tấm làm bìa cuốn album để xác nhận")).toHaveCount(0);
+    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveCount(0);
     await page.getByRole("button", { name: "Xác nhận" }).click();
 
     await expect

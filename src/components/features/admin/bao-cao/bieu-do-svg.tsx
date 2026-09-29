@@ -9,8 +9,9 @@
 
 import React from "react";
 import type { BieuDoBaoCao } from "@/lib/bao-cao/loai";
+import { mocTrucY } from "@/lib/bao-cao/truc-y";
 
-const MAU_CHUOI = ["var(--bb-primary)", "var(--bb-accent)", "var(--bb-warning)", "var(--bb-urgent)"];
+const MAU_CHUOI = ["var(--bb-primary)", "var(--bb-accent)", "var(--bb-danger)", "var(--bb-urgent)"];
 
 export function BieuDoSvg({ bieuDo }: { bieuDo: BieuDoBaoCao }) {
   const RONG = 640;
@@ -20,7 +21,9 @@ export function BieuDoSvg({ bieuDo }: { bieuDo: BieuDoBaoCao }) {
   const LE_TREN = 12;
 
   const tatCaGiaTri = bieuDo.chuoi.flatMap((c) => c.giaTri);
-  const max = Math.max(1, ...tatCaGiaTri);
+  // BB-318 (Q-d): vạch trục Y chỉ số nguyên, không lặp; `max` = vạch trên cùng.
+  const mocY = mocTrucY(Math.max(1, ...tatCaGiaTri));
+  const max = mocY[mocY.length - 1]!;
   const n = bieuDo.nhan.length;
 
   if (n === 0 || tatCaGiaTri.every((v) => v === 0)) {
@@ -33,8 +36,6 @@ export function BieuDoSvg({ bieuDo }: { bieuDo: BieuDoBaoCao }) {
   const xCua = (i: number) => LE_TRAI + (n <= 1 ? rongVe / 2 : (i / (n - 1)) * rongVe);
   const rongCot = n > 0 ? Math.max(4, (rongVe / n) * 0.6) : 4;
 
-  const mocLuoi = 4;
-
   return (
     <svg
       viewBox={`0 0 ${RONG} ${CAO}`}
@@ -42,11 +43,10 @@ export function BieuDoSvg({ bieuDo }: { bieuDo: BieuDoBaoCao }) {
       role="img"
       aria-label="Biểu đồ báo cáo"
     >
-      {Array.from({ length: mocLuoi + 1 }).map((_, i) => {
-        const y = LE_TREN + (caoVe / mocLuoi) * i;
-        const gia = Math.round(max - (max / mocLuoi) * i);
+      {mocY.map((gia) => {
+        const y = yCua(gia);
         return (
-          <g key={i}>
+          <g key={gia}>
             <line
               x1={LE_TRAI}
               y1={y}

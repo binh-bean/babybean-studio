@@ -34,6 +34,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { CARD_TITLE_CLASS } from "./page-header";
+import { formatNgayGioVN } from "@/lib/utils/dinh-dang";
 
 interface LoiItem {
   galleryId: string;
@@ -372,13 +373,5 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
 /** Chưa đồng bộ lần nào thì để gạch ngang, đừng bịa ra ngày 01/01/1970. */
 function formatDateTime(value: string | null): string {
   if (!value) return "Chưa từng tải được";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatNgayGioVN(value) || "—";
 }

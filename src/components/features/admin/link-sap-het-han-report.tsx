@@ -30,6 +30,8 @@
 import React from "react";
 import Link from "next/link";
 import { CARD_TITLE_CLASS } from "./page-header";
+import { Badge } from "@/components/ui/badge";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 
 interface Item {
   shareLinkId: string;
@@ -168,20 +170,11 @@ export function LinkSapHetHanReport() {
                   >
                     {it.customerName ?? "—"}
                   </Link>
-                  <span
-                    className="inline-block rounded-full border px-2 py-0.5 text-xs"
-                    style={{
-                      borderColor: it.daChet
-                        ? "var(--bb-danger)"
-                        : it.conLaiNgay <= 7
-                          ? "var(--bb-warning)"
-                          : "var(--bb-border)",
-                    }}
-                  >
+                  <Badge variant={it.daChet || it.conLaiNgay <= 7 ? "danger" : "outline"}>
                     {it.daChet
                       ? `chết ${Math.abs(it.conLaiNgay)} ngày`
                       : `còn ${it.conLaiNgay} ngày`}
-                  </span>
+                  </Badge>
                 </div>
 
                 {/* Số điện thoại lên hàng đầu và bấm gọi được ngay. */}
@@ -225,20 +218,11 @@ export function LinkSapHetHanReport() {
               {items.map((it) => (
                 <tr key={it.shareLinkId} className="border-b border-[var(--bb-border)]">
                   <td className="py-2 pr-3">
-                    <span
-                      className="inline-block rounded-full border px-2 py-0.5 text-xs"
-                      style={{
-                        borderColor: it.daChet
-                          ? "var(--bb-danger)"
-                          : it.conLaiNgay <= 7
-                            ? "var(--bb-warning)"
-                            : "var(--bb-border)",
-                      }}
-                    >
+                    <Badge variant={it.daChet || it.conLaiNgay <= 7 ? "danger" : "outline"}>
                       {it.daChet
                         ? `chết ${Math.abs(it.conLaiNgay)} ngày`
                         : `còn ${it.conLaiNgay} ngày`}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="py-2 pr-3">
                     <Link
@@ -311,6 +295,5 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
 }
 
 function ngay(value: string): string {
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("vi-VN");
+  return formatNgayVN(value) || "—";
 }

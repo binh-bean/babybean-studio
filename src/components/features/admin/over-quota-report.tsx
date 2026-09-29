@@ -28,6 +28,7 @@
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { CARD_TITLE_CLASS } from "./page-header";
+import { formatNgayVN } from "@/lib/utils/dinh-dang";
 
 interface ReportItem {
   galleryId: string;
@@ -88,7 +89,7 @@ export function OverQuotaReport() {
     <div className="flex flex-col gap-6">
       {/* BB-280: tiêu đề cấp trang chuyển sang PageHeader của /admin/viec-can-xu-ly. */}
       <header>
-        <h2 className={CARD_TITLE_CLASS}>Ảnh đã giao vượt hạn mức chưa thu tiền</h2>
+        <h2 className={CARD_TITLE_CLASS}>Ảnh khách chọn vượt hạn mức, chưa thu tiền</h2>
         <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
           Bộ ảnh khách đã chọn nhiều hơn số ảnh đã trả tiền, và chưa mua thêm.
         </p>
@@ -229,8 +230,5 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
 }
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("vi-VN");
+  return (value && formatNgayVN(value)) || "—";
 }

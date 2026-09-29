@@ -17,6 +17,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { Info } from "lucide-react";
+import { formatGioVN, formatNgayGioVN } from "@/lib/utils/dinh-dang";
 
 interface DongThoiGian {
   luc: string;
@@ -49,7 +50,7 @@ function thoiGianTuongDoi(iso: string, bayGio: number = Date.now()): string {
   if (gio < 24) return `${gio} giờ trước`;
 
   const d = new Date(luc);
-  const gioPhut = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  const gioPhut = formatGioVN(d);
 
   const homNay = new Date(bayGio);
   const homQua = new Date(bayGio);
@@ -60,8 +61,7 @@ function thoiGianTuongDoi(iso: string, bayGio: number = Date.now()): string {
   if (cungNgay(d, homQua)) return `hôm qua ${gioPhut}`;
   if (cungNgay(d, homNay)) return gioPhut;
 
-  const ngayThang = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
-  return `${ngayThang} ${gioPhut}`;
+  return formatNgayGioVN(d);
 }
 
 export function DongThoiGianHoatDong({

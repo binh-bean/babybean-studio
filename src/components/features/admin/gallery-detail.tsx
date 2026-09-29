@@ -46,21 +46,14 @@ import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import { nhomSanPham } from "@/lib/products/nhom-san-pham";
-import { formatKichThuoc, formatSdt, formatNgayVN, tinhTieuDeBoAnhQuanTri } from "@/lib/utils/dinh-dang";
-/**
- * "27/09" — ngày/tháng KHÔNG kèm năm, dùng riêng cho thẻ "Chốt lúc" (hàng số
- * liệu đầu trang chi tiết bộ ảnh) để khớp bản vẽ quan-tri-chi-tiet.html và
- * không tràn thẻ hẹp trên điện thoại (BB-294 #18). `formatNgayVN` dùng chung
- * toàn app in đủ năm — không đổi hàm đó vì nơi khác vẫn cần đủ năm.
- */
-function formatNgayNgan(input: string): string {
-  const d = new Date(input);
-  if (Number.isNaN(d.getTime())) return "";
-  const ngay = String(d.getDate()).padStart(2, "0");
-  const thang = String(d.getMonth() + 1).padStart(2, "0");
-  return `${ngay}/${thang}`;
-}
-
+import {
+  formatGioVN,
+  formatKichThuoc,
+  formatNgayGioVN,
+  formatNgayVN,
+  formatSdt,
+  tinhTieuDeBoAnhQuanTri,
+} from "@/lib/utils/dinh-dang";
 /**
  * BB-296 mục #6 — tên thân thiện cho một dòng "Mua thêm", cùng luật với
  * `tenThanThienSanPham` (`components/features/gallery/cua-hang.tsx`, màn
@@ -772,7 +765,12 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                   style={{ backgroundColor: canhBaoUi(detail.warningColor)!.mauToken }}
                 />
               )}
-              <Badge variant={statusBadge.variant}>{detail.statusLabel ?? statusBadge.label}</Badge>
+              <Badge
+                variant={statusBadge.variant}
+                title={detail.larkTenTrangThai ? `Trên Lark: ${detail.larkTenTrangThai}` : undefined}
+              >
+                {detail.statusLabel ?? statusBadge.label}
+              </Badge>
             </span>
           </div>
           {/* BB-303 (quan-tri-chi-tiet.png) — dòng phụ "khách · SĐT · chi
@@ -847,7 +845,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             // lên đầu trang — chỉ hiện MỘT bản, không lặp hai nút cùng ý.
             <div className="hidden shrink-0 flex-col items-end gap-2 lg:flex">
               {detail.outstanding > 0 && (
-                <p className="max-w-xs text-right text-xs text-[var(--bb-warning)]">
+                <p className="max-w-xs text-right text-xs text-[var(--bb-danger)]">
                   Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>
                 </p>
               )}
@@ -916,19 +914,13 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           value={`${new Intl.NumberFormat("vi-VN").format(Math.max(0, detail.addonsAmount))} ₫`}
         />
         <TheSoLieu
-          // BB-294 (#18, mục cũ #36): ngày KHÔNG kèm năm ("27/09" như bản vẽ)
-          // — bản cũ in cả năm ("27/09/2026") khiến thẻ hẹp trên điện thoại bị
-          // tràn giờ ra ngoài mép. Giờ:phút vẫn ở `phu`, như bản vẽ.
+          // BB-318 (Q-c): ngày đủ dd/mm/yyyy như mọi màn (không còn bản "27/09"
+          // rút gọn); `chuNho` co cỡ số để không tràn thẻ hẹp (BB-294 #18).
+          // Giờ:phút vẫn ở `phu`.
           label="Chốt lúc"
-          value={detail.submittedAt ? formatNgayNgan(detail.submittedAt) : "—"}
-          phu={
-            detail.submittedAt
-              ? new Date(detail.submittedAt).toLocaleTimeString("vi-VN", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : undefined
-          }
+          value={detail.submittedAt ? formatNgayVN(detail.submittedAt) || "—" : "—"}
+          phu={detail.submittedAt ? formatGioVN(detail.submittedAt) || undefined : undefined}
+          chuNho
         />
       </section>
 
@@ -990,7 +982,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
               {detail.photoCount} ảnh đã kéo về ·{" "}
               {detail.lastSyncedAt
-                ? `đồng bộ lần cuối ${new Date(detail.lastSyncedAt).toLocaleString("vi-VN")}`
+                ? `đồng bộ lần cuối ${formatNgayGioVN(detail.lastSyncedAt)}`
                 : "chưa đồng bộ lần nào"}
             </p>
 
@@ -1052,7 +1044,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                     đúng chuỗi đã ghi, để đối chiếu hoặc gửi thẳng cho khách.
                   </p>
                 ) : (
-                  <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
+                  <p className="rounded-md border border-[var(--bb-danger)] p-3 text-sm">
                     <strong>Chưa ghi được sang Lark — dán tay giúp.</strong> Sao link dưới đây
                     dán vào cột <em>Link app</em> đúng dòng Hậu Kỳ của khách này.
                     {lyDoKhongGhiLark ? (
@@ -1130,7 +1122,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             galleryId={galleryId}
             canhBaoLark={
               detail.larkTenTrangThai
-                ? `Lark: ${detail.larkTenTrangThai} · đọc lúc ${new Date(detail.larkDocLuc ?? "").toLocaleString("vi-VN")}`
+                ? `Lark: ${detail.larkTenTrangThai} · đọc lúc ${formatNgayGioVN(detail.larkDocLuc) || "—"}`
                 : "Chưa đọc được trạng thái từ Lark"
             }
           />
@@ -1145,7 +1137,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       {detail.status === "submitted" && (
         <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 border-t border-[var(--bb-border)] bg-[var(--bb-bg)]/95 p-3 backdrop-blur-sm lg:hidden">
           {detail.outstanding > 0 && (
-            <p className="text-center text-xs text-[var(--bb-warning)]">
+            <p className="text-center text-xs text-[var(--bb-danger)]">
               Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>
             </p>
           )}
@@ -1244,7 +1236,7 @@ function KhoiChinh({
           Giữ nguyên logic/route, chỉ đổi VỊ TRÍ và NHÃN hiện (ngắn hơn). */}
 
       {!detail.quotaKnown && (
-        <p className="rounded-md border border-[var(--bb-warning)] p-3 text-sm">
+        <p className="rounded-md border border-[var(--bb-danger)] p-3 text-sm">
           Bộ ảnh này <strong>chưa rõ hạn mức</strong>, nên khách <strong>không chọn ảnh
           được</strong>. Thêm dòng <em>Edit file</em> bên dưới với số ảnh trong gói, hoặc
           bổ sung bên Lark rồi đồng bộ lại.
@@ -1295,7 +1287,7 @@ function KhoiChinh({
                       role="img"
                       aria-label="Có ghi chú"
                       title="Có ghi chú"
-                      className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-[var(--bb-warning)] text-[9px] text-white"
+                      className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-[var(--bb-danger)] text-[9px] text-white"
                     >
                       ✎
                     </span>
@@ -1517,7 +1509,7 @@ function KhoiChinh({
             .map((r) => (
               <p
                 key={r.round}
-                className="mt-3 rounded-md border border-[var(--bb-warning)] p-3 text-sm"
+                className="mt-3 rounded-md border border-[var(--bb-danger)] p-3 text-sm"
               >
                 <strong>Khách yêu cầu sửa (vòng {r.round}):</strong> {r.note}
               </p>
@@ -1547,7 +1539,7 @@ function KhoiChinh({
                 {detail.revisions.map((r) => (
                   <li key={r.round} className="text-sm">
                     <span className="text-[var(--bb-fg-muted)]">
-                      Vòng {r.round} · {new Date(r.created_at).toLocaleDateString("vi-VN")}
+                      Vòng {r.round} · {formatNgayVN(r.created_at)}
                       {r.resolved_at ? " · đã xử lý" : " · đang chờ"}
                     </span>
                     <br />
@@ -2111,10 +2103,13 @@ function TheSoLieu({
   value,
   phu,
   canhBao,
+  chuNho,
 }: {
   label: string;
   value: string;
   phu?: string;
+  /** BB-318: cỡ số nhỏ hơn cho giá trị là NGÀY (dd/mm/yyyy dài hơn số đếm) — để không tràn thẻ hẹp trên điện thoại. */
+  chuNho?: boolean;
   /** Chấm cảnh báo nhẹ khi số liệu cần chú ý (vd. đã vượt hạn mức). */
   canhBao?: boolean;
 }) {
@@ -2134,13 +2129,13 @@ function TheSoLieu({
           (`.bb-so`) thay Playfair Display — MỘT kiểu số duy nhất cho mọi thẻ
           thống kê quản trị (BB-301 XONG.md mục 2), không còn số oldstyle lệch
           chân của Playfair. */}
-      <div className="bb-so mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0 text-[26px] leading-tight sm:text-[28px]">
+      <div className={`bb-so mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0 leading-tight ${chuNho ? "text-[20px] sm:text-[22px]" : "text-[26px] sm:text-[28px]"}`}>
         {canhBao && (
           <span
             role="img"
             aria-label="Cần chú ý"
             title="Cần chú ý"
-            className="mb-0.5 inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--bb-warning)]"
+            className="mb-0.5 inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--bb-danger)]"
           />
         )}
         <span>{value}</span>
@@ -2221,8 +2216,7 @@ function TinhTrangLink({ detail }: { detail: Detail }) {
     );
   }
 
-  const ngay = (v: string | null) =>
-    v ? new Date(v).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+  const ngay = (v: string | null) => (v ? formatNgayVN(v) || "—" : "—");
 
   // Hết hạn là một tình trạng THẬT, nhưng cột `status` không tự đổi khi đồng hồ
   // đi qua `expires_at` — không có ai chạy qua bảng để đổi nó. Tính ở đây, nếu
@@ -2231,22 +2225,19 @@ function TinhTrangLink({ detail }: { detail: Detail }) {
     link.status === "active" && link.expiresAt !== null && new Date(link.expiresAt) < new Date();
 
   const nhan = link.revokedAt
-    ? { chu: "Đã thu hồi", vien: "var(--bb-danger)" }
+    ? { chu: "Đã thu hồi", variant: "danger" as const }
     : daHetHan || link.status === "expired"
-      ? { chu: "Đã hết hạn", vien: "var(--bb-warning)" }
+      ? { chu: "Đã hết hạn", variant: "danger" as const }
       : link.status === "active"
-        ? { chu: "Đang dùng", vien: "var(--bb-success)" }
-        : { chu: link.status, vien: "var(--bb-border)" };
+        ? { chu: "Đang dùng", variant: "success" as const }
+        : { chu: link.status, variant: "outline" as const };
 
   return (
     <div className="mt-2 space-y-1 text-sm">
       <p>
-        <span
-          className="mr-2 inline-block rounded-full border px-2 py-0.5 text-xs text-[var(--bb-fg)]"
-          style={{ borderColor: nhan.vien }}
-        >
+        <Badge variant={nhan.variant} className="mr-2">
           {nhan.chu}
-        </span>
+        </Badge>
         <span className="text-[var(--bb-fg-muted)]">
           mã <span className="tabular-nums">{link.tokenPrefix ?? "—"}…</span>
         </span>
@@ -2257,7 +2248,7 @@ function TinhTrangLink({ detail }: { detail: Detail }) {
         Cấp ngày {ngay(link.createdAt)} · hạn {ngay(link.expiresAt)} · khách đã mở {link.viewCount} lần
       </p>
       {(daHetHan || link.status !== "active") && (
-        <p className="rounded-md border border-[var(--bb-warning)] p-3">
+        <p className="rounded-md border border-[var(--bb-danger)] p-3">
           Ba mẹ mở link này sẽ thấy báo hết hạn.{" "}
           <strong>Mở khoá link cũ</strong> giữ nguyên địa chỉ — biểu tượng ba mẹ đã lưu ngoài
           màn hình điện thoại vẫn dùng được. <strong>Tạo link mới</strong> đổi địa chỉ, và

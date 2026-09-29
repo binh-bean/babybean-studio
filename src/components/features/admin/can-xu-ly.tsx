@@ -65,14 +65,14 @@ export function CanXuLy() {
     <Link
       href="/admin/viec-can-xu-ly"
       data-testid="can-xu-ly"
-      className="flex items-center gap-2 rounded-[var(--bb-radius-sm)] border border-[var(--bb-warning)]/40 bg-[var(--bb-warning)]/10 px-3.5 py-2.5 text-sm text-[var(--bb-fg)] transition-colors hover:bg-[var(--bb-warning)]/15"
+      className="flex items-center gap-2 rounded-[var(--bb-radius-sm)] border border-[var(--bb-danger)]/40 bg-[var(--bb-danger)]/10 px-3.5 py-2.5 text-sm text-[var(--bb-fg)] transition-colors hover:bg-[var(--bb-danger)]/15"
     >
       <span
         role="img"
         aria-label="Cảnh báo"
-        className="inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--bb-warning)]"
+        className="inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--bb-danger)]"
       />
-      <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--bb-warning)]" aria-hidden="true" />
+      <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--bb-danger)]" aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate">
         <strong className="font-medium">{tongSo}</strong> bộ cần xử lý trước khi gửi khách
       </span>

@@ -77,7 +77,9 @@ export function CamOnSauChot({
       data-testid="cam-on-sau-chot"
       role="status"
       aria-label="Đã chốt danh sách chọn ảnh"
-      className="mx-auto flex w-full max-w-md flex-col items-center bg-background px-6 pb-10 pt-8 text-center text-foreground sm:pt-14"
+      // BB-317 (K9) — máy tính: cả khối canh GIỮA theo chiều dọc màn, hết nửa dưới trống.
+      // Điện thoại giữ nguyên (nội dung bắt đầu từ trên, nút ngay sau nội dung).
+      className="mx-auto flex w-full max-w-md flex-col items-center bg-background px-6 pb-10 pt-8 text-center text-foreground sm:min-h-[100dvh] sm:justify-center sm:py-14"
     >
       {/*
         Tranh màu nước tròn đúng bản vẽ — `chot-thanh-cong` là tranh hành

@@ -35,12 +35,22 @@ const soNgay = (min: number, max: number) => z.number().int().min(min).max(max);
  * Rỗng có nghĩa: `chat.page_url` rỗng thì nút "Nhắn cho studio" của ba mẹ không
  * hiện — đó là một lựa chọn hợp lệ, không phải lỗi nhập liệu.
  */
-const diaChiHttps = z.union([
-  z.literal(""),
-  z.string().url().refine((v) => v.startsWith("https://"), {
-    message: "Địa chỉ phải bắt đầu bằng https://",
-  }),
-]);
+const diaChiHttps = z.preprocess(
+  // Meta đưa link dạng "m.me/<số>" không có https:// — tự thêm cho đỡ báo lỗi
+  // vô lý (anh báo 29/09). Có scheme khác (http://…) thì giữ nguyên để bị từ chối.
+  (v) => {
+    if (typeof v !== "string") return v;
+    const t = v.trim();
+    if (t === "" || /^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return t;
+    return `https://${t}`;
+  },
+  z.union([
+    z.literal(""),
+    z.string().url().refine((v) => v.startsWith("https://"), {
+      message: "Địa chỉ phải bắt đầu bằng https://",
+    }),
+  ]),
+);
 
 export const CAI_DAT_SUA_DUOC: DinhNghiaCaiDat[] = [
   // --- Album ---------------------------------------------------------------
