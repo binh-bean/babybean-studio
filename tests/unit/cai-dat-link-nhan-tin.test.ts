@@ -20,3 +20,13 @@ describe("chat.page_url", () => {
     expect(schema.safeParse("javascript://x").success).toBe(false);
   });
 });
+
+describe("kiểu ô cài đặt suy từ schema (không từ giá trị đang lưu)", () => {
+  it("lark.nhac_noi_bo là bật/tắt dù chưa có dòng nào trong bảng", async () => {
+    const { kieuCaiDat, timDinhNghia } = await import("@/app/api/admin/settings/schema");
+    expect(kieuCaiDat(timDinhNghia("lark.nhac_noi_bo")!)).toBe("bat-tat");
+    expect(kieuCaiDat(timDinhNghia("gallery.link_ttl_days")!)).toBe("so");
+    expect(kieuCaiDat(timDinhNghia("gallery.reminder_days")!)).toBe("mang-so");
+    expect(kieuCaiDat(timDinhNghia("chat.page_url")!)).toBe("chu");
+  });
+});

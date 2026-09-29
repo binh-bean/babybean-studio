@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CAI_DAT_SUA_DUOC, PatchSettingsSchema, cheBot, timDinhNghia } from "./schema";
+import { CAI_DAT_SUA_DUOC, PatchSettingsSchema, cheBot, kieuCaiDat, timDinhNghia } from "./schema";
 
 export const runtime = "nodejs";
 
@@ -45,6 +45,7 @@ export async function GET(): Promise<Response> {
       return {
         key: c.key,
         nhom: c.nhom,
+        kieu: kieuCaiDat(c),
         biMat: Boolean(c.biMat),
         // Giá trị bí mật KHÔNG đi ra khỏi máy chủ nguyên vẹn: màn hình chỉ cần
         // biết "đã có cấu hình chưa", không cần biết webhook là chuỗi gì.

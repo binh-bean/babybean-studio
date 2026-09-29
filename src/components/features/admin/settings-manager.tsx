@@ -25,6 +25,8 @@ const t = vi.admin.caiDat;
 interface CaiDat {
   key: string;
   nhom: "album" | "anh" | "quang-cao" | "lien-lac";
+  /** Kiểu ô, suy từ schema ở máy chủ — không đoán theo giá trị đang lưu. */
+  kieu: "bat-tat" | "so" | "mang-so" | "chu";
   biMat: boolean;
   value: unknown;
   daCauHinh: boolean;
@@ -55,6 +57,9 @@ function doiSangChu(v: unknown): string {
 export function SettingsManager() {
   const [items, setItems] = useState<CaiDat[]>([]);
   const [nhap, setNhap] = useState<Record<string, string | boolean>>({});
+  // Giá trị lúc tải — để chỉ gửi những ô NGƯỜI DÙNG ĐÃ ĐỔI. Trước 29/09 bấm Lưu
+  // gửi cả mọi ô, nên một ô "không bắt buộc" đang trống chặn lưu cả trang.
+  const [banDau, setBanDau] = useState<Record<string, string | boolean>>({});
   const [dangTai, setDangTai] = useState(true);
   const [dangLuu, setDangLuu] = useState(false);
   const [loi, setLoi] = useState<string | null>(null);
@@ -73,11 +78,11 @@ export function SettingsManager() {
       if (!res.ok) throw new Error(json?.error?.message ?? t.loiTai);
       const ds: CaiDat[] = json.data.items;
       setItems(ds);
-      setNhap(
-        Object.fromEntries(
-          ds.map((c) => [c.key, typeof c.value === "boolean" ? c.value : doiSangChu(c.value)]),
-        ),
+      const giaTri = Object.fromEntries(
+        ds.map((c) => [c.key, c.kieu === "bat-tat" ? c.value === true : doiSangChu(c.value)]),
       );
+      setNhap(giaTri);
+      setBanDau(giaTri);
       setNhomChon((hienTai) => {
         if (hienTai && ds.some((c) => c.nhom === hienTai)) return hienTai;
         return NHOM.find((n) => ds.some((c) => c.nhom === n.id))?.id ?? null;
@@ -96,19 +101,14 @@ export function SettingsManager() {
   /** Đổi chuỗi người gõ về đúng kiểu mà đường API chờ. */
   function doiVeKieu(c: CaiDat, v: string | boolean): unknown {
     if (typeof v === "boolean") return v;
-    if (c.key === "gallery.reminder_days") {
+    if (c.kieu === "mang-so") {
       return v
         .split(",")
         .map((x) => x.trim())
         .filter(Boolean)
         .map(Number);
     }
-    if (
-      c.key.endsWith("_days") ||
-      c.key.endsWith("_px") ||
-      c.key === "gallery.extra_photo_price_default"
-    )
-      return Number(v);
+    if (c.kieu === "so") return Number(v);
     return v.trim();
   }
 
@@ -118,12 +118,19 @@ export function SettingsManager() {
     setXong(null);
     try {
       const thayDoi = items
+        // Chỉ gửi ô đã đổi; ô số để trống coi như không đổi (không gửi "" → 0).
+        .filter((c) => nhap[c.key] !== banDau[c.key])
+        .filter((c) => !(c.kieu === "so" && !String(nhap[c.key] ?? "").trim()))
         // Ô bí mật để trống nghĩa là "giữ nguyên", không phải "xoá đi": giá trị
         // đọc ra đã bị che, nên gửi lại chuỗi che là ghi đè bằng rác.
         .filter((c) => !(c.biMat && !String(nhap[c.key] ?? "").trim()))
         .filter((c) => !(c.biMat && String(nhap[c.key] ?? "").includes("••")))
         .map((c) => ({ key: c.key, value: doiVeKieu(c, nhap[c.key] ?? "") }));
 
+      if (thayDoi.length === 0) {
+        setXong(t.khongCoGiDoi);
+        return;
+      }
       const res = await fetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
@@ -205,7 +212,7 @@ export function SettingsManager() {
             <div className="grid gap-4 md:grid-cols-2">
               {cuaNhomHien.map((c) => (
                 <Field key={c.key} label={nhan(c.key)} hint={moTa(c.key)}>
-                  {typeof c.value === "boolean" ? (
+                  {c.kieu === "bat-tat" ? (
                     <label className="flex items-center gap-2 text-sm">
                       {/* BB-294 (#19) — ô tick hệ thiết kế, không phải mặc định trình duyệt. */}
                       <Checkbox

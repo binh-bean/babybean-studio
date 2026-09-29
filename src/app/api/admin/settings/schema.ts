@@ -109,6 +109,20 @@ export const CAI_DAT_SUA_DUOC: DinhNghiaCaiDat[] = [
 
 export const KHOA_SUA_DUOC = new Set(CAI_DAT_SUA_DUOC.map((c) => c.key));
 
+/**
+ * Kiểu ô nhập cho màn Cài đặt — suy từ schema, KHÔNG từ giá trị đang lưu.
+ * Trước 29/09 màn hình đoán kiểu theo giá trị: khoá chưa có dòng nào trong
+ * bảng (vd `lark.nhac_noi_bo`) thành ô chữ rỗng, gửi "" lên và bị báo
+ * "không hợp lệ" dù ô ghi "không bắt buộc".
+ */
+export type KieuCaiDat = "bat-tat" | "so" | "mang-so" | "chu";
+export function kieuCaiDat(d: DinhNghiaCaiDat): KieuCaiDat {
+  if (d.schema instanceof z.ZodBoolean) return "bat-tat";
+  if (d.schema instanceof z.ZodNumber) return "so";
+  if (d.key === "gallery.reminder_days") return "mang-so";
+  return "chu";
+}
+
 export function timDinhNghia(key: string): DinhNghiaCaiDat | undefined {
   return CAI_DAT_SUA_DUOC.find((c) => c.key === key);
 }
