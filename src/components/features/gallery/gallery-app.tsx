@@ -27,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
+import { NutLenDauTrang } from "@/components/features/gallery/nut-len-dau-trang";
 import { CamOnSauChot } from "@/components/features/gallery/cam-on-sau-chot";
 import {
   themVaoSoSanh,
@@ -1729,7 +1730,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       : { src: "/minh-hoa/khong-tim-thay-1280.webp", srcSet: "/minh-hoa/khong-tim-thay-640.webp 640w, /minh-hoa/khong-tim-thay-1280.webp 1280w" };
     return (
       <div className="mx-auto flex min-h-[80dvh] max-w-md flex-col items-center justify-center bg-background p-6 text-center text-foreground">
-        <div className="relative mb-6 h-[120px] w-full max-w-[280px] overflow-hidden rounded-[16px] bg-[#FBF7F2] md:h-[150px]">
+        <div className="relative mb-6 h-[120px] w-full max-w-[280px] overflow-hidden rounded-[16px] bg-[#fdfbf9] md:h-[150px]">
           {/* Đồng hồ cát chỉ cho link HẾT HẠN; link không có thật thì nói
               "hết hạn" bằng hình là sai (Opus soát BB-225). */}
           <img
@@ -1909,8 +1910,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
         // vừa MỘT hàng 342px, không chip nào cụt ở mép phải. Máy tính giữ 14px/`px-4`.
         "shrink-0 whitespace-nowrap rounded-full border border-[#2e2a27] px-2.5 py-1.5 text-[13px] transition-colors lg:px-4 lg:text-[14px]",
         filter === loai
-          ? "bg-[#2e2a27] text-[#fbf7f2]"
-          : "bg-[#fbf7f2] text-[#2e2a27] hover:bg-[#2e2a27]/5",
+          ? "bg-[#2e2a27] text-[#fdfbf9]"
+          : "bg-[#fdfbf9] text-[#2e2a27] hover:bg-[#2e2a27]/5",
       )}
     >
       {nhan}
@@ -1941,16 +1942,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
       onMo={() => setMoManDot(true)}
     />
   ) : null;
+  /*
+    BB-330 — "Mời ông bà cùng xem" (BB-254) cho MỌI trạng thái của ba mẹ, cả
+    điện thoại lẫn máy tính. Gate GIỐNG hệt route (`/api/g/moi-nguoi-than` chặn
+    403 nếu phiên là viewer): `duocChon` đúng bằng "vaiTro !== 'viewer'".
+  */
+  const theMoiOngBa = duocChon ? <MoiNguoiThan /> : null;
   const theBanHang = (
     <>
     {/* BB-321 — thẻ "Mời mua lần hai" của ba mẹ đã NGHỈ, thay bằng mua theo đợt (DotChonTrenManChinh). */}
 
     {/*
-      BB-254 — "Mời ông bà cùng xem". Gate GIỐNG hệt route
-      (`/api/g/moi-nguoi-than` chặn 403 nếu phiên là viewer): `duocChon`
-      đúng bằng "vaiTro !== 'viewer'" (owner/co_editor/suggester).
+      BB-254 — "Mời ông bà cùng xem" từng nằm ở đây. BB-330: dời ra thành
+      khối riêng `theMoiOngBa` (xem ngay dưới) — đứng trong `theBanHang` nó bị
+      kẹt sau cổng "thông báo trạng thái" (chỉ dựng khi có review/khoá/chưa
+      có hạn mức…), nên bộ ảnh đang chọn bình thường KHÔNG có thẻ mời, trên
+      cả máy tính lẫn điện thoại.
     */}
-    {duocChon && <MoiNguoiThan />}
 
     {!duocChon && (
       <div className="space-y-3">
@@ -2067,7 +2075,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       <div ref={phanTrenBiaRef}>
       <div
         data-testid="thanh-thuong-hieu"
-        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-[#e5dcd2] bg-[#fbf7f2] px-3.5 py-3.5 sm:px-6 lg:flex lg:justify-between lg:px-10 lg:py-3"
+        className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-[#e5dcd2] bg-[#fdfbf9] px-3.5 py-3.5 sm:px-6 lg:flex lg:justify-between lg:px-10 lg:py-3"
       >
         {/*
           Opus soát lần 2 (27/09/2026) — `1fr` cùng ĐƠN VỊ nhưng KHÔNG cùng
@@ -2211,7 +2219,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       */}
       {/* BB-319 K-S1 — bộ đã giao: KHÔNG hiện viên "Lưu ra màn hình chính" chen trước lưới ảnh hoàn thiện. */}
       {!dangGiao && (
-        <div className="flex justify-center bg-[#fbf7f2] px-6 pb-4 empty:hidden lg:hidden">
+        <div className="flex justify-center bg-[#fdfbf9] px-6 pb-4 empty:hidden lg:hidden">
           <LoiGoiYLuuApp
             daChon={selectionCounts.selectedCount}
             onXemCachLuu={() => setMoHuongDanLuuApp(true)}
@@ -2579,7 +2587,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
               <Lock className="mt-0.5 h-[18px] w-[18px] shrink-0 text-muted-foreground" />
               <div className="text-sm">
                 <p className="font-medium">
-                  {daChotChoXacNhan ? "Ba mẹ đã chốt danh sách" : "Bộ ảnh đang ở chế độ xem lại"}
+                  {/* BB-329 — CSKH chưa xác nhận thì chưa "chốt": nói là đã GỬI, đang chờ. */}
+                  {daChotChoXacNhan ? "Ba mẹ đã gửi danh sách" : "Bộ ảnh đang ở chế độ xem lại"}
                 </p>
                 <p className="mt-0.5 text-[13px] text-muted-foreground">
                   {daChotChoXacNhan
@@ -2640,6 +2649,13 @@ export function GalleryApp({ token }: GalleryAppProps) {
         </div>
       )}
 
+      {/* BB-330 — thẻ "Mời ông bà" đứng riêng, không phụ thuộc cổng thông báo trạng thái ở trên. */}
+      {!dangGiao && theMoiOngBa && (
+        <div data-testid="khoi-moi-ong-ba" className="mx-auto max-w-3xl px-6 pt-5">
+          {theMoiOngBa}
+        </div>
+      )}
+
       {/* MÀN 2 — LƯỚI ẢNH so le, giữ đúng khung */}
       <section
         aria-label="Ảnh của buổi chụp"
@@ -2677,6 +2693,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         >
           {theDotChon}
           {theBanHang}
+          {theMoiOngBa}
         </div>
       )}
 
@@ -2799,6 +2816,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
         presetPhotoId={presetCuaHang?.photoId ?? null}
         presetNhom={presetCuaHang?.nhom ?? null}
       />
+
+      {/* BB-330 — nút tròn "Lên đầu trang", đứng trên thanh đáy (không che). */}
+      <NutLenDauTrang />
 
       {/* THANH ĐÁY — một viên duy nhất: đã chọn mấy tấm, bước tiếp theo. */}
       {soSanhBat ? (
@@ -2997,7 +3017,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               tim, đệm ~15% quanh) → `chan-trang-vat-{160,320}.webp`. Tệp
               nguồn giữ nguyên, không sửa. Cao ~56px (< 120px cho phép), kèm
               `mix-blend-mode: multiply` + mặt nạ toả tròn (`layerMoVuong`)
-              để tan vào nền `#FBF7F2` thay vì hiện thành khối kem tách biệt.
+              để tan vào nền `#fdfbf9` thay vì hiện thành khối kem tách biệt.
               `alt=""` vì trang trí, không mang thông tin.
             */}
             <img
@@ -3010,7 +3030,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               className="h-[56px] w-auto object-contain opacity-90"
               style={layerMoVuong}
             />
-            <p className="text-lg text-foreground">Cảm ơn ba mẹ đã tin Baby Bean</p>
+            <p className="text-lg text-foreground">Cảm ơn ba mẹ đã yêu thương Baby Bean</p>
             <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
               © {new Date().getFullYear()} Baby Bean Studio
             </p>
@@ -3534,9 +3554,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
       {/* TẢI ẢNH VỀ MÁY — BB-156.
           Nút chọn tải nay ở đầu trang (MenuTaiAnh). Ở đây chỉ còn ô báo tiến độ
-          khi đang tải nhiều tấm, nổi ngay trên thanh đáy chứ không đè lên nó. */}
+          khi đang tải nhiều tấm, nổi ngay trên thanh đáy chứ không đè lên nó.
+          BB-330 — z-[60]: tải nhiều tấm từ màn xem lớn (z-50) thì ô tiến độ vẫn phải nổi lên trên. */}
       {choPhepTai && tienDoTai && tienDoTai.tong > 1 && (
-        <div className="fixed inset-x-6 bottom-[84px] z-30 mx-auto max-w-xl rounded-2xl border border-border bg-surface p-3 text-sm shadow-lg">
+        <div className="fixed inset-x-6 bottom-[84px] z-[60] mx-auto max-w-xl rounded-2xl border border-border bg-surface p-3 text-sm shadow-lg">
           <div className="flex items-center justify-between gap-3">
             <span className="min-w-0 truncate">
               Đang tải {formatSo(tienDoTai.daXong)}/{formatSo(tienDoTai.tong)} ảnh
@@ -3584,6 +3605,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
           }}
           onToggleHeart={handleToggleHeart}
           onTaiAnh={choPhepTai ? (p) => taiMotAnh({ id: p.id, fileName: p.fileName }) : null}
+          // BB-330 — nút tải ở màn xem lớn mở cùng thực đơn với màn ngoài.
+          menuTai={
+            choPhepTai
+              ? {
+                  soAnh: photos.length,
+                  dungLuong: doDocDuocDungLuong(gallery.tongDungLuongAnh),
+                  soDaChon: soAnhDaChon,
+                  onTaiDaChon: taiAnhDaChon,
+                  onTaiCaBo: taiCaBo,
+                }
+              : null
+          }
           mutatingIds={mutatingIds}
           isLocked={khoaTim}
           daChon={soAnhDaChon}

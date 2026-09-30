@@ -10,7 +10,18 @@ export const metadata: Metadata = {
   title: `${vi.admin.galleries.createGalleryCta} | BabyBean Studio`,
 };
 
-export default function CreateGalleryPage() {
+/**
+ * BB-332 — `?banGhiLark=<mã dòng Lark>` (từ khối "Bản ghi mới từ Lark"): thuật
+ * sĩ tự đọc dòng đó (GET /api/admin/lark-moi?ma=…) để điền sẵn. SĐT không bao
+ * giờ đi trên thanh địa chỉ — chỉ mã dòng.
+ */
+export default async function CreateGalleryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ banGhiLark?: string }>;
+}) {
+  const { banGhiLark } = await searchParams;
+  const maDong = banGhiLark && /^rec[A-Za-z0-9]{3,40}$/.test(banGhiLark) ? banGhiLark : null;
   return (
     <div className="space-y-6">
       {/* BB-320 (Q-N1): cùng khối tiêu đề trang với mọi màn quản trị. */}
@@ -27,7 +38,7 @@ export default function CreateGalleryPage() {
         }
       />
 
-      <CreateGalleryWizard />
+      <CreateGalleryWizard banGhiLark={maDong} />
     </div>
   );
 }

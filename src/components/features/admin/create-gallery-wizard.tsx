@@ -116,7 +116,12 @@ function OLark({ nhan, giaTri }: { nhan: string; giaTri: string | null | undefin
   );
 }
 
-export function CreateGalleryWizard() {
+/**
+ * BB-332 — mở từ khối "Bản ghi mới từ Lark" (Bàn làm việc) với mã dòng Lark:
+ * đọc dòng đó, điền sẵn mã hóa đơn + SĐT (+ link Drive nếu Lark đã có) rồi tự
+ * tra Lark một lần.
+ */
+export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null } = {}) {
   const [step, setStep] = useState(1);
   const [options, setOptions] = useState<Options | null>(null);
   const [error, setError] = useState<FieldError | null>(null);
@@ -176,7 +181,7 @@ export function CreateGalleryWizard() {
     if (dongChon?.tongFileEdit) setQuota(dongChon.tongFileEdit);
   }, [dongChon]);
 
-  async function traLark() {
+  async function traLark(ma = maHoaDon, sdt = sdtTra) {
     setDangTra(true);
     setError(null);
     setCacDong([]);
@@ -185,7 +190,7 @@ export function CreateGalleryWizard() {
       const res = await fetch("/api/admin/galleries/tra-lark", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ maHoaDon, soDienThoai: sdtTra }),
+        body: JSON.stringify({ maHoaDon: ma, soDienThoai: sdt }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -201,6 +206,30 @@ export function CreateGalleryWizard() {
       setDangTra(false);
     }
   }
+
+  // BB-332 — đến từ "Bản ghi mới từ Lark": đọc dòng, điền sẵn, tra Lark một lần.
+  useEffect(() => {
+    if (!banGhiLark) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/admin/lark-moi?ma=${encodeURIComponent(banGhiLark)}`, { cache: "no-store" });
+        const body = await res.json().catch(() => null);
+        const d = body?.data?.banGhi as { maHoaDon: string | null; soDienThoai: string | null; driveUrl: string | null } | null;
+        if (!alive || !res.ok || !d) return;
+        if (d.driveUrl) setDriveUrl(d.driveUrl);
+        setMaHoaDon(d.maHoaDon ?? "");
+        setSdtTra(d.soDienThoai ?? "");
+        if (d.maHoaDon && d.soDienThoai) void traLark(d.maHoaDon, d.soDienThoai);
+      } catch {
+        // Không đọc được thì thuật sĩ trống như cũ — nhân viên gõ tay.
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy lúc mở trang
+  }, [banGhiLark]);
 
   async function checkDrive() {
     setChecking(true);

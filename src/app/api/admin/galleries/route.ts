@@ -7,6 +7,7 @@
  * Order of operations: parse -> authenticate -> authorize -> mutate -> log -> respond.
  */
 
+import { keoDongHopDongTuLark } from "@/lib/lark/dong-hop-dong";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
@@ -26,8 +27,11 @@ import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
 import { docDongHauKy, LoiTraLark, duoiSoDienThoai } from "@/lib/lark/tra-hau-ky";
 import { boAnhTheoDongLark, boAnhTheoThuMuc } from "@/lib/gallery/bo-anh-da-co";
 import { timHoacTaoGoiLark } from "@/lib/gallery/goi-chup-lark";
+import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
 
 export const runtime = "nodejs";
+// BB-331: tạo bộ xong kéo luôn dòng hợp đồng từ Lark (3–9 giây, đo 30/09).
+export const maxDuration = 30;
 
 const BASE62_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
@@ -81,7 +85,7 @@ export async function POST(request: Request): Promise<Response> {
     try {
       dong = await docDongHauKy(input.larkHaukyRecordId);
     } catch (err) {
-      if (err instanceof LoiTraLark) return fail("INTERNAL", err.message);
+      if (err instanceof LoiTraLark) return fail("INTERNAL", err.thongDiep);
       throw err;
     }
     if (!dong) {
@@ -227,6 +231,15 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
+    // BB-331: bộ vừa neo vào hóa đơn Lark → kéo luôn dòng hợp đồng (hạn mức
+    // tính từ các dòng này, `app.gallery_quota`). Hỏng thì bộ vẫn tạo xong —
+    // màn chi tiết có nút "Kéo dòng hợp đồng từ Lark" để thử lại.
+    try {
+      await keoDongHopDongTuLark(admin, galleryIdMoi);
+    } catch (err) {
+      console.error(JSON.stringify({ evt: "gallery_create_keo_dong_loi", requestId, galleryId: galleryIdMoi, loi: String((err as Error)?.message ?? err) }));
+    }
+
     // BB-183: Cập nhật hạn sử dụng của link vừa tạo theo cấu hình (mặc định 60 ngày)
     const { data: ttlData } = await supabase
       .from("settings")
@@ -358,9 +371,16 @@ export async function GET(request: Request): Promise<Response> {
       p_sort_order: query.sortOrder,
       p_offset: offset,
       p_limit: limit,
+      // BB-335: CHỈ gửi khi đang lọc Photo — bản RPC trước 0081 không có tham số này.
+      ...(query.photo ? { p_lark_photo: query.photo } : {}),
     });
 
     if (rpcError) {
+      // BB-335: lọc Photo khi 0081 chưa áp (PostgREST không thấy hàm có p_lark_photo)
+      // → danh sách rỗng kèm cờ, không 500.
+      if (query.photo && (rpcError.code === "PGRST202" || /p_lark_photo/i.test(rpcError.message ?? ""))) {
+        return ok({ items: [], counts: {}, nextCursor: null, hasMore: false, chuaApMigration: true }, { hasMore: false });
+      }
       return failUnexpected(rpcError, requestId);
     }
 
@@ -447,13 +467,15 @@ export async function GET(request: Request): Promise<Response> {
       );
       for (const [id, photoId] of anhBia) coverMap.set(id, photoId);
     }
+    // BB-335 — "Photo" (thợ chụp) từ cột Lark; 0081 chưa áp → rỗng, không 500.
+    const { theoBo: photoMap } = await docLarkPhoto(admin, idsTrangNay);
 
     const items = rawItems.map((raw) => {
       const item = raw as Record<string, unknown>;
       const status = String(item.status ?? "");
       const larkTrangThai = (item.larkTrangThai as string | null) ?? null;
       const larkCanhBao = (item.larkCanhBao as string | null) ?? null;
-      const { larkTrangThai: _lt, larkCanhBao: _lcb, larkDocLuc: _ldl, ...rest } = item;
+      const { larkTrangThai: _lt, larkCanhBao: _lcb, larkDocLuc: _ldl, larkPhoto: _lp, ...rest } = item;
       return {
         ...rest,
         statusLabel: nhanHienThi(status, larkTrangThai, (s) => GALLERY_STATUS_LABEL[s] ?? s).quanTri,
@@ -471,6 +493,8 @@ export async function GET(request: Request): Promise<Response> {
         maHoaDon: maHoaDonMap.get(String(item.id)) ?? null,
         // BB-320 (Link app): true khi bộ có link chưa thu hồi (hoặc không tra được — xem trên).
         coLinkApp: traLinkDuoc ? boCoLink.has(String(item.id)) : true,
+        // BB-335 — tên thợ chụp đọc từ cột "photo" bên Lark; null khi trống / chưa áp 0081.
+        larkPhoto: photoMap.get(String(item.id)) ?? null,
       };
     });
 

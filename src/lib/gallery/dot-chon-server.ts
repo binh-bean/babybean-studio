@@ -29,6 +29,7 @@ import {
 } from "@/lib/gallery/dot-chon";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
+import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
 
 // ---------------------------------------------------------------------------
 // Nhận diện lỗi "chưa áp migration"
@@ -330,8 +331,8 @@ export async function chuanBiSanPham(
     if (p.list_price === null || p.list_price === undefined) {
       return { ok: false, code: "INVALID_INPUT", message: "Có sản phẩm chưa có đơn giá niêm yết, vui lòng liên hệ CSKH" };
     }
-    const tinCay = p.price_confidence !== null ? Number(p.price_confidence) : 0;
-    if (tinCay < 0.8 || (p.price_samples ?? 0) < 5) {
+    // BB-335: cùng luật giá với danh mục của /api/g/gallery.
+    if (!giaDuocBaoTuDong(p)) {
       return { ok: false, code: "INVALID_INPUT", message: "Có sản phẩm chưa đủ độ tin cậy về giá, CSKH sẽ báo giá trực tiếp" };
     }
     // Sản phẩm in (ảnh in/khung) chưa gắn ảnh, hoặc album (ảnh đưa vào sau) — KHÔNG

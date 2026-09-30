@@ -1,4 +1,5 @@
 "use client";
+import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 import React, { useState, useEffect, useRef } from "react";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
@@ -76,10 +77,8 @@ export function BiaBoAnhEditor({
 
   useEffect(() => {
     if (!moEditor) return;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
+    // BB-329 — khoá CÓ ĐẾM (khoa-cuon-trang.ts), không gán thẳng `""` khi đóng.
+    return khoaCuonTrang();
   }, [moEditor]);
 
   // BB-277 — Esc đóng + Tab quẩn trong hộp thoại + focus trả về nút mở.
@@ -370,7 +369,7 @@ export function BiaBoAnhEditor({
               tính tay dễ lệch. */}
           {/* BB-294 (#9) — nền khung xem trước trước đây `bg-gray-100`
               (#F3F4F6, xám lạnh Tailwind mặc định) lệch hẳn tông kem của
-              thương hiệu (#FBF7F2 / `--bb-bg`, xem LUAT-DOT-8.md). */}
+              thương hiệu (#fdfbf9 / `--bb-bg`, xem LUAT-DOT-8.md). */}
           <div className="relative shrink-0 bg-[var(--bb-bg)] dark:bg-gray-900 md:w-1/2 md:flex-1 flex flex-col items-center justify-center gap-3 overflow-hidden p-4">
             <div className="flex items-center gap-1 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-white/70 backdrop-blur p-0.5 text-xs">
               <button

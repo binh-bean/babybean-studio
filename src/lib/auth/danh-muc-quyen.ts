@@ -91,7 +91,7 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
   { ma: "settings:branch:write", ten: "Sửa cài đặt chi nhánh", nhom: "Cài đặt", dangCoHieuLuc: true },
   { ma: "settings:branch:delete", ten: "Xoá cài đặt chi nhánh", nhom: "Cài đặt" },
 
-  { ma: "retouch:read", ten: "Xem hàng đợi chỉnh ảnh", nhom: "Hậu kỳ" },
+  { ma: "retouch:read", ten: "Xem danh sách chờ chỉnh ảnh", nhom: "Hậu kỳ" },
   { ma: "retouch:write", ten: "Cập nhật trạng thái chỉnh ảnh", nhom: "Hậu kỳ" },
   { ma: "deliveries:read", ten: "Xem lịch sử giao ảnh", nhom: "Hậu kỳ" },
   { ma: "deliveries:write", ten: "Cập nhật tiến độ giao ảnh", nhom: "Hậu kỳ", dangCoHieuLuc: true },

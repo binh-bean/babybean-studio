@@ -345,7 +345,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // BB-278/BB-281 — chip chỉ còn MỘT nhãn bấm được (nhãn ngắn), thay cho
     // nút "Xem cách lưu" riêng của thẻ cũ; bấm vào nhãn mở đúng tấm hướng dẫn
     // như trước.
-    await goiY.getByRole("button", { name: "Lưu ra màn hình chính" }).click();
+    await goiY.getByRole("button", { name: "Lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn" }).click();
 
     await expect(page.getByRole("dialog", { name: "Lưu app ra màn hình chính" })).toBeVisible();
   });

@@ -34,6 +34,27 @@ export function noiDungNhacKhach(): { tieuDe: string; noiDung: string; loai: str
 }
 
 /**
+ * BB-331 — nhắc khách THANH TOÁN phần ảnh chọn vượt hạn mức (dòng "Ảnh vượt
+ * hạn mức" ở Việc cần xử lý). Khác nhắc chọn ảnh: bộ ảnh đã chốt rồi nên
+ * không kiểm trạng thái "đang chờ chọn". Cùng luật riêng tư: không tên, không
+ * số tiền, không link trong payload đẩy.
+ */
+export type LoaiNhacKhach = "chon_anh" | "thanh_toan";
+
+export function noiDungNhacThanhToan(): { tieuDe: string; noiDung: string; loai: string } {
+  return {
+    tieuDe: "Ảnh chọn thêm của bé",
+    noiDung: "Ba mẹ đã chọn thêm ảnh ngoài gói. Studio nhờ ba mẹ mở bộ ảnh xem phần chọn thêm và thanh toán giúp em nhé.",
+    loai: "nhac_thanh_toan",
+  };
+}
+
+/** Nhắc loại nào thì được ở trạng thái nào. `thanh_toan` không phụ thuộc trạng thái chọn. */
+export function coTheNhac(loai: LoaiNhacKhach, status: string): boolean {
+  return loai === "thanh_toan" ? true : coTheNhacKhach(status);
+}
+
+/**
  * Câu báo kết quả cho CSKH ngay sau khi bấm. Nói THẬT tin tới đâu: khách chưa
  * bật thông báo thì tin chỉ nằm trong chuông, lần sau khách mở app mới thấy.
  */

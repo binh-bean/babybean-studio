@@ -1,4 +1,5 @@
 "use client";
+import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Printer, PenLine } from "lucide-react";
@@ -22,6 +23,7 @@ import {
   type TrangThaiPhong,
 } from "@/lib/gallery/phong-anh";
 import { formatSo } from "@/lib/utils/dinh-dang";
+import { MenuTaiAnh, type MenuTaiAnhProps } from "@/components/features/gallery/menu-tai-anh";
 
 export interface PhotoLightboxProps {
   /** BB-319 (Ghi nhận K4/K5) — tên bé, hiện nhỏ dưới số thứ tự: xem lớn vẫn "gọi tên bé". */
@@ -32,6 +34,13 @@ export interface PhotoLightboxProps {
   onToggleHeart: (photo: PhotoPublic) => void;
   /** BB-156: null = bộ ảnh này không cho tải. */
   onTaiAnh?: ((photo: PhotoPublic) => void) | null;
+  /**
+   * BB-330 — nút tải ở màn xem lớn mở CÙNG thực đơn với màn ngoài (Tải ảnh
+   * đang xem / Tải ảnh đã chọn / Tải cả bộ) thay vì tải ngay tấm đang xem.
+   * Truyền kèm `onTaiAnh` (lựa chọn "đang xem"). Thiếu prop này thì giữ nút
+   * tải một tấm như cũ.
+   */
+  menuTai?: Omit<MenuTaiAnhProps, "onTaiDangXem" | "nutClassName"> | null;
   mutatingIds: Set<string>;
   isLocked: boolean;
   /** BB-180: so anh da chon va han muc, hien thuong truc trong man xem lon. */
@@ -85,7 +94,7 @@ export interface PhotoLightboxProps {
  * 1. Mở ảnh chất lượng cao w=1600 (/api/img/<id>?w=1600).
  * 2. BB-289 lượt 2 — nền KÍNH TRONG (không còn đặc `--bb-viewer-bg`), đúng
  *    bản vẽ `babybean-assets/BB-285/xem-lon-dien-thoai.html` (`.kinh`):
- *    `rgba(251,247,242,.66)` + `backdrop-filter: blur(8px)` — thấy lưới ảnh
+ *    `rgba(253,251,249,.66)` + `backdrop-filter: blur(8px)` — thấy lưới ảnh
  *    bên dưới mờ qua lớp kính, không phải nền tối đặc như trước. Các chip
  *    điều khiển ngồi TRÊN lớp kính (số thứ tự, nút đóng/tải) đổi sang chữ
  *    mực + nền sáng hơn (khớp `.so{background:rgba(255,255,255,.7)}` của
@@ -108,6 +117,7 @@ export function PhotoLightbox({
   onClose,
   onToggleHeart,
   onTaiAnh,
+  menuTai,
   mutatingIds,
   isLocked,
   
@@ -142,13 +152,8 @@ export function PhotoLightbox({
   });
 
   // Khóa cuộn trang nền khi mở lightbox
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
+  // BB-329 — khoá CÓ ĐẾM, không tự nhớ/trả `overflow` (lý do ở khoa-cuon-trang.ts).
+  useEffect(() => khoaCuonTrang(), []);
 
   // BB-277 — focus quay về đúng tấm ảnh (hoặc nút) đã mở màn xem lớn khi đóng.
   // Ghi lại phần tử đang giữ focus NGAY LÚC MỞ (còn là tấm bấm/Enter trong
@@ -668,7 +673,17 @@ export function PhotoLightbox({
         </div>
 
         <div className="flex justify-end">
-          {onTaiAnh && (
+          {onTaiAnh && menuTai && (
+            // Chặn nổi bọt: bấm trong thực đơn không được lọt xuống lớp đóng màn xem lớn.
+            <div onClick={(e) => e.stopPropagation()}>
+              <MenuTaiAnh
+                {...menuTai}
+                onTaiDangXem={() => onTaiAnh(currentPhoto)}
+                nutClassName="flex h-11 w-11 items-center justify-center rounded-full text-[#2e2a27]/85 transition-colors hover:bg-black/5 active:scale-90 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
+              />
+            </div>
+          )}
+          {onTaiAnh && !menuTai && (
             <button
               type="button"
               onClick={(e) => {
@@ -850,7 +865,7 @@ export function PhotoLightbox({
             // trên nền kem lạc tông; đổi sang viên kem/viền mảnh + icon mực từ
             // `lg:` (mục ".mui" trong `xem-lon-may-tinh.html`). Điện thoại giữ
             // nguyên viên tối cũ.
-            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/70 hover:text-white transition-all active:scale-90 lg:h-12 lg:w-12 lg:bg-[rgba(251,247,242,0.9)] lg:text-[#2e2a27] lg:ring-1 lg:ring-[#e5dcd2] lg:backdrop-blur-none lg:hover:bg-white"
+            className="absolute left-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/70 hover:text-white transition-all active:scale-90 lg:h-12 lg:w-12 lg:bg-[rgba(253,251,249,0.9)] lg:text-[#2e2a27] lg:ring-1 lg:ring-[#e5dcd2] lg:backdrop-blur-none lg:hover:bg-white"
           >
             <ChevronLeft className="h-7 w-7" />
           </button>
@@ -865,7 +880,7 @@ export function PhotoLightbox({
               goNext();
             }}
             aria-label={vi.ui.pagination.next}
-            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/70 hover:text-white transition-all active:scale-90 lg:bg-[rgba(251,247,242,0.9)] lg:text-[#2e2a27] lg:ring-1 lg:ring-[#e5dcd2] lg:backdrop-blur-none lg:hover:bg-white"
+            className="absolute right-3 top-1/2 -translate-y-1/2 z-20 hidden sm:flex h-12 w-12 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-md hover:bg-black/70 hover:text-white transition-all active:scale-90 lg:bg-[rgba(253,251,249,0.9)] lg:text-[#2e2a27] lg:ring-1 lg:ring-[#e5dcd2] lg:backdrop-blur-none lg:hover:bg-white"
           >
             <ChevronRight className="h-7 w-7" />
           </button>
@@ -879,7 +894,7 @@ export function PhotoLightbox({
           với quyết định của admin trên bản vẽ BB-285 ("không phải nền tối mà
           là nền trong nhìn được bên dưới"). Đúng bản vẽ
           `xem-lon-dat-in-dien-thoai.png`: nền KÍNH SÁNG
-          `rgba(251,247,242,.92)` + `backdrop-blur`, chữ mực #2E2A27, chữ phụ
+          `rgba(253,251,249,.92)` + `backdrop-blur`, chữ mực #2E2A27, chữ phụ
           #6b6057, viền trái 1px #e5dcd2 — cùng công thức với tấm trượt sản
           phẩm trên điện thoại (`.kinh` toàn màn), không phải nền đặc như
           `#2E2A27` nữa. `BangSanPhamCuaAnh` nhận `tong="sang"` để đổi chữ
@@ -890,7 +905,7 @@ export function PhotoLightbox({
         {(bangSanPham || onLuuGhiChu) && currentPhoto && (
           <aside
             ref={asideRef}
-            className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-[#e5dcd2] bg-[rgba(251,247,242,0.92)] p-4 text-[#2E2A27] backdrop-blur-md lg:block"
+            className="hidden w-72 shrink-0 space-y-4 overflow-y-auto border-l border-[#e5dcd2] bg-[rgba(253,251,249,0.92)] p-4 text-[#2E2A27] backdrop-blur-md lg:block"
             onClick={(e) => e.stopPropagation()}
           >
             {bangSanPham?.(currentPhoto, "sang")}
@@ -925,7 +940,7 @@ export function PhotoLightbox({
                     BB-293 vòng 2 mục #3 — giám đốc chốt màu "Đã lưu ghi chú"
                     trên nền sáng là sage ĐẬM #4F5B45 (không phải
                     `--bb-accent` #7fa99b — quá nhạt trên nền kem, dưới
-                    4.5:1). #4F5B45 trên #FBF7F2 đạt ~5.2:1.
+                    4.5:1). #4F5B45 trên #fdfbf9 đạt ~5.2:1.
                   */}
                   {ketQuaLuu === "ok" && (
                     <span className="inline-flex items-center gap-1 text-[#4F5B45]">
@@ -948,7 +963,7 @@ export function PhotoLightbox({
           ------------------------------------------------------------------
           BB-289 lượt 3 — Opus chấm ảnh chụp: viên tối kiểu cũ không khớp bản
           vẽ `xem-lon-dien-thoai.html` (`.thanh`): dải KEM KÍNH TRONG
-          (`rgba(251,247,242,.6)` + blur), BA CỘT ĐỀU Tim · Ghi chú · Đặt in
+          (`rgba(253,251,249,.6)` + blur), BA CỘT ĐỀU Tim · Ghi chú · Đặt in
           — mỗi cột icon 22px + nhãn chữ 11px NGAY DƯỚI, chữ mực; tim đã chọn
           tô hồng đất (`#C4645A`). Khác điện thoại, MÁY TÍNH (`lg`) đã có cột
           phải riêng cho ghi chú/sản phẩm (`bangSanPham` render thẳng trong
@@ -1060,7 +1075,10 @@ export function PhotoLightbox({
                     ? vi.gallery.noteNeedsSelect
                     : "Ghi chú cho thợ chỉnh ảnh"
               }
-              className="w-full rounded-[12px] border border-[#2e2a27]/20 bg-white/70 px-4 py-3 text-[14px] text-[#2e2a27] placeholder-[#6b6057] focus:border-[#2e2a27]/50 focus:outline-hidden disabled:opacity-50"
+              // BB-329 mục 2 — 16px: dưới 16px Safari iOS tự phóng to trang khi
+              // chạm ô này và không thu lại; màn xem lớn khoá cử chỉ nên ba mẹ
+              // kẹt ở màn phóng, tràn phải (ảnh 6ce23a90). Xem globals.css.
+              className="w-full rounded-[12px] border border-[#2e2a27]/20 bg-white/70 px-4 py-3 text-[16px] text-[#2e2a27] placeholder-[#6b6057] focus:border-[#2e2a27]/50 focus:outline-hidden disabled:opacity-50"
             />
           )}
         </div>
@@ -1080,7 +1098,7 @@ export function PhotoLightbox({
           nhãn dưới icon vẫn đúng bản vẽ.
         */}
         <div className="mx-auto hidden max-w-md lg:block lg:pb-2">
-          <div className="mx-auto flex h-[56px] w-fit items-center gap-1 rounded-full border border-[#e5dcd2] bg-[rgba(251,247,242,0.92)] px-2 shadow-[0_10px_28px_-14px_rgba(46,42,39,0.3)]">
+          <div className="mx-auto flex h-[56px] w-fit items-center gap-1 rounded-full border border-[#e5dcd2] bg-[rgba(253,251,249,0.92)] px-2 shadow-[0_10px_28px_-14px_rgba(46,42,39,0.3)]">
             <button
               type="button"
               disabled={timBiKhoa || isMutating}
@@ -1168,11 +1186,11 @@ export function PhotoLightbox({
             // BB-310 mục 5 — báo cáo chấm độc lập vòng 4: nền gần đen
             // (#231e1a) lạc hẳn khỏi hệ màu kem của toàn app ("mảng tối lạc
             // giữa hệ kem" — kh-dt-07b-san-pham-tam-nay). Đổi sang cùng hệ
-            // kem #FBF7F2 + chữ mực #2E2A27 như mọi tấm trượt khác, và
+            // kem #fdfbf9 + chữ mực #2E2A27 như mọi tấm trượt khác, và
             // `bangSanPham` gọi với `tong="sang"` (đã có sẵn ở
             // `bang-san-pham-cua-anh.tsx`, dựng cho đúng trường hợp nền
             // sáng này) thay vì mặc định `tong="toi"`.
-            className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#FBF7F2] px-6 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-[#2E2A27] shadow-2xl animate-in slide-in-from-bottom-8"
+            className="max-h-[75vh] cursor-auto touch-pan-y overflow-y-auto rounded-t-[28px] bg-[#fdfbf9] px-6 pb-[max(20px,env(safe-area-inset-bottom))] pt-3 text-[#2E2A27] shadow-2xl animate-in slide-in-from-bottom-8"
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#2E2A27]/15" aria-hidden="true" />
             {/*

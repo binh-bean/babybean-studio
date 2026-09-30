@@ -139,9 +139,9 @@ const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
         : `Nhân viên ghi nhận thu ${formatVND(amount)}`;
     },
   },
-  "gallery.item_added": { nhom: "nhan_vien", cau: () => "Nhân viên thêm dòng hàng vào hợp đồng" },
-  "gallery.item_changed": { nhom: "nhan_vien", cau: () => "Nhân viên đổi số lượng dòng hàng" },
-  "gallery.item_removed": { nhom: "nhan_vien", cau: () => "Nhân viên xoá một dòng hàng" },
+  "gallery.item_added": { nhom: "nhan_vien", cau: () => "Nhân viên thêm sản phẩm vào hợp đồng" },
+  "gallery.item_changed": { nhom: "nhan_vien", cau: () => "Nhân viên đổi số lượng sản phẩm" },
+  "gallery.item_removed": { nhom: "nhan_vien", cau: () => "Nhân viên xoá một sản phẩm" },
   "addon.set": {
     nhom: "khach",
     cau: (m) => {

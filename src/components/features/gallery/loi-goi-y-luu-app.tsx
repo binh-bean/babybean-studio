@@ -144,7 +144,9 @@ export function LoiGoiYLuuApp({ onXemCachLuu }: LoiGoiYLuuAppProps) {
       aria-label={vi.gallery.saveAppPrompt.message}
       data-testid="goi-y-luu-app"
       className={cn(
-        "mx-auto flex h-9 w-fit max-w-full items-center gap-2 rounded-full border border-[#e5dcd2] bg-white px-3.5 text-[14px] text-[#2e2a27] shadow-[0_2px_10px_-2px_rgba(46,42,39,0.12)]",
+        // BB-330 — câu dài hơn (nói rõ để làm gì) nên cho xuống 2 dòng ở 390px: bỏ `h-9`
+        // cố định + `truncate`, bo góc 18px thay vì viên tròn.
+        "mx-auto flex min-h-9 w-fit max-w-full items-center gap-2 rounded-[18px] border border-[#e5dcd2] bg-white px-3.5 py-1.5 text-[13px] leading-snug text-[#2e2a27] shadow-[0_2px_10px_-2px_rgba(46,42,39,0.12)]",
         "animate-in fade-in slide-in-from-top-2 duration-300",
       )}
     >
@@ -168,7 +170,7 @@ export function LoiGoiYLuuApp({ onXemCachLuu }: LoiGoiYLuuAppProps) {
       <button
         type="button"
         onClick={xemCachLuu}
-        className="truncate font-medium hover:underline"
+        className="text-left font-medium hover:underline"
       >
         {vi.gallery.saveAppPrompt.shortLabel}
       </button>

@@ -81,8 +81,10 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
         kind: "print",
         material: "Gỗ",
         list_price: 1800000,
-        price_confidence: 1.0,
-        price_samples: 1, // chỉ có 1 mẫu -> vi phạm luật 2 (cần >= 5)
+        // BB-335: 0 lần bán và KHÔNG phải giá nhập bên Lark (độ tin cậy < 1)
+        // -> vi phạm luật 2 (cần >= 1 lần bán, hoặc Giá Bán Lark = tin cậy 1).
+        price_confidence: 0.9,
+        price_samples: 0,
         is_active: true,
       },
       {
@@ -90,7 +92,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
         name: "Fixture Khung kính đa giác",
         kind: "print",
         list_price: 150000,
-        price_confidence: 0.5, // vi phạm luật 2 (cần >= 0.8)
+        price_confidence: 0.5, // hai mức giá hoà nhau -> vi phạm luật 2 (BB-335: cần > 0.5)
         price_samples: 8,
         is_active: true,
       },
@@ -245,56 +247,31 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     expect(dbAddon.quantity).toBe(2);
   });
 
-  it("Test 2: Mua sản phẩm 1 mẫu giá (price_samples = 1 < 5) -> từ chối, không tạo dòng", async () => {
-    vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
-
-    const req = new Request("http://localhost:3000/api/g/addons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        productId: prodLowSamplesId,
-        quantity: 1,
-        photoId,
-      }),
+  // Anh chốt 30/09 (sau BB-335): "kích thước kể cả chưa bán nhưng có giá cũng hiện"
+  // → có giá là bán được, không còn ngưỡng số lần bán / độ tin cậy. Sản phẩm KHÔNG
+  // có giá vẫn bị từ chối (Test 3). Hai ca dưới xoá dòng vừa tạo để Test 5 tính tổng đúng.
+  for (const [ten, layId] of [
+    ["Test 2: sản phẩm 0 lần bán nhưng có giá -> bán được", () => prodLowSamplesId],
+    ["Test 2b: giá hoà (price_confidence = 0.5) nhưng có giá -> bán được", () => prodLowConfidenceId],
+  ] as const) {
+    it(ten, async () => {
+      vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
+      const res = await postAddon(
+        new Request("http://localhost:3000/api/g/addons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: layId(), quantity: 1, photoId }),
+        }),
+      );
+      expect(res.status).toBe(200);
+      const { error } = await supabase
+        .from("selection_addons")
+        .delete()
+        .eq("selection_id", selectionId)
+        .eq("product_id", layId());
+      expect(error).toBeNull();
     });
-
-    const res = await postAddon(req);
-    expect(res.status).toBe(400);
-
-    const body = await res.json();
-    expect(body.error).toBeDefined();
-    expect(body.error.code).toBe("INVALID_INPUT");
-
-    // Kiểm tra không có dòng nào được tạo cho sản phẩm này
-    const { count } = await supabase
-      .from("selection_addons")
-      .select("*", { count: "exact", head: true })
-      .eq("selection_id", selectionId)
-      .eq("product_id", prodLowSamplesId);
-
-    expect(count).toBe(0);
-  });
-
-  it("Test 2b: Mua sản phẩm độ tin cậy thấp (price_confidence = 0.5 < 0.8) -> từ chối", async () => {
-    vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);
-
-    const req = new Request("http://localhost:3000/api/g/addons", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        productId: prodLowConfidenceId,
-        quantity: 1,
-        photoId,
-      }),
-    });
-
-    const res = await postAddon(req);
-    expect(res.status).toBe(400);
-
-    const body = await res.json();
-    expect(body.error).toBeDefined();
-    expect(body.error.code).toBe("INVALID_INPUT");
-  });
+  }
 
   it("Test 3: Mua sản phẩm list_price null -> từ chối", async () => {
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);

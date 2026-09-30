@@ -35,6 +35,21 @@ const NHAN_TRANG_THAI: Record<string, string> = {
   expired: "Hết hạn",
 };
 
+/**
+ * BB-330 — link mời LUÔN là địa chỉ tuyệt đối tới đúng bộ ảnh (`…/g/<mã>`).
+ * Máy chủ thiếu `NEXT_PUBLIC_APP_URL` thì `diaChiDayDu` chỉ còn đường dẫn
+ * tương đối "/g/<mã>" — chép vào Zalo thành chữ vô nghĩa. Ghép với địa chỉ
+ * trang đang mở (cùng tên miền của app) thay vì tin mù.
+ */
+export function diaChiTuyetDoi(diaChiDayDu: string | undefined, duongDan: string): string {
+  const goc = diaChiDayDu && /^https?:\/\//.test(diaChiDayDu) ? diaChiDayDu : duongDan;
+  try {
+    return new URL(goc, window.location.href).href;
+  } catch {
+    return goc;
+  }
+}
+
 export function MoiNguoiThan() {
   const [ds, setDs] = React.useState<NguoiDaMoi[] | null>(null);
   const [mo, setMo] = React.useState(false);
@@ -90,7 +105,7 @@ export function MoiNguoiThan() {
         setLoi(json?.error?.message ?? "Chưa tạo được link, ba mẹ thử lại giúp em nhé");
         return;
       }
-      setLinkVuaTao({ nhan: json.data.nhan, diaChi: json.data.diaChiDayDu });
+      setLinkVuaTao({ nhan: json.data.nhan, diaChi: diaChiTuyetDoi(json.data.diaChiDayDu, json.data.duongDan) });
       setNhan("");
       setDaSaoChep(false);
       await taiLai();

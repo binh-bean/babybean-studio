@@ -43,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
     try {
       dong = await traHauKy(maHoaDon, soDienThoai);
     } catch (err) {
-      if (err instanceof LoiTraLark) return fail("INTERNAL", err.message);
+      if (err instanceof LoiTraLark) return fail("INTERNAL", err.thongDiep);
       throw err;
     }
     if (dong.length === 0) {

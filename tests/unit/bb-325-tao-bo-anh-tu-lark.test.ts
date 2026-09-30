@@ -10,7 +10,7 @@
  * Dữ liệu là dữ liệu giả (AGENTS.md §6).
  */
 import { describe, it, expect } from "vitest";
-import { locDongKhop, bocDongHauKy, duoiSoDienThoai, chuanHoaMaHoaDon, danhSachGoi } from "@/lib/lark/tra-hau-ky";
+import { locDongKhop, bocDongHauKy, duoiSoDienThoai, chuanHoaMaHoaDon, danhSachGoi, LoiTraLark, THONG_DIEP_LOI_TRA_LARK } from "@/lib/lark/tra-hau-ky";
 import { maGoiLark } from "@/lib/gallery/goi-chup-lark";
 import { tinhTieuDeBoAnhQuanTri, dongThongTinBoAnhQuanTri } from "@/lib/utils/dinh-dang";
 import { dinhDangNghin, docSoNghin } from "@/lib/utils/so-tien-nhap";
@@ -151,5 +151,23 @@ describe("BB-325: gói chụp lấy từ Lark", () => {
   it("mã gói Lark không dấu, ổn định theo tên", () => {
     expect(maGoiLark("Baby 02")).toBe("LARK-BABY-02");
     expect(maGoiLark("Gia đình Ông Bà")).toBe("LARK-GIA-DINH-ONG-BA");
+  });
+});
+
+describe("BB-336: LoiTraLark — màn hình chỉ thấy câu tiếng Việt cố định", () => {
+  it("chi tiết thô của Lark nằm ở message (log), KHÔNG lọt vào thongDiep", () => {
+    const loi = new LoiTraLark("LARK_TU_CHOI", "Lark code 1254045: FieldNameNotFound");
+    expect(loi.thongDiep).toBe(THONG_DIEP_LOI_TRA_LARK.LARK_TU_CHOI);
+    expect(loi.thongDiep).not.toContain("FieldNameNotFound");
+    expect(loi.message).toContain("FieldNameNotFound");
+    expect(loi).toBeInstanceOf(Error);
+  });
+
+  it("mọi mã đều có câu tiếng Việt, không phải mã trần", () => {
+    for (const [ma, cau] of Object.entries(THONG_DIEP_LOI_TRA_LARK)) {
+      expect(cau.length, ma).toBeGreaterThan(10);
+      expect(cau).not.toMatch(/^[A-Z_]+$/);
+      expect(new LoiTraLark(ma as keyof typeof THONG_DIEP_LOI_TRA_LARK).thongDiep).toBe(cau);
+    }
   });
 });

@@ -12,9 +12,14 @@
  * ---------------------------------------------------------------------------
  * Vì sao phải suy ra giá
  * ---------------------------------------------------------------------------
- * Bảng danh mục bên Lark có 6 cột và KHÔNG cột nào là giá. Giá chỉ tồn tại
- * trên từng dòng hóa đơn đã bán. Nên đơn giá niêm yết ở đây là giá QUAN SÁT
- * ĐƯỢC: mức xuất hiện nhiều nhất trong lịch sử.
+ * Lúc viết (BB-100) bảng danh mục bên Lark KHÔNG có cột giá, nên đơn giá niêm
+ * yết là giá QUAN SÁT ĐƯỢC: mức xuất hiện nhiều nhất trên hóa đơn đã bán.
+ *
+ * BB-335 (30/09/2026): danh mục nay có cột "Giá Bán" (Number). Đo cùng ngày:
+ * 106/106 sản phẩm có cả hai thì "Giá Bán" KHỚP ĐÚNG giá quan sát, và 22 sản
+ * phẩm chỉ có "Giá Bán" (chưa bán lần nào — 70×110, 80×120…). Nên "Giá Bán" > 0
+ * là giá niêm yết (độ tin cậy 1, nhập thẳng bên Lark); không có thì rơi về giá
+ * quan sát như cũ. Xem `giaNiemYet` bên dưới.
  *
  * Đã kiểm trên 11.163 dòng có đủ hai cột: "Thành Tiền niêm yết" luôn bằng
  * "Giá niêm yết" nhân "Số Lượng". Nên "Giá niêm yết" là ĐƠN GIÁ, không phải
@@ -161,6 +166,26 @@ function splitName(name) {
   return { material: material || null, size };
 }
 
+// --- giá niêm yết (BB-335) --------------------------------------------------
+
+/**
+ * Chọn giá niêm yết cho MỘT sản phẩm. Hàm thuần — phép thử đơn vị canh.
+ *
+ *   giaBan  : ô "Giá Bán" của danh mục Lark (số; 0/trống = chưa nhập).
+ *   quanSat : kết quả `observedPrices` cho tên sản phẩm (hoặc undefined).
+ *
+ * "Giá Bán" > 0 → dùng nó, độ tin cậy 1, số lần bán giữ số quan sát được (có
+ * thể 0). Không có → giá quan sát. Không có cả hai → null. Không bịa giá.
+ */
+export function giaNiemYet(giaBan, quanSat) {
+  const gb = Number(giaBan);
+  if (Number.isFinite(gb) && gb > 0) {
+    return { price: gb, confidence: 1, samples: quanSat?.samples ?? 0 };
+  }
+  if (quanSat && quanSat.price > 0) return quanSat;
+  return { price: null, confidence: null, samples: quanSat?.samples ?? 0 };
+}
+
 // --- giá quan sát được ------------------------------------------------------
 
 /**
@@ -292,6 +317,8 @@ async function main() {
   // Mọi record_id đọc được từ Lark, KỂ CẢ dòng bị skip — dùng để biết sản
   // phẩm nào KHÔNG còn bên Lark nữa (xem sanPhamCanTat).
   const boMaLarkDangDoc = new Set();
+  // BB-335 — sản phẩm có "Giá Bán" khác giá quan sát trên hóa đơn (in ra để soát).
+  const lechGia = [];
 
   for (const row of catalog.rows) {
     const f = row.fields ?? {};
@@ -312,16 +339,21 @@ async function main() {
     }
 
     const { material, size } = splitName(name);
-    const p = prices.get(name);
+    const quanSat = prices.get(name);
+    const giaBanLark = cellNumber(f["Giá Bán"]);
+    const p = giaNiemYet(giaBanLark, quanSat);
+    if (giaBanLark > 0 && quanSat && quanSat.price !== giaBanLark) {
+      lechGia.push(`${name}: Giá Bán ${giaBanLark} ≠ giá quan sát ${quanSat.price}`);
+    }
 
     items.push({
       name,
       kind,
       material,
       size,
-      list_price: p?.price ?? null,
-      price_confidence: p?.confidence ?? null,
-      price_samples: p?.samples ?? 0,
+      list_price: p.price ?? null,
+      price_confidence: p.confidence ?? null,
+      price_samples: p.samples ?? 0,
       default_quota: kind === "shoot_package" ? (quotas.get(name) ?? null) : null,
       lark_category: category || null,
       lark_record_id: recordId,
@@ -332,7 +364,16 @@ async function main() {
   const byKind = items.reduce((acc, i) => ({ ...acc, [i.kind]: (acc[i.kind] ?? 0) + 1 }), {});
   console.log("\nPhân loại:", byKind);
   console.log(`Đang kinh doanh: ${items.filter((i) => i.is_active).length}/${items.length}`);
-  console.log(`Có giá quan sát được: ${items.filter((i) => i.list_price).length}/${items.length}`);
+  console.log(`Có giá (Giá Bán Lark hoặc quan sát): ${items.filter((i) => i.list_price).length}/${items.length}`);
+  if (lechGia.length) {
+    console.log(`
+Giá Bán khác giá quan sát (${lechGia.length}) — dùng Giá Bán:`);
+    for (const l of lechGia) console.log(`  ${l}`);
+  }
+  const inChuaGia = items.filter((i) => i.kind === "print" && i.is_active && !i.list_price);
+  console.log(`
+Ảnh in/khung/album đang bán CHƯA có giá: ${inChuaGia.length}`);
+  for (const i of inChuaGia) console.log(`  ${i.name}`);
   const withQuota = items.filter((i) => i.default_quota);
   console.log(`Gói chụp suy được hạn mức: ${withQuota.length}`);
   for (const i of withQuota.sort((x, y) => x.name.localeCompare(y.name))) {

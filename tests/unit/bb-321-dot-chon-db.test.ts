@@ -425,14 +425,38 @@ describe("BB-321: đợt chọn chạy thật trên cơ sở dữ liệu", () =>
     const chua = await chot({ tenNguoiChot: "Mẹ Fixture", photoIds: [anh[4]!], items: [] });
     expect(chua.status).toBe(409);
 
-    await client.query("update galleries set lark_trang_thai = 'optl5DyKLx' where id = $1", [galleryId]);
+    // BB-336: từ BB-327 (`maLarkConHieuLuc`, 34013ae) trạng thái Lark chỉ còn
+    // hiệu lực khi Lark đổi trạng thái SAU lần CSKH mở lại (`reopened_at`) —
+    // bộ fixture này đã được mở lại ở ca 16. Bản cũ của ca này đặt
+    // `lark_trang_thai` mà bỏ trống `lark_trang_thai_tu`, tức "không biết Lark
+    // đổi lúc nào" → lần mở lại thắng → 409. Đó là đúng luật BB-327, không phải
+    // hồi quy. Nên dựng đúng tình huống ca này muốn canh: Lark vừa sang
+    // "Đã chọn hình" (sau lần mở lại) → đợt mua thêm mở (luật chủ studio:
+    // đợt 2 mở khi CSKH xác nhận đợt 1 HOẶC Lark ≥ "Đã chọn hình").
+    const { rows: moLai } = await client.query("select reopened_at from galleries where id = $1", [galleryId]);
+    const sauMoLai = new Date(Math.max(Date.now(), new Date(moLai[0]?.reopened_at ?? 0).getTime() + 1000));
+
+    // Lark "Đã chọn hình" nhưng CŨ HƠN lần mở lại → mở lại thắng, vẫn 409 (BB-327).
+    if (moLai[0]?.reopened_at) {
+      await client.query(
+        "update galleries set lark_trang_thai = 'optl5DyKLx', lark_trang_thai_tu = $2 where id = $1",
+        [galleryId, new Date(new Date(moLai[0].reopened_at).getTime() - 86_400_000)],
+      );
+      const cu = await chot({ tenNguoiChot: "Mẹ Fixture", photoIds: [anh[4]!], items: [] });
+      expect(cu.status).toBe(409);
+    }
+
+    await client.query(
+      "update galleries set lark_trang_thai = 'optl5DyKLx', lark_trang_thai_tu = $2 where id = $1",
+      [galleryId, sauMoLai],
+    );
     const co = await chot({ tenNguoiChot: "Mẹ Fixture", photoIds: [anh[4]!], items: [] });
     expect(co.status).toBe(200);
     const { data } = await (await docDot()).json();
     expect(data.cheDoChonThem).toBe(true);
     expect(data.cauDongY.studioChon).toBe("Tôi đồng ý với ảnh studio chọn dùm và không đổi lại");
     expect(data.cauDongY.bietAnhInCham).toBe("Tôi biết chưa chọn ảnh in thì nhận ảnh chậm hơn");
-    await client.query("update galleries set lark_trang_thai = null where id = $1", [galleryId]);
+    await client.query("update galleries set lark_trang_thai = null, lark_trang_thai_tu = null where id = $1", [galleryId]);
     await datTrangThai("in_retouch");
   });
 });

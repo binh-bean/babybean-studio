@@ -30,6 +30,7 @@
  * là không ai dám dùng bảng này nữa, nên thà thiếu còn hơn thừa.
  */
 
+import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
@@ -65,6 +66,15 @@ export async function GET(request: Request): Promise<Response> {
 
     const admin = createAdminClient();
 
+    // BB-333 — câu đếm "chưa biết hạn mức" không phụ thuộc gì vào danh sách
+    // bên dưới: gửi đi NGAY, chạy song song với câu đọc view (trước đây nó đi
+    // cuối cùng, sau năm câu khác). `.catch` rỗng chỉ để một lượt ném lỗi sớm
+    // không để lại lời hứa mồ côi; lỗi thật vẫn được đọc ở chỗ `await` phía dưới.
+    const pUnknown = Promise.resolve(
+      admin.rpc("count_galleries_missing_quota", { p_branch_ids: branchIds }).single(),
+    );
+    pUnknown.catch(() => {});
+
     const { data: rows, error } = await admin
       .from("v_over_quota_unbilled")
       .select(
@@ -95,68 +105,92 @@ export async function GET(request: Request): Promise<Response> {
     // BB-320 (Q-D2): CSKH phải biết GỌI AI để thu tiền — view chỉ có mã hợp đồng,
     // không có tên bé/khách. Tra thêm tên theo đúng các bộ ảnh vừa lấy (ba lượt
     // nhỏ theo id, không truy vấn nặng). Tra hỏng thì để trống — dòng vẫn hiện, chỉ thiếu tên.
-    const tenTheoBo = new Map<string, { customerName: string | null; babyNickname: string | null; babyFullName: string | null }>();
-    if (rowsTyped.length > 0) {
-      const { data: boRows } = await admin
-        .from("galleries")
-        .select("id, customer_id, baby_id")
-        .in("id", rowsTyped.map((r) => r.gallery_id));
-      const customerIds = [...new Set((boRows ?? []).map((b) => b.customer_id as string | null).filter((v): v is string => !!v))];
-      const babyIds = [...new Set((boRows ?? []).map((b) => b.baby_id as string | null).filter((v): v is string => !!v))];
-      const [{ data: khachRows }, { data: beRows }] = await Promise.all([
-        customerIds.length > 0 ? admin.from("customers").select("id, full_name").in("id", customerIds) : Promise.resolve({ data: [] }),
-        babyIds.length > 0 ? admin.from("babies").select("id, full_name, nickname").in("id", babyIds) : Promise.resolve({ data: [] }),
-      ]);
-      const khach = new Map((khachRows ?? []).map((k) => [String(k.id), String(k.full_name)]));
-      const be = new Map(
-        (beRows ?? []).map((b) => [String(b.id), { full: (b.full_name as string | null) ?? null, nick: (b.nickname as string | null) ?? null }]),
-      );
-      for (const b of boRows ?? []) {
-        const beCuaBo = b.baby_id ? be.get(String(b.baby_id)) : undefined;
-        tenTheoBo.set(String(b.id), {
-          customerName: b.customer_id ? khach.get(String(b.customer_id)) ?? null : null,
-          babyNickname: beCuaBo?.nick ?? null,
-          babyFullName: beCuaBo?.full ?? null,
-        });
-      }
-    }
+    // BB-333 — ba lượt tra theo id bộ ảnh (tên khách/bé, tiền đã ghi có, số lúc
+    // chốt) không phụ thuộc nhau: chạy SONG SONG thay vì nối đuôi. Nội dung mỗi
+    // lượt giữ nguyên như trước.
+    const idsBo = rowsTyped.map((r) => r.gallery_id);
+    const [tenTheoBo, daThuTheoBo, lucChotTheoBo] = await Promise.all([
+      // BB-320 (Q-D2): CSKH phải biết GỌI AI để thu tiền — view chỉ có mã hợp đồng,
+      // không có tên bé/khách. Tra thêm tên theo đúng các bộ ảnh vừa lấy (ba lượt
+      // nhỏ theo id, không truy vấn nặng). Tra hỏng thì để trống — dòng vẫn hiện, chỉ thiếu tên.
+      (async () => {
+        const tenTheoBo = new Map<string, { customerName: string | null; babyNickname: string | null; babyFullName: string | null; chatUrl: string | null }>();
+        if (rowsTyped.length > 0) {
+          const { data: boRows } = await admin
+            .from("galleries")
+            .select("id, customer_id, baby_id")
+            .in("id", idsBo);
+          const customerIds = [...new Set((boRows ?? []).map((b) => b.customer_id as string | null).filter((v): v is string => !!v))];
+          const babyIds = [...new Set((boRows ?? []).map((b) => b.baby_id as string | null).filter((v): v is string => !!v))];
+          const [{ data: khachRows }, { data: beRows }] = await Promise.all([
+            customerIds.length > 0 ? admin.from("customers").select("id, full_name, facebook").in("id", customerIds) : Promise.resolve({ data: [] }),
+            babyIds.length > 0 ? admin.from("babies").select("id, full_name, nickname").in("id", babyIds) : Promise.resolve({ data: [] }),
+          ]);
+          const khach = new Map((khachRows ?? []).map((k) => [String(k.id), String(k.full_name)]));
+          // BB-331: link "Chat với khách" (Lark) — nút "Nhắn khách" trên dòng.
+          const chat = new Map(
+            (khachRows ?? []).map((k) => [String(k.id), linkChatKhach((k as { facebook?: unknown }).facebook)]),
+          );
+          const be = new Map(
+            (beRows ?? []).map((b) => [String(b.id), { full: (b.full_name as string | null) ?? null, nick: (b.nickname as string | null) ?? null }]),
+          );
+          for (const b of boRows ?? []) {
+            const beCuaBo = b.baby_id ? be.get(String(b.baby_id)) : undefined;
+            tenTheoBo.set(String(b.id), {
+              customerName: b.customer_id ? khach.get(String(b.customer_id)) ?? null : null,
+              babyNickname: beCuaBo?.nick ?? null,
+              babyFullName: beCuaBo?.full ?? null,
+              chatUrl: b.customer_id ? chat.get(String(b.customer_id)) ?? null : null,
+            });
+          }
+        }
+        return tenTheoBo;
+      })(),
 
-    // BB-320: tiền ĐÃ GHI CÓ cho từng bộ (tiền thu + phần giảm giá) — báo cáo "chưa thu
-    // tiền" phải trừ cả hai, nếu không bộ đã thu đủ vẫn nằm mãi trong danh sách đòi tiền.
-    const daThuTheoBo = new Map<string, { daThu: number; giamGia: number }>();
-    if (rowsTyped.length > 0) {
-      const { data: thuRows, error: thuErr } = await admin
-        .from("gallery_payments")
-        .select("gallery_id, amount, payment_method")
-        .in("gallery_id", rowsTyped.map((r) => r.gallery_id));
-      if (thuErr) throw thuErr;
-      for (const t of thuRows ?? []) {
-        const cu = daThuTheoBo.get(String(t.gallery_id)) ?? { daThu: 0, giamGia: 0 };
-        if (t.payment_method === HINH_THUC_GIAM_GIA) cu.giamGia += Number(t.amount);
-        else cu.daThu += Number(t.amount);
-        daThuTheoBo.set(String(t.gallery_id), cu);
-      }
-    }
+      // BB-320: tiền ĐÃ GHI CÓ cho từng bộ (tiền thu + phần giảm giá) — báo cáo "chưa thu
+      // tiền" phải trừ cả hai, nếu không bộ đã thu đủ vẫn nằm mãi trong danh sách đòi tiền.
+      (async () => {
+        const daThuTheoBo = new Map<string, { daThu: number; giamGia: number }>();
+        if (rowsTyped.length > 0) {
+          const { data: thuRows, error: thuErr } = await admin
+            .from("gallery_payments")
+            .select("gallery_id, amount, payment_method")
+            .in("gallery_id", idsBo);
+          if (thuErr) throw thuErr;
+          for (const t of thuRows ?? []) {
+            const cu = daThuTheoBo.get(String(t.gallery_id)) ?? { daThu: 0, giamGia: 0 };
+            if (t.payment_method === HINH_THUC_GIAM_GIA) cu.giamGia += Number(t.amount);
+            else cu.daThu += Number(t.amount);
+            daThuTheoBo.set(String(t.gallery_id), cu);
+          }
+        }
+        return daThuTheoBo;
+      })(),
 
-    // BB-327: số khách nhìn thấy LÚC CHỐT (cùng số sổ thu tiền + màn chi tiết dùng).
-    const lucChotTheoBo = new Map<string, number>();
-    if (rowsTyped.length > 0) {
-      const { data: selRows, error: selErr } = await admin
-        .from("selections")
-        .select("gallery_id, snapshot_extra_amount")
-        .eq("is_primary", true)
-        .in("gallery_id", rowsTyped.map((r) => r.gallery_id));
-      if (selErr) throw selErr;
-      for (const s of selRows ?? []) {
-        if (s.snapshot_extra_amount !== null) lucChotTheoBo.set(String(s.gallery_id), Number(s.snapshot_extra_amount));
-      }
-    }
+      // BB-327: số khách nhìn thấy LÚC CHỐT (cùng số sổ thu tiền + màn chi tiết dùng).
+      (async () => {
+        const lucChotTheoBo = new Map<string, number>();
+        if (rowsTyped.length > 0) {
+          const { data: selRows, error: selErr } = await admin
+            .from("selections")
+            .select("gallery_id, snapshot_extra_amount")
+            .eq("is_primary", true)
+            .in("gallery_id", idsBo);
+          if (selErr) throw selErr;
+          for (const s of selRows ?? []) {
+            if (s.snapshot_extra_amount !== null) lucChotTheoBo.set(String(s.gallery_id), Number(s.snapshot_extra_amount));
+          }
+        }
+        return lucChotTheoBo;
+      })(),
+    ]);
 
     const items = rowsTyped.map((r) => ({
       galleryId: r.gallery_id,
       customerName: tenTheoBo.get(r.gallery_id)?.customerName ?? null,
       babyNickname: tenTheoBo.get(r.gallery_id)?.babyNickname ?? null,
       babyFullName: tenTheoBo.get(r.gallery_id)?.babyFullName ?? null,
+      chatUrl: tenTheoBo.get(r.gallery_id)?.chatUrl ?? null,
       galleryTitle: r.gallery_title,
       branchName: r.branch_name,
       contractCode: r.lark_contract_code,
@@ -185,9 +219,8 @@ export async function GET(request: Request): Promise<Response> {
     // người gọi nhìn thấy, và khi đọc bằng khoá quản trị thì đó là tất cả. Một
     // con số tổng của toàn studio đặt cạnh danh sách của một chi nhánh là cách
     // chắc chắn để người đọc hiểu sai.
-    const { data: unknownRows, error: unknownErr } = await admin
-      .rpc("count_galleries_missing_quota", { p_branch_ids: branchIds })
-      .single();
+    // (Đã gửi từ đầu cùng câu đọc view — xem BB-333 ở trên.)
+    const { data: unknownRows, error: unknownErr } = await pUnknown;
 
     if (unknownErr) throw unknownErr;
 

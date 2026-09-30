@@ -362,7 +362,7 @@ test.describe("BB-313", () => {
     // báo "đến từ hợp đồng Lark" nữa, đúng thiết kế) — dòng này còn nguyên
     // `lark_contract_code`, nên xoá xong phải thấy cảnh báo đó. Nút "bỏ"
     // CUỐI CÙNG trên trang ứng với dòng thêm sau cùng trong `beforeAll`.
-    const nutBoDongXoaTest = page.getByRole("button", { name: "Bỏ dòng hàng này" }).last();
+    const nutBoDongXoaTest = page.getByRole("button", { name: "Bỏ sản phẩm này" }).last();
     page.once("dialog", (d) => void d.dismiss());
     await nutBoDongXoaTest.click();
     await page.waitForTimeout(500);

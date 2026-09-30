@@ -172,8 +172,12 @@ test.describe("BB-160: Tải ảnh và Kanban", () => {
     await theAnh.waitFor({ state: "visible" });
     await theAnh.click();
 
-    // Chờ nút tải ảnh xuất hiện trong lightbox
-    const downloadBtn = page.locator('button[aria-label="Tải ảnh này về máy"]');
+    // BB-330 — nút tải trong lightbox nay mở thực đơn 3 lựa chọn như màn ngoài
+    // (Tải ảnh đang xem / Tải ảnh đã chọn / Tải cả bộ), không tải ngay nữa.
+    const nutMenu = page.getByRole("dialog").getByRole("button", { name: "Tải ảnh về máy" });
+    await nutMenu.waitFor({ state: "visible" });
+    await nutMenu.click();
+    const downloadBtn = page.getByRole("menuitem", { name: "Tải ảnh đang xem" });
     await downloadBtn.waitFor({ state: "visible" });
 
     // Lắng nghe sự kiện download trước khi click
@@ -220,6 +224,8 @@ test.describe("BB-160: Tải ảnh và Kanban", () => {
 
     const downloadBtn = page.locator('button[aria-label="Tải ảnh này về máy"]');
     await expect(downloadBtn).toHaveCount(0);
+    // BB-330 — cũng không có thực đơn tải trong màn xem lớn.
+    await expect(page.getByRole("dialog").getByRole("button", { name: "Tải ảnh về máy" })).toHaveCount(0);
   });
 
   test("4. Kanban: có cột Lỗi tải ảnh và số lượng chuẩn", async ({ page }) => {

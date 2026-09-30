@@ -20,6 +20,13 @@ export interface MenuTaiAnhProps {
   soDaChon: number;
   onTaiDaChon: () => void;
   onTaiCaBo: () => void;
+  /**
+   * BB-330 — màn xem ảnh lớn: thêm lựa chọn thứ ba "Tải ảnh đang xem" ở ĐẦU
+   * thực đơn. Thiếu prop này (màn ngoài) thì thực đơn giữ nguyên hai lựa chọn.
+   */
+  onTaiDangXem?: () => void;
+  /** Lớp của nút mở thực đơn — màn xem lớn cần vùng chạm 44px, màu mực riêng. */
+  nutClassName?: string;
 }
 
 export function MuiTenTai({ className }: { className?: string }) {
@@ -43,7 +50,15 @@ export function MuiTenTai({ className }: { className?: string }) {
   );
 }
 
-export function MenuTaiAnh({ soAnh, dungLuong, soDaChon, onTaiDaChon, onTaiCaBo }: MenuTaiAnhProps) {
+export function MenuTaiAnh({
+  soAnh,
+  dungLuong,
+  soDaChon,
+  onTaiDaChon,
+  onTaiCaBo,
+  onTaiDangXem,
+  nutClassName,
+}: MenuTaiAnhProps) {
   const [mo, setMo] = useState(false);
   const khungRef = useRef<HTMLDivElement | null>(null);
 
@@ -77,7 +92,7 @@ export function MenuTaiAnh({ soAnh, dungLuong, soDaChon, onTaiDaChon, onTaiCaBo 
         aria-haspopup="menu"
         // BB-281 (Opus soát lần 2, 27/09/2026) — bỏ viền/nền tĩnh, chỉ icon
         // nét mảnh; vùng chạm giữ 40px.
-        className="grid h-10 w-10 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
+        className={nutClassName ?? "grid h-10 w-10 place-items-center rounded-full text-foreground transition hover:bg-surface-2"}
       >
         <MuiTenTai />
       </button>
@@ -87,12 +102,23 @@ export function MenuTaiAnh({ soAnh, dungLuong, soDaChon, onTaiDaChon, onTaiCaBo 
           role="menu"
           className="absolute right-0 top-11 z-40 w-64 overflow-hidden rounded-2xl border border-border bg-surface p-1.5 shadow-[0_18px_40px_-16px_rgba(42,36,32,.35)]"
         >
+          {onTaiDangXem && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={chon(onTaiDangXem)}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-foreground hover:bg-surface-2"
+            >
+              <MuiTenTai className="shrink-0 text-muted-foreground" />
+              Tải ảnh đang xem
+            </button>
+          )}
           {soDaChon > 0 && (
             <button
               type="button"
               role="menuitem"
               onClick={chon(onTaiDaChon)}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-surface-2"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-foreground hover:bg-surface-2"
             >
               <MuiTenTai className="shrink-0 text-muted-foreground" />
               Tải {soDaChon} ảnh đã chọn
@@ -102,7 +128,7 @@ export function MenuTaiAnh({ soAnh, dungLuong, soDaChon, onTaiDaChon, onTaiCaBo 
             type="button"
             role="menuitem"
             onClick={chon(onTaiCaBo)}
-            className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm hover:bg-surface-2"
+            className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-foreground hover:bg-surface-2"
           >
             <MuiTenTai className="mt-0.5 shrink-0 text-muted-foreground" />
             <span>

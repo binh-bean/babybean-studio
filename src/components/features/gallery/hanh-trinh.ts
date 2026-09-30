@@ -103,33 +103,45 @@ export interface HanhTrinhInfo {
  * Trả về danh sách 5 bước và vị trí hiện tại (0-4).
  * Lưu ý: nếu không in thì từ Duyệt (2) nhảy thẳng lên Nhận ảnh (4), đây là hành vi thiết kế có chủ ý.
  */
+/**
+ * BB-329 mục 1 — chủ studio 30/09/2026 (ảnh 2189fc61): ba mẹ vừa bấm Xác nhận,
+ * CSKH CHƯA xác nhận, mà thanh tiến độ đã nhảy sang "Đang chỉnh". Sai hai chỗ:
+ *   · `submitted` từng rơi vào bước 1 "Đang chỉnh" — phải là "Chờ xác nhận".
+ *   · CSKH đã xác nhận nhưng Lark còn "Đã chọn hình" (giai đoạn 2 — bộ ảnh
+ *     XẾP HÀNG, chưa ai chỉnh) cũng rơi vào "Đang chỉnh" (`giaiDoan <= 4`).
+ *     Luật docs/19 mục 3 (và `nhanHienThi`): chỉ "Đang chỉnh" khi Lark sang
+ *     "Đang làm" (giai đoạn 3) trở đi.
+ * Nay 5 bước: Chờ xác nhận → Chờ chỉnh → Đang chỉnh → Duyệt ảnh → In/nhận ảnh.
+ * "Đã giao" không còn là một bước: từ BB-298 thẻ này KHÔNG hiện khi đã giao
+ * (bìa tự báo "Đã hoàn thiện").
+ */
+export const BUOC_HANH_TRINH = ["Chờ xác nhận", "Chờ chỉnh", "Đang chỉnh", "Duyệt ảnh", "In/nhận ảnh"] as const;
+
+/** Tiêu đề thẻ khi máy chủ không gửi nhãn riêng (bộ ảnh vừa chốt, CSKH chưa xác nhận). */
+export const NHAN_CHO_XAC_NHAN = "Đang chờ studio xác nhận";
+
 export function buocHanhTrinh(status: string, giaiDoan: number | null): HanhTrinhInfo {
-  // BB-292: nhãn theo bản vẽ BB-285 `dang-chinh-da-giao-dien-thoai.png` — đổi
-  // tên 1:1 theo đúng vị trí cũ, KHÔNG đổi chỉ số `hienTai` bên dưới ("Chọn
-  // ảnh"→"Đã chốt" (thẻ này chỉ hiện sau khi đã chốt — BB-292 chốt lại đúng
-  // pha đầu thay vì bước chọn ảnh đã qua), "Chỉnh sửa"→"Đang chỉnh",
-  // "Duyệt"→"Duyệt ảnh", "In"→"In/nhận ảnh" (gộp — không có trường riêng
-  // phân biệt hai giai đoạn này trên màn khách), "Nhận ảnh"→"Đã giao").
-  const buoc = ["Đã chốt", "Đang chỉnh", "Duyệt ảnh", "In/nhận ảnh", "Đã giao"];
+  const buoc = [...BUOC_HANH_TRINH];
   let hienTai = 0;
 
   if (status === "awaiting_approval") {
-    hienTai = 2;
+    hienTai = 3;
   } else if (status === "delivered") {
     hienTai = 4;
   } else if (giaiDoan != null) {
-    if (giaiDoan <= 4 || giaiDoan === 6) hienTai = 1;
-    else if (giaiDoan === 5 || giaiDoan === 7) hienTai = 2;
-    else if (giaiDoan === 8) hienTai = 3;
-    else if (giaiDoan >= 9) hienTai = 4;
+    // Máy chủ (`nhanHienThi`) chỉ gửi giai đoạn khi CSKH đã xác nhận hoặc Lark
+    // đã sang "Đã chọn hình" trở lên; giai đoạn 1 ("Đã gửi file gốc") coi như 2.
+    if (giaiDoan <= 2) hienTai = 1;
+    else if (giaiDoan === 3 || giaiDoan === 4 || giaiDoan === 6) hienTai = 2;
+    else if (giaiDoan === 5 || giaiDoan === 7) hienTai = 3;
+    else hienTai = 4;
   } else if (status === "submitted") {
-    hienTai = 1; 
+    hienTai = 0;
   } else if (status === "in_retouch") {
+    // CSKH đã xác nhận, chưa có tin Lark "Đang làm" → đang xếp hàng.
     hienTai = 1;
   } else if (status === "approved") {
-    hienTai = 2;
-  } else if (status === "ready" || status === "in_review") {
-    hienTai = 0;
+    hienTai = 3;
   }
 
   return { buoc, hienTai };

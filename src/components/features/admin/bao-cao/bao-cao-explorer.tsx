@@ -413,7 +413,7 @@ function NoiDungBaoCao({
         // Kỳ chưa có gì: một hàng ô "0" trông như báo cáo hỏng. Tranh banana
         // BB-262 tràn khung + một câu, nhưng VẪN giữ các ô số bên dưới để người
         // xem thấy đúng là 0 chứ không phải tải lỗi.
-        <div className="overflow-hidden rounded-lg border border-[var(--bb-border)] bg-[#fbf7f2]">
+        <div className="overflow-hidden rounded-lg border border-[var(--bb-border)] bg-[#fdfbf9]">
           <img
             src="/minh-hoa/bao-cao-trong-1280.webp"
             srcSet="/minh-hoa/bao-cao-trong-640.webp 640w, /minh-hoa/bao-cao-trong-1280.webp 1280w"

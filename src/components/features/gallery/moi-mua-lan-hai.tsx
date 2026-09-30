@@ -496,7 +496,9 @@ function TranhNho({ ten, kichThuoc }: { ten: string; kichThuoc: number }) {
       srcSet={`/san-pham/${ten}-320.webp 320w, /san-pham/${ten}-640.webp 640w`}
       sizes={`${kichThuoc}px`}
       alt=""
-      loading="lazy"
+      // BB-329 — tranh nằm TRONG hộp thoại cố định có vùng cuộn riêng: Safari iOS
+      // có lúc không kích hoạt tải lười ở đó → ô tranh trắng. Tranh nhỏ, tải ngay.
+      loading="eager"
       width={kichThuoc}
       height={kichThuoc}
       className="shrink-0 rounded-xl object-cover"

@@ -439,10 +439,13 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
     expect(galBody.data.options.watermark).toBeUndefined();
 
     // 2. Schema nhập liệu CreateGallerySchema: options strip trường watermark và không có watermark mặc định
+    // BB-336: từ BB-325 (737a93a) bộ ảnh tạo mới PHẢI neo một dòng Hậu Kỳ Lark
+    // (`larkHaukyRecordId`); khách/gói do máy chủ đọc lại từ Lark nên schema
+    // không còn customerId/packageId. Thiếu trường này thì safeParse trượt vì
+    // lý do KHÁC watermark và ca này đỏ oan — bổ sung để ca canh đúng BB-108.
     const parseResult = CreateGallerySchema.safeParse({
       branchId: randomUUID(),
-      customerId: randomUUID(),
-      packageId: randomUUID(),
+      larkHaukyRecordId: "recFIXTURE0001",
       title: "Test Gallery",
       driveUrl: "https://drive.google.com/drive/folders/test",
       options: {

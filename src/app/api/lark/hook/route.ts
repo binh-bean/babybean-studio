@@ -9,6 +9,7 @@ import { readJsonBody } from "@/lib/api-response";
 import { taoDocMotBanGhi } from "@/lib/lark/doc-trang-thai-lark";
 import { capNhatTrangThaiTuHook } from "@/lib/lark/cap-nhat-tu-hook";
 import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
+import { ghiBanGhiMoi } from "@/lib/lark/ban-ghi-moi";
 
 export const runtime = "nodejs";
 
@@ -122,6 +123,15 @@ export async function POST(request: Request) {
           dbUrl,
         });
         results.push({ record_id: rId, result: res });
+
+        // BB-332 — dòng mới (đủ tên+SĐT+gói, Trạng Thái + Link app trống) vào khối "Bản
+        // ghi mới từ Lark" ngay, không đợi lượt 5 phút. Hỏng (vd chưa áp 0079)
+        // thì chỉ ghi log — không làm hỏng phần dựng bộ ảnh ở trên.
+        try {
+          await ghiBanGhiMoi(client, record, branchRows, dbUrl);
+        } catch (err) {
+          console.error(`[Lark Hook] Không ghi được bản ghi mới ${rId}:`, err);
+        }
       } catch (err) {
         console.error(`[Lark Hook] Lỗi xử lý bản ghi ${rId}:`, err);
         results.push({ record_id: rId, error: String(err) });

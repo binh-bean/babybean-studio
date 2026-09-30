@@ -20,7 +20,7 @@ export const PlacePhotoSchema = z
     path: ["photoId"],
   })
   .refine((data) => !!data.galleryItemId !== !!data.addonId, {
-    message: "Chọn đúng một trong hai: dòng hàng trong gói, hoặc album mua thêm",
+    message: "Chọn đúng một trong hai: sản phẩm trong gói, hoặc album mua thêm",
     path: ["galleryItemId"],
   });
 

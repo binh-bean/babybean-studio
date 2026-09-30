@@ -64,6 +64,7 @@ import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
 
 export const runtime = "nodejs";
 
@@ -210,9 +211,8 @@ export async function POST(request: Request): Promise<Response> {
       if (product.list_price === null || product.list_price === undefined) {
         return fail("INVALID_INPUT", "Có sản phẩm chưa có đơn giá niêm yết, vui lòng liên hệ CSKH");
       }
-      const confidence = product.price_confidence !== null ? Number(product.price_confidence) : 0;
-      const samples = product.price_samples ?? 0;
-      if (confidence < 0.8 || samples < 5) {
+      // BB-335: cùng luật giá với danh mục của /api/g/gallery.
+      if (!giaDuocBaoTuDong(product)) {
         return fail(
           "INVALID_INPUT",
           "Có sản phẩm chưa đủ độ tin cậy về giá, CSKH sẽ báo giá trực tiếp",

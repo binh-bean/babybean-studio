@@ -23,6 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BranchSelector } from "./branch-selector";
 import { NutNhacKhach } from "./nut-nhac-khach";
+import { BanGhiMoiLark } from "./ban-ghi-moi-lark";
+import { NutNhanKhach } from "./nut-nhan-khach";
 import {
   bienDongLaTot,
   chaoTheoBuoi,
@@ -119,6 +121,8 @@ type ViecHomNayItem = ViecHomNayThoLuoc & {
   babyFullName: string | null;
   packageName: string | null;
   customerPhone: string | null;
+  /** BB-331: link chat với khách (Lark) — nút "Nhắn khách". */
+  customerChatUrl?: string | null;
   /** BB-325 — mã hóa đơn cho dòng thông tin (route dashboard trả kèm). */
   maHoaDon?: string | null;
   coverPhotoId: string | null;
@@ -169,6 +173,13 @@ type DashboardData = {
   chartData: ChartData[];
 };
 
+/**
+ * BB-331 (30/09, ảnh anh f83ab017): thứ tự khối trên Bàn làm việc —
+ *   1. Lời chào
+ *   2. "Bản ghi mới từ Lark" (BB-332, `<BanGhiMoiLark />`) — đứng TRÊN CÙNG.
+ *   3. Cần xử lý ngay · hàng thẻ số · Mua thêm 7 ngày + Theo chi nhánh · biểu đồ
+ *   4. "Việc hôm nay" — anh khoanh khối này, dời xuống DƯỚI các khối khác.
+ */
 export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   const searchParams = useSearchParams();
   /**
@@ -417,6 +428,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     return (
       <div className="space-y-6">
         {khoiChao}
+        <BanGhiMoiLark />
         {/* BB-294 (mục cũ #32): hàng thẻ số vẫn hiện khi trống — 0 có NGHĨA
             (chưa có gì cần chọn/sắp hết hạn/quá hạn…), không phải một khối
             biến mất khiến trang trông như hỏng. Không bịa số: đây vẫn là
@@ -453,6 +465,9 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   return (
     <div className="space-y-6">
       {khoiChao}
+      {/* BB-332 — "Bản ghi mới từ Lark" đứng ĐẦU trang (chủ studio 30/09/2026);
+          BB-331 xếp "Việc hôm nay" xuống dưới khối này. */}
+      <BanGhiMoiLark />
       {/*
         BB-280: chủ studio 27/09/2026 chốt lại tư duy màn Tổng quan — khối
         "Cần xử lý" phải lên ĐẦU trang, trước cả hàng thẻ số. Trước đây nó
@@ -531,19 +546,19 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
           Điện thoại (bang-dieu-khien-dien-thoai.html): thứ tự xếp DỌC khác
           máy tính — "Mua thêm 7 ngày" lên TRƯỚC "Việc hôm nay" (order-*), và
           "Theo chi nhánh" KHÔNG có trong bản vẽ điện thoại (`hidden lg:block`). */}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        <div className="order-2 min-w-0 lg:order-1">
-          <ViecHomNayCard items={data.viecHomNay ?? []} onLamMoi={loadData} />
-        </div>
-        <div className="order-1 flex min-w-0 flex-col gap-6 lg:order-2">
-          {/* Chống vỡ trang khi phản hồi API còn thiếu các trường MỚI của
-              BB-303 (ví dụ bản đã lưu đệm/giả lập cũ chưa có
-              muaThem7Ngay/theoChiNhanhMuaThem) — một khối trống hoá ra một
-              khối rỗng, không phải cả trang trắng. */}
+      {/* BB-331: "Việc hôm nay" đã dời xuống cuối trang (xem chú thích đầu
+          `Dashboard`) — hàng này chỉ còn "Mua thêm 7 ngày" + "Theo chi nhánh"
+          nằm cạnh nhau trên máy tính. */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        {/* Chống vỡ trang khi phản hồi API còn thiếu các trường MỚI của
+            BB-303 (ví dụ bản đã lưu đệm/giả lập cũ chưa có
+            muaThem7Ngay/theoChiNhanhMuaThem) — một khối trống hoá ra một
+            khối rỗng, không phải cả trang trắng. */}
+        <div className="min-w-0">
           <MuaThem7NgayCard data={data.muaThem7Ngay ?? RONG_MUA_THEM_7_NGAY} />
-          <div className="hidden lg:block">
-            <TheoChiNhanhMuaThemCard items={data.theoChiNhanhMuaThem ?? []} />
-          </div>
+        </div>
+        <div className="hidden min-w-0 lg:block">
+          <TheoChiNhanhMuaThemCard items={data.theoChiNhanhMuaThem ?? []} />
         </div>
       </div>
 
@@ -642,6 +657,11 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* BB-331: "Việc hôm nay" xuống dưới các khối khác (anh khoanh ở ảnh). */}
+      <div className="min-w-0" data-testid="khoi-viec-hom-nay-cuoi">
+        <ViecHomNayCard items={data.viecHomNay ?? []} onLamMoi={loadData} />
       </div>
     </div>
   );
@@ -845,6 +865,8 @@ function DongViec({ item, onLamMoi }: { item: ViecHomNayItem; onLamMoi: () => Pr
         <IconHan className="h-3.5 w-3.5" aria-hidden="true" />
         {han.text}
       </span>
+      {/* BB-331: "Nhắn khách" — link chat Lark, mở tab mới; không có link thì ẩn. */}
+      <NutNhanKhach url={item.customerChatUrl} gonNho />
       <NutLamNhanhViec item={item} dangXuLy={dangXuLy} onChuyenChinh={() => void chuyenChinh()} />
     </li>
   );

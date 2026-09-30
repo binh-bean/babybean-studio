@@ -1,4 +1,5 @@
 "use client";
+import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 /**
  * Màn so sánh nhiều tấm (BB-218) — xem 2–4 tấm cạnh nhau, bỏ bớt ngay tại chỗ.
@@ -20,7 +21,7 @@
  * đen) đứng lạc giữa hệ màu KEM của toàn màn khách — "hai mảng tối lạc giữa
  * hệ kem" cùng với tấm trượt "Tấm này dùng cho…" của `photo-lightbox.tsx`
  * (đã đổi ở đó). Màn này đổi SANG cùng hệ kem: nền #F3EDE5 (khối chữ) hoặc
- * #FBF7F2 (khối viền/nút), chữ mực #2E2A27 — CHỈ đổi các mảng CHROME (đầu
+ * #fdfbf9 (khối viền/nút), chữ mực #2E2A27 — CHỈ đổi các mảng CHROME (đầu
  * trang, dải nhãn, thanh điều khiển, khe hở giữa các tấm); các nút nổi TRÊN
  * ảnh (ghim, tim, mũi tên trượt) giữ nguyên nền tối bán trong suốt — ảnh bên
  * dưới đổi màu tuỳ ý, nút nổi trên ảnh cần tương phản với CHÍNH ẢNH, không
@@ -90,13 +91,8 @@ export function SoSanhAnh({
   }, []);
 
   // Khoá cuộn trang nền — cùng luật với photo-lightbox.tsx.
-  useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, []);
+  // BB-329 — khoá CÓ ĐẾM (khoa-cuon-trang.ts).
+  useEffect(() => khoaCuonTrang(), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

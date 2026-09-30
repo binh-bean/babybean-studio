@@ -1,4 +1,5 @@
 "use client";
+import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 /**
  * Cửa hàng — màn mua thêm sản phẩm, mở ra từ một nút riêng.
@@ -57,8 +58,8 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import {
   nhomCoHang,
-  kichThuocCuaNhom,
-  chatLieuTheoKichThuoc,
+  chatLieuCuaNhom,
+  kichThuocTheoChatLieu,
   chonSanPham,
   type SanPhamCuaHang,
 } from "@/lib/products/cau-hinh-cua-hang";
@@ -279,6 +280,13 @@ export function CuaHang({
   // và Esc đóng được, focus trả về đúng nút đã mở cửa hàng.
   useBayFocusHopThoai(mo, onDong, hopThoaiRef);
 
+  // BB-329 — tấm trượt phủ cả màn: khoá cuộn nền khi mở, NHẢ khi đóng (khoá
+  // có đếm — mở từ "Đặt in tấm này" thì màn xem lớn vừa nhả khoá của nó).
+  React.useEffect(() => {
+    if (!mo) return;
+    return khoaCuonTrang();
+  }, [mo]);
+
   // Mở lại từ đầu mỗi lần bật cửa hàng — kể cả preset (đường thứ hai).
   React.useEffect(() => {
     if (!mo) return;
@@ -320,31 +328,36 @@ export function CuaHang({
     [anhDaChonTrongLuoi],
   );
 
-  const dsKichThuoc = React.useMemo(
-    () => kichThuocCuaNhom(danhMuc, nhomDangXem),
-    [danhMuc, nhomDangXem],
-  );
-  const canKichThuoc = dsKichThuoc.length > 0;
-
-  // Giá trị HIỆU LỰC: lựa chọn của ba mẹ nếu còn hợp lệ trong danh sách hiện
-  // tại, không thì phần tử đầu — tính lại mỗi render, không cần effect.
-  const kichThuoc = !canKichThuoc
-    ? null
-    : kichThuocChon && dsKichThuoc.includes(kichThuocChon)
-      ? kichThuocChon
-      : dsKichThuoc[0] ?? null;
-
+  // BB-329 mục 4 — CHẤT LIỆU TRƯỚC, kích thước lọc theo chất liệu (lý do ở
+  // `chatLieuCuaNhom`, `src/lib/products/cau-hinh-cua-hang.ts`). Bậc cũ
+  // (kích thước trước) để khổ mặc định 10×15 chỉ còn đúng một chất liệu UV —
+  // ba mẹ không thấy có gì để chọn.
   const dsChatLieu = React.useMemo(
-    () => chatLieuTheoKichThuoc(danhMuc, nhomDangXem, canKichThuoc ? kichThuoc : null),
-    [danhMuc, nhomDangXem, canKichThuoc, kichThuoc],
+    () => chatLieuCuaNhom(danhMuc, nhomDangXem),
+    [danhMuc, nhomDangXem],
   );
   const canChatLieu = dsChatLieu.length > 0;
 
+  // Giá trị HIỆU LỰC: lựa chọn của ba mẹ nếu còn hợp lệ trong danh sách hiện
+  // tại, không thì phần tử đầu — tính lại mỗi render, không cần effect.
   const chatLieu = !canChatLieu
     ? null
     : chatLieuChon && dsChatLieu.includes(chatLieuChon)
       ? chatLieuChon
       : dsChatLieu[0] ?? null;
+
+  const dsKichThuoc = React.useMemo(
+    () => kichThuocTheoChatLieu(danhMuc, nhomDangXem, canChatLieu ? chatLieu : null),
+    [danhMuc, nhomDangXem, canChatLieu, chatLieu],
+  );
+  const canKichThuoc = dsKichThuoc.length > 0;
+
+  // Đổi chất liệu mà khổ đang chọn vẫn có ở chất liệu mới thì GIỮ khổ đó.
+  const kichThuoc = !canKichThuoc
+    ? null
+    : kichThuocChon && dsKichThuoc.includes(kichThuocChon)
+      ? kichThuocChon
+      : dsKichThuoc[0] ?? null;
 
   if (!mo) return null;
 
@@ -546,7 +559,7 @@ export function CuaHang({
         <div className="flex-1 overflow-y-auto px-6 sm:px-7">
           {nhomKhaDung.length === 0 ? (
             <p className="py-6 text-sm text-muted-foreground">
-              Cửa hàng chưa có sản phẩm nào đang bán. Ba mẹ nhắn studio giúp em nhé.
+              Chưa có sản phẩm nào đang bán. Ba mẹ nhắn studio giúp em nhé.
             </p>
           ) : (
             <div className="mx-auto max-w-xl pb-6">
@@ -575,6 +588,37 @@ export function CuaHang({
 
               {/* Các bước ngăn bằng vạch mảnh, nhãn CHỮ HOA giãn — bản vẽ .buoc/.nhan. */}
               <div className="divide-y divide-[var(--bb-border)] border-t border-[var(--bb-border)]">
+                {canChatLieu && (
+                  <div className="py-3.5" data-testid="buoc-chat-lieu">
+                    <p className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                      Chất liệu
+                    </p>
+                    {/*
+                      BB-287 mục 8 — nhóm chỉ có MỘT chất liệu (album, khung)
+                      thì hiện chữ thường, không thành chip. BB-329: ảnh in có
+                      nhiều chất liệu nên từ nay luôn là chip bấm được, đứng
+                      TRƯỚC kích thước.
+                    */}
+                    {dsChatLieu.length === 1 ? (
+                      <p className="text-sm text-foreground">{dsChatLieu[0]}</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {dsChatLieu.map((cl) => (
+                          <button
+                            key={cl}
+                            type="button"
+                            aria-pressed={cl === chatLieu}
+                            onClick={() => setChatLieuChon(cl)}
+                            className={chipButton(cl === chatLieu)}
+                          >
+                            {cl}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {canKichThuoc && (
                   <div className="py-3.5">
                     <div className="mb-2.5 flex items-center justify-between">
@@ -596,10 +640,8 @@ export function CuaHang({
                         <button
                           key={kt}
                           type="button"
-                          onClick={() => {
-                            setKichThuocChon(kt);
-                            setChatLieuChon(null);
-                          }}
+                          aria-pressed={kt === kichThuoc}
+                          onClick={() => setKichThuocChon(kt)}
                           className={chipButton(kt === kichThuoc)}
                         >
                           {formatKichThuoc(kt)}
@@ -609,40 +651,11 @@ export function CuaHang({
                   </div>
                 )}
 
-                {canChatLieu && (
-                  <div className="py-3.5">
-                    <p className="mb-2.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Chất liệu
-                    </p>
-                    {/*
-                      BB-287 mục 8 — báo cáo chấm #17: nhóm chỉ có MỘT chất
-                      liệu vẫn hiện một chip "UV" cô đơn, trông như còn phải
-                      chọn. Chỉ một lựa chọn thì không có gì để chọn — hiện
-                      thành chữ thường, không thành chip bấm được.
-                    */}
-                    {dsChatLieu.length === 1 ? (
-                      <p className="text-sm text-foreground">{dsChatLieu[0]}</p>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {dsChatLieu.map((cl) => (
-                          <button
-                            key={cl}
-                            type="button"
-                            onClick={() => setChatLieuChon(cl)}
-                            className={chipButton(cl === chatLieu)}
-                          >
-                            {cl}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {sanPham && (
                   <div className="flex items-center justify-between py-3.5">
+                    {/* BB-329 — chủ studio khoanh "mỗi tấm" (khó hiểu): nói rõ là số bản in cho MỖI ảnh chọn. */}
                     <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                      Số lượng{sanPham.canGanAnh ? " · mỗi tấm" : ""}
+                      {sanPham.canGanAnh ? "Số bản cho mỗi ảnh" : "Số lượng"}
                     </p>
                     <div className="flex items-center gap-3.5">
                       <button
@@ -966,7 +979,9 @@ function TranhNho({ ten, kichThuoc }: { ten: string; kichThuoc: number }) {
       srcSet={`/san-pham/${ten}-320.webp 320w, /san-pham/${ten}-640.webp 640w`}
       sizes={`${kichThuoc}px`}
       alt=""
-      loading="lazy"
+      // BB-329 — tranh nằm TRONG hộp thoại cố định có vùng cuộn riêng: Safari iOS
+      // có lúc không kích hoạt tải lười ở đó → ô tranh trắng. Tranh nhỏ, tải ngay.
+      loading="eager"
       width={kichThuoc}
       height={kichThuoc}
       className="shrink-0 rounded-xl object-cover"

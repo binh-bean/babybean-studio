@@ -210,7 +210,7 @@ ownIpTest.describe("BB-310 mục 4/5: Xem lớn và So sánh dùng tông sáng c
     await ownIpExpect(hop).toBeVisible();
     const bg = await hop.evaluate((el) => getComputedStyle(el).backgroundColor);
     // #F3EDE5 = rgb(243, 237, 229), ĐẶC (alpha 1) — không còn
-    // rgba(251,247,242,0.66) trong mờ như bản cũ.
+    // rgba(253,251,249,0.66) trong mờ như bản cũ.
     ownIpExpect.soft(bg, `Nền xem lớn điện thoại phải kem đặc #F3EDE5, đo được: ${bg}`).toBe("rgb(243, 237, 229)");
 
     await page.screenshot({ path: `${THU_MUC_ANH}/4-dt-xem-lon-nen-kem.png` });
@@ -228,8 +228,8 @@ ownIpTest.describe("BB-310 mục 4/5: Xem lớn và So sánh dùng tông sáng c
     const tam = page.getByTestId("tam-truot-dung-cho");
     await ownIpExpect(tam).toBeVisible();
     const bg = await tam.evaluate((el) => getComputedStyle(el).backgroundColor);
-    // #FBF7F2 = rgb(251, 247, 242) — không còn #231e1a (rgb(35, 30, 26)).
-    ownIpExpect.soft(bg, `Tấm trượt 'dùng cho' phải nền kem #FBF7F2, đo được: ${bg}`).toBe("rgb(251, 247, 242)");
+    // #fdfbf9 = rgb(253, 251, 249) — không còn #231e1a (rgb(35, 30, 26)).
+    ownIpExpect.soft(bg, `Tấm trượt 'dùng cho' phải nền kem #fdfbf9, đo được: ${bg}`).toBe("rgb(253, 251, 249)");
 
     await page.screenshot({ path: `${THU_MUC_ANH}/5-dt-tam-truot-sang.png` });
     await page.screenshot({ path: `${CHUP}/5-dt-tam-truot-sang.png` });

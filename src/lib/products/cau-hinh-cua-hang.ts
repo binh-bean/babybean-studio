@@ -91,6 +91,45 @@ export function chatLieuTheoKichThuoc(
 }
 
 /**
+ * BB-329 mục 4 — chủ studio 30/09/2026: "màn đặt in không có lựa chọn chất
+ * liệu và kích thước". Gốc lỗi: bậc xếp tầng cũ là KÍCH THƯỚC TRƯỚC, chất
+ * liệu lọc theo kích thước. Kích thước mặc định là khổ rẻ nhất (10×15) — mà
+ * danh mục đang bán chỉ có MỘT chất liệu ở khổ đó (UV), nên bước "Chất liệu"
+ * luôn hiện một chữ "UV" không bấm được: ba mẹ không bao giờ thấy Tráng gương,
+ * Gỗ, Mica, Thuỷ tinh… trừ khi tình cờ bấm sang khổ lớn.
+ *
+ * Nay CHẤT LIỆU TRƯỚC (mọi chất liệu đang bán của nhóm, không lọc), kích
+ * thước lọc theo chất liệu đã chọn — `kichThuocTheoChatLieu` bên dưới.
+ * Thứ tự: theo thứ tự xuất hiện trong danh mục (máy chủ sắp giá tăng dần),
+ * tức chất liệu có món rẻ nhất đứng đầu.
+ */
+export function chatLieuCuaNhom(danhMuc: SanPhamCuaHang[], nhom: NhomSanPham): string[] {
+  return chatLieuTheoKichThuoc(danhMuc, nhom, null);
+}
+
+/**
+ * Kích thước có hàng của một nhóm, LỌC THEO chất liệu đã chọn (BB-329).
+ * `material = null` = nhóm không có bước chất liệu — không lọc.
+ */
+export function kichThuocTheoChatLieu(
+  danhMuc: SanPhamCuaHang[],
+  nhom: NhomSanPham,
+  material: string | null,
+): string[] {
+  const daThay = new Set<string>();
+  const ds: string[] = [];
+  for (const sp of danhMuc) {
+    if (sp.nhom !== nhom) continue;
+    if (material !== null && (sp.material?.trim() || null) !== material) continue;
+    const kt = sp.size?.trim();
+    if (!kt || daThay.has(kt)) continue;
+    daThay.add(kt);
+    ds.push(kt);
+  }
+  return ds;
+}
+
+/**
  * Tổ hợp nhóm + kích thước + chất liệu → đúng MỘT sản phẩm (hoặc `null` nếu
  * tổ hợp đó chưa từng bán).
  *

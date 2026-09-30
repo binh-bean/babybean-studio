@@ -68,7 +68,12 @@ export async function kiemTraLaiMotBo(
     await assertFolderReadable(folderId, { requestId, folderId });
   } catch (err) {
     const loi = moTaLoi(err);
-    await db.from("galleries").update({ sync_error: loi }).eq("id", galleryId);
+    // BB-336: ghi hụt thì phải kêu (BB-190) — `sync_error` không được ghi thì
+    // `updated_at` không nhích, lượt sau cứ quay lại đúng bộ này mà không ai
+    // biết. Ném lên giống `ghiLoiDongBo`: `kiemTraLaiCacBoLoi` bắt từng bộ và
+    // ghi console, route một bộ trả lỗi chung.
+    const { error: loiGhi } = await db.from("galleries").update({ sync_error: loi }).eq("id", galleryId);
+    if (loiGhi) throw loiGhi;
     return { galleryId, hetLoi: false, loi };
   }
 

@@ -76,6 +76,8 @@ export const GetGalleriesQuerySchema = z.object({
       return [val];
     }),
   photographerId: z.string().uuid("photographerId phải là UUID hợp lệ").optional(),
+  /** BB-335 — lọc theo tên thợ chụp đọc từ cột "photo" của Lark (galleries.lark_photo). */
+  photo: z.string().trim().min(1).max(120).optional(),
   editorId: z.string().uuid("editorId phải là UUID hợp lệ").optional(),
   cskhId: z.string().uuid("cskhId phải là UUID hợp lệ").optional(),
   dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dateFrom phải theo định dạng YYYY-MM-DD").optional(),

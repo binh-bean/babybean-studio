@@ -17,10 +17,10 @@
   --bb-primary:        #E8A598;   /* hồng đất */
   --bb-primary-fg:     #FFFFFF;
   --bb-accent:         #7FA99B;   /* xanh sage */
-  --bb-cream:          #FBF7F2;
+  --bb-cream:          #fdfbf9;
 
   /* Nền */
-  --bb-bg:             #FBF7F2;
+  --bb-bg:             #fdfbf9;
   --bb-surface:        #FFFFFF;
   --bb-surface-2:      #F3EDE6;
   --bb-border:         #E5DCD2;
@@ -197,7 +197,7 @@ Nhóm rỗng với một vai nào đó (ví dụ "Báo cáo" với `photoshop_ct
 | Phần | Số đo | Token/lớp |
 |---|---|---|
 | Chiều rộng sidebar | 248px | `w-[248px]` (`admin-sidebar.tsx`) |
-| Nền sidebar | `#f6f0e8`, khác nền trang `#FBF7F2` | `--bb-sidebar-bg` |
+| Nền sidebar | `#f6f0e8`, khác nền trang `#fdfbf9` | `--bb-sidebar-bg` |
 | Logo | "BABY BEAN" serif, giãn chữ, 18px | `font-display text-[18px] tracking-[0.14em]` |
 | Nhãn nhóm | 10.5px hoa, giãn chữ `.14em`, màu muted | `text-[10.5px] tracking-[0.14em] text-[var(--bb-fg-muted)]` |
 | Mục menu | cao 38px, bo góc 10px, icon nét 1.5 cỡ 18px | `h-[38px] rounded-[10px]`, `<Icon size={18} strokeWidth={1.5} />` |

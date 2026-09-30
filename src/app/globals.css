@@ -81,6 +81,28 @@ button:disabled,
   cursor: not-allowed;
 }
 
+/*
+  BB-329 mục 2 — chủ studio 30/09/2026 (iPhone, ảnh 6ce23a90): "bấm Đặt in rồi
+  quay lại thì màn hình bị tràn, không cuộn được".
+
+  Một nửa gốc lỗi: Safari iOS TỰ PHÓNG TO trang khi chạm vào ô nhập có cỡ chữ
+  < 16px (ô "Ghi chú cho thợ chỉnh ảnh" ở màn xem lớn là 14px) và KHÔNG tự thu
+  lại khi rời ô. Màn xem lớn lại khoá cử chỉ (`touch-action: none`) nên ba mẹ
+  không chụm tay thu nhỏ lại được — màn hình kẹt ở trạng thái phóng, lệch
+  sang phải, thanh đáy bị cắt. (Nửa còn lại — khoá cuộn không được trả — ở
+  `src/lib/utils/khoa-cuon-trang.ts`.)
+
+  Chỉ áp cho Safari/WebKit trên iOS (`-webkit-touch-callout` chỉ iOS hỗ trợ):
+  máy tính và Android giữ nguyên cỡ chữ đã thiết kế.
+*/
+@supports (-webkit-touch-callout: none) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
 /* Ảnh bìa màn khách hiện ra từ từ, hơi thu lại — như lật trang đầu một cuốn
    album. Tắt khi máy bật "giảm chuyển động" (lớp motion-safe ở bia-bo-anh). */
 @keyframes bia-hien {

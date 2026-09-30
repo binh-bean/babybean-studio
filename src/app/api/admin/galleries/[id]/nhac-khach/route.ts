@@ -11,20 +11,26 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { guiThongBaoBoAnh } from "@/lib/thong-bao/gui-day";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
-import { coTheNhacKhach, GIAN_CACH_NHAC_GIAY, noiDungNhacKhach } from "@/lib/gallery/nhac-khach-ngay";
+import {
+  coTheNhac,
+  GIAN_CACH_NHAC_GIAY,
+  noiDungNhacKhach,
+  noiDungNhacThanhToan,
+  type LoaiNhacKhach,
+} from "@/lib/gallery/nhac-khach-ngay";
 
 export const runtime = "nodejs";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const requestId = randomUUID();
@@ -44,9 +50,18 @@ export async function POST(
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     requireBranch(staff, gallery.branch_id);
 
-    if (!coTheNhacKhach(String(gallery.status))) {
+    // BB-331: body tuỳ chọn `{ loai: "thanh_toan" }` — nhắc khách thanh toán
+    // phần ảnh vượt hạn mức (Việc cần xử lý). Không body = nhắc chọn ảnh như cũ.
+    // Thân rỗng/hỏng → `ok: false` → giữ mặc định (BB-336: qua helper chung BB-223).
+    let loai: LoaiNhacKhach = "chon_anh";
+    const body = await readJsonBody<{ loai?: unknown } | null>(request);
+    if (body.ok && body.data?.loai === "thanh_toan") loai = "thanh_toan";
+
+    if (!coTheNhac(loai, String(gallery.status))) {
       const nhan = GALLERY_STATUS_LABEL[String(gallery.status)] ?? String(gallery.status);
-      return fail("CONFLICT", `Bộ ảnh đang ở "${nhan}" — không còn chờ khách chọn nên không nhắc`);
+      // BB-331: câu cũ ("Bộ ảnh đang ở … — không còn chờ khách chọn nên không
+      // nhắc") dài, tràn khỏi dòng Việc hôm nay. Ngắn lại, đủ ý.
+      return fail("CONFLICT", `Không nhắc: bộ ảnh đang “${nhan}”`);
     }
 
     // Chặn bấm đúp: lần nhắc gần nhất còn trong khoảng giãn cách thì không gửi lại.
@@ -66,7 +81,11 @@ export async function POST(
       }
     }
 
-    const kq = await guiThongBaoBoAnh(admin, galleryId, noiDungNhacKhach());
+    const kq = await guiThongBaoBoAnh(
+      admin,
+      galleryId,
+      loai === "thanh_toan" ? noiDungNhacThanhToan() : noiDungNhacKhach(),
+    );
     if (!kq.daVaoChuong && kq.soMayNhanDay === 0) {
       return fail("INTERNAL", "Chưa gửi được lời nhắc, thử lại giúp");
     }
@@ -80,7 +99,7 @@ export async function POST(
       entityType: "gallery",
       entityId: galleryId,
       galleryId,
-      metadata: { daVaoChuong: kq.daVaoChuong, soMayNhanDay: kq.soMayNhanDay },
+      metadata: { daVaoChuong: kq.daVaoChuong, soMayNhanDay: kq.soMayNhanDay, loai },
     });
 
     return ok({ luc, daVaoChuong: kq.daVaoChuong, soMayNhanDay: kq.soMayNhanDay });

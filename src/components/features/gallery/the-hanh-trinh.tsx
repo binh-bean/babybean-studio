@@ -1,5 +1,5 @@
 import React from "react";
-import { tranhHanhTrinh, buocHanhTrinh, anhHanhTrinh } from "./hanh-trinh";
+import { tranhHanhTrinh, buocHanhTrinh, anhHanhTrinh, NHAN_CHO_XAC_NHAN } from "./hanh-trinh";
 import { cn } from "@/components/ui/utils";
 
 interface TheHanhTrinhProps {
@@ -28,7 +28,9 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
   if (!tenTranh) return null;
 
   const { buoc, hienTai } = buocHanhTrinh(status, giaiDoan);
-  const nhanText = nhanTienDo || (status === "submitted" ? "Studio đã nhận danh sách chọn" : "Tiến độ xử lý");
+  // BB-329 — vừa chốt, CSKH chưa xác nhận: nói đúng là đang CHỜ studio, không
+  // nói "đã nhận"/"đã chốt" như thể bộ ảnh đã vào hàng chỉnh.
+  const nhanText = nhanTienDo || (status === "submitted" ? NHAN_CHO_XAC_NHAN : "Tiến độ xử lý");
   const anh = anhHanhTrinh(tenTranh);
 
   return (
@@ -39,10 +41,10 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
         nổi lên — "viền lộ, thiếu thẩm mỹ". Nay tranh TRÀN ĐẦY phần trên của
         thẻ: rộng bằng thẻ, `object-cover`, bo góc trên THEO thẻ (bo bằng
         `overflow-hidden` ở khung ngoài, không tự bo lại ở <img>). Nền
-        `#FBF7F2` phía sau phòng khi ảnh còn đang tải hoặc lỗi — trùng màu nền
+        `#fdfbf9` phía sau phòng khi ảnh còn đang tải hoặc lỗi — trùng màu nền
         tranh gốc nên không lộ viền dù `object-cover` gần như luôn phủ kín.
       */}
-      <div className="relative h-[160px] w-full bg-[#FBF7F2] sm:h-[180px] md:h-[200px]">
+      <div className="relative h-[160px] w-full bg-[#fdfbf9] sm:h-[180px] md:h-[200px]">
         <img
           src={anh.src}
           srcSet={anh.srcSet}
@@ -62,11 +64,14 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
         dùng ba cỡ chữ khác nhau (18/22 đậm/24→28). Cả bốn nay dùng chung
         `kh-h3` — CÙNG một bậc trong thang chữ 6 bậc.
       */}
-      <h3 className="kh-h3 max-w-[280px] text-[#2E2A27]">
+      <h3 className="kh-h3 max-w-[280px] text-balance text-[#2E2A27]">
         {nhanText}
       </h3>
 
-      <div className="mt-12 w-full max-w-[300px]">
+      {/* BB-329 — nhãn bước mới dài hơn ("Chờ xác nhận"): mỗi nhãn xuống HAI dòng ngắn
+          (tách ở khoảng trắng đầu tiên), và đường chấm thu vào 12px mỗi bên — năm nhãn
+          không đè nhau, nhãn đầu/cuối không tràn khỏi thẻ ở 390px. */}
+      <div className="mt-12 w-full max-w-[300px] px-3">
         <div className="relative flex items-center justify-between">
           {/* Đường nối */}
           <div className="absolute left-0 top-1/2 h-[2px] w-full -translate-y-1/2 bg-[#E5DED6]" />
@@ -93,19 +98,19 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
                     "bg-[#E5DED6]"
                   )}
                 />
-                <span 
+                <span
                   className={cn(
-                    "absolute top-6 w-max text-[11px] font-medium transition-colors",
+                    "absolute top-6 w-max whitespace-pre-line text-center text-[11px] font-medium leading-tight transition-colors",
                     daQua || dangHienTai ? "text-[#2E2A27]" : "text-[#2E2A27]/50"
                   )}
                 >
-                  {b}
+                  {b.replace(" ", "\n")}
                 </span>
               </div>
             );
           })}
         </div>
-        <div className="h-4" aria-hidden="true" />
+        <div className="h-7" aria-hidden="true" />
       </div>
       </div>
     </div>

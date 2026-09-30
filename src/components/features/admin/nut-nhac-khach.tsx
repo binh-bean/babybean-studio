@@ -13,7 +13,16 @@ import { Button } from "@/components/ui/button";
 import { formatGioVN } from "@/lib/utils/dinh-dang";
 import { cauDaGuiNhac } from "@/lib/gallery/nhac-khach-ngay";
 
-export function NutNhacKhach({ galleryId, gonNho = false }: { galleryId: string; gonNho?: boolean }) {
+export function NutNhacKhach({
+  galleryId,
+  gonNho = false,
+  loai = "chon_anh",
+}: {
+  galleryId: string;
+  gonNho?: boolean;
+  /** BB-331: "thanh_toan" = nhắc khách trả phần ảnh vượt hạn mức. */
+  loai?: "chon_anh" | "thanh_toan";
+}) {
   const [dangGui, setDangGui] = React.useState(false);
   const [ketQua, setKetQua] = React.useState<{ ok: boolean; cau: string } | null>(null);
 
@@ -21,7 +30,12 @@ export function NutNhacKhach({ galleryId, gonNho = false }: { galleryId: string;
     setDangGui(true);
     setKetQua(null);
     try {
-      const res = await fetch(`/api/admin/galleries/${encodeURIComponent(galleryId)}/nhac-khach`, { method: "POST" });
+      const res = await fetch(`/api/admin/galleries/${encodeURIComponent(galleryId)}/nhac-khach`, {
+        method: "POST",
+        ...(loai === "thanh_toan"
+          ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ loai }) }
+          : {}),
+      });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
         setKetQua({ ok: false, cau: json?.error?.message ?? "Chưa gửi được, thử lại giúp" });
@@ -40,7 +54,8 @@ export function NutNhacKhach({ galleryId, gonNho = false }: { galleryId: string;
     <span
       role="status"
       data-testid="ket-qua-nhac-khach"
-      className={`text-[11px] leading-tight ${ketQua.ok ? "text-[var(--bb-moss,var(--bb-fg-muted))]" : "text-[var(--bb-danger)]"}`}
+      // BB-331: xuống dòng gọn trong bề rộng cột nút, không tràn sang trái.
+      className={`max-w-[15rem] whitespace-normal break-words text-right text-[11px] leading-snug ${ketQua.ok ? "text-[var(--bb-moss,var(--bb-fg-muted))]" : "text-[var(--bb-danger)]"}`}
     >
       {ketQua.cau}
     </span>

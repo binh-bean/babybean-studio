@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, MapPin, MessageCircle, UserRound } from "lucide-react";
+import { MapPin, MessageCircle, UserRound } from "lucide-react";
 import { getDictionary } from "@/i18n";
 import { getActiveBranches, getChatPageUrl } from "@/app/actions";
 
@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   title: "BabyBean Studio",
   description: "Nơi lưu giữ những khoảnh khắc đáng yêu của bé.",
 };
+
+type ChiNhanh = Awaited<ReturnType<typeof getActiveBranches>>[number];
 
 export const revalidate = 3600; // Cache for 1 hour since branches don't change often
 
@@ -24,8 +26,13 @@ export const revalidate = 3600; // Cache for 1 hour since branches don't change 
  *    trang (admin: "làm nhẹ nhàng hơn").
  *  - Chi nhánh là một danh sách kẻ mảnh thay vì chồng thẻ trắng.
  *  - Lối vào thứ hai cho nhân viên ở cuối trang.
- * Máy tính (≥1024px): hai cột — giới thiệu bên trái, chi nhánh + lối nhân
- * viên bên phải, căn giữa theo chiều dọc.
+ *
+ * BB-331 (30/09/2026) — anh gạch thẻ "Nhân viên studio" ở cột phải:
+ *  - Bỏ thẻ đó; lối vào nhân viên chỉ còn nút nhỏ ở góc phải, kiểu kính mờ
+ *    (nền trong mờ + backdrop-blur + viền mảnh) thay vì khối xám đậm.
+ *  - Tiêu đề lớn đổi thành "Yours truly, Bean" (Playfair, không nghiêng).
+ *  - Mất cột phải nên dồn về MỘT cột căn giữa ở mọi khổ; danh sách chi nhánh
+ *    (nếu có) nằm ngay dưới, cùng bề rộng.
  */
 export default async function LandingPage() {
   const t = getDictionary("vi");
@@ -46,16 +53,16 @@ export default async function LandingPage() {
           <Link
             href="/login"
             data-testid="nut-nhan-vien-dau-trang"
-            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-foreground transition hover:bg-primary/90"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background/55 px-3 text-[12px] font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-md transition hover:border-foreground/25 hover:bg-background/75"
           >
-            <UserRound className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
+            <UserRound className="h-[13px] w-[13px]" strokeWidth={1.8} aria-hidden="true" />
             {t.landing.loginCta}
           </Link>
         </div>
       </header>
 
-      <main className="mx-auto grid w-full max-w-6xl flex-1 gap-10 px-5 pb-6 pt-2 sm:px-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-20 lg:px-12 lg:py-10">
-        <section>
+      <main className="mx-auto flex w-full max-w-[560px] flex-1 flex-col items-center justify-center px-5 pb-8 pt-4 text-center sm:px-8 lg:py-12">
+        <section className="flex w-full flex-col items-center">
           {/* Tranh bìa album (banana BB-262), bản đã đưa nền về trắng để
               `multiply` tan hẳn vào nền kem — tệp gốc có vân giấy ngả vàng
               hiện thành một khối mờ quanh tranh. */}
@@ -63,21 +70,24 @@ export default async function LandingPage() {
           <img
             src="/minh-hoa/trang-chu-album-640.webp"
             srcSet="/minh-hoa/trang-chu-album-640.webp 640w, /minh-hoa/trang-chu-album-1280.webp 1280w"
-            sizes="(min-width: 1024px) 380px, 300px"
+            sizes="(min-width: 1024px) 340px, 280px"
             alt=""
             aria-hidden="true"
             width={640}
             height={357}
-            className="mx-auto block h-auto w-full max-w-[300px] mix-blend-multiply [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)] lg:mx-0 lg:-ml-5 lg:max-w-[380px]"
+            className="mx-auto block h-auto w-full max-w-[280px] mix-blend-multiply [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)] lg:max-w-[340px]"
           />
-          <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             {t.landing.studioName}
           </p>
-          <h1 className="mt-2.5 max-w-[520px] font-display text-[30px] font-normal leading-[1.25] text-foreground lg:text-[44px] lg:leading-[1.18]">
+          <h1
+            data-testid="tieu-de-trang-chu"
+            className="mt-2.5 font-display text-[34px] font-normal not-italic leading-[1.2] text-foreground lg:text-[48px]"
+          >
             {t.landing.tagline}
           </h1>
           {/* Ghép bằng JSX, không dùng dangerouslySetInnerHTML — trang CÔNG KHAI. */}
-          <p className="mt-3.5 max-w-[460px] text-[15px] leading-[1.65] text-muted-foreground lg:text-base">
+          <p className="mt-3.5 max-w-[440px] text-[15px] leading-[1.65] text-muted-foreground lg:text-base">
             {t.landing.lostBefore}
             <strong className="font-medium text-foreground">{t.landing.lostStrong}</strong>
             {branches?.some((b) => b.hotline)
@@ -104,59 +114,53 @@ export default async function LandingPage() {
           */}
         </section>
 
-        <div>
-          {branches.length > 0 && (
-            <section aria-labelledby="tieu-de-chi-nhanh">
-              <h2
-                id="tieu-de-chi-nhanh"
-                className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground"
-              >
-                {t.landing.branchesHeading}
-              </h2>
-              <ul className="mt-3 border-t border-border" data-testid="ds-chi-nhanh">
-                {branches.map((branch, i) => (
-                  <li key={i} className="flex items-start gap-3 border-b border-border py-4">
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-[15px] font-medium leading-snug text-foreground">{branch.name}</h3>
-                      {branch.address && (
-                        <p className="mt-0.5 text-[13px] leading-normal text-muted-foreground">{branch.address}</p>
-                      )}
-                    </div>
-                    {branch.hotline && (
-                      <a
-                        href={`tel:${branch.hotline.replace(/\s+/g, "")}`}
-                        className="mt-1 shrink-0 whitespace-nowrap text-[13px] font-medium text-foreground underline-offset-2 hover:underline"
-                      >
-                        {branch.hotline}
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          <Link
-            href="/login"
-            data-testid="loi-vao-nhan-vien"
-            className="mt-10 flex items-center gap-3 rounded-[14px] border border-border bg-card p-4 transition hover:border-foreground/30"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-              <UserRound className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium text-foreground">{t.landing.staffTitle}</span>
-              <span className="block text-[12.5px] text-muted-foreground">{t.landing.staffHint}</span>
-            </span>
-            <ArrowRight className="h-[18px] w-[18px] shrink-0 text-foreground" strokeWidth={1.8} aria-hidden="true" />
-          </Link>
-        </div>
+        {branches.length > 0 && (
+          <section aria-labelledby="tieu-de-chi-nhanh" className="mt-10 w-full text-left">
+            <h2
+              id="tieu-de-chi-nhanh"
+              className="text-center text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground"
+            >
+              {t.landing.branchesHeading}
+            </h2>
+            <DanhSachChiNhanh branches={branches} />
+          </section>
+        )}
       </main>
 
       <footer className="py-6 text-center text-xs text-muted-foreground">{t.landing.footer}</footer>
     </div>
+  );
+}
+
+/**
+ * Trình bày thuần danh sách chi nhánh. Dữ liệu do `LandingPage` đọc bằng
+ * `getActiveBranches()` rồi truyền xuống qua props (BB-336: tách để
+ * verify:wired thấy danh sách có nguồn).
+ */
+function DanhSachChiNhanh({ branches }: { branches: ChiNhanh[] }) {
+  return (
+    <ul className="mt-3 border-t border-border" data-testid="ds-chi-nhanh">
+      {branches.map((branch, i) => (
+        <li key={i} className="flex items-start gap-3 border-b border-border py-4">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[15px] font-medium leading-snug text-foreground">{branch.name}</h3>
+            {branch.address && (
+              <p className="mt-0.5 text-[13px] leading-normal text-muted-foreground">{branch.address}</p>
+            )}
+          </div>
+          {branch.hotline && (
+            <a
+              href={`tel:${branch.hotline.replace(/\s+/g, "")}`}
+              className="mt-1 shrink-0 whitespace-nowrap text-[13px] font-medium text-foreground underline-offset-2 hover:underline"
+            >
+              {branch.hotline}
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }

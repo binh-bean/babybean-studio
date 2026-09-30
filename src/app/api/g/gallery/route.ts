@@ -5,6 +5,7 @@ import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
+import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { nhanHienThi, qua60NgayFileGoc } from "@/lib/lark/trang-thai-hau-ky";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
@@ -33,21 +34,38 @@ export async function GET(request: Request) {
     // ba mẹ vừa bấm. Không gửi mã thì bỏ qua phần so — các đường gọi khác
     // (đổi tim, tải ảnh…) vẫn chạy như cũ.
     const maTrenDiaChi = new URL(request.url).searchParams.get("token");
-    if (maTrenDiaChi) {
-      const admin0 = await createAdminClient();
-      const { data: linkTheoMa } = await admin0
-        .from("share_links")
-        .select("id")
-        .eq("token_hash", await bamMaLink(maTrenDiaChi))
-        .maybeSingle();
 
-      if (!linkTheoMa || linkTheoMa.id !== session.shareLinkId) {
-        return fail(
-          "SESSION_MISMATCH",
-          "Phiên đang mở thuộc về một link khác",
-        );
-      }
-    }
+    // -------------------------------------------------------------------
+    // BB-333 — CHẠY SONG SONG, không nối đuôi
+    // -------------------------------------------------------------------
+    // Trước bản vá này đường này đi ~22 câu truy vấn NỐI ĐUÔI nhau (câu sau
+    // chờ câu trước về mới đi), dù gần hết chỉ cần `session.galleryId` /
+    // `session.selectionId` — thứ đã có ngay từ cookie. Đo bản build ở máy
+    // (giả lập 4G): /api/g/gallery 2,5 s, là lượt chậm nhất của màn khách và nằm
+    // thẳng trên đường tới ảnh bìa.
+    //
+    // Nay chia hai đợt theo đúng phụ thuộc dữ liệu:
+    //   Đợt 1 — mọi câu chỉ cần phiên (kể cả câu so mã trên địa chỉ).
+    //   Đợt 2 — câu cần kết quả đợt 1 (bé/khách theo `gallery`, bìa album theo
+    //           hợp đồng, vị trí ảnh theo `selection_items`, vòng duyệt theo
+    //           trạng thái).
+    // Kết quả trả về GIỮ NGUYÊN từng trường; chỉ đổi thứ tự chờ.
+    //
+    // Thứ tự KIỂM giữ như cũ: sai mã trên địa chỉ → SESSION_MISMATCH trước,
+    // rồi mới tới "chưa chọn buổi chụp", rồi "không thấy bộ ảnh". Dữ liệu của
+    // đợt 1 chỉ được đọc SAU khi hai phép kiểm đó qua — chạy trước không có
+    // nghĩa là trả ra trước.
+    const supabase = await createAdminClient();
+    const kiemMaTrenDiaChi: Promise<boolean> = maTrenDiaChi
+      ? (async () => {
+          const { data: linkTheoMa } = await supabase
+            .from("share_links")
+            .select("id")
+            .eq("token_hash", await bamMaLink(maTrenDiaChi))
+            .maybeSingle();
+          return !!linkTheoMa && linkTheoMa.id === session.shareLinkId;
+        })()
+      : Promise.resolve(true);
 
     // Phiên của link gắn theo khách, chưa chọn buổi chụp nào (BB-130).
     //
@@ -58,167 +76,96 @@ export async function GET(request: Request) {
     // `canChonBuoiChup` là dấu hiệu để màn hình rẽ sang danh sách buổi chụp
     // mà không phải đoán qua câu chữ của thông báo lỗi.
     if (!session.galleryId) {
+      if (!(await kiemMaTrenDiaChi)) {
+        return fail("SESSION_MISMATCH", "Phiên đang mở thuộc về một link khác");
+      }
       return fail("NOT_FOUND", "Ba mẹ chọn giúp buổi chụp muốn xem", {
         canChonBuoiChup: true,
       });
     }
+    const galleryId = session.galleryId;
 
-    const supabase = await createAdminClient();
+    /**
+     * Bắt đầu một truy vấn NGAY (builder của Supabase lười — chưa `then` thì
+     * chưa gửi), và đánh dấu "đã có người nhận lỗi" để một lượt trả sớm (sai mã,
+     * không thấy bộ ảnh) không để lại lời hứa bị từ chối mồ côi. Lỗi thật vẫn
+     * nổi lên ở chỗ `await` bên dưới, vào đúng khối `catch` cũ.
+     */
+    const chayNgay = <T,>(q: PromiseLike<T>): Promise<T> => {
+      const p = Promise.resolve(q);
+      p.catch(() => {});
+      return p;
+    };
 
-    const { data: gallery, error: galleryError } = await supabase
-      .from("galleries")
-      .select(`
+    // ---------------- Đợt 1 ----------------
+    const pGallery = chayNgay(
+      supabase
+        .from("galleries")
+        .select(`
         id, title, welcome_message, status, baby_id, customer_id, shoot_date:shoots(shoot_date, concept),
         branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
         cover_photo_id, cover_headline, cover_layout, download_enabled, notes_enabled, invite_enabled,
         lark_trang_thai, lark_trang_thai_tu, reopened_at
       `)
-      .eq("id", session.galleryId)
-      .single();
+        .eq("id", galleryId)
+        .single(),
+    );
 
-    if (galleryError || !gallery) {
-      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
-    }
-
-    const { data: baby } = gallery.baby_id ? await supabase
-      .from("babies")
-      .select("full_name, nickname")
-      .eq("id", gallery.baby_id)
-      .single() : { data: null };
-
-    // BB-212 — tên khách hàng để ĐIỀN SẴN ô "người xác nhận" trong hộp chốt.
-    //
-    // Chủ studio 22/09/2026: "tên người xác nhận là tên khách hàng trong bộ".
-    // Trước đây ô này luôn trống, ba mẹ phải tự gõ lại đúng cái tên đã ký hợp
-    // đồng — một việc thừa mà máy đã biết sẵn.
-    //
-    // `customer_id` là NOT NULL trên `galleries` nên về lý thuyết dòng khách
-    // luôn có; vẫn tách truy vấn riêng và trả `null` khi không thấy, để một
-    // dòng dữ liệu thiếu không làm sập cả màn hình chọn ảnh.
-    const { data: customer } = await supabase
-      .from("customers")
-      .select("full_name")
-      .eq("id", gallery.customer_id)
-      .maybeSingle();
-
-    const { data: chatSetting } = await supabase
-      .from("settings")
-      .select("value")
-      .eq("key", "chat.page_url")
-      .is("branch_id", null)
-      .maybeSingle();
-
-    let chatUrl = null;
-    if (chatSetting?.value && typeof chatSetting.value === "string" && chatSetting.value.startsWith("https://")) {
-      chatUrl = chatSetting.value;
-    }
+    const pChatSetting = chayNgay(
+      supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "chat.page_url")
+        .is("branch_id", null)
+        .maybeSingle(),
+    );
 
     // Get subfolders for the gallery
-    const { data: subfoldersData } = await supabase
-      .from("photos")
-      .select("subfolder")
-      .eq("gallery_id", session.galleryId)
-      .neq("status", "hidden")
-      .not("subfolder", "is", null);
-
-    const subfolders = Array.from(new Set(subfoldersData?.map(s => s.subfolder as string) || []));
+    const pSubfolders = chayNgay(
+      supabase
+        .from("photos")
+        .select("subfolder")
+        .eq("gallery_id", galleryId)
+        .neq("status", "hidden")
+        .not("subfolder", "is", null),
+    );
 
     // Get selection summary
-    const { data: selection } = await supabase
-      .from("selections")
-      .select("id, snapshot_selected_count, snapshot_extra_count, snapshot_extra_amount, general_note, submitted_at")
-      .eq("id", session.selectionId)
-      .single();
+    const pSelection = chayNgay(
+      supabase
+        .from("selections")
+        .select("id, snapshot_selected_count, snapshot_extra_count, snapshot_extra_amount, general_note, submitted_at")
+        .eq("id", session.selectionId)
+        .single(),
+    );
 
     // Since we don't have counts in 'selections' directly unless submitted,
     // wait, we need current counts. Let's get current counts from selection_items.
-    const { count: selectedCount } = await supabase
-      .from("selection_items")
-      .select("*", { count: "exact", head: true })
-      .eq("selection_id", session.selectionId)
-      .eq("mark", "selected");
+    const pSelectedCount = chayNgay(
+      supabase
+        .from("selection_items")
+        .select("*", { count: "exact", head: true })
+        .eq("selection_id", session.selectionId)
+        .eq("mark", "selected"),
+    );
 
-    const { count: favoriteCount } = await supabase
-      .from("selection_items")
-      .select("*", { count: "exact", head: true })
-      .eq("selection_id", session.selectionId)
-      .eq("mark", "favorite");
+    const pFavoriteCount = chayNgay(
+      supabase
+        .from("selection_items")
+        .select("*", { count: "exact", head: true })
+        .eq("selection_id", session.selectionId)
+        .eq("mark", "favorite"),
+    );
 
     // Lấy thành phần hợp đồng và hạn mức từ app.gallery_quota
-    const contractSummary = await getGalleryContractSummary(session.galleryId, supabase);
-    const { quotaKnown, includedQuota } = contractSummary;
-
-    const selected = selectedCount || 0;
-    const favorite = favoriteCount || 0;
-    const extraCount = quotaKnown && includedQuota !== null
-      ? Math.max(0, selected - includedQuota)
-      : 0;
-    const extraAmount = extraCount * gallery.extra_photo_price;
-
-    /*
-      BB-202 — "Bìa album": mỗi album TRONG GÓI (`nhomSanPham === 'album'`)
-      hiện đang có bìa nào (nếu có), để màn khách vẽ khối "Chọn ảnh bìa album".
-
-      Bảng `album_covers` có thể CHƯA TỒN TẠI (migration 0075 chưa áp) — bắt
-      lỗi "bảng không tồn tại" (42P01) và trả danh sách rỗng thay vì làm sập cả
-      màn hình khách vì một tính năng chưa triển khai.
-    */
-    const albumRowsTrongGoi = locHangInTrongGoi(contractSummary.items).filter(
-      (h) => h.nhom === "album",
-    );
-    let albumBia: Array<{
-      galleryItemId: string;
-      name: string;
-      coverPhotoId: string | null;
-      coverFileName: string | null;
-    }> = albumRowsTrongGoi.map((a) => ({
-      galleryItemId: a.galleryItemId,
-      name: a.name,
-      coverPhotoId: null,
-      coverFileName: null,
-    }));
-
-    if (albumRowsTrongGoi.length > 0) {
-      const { data: covers, error: coversErr } = await supabase
-        .from("album_covers")
-        .select("gallery_item_id, selection_item_id")
-        .in(
-          "gallery_item_id",
-          albumRowsTrongGoi.map((a) => a.galleryItemId),
-        );
-
-      if (!coversErr && covers && covers.length > 0) {
-        const selItemIds = covers.map((c) => c.selection_item_id);
-        const { data: sis } = await supabase
-          .from("selection_items")
-          .select("id, photo_id")
-          .in("id", selItemIds);
-        const photoIdBySelItem = new Map((sis ?? []).map((s) => [s.id, s.photo_id as string]));
-
-        const photoIds = Array.from(new Set(Array.from(photoIdBySelItem.values())));
-        const { data: anhs } = photoIds.length
-          ? await supabase.from("photos").select("id, file_name").in("id", photoIds)
-          : { data: [] as { id: string; file_name: string }[] };
-        const fileNameByPhoto = new Map((anhs ?? []).map((a) => [a.id, a.file_name as string]));
-
-        const coverByGalleryItem = new Map(covers.map((c) => [c.gallery_item_id, c.selection_item_id]));
-        albumBia = albumRowsTrongGoi.map((a) => {
-          const selItemId = coverByGalleryItem.get(a.galleryItemId) ?? null;
-          const photoId = selItemId ? photoIdBySelItem.get(selItemId) ?? null : null;
-          const fileName = photoId ? fileNameByPhoto.get(photoId) ?? null : null;
-          return { galleryItemId: a.galleryItemId, name: a.name, coverPhotoId: photoId, coverFileName: fileName };
-        });
-      }
-      // `coversErr` (kể cả 42P01 bảng chưa có) thì giữ nguyên danh sách chưa
-      // có bìa đã dựng sẵn ở trên — màn khách vẫn thấy tên album, chỉ chưa
-      // biết bìa đang là tấm nào.
-    }
+    const pContractSummary = chayNgay(getGalleryContractSummary(galleryId, supabase));
 
     // Lấy danh sách sản phẩm mua thêm (addons) của phiên chọn ảnh
-    const { data: rawAddons } = await supabase
-      .from("selection_addons")
-      .select(`
+    const pAddons = chayNgay(
+      supabase
+        .from("selection_addons")
+        .select(`
         id,
         selection_id,
         product_id,
@@ -233,8 +180,294 @@ export async function GET(request: Request) {
           size
         )
       `)
-      .eq("selection_id", session.selectionId)
-      .order("created_at", { ascending: true });
+        .eq("selection_id", session.selectionId)
+        .order("created_at", { ascending: true }),
+    );
+
+    /**
+     * DANH MỤC sản phẩm ba mẹ có thể mua thêm.
+     *
+     * Trước 22/09/2026 màn khách dựng `AddonSelector` từ chính những dòng ĐÃ
+     * MUA. Chưa mua gì thì danh sách rỗng, mà danh sách rỗng thì component tự
+     * ẩn — nên không bao giờ có cái gì để bấm mua. Vòng tròn khép kín, và
+     * `selection_addons` trên bb-dev đúng **0 dòng** từ đầu tới nay.
+     *
+     * Lọc theo LUẬT GIÁ dùng chung `giaDuocBaoTuDong` (BB-335, thay ngưỡng
+     * BB-105 0.8/5 mẫu — xem lib/products/kich-thuoc-dang-ban.ts); `/api/g/addons`
+     * kiểm lại đúng hàm đó khi ghi. Truy vấn chỉ lọc thô (có giá, có độ tin
+     * cậy), luật thật chạy ở bước lọc bên dưới — một chỗ, không hai.
+     *
+     * Không bày `shoot_package`: đó là một buổi chụp mới, không phải thứ mua
+     * thêm trong lúc đang chọn ảnh. Bán buổi chụp qua nút "+" trên màn ảnh là
+     * đường dẫn tới hiểu nhầm đắt tiền.
+     */
+    const pCatalogue = chayNgay(
+      supabase
+        .from("products")
+        .select("id, name, kind, material, size, list_price, price_confidence, price_samples")
+        .eq("is_active", true)
+        .in("kind", ["print", "addon", "edited_photo"])
+        .not("list_price", "is", null)
+        .not("price_confidence", "is", null)
+        .order("list_price", { ascending: true }),
+    );
+
+    /*
+      Dải quảng cáo của studio, hiện ở khoảng trống bên tấm ảnh đang xem.
+
+      Đọc từ `settings` chứ không chôn trong mã: nội dung quảng cáo đổi theo
+      mùa (khuyến mãi Tết, gói chụp mới), và mỗi lần đổi mà phải sửa mã là mỗi
+      lần chờ một lượt phát hành.
+
+      Không có ảnh thì trả `null` — màn khách không dựng ô trống.
+    */
+    const pBanner = chayNgay(
+      supabase
+        .from("settings")
+        .select("key, value")
+        .in("key", ["gallery.banner_image_url", "gallery.banner_link_url"])
+        .is("branch_id", null),
+    );
+
+    // Lấy danh sách ảnh đã đặt vào sản phẩm in (selection_placements)
+    const pSelectionItems = chayNgay(
+      supabase
+        .from("selection_items")
+        .select("id, photo_id")
+        .eq("selection_id", session.selectionId),
+    );
+
+    // BB-156: tổng dung lượng ảnh của bộ này. Cộng ở máy chủ vì màn khách chỉ
+    // tải về từng trang ảnh một — cộng ở trình duyệt là ra số của trang đang
+    // xem, không phải của cả bộ.
+    const pDungLuong = chayNgay(
+      supabase
+        .from("photos")
+        .select("size_bytes")
+        .eq("gallery_id", galleryId)
+        .eq("status", "active"),
+    );
+
+    // BB-312 — trạng thái "xin mở lại" của CHÍNH bộ ảnh này, để màn khách nói
+    // rõ: đang chờ (không cho gửi trùng), đã mở, hay bị từ chối kèm lý do.
+    // (`gallery.id` === `session.galleryId` — truy vấn bộ ảnh lọc đúng id đó.)
+    const pReopenRequest = chayNgay(layTrangThaiXinMoLai(supabase, galleryId));
+
+    // BB-187 — kiểm mã trên địa chỉ TRƯỚC khi đọc bất cứ kết quả nào.
+    if (!(await kiemMaTrenDiaChi)) {
+      return fail(
+        "SESSION_MISMATCH",
+        "Phiên đang mở thuộc về một link khác",
+      );
+    }
+
+    const { data: gallery, error: galleryError } = await pGallery;
+
+    if (galleryError || !gallery) {
+      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
+    }
+
+    const [
+      { data: chatSetting },
+      { data: subfoldersData },
+      { data: selection },
+      { count: selectedCount },
+      { count: favoriteCount },
+      contractSummary,
+      { data: rawAddons },
+      { data: rawCatalogue },
+      { data: rawBanner },
+      { data: userSelectionItems },
+    ] = await Promise.all([
+      pChatSetting,
+      pSubfolders,
+      pSelection,
+      pSelectedCount,
+      pFavoriteCount,
+      pContractSummary,
+      pAddons,
+      pCatalogue,
+      pBanner,
+      pSelectionItems,
+    ]);
+
+    let chatUrl = null;
+    if (chatSetting?.value && typeof chatSetting.value === "string" && chatSetting.value.startsWith("https://")) {
+      chatUrl = chatSetting.value;
+    }
+
+    const subfolders = Array.from(new Set(subfoldersData?.map(s => s.subfolder as string) || []));
+
+    const { quotaKnown, includedQuota } = contractSummary;
+
+    const selected = selectedCount || 0;
+    const favorite = favoriteCount || 0;
+    const extraCount = quotaKnown && includedQuota !== null
+      ? Math.max(0, selected - includedQuota)
+      : 0;
+    const extraAmount = extraCount * gallery.extra_photo_price;
+
+    // ---------------- Đợt 2 ----------------
+    const selectionItemIds = (userSelectionItems || []).map((si) => si.id);
+    const photoMap = new Map((userSelectionItems || []).map((si) => [si.id, si.photo_id]));
+
+    const albumRowsTrongGoi = locHangInTrongGoi(contractSummary.items).filter(
+      (h) => h.nhom === "album",
+    );
+
+    const [
+      { data: baby },
+      // BB-212 — tên khách hàng để ĐIỀN SẴN ô "người xác nhận" trong hộp chốt.
+      //
+      // Chủ studio 22/09/2026: "tên người xác nhận là tên khách hàng trong bộ".
+      // Trước đây ô này luôn trống, ba mẹ phải tự gõ lại đúng cái tên đã ký hợp
+      // đồng — một việc thừa mà máy đã biết sẵn.
+      //
+      // `customer_id` là NOT NULL trên `galleries` nên về lý thuyết dòng khách
+      // luôn có; vẫn tách truy vấn riêng và trả `null` khi không thấy, để một
+      // dòng dữ liệu thiếu không làm sập cả màn hình chọn ảnh.
+      { data: customer },
+      albumBia,
+      { placementsList, albumPlacements },
+      review,
+    ] = await Promise.all([
+      gallery.baby_id
+        ? supabase
+            .from("babies")
+            .select("full_name, nickname")
+            .eq("id", gallery.baby_id)
+            .single()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("customers")
+        .select("full_name")
+        .eq("id", gallery.customer_id)
+        .maybeSingle(),
+      /*
+        BB-202 — "Bìa album": mỗi album TRONG GÓI (`nhomSanPham === 'album'`)
+        hiện đang có bìa nào (nếu có), để màn khách vẽ khối "Chọn ảnh bìa album".
+
+        Bảng `album_covers` có thể CHƯA TỒN TẠI (migration 0075 chưa áp) — bắt
+        lỗi "bảng không tồn tại" (42P01) và trả danh sách rỗng thay vì làm sập cả
+        màn hình khách vì một tính năng chưa triển khai.
+      */
+      (async () => {
+        let albumBia: Array<{
+          galleryItemId: string;
+          name: string;
+          coverPhotoId: string | null;
+          coverFileName: string | null;
+        }> = albumRowsTrongGoi.map((a) => ({
+          galleryItemId: a.galleryItemId,
+          name: a.name,
+          coverPhotoId: null,
+          coverFileName: null,
+        }));
+
+        if (albumRowsTrongGoi.length > 0) {
+          const { data: covers, error: coversErr } = await supabase
+            .from("album_covers")
+            .select("gallery_item_id, selection_item_id")
+            .in(
+              "gallery_item_id",
+              albumRowsTrongGoi.map((a) => a.galleryItemId),
+            );
+
+          if (!coversErr && covers && covers.length > 0) {
+            const selItemIds = covers.map((c) => c.selection_item_id);
+            const { data: sis } = await supabase
+              .from("selection_items")
+              .select("id, photo_id")
+              .in("id", selItemIds);
+            const photoIdBySelItem = new Map((sis ?? []).map((s) => [s.id, s.photo_id as string]));
+
+            const photoIds = Array.from(new Set(Array.from(photoIdBySelItem.values())));
+            const { data: anhs } = photoIds.length
+              ? await supabase.from("photos").select("id, file_name").in("id", photoIds)
+              : { data: [] as { id: string; file_name: string }[] };
+            const fileNameByPhoto = new Map((anhs ?? []).map((a) => [a.id, a.file_name as string]));
+
+            const coverByGalleryItem = new Map(covers.map((c) => [c.gallery_item_id, c.selection_item_id]));
+            albumBia = albumRowsTrongGoi.map((a) => {
+              const selItemId = coverByGalleryItem.get(a.galleryItemId) ?? null;
+              const photoId = selItemId ? photoIdBySelItem.get(selItemId) ?? null : null;
+              const fileName = photoId ? fileNameByPhoto.get(photoId) ?? null : null;
+              return { galleryItemId: a.galleryItemId, name: a.name, coverPhotoId: photoId, coverFileName: fileName };
+            });
+          }
+          // `coversErr` (kể cả 42P01 bảng chưa có) thì giữ nguyên danh sách chưa
+          // có bìa đã dựng sẵn ở trên — màn khách vẫn thấy tên album, chỉ chưa
+          // biết bìa đang là tấm nào.
+        }
+        return albumBia;
+      })(),
+      (async () => {
+        let placementsList: { selectionItemId: string; photoId: string; galleryItemId: string }[] = [];
+        let albumPlacements: { addonId: string; photoId: string }[] = [];
+        if (selectionItemIds.length > 0) {
+          const [{ data: rawPlacements }, { data: rawAlbum }] = await Promise.all([
+            supabase
+              .from("selection_placements")
+              .select("selection_item_id, gallery_item_id")
+              .in("selection_item_id", selectionItemIds),
+            // Ảnh đã đưa vào album MUA THÊM (migration 0062). Bảng riêng vì album
+            // mua thêm nằm ở `selection_addons`, không phải ở dòng hợp đồng.
+            supabase
+              .from("selection_addon_photos")
+              .select("addon_id, selection_item_id")
+              .in("selection_item_id", selectionItemIds),
+          ]);
+
+          placementsList = (rawPlacements || []).map((p) => ({
+            selectionItemId: p.selection_item_id,
+            photoId: photoMap.get(p.selection_item_id) || "",
+            galleryItemId: p.gallery_item_id,
+          }));
+
+          albumPlacements = (rawAlbum || []).map((p) => ({
+            addonId: p.addon_id,
+            photoId: photoMap.get(p.selection_item_id) || "",
+          }));
+        }
+        return { placementsList, albumPlacements };
+      })(),
+      // Vòng duyệt ảnh đã chỉnh (BB-121). Khách cần THẤY link bản đã chỉnh, nếu
+      // không thì nút "duyệt" bắt họ đồng ý với thứ chưa xem. Chỉ đọc khi bộ ảnh
+      // đã qua bước chỉnh — trước đó chưa có gì để xem.
+      (async (): Promise<{
+        finalDriveUrl: string | null;
+        deliveredAt: string | null;
+        rounds: Array<{ round: number; note: string; createdAt: string; resolved: boolean }>;
+      } | null> => {
+        if (!["in_retouch", "awaiting_approval", "approved", "delivered"].includes(gallery.status)) {
+          return null;
+        }
+        const [{ data: delivery }, { data: rounds }] = await Promise.all([
+          supabase
+            .from("deliveries")
+            .select("final_drive_url, delivered_at")
+            .eq("gallery_id", gallery.id)
+            .maybeSingle(),
+          supabase
+            .from("revision_requests")
+            .select("round, note, created_at, resolved_at")
+            .eq("gallery_id", gallery.id)
+            .order("round", { ascending: true }),
+        ]);
+
+        return {
+          finalDriveUrl: delivery?.final_drive_url ?? null,
+          // BB-298 — ngày giao thật cho dấu "Đã hoàn thiện" ở màn "Đã giao".
+          deliveredAt: delivery?.delivered_at ?? null,
+          rounds: (rounds ?? []).map((r) => ({
+            round: r.round as number,
+            note: r.note as string,
+            createdAt: r.created_at as string,
+            resolved: r.resolved_at !== null,
+          })),
+        };
+      })(),
+    ]);
 
     const addonsList = (rawAddons || []).map((row) => {
       const prod = Array.isArray(row.product) ? row.product[0] : row.product;
@@ -258,33 +491,6 @@ export async function GET(request: Request) {
 
     const totalAddonsAmount = addonsList.reduce((sum, a) => sum + a.totalPrice, 0);
 
-    /**
-     * DANH MỤC sản phẩm ba mẹ có thể mua thêm.
-     *
-     * Trước 22/09/2026 màn khách dựng `AddonSelector` từ chính những dòng ĐÃ
-     * MUA. Chưa mua gì thì danh sách rỗng, mà danh sách rỗng thì component tự
-     * ẩn — nên không bao giờ có cái gì để bấm mua. Vòng tròn khép kín, và
-     * `selection_addons` trên bb-dev đúng **0 dòng** từ đầu tới nay.
-     *
-     * Lọc theo đúng ba luật tiền của BB-105 (`/api/g/addons` kiểm lại lần nữa
-     * khi ghi): có giá niêm yết, độ tin cậy >= 0.8, và ít nhất 5 lần bán làm
-     * mẫu. Sản phẩm chưa đủ tin cậy thì KHÔNG bày ra — thà để CSKH báo giá còn
-     * hơn hiện một con số rồi phải cải chính.
-     *
-     * Không bày `shoot_package`: đó là một buổi chụp mới, không phải thứ mua
-     * thêm trong lúc đang chọn ảnh. Bán buổi chụp qua nút "+" trên màn ảnh là
-     * đường dẫn tới hiểu nhầm đắt tiền.
-     */
-    const { data: rawCatalogue } = await supabase
-      .from("products")
-      .select("id, name, kind, material, size, list_price")
-      .eq("is_active", true)
-      .in("kind", ["print", "addon", "edited_photo"])
-      .not("list_price", "is", null)
-      .gte("price_confidence", 0.8)
-      .gte("price_samples", 5)
-      .order("list_price", { ascending: true });
-
     /*
       Gắn NHÓM cho từng sản phẩm để màn khách bày theo ba nhóm chủ studio gọi
       tên: ảnh in/ảnh phóng, album, khung. Trong mỗi nhóm phân theo chất liệu
@@ -294,21 +500,6 @@ export async function GET(request: Request) {
       hoa, trái cây) bị loại khỏi danh mục: lúc ba mẹ ngồi chọn ảnh thì buổi
       chụp đã xong từ lâu, bày bánh sinh nhật ở đó là bán nhầm lúc.
     */
-    /*
-      Dải quảng cáo của studio, hiện ở khoảng trống bên tấm ảnh đang xem.
-
-      Đọc từ `settings` chứ không chôn trong mã: nội dung quảng cáo đổi theo
-      mùa (khuyến mãi Tết, gói chụp mới), và mỗi lần đổi mà phải sửa mã là mỗi
-      lần chờ một lượt phát hành.
-
-      Không có ảnh thì trả `null` — màn khách không dựng ô trống.
-    */
-    const { data: rawBanner } = await supabase
-      .from("settings")
-      .select("key, value")
-      .in("key", ["gallery.banner_image_url", "gallery.banner_link_url"])
-      .is("branch_id", null);
-
     const layCaiDat = (k: string) => {
       const v = (rawBanner ?? []).find((r) => r.key === k)?.value;
       return typeof v === "string" && v.startsWith("https://") ? v : null;
@@ -324,6 +515,7 @@ export async function GET(request: Request) {
     // truy vấn phía trên đã `.eq("is_active", true)` nên luôn `true` ở đây.
     const catalogue = (rawCatalogue ?? [])
       .filter((p) => sanPhamBanChoKhach({ isActive: true, kind: p.kind, material: p.material }))
+      .filter((p) => giaDuocBaoTuDong(p))
       .map((p) => ({
         productId: p.id,
         name: p.name,
@@ -335,77 +527,11 @@ export async function GET(request: Request) {
         canGanAnh: canGanAnh(nhomSanPham(p.kind, p.material)),
       }));
 
-    // Lấy danh sách ảnh đã đặt vào sản phẩm in (selection_placements)
-    const { data: userSelectionItems } = await supabase
-      .from("selection_items")
-      .select("id, photo_id")
-      .eq("selection_id", session.selectionId);
-
-    const selectionItemIds = (userSelectionItems || []).map((si) => si.id);
-    const photoMap = new Map((userSelectionItems || []).map((si) => [si.id, si.photo_id]));
-
-    let placementsList: { selectionItemId: string; photoId: string; galleryItemId: string }[] = [];
-    let albumPlacements: { addonId: string; photoId: string }[] = [];
-    if (selectionItemIds.length > 0) {
-      const { data: rawPlacements } = await supabase
-        .from("selection_placements")
-        .select("selection_item_id, gallery_item_id")
-        .in("selection_item_id", selectionItemIds);
-
-      placementsList = (rawPlacements || []).map((p) => ({
-        selectionItemId: p.selection_item_id,
-        photoId: photoMap.get(p.selection_item_id) || "",
-        galleryItemId: p.gallery_item_id,
-      }));
-
-      // Ảnh đã đưa vào album MUA THÊM (migration 0062). Bảng riêng vì album
-      // mua thêm nằm ở `selection_addons`, không phải ở dòng hợp đồng.
-      const { data: rawAlbum } = await supabase
-        .from("selection_addon_photos")
-        .select("addon_id, selection_item_id")
-        .in("selection_item_id", selectionItemIds);
-
-      albumPlacements = (rawAlbum || []).map((p) => ({
-        addonId: p.addon_id,
-        photoId: photoMap.get(p.selection_item_id) || "",
-      }));
-    }
-
-    // Vòng duyệt ảnh đã chỉnh (BB-121). Khách cần THẤY link bản đã chỉnh, nếu
-    // không thì nút "duyệt" bắt họ đồng ý với thứ chưa xem. Chỉ đọc khi bộ ảnh
-    // đã qua bước chỉnh — trước đó chưa có gì để xem.
-    let review: {
-      finalDriveUrl: string | null;
-      deliveredAt: string | null;
-      rounds: Array<{ round: number; note: string; createdAt: string; resolved: boolean }>;
-    } | null = null;
-
-    if (["in_retouch", "awaiting_approval", "approved", "delivered"].includes(gallery.status)) {
-      const [{ data: delivery }, { data: rounds }] = await Promise.all([
-        supabase
-          .from("deliveries")
-          .select("final_drive_url, delivered_at")
-          .eq("gallery_id", gallery.id)
-          .maybeSingle(),
-        supabase
-          .from("revision_requests")
-          .select("round, note, created_at, resolved_at")
-          .eq("gallery_id", gallery.id)
-          .order("round", { ascending: true }),
-      ]);
-
-      review = {
-        finalDriveUrl: delivery?.final_drive_url ?? null,
-        // BB-298 — ngày giao thật cho dấu "Đã hoàn thiện" ở màn "Đã giao".
-        deliveredAt: delivery?.delivered_at ?? null,
-        rounds: (rounds ?? []).map((r) => ({
-          round: r.round as number,
-          note: r.note as string,
-          createdAt: r.created_at as string,
-          resolved: r.resolved_at !== null,
-        })),
-      };
-    }
+    const [{ data: dungLuong }, reopenRequest] = await Promise.all([pDungLuong, pReopenRequest]);
+    const tongDungLuong = (dungLuong ?? []).reduce(
+      (t: number, r: { size_bytes: number | null }) => t + Number(r.size_bytes ?? 0),
+      0,
+    );
 
     const submittedOrLater = isSubmittedOrLater(gallery.status);
     const hasSnapshot = submittedOrLater && selection?.snapshot_selected_count !== null && selection?.snapshot_selected_count !== undefined;
@@ -415,19 +541,6 @@ export async function GET(request: Request) {
     const finalSelectedCount = hasSnapshot ? (selection?.snapshot_selected_count ?? 0) : selected;
     const finalExtraCount = hasSnapshot ? (selection?.snapshot_extra_count ?? 0) : extraCount;
     const finalExtraAmount = hasSnapshot ? (selection?.snapshot_extra_amount ?? 0) : extraAmount;
-
-    // BB-156: tổng dung lượng ảnh của bộ này. Cộng ở máy chủ vì màn khách chỉ
-    // tải về từng trang ảnh một — cộng ở trình duyệt là ra số của trang đang
-    // xem, không phải của cả bộ.
-    const { data: dungLuong } = await supabase
-      .from("photos")
-      .select("size_bytes")
-      .eq("gallery_id", session.galleryId)
-      .eq("status", "active");
-    const tongDungLuong = (dungLuong ?? []).reduce(
-      (t: number, r: { size_bytes: number | null }) => t + Number(r.size_bytes ?? 0),
-      0,
-    );
 
     // BB-327: CSKH mở lại SAU lần cuối Lark đổi trạng thái thì mã Lark cũ
     // không còn khoá/đè nhãn — xem `maLarkConHieuLuc`.
@@ -450,10 +563,6 @@ export async function GET(request: Request) {
     // app còn ghi ready/in_review/submitted. Không trả mã Lark thô cho khách
     // (xem chú thích cũ dưới đây) — chỉ trả boolean đã tính sẵn.
     const khoaChonTheoLark = isGalleryLocked(gallery.status, larkHieuLuc) || quaHan60Ngay;
-
-    // BB-312 — trạng thái "xin mở lại" của CHÍNH bộ ảnh này, để màn khách nói
-    // rõ: đang chờ (không cho gửi trùng), đã mở, hay bị từ chối kèm lý do.
-    const reopenRequest = await layTrangThaiXinMoLai(supabase, gallery.id);
 
     const responseData = {
       id: gallery.id,

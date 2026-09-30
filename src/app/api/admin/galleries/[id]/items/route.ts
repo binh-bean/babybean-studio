@@ -5,6 +5,7 @@
  * Hạn mức lấy từ app.gallery_quota(), cây hai tầng (dòng hợp đồng cha và thành phần con).
  */
 
+import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 import { randomUUID, createHash } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { HINH_THUC_GIAM_GIA } from "@/lib/gallery/tien-phat-sinh";
@@ -23,6 +24,7 @@ import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layChiTietDotQuanTri, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
+import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
 
 export const runtime = "nodejs";
 
@@ -358,7 +360,7 @@ export async function GET(
     // truy vấn có sẵn, không đổi schema. Cùng nguồn `shoots.concept` mà màn
     // khách đọc qua (`GET /api/g/gallery`, prop `sessionType` của `BiaBoAnh`).
     const [{ data: customer }, { data: shoot }] = await Promise.all([
-      admin.from("customers").select("full_name, phone").eq("id", gallery.customer_id).maybeSingle(),
+      admin.from("customers").select("full_name, phone, facebook").eq("id", gallery.customer_id).maybeSingle(),
       gallery.shoot_id
         ? admin
             .from("shoots")
@@ -445,6 +447,10 @@ export async function GET(
       packageName: goiChup?.name ?? null,
       customerName: customer?.full_name ?? null,
       customerPhone: customer?.phone ?? null,
+      // BB-331: link "Chat với khách" (ô Lark Hậu Kỳ → customers.facebook) cho nút "Nhắn khách".
+      customerChatUrl: linkChatKhach((customer as { facebook?: unknown } | null)?.facebook),
+      // BB-335 — "Photo": tên thợ chụp từ cột Lark (galleries.lark_photo); 0081 chưa áp → null.
+      larkPhoto: (await docLarkPhoto(admin, [galleryId])).theoBo.get(galleryId) ?? null,
       shootDate: shoot?.shoot_date ?? null,
       // BB-308 (vòng 4, mục #5) — "loại buổi chụp" ("Thôi nôi", "Newborn"…),
       // CÙNG TÊN PROP `sessionType` mà `BiaBoAnh` (component dùng chung với
@@ -561,7 +567,7 @@ async function loadEditableGallery(galleryId: string): Promise<EditableGallery> 
     return {
       error: fail(
         "GALLERY_LOCKED",
-        "Bộ ảnh đã lưu trữ. Không sửa được dòng hàng nữa.",
+        "Bộ ảnh đã lưu trữ. Không sửa được sản phẩm nữa.",
       ),
     } as const;
   }
@@ -642,7 +648,7 @@ export async function POST(
       quotaAfter,
     });
   } catch (err) {
-    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
+    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa sản phẩm");
     return failUnexpected(err, requestId);
   }
 }
@@ -667,7 +673,7 @@ export async function PATCH(
     } | null;
 
     if (!body?.itemId || !UUID_REGEX.test(body.itemId)) {
-      return fail("INVALID_INPUT", "Thiếu dòng hàng cần sửa");
+      return fail("INVALID_INPUT", "Thiếu sản phẩm cần sửa");
     }
     const quantity = Number(body.quantity);
     if (!Number.isInteger(quantity) || quantity < 1) {
@@ -707,7 +713,7 @@ export async function PATCH(
       .eq("gallery_id", galleryId)
       .maybeSingle();
     if (loiDoc) throw loiDoc;
-    if (!dongHienTai) return fail("NOT_FOUND", "Không tìm thấy dòng hàng này");
+    if (!dongHienTai) return fail("NOT_FOUND", "Không tìm thấy sản phẩm này");
 
     const quantityBefore = Number(dongHienTai.quantity);
     const tachKhoiLark = dongHienTai.lark_contract_code !== null;
@@ -761,7 +767,7 @@ export async function PATCH(
 
     return ok({ quotaBefore, quotaAfter });
   } catch (err) {
-    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
+    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa sản phẩm");
     return failUnexpected(err, requestId);
   }
 }
@@ -786,7 +792,7 @@ export async function DELETE(
       url.searchParams.get("itemId") ??
       "";
 
-    if (!UUID_REGEX.test(itemId)) return fail("INVALID_INPUT", "Thiếu dòng hàng cần bỏ");
+    if (!UUID_REGEX.test(itemId)) return fail("INVALID_INPUT", "Thiếu sản phẩm cần bỏ");
 
     const quotaBefore = await quotaOf(admin, galleryId);
 
@@ -837,7 +843,7 @@ export async function DELETE(
     // không phải đoán.
     return ok({ quotaBefore, quotaAfter, tuLark });
   } catch (err) {
-    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa dòng hàng");
+    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền sửa sản phẩm");
     return failUnexpected(err, requestId);
   }
 }

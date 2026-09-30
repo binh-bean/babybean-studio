@@ -7,6 +7,7 @@
  * CHỦ đọc lại dòng đó từ Lark rồi mới ghi. Chỉ ghi vào app (galleries), KHÔNG
  * ghi gì sang Lark. Dòng đã thuộc bộ khác → từ chối, nói rõ bộ nào.
  */
+import { keoDongHopDongTuLark } from "@/lib/lark/dong-hop-dong";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
@@ -17,6 +18,8 @@ import { boAnhTheoDongLark } from "@/lib/gallery/bo-anh-da-co";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 
 export const runtime = "nodejs";
+// BB-331: kéo dòng hợp đồng từ Lark ngay sau khi gắn (3–9 giây, đo 30/09).
+export const maxDuration = 30;
 
 const Schema = z.object({ larkHaukyRecordId: z.string().trim().min(1) });
 
@@ -48,7 +51,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     try {
       dong = await docDongHauKy(parsed.data.larkHaukyRecordId);
     } catch (err) {
-      if (err instanceof LoiTraLark) return fail("INTERNAL", err.message);
+      if (err instanceof LoiTraLark) return fail("INTERNAL", err.thongDiep);
       throw err;
     }
     if (!dong || !dong.maHoaDon) return fail("NOT_FOUND", "Không đọc được dòng Hậu Kỳ này bên Lark.");
@@ -83,7 +86,19 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       metadata: { larkHaukyRecordId: dong.recordId, maHoaDon: dong.maHoaDon },
     });
 
-    return ok({ recordId: dong.recordId, maHoaDon: dong.maHoaDon, linkLark: dong.linkLark });
+    // BB-331: gắn xong là kéo luôn dòng hợp đồng + hạn mức từ hóa đơn Lark —
+    // trước đây phải nhập tay ("Chưa có dòng hàng nào"). Hỏng thì KHÔNG làm
+    // hỏng việc gắn: báo lại để màn hình mời bấm "Kéo dòng hợp đồng từ Lark".
+    let dongHopDong: { soDongGhi: number; maKhongThay: string[]; sanPhamChuaCo: string[] } | { loi: string };
+    try {
+      const kq = await keoDongHopDongTuLark(admin, id);
+      dongHopDong = { soDongGhi: kq.soDongGhi, maKhongThay: kq.maKhongThay, sanPhamChuaCo: kq.sanPhamChuaCo };
+    } catch (err) {
+      console.error(JSON.stringify({ evt: "gan_lark_keo_dong_loi", requestId, galleryId: id, loi: String((err as Error)?.message ?? err) }));
+      dongHopDong = { loi: "Chưa kéo được dòng hợp đồng từ Lark" };
+    }
+
+    return ok({ recordId: dong.recordId, maHoaDon: dong.maHoaDon, linkLark: dong.linkLark, dongHopDong });
   } catch (err) {
     if (err instanceof AuthError) {
       return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);

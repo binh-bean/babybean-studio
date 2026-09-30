@@ -313,15 +313,16 @@ test.describe("BB-292: gắn 5 tranh mới + trả nợ BB-289/290", () => {
   // Mục 6 (+ tranh hành trình không liên quan BB-292, chỉ nhãn) và mục 5.
   // -------------------------------------------------------------------
   ownIpTest(
-    "mục 6: nhãn hành trình theo bản vẽ BB-285 ('Đã chốt'/'Đang chỉnh'/'Đã giao'), không tràn 390px",
+    "mục 6: nhãn hành trình theo bản vẽ BB-285 (BB-329: 'Chờ xác nhận'/'Chờ chỉnh'/'In/nhận ảnh'), không tràn 390px",
     async ({ page }) => {
       await page.setViewportSize(DIEN_THOAI);
       await page.goto(`/g/${maLinkHanhTrinh}`);
 
-      const stepDangChinh = page.locator("div[aria-current='step']:has-text('Đang chỉnh')");
+      // BB-329: in_retouch + Lark chưa "Đang làm" = xếp hàng → bước "Chờ chỉnh", không phải "Đang chỉnh".
+      const stepDangChinh = page.locator("div[aria-current='step']:has-text('Chờ chỉnh')");
       await ownIpExpect(stepDangChinh).toBeVisible();
 
-      for (const nhan of ["Đã chốt", "Đã giao"]) {
+      for (const nhan of ["Chờ xác nhận", "In/nhận ảnh"]) {
         const hop = await page.getByText(nhan, { exact: true }).boundingBox();
         expect(hop, nhan).not.toBeNull();
         expect(hop!.x, `${nhan} tràn trái`).toBeGreaterThanOrEqual(0);

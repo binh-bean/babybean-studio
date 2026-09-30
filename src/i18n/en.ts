@@ -187,7 +187,7 @@ export const en: Messages = {
     packageQuotaLine: "Your package includes {n} edited photos",
     saveAppPrompt: {
       message: "Save this gallery to your home screen to reopen it in one tap",
-      shortLabel: "Save to home screen",
+      shortLabel: "Save to your home screen to reopen your baby's photos faster",
       howTo: "See how",
       later: "Later",
     },
@@ -243,6 +243,10 @@ export const en: Messages = {
       close: "Close branch",
       reopen: "Reopen",
       confirmClose: "Close {name}? Galleries and history are kept; only new ones are blocked.",
+      delete: "Delete",
+      confirmDelete: "Permanently delete {name}? This cannot be undone.",
+      deleted: "Deleted {name}",
+      cannotDelete: "This branch still has {staff} staff and {galleries} galleries, so it cannot be deleted. Deactivate it instead — history is kept.",
       created: "Added branch {name}",
       updated: "Saved",
       emptyTitle: "No branches yet",
@@ -630,7 +634,7 @@ export const en: Messages = {
   },
   landing: {
     studioName: "BabyBean Studio",
-    tagline: "Every lovely moment of your little one, kept safe",
+    tagline: "Yours truly, Bean",
     branchesHeading: "Our branches",
     lostBefore: "Your baby's photos are sent via a ",
     lostStrong: "private link",
@@ -639,8 +643,6 @@ export const en: Messages = {
     lostAfterChiNhanh: ". If you haven't received it or it won't open, please contact the branch where your shoot took place.",
     messageCta: "Message studio",
     loginCta: "Staff Login",
-    staffTitle: "Studio staff",
-    staffHint: "Sign in to manage galleries",
     footer: "© BabyBean Studio",
   },
   errorPages: {

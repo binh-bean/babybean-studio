@@ -542,6 +542,30 @@ async function xoaBoAnh(pg: Client, id: string): Promise<void> {
   await q("delete from activity_logs where entity_id = $1");
   await q("delete from notifications where payload->>'galleryId' = $1::text");
   await q("delete from gallery_items where gallery_id = $1");
+  // BB-331: danh sách trên thiếu các bảng mới (gallery_payments, deliveries,
+  // yêu cầu mở lại, hộp thư khách, đợt chọn…) — `delete from galleries` gãy
+  // khoá ngoại, `.catch` nuốt lỗi, và chi nhánh "Fixture DANHGIA5-…" nằm lại
+  // trên bb-dev (2 chi nhánh thấy ngày 30/09, lên cả "Theo chi nhánh"). Quét
+  // MỌI bảng trỏ vào galleries theo information_schema, vài vòng cho đủ thứ tự.
+  const { rows: fk } = await pg
+    .query(
+      `select tc.table_name t, kcu.column_name c
+         from information_schema.table_constraints tc
+         join information_schema.key_column_usage kcu
+           on kcu.constraint_name = tc.constraint_name and kcu.table_schema = tc.table_schema
+         join information_schema.constraint_column_usage ccu
+           on ccu.constraint_name = tc.constraint_name and ccu.table_schema = tc.table_schema
+        where tc.constraint_type = 'FOREIGN KEY' and tc.table_schema = 'public'
+          and ccu.table_name = 'galleries' and ccu.column_name = 'id' and tc.table_name <> 'galleries'`,
+    )
+    .catch(() => ({ rows: [] as { t: string; c: string }[] }));
+  await q("update galleries set cover_photo_id = null where id = $1");
+  for (let vong = 0; vong < 3; vong++) {
+    for (const f of fk as { t: string; c: string }[]) {
+      if (!/^[a-z_][a-z0-9_]*$/.test(f.t) || !/^[a-z_][a-z0-9_]*$/.test(f.c)) continue;
+      await q(`delete from public.${f.t} where ${f.c} = $1`);
+    }
+  }
   await q("delete from photos where gallery_id = $1");
   await q("delete from galleries where id = $1");
 }

@@ -1,4 +1,5 @@
 "use client";
+import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 /**
  * "Ướm ảnh của con lên tường nhà mình" — màn toàn màn hình mở từ nút
@@ -101,6 +102,9 @@ export interface ManTreoTuongProps {
  * dày viền khung mẫu bên dưới), không thì viền khung sẽ không cùng tỉ lệ với
  * khung ảnh khi phóng to/thu nhỏ màn hình.
  */
+/** BB-335 — khoảng hở giữa đáy cụm chọn phòng và mép trên khung ảnh (px màn hình). */
+const KHOANG_HO_DUOI_CUM_PHONG_PX = 8;
+
 function tiLeHienThi(containerW: number, containerH: number, anhW: number, anhH: number): number {
   if (containerW <= 0 || containerH <= 0 || anhW <= 0 || anhH <= 0) return 0;
   return Math.max(containerW / anhW, containerH / anhH);
@@ -247,7 +251,10 @@ export function ManTreoTuong({
   );
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [khungRef, setKhungRef] = useState({ w: 0, h: 0 });
+  // BB-335 — cụm chọn phòng (nổi trên ảnh phòng): đo mép DƯỚI của nó, tính từ
+  // mép trên ảnh phòng, để khung ảnh không chờm lên (xem phongDeTinhKhung).
+  const cumPhongRef = useRef<HTMLDivElement | null>(null);
+  const [khungRef, setKhungRef] = useState({ w: 0, h: 0, mepTren: 0 });
   const chamBatDau = useRef<{ x: number; y: number } | null>(null);
 
   // Reset về ảnh vừa mở mỗi lần bấm "Xem trên tường" từ một tấm khác — và gấp
@@ -274,10 +281,17 @@ export function ManTreoTuong({
     if (!mo) return;
     const el = containerRef.current;
     if (!el) return;
-    const doLai = () => setKhungRef({ w: el.clientWidth, h: el.clientHeight });
+    const doLai = () => {
+      const cum = cumPhongRef.current;
+      const mepTren = cum
+        ? Math.max(0, cum.getBoundingClientRect().bottom - el.getBoundingClientRect().top + KHOANG_HO_DUOI_CUM_PHONG_PX)
+        : 0;
+      setKhungRef({ w: el.clientWidth, h: el.clientHeight, mepTren });
+    };
     doLai();
     const ro = new ResizeObserver(doLai);
     ro.observe(el);
+    if (cumPhongRef.current) ro.observe(cumPhongRef.current);
     return () => ro.disconnect();
   }, [mo]);
 
@@ -304,11 +318,8 @@ export function ManTreoTuong({
   // Khoá cuộn trang nền — màn này chiếm toàn màn hình.
   useEffect(() => {
     if (!mo) return;
-    const cu = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = cu;
-    };
+    // BB-329 — khoá CÓ ĐẾM (khoa-cuon-trang.ts): màn này mở CHỒNG lên màn xem lớn.
+    return khoaCuonTrang();
   }, [mo]);
 
   const anhDangXem = anh[chiSo] ?? anh[0] ?? null;
@@ -347,17 +358,48 @@ export function ManTreoTuong({
    * thoại (bảng máy tính là cột dọc bên phải, không che theo chiều cao).
    */
   const TY_LE_CHIEU_CAO_BANG_DIEN_THOAI = 0.3; // khớp `max-h-[30vh]` trong JSX
+  /*
+    BB-329 mục 3 — chủ studio 30/09/2026 (iPhone, ảnh 1ebf1731/ce4da593/
+    7269b908): phòng ngủ khung ảnh bị đẩy lên sát trần đè cả đèn; phòng thứ
+    tư (sảnh) KHÔNG hiện ảnh. Gốc lỗi: bản BB-296 trừ NGUYÊN chiều cao bảng
+    (30% màn) khỏi mảng tường bất kể đáy tường có thật sự nằm dưới bảng hay
+    không — và trừ cả khi ba mẹ đã ẩn bảng ("Hiện bảng"). Trên iPhone (màn dọc
+    cao) đáy tường phòng ngủ/sảnh nằm TRÊN mép bảng, nên phép trừ chỉ làm mảng
+    tường hụt oan ~600px ảnh gốc: khung bị đẩy lên đỉnh tường, và ở sảnh không
+    còn cỡ nào của chất liệu đang chọn vừa → không vẽ khung.
+    Nay chỉ CẮT phần tường thật sự nằm dưới mép trên của bảng (quy đổi đúng
+    phép `object-fit: cover`), và không cắt gì khi bảng đang ẩn.
+  */
+  /*
+    BB-335 — MÉP TRÊN, cùng cách với mép dưới: trên điện thoại cụm chọn phòng
+    nổi ở top-16 đè lên phần trên của ảnh phòng. Hạ ngưỡng giá (BB-335) làm
+    danh mục có thêm khổ lớn (120×180, 100×150…), và luật "cỡ lớn nhất vừa
+    tường" chọn đúng khổ lớn đó → khung chờm lên cụm chọn phòng (e2e bb-329
+    mục 3, "Phòng của bé"). Nay cắt phần tường nằm TRÊN mép dưới của cụm phòng
+    (đo thật bằng getBoundingClientRect, quy đổi đúng phép `object-fit: cover`)
+    trước khi tính khung — `macDinhTuToanDanhMuc`/`coVua` tự chọn cỡ lớn nhất
+    VỪA phần tường còn lại. Cắt cả khi bảng đang ẩn: cụm phòng luôn hiện.
+  */
   const phongDeTinhKhung = useMemo(() => {
     if (manRong || khungRef.h === 0) return phong;
     const scale = tiLeHienThi(khungRef.w, khungRef.h, phong.rongAnhPx, phong.caoAnhPx);
     if (scale <= 0) return phong;
-    const bangPxContainer = khungRef.h * TY_LE_CHIEU_CAO_BANG_DIEN_THOAI;
-    const bangPxGoc = bangPxContainer / scale;
-    return {
-      ...phong,
-      tuong: { ...phong.tuong, cao: Math.max(0, phong.tuong.cao - bangPxGoc) },
-    };
-  }, [phong, manRong, khungRef]);
+    const offsetY = (phong.caoAnhPx * scale - khungRef.h) / 2;
+    let tuong = phong.tuong;
+    if (khungRef.mepTren > 0) {
+      const mepCumPhongGoc = (khungRef.mepTren + offsetY) / scale;
+      if (tuong.y < mepCumPhongGoc) {
+        const day = tuong.y + tuong.cao;
+        tuong = { ...tuong, y: mepCumPhongGoc, cao: Math.max(0, day - mepCumPhongGoc) };
+      }
+    }
+    if (!banAn) {
+      const mepBangGoc = (khungRef.h * (1 - TY_LE_CHIEU_CAO_BANG_DIEN_THOAI) + offsetY) / scale;
+      const dayTuong = tuong.y + tuong.cao;
+      if (dayTuong > mepBangGoc) tuong = { ...tuong, cao: Math.max(0, mepBangGoc - tuong.y) };
+    }
+    return tuong === phong.tuong ? phong : { ...phong, tuong };
+  }, [phong, manRong, banAn, khungRef]);
 
   // Hướng khung theo TẤM ẢNH CỦA BÉ (dọc/ngang), không theo khổ ảnh phòng —
   // đúng đề bài "ảnh dọc 40×60 = rộng 40 cao 60".
@@ -450,6 +492,16 @@ export function ManTreoTuong({
   useEffect(() => {
     if (coMacDinhTuDanhMuc && !coVua.includes(co)) setCo(coMacDinhTuDanhMuc);
   }, [coVua, co, coMacDinhTuDanhMuc]);
+
+  // BB-329 mục 3 — đổi sang phòng mà chất liệu ĐANG CHỌN không có cỡ nào vừa
+  // tường (vd Thuỷ tinh nhỏ nhất 35×50 ở sảnh) thì trước đây không vẽ khung
+  // nào cả, ba mẹ thấy bức tường trống. Nay chuyển sang tổ hợp chất liệu + cỡ
+  // lớn nhất vừa tường của đúng phòng này (cùng luật mặc định lúc mở màn).
+  useEffect(() => {
+    if (chatLieu === null || coVua.length > 0 || !macDinhTuToanDanhMuc) return;
+    setChatLieu(macDinhTuToanDanhMuc.material);
+    setCo(macDinhTuToanDanhMuc.size);
+  }, [chatLieu, coVua, macDinhTuToanDanhMuc]);
 
   const ketQuaKhung = useMemo(
     () => tinhKhungTrenTuong(phongDeTinhKhung, co, huongKhung, coKhung, mauKhungDaChon.vienCm),
@@ -751,7 +803,10 @@ export function ManTreoTuong({
           cùng một hàng. Máy tính đủ rộng nên giữ nguyên top-4; điện thoại đẩy
           cụm phòng xuống một hàng riêng (top-16), dưới hàng "Ẩn bảng"/"Đóng".
         */}
-        <div className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 gap-2 rounded-full bg-black/35 p-1.5 backdrop-blur-sm sm:top-4">
+        <div
+          ref={cumPhongRef}
+          className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 gap-2 rounded-full bg-black/35 p-1.5 backdrop-blur-sm sm:top-4"
+        >
           {THU_TU_PHONG.map((ma) => (
             <button
               key={ma}

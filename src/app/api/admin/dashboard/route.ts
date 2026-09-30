@@ -1,4 +1,6 @@
 import { ok, fail, failUnexpected } from "@/lib/api-response";
+import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
+import { laChiNhanhCongKhai } from "@/lib/utils/chi-nhanh-cong-khai";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { randomUUID } from "node:crypto";
@@ -202,6 +204,68 @@ export async function GET(request: Request): Promise<Response> {
       .lt("updated_at", kyDeliveredTruoc.den.toISOString());
     truyVanDaGiaoKyTruoc = locBoAnhThat(truyVanDaGiaoKyTruoc);
 
+    // BB-333 — mọi truy vấn chỉ cần `branchIds`/`now` được GỬI ĐI NGAY tại đây,
+    // song song với bảy thẻ số. Trước đây chúng đi nối đuôi nhau (thẻ số → chi
+    // nhánh → "Cần xử lý" → chi tiết → xin mở lại → lượt chốt → mua thêm →
+    // biểu đồ): ~10 vòng mạng liên tiếp, lượt chậm nhất của Bàn làm việc (đo bản
+    // build, 4G giả lập: 2,4 s). Nội dung từng câu GIỮ NGUYÊN; chỉ đổi lúc gửi.
+    // `batDau` đánh dấu đã có người nhận lỗi để một lượt ném sớm không để lại
+    // lời hứa mồ côi — lỗi thật vẫn nổi lên đúng chỗ `await` cũ bên dưới.
+    const batDau = <T,>(q: PromiseLike<T>): Promise<T> => {
+      const p = Promise.resolve(q);
+      p.catch(() => {});
+      return p;
+    };
+
+    const pTienDoChiNhanh = batDau(
+      Promise.all([
+        (async () => {
+          const { data, error } = await admin.from("branches").select("id, name").in("id", branchIds);
+          if (error) throw new Error(`Tên chi nhánh hỏng: ${error.message}`);
+          return data ?? [];
+        })(),
+        demGalleryTheoChiNhanh(admin, branchIds, TRANG_THAI_DANG_HOAT_DONG),
+        demGalleryTheoChiNhanh(admin, branchIds, TRANG_THAI_DA_CHOT),
+      ]),
+    );
+
+    let truyVanCanXuLy = admin
+      .from("v_gallery_progress")
+      .select("id, title, customer_name, branch_name, status, due_at, selected_count, included_quota, urgency")
+      .in("branch_id", branchIds)
+      .or("urgency.eq.due_soon,urgency.eq.overdue,status.eq.submitted")
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .limit(20);
+    truyVanCanXuLy = locBoAnhThat(truyVanCanXuLy);
+    const pCanXuLy = batDau(truyVanCanXuLy);
+
+    const pChoXuLyMoLai = canDayDu ? batDau(layDanhSachChoXuLyMoLai(admin, branchIds)) : null;
+
+    const ky7NgayNay = nNgayGanDay(now, 7);
+    const ky7NgayTruoc = kyTruocCungDoDai(ky7NgayNay);
+    const pChot = canDayDu
+      ? batDau(
+          admin
+            .from("selections")
+            .select("id, submitted_at, galleries!inner(id, branch_id, customer_id, title, status)")
+            .eq("is_primary", true)
+            .gte("submitted_at", ky7NgayTruoc.tu.toISOString())
+            .lt("submitted_at", ky7NgayNay.den.toISOString()),
+        )
+      : null;
+
+    const startOfChart = new Date();
+    startOfChart.setDate(startOfChart.getDate() - 13);
+    startOfChart.setHours(0, 0, 0, 0);
+
+    let truyVanBieuDo = admin
+      .from("galleries")
+      .select("created_at")
+      .in("branch_id", branchIds)
+      .gte("created_at", startOfChart.toISOString());
+    truyVanBieuDo = locBoAnhThat(truyVanBieuDo);
+    const pBieuDo = batDau(truyVanBieuDo);
+
     const ketQua = await Promise.all([
       truyVanChoChon,
       truyVanSapHetHan,
@@ -237,17 +301,11 @@ export async function GET(request: Request): Promise<Response> {
     // xem (`branchIds` đã áp `staff.branchIds`/`system:superuser` ở trên).
     // Định nghĩa "đang hoạt động"/"đã chốt": xem chú thích ở
     // `src/lib/utils/bang-dieu-khien.ts`.
-    const [tenChiNhanh, dangHoatDongMap, daChotMap] = await Promise.all([
-      (async () => {
-        const { data, error } = await admin.from("branches").select("id, name").in("id", branchIds);
-        if (error) throw new Error(`Tên chi nhánh hỏng: ${error.message}`);
-        return data ?? [];
-      })(),
-      demGalleryTheoChiNhanh(admin, branchIds, TRANG_THAI_DANG_HOAT_DONG),
-      demGalleryTheoChiNhanh(admin, branchIds, TRANG_THAI_DA_CHOT),
-    ]);
+    const [tenChiNhanh, dangHoatDongMap, daChotMap] = await pTienDoChiNhanh;
 
+    // BB-331: chi nhánh do phép thử dựng ("Fixture …") không lên Bàn làm việc.
     const tienDoChiNhanh: TienDoChiNhanh[] = tenChiNhanh
+      .filter((b: { name: string }) => laChiNhanhCongKhai({ name: b.name }))
       .map((b: { id: string; name: string }) => {
         const dang = dangHoatDongMap.get(b.id) ?? 0;
         const chot = daChotMap.get(b.id) ?? 0;
@@ -261,15 +319,7 @@ export async function GET(request: Request): Promise<Response> {
       })
       .sort((a, b) => a.branchName.localeCompare(b.branchName, "vi"));
 
-    let truyVanCanXuLy = admin
-      .from("v_gallery_progress")
-      .select("id, title, customer_name, branch_name, status, due_at, selected_count, included_quota, urgency")
-      .in("branch_id", branchIds)
-      .or("urgency.eq.due_soon,urgency.eq.overdue,status.eq.submitted")
-      .order("due_at", { ascending: true, nullsFirst: false })
-      .limit(20);
-    truyVanCanXuLy = locBoAnhThat(truyVanCanXuLy);
-    const { data: actionRequired, error: loiCanXuLy } = await truyVanCanXuLy;
+    const { data: actionRequired, error: loiCanXuLy } = await pCanXuLy;
     if (loiCanXuLy) throw new Error(`Bảng "Cần xử lý ngay" hỏng: ${loiCanXuLy.message}`);
 
     // BB-303 — mặc định RỖNG (khớp lượt gọi không mang `full=1`, xem chú
@@ -295,6 +345,8 @@ export async function GET(request: Request): Promise<Response> {
       babyFullName: string | null;
       packageName: string | null;
       customerPhone: string | null;
+      /** BB-331 — link chat với khách (Lark), đã lọc http/https. */
+      customerChatUrl?: string | null;
       /** BB-325 — mã hóa đơn (lark_contract_code) cho dòng thông tin. */
       maHoaDon?: string | null;
       coverPhotoId: string | null;
@@ -333,6 +385,7 @@ export async function GET(request: Request): Promise<Response> {
         babyFullName: string | null;
         packageName: string | null;
         customerPhone: string | null;
+        customerChatUrl: string | null;
         maHoaDon: string | null;
         coverPhotoId: string | null;
         sentAt: string | null;
@@ -349,7 +402,8 @@ export async function GET(request: Request): Promise<Response> {
       const packageIds = [...new Set((rows ?? []).map((r) => r.package_id).filter((v): v is string => !!v))];
       const customerIds = [...new Set((rows ?? []).map((r) => r.customer_id).filter((v): v is string => !!v))];
 
-      const [babyRows, packageRows, customerRows] = await Promise.all([
+      // BB-333: ảnh bìa chỉ cần `rows` — chạy cùng đợt với bé/gói/khách.
+      const [babyRows, packageRows, customerRows, anhBia] = await Promise.all([
         babyIds.length
           ? admin.from("babies").select("id, nickname, full_name").in("id", babyIds)
           : Promise.resolve({ data: [] as { id: string; nickname: string | null; full_name: string }[] }),
@@ -357,19 +411,20 @@ export async function GET(request: Request): Promise<Response> {
           ? admin.from("packages").select("id, name").in("id", packageIds)
           : Promise.resolve({ data: [] as { id: string; name: string }[] }),
         customerIds.length
-          ? admin.from("customers").select("id, phone").in("id", customerIds)
-          : Promise.resolve({ data: [] as { id: string; phone: string | null }[] }),
+          ? admin.from("customers").select("id, phone, facebook").in("id", customerIds)
+          : Promise.resolve({ data: [] as { id: string; phone: string | null; facebook: string | null }[] }),
+        anhBiaTheoBo(
+          admin,
+          (rows ?? []).map((r) => ({ id: String(r.id), coverPhotoId: (r.cover_photo_id as string | null) ?? null })),
+        ),
       ]);
       const beMap = new Map(
         (babyRows.data ?? []).map((b) => [String(b.id), { nickname: b.nickname, full_name: b.full_name }]),
       );
       const tenGoi = new Map((packageRows.data ?? []).map((p) => [String(p.id), String(p.name)]));
       const sdt = new Map((customerRows.data ?? []).map((c) => [String(c.id), c.phone as string | null]));
-
-      const anhBia = await anhBiaTheoBo(
-        admin,
-        (rows ?? []).map((r) => ({ id: String(r.id), coverPhotoId: (r.cover_photo_id as string | null) ?? null })),
-      );
+      // BB-331: link "Chat với khách" (Lark) cho nút "Nhắn khách" trên dòng Việc hôm nay.
+      const chat = new Map((customerRows.data ?? []).map((c) => [String(c.id), linkChatKhach(c.facebook)]));
 
       for (const r of rows ?? []) {
         const id = String(r.id);
@@ -379,6 +434,7 @@ export async function GET(request: Request): Promise<Response> {
           babyFullName: be?.full_name ?? null,
           packageName: r.package_id ? tenGoi.get(String(r.package_id)) ?? null : null,
           customerPhone: r.customer_id ? sdt.get(String(r.customer_id)) ?? null : null,
+          customerChatUrl: r.customer_id ? chat.get(String(r.customer_id)) ?? null : null,
           maHoaDon: (r.lark_contract_code as string | null) ?? null,
           coverPhotoId: anhBia.get(id) ?? null,
           sentAt: (r.sent_at as string | null) ?? null,
@@ -401,6 +457,7 @@ export async function GET(request: Request): Promise<Response> {
         babyFullName: bs?.babyFullName ?? null,
         packageName: bs?.packageName ?? null,
         customerPhone: bs?.customerPhone ?? null,
+        customerChatUrl: bs?.customerChatUrl ?? null,
         maHoaDon: bs?.maHoaDon ?? null,
         coverPhotoId: bs?.coverPhotoId ?? null,
         sentAt: bs?.sentAt ?? null,
@@ -417,7 +474,7 @@ export async function GET(request: Request): Promise<Response> {
      * sắp hết hạn/vừa đang có yêu cầu mở lại — một dòng, không hai).
      */
     const idsDaCoTrongViecHomNay = new Set(viecHomNay.map((v) => String(v.id)));
-    const choXuLyMoLai = await layDanhSachChoXuLyMoLai(admin, branchIds);
+    const choXuLyMoLai = await pChoXuLyMoLai!;
     for (const r of choXuLyMoLai) {
       if (idsDaCoTrongViecHomNay.has(r.galleryId)) continue;
       viecHomNay.push({
@@ -452,9 +509,6 @@ export async function GET(request: Request): Promise<Response> {
      * lọc theo cột của bảng LỒNG NHAU qua PostgREST, xem ghi chú ở
      * items/route.ts về rủi ro cú pháp `!inner` lồng nhau).
      */
-    const ky7NgayNay = nNgayGanDay(now, 7);
-    const ky7NgayTruoc = kyTruocCungDoDai(ky7NgayNay);
-
     interface HangChotGanDay {
       selectionId: string;
       branchId: string;
@@ -463,12 +517,7 @@ export async function GET(request: Request): Promise<Response> {
       trongKyNay: boolean;
     }
 
-    const { data: chotRaw, error: loiChot } = await admin
-      .from("selections")
-      .select("id, submitted_at, galleries!inner(id, branch_id, customer_id, title, status)")
-      .eq("is_primary", true)
-      .gte("submitted_at", ky7NgayTruoc.tu.toISOString())
-      .lt("submitted_at", ky7NgayNay.den.toISOString());
+    const { data: chotRaw, error: loiChot } = await pChot!;
     if (loiChot) throw new Error(`Truy vấn lượt chốt gần đây hỏng: ${loiChot.message}`);
 
     type RawChotRow = {
@@ -517,6 +566,9 @@ export async function GET(request: Request): Promise<Response> {
     for (const raw of (addonRaw ?? []) as RawAddonRow[]) {
       const c = chotById.get(raw.selection_id);
       if (!c) continue;
+      // BB-331: bỏ đơn của chi nhánh do phép thử dựng — tổng "Mua thêm 7
+      // ngày" và "Theo chi nhánh" phải khớp nhau, không lẫn tiền fixture.
+      if (!laChiNhanhCongKhai({ name: tenChiNhanhMap.get(c.branchId) ?? "—" })) continue;
       const sp = Array.isArray(raw.products) ? raw.products[0] : raw.products;
       const dong: DongMuaThem = {
         ngay: c.ngayVN,
@@ -552,17 +604,7 @@ export async function GET(request: Request): Promise<Response> {
     theoChiNhanhMuaThem = tinhTheoChiNhanhMuaThem(dongMuaThemNay);
     } // if (canDayDu)
 
-    const startOfChart = new Date();
-    startOfChart.setDate(startOfChart.getDate() - 13);
-    startOfChart.setHours(0, 0, 0, 0);
-
-    let truyVanBieuDo = admin
-      .from("galleries")
-      .select("created_at")
-      .in("branch_id", branchIds)
-      .gte("created_at", startOfChart.toISOString());
-    truyVanBieuDo = locBoAnhThat(truyVanBieuDo);
-    const { data: chartRaw, error: loiBieuDo } = await truyVanBieuDo;
+    const { data: chartRaw, error: loiBieuDo } = await pBieuDo;
     if (loiBieuDo) throw new Error(`Biểu đồ 14 ngày hỏng: ${loiBieuDo.message}`);
 
     const chartDataMap: Record<string, number> = {};

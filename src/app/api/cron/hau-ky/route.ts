@@ -20,6 +20,7 @@ import pg from "pg";
 import { docTrangThaiTuLark, ghiTrangThaiVaoGalleries } from "@/lib/lark/doc-trang-thai-lark";
 import { chayNhacHauKy } from "@/lib/lark/nhac-hau-ky";
 import { dongBoBoAnhTuLark, type KetQuaDongBo } from "@/lib/lark/dong-bo-bo-anh";
+import { xuLyBoAnhMatDongLark } from "@/lib/lark/ban-ghi-moi";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
 import { nhacThongBaoChuaDoc } from "@/lib/thong-bao/nhac-chua-doc";
@@ -89,6 +90,26 @@ async function chay(request: Request) {
         baseToken: LARK_BASE_APP_TOKEN,
       });
       const { sangHinhDaVe, ...ghi } = await ghiTrangThaiVaoGalleries(client, doc);
+
+      // BB-332 — lưới đỡ "Lark xoá dòng": lượt đọc trên là quét ĐỦ bảng Hậu Kỳ,
+      // nên bộ ảnh neo vào mã dòng không còn trong đó là dòng đã bị xoá. Bộ chưa
+      // gửi khách → lưu trữ; bộ đã gửi/có ảnh chọn → chỉ đánh dấu (Việc cần xử
+      // lý). Có trần số bộ mỗi lượt (ban-ghi-moi.ts). Hỏng (vd chưa áp 0079) thì
+      // ghi log, không kéo cron đỏ.
+      let larkXoaDong: Awaited<ReturnType<typeof xuLyBoAnhMatDongLark>> | { loi: string } | null = null;
+      if (doc.size > 0) {
+        try {
+          const { rows: neo } = await client.query<{ r: string }>(
+            `select lark_hauky_record_id as r from galleries
+              where lark_hauky_record_id is not null and status <> 'archived' and lark_dong_da_xoa_luc is null`,
+          );
+          const mat = neo.map((x) => x.r).filter((r) => !doc.has(r));
+          larkXoaDong = await xuLyBoAnhMatDongLark(client, mat);
+        } catch (err) {
+          larkXoaDong = { loi: err instanceof Error ? err.message : String(err) };
+          console.error(JSON.stringify({ evt: "cron.hau_ky.lark_xoa_dong_loi", lyDo: larkXoaDong.loi }));
+        }
+      }
       // BB-250 — lưới đỡ: bộ nào hook (BB-252) đã báo thì ở đây thấy 9 → 9,
       // không báo lại. Tuần tự: vài bộ mỗi sáng; baoHinhDaVe không ném.
       for (const id of sangHinhDaVe) await baoHinhDaVe(id);
@@ -147,6 +168,7 @@ async function chay(request: Request) {
         nhacChuaDoc,
         dongBo,
         kiemLaiLoi,
+        larkXoaDong,
       };
       console.info(JSON.stringify({ evt: "cron.hau_ky.xong", ...ketQua }));
       return NextResponse.json({ data: ketQua });

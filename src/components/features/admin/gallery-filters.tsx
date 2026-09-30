@@ -10,7 +10,8 @@ import { Search, Table2, Kanban, X, SlidersHorizontal } from "lucide-react";
 export interface GalleryFilterState {
   branchId: string;
   status: string;
-  photographerId: string;
+  /** BB-335 — tên thợ chụp đọc từ cột "photo" bên Lark (galleries.lark_photo). */
+  photo: string;
   dateFrom: string;
   dateTo: string;
   search: string;
@@ -21,14 +22,15 @@ export interface GalleryFiltersProps {
   values: GalleryFilterState;
   onChange: (updates: Partial<GalleryFilterState>) => void;
   branches: { id: string; name: string }[];
-  photographers: { id: string; name: string }[];
+  /** BB-335 — các giá trị khác nhau của cột "photo" Lark; nhân viên không gõ tay. */
+  photoOptions: string[];
 }
 
 export function GalleryFilters({
   values,
   onChange,
   branches,
-  photographers,
+  photoOptions,
 }: GalleryFiltersProps) {
   /**
    * Ô tìm kiếm mặc định THU LẠI thành một nút kính lúp.
@@ -84,7 +86,7 @@ export function GalleryFilters({
   const soBoLocDangBat = [
     values.branchId,
     values.status,
-    values.photographerId,
+    values.photo,
     values.dateFrom,
     values.dateTo,
   ].filter(Boolean).length;
@@ -271,19 +273,19 @@ export function GalleryFilters({
             </Select>
           </div>
 
-          {/* Lọc người phụ trách (Photographer) */}
+          {/* BB-335 — lọc "Photo": lựa chọn là các tên đọc từ cột "photo" bên Lark. */}
           <div className="w-full sm:w-auto">
             <Select
-              name="photographerId"
-              value={values.photographerId}
-              onChange={(e) => onChange({ photographerId: e.target.value })}
+              name="photo"
+              value={values.photo}
+              onChange={(e) => onChange({ photo: e.target.value })}
               className="w-full sm:w-[170px]"
               aria-label={vi.admin.galleries.filterPhotographer}
             >
               <option value="">{vi.admin.galleries.filterPhotographer}: Tất cả</option>
-              {photographers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
+              {photoOptions.map((ten) => (
+                <option key={ten} value={ten}>
+                  {ten}
                 </option>
               ))}
             </Select>
@@ -321,7 +323,7 @@ export function GalleryFilters({
               size="sm"
               className="h-9 px-2 text-xs text-[var(--bb-fg-muted)]"
               onClick={() =>
-                onChange({ branchId: "", status: "", photographerId: "", dateFrom: "", dateTo: "" })
+                onChange({ branchId: "", status: "", photo: "", dateFrom: "", dateTo: "" })
               }
             >
               <X className="h-3.5 w-3.5 mr-1" /> Xoá lọc

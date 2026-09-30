@@ -26,6 +26,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { LarkDaXoaReport } from "./lark-da-xoa-report";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "./page-header";
@@ -140,6 +141,11 @@ export function ViecCanXuLy({ role }: { role?: string }) {
         {tabsChoVai.some((t) => t.value === "khach-mua-them") && (
           <TabsContent value="khach-mua-them">
             <KhachMuaThemReport />
+          </TabsContent>
+        )}
+        {tabsChoVai.some((t) => t.value === "lark-da-xoa") && (
+          <TabsContent value="lark-da-xoa">
+            <LarkDaXoaReport />
           </TabsContent>
         )}
         {tabsChoVai.some((t) => t.value === "quen-mat-khau") && (

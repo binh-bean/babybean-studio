@@ -87,9 +87,11 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
         nutCaiTrucTiep: false,
       };
     case "ios-safari":
+      // BB-330 — iPhone Safari: "Thêm vào màn hình chính", câu nói rõ để làm gì,
+      // hai bước ngắn có hình (Chia sẻ → Thêm vào MH chính).
       return {
-        tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Lần sau ba mẹ mở nhanh hơn, như một app riêng.",
+        tieuDe: "Thêm vào màn hình chính",
+        moTa: "Lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn.",
         buoc: [buocChiaSe, buocThemMH],
         nutCaiTrucTiep: false,
       };

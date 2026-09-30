@@ -20,7 +20,8 @@ export type TabViecCanXuLy =
   | "over-quota"
   | "yeu-cau-mo-lai"
   | "khach-mua-them"
-  | "quen-mat-khau";
+  | "quen-mat-khau"
+  | "lark-da-xoa";
 
 export interface DinhNghiaTabViec {
   value: TabViecCanXuLy;
@@ -85,6 +86,14 @@ export const TABS_VIEC_CAN_XU_LY: DinhNghiaTabViec[] = [
     value: "quen-mat-khau",
     label: "Quên mật khẩu",
     api: "/api/admin/reports/quen-mat-khau",
+    hiddenForRoles: ["photoshop_ctv"],
+    demSo: demItems,
+  },
+  {
+    // BB-332 — bộ ảnh đã gửi khách mà dòng Hậu Kỳ bị xoá bên Lark (không tự xoá).
+    value: "lark-da-xoa",
+    label: "Dòng Lark đã bị xoá",
+    api: "/api/admin/reports/lark-da-xoa",
     hiddenForRoles: ["photoshop_ctv"],
     demSo: demItems,
   },

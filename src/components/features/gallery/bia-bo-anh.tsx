@@ -319,7 +319,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     );
 
     return (
-      <section aria-label="Ảnh bìa — đã giao" data-testid="bia-bo-anh" className="w-full bg-[#fbf7f2] pb-6 text-[#2e2a27] lg:pb-0">
+      <section aria-label="Ảnh bìa — đã giao" data-testid="bia-bo-anh" className="w-full bg-[#fdfbf9] pb-6 text-[#2e2a27] lg:pb-0">
         {/*
           BB-317 K-d — CÙNG LƯỚI BÌA với màn đầu (K1) và màn đang chỉnh (K10):
           máy tính chia hai cột `[1fr | 42%]`, ẢNH Ở CỘT PHẢI tràn mép, chữ ở cột
@@ -395,7 +395,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                   type="button"
                   onClick={onTaiCaBo}
                   data-testid="nut-tai-ca-bo-bia"
-                  className="inline-flex h-[52px] items-center justify-center gap-2 rounded-full bg-[#2e2a27] px-7 text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
+                  className="inline-flex h-[52px] items-center justify-center gap-2 rounded-full bg-[#2e2a27] px-7 text-[15px] font-medium text-[#fdfbf9] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
                 >
                   <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={1.8}>
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -600,7 +600,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           // nút phía dưới), y hệt cách máy tính tách ảnh và cột chữ. Ảnh nhận PHẦN CÒN LẠI của
           // màn sau khi trừ khối chữ (tối đa ~62% màn), nên tên/loại buổi chụp dài thì ảnh co
           // lại chứ nút chính không bị đẩy xuống dưới mép màn. Máy tính: một hàng, hai cột.
-          "relative isolate flex min-h-[calc(var(--bb-bia-khung-cao,100svh)-var(--bb-phan-tren-bia,0px))] w-full flex-col overflow-hidden bg-[#fbf7f2] text-[#2e2a27]",
+          "relative isolate flex min-h-[calc(var(--bb-bia-khung-cao,100svh)-var(--bb-phan-tren-bia,0px))] w-full flex-col overflow-hidden bg-[#fdfbf9] text-[#2e2a27]",
           "@[64rem]:grid @[64rem]:min-h-0 @[64rem]:grid-cols-[minmax(0,1fr)_42%] @[64rem]:grid-rows-1 @[64rem]:items-stretch",
           className,
         )}
@@ -678,7 +678,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           data-testid="bia-khoi-chu"
           className={cn(
             // BB-317 K-b — điện thoại: dải kem RIÊNG dưới ảnh (hàng 2), chữ mực — không đè ảnh nữa.
-            "relative z-10 shrink-0 bg-[#fbf7f2] px-6 pb-6 pt-5 text-[#2e2a27]",
+            "relative z-10 shrink-0 bg-[#fdfbf9] px-6 pb-6 pt-5 text-[#2e2a27]",
             "@[64rem]:static @[64rem]:col-start-1 @[64rem]:row-start-1 @[64rem]:row-end-2 @[64rem]:flex @[64rem]:flex-col @[64rem]:justify-center",
             // BB-319 (luật 2) — cột chữ bìa máy tính đứng CÙNG lề trang 40 px với thanh đầu,
             // lưới ảnh và chân trang (trước đây 64 px từ 1280 px — hai mép trái trên một màn).
@@ -782,7 +782,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
               <button
                 type="button"
                 onClick={onBatDau}
-                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#2e2a27] px-7 text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98] @[64rem]:w-auto"
+                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#2e2a27] px-7 text-[15px] font-medium text-[#fdfbf9] transition hover:bg-[#2e2a27]/90 active:scale-[0.98] @[64rem]:w-auto"
               >
                 {nhanNut} <ArrowDown className="h-4 w-4 -rotate-90" aria-hidden="true" />
               </button>

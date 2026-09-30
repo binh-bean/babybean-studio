@@ -5,7 +5,8 @@
  *
  * Ba luật về tiền:
  * 1. Đơn giá CHỐT lúc bấm mua, chép từ products.list_price vào selection_addons.unit_price.
- * 2. CHỈ bán khi products.price_confidence >= 0.8 VÀ price_samples >= 5.
+ * 2. CHỈ bán khi giá qua luật dùng chung `giaDuocBaoTuDong` (BB-335 — xem
+ *    src/lib/products/kich-thuoc-dang-ban.ts; thay ngưỡng cũ 0.8 / 5 mẫu).
  * 3. list_price null thì KHÔNG bán.
  */
 
@@ -17,6 +18,7 @@ import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateAddonSchema } from "./schema";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
+import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
 
 export const runtime = "nodejs";
 
@@ -88,11 +90,8 @@ export async function POST(request: Request): Promise<Response> {
       return fail("INVALID_INPUT", "Sản phẩm chưa có đơn giá niêm yết, vui lòng liên hệ CSKH");
     }
 
-    // Luật 2: CHỈ bán khi price_confidence >= 0.8 VÀ price_samples >= 5
-    const confidence = product.price_confidence !== null ? Number(product.price_confidence) : 0;
-    const samples = product.price_samples ?? 0;
-
-    if (confidence < 0.8 || samples < 5) {
+    // Luật 2 (BB-335): cùng luật giá với danh mục của /api/g/gallery.
+    if (!giaDuocBaoTuDong(product)) {
       return fail(
         "INVALID_INPUT",
         "Sản phẩm chưa đủ độ tin cậy về giá, CSKH sẽ báo giá trực tiếp"

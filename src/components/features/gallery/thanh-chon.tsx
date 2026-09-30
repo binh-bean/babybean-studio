@@ -143,7 +143,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
         className={cn(
           // BB-317 K-a — viên RỘNG THEO NỘI DUNG trên máy tính (`lg:w-fit`, bỏ trần 420px):
           // số đếm không bao giờ bị cắt thành "17 / 15 t…", viên phụ không giành chỗ của số.
-          "mx-auto flex h-12 max-w-[520px] items-center gap-2 rounded-full border border-[#e5dcd2] bg-[#FBF7F2]/92 pl-5 pr-2 text-[#2E2A27] shadow-lg backdrop-blur-md lg:h-11 lg:w-fit lg:max-w-full",
+          "mx-auto flex h-12 max-w-[520px] items-center gap-2 rounded-full border border-[#e5dcd2] bg-[#fdfbf9]/92 pl-5 pr-2 text-[#2E2A27] shadow-lg backdrop-blur-md lg:h-11 lg:w-fit lg:max-w-full",
           an ? "pointer-events-none" : "pointer-events-auto",
         )}>
         <div className="min-w-0 flex-1 leading-tight lg:min-w-max lg:flex-none">
@@ -187,7 +187,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
             onClick={muaThem.onClick}
             aria-label="Mua thêm"
             title={muaThem.tien > 0 ? `Mua thêm — ${formatCurrencyVND(muaThem.tien)}` : "Mua thêm"}
-            className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#2E2A27]/75 transition hover:bg-[#2E2A27]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FBF7F2]"
+            className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#2E2A27]/75 transition hover:bg-[#2E2A27]/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#fdfbf9]"
           >
             <ShoppingBag className="h-[17px] w-[17px]" strokeWidth={1.6} aria-hidden="true" />
             {/*
@@ -200,7 +200,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
               <span
                 data-testid="huy-hieu-gio"
                 aria-hidden="true"
-                className="absolute -right-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-[#2E2A27] px-1 text-[11px] font-semibold text-[#FBF7F2]"
+                className="absolute -right-0.5 -top-0.5 grid h-[17px] min-w-[17px] place-items-center rounded-full bg-[#2E2A27] px-1 text-[11px] font-semibold text-[#fdfbf9]"
               >
                 {muaThem.soMon}
               </span>

@@ -17,6 +17,7 @@
  * mà báo cáo kia chưa cần.
  */
 
+import { laChiNhanhCongKhai } from "./chi-nhanh-cong-khai";
 import { nhomSanPham, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 
 /** Thứ tự hiện + màu của bản vẽ: Ảnh in (mực) · Khung ảnh (rêu) · Album (hồng) — KHÁC thứ tự bày hàng cho khách (THU_TU_NHOM ở nhom-san-pham.ts). */
@@ -98,10 +99,16 @@ export interface ChiNhanhMuaThem {
   tongTien: number;
 }
 
-/** Tổng tiền theo chi nhánh, sắp giảm dần (chi nhánh nhiều tiền nhất lên đầu — bản vẽ vẽ thanh theo tỉ lệ so với chi nhánh cao nhất). */
+/**
+ * Tổng tiền theo chi nhánh, sắp giảm dần (chi nhánh nhiều tiền nhất lên đầu — bản vẽ vẽ thanh theo tỉ lệ so với chi nhánh cao nhất).
+ *
+ * BB-331: bỏ chi nhánh do phép thử dựng ("Fixture …") — ảnh anh 30/09 thấy
+ * "Fixture DANH…" đứng đầu khối "Theo chi nhánh" trên Bàn làm việc.
+ */
 export function tinhTheoChiNhanhMuaThem(rows: DongMuaThem[]): ChiNhanhMuaThem[] {
   const map = new Map<string, ChiNhanhMuaThem>();
   for (const r of rows) {
+    if (!laChiNhanhCongKhai({ name: r.branchName })) continue;
     const cu = map.get(r.branchId) ?? { branchId: r.branchId, branchName: r.branchName, tongTien: 0 };
     cu.tongTien += r.quantity * r.unitPrice;
     map.set(r.branchId, cu);

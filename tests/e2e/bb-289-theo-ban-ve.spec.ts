@@ -455,7 +455,7 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
       // Nhãn ngày chốt thật (hôm nay), không phải ngày bịa.
       const homNay = new Date();
       const ddmmyyyy = `${String(homNay.getDate()).padStart(2, "0")}/${String(homNay.getMonth() + 1).padStart(2, "0")}/${homNay.getFullYear()}`;
-      await ownIpExpect(camOn.getByText(`Đã chốt · ${ddmmyyyy}`)).toBeVisible();
+      await ownIpExpect(camOn.getByText(`Chờ studio xác nhận · ${ddmmyyyy}`)).toBeVisible();
 
       await page.screenshot({ path: tenAnh("cam-on-sau-chot", DIEN_THOAI), fullPage: false });
 
@@ -603,7 +603,7 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
       const chanTrang = page.locator("footer");
       await chanTrang.scrollIntoViewIfNeeded();
       await ownIpExpect(chanTrang).toBeVisible();
-      await ownIpExpect(chanTrang.getByText("Cảm ơn ba mẹ đã tin Baby Bean")).toBeVisible();
+      await ownIpExpect(chanTrang.getByText("Cảm ơn ba mẹ đã yêu thương Baby Bean")).toBeVisible();
       await ownIpExpect(chanTrang.getByText(/© \d{4} Baby Bean Studio/)).toBeVisible();
 
       await page.screenshot({ path: tenAnh("chan-trang-khach", kichThuoc), fullPage: false });

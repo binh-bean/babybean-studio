@@ -14,6 +14,8 @@ import {
   nhomCoHang,
   kichThuocCuaNhom,
   chatLieuTheoKichThuoc,
+  chatLieuCuaNhom,
+  kichThuocTheoChatLieu,
   chonSanPham,
   type SanPhamCuaHang,
 } from "@/lib/products/cau-hinh-cua-hang";
@@ -128,5 +130,35 @@ describe("BB-279: chonSanPham — tổ hợp → đúng một sản phẩm", () 
       sp({ productId: "2", nhom: "album", size: "20x20", material: "Ultra HD" }),
     ];
     expect(chonSanPham(danhMuc, "album", null, "Ultra HD")?.productId).toBe("1");
+  });
+});
+
+// BB-329 mục 4 — chất liệu TRƯỚC, kích thước lọc theo chất liệu. Danh mục giả
+// dựng theo đúng HÌNH DẠNG danh mục đang bán (khổ nhỏ nhất chỉ có một chất
+// liệu), giá sắp tăng dần như máy chủ trả về.
+describe("BB-329: chất liệu trước, kích thước theo chất liệu", () => {
+  const danhMuc = [
+    sp({ productId: "a", material: "Fixture UV", size: "10x15", unitPrice: 20000 }),
+    sp({ productId: "b", material: "Fixture UV", size: "20x30", unitPrice: 60000 }),
+    sp({ productId: "c", material: "Fixture Gương", size: "20x30", unitPrice: 150000 }),
+    sp({ productId: "d", material: "Fixture Gỗ", size: "30x45", unitPrice: 300000 }),
+    sp({ productId: "e", material: "Fixture Gương", size: "40x60", unitPrice: 500000 }),
+    sp({ productId: "k", nhom: "khung", material: "Fixture Khung", size: "30x45", unitPrice: 400000 }),
+  ];
+
+  it("mọi chất liệu của nhóm đều hiện, không phụ thuộc khổ mặc định", () => {
+    expect(chatLieuCuaNhom(danhMuc, "anh_in")).toEqual(["Fixture UV", "Fixture Gương", "Fixture Gỗ"]);
+    // Bậc cũ: khổ mặc định 10x15 → chỉ còn một chất liệu, ba mẹ không có gì để chọn.
+    expect(chatLieuTheoKichThuoc(danhMuc, "anh_in", "10x15")).toEqual(["Fixture UV"]);
+  });
+
+  it("kích thước lọc đúng theo chất liệu đã chọn", () => {
+    expect(kichThuocTheoChatLieu(danhMuc, "anh_in", "Fixture Gương")).toEqual(["20x30", "40x60"]);
+    expect(kichThuocTheoChatLieu(danhMuc, "anh_in", "Fixture UV")).toEqual(["10x15", "20x30"]);
+    expect(kichThuocTheoChatLieu(danhMuc, "khung", "Fixture Khung")).toEqual(["30x45"]);
+  });
+
+  it("chất liệu + kích thước → đúng một sản phẩm", () => {
+    expect(chonSanPham(danhMuc, "anh_in", "40x60", "Fixture Gương")?.productId).toBe("e");
   });
 });

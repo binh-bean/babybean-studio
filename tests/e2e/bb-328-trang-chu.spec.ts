@@ -4,8 +4,9 @@
  * Canh:
  *  1. Chi nhánh do phép thử dựng ("Fixture …") KHÔNG hiện cho khách. Lỗi thật
  *     29/09: trang gốc liệt kê "Fixture DANHGIA5-… Chi nhánh".
- *  2. "Nhân viên đăng nhập" có ở đầu trang VÀ lối vào ở cuối trang, cả hai
- *     dẫn tới /login.
+ *  2. "Nhân viên đăng nhập" ở đầu trang dẫn tới /login. BB-331: nút nhỏ kiểu
+ *     kính mờ (nền trong mờ + backdrop-blur), và thẻ "Nhân viên studio" ở cột
+ *     phải đã bị bỏ theo yêu cầu anh. Tiêu đề lớn là "Yours truly, Bean".
  *  3. "Nhắn tin cho studio" là nút viền nhẹ (nền trong suốt), không phải khối
  *     màu mực như trước.
  *  4. Màn đăng nhập có lối quay về trang chủ.
@@ -73,14 +74,33 @@ test.describe("BB-328: trang gốc + đăng nhập nhân viên", () => {
       await expect(page.getByText(TEN_FIXTURE)).toHaveCount(0);
       await expect(page.getByTestId("ds-chi-nhanh").getByText(/^Fixture/i)).toHaveCount(0);
 
-      // 2. Hai lối vào cho nhân viên.
+      // 2. Một lối vào cho nhân viên ở góc phải, kiểu kính mờ (BB-331).
       const dau = page.getByTestId("nut-nhan-vien-dau-trang");
       await expect(dau).toBeVisible();
       await expect(dau).toHaveText("Nhân viên đăng nhập");
       await expect(dau).toHaveAttribute("href", "/login");
-      const cuoi = page.getByTestId("loi-vao-nhan-vien");
-      await expect(cuoi).toBeVisible();
-      await expect(cuoi).toHaveAttribute("href", "/login");
+      const kieu = await dau.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return {
+          blur: cs.backdropFilter || (cs as unknown as Record<string, string>).webkitBackdropFilter || "",
+          nen: cs.backgroundColor,
+          cao: el.getBoundingClientRect().height,
+        };
+      });
+      expect(kieu.blur).toContain("blur");
+      // Nền bán trong suốt: alpha < 1 (rgba(…, a) hoặc color(… / a)), không phải khối đặc.
+      const alpha = Number(kieu.nen.match(/[,/]\s*([\d.]+)\)$/)?.[1] ?? "1");
+      expect(alpha).toBeLessThan(1);
+      expect(kieu.cao).toBeLessThanOrEqual(34);
+      // Thẻ "Nhân viên studio" anh gạch bỏ đã không còn.
+      await expect(page.getByTestId("loi-vao-nhan-vien")).toHaveCount(0);
+      await expect(page.getByText("Nhân viên studio", { exact: true })).toHaveCount(0);
+      // Tiêu đề mới, Playfair, không nghiêng.
+      const h1 = page.getByTestId("tieu-de-trang-chu");
+      await expect(h1).toHaveText("Yours truly, Bean");
+      const phong = await h1.evaluate((el) => ({ f: getComputedStyle(el).fontFamily, s: getComputedStyle(el).fontStyle }));
+      expect(phong.f).toMatch(/Playfair/i);
+      expect(phong.s).toBe("normal");
 
       // 3. Nút nhắn tin (nếu đã cấu hình) là nút viền, nền trong suốt.
       const nhan = page.getByTestId("nut-nhan-studio");

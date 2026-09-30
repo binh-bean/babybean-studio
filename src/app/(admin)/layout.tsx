@@ -10,8 +10,7 @@
 
 import type { Metadata } from "next";
 import { AdminLayoutShell } from "@/components/features/admin/admin-layout-shell";
-import { requireStaff, AuthError } from "@/lib/auth/staff";
-import { createServerClient } from "@/lib/supabase/server";
+import { requireStaff, AuthError, layHoTenNhanVien } from "@/lib/auth/staff";
 
 export const metadata: Metadata = {
   title: "Quản trị | BabyBean Studio",
@@ -31,13 +30,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     // Hỏi riêng chứ không thêm vào `requireStaff()`: hàm đó chạy ở **mọi** đường
     // API, thêm một cột vào đó là thêm chi phí cho hàng trăm lượt gọi không cần tên.
     // Hỏng thì thôi — thiếu tên không được phép chặn cả khu quản trị.
-    const supabase = await createServerClient();
-    const { data } = await supabase
-      .from("staff_profiles")
-      .select("full_name")
-      .eq("id", staff.staffId)
-      .maybeSingle();
-    hoTen = (data?.full_name as string | undefined) ?? null;
+    // BB-333: `layHoTenNhanVien` có `cache()` — trang /admin hỏi cùng câu này
+    // trong cùng lượt dựng thì dùng lại, không đi thêm một vòng mạng.
+    hoTen = await layHoTenNhanVien(staff.staffId);
   } catch (err) {
     // Chưa đăng nhập thì middleware đã chuyển hướng rồi; ở đây chỉ dựng khung
     // không có menu thay vì đổ vỡ.

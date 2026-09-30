@@ -253,7 +253,7 @@ export function ManChonThemDot({
       aria-pressed={filter === loai}
       className={cn(
         "shrink-0 whitespace-nowrap rounded-full border border-[#2e2a27] px-4 py-1.5 text-[14px] transition-colors",
-        filter === loai ? "bg-[#2e2a27] text-[#fbf7f2]" : "bg-[#fbf7f2] text-[#2e2a27] hover:bg-[#2e2a27]/5",
+        filter === loai ? "bg-[#2e2a27] text-[#fdfbf9]" : "bg-[#fdfbf9] text-[#2e2a27] hover:bg-[#2e2a27]/5",
       )}
     >
       {nhan}

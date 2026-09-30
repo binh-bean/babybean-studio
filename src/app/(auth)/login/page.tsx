@@ -221,7 +221,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen w-full flex-col bg-[var(--bb-bg)] md:flex-row">
       <div
         aria-hidden="true"
-        className="relative h-[160px] w-full shrink-0 overflow-hidden bg-[#fbf7f2] md:hidden"
+        className="relative h-[160px] w-full shrink-0 overflow-hidden bg-[#fdfbf9] md:hidden"
       >
         <img
           src="/minh-hoa/dai-dang-nhap-1920.webp"
@@ -237,7 +237,7 @@ export default function LoginPage() {
 
       <div
         aria-hidden="true"
-        className="relative hidden w-1/2 overflow-hidden bg-[#fbf7f2] md:block"
+        className="relative hidden w-1/2 overflow-hidden bg-[#fdfbf9] md:block"
       >
         {/* Tranh dọc vẽ riêng cho trang này (banana BB-262) — TRÀN cả nửa trái,
             không đặt một ô tranh nhỏ giữa nền khác màu (chủ studio 26/09: lộ

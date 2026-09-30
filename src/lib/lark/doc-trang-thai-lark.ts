@@ -22,6 +22,7 @@ import type pg from "pg";
 import { HOST, larkAuth, type LarkAuthHeader } from "@/lib/lark/sync-retouch";
 import { dangChayPhepThu } from "@/lib/kiem-thu";
 import { MA_NEO_COT_CANH_BAO, MA_NEO_COT_TRANG_THAI, giaiDoanCua } from "@/lib/lark/trang-thai-hau-ky";
+import { COT_PHOTO_LARK, coCotLarkPhoto, tenPhotoTuO } from "@/lib/lark/photo-hau-ky";
 
 /** Cột ngày của Lark ứng với lúc VÀO giai đoạn — dùng khi mới thấy bộ ảnh lần đầu. */
 const COT_NGAY_THEO_GIAI_DOAN: Record<number, RegExp> = {
@@ -50,6 +51,8 @@ export interface BangMa {
   maCanhBao: Map<string, string>;
   /** giai đoạn → tên cột ngày */
   cotNgay: Map<number, string>;
+  /** BB-335 — tên cột "photo" (thợ chụp); null khi bảng chưa có cột đó. */
+  cotPhoto?: string | null;
 }
 
 /** Từ danh sách cột của bảng, dựng bảng đổi tên → mã. Không thấy cột trạng thái thì ném. */
@@ -70,6 +73,7 @@ export function dungBangMa(cot: CotLark[]): BangMa {
     maTrangThai: map(tt),
     maCanhBao: map(cb),
     cotNgay,
+    cotPhoto: cot.find((c) => COT_PHOTO_LARK.test(c.field_name))?.field_name ?? null,
   };
 }
 
@@ -80,6 +84,11 @@ export interface TrangThaiDoc {
   ngayVaoGiaiDoan: Date | null;
   /** last_modified_time của bản ghi. */
   suaLuc: Date | null;
+  /**
+   * BB-335 — tên thợ chụp (cột "photo"); null = ô trống; undefined = lượt đọc
+   * này không đọc cột đó (bảng chưa có cột) → KHÔNG đụng galleries.lark_photo.
+   */
+  photo?: string | null;
 }
 
 function oChonMot(v: unknown): string | null {
@@ -110,6 +119,7 @@ export function dichBanGhi(
     maCanhBao,
     ngayVaoGiaiDoan,
     suaLuc: typeof lastModified === "number" && lastModified > 0 ? new Date(lastModified) : null,
+    ...(bang.cotPhoto ? { photo: tenPhotoTuO(fields[bang.cotPhoto]) } : {}),
   };
 }
 
@@ -182,7 +192,7 @@ export async function docTrangThaiTuLark(opts: {
     `/bitable/v1/apps/${opts.baseToken}/tables/${tableId}/fields?page_size=100`,
   );
   const bang = dungBangMa(cot.items);
-  const tenCot = [bang.cotTrangThai, bang.cotCanhBao, ...bang.cotNgay.values()].filter(
+  const tenCot = [bang.cotTrangThai, bang.cotCanhBao, ...bang.cotNgay.values(), bang.cotPhoto].filter(
     (x): x is string => !!x,
   );
 
@@ -302,5 +312,33 @@ export async function ghiTrangThaiVaoGalleries(
       await client.query(`update galleries set lark_doc_luc = $2 where id = $1`, [g.id, bayGio]);
     }
   }
+  await ghiPhotoVaoGalleries(client, doc);
   return { doc: soDoc, doi: soDoi, sangHinhDaVe };
+}
+
+/**
+ * BB-335 — ghi tên thợ chụp (cột "photo" bên Lark) vào galleries.lark_photo.
+ * Tách riêng khỏi phần trạng thái ở trên: 0081 CHƯA ÁP thì bỏ qua êm, không làm
+ * hỏng lượt ghi trạng thái. Chỉ cập nhật dòng có giá trị khác.
+ */
+export async function ghiPhotoVaoGalleries(
+  client: pg.Client | pg.PoolClient,
+  doc: Map<string, TrangThaiDoc>,
+): Promise<{ doi: number; chuaApMigration: boolean }> {
+  const coDoc = [...doc.entries()].filter(([, d]) => d.photo !== undefined);
+  if (coDoc.length === 0) return { doi: 0, chuaApMigration: false };
+  if (!(await coCotLarkPhoto(client))) return { doi: 0, chuaApMigration: true };
+  const { rows } = await client.query<{ id: string; lark_hauky_record_id: string; lark_photo: string | null }>(
+    `select id, lark_hauky_record_id, lark_photo from galleries
+      where lark_hauky_record_id = any($1::text[]) and status <> 'archived'`,
+    [coDoc.map(([r]) => r)],
+  );
+  let doi = 0;
+  for (const g of rows) {
+    const moi = doc.get(g.lark_hauky_record_id)?.photo ?? null;
+    if ((g.lark_photo ?? null) === moi) continue;
+    await client.query(`update galleries set lark_photo = $2 where id = $1`, [g.id, moi]);
+    doi++;
+  }
+  return { doi, chuaApMigration: false };
 }

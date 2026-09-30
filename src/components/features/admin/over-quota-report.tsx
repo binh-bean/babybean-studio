@@ -21,6 +21,15 @@
  * Bộ ảnh nhập từ Lark đang che tên và số điện thoại khách (docs/16 mục 7.3),
  * nên mã hợp đồng là thứ duy nhất tra ngược được sang Lark. Cột đó phải chọn
  * và sao chép được, đừng cắt ngắn.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-331 — mỗi dòng tự xử lý được
+ * ---------------------------------------------------------------------------
+ * Anh 30/09: dòng vượt hạn mức chỉ để xem, không làm gì được. Nay mỗi dòng có
+ * "Xác nhận thanh toán" (đúng form giảm giá % của BB-320, `form-thanh-toan`),
+ * "Mở bộ ảnh", "Nhắc khách" (nhắc THANH TOÁN, chuông + thông báo) và "Nhắn
+ * khách" (link chat Lark, nếu có). Ghi thu xong là tải lại — bộ đã hết nợ tự
+ * rời danh sách, và số trên menu/tab đếm lại (SU_KIEN_VIEC_DOI).
  */
 
 "use client";
@@ -31,6 +40,10 @@ import Link from "next/link";
 import { CARD_TITLE_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
 import { formatNgayVN, tinhTenBiaTuDuLieu, tinhTieuDeBoAnhQuanTri, formatSo } from "@/lib/utils/dinh-dang";
+import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
+import { PaymentForm, ghiThanhToan } from "./form-thanh-toan";
+import { NutNhacKhach } from "./nut-nhac-khach";
+import { NutNhanKhach } from "./nut-nhan-khach";
 
 interface ReportItem {
   galleryId: string;
@@ -51,6 +64,8 @@ interface ReportItem {
   unbilledAmount: number;
   daThu?: number;
   giamGia?: number;
+  /** BB-331: link "Chat với khách" từ Lark (đã lọc http/https). */
+  chatUrl?: string | null;
 }
 
 interface ReportSummary {
@@ -65,30 +80,123 @@ export function OverQuotaReport() {
   const [error, setError] = React.useState<string | null>(null);
   const [summary, setSummary] = React.useState<ReportSummary | null>(null);
   const [items, setItems] = React.useState<ReportItem[]>([]);
+  // BB-331: dòng đang mở form "Xác nhận thanh toán" + câu báo sau khi ghi.
+  const [moThanhToan, setMoThanhToan] = React.useState<string | null>(null);
+  const [dangGhi, setDangGhi] = React.useState(false);
+  const [thongBao, setThongBao] = React.useState<{ id: string; ok: boolean; cau: string } | null>(null);
+  const alive = React.useRef(true);
+
+  const tai = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/reports/over-quota", { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!alive.current) return;
+      if (!res.ok) {
+        setError(json?.error?.message ?? "Không tải được báo cáo");
+        return;
+      }
+      setSummary(json.data.summary);
+      setItems(json.data.items);
+    } catch {
+      if (alive.current) setError("Mất kết nối, thử lại giúp.");
+    } finally {
+      if (alive.current) setLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/admin/reports/over-quota");
-        const json = await res.json().catch(() => null);
-        if (!alive) return;
-        if (!res.ok) {
-          setError(json?.error?.message ?? "Không tải được báo cáo");
-          return;
-        }
-        setSummary(json.data.summary);
-        setItems(json.data.items);
-      } catch {
-        if (alive) setError("Mất kết nối, thử lại giúp.");
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
+    alive.current = true;
+    void tai();
     return () => {
-      alive = false;
+      alive.current = false;
     };
-  }, []);
+  }, [tai]);
+
+  async function xacNhanThanhToan(
+    it: ReportItem,
+    amount: number,
+    method: string,
+    note: string,
+    discountPercent: number | null,
+  ) {
+    setDangGhi(true);
+    setThongBao(null);
+    try {
+      const kq = await ghiThanhToan(it.galleryId, amount, method, note, discountPercent);
+      if (!kq.ok) {
+        setThongBao({ id: it.galleryId, ok: false, cau: kq.message });
+        return;
+      }
+      const cau =
+        kq.outstanding > 0
+          ? `Đã ghi. Còn thiếu ${formatCurrencyVND(kq.outstanding)}.`
+          : "Đã ghi. Khách đã trả đủ — dòng này rời danh sách.";
+      setThongBao({ id: it.galleryId, ok: true, cau });
+      setMoThanhToan(null);
+      await tai();
+      window.dispatchEvent(new Event(SU_KIEN_VIEC_DOI));
+    } catch {
+      setThongBao({ id: it.galleryId, ok: false, cau: "Mất kết nối, thử lại giúp." });
+    } finally {
+      setDangGhi(false);
+    }
+  }
+
+  /** Hàng nút thao tác của một dòng — dùng chung cho thẻ (điện thoại) và bảng (máy tính). */
+  function thaoTac(it: ReportItem) {
+    return (
+      <div className="flex flex-wrap items-center gap-2" data-testid="thao-tac-vuot-han-muc">
+        <button
+          type="button"
+          data-testid="nut-xac-nhan-thanh-toan"
+          aria-expanded={moThanhToan === it.galleryId}
+          onClick={() => {
+            setThongBao(null);
+            setMoThanhToan(moThanhToan === it.galleryId ? null : it.galleryId);
+          }}
+          className="inline-flex h-8 items-center whitespace-nowrap rounded-md bg-[var(--bb-fg)] px-3 text-xs font-medium text-[var(--bb-bg)] transition hover:opacity-90"
+        >
+          {moThanhToan === it.galleryId ? "Đóng" : "Xác nhận thanh toán"}
+        </button>
+        <Link
+          href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}
+          data-testid="nut-mo-bo-anh"
+          className="inline-flex h-8 items-center whitespace-nowrap rounded-md border border-[var(--bb-border)] px-3 text-xs font-medium text-[var(--bb-fg)] transition hover:bg-[var(--bb-surface-2)]"
+        >
+          Mở bộ ảnh
+        </Link>
+        <NutNhacKhach galleryId={it.galleryId} loai="thanh_toan" />
+        <NutNhanKhach url={it.chatUrl} />
+      </div>
+    );
+  }
+
+  function khoiThanhToan(it: ReportItem) {
+    return (
+      <>
+        {moThanhToan === it.galleryId && (
+          <div data-testid="form-thanh-toan-vuot-han-muc" className="rounded-md border border-[var(--bb-border)] p-3">
+            <p className="text-xs text-[var(--bb-fg-muted)]">
+              Còn phải thu <strong className="text-[var(--bb-fg)]">{formatCurrencyVND(it.unbilledAmount)}</strong>
+            </p>
+            <PaymentForm
+              disabled={dangGhi}
+              conThieu={it.unbilledAmount > 0 ? it.unbilledAmount : 0}
+              onSubmit={(a, m, n, pt) => void xacNhanThanhToan(it, a, m, n, pt)}
+            />
+          </div>
+        )}
+        {thongBao?.id === it.galleryId && (
+          <p
+            role="status"
+            className={`text-xs ${thongBao.ok ? "text-[var(--bb-fg-muted)]" : "text-[var(--bb-danger)]"}`}
+          >
+            {thongBao.cau}
+          </p>
+        )}
+      </>
+    );
+  }
 
   if (loading) return <p className="text-sm text-[var(--bb-fg-muted)]">Đang tải báo cáo…</p>;
   if (error) return <p className="text-sm text-[var(--bb-danger)]">{error}</p>;
@@ -128,6 +236,12 @@ export function OverQuotaReport() {
           </>
         )}
       </p>
+
+      {thongBao && !items.some((it) => it.galleryId === thongBao.id) && (
+        <p role="status" data-testid="thong-bao-da-xu-ly" className="text-sm text-[var(--bb-fg-muted)]">
+          {thongBao.cau}
+        </p>
+      )}
 
       {items.length === 0 ? (
         <p className="text-sm text-[var(--bb-fg-muted)]">
@@ -170,6 +284,10 @@ export function OverQuotaReport() {
                     <TruCu it={it} />
                   </span>
                 </div>
+                <div className="mt-3 flex flex-col gap-2">
+                  {thaoTac(it)}
+                  {khoiThanhToan(it)}
+                </div>
               </li>
             ))}
           </ul>
@@ -191,7 +309,8 @@ export function OverQuotaReport() {
             </thead>
             <tbody>
               {items.map((it) => (
-                <tr key={it.galleryId} className="border-b border-[var(--bb-border)]">
+                <React.Fragment key={it.galleryId}>
+                <tr>
                   <td className="py-2 pr-3">
                     <BoAnhCell it={it} />
                   </td>
@@ -210,6 +329,16 @@ export function OverQuotaReport() {
                     <TruCu it={it} />
                   </td>
                 </tr>
+                {/* BB-331: hàng thao tác riêng của dòng, ngay dưới số liệu. */}
+                <tr className="border-b border-[var(--bb-border)]">
+                  <td colSpan={9} className="pb-3 pt-1">
+                    <div className="flex flex-col gap-2">
+                      {thaoTac(it)}
+                      {khoiThanhToan(it)}
+                    </div>
+                  </td>
+                </tr>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

@@ -38,6 +38,8 @@ export function BranchManager() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // BB-331: chi nhánh bấm "Xoá" mà còn dữ liệu → giải thích + mời ngừng hoạt động.
+  const [blocked, setBlocked] = useState<{ id: string; message: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,6 +86,68 @@ export function BranchManager() {
   function toggleActive(row: BranchRow) {
     if (row.isActive && !confirm(t.confirmClose.replace("{name}", row.name))) return;
     void patch(row.id, { isActive: !row.isActive });
+  }
+
+  /**
+   * BB-331: chỉ xoá hẳn chi nhánh rỗng. Còn nhân sự/bộ ảnh thì KHÔNG gọi API,
+   * nói lý do ngay và mời "Ngừng hoạt động". Route vẫn kiểm lại (khách, buổi
+   * chụp… cũng chặn) — lý do từ server hiện cùng một chỗ.
+   */
+  async function tryDelete(row: BranchRow) {
+    setNotice(null);
+    setError(null);
+    if (row.staffCount > 0 || row.galleryCount > 0) {
+      setBlocked({
+        id: row.id,
+        message: t.cannotDelete
+          .replace("{staff}", String(row.staffCount))
+          .replace("{galleries}", String(row.galleryCount)),
+      });
+      return;
+    }
+    if (!confirm(t.confirmDelete.replace("{name}", row.name))) return;
+    setBusyId(row.id);
+    try {
+      const res = await fetch(`/api/admin/branches/${row.id}`, { method: "DELETE" });
+      const body = await res.json();
+      if (!res.ok) {
+        setBlocked({ id: row.id, message: body?.error?.message ?? "Không xoá được" });
+        return;
+      }
+      setBlocked(null);
+      setNotice(t.deleted.replace("{name}", row.name));
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không xoá được");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function blockedNote(row: BranchRow) {
+    if (blocked?.id !== row.id) return null;
+    return (
+      <div
+        role="alert"
+        data-testid="ly-do-khong-xoa-chi-nhanh"
+        className="flex flex-wrap items-center gap-3 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-[var(--bb-surface-2)] px-4 py-3 text-sm text-[var(--bb-fg)]"
+      >
+        <span className="min-w-0 flex-1">{blocked.message}</span>
+        {row.isActive && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busyId === row.id}
+            onClick={() => {
+              setBlocked(null);
+              toggleActive(row);
+            }}
+          >
+            {t.close}
+          </Button>
+        )}
+      </div>
+    );
   }
 
   if (loading) {
@@ -207,9 +271,29 @@ export function BranchManager() {
                             {row.isActive ? t.close : t.reopen}
                           </Button>
                         )}
+                        {canCreate && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            data-testid="nut-xoa-chi-nhanh"
+                            disabled={busyId === row.id}
+                            onClick={() => void tryDelete(row)}
+                            className="text-[var(--bb-danger)]"
+                          >
+                            {t.delete}
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
+
+                  {blocked?.id === row.id && (
+                    <tr className="border-b border-[var(--bb-border)]">
+                      <td colSpan={7} className="px-4 py-3">
+                        {blockedNote(row)}
+                      </td>
+                    </tr>
+                  )}
 
                   {editingId === row.id && (
                     <tr className="border-b border-[var(--bb-border)] bg-[var(--bb-surface-2)]">
@@ -288,7 +372,24 @@ export function BranchManager() {
                       {row.isActive ? t.close : t.reopen}
                     </Button>
                   )}
+                  {canCreate && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-testid="nut-xoa-chi-nhanh"
+                      disabled={busyId === row.id}
+                      onClick={() => void tryDelete(row)}
+                      className="text-[var(--bb-danger)]"
+                    >
+                      {t.delete}
+                    </Button>
+                  )}
                 </div>
+                {blocked?.id === row.id && (
+                  <div className="mt-3">
+                    {blockedNote(row)}
+                  </div>
+                )}
 
                 {editingId === row.id && (
                   <div className="mt-4 border-t border-[var(--bb-border)] pt-4">

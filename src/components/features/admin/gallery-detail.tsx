@@ -43,8 +43,10 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { luaChonMoLai, type DotTomTat } from "@/lib/gallery/dot-chon";
-import { cauBaoSauDoiHanMuc, tinhGiamGia, tinhPhatSinhTheoHanMuc } from "@/lib/gallery/tien-phat-sinh";
-import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import { cauBaoSauDoiHanMuc, tinhPhatSinhTheoHanMuc } from "@/lib/gallery/tien-phat-sinh";
+import { PaymentForm } from "./form-thanh-toan";
+import { NutNhanKhach } from "./nut-nhan-khach";
+import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
 import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
@@ -128,8 +130,8 @@ function NutXoaDongHang({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      aria-label="Bỏ dòng hàng này"
-      title="Bỏ dòng hàng này"
+      aria-label="Bỏ sản phẩm này"
+      title="Bỏ sản phẩm này"
       className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--bb-radius-sm)] text-[var(--bb-fg-muted)] transition hover:bg-[var(--bb-danger)]/10 hover:text-[var(--bb-danger)] disabled:opacity-40"
     >
       <Trash2 className="h-4 w-4" />
@@ -228,6 +230,10 @@ interface Detail {
   packageName: string | null;
   customerName: string | null;
   customerPhone: string | null;
+  /** BB-331: link chat với khách từ Lark (đã lọc http/https). */
+  customerChatUrl?: string | null;
+  /** BB-335 — "Photo": tên thợ chụp đọc từ cột "photo" bên Lark; null khi trống / chưa áp 0081. */
+  larkPhoto?: string | null;
   shootDate: string | null;
   /**
    * BB-308 (vòng 4, mục #5) — "loại buổi chụp" thật ("Thôi nôi", "Newborn"…,
@@ -415,7 +421,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       const json = await res.json().catch(() => null);
       setNotice(
         res.ok
-          ? "Đã xác nhận, bộ ảnh chuyển sang giai đoạn chỉnh ảnh."
+          ? "Đã xác nhận — bộ ảnh vào hàng chờ chỉnh sửa."
           : (json?.error?.message ?? "Không xác nhận được"),
       );
       await load();
@@ -794,6 +800,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     }),
     detail.branchName,
     detail.shootDate ? formatNgayVN(detail.shootDate) : null,
+    detail.larkPhoto ? `Photo: ${detail.larkPhoto}` : null,
   ].filter((v): v is string => !!v);
 
   return (
@@ -887,6 +894,8 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                 {vi.admin.export.title} ↓
               </a>
             )}
+            {/* BB-331: "Nhắn khách" — mở link chat Lark ở tab mới; không có link thì ẩn. */}
+            <NutNhanKhach url={detail.customerChatUrl} />
             {/* BB-308: menu ⋯ gom các thao tác phụ; hành vi/API từng thao tác giữ nguyên. */}
             <MenuThaoTacPhu
               detail={detail}
@@ -1487,13 +1496,17 @@ function KhoiChinh({
         */}
         {!canSuaDong && !locked && (
           <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-            Vai của bạn không có quyền sửa dòng hàng — chỉ xem được.
+            Vai của bạn không có quyền sửa sản phẩm — chỉ xem được.
           </p>
         )}
         {detail.items.length === 0 ? (
-          <p className="mt-2 text-sm text-[var(--bb-fg-muted)]">
-            Chưa có dòng hàng nào. Nhập mã hợp đồng rồi chạy đồng bộ, hoặc thêm tay.
-          </p>
+          <div className="mt-2 text-sm text-[var(--bb-fg-muted)]">
+            <p>Chưa có sản phẩm nào. Nhập mã hợp đồng rồi chạy đồng bộ, hoặc thêm tay.</p>
+            {/* BB-331: bộ đã gắn hóa đơn Lark → kéo dòng hợp đồng (và hạn mức) về bằng một nút. */}
+            {canSuaDong && !locked && detail.contractCodes.length > 0 && (
+              <NutKeoDongHopDong galleryId={galleryId} onDone={onDelivered} />
+            )}
+          </div>
         ) : (
           <ul className="mt-2 flex flex-col gap-1">
             {detail.items.map((item) => (
@@ -2060,139 +2073,14 @@ function ReopenForm({
  * đúng số còn thiếu, và bắt CSKH gõ lại con số đang hiện ngay phía trên là cách
  * chắc chắn để thỉnh thoảng gõ nhầm.
  */
-function PaymentForm({
-  disabled,
-  conThieu,
-  onSubmit,
-}: {
-  disabled?: boolean;
-  /** Số còn thiếu hiện tại (0 nếu đã đủ) — nền để gợi ý số tiền và tính giảm giá. */
-  conThieu: number;
-  onSubmit: (amount: number, method: string, note: string, discountPercent: number | null) => void;
-}) {
-  const [amount, setAmount] = React.useState(conThieu > 0 ? String(conThieu) : "");
-  const [method, setMethod] = React.useState("tien_mat");
-  const [note, setNote] = React.useState("");
-  // BB-320: "Giảm giá %" — 0–100. Trống = không giảm.
-  const [giamPt, setGiamPt] = React.useState("");
-
-  const phanTram = giamPt.trim() === "" ? 0 : Number(giamPt);
-  const phanTramHopLe = Number.isFinite(phanTram) && phanTram > 0 && phanTram <= 100;
-  const giam = phanTramHopLe ? tinhGiamGia(conThieu, phanTram) : null;
-
-  // Ghi xong thì số còn thiếu đổi → xoá ô % và lý do của lần vừa ghi (không để lại "10%" cạnh dòng "hết nợ").
-  React.useEffect(() => {
-    setGiamPt("");
-    setNote("");
-  }, [conThieu]);
-
-  // Số tiền gợi ý = còn thiếu × (1 − %/100), làm tròn nghìn — đổi % thì số gợi ý đổi theo (CSKH vẫn sửa tay được).
-  React.useEffect(() => {
-    setAmount(giam ? String(giam.soTienGoiY) : conThieu > 0 ? String(conThieu) : "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ chạy khi nền hoặc % đổi
-  }, [conThieu, giam?.soTienGoiY]);
-
-  const parsed = amount.trim() === "" ? 0 : Number(amount);
-  const amountOk = Number.isInteger(parsed) && parsed !== 0;
-  // Dòng trừ tiền bắt buộc có lý do — route cũng chặn. Giảm giá cũng phải có lý do.
-  const coGiam = giamPt.trim() !== "" && phanTram !== 0;
-  const giamOk = !coGiam || (phanTramHopLe && giam !== null && giam.soTienGiam > 0);
-  const soTienOk = amountOk ? parsed > 0 || note.trim().length > 0 : coGiam && Number.isInteger(parsed);
-  const valid = giamOk && soTienOk && (!coGiam || note.trim().length > 0);
-
-  return (
-    <div className="mt-3 flex flex-wrap items-end gap-2">
-      {/* BB-294 (#19) — ô số, select, ô nhập hệ thiết kế, không phải mặc định trình duyệt. */}
-      <label className="flex flex-col gap-1 text-xs">
-        Giảm giá %
-        <Input
-          type="number"
-          name="giamGiaPhanTram"
-          inputMode="decimal"
-          min={0}
-          max={100}
-          step="any"
-          value={giamPt}
-          disabled={disabled || conThieu <= 0}
-          onChange={(e) => setGiamPt(e.target.value)}
-          placeholder="0–100"
-          className="h-9 w-24 min-h-0 px-2 py-2 text-sm"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs">
-        Số tiền
-        <Input
-          type="number"
-          name="amount"
-          value={amount}
-          disabled={disabled}
-          onChange={(e) => setAmount(e.target.value)}
-          className="h-9 w-36 min-h-0 px-2 py-2 text-sm"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs">
-        Hình thức
-        <Select
-          name="method"
-          value={method}
-          disabled={disabled}
-          onChange={(e) => setMethod(e.target.value)}
-          className="h-9 min-h-0 px-2 py-2 text-sm"
-        >
-          {PAYMENT_METHODS.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </Select>
-      </label>
-      <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs">
-        {coGiam ? "Lý do giảm giá" : "Ghi chú"}
-        <Input
-          type="text"
-          name="note"
-          maxLength={500}
-          value={note}
-          disabled={disabled}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder={
-            coGiam ? "Bắt buộc: lý do giảm giá" : parsed < 0 ? "Bắt buộc: lý do trừ tiền" : "Mã giao dịch, ghi chú…"
-          }
-          className="h-9 min-h-0 px-2 py-2 text-sm"
-        />
-      </label>
-      <button
-        type="button"
-        disabled={disabled || !valid}
-        onClick={() => onSubmit(amountOk ? parsed : 0, method, note.trim(), coGiam ? phanTram : null)}
-        className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
-      >
-        {coGiam ? "Ghi giảm giá và thu" : "Ghi nhận đã thu"}
-      </button>
-      {/* Hiện RÕ phần giảm và số khách phải trả — trước khi bấm ghi. */}
-      {coGiam && (
-        <p data-testid="dong-giam-gia" className="basis-full text-sm">
-          {giam ? (
-            <>
-              Giảm <strong>{phanTram}%</strong> = <strong>−{formatCurrencyVND(giam.soTienGiam)}</strong> · khách trả{" "}
-              <strong>{formatCurrencyVND(giam.soTienGoiY)}</strong> (làm tròn nghìn đồng)
-            </>
-          ) : conThieu <= 0 ? (
-            <span className="text-[var(--bb-danger)]">Không còn khoản nào để giảm.</span>
-          ) : (
-            <span className="text-[var(--bb-danger)]">Phần trăm phải lớn hơn 0 và không quá 100.</span>
-          )}
-        </p>
-      )}
-    </div>
-  );
-}
+// BB-331: PaymentForm chuyển sang `./form-thanh-toan.tsx` để dòng "Ảnh vượt
+// hạn mức" ở Việc cần xử lý dùng lại đúng form này (giảm giá % của BB-320).
 
 /** Tên tiếng Việt của loại sản phẩm. */
 const KIND_LABEL: Record<string, string> = {
   shoot_package: "Gói chụp",
   edited_photo: "Ảnh chỉnh sửa",
-  print: "Hàng in",
+  print: "Sản phẩm in ấn",
   addon: "Mua thêm",
   service: "Dịch vụ",
 };
@@ -2243,7 +2131,7 @@ function AddItemForm({
     <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-[var(--bb-border)] pt-3">
       {/* BB-294 (#19) — select, ô số hệ thiết kế, không phải mặc định trình duyệt. */}
       <label className="flex min-w-56 flex-1 flex-col gap-1 text-xs">
-        Thêm dòng hàng
+        Thêm sản phẩm
         <Select
           name="productId"
           value={productId}

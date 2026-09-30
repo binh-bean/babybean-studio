@@ -16,6 +16,7 @@ import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { soNgayHanChot } from "@/lib/gallery/han-chot";
 import { giaAnhChonThemMacDinh } from "@/lib/gallery/gia-anh-chon-them";
+import { danhSachPhoto } from "@/lib/lark/photo-hau-ky";
 
 export const runtime = "nodejs";
 
@@ -49,7 +50,13 @@ export async function GET(): Promise<Response> {
       .in("role", ["photographer", "cs", "owner", "admin", "branch_manager"])
       .order("full_name");
 
+    // BB-335 — lựa chọn bộ lọc "Photo": các giá trị khác nhau của
+    // galleries.lark_photo (đọc từ Lark), không phải danh sách nhân sự gõ tay.
+    const photo = await danhSachPhoto(admin);
+
     return ok({
+      photoLark: photo.ds,
+      photoLarkChuaApMigration: photo.chuaApMigration,
       /**
        * Hạn chốt mặc định lấy từ màn Cài đặt, không chôn cứng trong thuật sĩ.
        *

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "../supabase/server";
 import { StaffSession, StaffRole } from "../../types/domain";
 
@@ -11,8 +12,23 @@ export class AuthError extends Error {
 /**
  * Gets the current authenticated staff session.
  * Throws AuthError('UNAUTHENTICATED') if no valid session or deactivated.
+ *
+ * BB-333 — hai thay đổi CHỈ về tốc độ, không đổi luật quyền:
+ *
+ * 1. `cache()` của React: trong MỘT lượt dựng trang, layout quản trị và trang
+ *    con cùng gọi hàm này (vd. /admin: layout + page) — trước đây mỗi nơi tự đi
+ *    lại trọn chuỗi getUser → hồ sơ → chi nhánh. Nay lượt thứ hai dùng lại kết
+ *    quả của lượt đầu. Ngoài lượt dựng trang (route API, phép thử) `cache()`
+ *    không có kho theo lượt nên gọi thẳng — không bao giờ dùng chung giữa hai
+ *    request, hai người.
+ * 2. Hồ sơ và HAI câu chi nhánh chạy SONG SONG sau getUser, thay vì nối đuôi
+ *    (hồ sơ xong mới biết là superuser hay không rồi mới hỏi chi nhánh). Câu
+ *    chi nhánh không dùng tới bị bỏ đi — tốn một câu nhỏ, bớt một vòng mạng
+ *    ở MỌI route API quản trị.
  */
-export async function requireStaff(): Promise<StaffSession> {
+export const requireStaff = cache(requireStaffKhongCache);
+
+async function requireStaffKhongCache(): Promise<StaffSession> {
   const supabase = await createServerClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
 
@@ -22,11 +38,19 @@ export async function requireStaff(): Promise<StaffSession> {
 
   // Load the profile and branches using the authenticated client.
   // Because RLS is enabled, the staff member can always read their own profile.
-  const { data: profile, error: profileError } = await supabase
-    .from("staff_profiles")
-    .select("role, is_active, role_id, roles(name, permissions)")
-    .eq("id", user.id)
-    .single();
+  const [
+    { data: profile, error: profileError },
+    tatCaChiNhanh,
+    chiNhanhDuocGan,
+  ] = await Promise.all([
+    supabase
+      .from("staff_profiles")
+      .select("role, is_active, role_id, roles(name, permissions)")
+      .eq("id", user.id)
+      .single(),
+    supabase.from("branches").select("id"),
+    supabase.from("staff_branches").select("branch_id").eq("staff_id", user.id),
+  ]);
 
   if (profileError || !profile || !profile.is_active) {
     throw new AuthError("UNAUTHENTICATED", "Account deactivated or not found");
@@ -59,15 +83,12 @@ export async function requireStaff(): Promise<StaffSession> {
   let branchIds: string[] = [];
   if (permissions.includes("system:superuser")) {
     // Owners and admins can see all branches.
-    const { data: branches } = await supabase.from("branches").select("id");
-    branchIds = (branches || []).map((b: { id: string }) => b.id);
+    const branches = tatCaChiNhanh.data as { id: string }[] | null;
+    branchIds = (branches || []).map((b) => b.id);
   } else {
     // Regular staff only see assigned branches.
-    const { data: staffBranches } = await supabase
-      .from("staff_branches")
-      .select("branch_id")
-      .eq("staff_id", user.id);
-    branchIds = (staffBranches || []).map((b: { branch_id: string }) => b.branch_id);
+    const staffBranches = chiNhanhDuocGan.data as { branch_id: string }[] | null;
+    branchIds = (staffBranches || []).map((b) => b.branch_id);
   }
 
   return {
@@ -117,3 +138,20 @@ export function requireBranch(staff: StaffSession, branchId: string): void {
     throw new AuthError("FORBIDDEN");
   }
 }
+
+/**
+ * BB-333 — tên nhân viên đang đăng nhập, hỏi MỘT lần cho cả lượt dựng trang.
+ *
+ * Layout quản trị (góc phải) và trang /admin (lời chào) cùng cần tên; trước đây
+ * mỗi nơi tự hỏi `staff_profiles` một lần. `cache()` gộp hai lượt đó thành một.
+ * Không có dòng/không có tên thì trả `null` (giữ đúng luật cũ của hai nơi gọi).
+ */
+export const layHoTenNhanVien = cache(async (staffId: string): Promise<string | null> => {
+  const supabase = await createServerClient();
+  const { data } = await supabase
+    .from("staff_profiles")
+    .select("full_name")
+    .eq("id", staffId)
+    .maybeSingle();
+  return (data?.full_name as string | undefined) ?? null;
+});

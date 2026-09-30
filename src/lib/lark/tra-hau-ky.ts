@@ -112,13 +112,41 @@ export function locDongKhop(records: LarkRecord[], maHoaDon: string, soDienThoai
   });
 }
 
-export class LoiTraLark extends Error {}
+/**
+ * BB-336 — mã lỗi tra Lark → câu tiếng Việt CỐ ĐỊNH cho nhân viên đọc
+ * (luật BB-223: hàm trả lỗi không nhận thông điệp thô của lỗi chưa kiểm soát).
+ *
+ * Trước đây route trả thẳng `err.message`, mà một nhánh ghép cả `json.msg`
+ * của Lark (tiếng Anh, thô) vào đó. Giờ `message` chỉ dùng cho log máy chủ
+ * (có thể kèm chi tiết Lark); màn hình chỉ thấy `thongDiep`.
+ */
+export type MaLoiTraLark = "CHUA_CAU_HINH" | "KHONG_THAY_BANG" | "LARK_TU_CHOI" | "PHEP_THU";
+
+export const THONG_DIEP_LOI_TRA_LARK: Record<MaLoiTraLark, string> = {
+  CHUA_CAU_HINH: "Chưa cấu hình kết nối Lark trên máy chủ.",
+  KHONG_THAY_BANG: "Không tìm thấy bảng Hậu Kỳ bên Lark.",
+  LARK_TU_CHOI: "Lark từ chối tra cứu lúc này — thử lại sau ít phút.",
+  PHEP_THU: "Đang chạy phép thử — không gọi Lark thật.",
+};
+
+export class LoiTraLark extends Error {
+  readonly ma: MaLoiTraLark;
+  /** Câu hiển thị cho nhân viên — luôn lấy từ bảng cố định, không chứa chữ của Lark. */
+  readonly thongDiep: string;
+  constructor(ma: MaLoiTraLark, chiTiet?: string) {
+    const thongDiep = THONG_DIEP_LOI_TRA_LARK[ma];
+    super(chiTiet ? `${thongDiep} (${chiTiet})` : thongDiep);
+    this.name = "LoiTraLark";
+    this.ma = ma;
+    this.thongDiep = thongDiep;
+  }
+}
 
 function cauHinh(): { appId: string; appSecret: string; baseToken: string } {
   const appId = process.env.LARK_APP_ID?.trim();
   const appSecret = process.env.LARK_APP_SECRET?.trim();
   const baseToken = process.env.LARK_BASE_APP_TOKEN?.trim();
-  if (!appId || !appSecret || !baseToken) throw new LoiTraLark("Chưa cấu hình kết nối Lark trên máy chủ.");
+  if (!appId || !appSecret || !baseToken) throw new LoiTraLark("CHUA_CAU_HINH");
   return { appId, appSecret, baseToken };
 }
 
@@ -128,7 +156,7 @@ async function timBangHauKy(auth: { authorization: string }, baseToken: string):
   });
   const json = (await res.json()) as { code: number; data?: { items?: { table_id: string; name: string }[] } };
   const bang = json.data?.items?.find((t) => BANG_HAU_KY.test(t.name));
-  if (json.code !== 0 || !bang) throw new LoiTraLark("Không tìm thấy bảng Hậu Kỳ bên Lark.");
+  if (json.code !== 0 || !bang) throw new LoiTraLark("KHONG_THAY_BANG");
   return bang.table_id;
 }
 
@@ -139,7 +167,7 @@ function linkDong(baseToken: string, tableId: string, recordId: string): string 
 
 /** Tra dòng Hậu Kỳ theo mã hóa đơn + số điện thoại. Trả MỌI dòng khớp (thường 1). */
 export async function traHauKy(maHoaDon: string, soDienThoai: string): Promise<DongHauKy[]> {
-  if (dangChayPhepThu()) throw new LoiTraLark("Đang chạy phép thử — không gọi Lark thật.");
+  if (dangChayPhepThu()) throw new LoiTraLark("PHEP_THU");
   const ma = chuanHoaMaHoaDon(maHoaDon);
   const duoi = duoiSoDienThoai(soDienThoai);
   if (!ma || !duoi) return [];
@@ -165,7 +193,11 @@ export async function traHauKy(maHoaDon: string, soDienThoai: string): Promise<D
     }),
   });
   const json = (await res.json()) as { code: number; msg?: string; data?: { items?: { record_id: string }[] } };
-  if (json.code !== 0) throw new LoiTraLark(`Lark từ chối tra cứu: ${json.msg ?? json.code}`);
+  if (json.code !== 0) {
+    // Chi tiết của Lark chỉ vào log máy chủ; màn hình nhận câu cố định (BB-336).
+    console.error(JSON.stringify({ evt: "lark.tra_hau_ky.tu_choi", code: json.code, msg: json.msg ?? null }));
+    throw new LoiTraLark("LARK_TU_CHOI", `Lark code ${json.code}: ${json.msg ?? ""}`);
+  }
 
   // API search trả ô theo hình dạng KHÁC API đọc bản ghi ("HĐ Tổng" chỉ còn
   // link_record_ids, ô tra cứu thành {type, value}) — đo thật 29/09. Nên search
@@ -195,7 +227,7 @@ async function docBanGhi(
 
 /** Đọc lại MỘT dòng Hậu Kỳ theo record_id — máy chủ tự đọc, không tin dữ liệu trình duyệt gửi lên. */
 export async function docDongHauKy(recordId: string): Promise<DongHauKy | null> {
-  if (dangChayPhepThu()) throw new LoiTraLark("Đang chạy phép thử — không gọi Lark thật.");
+  if (dangChayPhepThu()) throw new LoiTraLark("PHEP_THU");
   const { appId, appSecret, baseToken } = cauHinh();
   const auth = await larkAuth(appId, appSecret);
   const tableId = await timBangHauKy(auth, baseToken);

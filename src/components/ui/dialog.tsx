@@ -1,4 +1,5 @@
 "use client";
+import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 import * as React from "react";
 import { X } from "lucide-react";
@@ -105,12 +106,13 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
           context?.onOpenChange(false);
         }
       };
+      // BB-329 — khoá CÓ ĐẾM (khoa-cuon-trang.ts), không gán thẳng `""` khi đóng.
+      const moKhoa = open ? khoaCuonTrang() : null;
       if (open) {
-        document.body.style.overflow = "hidden";
         window.addEventListener("keydown", handleKeyDown);
       }
       return () => {
-        document.body.style.overflow = "";
+        moKhoa?.();
         window.removeEventListener("keydown", handleKeyDown);
       };
     }, [open, context]);

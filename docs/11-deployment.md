@@ -95,6 +95,7 @@ Yêu cầu với `scripts/db-push.mjs`:
 | `SUPABASE_DB_URL` | ✓ | — | ✓ | **Bí mật.** `/api/cron/sync-lark` nối thẳng Postgres, không qua PostgREST |
 | `UPSTASH_REDIS_*` | tuỳ | ✓ | ✓ | Rate limit; thiếu thì fallback in-memory |
 | `LARK_*` | — | — | ✓ | Phase 3 |
+| `LARK_BASE_URL` | tuỳ | tuỳ | tuỳ | **Tuỳ chọn** (BB-325). Gốc link mở một dòng Hậu Kỳ bên Lark; bỏ trống thì app tự dựng `https://www.larksuite.com/base/<LARK_BASE_APP_TOKEN>` |
 | `SENTRY_DSN` | — | ✓ | ✓ | |
 
 **Không có `.env` nào được commit.** `.env.example` chỉ chứa tên biến, không chứa giá trị.

@@ -166,6 +166,8 @@ export interface GalleryItem {
   packageName?: string | null;
   /** BB-325 — mã hóa đơn (lark_contract_code). */
   maHoaDon?: string | null;
+  /** BB-335 — "Photo": tên thợ chụp từ cột Lark; null khi trống / chưa áp 0081. */
+  larkPhoto?: string | null;
 }
 
 /**
@@ -335,7 +337,7 @@ function KanbanColumn({
         const queryParams = new URLSearchParams();
         if (filters.branchId) queryParams.set("branchId", filters.branchId);
         queryParams.set("status", colKey);
-        if (filters.photographerId) queryParams.set("photographerId", filters.photographerId);
+        if (filters.photo) queryParams.set("photo", filters.photo);
         if (filters.dateFrom) queryParams.set("dateFrom", filters.dateFrom);
         if (filters.dateTo) queryParams.set("dateTo", filters.dateTo);
         if (filters.search) queryParams.set("q", filters.search);
@@ -519,12 +521,12 @@ export function GalleryList() {
   });
 
   const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
-  const [photographers, setPhotographers] = useState<{ id: string; name: string }[]>([]);
+  const [photoOptions, setPhotoOptions] = useState<string[]>([]);
 
   const [filters, setFilters] = useState<GalleryFilterState>({
     branchId: "",
     status: "",
-    photographerId: "",
+    photo: "",
     dateFrom: "",
     dateTo: "",
     search: "",
@@ -549,14 +551,8 @@ export function GalleryList() {
         if (res.ok) {
           const body = await res.json();
           if (body?.data?.branches) setBranches(body.data.branches);
-          if (body?.data?.photographers) {
-            setPhotographers(
-              body.data.photographers.map((p: { id: string; name: string }) => ({
-                id: p.id,
-                name: p.name,
-              }))
-            );
-          }
+          // BB-335 — lựa chọn "Photo" là giá trị đọc từ cột Lark, không phải danh sách nhân sự.
+          if (Array.isArray(body?.data?.photoLark)) setPhotoOptions(body.data.photoLark as string[]);
         }
       } catch (err) {
         console.error("Lỗi tải options bộ lọc:", err);
@@ -588,7 +584,7 @@ export function GalleryList() {
         const queryParams = new URLSearchParams();
         if (filters.branchId) queryParams.set("branchId", filters.branchId);
         if (filters.status) queryParams.set("status", filters.status);
-        if (filters.photographerId) queryParams.set("photographerId", filters.photographerId);
+        if (filters.photo) queryParams.set("photo", filters.photo);
         if (filters.dateFrom) queryParams.set("dateFrom", filters.dateFrom);
         if (filters.dateTo) queryParams.set("dateTo", filters.dateTo);
         if (filters.search) queryParams.set("q", filters.search);
@@ -727,7 +723,7 @@ export function GalleryList() {
         values={filters}
         onChange={handleFilterChange}
         branches={branches}
-        photographers={photographers}
+        photoOptions={photoOptions}
       />
 
       {/* BB-311: kết quả lần chép link khách gần nhất (thành công hoặc lỗi). */}
@@ -829,6 +825,11 @@ export function GalleryList() {
                       {/* 2. Chi nhánh */}
                       <td className="px-4 py-3 text-[var(--bb-fg-muted)]">
                         {item.branchName}
+                        {item.larkPhoto && (
+                          <span className="mt-0.5 flex items-center gap-1 text-[11px]" title="Photo" data-testid="lark-photo">
+                            <Camera className="h-3 w-3 shrink-0" /> Photo: {item.larkPhoto}
+                          </span>
+                        )}
                       </td>
 
                       {/* 3. Tiến độ chọn — thanh + n/m */}
@@ -995,9 +996,9 @@ export function GalleryList() {
                   {/* Nhân sự & Hạn chốt */}
                   <div className="flex items-center justify-between text-[11px] text-[var(--bb-fg-muted)] pt-1">
                     <div className="flex items-center gap-2">
-                      {item.photographerName && (
-                        <span className="flex items-center gap-1" title="Thợ chụp">
-                          <Camera className="h-3 w-3" /> {item.photographerName}
+                      {item.larkPhoto && (
+                        <span className="flex items-center gap-1" title="Photo" data-testid="lark-photo">
+                          <Camera className="h-3 w-3" /> {item.larkPhoto}
                         </span>
                       )}
                       {item.editorName && (

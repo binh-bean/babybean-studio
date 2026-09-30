@@ -1,4 +1,5 @@
 "use client";
+import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 import * as React from "react";
 import { createPortal } from "react-dom";
@@ -153,12 +154,15 @@ const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
           context?.onOpenChange(false);
         }
       };
+      // BB-329 — khoá CÓ ĐẾM (khoa-cuon-trang.ts). Trước đây đóng là gán thẳng
+      // `overflow = ""` — kể cả khi Sheet đang ĐÓNG mà effect chạy lại — mở
+      // khoá luôn lớp phủ khác đang mở phía dưới.
+      const moKhoa = open ? khoaCuonTrang() : null;
       if (open) {
-        document.body.style.overflow = "hidden";
         window.addEventListener("keydown", handleKeyDown);
       }
       return () => {
-        document.body.style.overflow = "";
+        moKhoa?.();
         window.removeEventListener("keydown", handleKeyDown);
       };
     }, [open, context]);

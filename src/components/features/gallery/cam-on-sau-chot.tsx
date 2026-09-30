@@ -76,7 +76,7 @@ export function CamOnSauChot({
     <div
       data-testid="cam-on-sau-chot"
       role="status"
-      aria-label="Đã chốt danh sách chọn ảnh"
+      aria-label="Đã gửi danh sách chọn ảnh"
       // BB-317 (K9) — máy tính: cả khối canh GIỮA theo chiều dọc màn, hết nửa dưới trống.
       // Điện thoại giữ nguyên (nội dung bắt đầu từ trên, nút ngay sau nội dung).
       className="mx-auto flex w-full max-w-md flex-col items-center bg-background px-6 pb-10 pt-8 text-center text-foreground sm:min-h-[100dvh] sm:justify-center sm:py-14"
@@ -111,7 +111,8 @@ export function CamOnSauChot({
       </div>
 
       <p className="mt-4 text-[12px] uppercase tracking-[0.14em] text-muted-foreground">
-        Đã chốt · {formatNgayVN(chotLuc)}
+        {/* BB-329 — vừa bấm Xác nhận là CHỜ studio xác nhận, chưa "đã chốt". */}
+        Chờ studio xác nhận · {formatNgayVN(chotLuc)}
       </p>
       <h1 className="mt-2 font-display text-[28px] font-light leading-[1.15] sm:text-[32px]">
         Studio đã nhận danh sách{tenBe ? ` của ${tenBe}` : ""}
@@ -148,7 +149,7 @@ export function CamOnSauChot({
         <button
           type="button"
           onClick={onXemTienDo}
-          className="h-[52px] w-full rounded-full bg-[#2e2a27] text-[15px] font-medium text-[#fbf7f2] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
+          className="h-[52px] w-full rounded-full bg-[#2e2a27] text-[15px] font-medium text-[#fdfbf9] transition hover:bg-[#2e2a27]/90 active:scale-[0.98]"
         >
           Xem tiến độ
         </button>

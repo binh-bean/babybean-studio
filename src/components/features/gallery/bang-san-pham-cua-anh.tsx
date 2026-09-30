@@ -220,7 +220,7 @@ export function BangSanPhamCuaAnh({
       */}
       {/*
         BB-287 — báo cáo chấm mục #11: gradient đỏ rượu viền vàng không nằm
-        trong bảng màu (#FBF7F2/#2E2A27/#C4645A/#E8A598/#4F5B45/#7FA99B) và
+        trong bảng màu (#fdfbf9/#2E2A27/#C4645A/#E8A598/#4F5B45/#7FA99B) và
         "nhìn rất sến". Đổi về nền tối #2E2A27 (mực), chữ kem — đúng tông thẻ
         "Xem trên tường" theo hệ thiết kế, không còn amber/rose ngoài bảng.
         Đúng cho tấm trượt điện thoại (`tong="toi"`, mặc định) — GIỮ NGUYÊN.
@@ -259,10 +259,10 @@ export function BangSanPhamCuaAnh({
           className="flex w-full items-center justify-between gap-2 rounded-xl bg-[#2E2A27] px-3.5 py-3 text-left ring-1 ring-white/10 transition hover:bg-[#3a352f]"
         >
           <span>
-            <span className="block text-sm font-semibold text-[#FBF7F2]">Xem trên tường nhà mình</span>
-            <span className="block text-[11px] text-[#FBF7F2]/70">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
+            <span className="block text-sm font-semibold text-[#fdfbf9]">Xem trên tường nhà mình</span>
+            <span className="block text-[11px] text-[#fdfbf9]/70">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
           </span>
-          <span className="shrink-0 text-base leading-none text-[#FBF7F2]">→</span>
+          <span className="shrink-0 text-base leading-none text-[#fdfbf9]">→</span>
         </button>
       ))}
 

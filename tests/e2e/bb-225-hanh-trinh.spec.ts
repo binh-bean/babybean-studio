@@ -95,7 +95,7 @@ test.describe("BB-225 Hanh Trinh", () => {
     // tràn khỏi màn điện thoại (tràn là trang cuộn ngang).
     // BB-292: nhãn đổi theo bản vẽ BB-285 — mép trái/phải nay là "Đã chốt"/"Đã giao".
     await page.screenshot({ path: "test-results/bb-225-390.png", fullPage: false });
-    for (const nhan of ["Đã chốt", "Đã giao"]) {
+    for (const nhan of ["Chờ xác nhận", "In/nhận ảnh"]) {
       const hop = await page.getByText(nhan, { exact: true }).boundingBox();
       expect(hop, nhan).not.toBeNull();
       expect(hop!.x, `${nhan} tràn trái`).toBeGreaterThanOrEqual(0);

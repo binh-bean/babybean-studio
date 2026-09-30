@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     const prod = Array.isArray(galleryItem.product) ? galleryItem.product[0] : galleryItem.product;
     if (!prod || nhomSanPham(prod.kind, prod.material ?? null) !== "album") {
-      return fail("INVALID_INPUT", "Dòng hàng này không phải là album, không đặt bìa được");
+      return fail("INVALID_INPUT", "Sản phẩm này không phải là album, không đặt bìa được");
     }
 
     // Luật 2: ảnh phải ĐÃ THẢ TIM của ĐÚNG lượt chọn đang mở.

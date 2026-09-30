@@ -9,8 +9,7 @@
  */
 
 import { Dashboard } from "@/components/features/admin/dashboard";
-import { requireStaff, AuthError } from "@/lib/auth/staff";
-import { createServerClient } from "@/lib/supabase/server";
+import { requireStaff, AuthError, layHoTenNhanVien } from "@/lib/auth/staff";
 
 export default async function AdminDashboardPage() {
   // BB-303 (bản vẽ BB-301: "Chào buổi sáng, Admin") — Dashboard tự vẽ lời
@@ -22,13 +21,9 @@ export default async function AdminDashboardPage() {
   let hoTen: string | null = null;
   try {
     const staff = await requireStaff();
-    const supabase = await createServerClient();
-    const { data } = await supabase
-      .from("staff_profiles")
-      .select("full_name")
-      .eq("id", staff.staffId)
-      .maybeSingle();
-    hoTen = (data?.full_name as string | undefined) ?? null;
+    // BB-333: cả hai hàm đều có `cache()` — layout vừa hỏi xong thì ở đây
+    // dùng lại, không lặp getUser → hồ sơ → chi nhánh → tên thêm lần nữa.
+    hoTen = await layHoTenNhanVien(staff.staffId);
   } catch (err) {
     if (!(err instanceof AuthError)) throw err;
   }

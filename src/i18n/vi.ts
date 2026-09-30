@@ -200,7 +200,9 @@ export const vi = {
       message: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
       // BB-278/BB-281 — nhãn ngắn cho chip một dòng ở đầu trang (thay bản thẻ
       // nổi ở đáy cũ); "message" (câu đầy đủ) vẫn dùng cho `aria-label`.
-      shortLabel: "Lưu ra màn hình chính",
+      // BB-330 — chủ studio (mục cũ "lưu app ra màn hình chính"): câu phải nói
+      // NÓ ĐỂ LÀM GÌ, không chỉ tên thao tác.
+      shortLabel: "Lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn",
       howTo: "Xem cách lưu",
       later: "Để sau",
     },
@@ -259,9 +261,15 @@ export const vi = {
       cancel: "Huỷ",
       save: "Lưu",
       saving: "Đang lưu…",
-      close: "Đóng chi nhánh",
+      // BB-331: anh dùng chữ "Ngừng hoạt động".
+      close: "Ngừng hoạt động",
       reopen: "Mở lại",
-      confirmClose: "Đóng chi nhánh {name}? Bộ ảnh và lịch sử vẫn giữ nguyên, chỉ không tạo mới được nữa.",
+      confirmClose: "Ngừng hoạt động chi nhánh {name}? Bộ ảnh và lịch sử vẫn giữ nguyên, chỉ không tạo mới được nữa.",
+      // BB-331: xoá hẳn — chỉ chi nhánh rỗng (không bộ ảnh, không nhân sự).
+      delete: "Xoá",
+      confirmDelete: "Xoá hẳn chi nhánh {name}? Không hoàn tác được.",
+      deleted: "Đã xoá chi nhánh {name}",
+      cannotDelete: "Chi nhánh còn {staff} nhân sự, {galleries} bộ ảnh nên không xoá được. Hãy chọn “Ngừng hoạt động” — lịch sử vẫn giữ nguyên.",
       created: "Đã thêm chi nhánh {name}",
       updated: "Đã lưu",
       emptyTitle: "Chưa có chi nhánh nào",
@@ -313,7 +321,7 @@ export const vi = {
         admin: "Quản trị hệ thống",
         branch_manager: "Quản lý chi nhánh",
         cs: "CSKH",
-        photographer: "Thợ chụp",
+        photographer: "Photo",
         retoucher: "Người Photoshop",
         photoshop_ctv: "Photoshop CTV",
         accountant: "Kế toán",
@@ -535,7 +543,7 @@ export const vi = {
       filterBranch: "Chi nhánh",
       filterStatus: "Trạng thái",
       filterUrgency: "Mức khẩn",
-      filterPhotographer: "Thợ chụp",
+      filterPhotographer: "Photo",
       filterDate: "Khoảng ngày",
       menuView: "Xem bộ ảnh",
       menuCopyLink: "Sao chép link",
@@ -573,7 +581,7 @@ export const vi = {
       createCustomer: "Thêm khách hàng mới",
       babyName: "Tên bé",
       shootDate: "Ngày chụp",
-      photographer: "Thợ chụp",
+      photographer: "Photo",
       packageSelect: "Gói chụp",
       rulesTitle: "Thiết lập luật chọn ảnh",
       quota: "Số ảnh trong gói (quota)",
@@ -612,7 +620,7 @@ export const vi = {
       tabShareLinks: "Link chia sẻ",
       tabLogs: "Nhật ký",
       infoBranch: "Chi nhánh",
-      infoPhotographer: "Thợ chụp",
+      infoPhotographer: "Photo",
       infoDate: "Ngày chụp",
       infoPackage: "Gói chụp",
       infoDeadline: "Hạn chốt",
@@ -655,9 +663,9 @@ export const vi = {
   },
   landing: {
     studioName: "BabyBean Studio",
-    // BB-328: câu này thành tiêu đề lớn (Playfair) của trang gốc — ngắn lại
-    // cho vừa 2 dòng trên điện thoại.
-    tagline: "Nơi lưu giữ từng khoảnh khắc đáng yêu của con",
+    // BB-331 (30/09): anh đổi tiêu đề lớn của trang gốc thành câu ký tên của
+    // studio — tiếng Anh, giữ nguyên chữ, Playfair không nghiêng.
+    tagline: "Yours truly, Bean",
     branchesHeading: "Các chi nhánh",
     lostBefore: "Ảnh của bé được gửi qua ",
     lostStrong: "link riêng",
@@ -669,9 +677,6 @@ export const vi = {
     lostAfterChiNhanh: ". Chưa nhận được hoặc link không mở được, ba mẹ liên hệ chi nhánh đã chụp giúp bên mình nhé.",
     messageCta: "Nhắn tin cho studio",
     loginCta: "Nhân viên đăng nhập",
-    // BB-328: lối vào thứ hai cho nhân viên ở cuối trang.
-    staffTitle: "Nhân viên studio",
-    staffHint: "Đăng nhập để quản lý bộ ảnh",
     footer: "© BabyBean Studio",
   },
   errorPages: {

@@ -1,4 +1,5 @@
 "use client";
+import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 /**
  * Chuông thông báo — góc phải màn khách.
@@ -172,11 +173,8 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
   // xem lớn kia đã làm.
   useEffect(() => {
     if (!mo) return;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
+    // BB-329 — khoá CÓ ĐẾM (khoa-cuon-trang.ts).
+    return khoaCuonTrang();
   }, [mo]);
 
   const moBang = useCallback(async () => {

@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 /**
  * BB-292 vòng 2 — giám đốc chấm ảnh chụp: tranh minh hoạ (`public/minh-hoa/**`)
- * có nền kem ngả vàng hơi khác `#FBF7F2` của trang, nên hiện thành MỘT KHỐI
+ * có nền kem ngả vàng hơi khác `#fdfbf9` của trang, nên hiện thành MỘT KHỐI
  * tách khỏi nền thay vì tan vào — thấy rõ viền hình chữ nhật/vuông quanh
  * tranh dù đã cùng tông màu.
  *

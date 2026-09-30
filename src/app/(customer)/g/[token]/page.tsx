@@ -28,6 +28,22 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: { absolute: tenNgan },
     robots: { index: false, follow: false },
+    // BB-330 — "Mời ông bà" trên iPhone ra link TRANG CHỦ: layout gốc khai
+    // `openGraph.url: "/"`, nên MỌI trang /g/<mã> mang
+    // `og:url = https://hauky.babybeanstudio.vn` (đo trên production 30/09).
+    // Zalo/Messenger/iMessage coi og:url là địa chỉ CHUẨN của link được dán:
+    // thẻ xem trước mở trang chủ, không mở bộ ảnh. Ghi đè CẢ khối openGraph
+    // (Next gộp metadata nông theo khoá) và KHÔNG khai `url` — trình đọc thẻ
+    // dùng đúng địa chỉ đã dán. Tiêu đề chung, không có tên bé: thẻ xem trước
+    // do máy chủ Zalo/Facebook đọc (AGENTS.md §5 — không gửi dữ liệu trẻ em).
+    openGraph: {
+      title: "Baby Bean Studio",
+      description: "Ảnh của bé tại Baby Bean Studio",
+      siteName: "Baby Bean Studio",
+      images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "Baby Bean Studio" }],
+      locale: "vi_VN",
+      type: "website",
+    },
     manifest: `/api/g/${token}/manifest.webmanifest`,
     // Chỉ `title`. Next mặc định `capable: true` (thêm thẻ mobile-web-app-capable)
     // — tắt đi: cách mở app đã do `display` của manifest quyết định (BB-213).
