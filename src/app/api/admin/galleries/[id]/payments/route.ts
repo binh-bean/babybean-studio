@@ -56,6 +56,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PAYMENT_METHODS, isPaymentMethod } from "@/lib/payment-methods";
 import { HINH_THUC_GIAM_GIA, tinhGiamGia, CAU_CHUA_PHAT_SINH_TIEN } from "@/lib/gallery/tien-phat-sinh";
 import { layTienCanThu } from "@/lib/gallery/tien-can-thu-server";
+import { dongBoHanMucTheoThanhToan } from "@/lib/gallery/han-muc-thanh-toan";
+import {
+  CAU_KHACH_DANG_SUA,
+  baoKhachSauThanhToan,
+  chotThayKhachTheoDanhSachHienTai,
+  layKhoaKhiThu,
+  xacNhanDot1,
+  xacNhanDotMuaThem,
+} from "@/lib/gallery/xac-nhan-danh-sach";
+import { layMotDot } from "@/lib/gallery/dot-chon-server";
 import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
 import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
@@ -87,6 +97,8 @@ export async function POST(
       method?: unknown;
       note?: unknown;
       discountPercent?: unknown;
+      khoaBoAnh?: unknown;
+      chacChan?: unknown;
     } | null;
 
     // BB-320: có giảm giá khi `discountPercent` là số khác 0/rỗng.
@@ -156,6 +168,27 @@ export async function POST(
       return fail("INVALID_INPUT", CAU_CHUA_PHAT_SINH_TIEN);
     }
 
+    // BB-349 — thu tiền kèm "xác nhận danh sách và khoá bộ ảnh" (anh chốt 01/10/2026).
+    // `khoaBoAnh`: CSKH tick ô "Đồng thời xác nhận…". `chacChan`: CSKH tick "Tôi chắc chắn
+    // muốn xác nhận". Máy chủ tự kiểm, không tin giao diện:
+    //   · khoá thì luôn phải có `chacChan`;
+    //   · khách đang sửa lại (đã mở lại, chưa gửi lại) thì MỌI dòng thu/giảm phải có
+    //     `chacChan` — số tiền có thể đổi khi khách gửi lại. Dòng trừ (đính chính) không chặn.
+    const muonKhoa = body?.khoaBoAnh === true;
+    const chacChan = body?.chacChan === true;
+    const khoa = await layKhoaKhiThu(admin, galleryId);
+    if (muonKhoa && !khoa.coTheKhoa) {
+      return fail("INVALID_INPUT", "Bộ ảnh không có danh sách nào đang chờ xác nhận để khoá");
+    }
+    if ((muonKhoa || (khoa.dangMoLai && (amount > 0 || coGiamGia))) && !chacChan) {
+      return fail(
+        "INVALID_INPUT",
+        khoa.dangMoLai
+          ? `${CAU_KHACH_DANG_SUA} Tick "Tôi chắc chắn muốn xác nhận" để tiếp tục.`
+          : 'Tick "Tôi chắc chắn muốn xác nhận" để tiếp tục.',
+      );
+    }
+
     // BB-320: số còn thiếu HIỆN TẠI (phải thu − mọi khoản đã ghi có) — nền để tính phần giảm.
     let soTienGiam = 0;
     if (coGiamGia) {
@@ -186,8 +219,47 @@ export async function POST(
       dongGhi.push({ ...chung, amount, payment_method: method, note: note.length > 0 ? note : null });
     }
     // MỘT câu insert cho cả dòng giảm và dòng thu: hoặc cả hai vào sổ, hoặc không dòng nào.
-    const { error: insErr } = await admin.from("gallery_payments").insert(dongGhi);
+    const { data: dongDaGhi, error: insErr } = await admin.from("gallery_payments").insert(dongGhi).select("id");
     if (insErr) throw insErr;
+
+    // BB-349 — khoá cùng lúc ghi thu, bằng ĐÚNG luồng xác nhận cũ (xac-nhan-danh-sach.ts).
+    // Sổ đã ghi ở trên; khoá hỏng (vd người khác vừa xác nhận) thì vẫn trả 200 kèm lý do —
+    // tiền đã vào sổ, không được báo "thất bại" cho một khoản đã ghi.
+    let daKhoa = false;
+    let loiKhoa: string | null = null;
+    if (muonKhoa && khoa.soDot !== null) {
+      if (khoa.soDot === 1) {
+        // Khách đang sửa dở: chốt thay theo danh sách khách ĐANG chọn (lý do ở hàm).
+        if (khoa.dangMoLai) await chotThayKhachTheoDanhSachHienTai(admin, { galleryId, staffLabel: "CSKH (xác nhận khi thu tiền)" });
+        const kq = await xacNhanDot1(admin, { galleryId, branchId: gallery.branch_id, staff });
+        daKhoa = kq.ok;
+        if (!kq.ok) loiKhoa = kq.message;
+      } else {
+        const dot = await layMotDot(admin, galleryId, khoa.soDot);
+        const kq = dot
+          ? await xacNhanDotMuaThem(admin, { galleryId, branchId: gallery.branch_id, staff, dot })
+          : ({ ok: false, message: `Không có đợt ${khoa.soDot}` } as const);
+        daKhoa = kq.ok;
+        if (!kq.ok) loiKhoa = kq.message;
+      }
+    }
+
+    // BB-348 — trả đủ N ảnh vượt thì hạn mức tự tăng N (dòng "Edit file × N" nguồn thanh
+    // toán); dòng đính chính âm thì hạn mức giảm về. Sổ tiền đã ghi xong ở trên: bước này
+    // hỏng thì KHÔNG làm hỏng việc ghi thu — báo lỗi ra log, lần ghi sổ sau tự đồng bộ lại
+    // (hàm tính theo MỤC TIÊU, không cộng dồn).
+    const idDongSo = String((dongDaGhi ?? []).at(-1)?.id ?? "");
+    let hanMuc: { truoc: number; sau: number; boQua?: string } | null = null;
+    try {
+      hanMuc = await dongBoHanMucTheoThanhToan(admin, {
+        galleryId,
+        paymentId: idDongSo,
+        staffId: staff.staffId,
+        branchId: gallery.branch_id,
+      });
+    } catch (e) {
+      console.error(JSON.stringify({ evt: "han_muc_theo_thanh_toan.loi", requestId, loi: e instanceof Error ? e.message : String(e) }));
+    }
 
     // Đọc lại tổng từ cơ sở dữ liệu chứ không cộng dồn trong bộ nhớ: hai người
     // cùng ghi một lúc thì bản cộng dồn ra số sai.
@@ -219,12 +291,22 @@ export async function POST(
     // BB-342: khách thấy số đã thanh toán ngay, không F5.
     await phatSuKienBoAnh({ galleryId, branchId: gallery.branch_id, loai: LOAI_TUC_THI.studioThanhToan });
 
+    // BB-349: báo ba mẹ (chuông + đẩy) — chỉ khi thật sự có tiền/giảm giá vào, không báo dòng đính chính.
+    const thongBao = amount > 0 || coGiamGia ? await baoKhachSauThanhToan(admin, galleryId, daKhoa) : null;
+
     return ok({
       paidAmount: paid,
       dueAmount: due,
       // BB-320: phần giảm giá vừa ghi (0 nếu lần này không giảm).
       discountAmount: soTienGiam,
       outstanding: due - paid,
+      // BB-348: số ảnh hạn mức tăng (âm = giảm) do lần ghi sổ này; null = không đồng bộ được.
+      quotaChange: hanMuc ? hanMuc.sau - hanMuc.truoc : null,
+      quotaSkipped: hanMuc?.boQua ?? null,
+      // BB-349
+      daKhoa,
+      loiKhoa,
+      thongBao,
     });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền ghi nhận thanh toán");

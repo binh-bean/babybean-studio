@@ -15,7 +15,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ghiNhatKy } from "@/lib/nhat-ky";
+import { xacNhanDotMuaThem } from "@/lib/gallery/xac-nhan-danh-sach";
 import { guiThongBaoBoAnh } from "@/lib/thong-bao/gui-day";
 import { layMotDot } from "@/lib/gallery/dot-chon-server";
 
@@ -54,32 +54,9 @@ export async function POST(
     }
 
     const bay = new Date().toISOString();
-    const { data: daSua, error } = await admin
-      .from("selection_rounds")
-      .update({
-        trang_thai: "da_xac_nhan",
-        confirmed_at: bay,
-        confirmed_by: staff.staffId,
-        updated_at: bay,
-      })
-      .eq("id", dot.id)
-      .eq("trang_thai", "cho_xac_nhan") // hàng rào chống hai người bấm cùng lúc
-      .select("id");
-    if (error) throw error;
-    if (!daSua || daSua.length === 0) {
-      return fail("CONFLICT", `Đợt ${soDot} vừa được xử lý bởi người khác`);
-    }
-
-    await ghiNhatKy({
-      actorType: "staff",
-      actorId: staff.staffId,
-      branchId: String(gallery.branch_id),
-      action: "selection.round_confirm",
-      entityType: "gallery",
-      entityId: galleryId,
-      galleryId,
-      metadata: { soDot, soAnh: dot.soAnh, tong: dot.tong },
-    });
+    // Phần thân dùng chung với route thu tiền (BB-349), xem xac-nhan-danh-sach.ts.
+    const kq = await xacNhanDotMuaThem(admin, { galleryId, branchId: String(gallery.branch_id), staff, dot });
+    if (!kq.ok) return fail(kq.code, kq.message);
 
     // Báo khách qua chuông + đẩy (không qua Lark — đó là kênh Studio→Studio).
     await guiThongBaoBoAnh(admin, galleryId, {

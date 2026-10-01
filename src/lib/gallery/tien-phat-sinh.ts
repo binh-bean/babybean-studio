@@ -132,10 +132,68 @@ export function tienVuotHanMucConPhaiThu(p: {
   tienTheoAnh: number;
   tienLucChot: number | null | undefined;
   daGhiCo: number;
+  /** BB-348 — xem `TienHanMucDaQuyDoi`. Bỏ trống = bộ chưa có dòng hạn mức nào do thanh toán. */
+  quyDoi?: TienHanMucDaQuyDoi;
+}): number {
+  return tienConPhaiThuSauGhiCo(tienVuotHanMucPhaiThu(p), p.daGhiCo);
+}
+
+/**
+ * BB-348 — giá trị (đồng) của các dòng "Ảnh chỉnh thêm" mà app TỰ thêm vào hạn mức
+ * khi CSKH xác nhận thanh toán (`han-muc-thanh-toan.ts`).
+ *
+ * Vì sao cần: dòng đó làm hạn mức tăng N, nên "số theo ảnh" (`v_over_quota_unbilled`)
+ * tự giảm N ảnh — trong khi khoản tiền trả cho N ảnh đó VẪN nằm trong `daGhiCo`.
+ * Không cộng lại thì N ảnh bị trừ HAI LẦN (một lần qua hạn mức, một lần qua tiền
+ * đã thu) và số còn phải thu ra thấp hơn thật. Cộng lại đúng giá trị đó thì việc
+ * tăng hạn mức KHÔNG làm đổi số tiền nào — nó chỉ đổi con số hạn mức hiển thị.
+ *
+ *   · `tatCa`     — mọi dòng như vậy; số theo ảnh luôn tính trên hạn mức HIỆN TẠI.
+ *   · `truocChot` — chỉ những dòng tạo TRƯỚC lúc khách chốt: số lúc chốt
+ *     (`snapshot_extra_amount`) chụp hạn mức lúc đó, nên chỉ thiếu đúng những dòng này.
+ */
+export interface TienHanMucDaQuyDoi {
+  tatCa: number;
+  truocChot: number;
+}
+
+/** Phần vượt hạn mức phải thu, CHƯA trừ khoản ghi có (số lúc chốt khi có, không thì số theo ảnh). */
+export function tienVuotHanMucPhaiThu(p: {
+  tienTheoAnh: number;
+  tienLucChot: number | null | undefined;
+  quyDoi?: TienHanMucDaQuyDoi;
 }): number {
   const lucChot = Number(p.tienLucChot ?? 0);
-  const phaiThu = Number.isFinite(lucChot) && lucChot > 0 ? lucChot : p.tienTheoAnh;
-  return tienConPhaiThuSauGhiCo(phaiThu, p.daGhiCo);
+  return Number.isFinite(lucChot) && lucChot > 0
+    ? lucChot + Math.max(0, p.quyDoi?.truocChot ?? 0)
+    : p.tienTheoAnh + Math.max(0, p.quyDoi?.tatCa ?? 0);
+}
+
+/**
+ * BB-348 — bao nhiêu ảnh vượt đã được TRẢ ĐỦ tiền, tức hạn mức phải tăng bấy nhiêu.
+ *
+ * Chọn "chỉ cộng số ảnh đã trả đủ" (không chờ trả hết): khách trả trước 3/5 ảnh thì
+ * hạn mức tăng 3, còn 2 ảnh vẫn nằm trong báo cáo đòi tiền — khớp từng đồng với
+ * `tienCanThuCuaBo`. Ảnh trả dở (lẻ tiền) chưa tính: làm tròn LÊN số ảnh còn nợ.
+ *
+ * Tiền ghi có trừ vào phần VƯỢT HẠN MỨC trước (đúng như báo cáo "Ảnh vượt hạn mức"
+ * đang trừ), đợt mua thêm không chen vào đây.
+ *
+ * Hàm tính MỤC TIÊU (tổng số ảnh do thanh toán), không phải phần cộng thêm: gọi lại
+ * bao nhiêu lần cũng ra cùng số, và dòng đính chính (âm) làm mục tiêu giảm xuống.
+ */
+export function soAnhHanMucTheoThanhToan(p: {
+  /** Số ảnh vượt tính trên hạn mức KHÔNG kể dòng do thanh toán (đã trừ ảnh mua thêm). */
+  anhVuotGoc: number;
+  /** Phần vượt hạn mức còn phải thu sau mọi khoản ghi có (`tienVuotHanMucConPhaiThu`). */
+  conThieuVuot: number;
+  giaMotAnh: number;
+}): number {
+  const vuot = Math.max(0, Math.floor(Number.isFinite(p.anhVuotGoc) ? p.anhVuotGoc : 0));
+  if (vuot === 0 || !Number.isFinite(p.giaMotAnh) || p.giaMotAnh <= 0) return 0;
+  const conThieu = Math.max(0, Number.isFinite(p.conThieuVuot) ? p.conThieuVuot : 0);
+  const anhConNo = Math.ceil(conThieu / p.giaMotAnh);
+  return Math.min(vuot, Math.max(0, vuot - anhConNo));
 }
 
 /**
@@ -158,8 +216,10 @@ export function tienCanThuCuaBo(p: {
   /** Tổng `tien_anh + tien_san_pham` của các đợt ≥ 2 đang `da_xac_nhan`. */
   tienDotMuaThem: number;
   daGhiCo: number;
+  /** BB-348 — xem `TienHanMucDaQuyDoi`. */
+  quyDoi?: TienHanMucDaQuyDoi;
 }): number {
-  const vuot = tienVuotHanMucConPhaiThu({ tienTheoAnh: p.tienTheoAnh, tienLucChot: p.tienLucChot, daGhiCo: 0 });
+  const vuot = tienVuotHanMucPhaiThu({ tienTheoAnh: p.tienTheoAnh, tienLucChot: p.tienLucChot, quyDoi: p.quyDoi });
   const dot = Number.isFinite(p.tienDotMuaThem) ? Math.max(0, p.tienDotMuaThem) : 0;
   return tienConPhaiThuSauGhiCo(vuot + dot, p.daGhiCo);
 }

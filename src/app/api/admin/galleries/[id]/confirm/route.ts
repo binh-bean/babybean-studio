@@ -12,8 +12,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
-import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
+import { xacNhanDot1 } from "@/lib/gallery/xac-nhan-danh-sach";
 
 export const runtime = "nodejs";
 
@@ -62,39 +61,10 @@ export async function POST(
       );
     }
 
-    const now = new Date().toISOString();
-
-    // 6. Cập nhật trạng thái sang 'in_retouch'
-    const { error: updateError } = await admin
-      .from("galleries")
-      .update({
-        status: "in_retouch",
-        updated_at: now,
-      })
-      .eq("id", galleryId);
-
-    if (updateError) {
-      throw updateError;
-    }
-
-    // 7. Ghi nhật ký hoạt động
-    const { error: logErr } = await admin.from("activity_logs").insert({
-      actor_type: "staff",
-      actor_id: staff.staffId,
-      actor_label: staff.role,
-      action: "gallery.confirm_retouch",
-      entity_type: "gallery",
-      entity_id: galleryId,
-      metadata: {
-        fromStatus: "submitted",
-        toStatus: "in_retouch",
-        confirmedAt: now,
-      },
-    });
-    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
-
-    // BB-342: màn khách đang mở thấy "đã xác nhận" ngay; nhân viên khác thấy việc rời hàng đợi.
-    await phatSuKienBoAnh({ galleryId, branchId: gallery.branch_id, loai: LOAI_TUC_THI.studioXacNhan });
+    // 6–7. Đổi trạng thái + nhật ký + tín hiệu tức thì — phần thân dùng chung với route
+    // thu tiền (BB-349: "xác nhận thanh toán kèm khoá"), xem xac-nhan-danh-sach.ts.
+    const kq = await xacNhanDot1(admin, { galleryId, branchId: gallery.branch_id, staff });
+    if (!kq.ok) return fail(kq.code, kq.message);
 
     return ok({
       galleryId,

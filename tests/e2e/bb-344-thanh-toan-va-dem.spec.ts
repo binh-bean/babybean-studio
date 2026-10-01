@@ -70,6 +70,10 @@ test("2. Bộ vượt hạn mức: nút dùng được; ghi thu đủ xong thì 
     await expect(khoi).toBeVisible({ timeout: 30_000 });
     await expect(khoi.getByTestId("chua-phat-sinh-tien")).toHaveCount(0);
     const nut = khoi.getByRole("button", { name: "Ghi nhận đã thu" });
+    // BB-349: bộ đã chốt → ô "xác nhận + khoá" tick sẵn và nút chờ tick "chắc chắn". Ca này chỉ
+    // thử phần TIỀN (BB-344) nên bỏ tick khoá — khi đó không cần "chắc chắn", nút dùng được ngay.
+    await expect(nut).toBeDisabled({ timeout: 15_000 });
+    await khoi.locator('input[name="khoaBoAnh"]').uncheck();
     await expect(nut).toBeEnabled({ timeout: 15_000 });
     await expect(khoi.locator('input[name="amount"]')).toHaveValue("300000");
     await khoi.screenshot({ path: path.join(THU_MUC, "vuot-han-muc-nut-dung-duoc.png") });

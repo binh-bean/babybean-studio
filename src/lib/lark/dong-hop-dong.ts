@@ -218,8 +218,12 @@ export async function keoDongHopDongTuLark(admin: SupabaseClient, galleryId: str
   return kq;
 }
 
-/** Cùng luật `writeGallery` của script: xoá dòng của hợp đồng này, giữ dòng đã sửa tay. */
-async function ghiDongHopDong(
+/**
+ * Cùng luật `writeGallery` của script: xoá dòng của hợp đồng này, giữ dòng đã sửa tay.
+ * BB-348: dòng hạn mức do thanh toán (`lark_contract_code` null) cũng được giữ —
+ * export để phép thử gọi đúng bước ghi này (không gọi Lark).
+ */
+export async function ghiDongHopDong(
   admin: SupabaseClient,
   galleryId: string,
   ma: string,

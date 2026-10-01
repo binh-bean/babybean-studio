@@ -46,7 +46,8 @@ import { OChonTim } from "@/components/ui/o-chon-tim";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { luaChonMoLai, type DotTomTat } from "@/lib/gallery/dot-chon";
 import { cauBaoSauDoiHanMuc, tinhPhatSinhTheoHanMuc } from "@/lib/gallery/tien-phat-sinh";
-import { PaymentForm } from "./form-thanh-toan";
+import { PaymentForm, type TuyChonXacNhan } from "./form-thanh-toan";
+import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
 import { vi } from "@/i18n/vi";
@@ -217,6 +218,8 @@ interface Detail {
   outstanding: number;
   /** BB-344 — số CÒN PHẢI THU (0 = chưa phát sinh: nút xác nhận thanh toán bị khoá). */
   amountToCollect: number;
+  /** BB-349 — xem src/lib/gallery/khoa-khi-thu.ts. */
+  khoaKhiThu?: KhoaKhiThu;
   /** BB-215 — khối "Bìa bộ ảnh". */
   coverPhotoId: string | null;
   coverHeadline: string | null;
@@ -750,16 +753,27 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   }
 
   /** Ghi nhận đã thu tiền. Ghi thêm dòng, không sửa đè — bảng là sổ. */
-  async function recordPayment(amount: number, method: string, note: string, discountPercent: number | null) {
+  async function recordPayment(
+    amount: number,
+    method: string,
+    note: string,
+    discountPercent: number | null,
+    xacNhan: TuyChonXacNhan = {},
+  ) {
     setBusy(true);
     setNotice(null);
     try {
       const res = await fetch(`/api/admin/galleries/${galleryId}/payments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          discountPercent ? { amount, method, note, discountPercent } : { amount, method, note },
-        ),
+        body: JSON.stringify({
+          amount,
+          method,
+          note,
+          ...(discountPercent ? { discountPercent } : {}),
+          ...(xacNhan.khoaBoAnh ? { khoaBoAnh: true } : {}),
+          ...(xacNhan.chacChan ? { chacChan: true } : {}),
+        }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
@@ -769,6 +783,8 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       const left = json.data.outstanding as number;
       const giam = Number(json.data.discountAmount ?? 0);
       setNotice(
+        (json.data.daKhoa ? "Đã xác nhận danh sách và khoá bộ ảnh. " : "") +
+        (json.data.loiKhoa ? `Chưa khoá được: ${json.data.loiKhoa}. ` : "") +
         (giam > 0 ? `Đã ghi giảm giá ${formatCurrencyVND(giam)}. ` : "") +
         (left > 0
           ? `Đã ghi. Còn thiếu ${formatCurrencyVND(left)}.`
@@ -1273,7 +1289,7 @@ function KhoiChinh({
   locked: boolean;
   changeItem: (method: "PATCH" | "DELETE", body: Record<string, unknown>) => Promise<void>;
   addItem: (productId: string, quantity: number) => Promise<void>;
-  recordPayment: (amount: number, method: string, note: string, discountPercent: number | null) => Promise<void>;
+  recordPayment: (amount: number, method: string, note: string, discountPercent: number | null, xacNhan?: TuyChonXacNhan) => Promise<void>;
   sendRetouched: (url: string) => Promise<void>;
   reopen: (reason: string, dot?: number) => Promise<void>;
   /** BB-311 — tải lại dữ liệu sau khi đánh dấu đã giao ảnh thành công. */
@@ -1370,8 +1386,19 @@ function KhoiChinh({
                     loading="lazy"
                     className="h-full w-full object-cover"
                   />
-                  <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-white">
-                    {i + 1}
+                  {/* BB-348 — tên file cạnh số thứ tự (anh 01/10: CSKH đối chiếu
+                      với thợ chỉnh ảnh theo TÊN FILE). Cùng kiểu nhãn cũ; dài
+                      thì cắt "…" và chừa chỗ cho huy hiệu ✎ góc phải; rê chuột
+                      xem tên đầy đủ. */}
+                  <span
+                    className={
+                      "absolute left-1 top-1 truncate rounded bg-black/60 px-1 py-0.5 text-[10px] font-medium tabular-nums text-white " +
+                      (p.note ? "max-w-[calc(100%-1.5rem)]" : "max-w-[calc(100%-0.5rem)]")
+                    }
+                    title={p.fileName || undefined}
+                    data-testid="nhan-anh-chon"
+                  >
+                    {p.fileName ? `${i + 1} · ${p.fileName}` : i + 1}
                   </span>
                   {p.note && (
                     <span
@@ -1507,7 +1534,8 @@ function KhoiChinh({
             disabled={busy}
             conThieu={detail.amountToCollect}
             chuaPhatSinh={detail.amountToCollect <= 0}
-            onSubmit={(a, m, n, pt) => void recordPayment(a, m, n, pt)}
+            khoa={detail.khoaKhiThu}
+            onSubmit={(a, m, n, pt, xn) => void recordPayment(a, m, n, pt, xn)}
           />
         </section>
       )}

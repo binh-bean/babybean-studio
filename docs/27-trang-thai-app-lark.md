@@ -100,3 +100,11 @@ hỏng — không làm gì, chỉ ghi log.
 `src/lib/gallery/thanh-toan-mua-them.ts` → `trangThaiThanhToan()`.
 Cột mã hoá đơn mua thêm, mã phiếu thu, mốc xác nhận từng đợt: migration 0080
 (chưa áp, chưa có màn hình ghi).
+
+## 4. Đổi trạng thái Lark → làm mới màn hình + chuông (BB-347)
+
+Khi Lark đẩy một dòng sang (`/api/lark/hook`) và cột "Trạng Thái" đổi thật, app
+phát tín hiệu `lark.trang_thai` để màn khách và màn nhân viên tự tải lại, và gửi
+chuông + đẩy cho ba mẹ ở **đúng ba mốc**: Đã chọn hình ("Đã xác nhận danh sách"),
+Đang làm ("Đang chỉnh sửa"), Hình đã về. **Không** báo "Đã giao". Hướng dẫn cài
+Automation trên Lark: `docs/28-tu-dong-hoa-lark-sang-app.md`.

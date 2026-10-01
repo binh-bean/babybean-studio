@@ -265,6 +265,22 @@ export function vuaSangHinhDaVe(
 }
 
 /**
+ * BB-347 — một bộ ảnh mà cột "Trạng Thái" bên Lark vừa ĐỔI GIÁ TRỊ THẬT (mã cũ
+ * khác mã mới). Hook dùng để phát tín hiệu tức thì + chọn mốc báo ba mẹ.
+ * Không có tên khách, không có số điện thoại.
+ */
+export interface DoiTrangThaiLark {
+  galleryId: string;
+  branchId: string | null;
+  /** Mã lựa chọn cũ (trong galleries); null = app chưa đọc Lark lần nào. */
+  maCu: string | null;
+  /** Mã lựa chọn mới; null = ô trống hoặc tên lạ. */
+  maMoi: string | null;
+  /** galleries.status lúc đó (để loại bộ đã giao). */
+  trangThaiApp: string;
+}
+
+/**
  * Ghi kết quả đọc vào galleries. Chỉ đụng bộ ảnh có lark_hauky_record_id nằm
  * trong kết quả; bộ không còn trên Lark thì để nguyên (không xoá trạng thái vì
  * một lượt đọc lỗi phân trang).
@@ -273,24 +289,26 @@ export async function ghiTrangThaiVaoGalleries(
   client: pg.Client | pg.PoolClient,
   doc: Map<string, TrangThaiDoc>,
   bayGio = new Date(),
-): Promise<{ doc: number; doi: number; sangHinhDaVe: string[] }> {
+): Promise<{ doc: number; doi: number; sangHinhDaVe: string[]; doiTrangThai: DoiTrangThaiLark[] }> {
   // Chỉ đọc đúng các bộ có mã bản ghi trong `doc` — đường hook (BB-252) gọi
   // hàm này cho MỘT bản ghi mỗi lần, không cần quét cả ~500 bộ.
   const { rows } = await client.query<{
     id: string;
+    branch_id: string | null;
     status: string;
     lark_hauky_record_id: string;
     lark_trang_thai: string | null;
     lark_canh_bao: string | null;
     lark_trang_thai_tu: Date | null;
   }>(
-    `select id, status, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_trang_thai_tu
+    `select id, branch_id, status, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_trang_thai_tu
        from galleries where lark_hauky_record_id = any($1::text[]) and status <> 'archived'`,
     [[...doc.keys()]],
   );
   let soDoc = 0;
   let soDoi = 0;
   const sangHinhDaVe: string[] = [];
+  const doiTrangThai: DoiTrangThaiLark[] = [];
   for (const g of rows) {
     const moi = doc.get(g.lark_hauky_record_id);
     if (!moi) continue;
@@ -302,6 +320,16 @@ export async function ghiTrangThaiVaoGalleries(
       (g.lark_trang_thai_tu?.getTime() ?? null) !== (tu?.getTime() ?? null);
     if (doi) soDoi++;
     if (vuaSangHinhDaVe(g.lark_trang_thai, moi.maTrangThai, g.status)) sangHinhDaVe.push(g.id);
+    // BB-347 — chỉ khi MÃ trạng thái đổi (Cảnh Báo hay mốc ngày đổi một mình thì không).
+    if (g.lark_trang_thai !== moi.maTrangThai) {
+      doiTrangThai.push({
+        galleryId: g.id,
+        branchId: g.branch_id,
+        maCu: g.lark_trang_thai,
+        maMoi: moi.maTrangThai,
+        trangThaiApp: g.status,
+      });
+    }
     if (doi) {
       await client.query(
         `update galleries set lark_trang_thai = $2, lark_canh_bao = $3, lark_trang_thai_tu = $4, lark_doc_luc = $5
@@ -313,7 +341,7 @@ export async function ghiTrangThaiVaoGalleries(
     }
   }
   await ghiPhotoVaoGalleries(client, doc);
-  return { doc: soDoc, doi: soDoi, sangHinhDaVe };
+  return { doc: soDoc, doi: soDoi, sangHinhDaVe, doiTrangThai };
 }
 
 /**

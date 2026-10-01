@@ -36,6 +36,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { HINH_THUC_GIAM_GIA, tienVuotHanMucConPhaiThu } from "@/lib/gallery/tien-phat-sinh";
+import { layDongThanhToanTheoBo, tinhTienQuyDoi } from "@/lib/gallery/han-muc-thanh-toan";
 
 export const runtime = "nodejs";
 
@@ -109,7 +110,7 @@ export async function GET(request: Request): Promise<Response> {
     // chốt) không phụ thuộc nhau: chạy SONG SONG thay vì nối đuôi. Nội dung mỗi
     // lượt giữ nguyên như trước.
     const idsBo = rowsTyped.map((r) => r.gallery_id);
-    const [tenTheoBo, daThuTheoBo, lucChotTheoBo] = await Promise.all([
+    const [tenTheoBo, daThuTheoBo, lucChotTheoBo, dongTTTheoBo] = await Promise.all([
       // BB-320 (Q-D2): CSKH phải biết GỌI AI để thu tiền — view chỉ có mã hợp đồng,
       // không có tên bé/khách. Tra thêm tên theo đúng các bộ ảnh vừa lấy (ba lượt
       // nhỏ theo id, không truy vấn nặng). Tra hỏng thì để trống — dòng vẫn hiện, chỉ thiếu tên.
@@ -169,20 +170,26 @@ export async function GET(request: Request): Promise<Response> {
 
       // BB-327: số khách nhìn thấy LÚC CHỐT (cùng số sổ thu tiền + màn chi tiết dùng).
       (async () => {
-        const lucChotTheoBo = new Map<string, number>();
+        const lucChotTheoBo = new Map<string, { tien: number | undefined; luc: string | null }>();
         if (rowsTyped.length > 0) {
           const { data: selRows, error: selErr } = await admin
             .from("selections")
-            .select("gallery_id, snapshot_extra_amount")
+            .select("gallery_id, snapshot_extra_amount, submitted_at")
             .eq("is_primary", true)
             .in("gallery_id", idsBo);
           if (selErr) throw selErr;
           for (const s of selRows ?? []) {
-            if (s.snapshot_extra_amount !== null) lucChotTheoBo.set(String(s.gallery_id), Number(s.snapshot_extra_amount));
+            lucChotTheoBo.set(String(s.gallery_id), {
+              tien: s.snapshot_extra_amount !== null ? Number(s.snapshot_extra_amount) : undefined,
+              luc: (s.submitted_at as string | null) ?? null,
+            });
           }
         }
         return lucChotTheoBo;
       })(),
+
+      // BB-348: dòng hạn mức do thanh toán — cộng lại giá trị để không trừ hai lần (cùng `layTienCanThu`).
+      layDongThanhToanTheoBo(admin, idsBo),
     ]);
 
     const items = rowsTyped.map((r) => ({
@@ -204,8 +211,13 @@ export async function GET(request: Request): Promise<Response> {
       // Số theo ảnh (view) trừ mọi khoản đã ghi có; giữ hai phần để màn hình nói rõ đã trừ gì.
       unbilledAmount: tienVuotHanMucConPhaiThu({
         tienTheoAnh: Number(r.unbilled_amount ?? 0),
-        tienLucChot: lucChotTheoBo.get(r.gallery_id),
+        tienLucChot: lucChotTheoBo.get(r.gallery_id)?.tien,
         daGhiCo: (daThuTheoBo.get(r.gallery_id)?.daThu ?? 0) + (daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0),
+        quyDoi: tinhTienQuyDoi(
+          dongTTTheoBo.get(r.gallery_id) ?? [],
+          Number(r.extra_photo_price ?? 0),
+          lucChotTheoBo.get(r.gallery_id)?.luc,
+        ),
       }),
       daThu: daThuTheoBo.get(r.gallery_id)?.daThu ?? 0,
       giamGia: daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0,

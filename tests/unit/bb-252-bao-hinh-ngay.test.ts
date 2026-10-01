@@ -12,6 +12,9 @@ import type { TrangThaiDoc } from "@/lib/lark/doc-trang-thai-lark";
 
 const DA_GUI_IN = "optxMAdtNX";
 const HINH_DA_VE = "opttKmVbce";
+// BB-347: hai biên mới của hook — phép thử này không canh chúng (xem bb-347-*.test.ts).
+const baoMocGia = () => vi.fn().mockResolvedValue(undefined);
+const phatGia = () => vi.fn().mockResolvedValue(true);
 
 describe("BB-252: capNhatTrangThaiTuHook", () => {
   let client: Client;
@@ -56,6 +59,8 @@ describe("BB-252: capNhatTrangThaiTuHook", () => {
         return tt(HINH_DA_VE);
       },
       bao,
+      baoMoc: baoMocGia(),
+      phat: phatGia(),
     });
     expect(bao).toHaveBeenCalledTimes(1);
     expect(bao).toHaveBeenCalledWith(galleryId);
@@ -66,7 +71,7 @@ describe("BB-252: capNhatTrangThaiTuHook", () => {
 
   it("Lark đẩy lại cùng bản ghi (vẫn 9) → không báo lần hai", async () => {
     const bao = vi.fn().mockResolvedValue(undefined);
-    await capNhatTrangThaiTuHook({ client, recordIds: [maBanGhi], docMotBanGhi: async () => tt(HINH_DA_VE), bao });
+    await capNhatTrangThaiTuHook({ client, recordIds: [maBanGhi], docMotBanGhi: async () => tt(HINH_DA_VE), bao, baoMoc: baoMocGia(), phat: phatGia() });
     expect(bao).not.toHaveBeenCalled();
   });
 });

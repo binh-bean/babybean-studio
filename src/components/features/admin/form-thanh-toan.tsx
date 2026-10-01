@@ -15,6 +15,13 @@ import { Select } from "@/components/ui/select";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { tinhGiamGia, CAU_CHUA_PHAT_SINH_TIEN } from "@/lib/gallery/tien-phat-sinh";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import { CAU_KHACH_DANG_SUA, type KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
+
+/** BB-349 — hai ô tick đi kèm lần ghi thu (máy chủ kiểm lại cả hai). */
+export interface TuyChonXacNhan {
+  khoaBoAnh?: boolean;
+  chacChan?: boolean;
+}
 
 /** Gửi một lần ghi thu (kèm % giảm nếu có). Trả `outstanding` sau khi ghi. */
 export async function ghiThanhToan(
@@ -42,6 +49,7 @@ export function PaymentForm({
   disabled: disabledNgoai,
   conThieu,
   chuaPhatSinh = false,
+  khoa,
   onSubmit,
 }: {
   disabled?: boolean;
@@ -54,7 +62,20 @@ export function PaymentForm({
    * chỗ chặn duy nhất.
    */
   chuaPhatSinh?: boolean;
-  onSubmit: (amount: number, method: string, note: string, discountPercent: number | null) => void;
+  /**
+   * BB-349 — trạng thái khoá của bộ ảnh (`khoaKhiThu` từ GET items). Có danh sách chờ
+   * xác nhận thì hiện ô "Đồng thời xác nhận danh sách và khoá bộ ảnh" (tick sẵn). Khoá,
+   * hoặc khách đang sửa lại chưa gửi, thì phải tick "Tôi chắc chắn muốn xác nhận" mới bấm
+   * được. Không truyền = như cũ (chỉ ghi tiền).
+   */
+  khoa?: KhoaKhiThu;
+  onSubmit: (
+    amount: number,
+    method: string,
+    note: string,
+    discountPercent: number | null,
+    xacNhan: TuyChonXacNhan,
+  ) => void;
 }) {
   const disabled = disabledNgoai || chuaPhatSinh;
   const [amount, setAmount] = React.useState(conThieu > 0 ? String(conThieu) : "");
@@ -86,6 +107,19 @@ export function PaymentForm({
   const giamOk = !coGiam || (phanTramHopLe && giam !== null && giam.soTienGiam > 0);
   const soTienOk = amountOk ? parsed > 0 || note.trim().length > 0 : coGiam && Number.isInteger(parsed);
   const valid = giamOk && soTienOk && (!coGiam || note.trim().length > 0);
+
+  // BB-349 — xác nhận + khoá cùng lúc, và ô "chắc chắn" bắt buộc.
+  const [khoaBoAnh, setKhoaBoAnh] = React.useState(true);
+  const [chacChan, setChacChan] = React.useState(false);
+  const coTheKhoa = khoa?.coTheKhoa === true;
+  const seKhoa = coTheKhoa && khoaBoAnh;
+  const dangMoLai = khoa?.dangMoLai === true;
+  // Dòng trừ (đính chính) không cần — chỉ dòng có tiền/giảm giá vào.
+  const coTienVao = (amountOk && parsed > 0) || coGiam;
+  const canChacChan = seKhoa || (dangMoLai && coTienVao);
+  const duChacChan = !canChacChan || chacChan;
+  // Ghi xong (số còn thiếu đổi) thì bỏ tick "chắc chắn" — lần sau phải tick lại.
+  React.useEffect(() => setChacChan(false), [conThieu, khoa?.coTheKhoa, khoa?.dangMoLai]);
 
   return (
     <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -150,12 +184,58 @@ export function PaymentForm({
       </label>
       <button
         type="button"
-        disabled={disabled || !valid}
-        onClick={() => onSubmit(amountOk ? parsed : 0, method, note.trim(), coGiam ? phanTram : null)}
+        disabled={disabled || !valid || !duChacChan}
+        onClick={() =>
+          onSubmit(amountOk ? parsed : 0, method, note.trim(), coGiam ? phanTram : null, {
+            khoaBoAnh: seKhoa,
+            chacChan: canChacChan && chacChan,
+          })
+        }
         className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
       >
         {coGiam ? "Ghi giảm giá và thu" : "Ghi nhận đã thu"}
       </button>
+      {coTheKhoa && !disabled && (
+        <label className="flex basis-full items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="khoaBoAnh"
+            checked={khoaBoAnh}
+            onChange={(e) => setKhoaBoAnh(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Đồng thời xác nhận danh sách và khoá bộ ảnh
+          {khoa?.soDot && khoa.soDot >= 2 ? ` (đợt ${khoa.soDot})` : ""}
+        </label>
+      )}
+      {canChacChan && !disabled && (
+        <div
+          role="alert"
+          data-testid="canh-bao-xac-nhan"
+          className={
+            "basis-full rounded-md border p-3 text-sm " +
+            (dangMoLai
+              ? "border-[var(--bb-danger)] bg-[color-mix(in_srgb,var(--bb-danger)_8%,transparent)]"
+              : "border-[var(--bb-border)] bg-[var(--bb-surface-2)]")
+          }
+        >
+          <p className={dangMoLai ? "font-medium text-[var(--bb-danger)]" : ""}>
+            {dangMoLai
+              ? CAU_KHACH_DANG_SUA
+              : "Xác nhận lúc này sẽ khoá bộ ảnh: khách không sửa danh sách được nữa, studio bắt đầu chỉnh ảnh."}
+          </p>
+          <label className="mt-2 flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="chacChan"
+              checked={chacChan}
+              onChange={(e) => setChacChan(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Tôi chắc chắn muốn xác nhận
+          </label>
+        </div>
+      )}
       {chuaPhatSinh && (
         <p data-testid="chua-phat-sinh-tien" className="basis-full text-sm text-[var(--bb-fg-muted)]">
           {CAU_CHUA_PHAT_SINH_TIEN}

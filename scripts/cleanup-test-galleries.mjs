@@ -27,6 +27,9 @@
  *   - Thư mục Drive giả: `SEED_FOLDER_ID_*`, `mock-*`. Bộ thật luôn mang mã
  *     Drive thật, 33 ký tự.
  *   - Tiền tố "Fixture " ở đầu tên — do chính phép thử đặt.
+ *   - Tiền tố cũ "Test BB" + số (vd "Test BB105 Gallery …") — quy ước trước
+ *     khi đổi sang "Fixture " (BB-350). Chỉ khớp khi ngay sau "Test BB" là chữ
+ *     số, ở ĐẦU tên.
  *
  * KHÔNG lọc theo chữ "test" nằm giữa tên: có khách tên thật chứa chuỗi đó, và
  * xoá nhầm một nhà thật thì không có đường lấy lại.
@@ -56,6 +59,7 @@ const BO_THU = `(
   or g.drive_folder_id like 'SEED_FOLDER_ID_%'
   or g.drive_folder_id like 'mock-%'
   or g.title like 'Fixture %'
+  or g.title ~ '^Test BB[0-9]'
 )`;
 
 /**
@@ -79,6 +83,7 @@ const NHAN_SU_THU = `(
 const KHACH_THU = `(
   cu.id::text like 'cccccccc-0000-0000-0000-%'
   or cu.full_name like 'Fixture %'
+  or cu.full_name ~ '^Test BB[0-9]'
   or cu.full_name = 'Khách Mới Test'
 )`;
 

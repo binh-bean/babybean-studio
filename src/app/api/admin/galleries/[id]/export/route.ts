@@ -36,6 +36,7 @@ import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { laLoiThieuCot, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
+import { dongAnhChiTiet, nhanBiaAlbum } from "@/lib/gallery/xuat-danh-sach";
 
 export const runtime = "nodejs";
 
@@ -199,18 +200,16 @@ async function xuatChiTiet(
   dongViet.push("=".repeat(60));
   dongViet.push("");
 
+  // BB-348 — mỗi ảnh MỘT dòng: `tên (Dùng cho: … · "ghi chú")`; không có gì thì chỉ tên.
   for (const d of dong) {
-    dongViet.push(d.file_name);
-    dongViet.push(`  Ghi chú chỉnh sửa: ${d.retouch_note ?? "(không có)"}`);
     const dungCho = [
-      ...(d.selection_item_id ? tenSanPhamTheoItem.get(d.selection_item_id) ?? [] : []),
-      ...(d.photo_id ? tenSanPhamTheoAnh.get(d.photo_id) ?? [] : []),
       // BB-202: liệt kê riêng "bìa" — CSKH/thợ chỉnh ảnh phải biết đây là ảnh
       // ĐẠI DIỆN cả cuốn, không chỉ là một tấm ruột thường.
-      ...(d.photo_id ? (tenAlbumBiaTheoAnh.get(d.photo_id) ?? []).map((t) => `${t} (BÌA)`) : []),
+      ...(d.photo_id ? (tenAlbumBiaTheoAnh.get(d.photo_id) ?? []).map(nhanBiaAlbum) : []),
+      ...(d.selection_item_id ? tenSanPhamTheoItem.get(d.selection_item_id) ?? [] : []),
+      ...(d.photo_id ? tenSanPhamTheoAnh.get(d.photo_id) ?? [] : []),
     ];
-    dongViet.push(`  Dùng cho: ${dungCho.length ? dungCho.join(", ") : "(chưa gắn sản phẩm nào)"}`);
-    dongViet.push("");
+    dongViet.push(dongAnhChiTiet({ tenFile: d.file_name, dungCho, ghiChu: d.retouch_note }));
   }
 
   return dongViet.join("\r\n");

@@ -9,6 +9,8 @@ import { readJsonBody } from "@/lib/api-response";
 import { taoDocMotBanGhi } from "@/lib/lark/doc-trang-thai-lark";
 import { capNhatTrangThaiTuHook } from "@/lib/lark/cap-nhat-tu-hook";
 import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
+import { baoMocKhach } from "@/lib/thong-bao/bao-moc-khach";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
 import { ghiBanGhiMoi } from "@/lib/lark/ban-ghi-moi";
 
 export const runtime = "nodejs";
@@ -139,7 +141,8 @@ export async function POST(request: Request) {
     }
 
     // BB-252 — trạng thái hậu kỳ (Trạng Thái / Cảnh Báo) cập nhật NGAY, không
-    // đợi cron 08:00; bộ vừa sang "Hình đã về" thì báo ba mẹ luôn. Lỗi ở đây
+    // đợi cron 08:00; bộ vừa sang "Hình đã về" thì báo ba mẹ luôn. BB-347: mọi lần đổi
+    // thật còn phát tín hiệu tức thì, và hai mốc "Đã xác nhận danh sách" / "Đang chỉnh sửa" có chuông. Lỗi ở đây
     // không được làm hỏng phần dựng bộ ảnh phía trên — cron sáng mai đỡ lại.
     let trangThai: Awaited<ReturnType<typeof capNhatTrangThaiTuHook>> | null = null;
     try {
@@ -148,6 +151,8 @@ export async function POST(request: Request) {
         recordIds: recordIdsToProcess,
         docMotBanGhi: await taoDocMotBanGhi({ auth, baseToken }),
         bao: baoHinhDaVe,
+        baoMoc: baoMocKhach,
+        phat: (suKien) => phatSuKienBoAnh(suKien),
       });
     } catch (err) {
       console.error("[Lark Hook] Lỗi cập nhật trạng thái hậu kỳ:", err);

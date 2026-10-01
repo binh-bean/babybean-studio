@@ -20,7 +20,6 @@ import { createHash, randomUUID } from "node:crypto";
 
 const admin = createAdminClient();
 const runId = randomUUID().slice(0, 8);
-const tao: string[] = [];
 
 /**
  * Bộ ảnh RIÊNG của tệp này, không mượn "bộ ảnh đầu tiên tìm thấy" trong bảng.
@@ -36,10 +35,21 @@ const tao: string[] = [];
  */
 let galleryId: string;
 let customerId: string;
+let branchId: string;
 
 beforeAll(async () => {
-  const { data: branch } = await admin.from("branches").select("id").limit(1).single();
-  const branchId = (branch as { id: string }).id;
+  // Chi nhánh RIÊNG của tệp này (BB-350): trước đây chọn bừa `limit(1)` không
+  // sắp thứ tự nên có thể rơi vào chi nhánh Fixture của đội khác.
+  const { data: branch, error: brErr } = await admin
+    .from("branches")
+    .insert({
+      code: `FIXTURE-BB214A-${runId}`,
+      name: `Fixture BB-214a ${runId} Chi nhánh`,
+    } as never)
+    .select("id")
+    .single();
+  if (brErr) throw brErr;
+  branchId = (branch as { id: string }).id;
 
   const { data: cust, error: custErr } = await admin
     .from("customers")
@@ -65,9 +75,24 @@ beforeAll(async () => {
   galleryId = (gal as { id: string }).id;
 });
 
+/**
+ * Dọn từ lá vào gốc: link chia sẻ → lượt chọn (route tạo khi mở link) → bộ ảnh
+ * → khách → chi nhánh. Lỗi KHÔNG được nuốt (BB-350): trước đây xoá khách trước
+ * bộ ảnh nên khoá ngoại chặn, lỗi bị bỏ qua và 38 khách "Fixture BB-214a"
+ * nằm lại trong bb-dev.
+ */
 afterAll(async () => {
-  if (customerId) await admin.from("customers").delete().eq("id", customerId);
-  if (galleryId) await admin.from("galleries").delete().eq("id", galleryId);
+  const xoa = async (ten: string, p: PromiseLike<{ error: { message: string } | null }>) => {
+    const { error } = await p;
+    if (error) throw new Error(`Dọn ${ten} lỗi: ${error.message}`);
+  };
+  if (galleryId) {
+    await xoa("share_links", admin.from("share_links").delete().eq("gallery_id", galleryId));
+    await xoa("selections", admin.from("selections").delete().eq("gallery_id", galleryId));
+    await xoa("galleries", admin.from("galleries").delete().eq("id", galleryId));
+  }
+  if (customerId) await xoa("customers", admin.from("customers").delete().eq("id", customerId));
+  if (branchId) await xoa("branches", admin.from("branches").delete().eq("id", branchId));
 });
 
 async function dungLink(nhan: string): Promise<{ ma: string; id: string }> {
@@ -87,7 +112,6 @@ async function dungLink(nhan: string): Promise<{ ma: string; id: string }> {
 
   if (error) throw error;
   const id = (data as { id: string }).id;
-  tao.push(id);
   return { ma, id };
 }
 
@@ -110,10 +134,6 @@ async function docViewCount(id: string): Promise<number> {
 }
 
 describe("BB-214a · đếm lượt mở link", () => {
-  afterAll(async () => {
-    if (tao.length) await admin.from("share_links").delete().in("id", tao);
-  });
-
   it("1. Mở link hai lần thì view_count tăng đúng 2", async () => {
     const { ma, id } = await dungLink("hai-lan");
 

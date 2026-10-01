@@ -99,7 +99,10 @@ async function chay(request: Request) {
         appSecret: LARK_APP_SECRET,
         baseToken: LARK_BASE_APP_TOKEN,
       });
-      const { sangHinhDaVe, ...ghi } = await ghiTrangThaiVaoGalleries(client, doc);
+      // BB-347: cron không phát tín hiệu / không báo hai mốc mới (việc của hook); bỏ
+      // danh sách đổi trạng thái khỏi kết quả để log không phình.
+      const { sangHinhDaVe, doiTrangThai: _doiTrangThai, ...ghi } = await ghiTrangThaiVaoGalleries(client, doc);
+      void _doiTrangThai;
 
       // BB-332 — lưới đỡ "Lark xoá dòng": lượt đọc trên là quét ĐỦ bảng Hậu Kỳ,
       // nên bộ ảnh neo vào mã dòng không còn trong đó là dòng đã bị xoá. Bộ chưa

@@ -26,6 +26,12 @@ export const LOAI_TUC_THI = {
   studioMoLink: "studio.mo_link",
   /** Mọi tin vào chuông của khách (xác nhận/từ chối đợt, mở lại, nhắc, đã giao…). */
   studioThongBao: "studio.thong_bao",
+  /**
+   * BB-347 — cột "Trạng Thái" bảng Hậu Kỳ bên Lark vừa đổi (hook Lark đẩy sang).
+   * Phát cho MỌI lần đổi thật, không chỉ ba mốc có chuông. Payload chỉ có loại
+   * (+ id bộ ảnh ở kênh nhân viên) — không mã trạng thái, không dữ liệu cá nhân.
+   */
+  larkTrangThai: "lark.trang_thai",
 } as const;
 
 /** Loại hợp lệ: chữ thường, số, `_`, `.` — không bao giờ là văn bản tự do. */

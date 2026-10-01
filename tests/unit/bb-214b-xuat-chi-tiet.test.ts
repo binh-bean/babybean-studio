@@ -67,7 +67,7 @@ describe("BB-214b: xuất văn bản chi tiết cho CSKH", () => {
     branchA = br[0].id;
 
     const { rows: c } = await client.query(
-      `insert into customers (branch_id, full_name) values ($1,'Fixture BB-214b Nguyễn Thị Mai') returning id`,
+      `insert into customers (branch_id, full_name) values ($1,'Fixture BB-348-214b Nguyễn Thị Mai') returning id`,
       [branchA],
     );
     customerId = c[0].id;
@@ -75,7 +75,7 @@ describe("BB-214b: xuất văn bản chi tiết cho CSKH", () => {
     const { rows: g } = await client.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
                               drive_folder_url, photo_count, included_quota)
-       values ($1,$2,'Fixture BB-214b','submitted',$3,'https://example.com/x',2,10) returning id`,
+       values ($1,$2,'Fixture BB-348-214b','submitted',$3,'https://example.com/x',3,10) returning id`,
       [branchA, customerId, `fixture-bb214b-${Date.now()}`],
     );
     galleryId = g[0].id;
@@ -85,7 +85,8 @@ describe("BB-214b: xuất văn bản chi tiết cho CSKH", () => {
     // tiếp theo tên file khi trùng sort_index. Soát khi gộp 24/09/2026: chèn
     // 0101 trước thì bỏ tiêu chí phụ mà phép thử vẫn xanh (thứ tự chèn tình cờ
     // trùng thứ tự đúng) — tức nó không canh gì cả, chỉ đỏ lúc có lúc không.
-    for (const ten of ["IMG_0102.jpg", "IMG_0101.jpg"]) {
+    // BB-348: thêm IMG_0103 — KHÔNG ghi chú, KHÔNG dùng cho sản phẩm nào → dòng chỉ có tên.
+    for (const ten of ["IMG_0103.jpg", "IMG_0102.jpg", "IMG_0101.jpg"]) {
       const { rows } = await client.query(
         `insert into photos (gallery_id, drive_file_id, file_name, mime_type, sort_index, status)
          values ($1,$2,$3,'image/jpeg',1,'active') returning id`,
@@ -114,6 +115,12 @@ describe("BB-214b: xuất văn bản chi tiết cho CSKH", () => {
       [selectionId, anh["IMG_0102.jpg"], galleryId],
     );
     const item2 = si2[0].id;
+
+    await client.query(
+      `insert into selection_items (selection_id, photo_id, gallery_id, mark, order_index)
+       values ($1,$2,$3,'selected',3)`,
+      [selectionId, anh["IMG_0103.jpg"], galleryId],
+    );
 
     const { rows: si1 } = await client.query(
       `insert into selection_items (selection_id, photo_id, gallery_id, mark, retouch_note, order_index)
@@ -183,35 +190,45 @@ describe("BB-214b: xuất văn bản chi tiết cho CSKH", () => {
     expect(res.headers.get("content-type")).toContain("text/plain");
 
     const than = await res.text();
-    expect(than).toContain("Bộ ảnh: Fixture BB-214b");
-    expect(than).toContain("Khách: Fixture BB-214b Nguyễn Thị Mai");
+    expect(than).toContain("Bộ ảnh: Fixture BB-348-214b");
+    expect(than).toContain("Khách: Fixture BB-348-214b Nguyễn Thị Mai");
     expect(than).toContain("Người xác nhận: Chị Mai (mẹ)");
     expect(than).toContain("Ghi chú chung: Làm tông ấm giúp em");
-    expect(than).toContain("Số ảnh đã chọn: 2");
+    expect(than).toContain("Số ảnh đã chọn: 3");
   });
 
-  it("2. Mỗi ảnh có ghi chú chỉnh sửa riêng", async () => {
+  // BB-348 — "Thông tin chi tiết": MỖI ẢNH MỘT DÒNG, `tên (Dùng cho: … · "ghi chú")`.
+  function dongCuaAnh(than: string, ten: string): string | undefined {
+    return than.split("\r\n").find((d) => d === ten || d.startsWith(`${ten} (`));
+  }
+
+  it("2. BB-348: ảnh có ghi chú + dùng cho sản phẩm → một dòng, ghi chú trong ngoặc kép", async () => {
     asRole("cs", [branchA]);
     const than = await (await goi()).text();
-    expect(than).toContain("IMG_0101.jpg");
-    expect(than).toContain("Ghi chú chỉnh sửa: Xoá mụn sữa");
-    expect(than).toContain("Ghi chú chỉnh sửa: (không có)");
+    expect(dongCuaAnh(than, "IMG_0101.jpg")).toBe(
+      'IMG_0101.jpg (Dùng cho: Fixture Ảnh phóng 20x30, Fixture Khung gỗ 15x21 (mua thêm) · "Xoá mụn sữa")',
+    );
+    // Dạng hai dòng cũ (BB-214b) không còn.
+    expect(than).not.toContain("Ghi chú chỉnh sửa:");
   });
 
-  it("3. IMG_0101 dùng cho suất trong gói VÀ sản phẩm mua thêm gắn thẳng vào ảnh", async () => {
+  it("3. BB-348: ảnh chỉ dùng cho sản phẩm (không ghi chú) → không có phần ghi chú", async () => {
     asRole("cs", [branchA]);
     const than = await (await goi()).text();
-    const dong101 = than.split("IMG_0101.jpg")[1]?.split("IMG_0102.jpg")[0] ?? "";
-    expect(dong101).toContain("Fixture Ảnh phóng 20x30");
-    expect(dong101).toContain("Fixture Khung gỗ 15x21 (mua thêm)");
+    expect(dongCuaAnh(than, "IMG_0102.jpg")).toBe("IMG_0102.jpg (Dùng cho: Fixture Album mini (album mua thêm))");
   });
 
-  it("4. IMG_0102 dùng cho album mua thêm, không dùng cho suất trong gói", async () => {
+  it("4. BB-348: ảnh không ghi chú, không dùng cho gì → CHỈ tên file, không ngoặc", async () => {
     asRole("cs", [branchA]);
     const than = await (await goi()).text();
-    const dong102 = than.split("IMG_0102.jpg")[1] ?? "";
-    expect(dong102).toContain("Fixture Album mini (album mua thêm)");
-    expect(dong102).not.toContain("Fixture Ảnh phóng 20x30");
+    const dong = than.split("\r\n");
+    expect(dong).toContain("IMG_0103.jpg");
+    expect(dong.some((d) => d.startsWith("IMG_0103.jpg ("))).toBe(false);
+    expect(than).not.toContain("chưa gắn sản phẩm nào");
+    // Thứ tự theo thư mục (cùng sort_index → theo tên), mỗi ảnh đúng một dòng.
+    const iAnh = ["IMG_0101.jpg", "IMG_0102.jpg", "IMG_0103.jpg"].map((t) => dong.findIndex((d) => d.startsWith(t)));
+    expect(iAnh[1]).toBe((iAnh[0] ?? -9) + 1);
+    expect(iAnh[2]).toBe((iAnh[1] ?? -9) + 1);
   });
 
   it("5. Dạng cũ .txt và .csv (BB-067) không bị đụng tới", async () => {
@@ -222,7 +239,7 @@ describe("BB-214b: xuất văn bản chi tiết cho CSKH", () => {
         { params: Promise.resolve({ id: galleryId }) },
       )
     ).text();
-    expect(txt).toBe("IMG_0101.jpg\r\nIMG_0102.jpg");
+    expect(txt).toBe("IMG_0101.jpg\r\nIMG_0102.jpg\r\nIMG_0103.jpg");
     expect(txt).not.toContain("Dùng cho");
   });
 });

@@ -139,6 +139,14 @@ const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
         : `Nhân viên ghi nhận thu ${formatVND(amount)}`;
     },
   },
+  // BB-348 — hạn mức tự đổi theo sổ thu (han-muc-thanh-toan.ts); âm = dòng đính chính.
+  "gallery.quota_by_payment": {
+    nhom: "tien",
+    cau: (m) => {
+      const n = so(m, "soAnh") ?? 0;
+      return n < 0 ? `Hạn mức giảm ${Math.abs(n)} do đính chính thanh toán` : `Hạn mức tăng ${n} do thanh toán`;
+    },
+  },
   "gallery.item_added": { nhom: "nhan_vien", cau: () => "Nhân viên thêm sản phẩm vào hợp đồng" },
   "gallery.item_changed": { nhom: "nhan_vien", cau: () => "Nhân viên đổi số lượng sản phẩm" },
   "gallery.item_removed": { nhom: "nhan_vien", cau: () => "Nhân viên xoá một sản phẩm" },

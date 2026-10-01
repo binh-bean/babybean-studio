@@ -74,7 +74,7 @@ export function DanhSachAnhChon({ galleryId, soAnh }: { galleryId: string; soAnh
     <div className="mt-3 space-y-2">
       <div className="flex flex-wrap items-center gap-1.5">
         {nutDinhDang("ten-file", "Tên file")}
-        {nutDinhDang("chi-tiet", "Kèm ghi chú")}
+        {nutDinhDang("chi-tiet", "Thông tin chi tiết")}
         <Button
           type="button"
           size="sm"

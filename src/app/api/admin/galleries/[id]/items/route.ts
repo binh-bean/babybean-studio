@@ -24,6 +24,7 @@ import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layChiTietDotQuanTri, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
+import { layKhoaKhiThu } from "@/lib/gallery/xac-nhan-danh-sach";
 import { layTienCanThu } from "@/lib/gallery/tien-can-thu-server";
 import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
 
@@ -249,6 +250,8 @@ export async function GET(
     ]);
 
     const tienCanThu = await layTienCanThu(admin, gallery.id);
+    // BB-349 — khối thu tiền: có cho "xác nhận + khoá" cùng lúc không, có phải cảnh báo không.
+    const khoaKhiThu = await layKhoaKhiThu(admin, gallery.id);
     const dueAmount = Number(primarySel?.snapshot_extra_amount ?? 0);
     // `paidAmount` = mọi khoản GHI CÓ cho khách (tiền thu + phần giảm giá) — số còn thiếu tính trên tổng này.
     const paidAmount = (payRows ?? []).reduce((t, r) => t + Number(r.amount), 0);
@@ -394,6 +397,7 @@ export async function GET(
       // 0 = chưa phát sinh tiền: khối "Xác nhận thanh toán" hiện nhưng không bấm được.
       // Cùng hàm với route ghi thu (`layTienCanThu`) nên màn hình và máy chủ không lệch nhau.
       amountToCollect: tienCanThu.tienCanThu,
+      khoaKhiThu,
       revisions: revisions ?? [],
       // BB-312 — xem chú thích ở phần truy vấn phía trên.
       reopenRequest,
