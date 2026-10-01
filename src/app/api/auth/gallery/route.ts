@@ -12,11 +12,8 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { signGallerySession, SESSION_COOKIE } from "@/lib/auth/gallery-session";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import type { ShareRole } from "@/types/domain";
-import { bamMaLink } from "@/lib/auth/bam-ma-link";
+import { dangNhapBangMa, datCookiePhien } from "@/lib/auth/dang-nhap-bang-ma";
 
 export const runtime = "nodejs";
 
@@ -24,24 +21,13 @@ const schema = z.object({
   token: z.string().min(1).max(200),
 });
 
-const RATE_LIMIT_PER_IP = 10;
-const RATE_WINDOW_MINUTES = 15;
-
-/** Logged against every attempt, valid or not. Dotted, like every other action. */
-const ACTION = "gallery.auth";
-
-/**
- * x-forwarded-for is a list — "client, proxy1, proxy2" — and the client is
- * first. The whole string is not a valid inet, and neither is a placeholder
- * like "unknown": either would make the activity_logs insert throw and take
- * the whole login down with it. Absent header means null.
- */
-function clientIp(req: NextRequest): string | null {
-  const raw = req.headers.get("x-forwarded-for") ?? req.headers.get("x-real-ip");
-  const first = raw?.split(",")[0]?.trim();
-  return first && first.length > 0 ? first : null;
-}
-
+/*
+  BB-341 — toàn bộ luật đổi mã lấy phiên (giới hạn lượt theo IP, nhật ký, tra
+  mã, lượt chọn theo link, đếm lượt mở) nay ở `dangNhapBangMa()`
+  (src/lib/auth/dang-nhap-bang-ma.ts), dùng chung với `GET /api/g/gallery`
+  khi chưa có phiên. Đường này giữ nguyên hợp đồng: cùng mã lỗi, cùng dữ
+  liệu trả, cùng cookie.
+*/
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const reqId = crypto.randomUUID();
 
@@ -51,40 +37,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const parsed = schema.safeParse(body.data);
     if (!parsed.success) return fail("INVALID_INPUT");
 
-    const { token } = parsed.data;
-    const admin = await createAdminClient();
-    const ip = clientIp(req);
-
-    // Rate limit BEFORE the token is looked up. Checking it afterwards would
-    // let someone probe tokens forever, because an unknown token returns
-    // early and never reaches the counter — docs/05-rbac.md §5 asks for the
-    // opposite.
-    if (ip) {
-      const since = new Date(Date.now() - RATE_WINDOW_MINUTES * 60_000).toISOString();
-      const { count } = await admin
-        .from("activity_logs")
-        .select("*", { count: "exact", head: true })
-        .eq("action", ACTION)
-        .eq("ip", ip)
-        .gte("created_at", since);
-
-      if ((count ?? 0) >= RATE_LIMIT_PER_IP) return fail("RATE_LIMITED");
-    }
-
-    const { error: logErr } = await admin.from("activity_logs").insert({
-      actor_type: "customer",
-      action: ACTION,
-      ip,
-      user_agent: req.headers.get("user-agent"),
-      metadata: { tokenPrefix: token.slice(0, 6) },
-    });
-    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
-
-    const { data: link } = await admin
-      .from("share_links")
-      .select("id, gallery_id, customer_id, role, status, expires_at")
-      .eq("token_hash", await bamMaLink(token))
-      .maybeSingle();
+    const kq = await dangNhapBangMa(parsed.data.token, req);
 
     // -------------------------------------------------------------------
     // Trả lời gì cho link không dùng được — đọc kỹ trước khi sửa
@@ -102,129 +55,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // **Ca ĐÃ THU HỒI vẫn trả NOT_FOUND** — không được đổi. Link bị thu hồi
     // thường là vì nó đã lọt ra ngoài; nói cho người đang cầm nó biết "link này
     // từng thật, gọi studio đi" là chỉ đường cho đúng người không nên biết.
-    const isLegacy = !link?.customer_id;
-    // BB-183: kiểm hạn dùng cho MỌI loại link. Trước đây chỉ link kiểu cũ bị kiểm,
-    // nên link gắn theo khách sống vĩnh viễn dù có đặt ngày hết hạn.
-    const usable =
-      link &&
-      link.status === "active" &&
-      (!link.expires_at || new Date(link.expires_at) > new Date());
-
-    if (!usable) {
-      if (link && link.expires_at && new Date(link.expires_at) <= new Date()) {
-         return fail("LINK_EXPIRED", "Ba mẹ liên hệ studio để được gửi lại link nhé.");
-      }
-      return fail("NOT_FOUND");
-    }
-
-    // One selection per share link, created on first successful entry rather
-    // than at gallery creation: BB-065 mints new share links later and they
-    // would otherwise arrive without one.
-    //
-    // Link gắn theo khách thì chưa biết buổi chụp nào, nên chưa tạo được lượt
-    // chọn ở đây. Ba mẹ chọn buổi ở `/api/g/buoi-chup`, và lượt chọn sinh ra ở
-    // đó (BB-130) — mỗi buổi chụp một lượt riêng.
-    let selectionId = "";
-    if (isLegacy && link.gallery_id) {
-      const { data: existing } = await admin
-        .from("selections")
-        .select("id")
-        // Khoá thêm theo bộ ảnh: từ 0040 một link có thể mang nhiều lượt chọn,
-        // nên tìm theo mỗi link là có ngày bốc trúng lượt chọn của buổi khác.
-        .eq("share_link_id", link.id)
-        .eq("gallery_id", link.gallery_id)
-        .maybeSingle();
-
-      if (existing) {
-        selectionId = existing.id;
-      } else {
-        // BB-148 — cấp lại link thì lượt chọn ĐI THEO link mới.
-        //
-        // Chủ studio chốt 15.09.2026: link cũ chết hẳn, nhưng ảnh ba mẹ đã thả
-        // tim phải còn nguyên. Studio cấp lại link vì lý do của studio, không
-        // phải lỗi của khách.
-        //
-        // uq_selections_primary chỉ cho MỘT lượt chọn mang cờ trên mỗi bộ ảnh.
-        // Bản cũ cứ thế insert thêm một cái nữa, nên link thứ hai mở lên là
-        // đụng khoá trùng, ném lỗi, 500 — và màn khách hiện "Link đã hết hạn".
-        const { data: dangGiuCo } = await admin
-          .from("selections")
-          .select("id, share_links!inner(status)")
-          .eq("gallery_id", link.gallery_id)
-          .eq("is_primary", true)
-          .maybeSingle();
-
-        // Link giữ cờ đã chết thì lượt chọn đó là của khách này, chuyển sang.
-        // Link giữ cờ CÒN SỐNG thì không đụng vào: hai người mở hai link hợp lệ
-        // mà người sau kéo lượt chọn về mình là người trước mất sạch lựa chọn
-        // vừa làm, không có gì báo. Cấp lại link luôn thu hồi link cũ trước,
-        // nên nhánh này không cản đường đi thường ngày.
-        const giuBoiLinkDaChet =
-          dangGiuCo &&
-          (dangGiuCo as { share_links?: { status?: string } }).share_links?.status !== "active";
-
-        if (link.role === "owner" && dangGiuCo && giuBoiLinkDaChet) {
-          const { error: updErr } = await admin
-            .from("selections")
-            .update({ share_link_id: link.id })
-            .eq("id", dangGiuCo.id);
-
-          if (updErr) throw updErr;
-          selectionId = dangGiuCo.id;
-        }
-
-        if (!selectionId) {
-          const { data: created, error: insErr } = await admin
-            .from("selections")
-            .insert({
-              gallery_id: link.gallery_id,
-              share_link_id: link.id,
-              // Chỉ nhận cờ khi chưa ai giữ. Bộ ảnh đang có lượt chọn chính của
-              // một link còn sống thì link này là link phụ, không phải link hỏng.
-              is_primary: link.role === "owner" && !dangGiuCo,
-            })
-            .select("id")
-            .single();
-
-          if (insErr || !created) throw insErr ?? new Error("selection insert returned nothing");
-          selectionId = created.id;
-        }
-      }
-    }
-
-    // Tăng view_count và đặt last_viewed_at NGUYÊN TỬ qua hàm SQL (migration
-    // 0064) — không đọc-rồi-ghi ở đây, vì hai lượt mở gần như cùng lúc sẽ mất
-    // một lượt nếu làm kiểu đó (BB-214a). Ghi trượt thật sự không quan trọng:
-    // đây chỉ là bộ đếm hiển thị, hụt thì lần sau cộng tiếp, không được chặn
-    // luồng khách vào xem ảnh.
-    const { error: demErr } = await admin.rpc("tang_luot_mo_link", {
-      p_share_link_id: link.id,
-    });
-    if (demErr) console.error("[share_links] Đếm lượt mở hụt:", demErr);
-
-    const { token: sessionToken, expiresAt } = await signGallerySession({
-      customerId: link.customer_id || "",
-      galleryId: link.gallery_id || "",
-      shareLinkId: link.id,
-      selectionId,
-      role: link.role as ShareRole,
-    });
+    if (!kq.ok) return fail(kq.code, kq.message);
 
     const response = ok({
-      customerId: link.customer_id || "",
-      galleryId: link.gallery_id || "",
-      role: link.role,
-      expiresAt: expiresAt.toISOString(),
+      customerId: kq.phien.customerId,
+      galleryId: kq.phien.galleryId,
+      role: kq.phien.role,
+      expiresAt: kq.cookie.expiresAt.toISOString(),
     });
-
-    response.cookies.set(SESSION_COOKIE, sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: expiresAt,
-    });
-
+    datCookiePhien(response, kq.cookie);
     return response;
   } catch (err) {
     return failUnexpected(err, reqId);

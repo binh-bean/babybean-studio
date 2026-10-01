@@ -603,7 +603,7 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
       const chanTrang = page.locator("footer");
       await chanTrang.scrollIntoViewIfNeeded();
       await ownIpExpect(chanTrang).toBeVisible();
-      await ownIpExpect(chanTrang.getByText("Cảm ơn ba mẹ đã yêu thương Baby Bean")).toBeVisible();
+      await ownIpExpect(chanTrang.getByText("Cảm ơn ba mẹ và các con đã yêu thương Bean ạ")).toBeVisible();
       await ownIpExpect(chanTrang.getByText(/© \d{4} Baby Bean Studio/)).toBeVisible();
 
       await page.screenshot({ path: tenAnh("chan-trang-khach", kichThuoc), fullPage: false });

@@ -122,7 +122,8 @@ test.describe("BB-254: mời ông bà cùng xem", () => {
     await page.getByRole("button", { name: "Tạo link" }).click();
 
     await expect(page.getByText("Đã tạo link cho")).toBeVisible();
-    const khoiDiaChi = page.locator("p.break-all");
+    // BB-338: danh sách "Đã mời" cũng hiện link (p.break-all) — lấy khối vừa tạo, đứng đầu.
+    const khoiDiaChi = page.locator("p.break-all").first();
     await expect(khoiDiaChi).toBeVisible();
     const diaChi = (await khoiDiaChi.textContent())?.trim() ?? "";
     const khopMa = diaChi.match(/\/g\/(\S+)$/);
@@ -137,6 +138,8 @@ test.describe("BB-254: mời ông bà cùng xem", () => {
     await pageOngBa.goto(`/g/${maLinkOngBa}`);
 
     // Lưới ảnh dùng alt chung "Ảnh N" (không phải tên tệp) — xem luoi-anh.tsx.
+    // Lưới dựng theo cửa sổ cuộn (luoi-anh.tsx luật 3) — cuộn tới lưới trước khi tìm ảnh.
+    await pageOngBa.getByRole("region", { name: "Ảnh của buổi chụp" }).scrollIntoViewIfNeeded();
     await expect(pageOngBa.getByAltText("Ảnh 1")).toBeVisible();
     await expect(pageOngBa.getByText("Link này để xem ảnh cùng gia đình")).toBeVisible();
 
@@ -165,6 +168,8 @@ test.describe("BB-254: mời ông bà cùng xem", () => {
         await nutChonAnh.click();
         const tamAnh = pageOngBa.getByAltText("BB254_001.jpg").last();
         await tamAnh.click();
+        // BB-338: chọn tấm nằm trong tấm chọn riêng — bấm "Xong" để quay về giỏ.
+        await pageOngBa.getByRole("button", { name: /^Xong/ }).click();
         daChonAnh = true;
         break;
       }

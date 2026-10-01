@@ -33,6 +33,8 @@ import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -135,6 +137,8 @@ export async function POST(request: Request): Promise<Response> {
 
       // Báo nhóm Lark của chi nhánh — chiều khách→studio, LUÔN gửi (không nằm
       // dưới công tắc `lark.nhac_noi_bo`, xem `notify.ts`).
+      await phatSuKienBoAnh({ galleryId: gallery.id, branchId: gallery.branch_id, loai: LOAI_TUC_THI.khachDuyetAnh });
+
       await enqueueLarkNotification({
         branchId: gallery.branch_id,
         event: "review.approved",
@@ -197,6 +201,7 @@ export async function POST(request: Request): Promise<Response> {
 
     // Báo nhóm Lark của chi nhánh — chiều khách→studio, LUÔN gửi. Ghi chú
     // nguyên văn để người chỉnh ảnh không phải gọi lại hỏi sửa gì.
+    await phatSuKienBoAnh({ galleryId: gallery.id, branchId: gallery.branch_id, loai: LOAI_TUC_THI.khachDuyetAnh });
     await enqueueLarkNotification({
       branchId: gallery.branch_id,
       event: "review.changes_requested",

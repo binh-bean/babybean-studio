@@ -159,7 +159,7 @@ export function OverQuotaReport() {
           {moThanhToan === it.galleryId ? "Đóng" : "Xác nhận thanh toán"}
         </button>
         <Link
-          href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}
+          href={`/admin/galleries/${encodeURIComponent(it.galleryId)}#thanh-toan`}
           data-testid="nut-mo-bo-anh"
           className="inline-flex h-8 items-center whitespace-nowrap rounded-md border border-[var(--bb-border)] px-3 text-xs font-medium text-[var(--bb-fg)] transition hover:bg-[var(--bb-surface-2)]"
         >

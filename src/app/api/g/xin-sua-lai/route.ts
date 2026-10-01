@@ -30,9 +30,12 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isGalleryLocked, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { khoaChonCuaKhach } from "@/lib/gallery/khoa-chon-khach";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { enqueueLarkNotification } from "@/lib/lark/notify";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -70,12 +73,17 @@ export async function POST(request: Request): Promise<Response> {
     const admin = createAdminClient();
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, branch_id, title, status")
+      .select("id, branch_id, title, status, lark_trang_thai, lark_trang_thai_tu, reopened_at")
       .eq("id", session.galleryId)
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
 
-    if (!isGalleryLocked(gallery.status)) {
+    // BB-338 — CÙNG luật khoá với màn khách (`/api/g/gallery` → `khoaChonTheoLark`):
+    // trạng thái app + mã Lark còn hiệu lực + luật 60 ngày. Trước đây chỉ xét
+    // `status`, nên bộ app còn `in_review`/`submitted` mà Lark đã "Đã chọn
+    // hình" bị màn khách khoá (hiện nút "Yêu cầu sửa lại") nhưng route này lại
+    // trả "vẫn đang mở" — ba mẹ kẹt giữa hai câu trái nhau.
+    if (!khoaChonCuaKhach(gallery).khoa) {
       return fail(
         "INVALID_INPUT",
         "Bộ ảnh vẫn đang mở — ba mẹ sửa trực tiếp được, không cần xin ạ.",
@@ -95,7 +103,7 @@ export async function POST(request: Request): Promise<Response> {
     if ((daGuiGanDay ?? 0) >= MAX_XIN_MOI_GIO) {
       return fail(
         "RATE_LIMITED",
-        "Bên mình đã nhận yêu cầu của ba mẹ rồi ạ — CSKH sẽ liên hệ lại sớm.",
+        "Bean đã nhận yêu cầu của ba mẹ rồi ạ, Bean sẽ liên hệ lại sớm nhé ạ.",
       );
     }
 
@@ -112,6 +120,9 @@ export async function POST(request: Request): Promise<Response> {
 
     // Báo vào nhóm Lark của chi nhánh. Không có nhóm thì dòng nhật ký ở trên
     // vẫn còn, và màn Nhật ký thao tác là chỗ CSKH đọc được.
+    // BB-342: yêu cầu mở lại hiện ngay ở màn nhân viên.
+    await phatSuKienBoAnh({ galleryId: gallery.id, branchId: gallery.branch_id, loai: LOAI_TUC_THI.khachXinMoLai });
+
     await enqueueLarkNotification({
       branchId: String(gallery.branch_id),
       event: "gallery.reopen_requested",
@@ -127,7 +138,7 @@ export async function POST(request: Request): Promise<Response> {
       daGui: true,
       // Câu này hiện thẳng cho ba mẹ: nói rõ chuyện gì xảy ra tiếp theo, thay
       // vì một chữ "đã gửi" rồi im lặng.
-      loiNhan: "Bên mình đã nhận yêu cầu và sẽ liên hệ lại với ba mẹ sớm nhất.",
+      loiNhan: "Bean đã nhận yêu cầu và sẽ liên hệ lại với ba mẹ sớm nhất ạ.",
     });
   } catch (err) {
     if (err instanceof GallerySessionError) return fail(err.code);

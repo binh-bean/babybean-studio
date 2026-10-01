@@ -9,6 +9,7 @@
  * 3. Nhận diện thao tác vuốt màn hình cảm ứng chính xác.
  */
 
+import { urlAnh } from "@/lib/utils/anh-lh3";
 import { THUMBNAIL_WIDTHS } from "@/types/domain";
 
 /**
@@ -40,21 +41,27 @@ export function getVisibleIndices(
  */
 export function buildLightboxImageUrl(
   photoId: string,
-  width: (typeof THUMBNAIL_WIDTHS)[number] = 2048
+  width: (typeof THUMBNAIL_WIDTHS)[number] = 2048,
+  /**
+   * BB-341 — mã tệp Drive (trường phụ của `/api/g/photos`). Có thì đi THẲNG lh3
+   * với đúng `=w<cỡ>` route vẫn kéo hộ — cùng tấm ảnh, cùng độ nét, không qua
+   * hàm Vercel. Không có thì đi route cũ.
+   */
+  maTepDrive?: string | null,
 ): string {
   if (!THUMBNAIL_WIDTHS.includes(width)) {
     throw new Error(
       `Cỡ ảnh ${width} không hợp lệ. THUMBNAIL_WIDTHS chỉ chấp nhận: ${THUMBNAIL_WIDTHS.join(", ")}`
     );
   }
-  return `/api/img/${photoId}?w=${width}`;
+  return urlAnh({ id: photoId, maTepDrive }, width);
 }
 
 /**
  * Tạo srcSet cho màn xem ảnh lớn hỗ trợ màn hình độ phân giải cao và xoay ngang.
  */
-export function buildLightboxSrcSet(photoId: string): string {
-  return `${buildLightboxImageUrl(photoId, 800)} 800w, ${buildLightboxImageUrl(photoId, 1600)} 1600w`;
+export function buildLightboxSrcSet(photoId: string, maTepDrive?: string | null): string {
+  return `${buildLightboxImageUrl(photoId, 800, maTepDrive)} 800w, ${buildLightboxImageUrl(photoId, 1600, maTepDrive)} 1600w`;
 }
 
 /**

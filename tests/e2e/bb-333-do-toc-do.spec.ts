@@ -55,6 +55,10 @@ interface SoDo {
   api: number;
   apiCham: number;
   apiChamTen: string;
+  /** BB-341 — số lượt gọi hàm ảnh /api/img (mỗi lượt = một lần chạy hàm Vercel). */
+  img: number;
+  /** BB-341 — số lượt tải ảnh thẳng từ lh3 (không qua hàm). */
+  lh3: number;
 }
 
 async function giaLapDienThoai(page: Page) {
@@ -110,6 +114,8 @@ async function doMotMan(page: Page, duong: string): Promise<SoDo> {
       api: api.length,
       apiCham: Math.round(cham),
       apiChamTen: chamTen,
+      img: res.filter((r) => r.name.includes("/api/img/")).length,
+      lh3: res.filter((r) => r.name.includes("lh3.googleusercontent.com")).length,
     };
   }, xong);
 }
@@ -124,7 +130,8 @@ function inBang(ten: string, lan: SoDo[]) {
   console.log(
     `[BB-333][${ten}] LẠNH ttfb=${lanh.ttfb} lcp=${lanh.lcp} xong=${lanh.xong} | ` +
       `TRUNG VỊ ${nong.length} lần: ttfb=${m("ttfb")} lcp=${m("lcp")} xong=${m("xong")} ` +
-      `js=${m("jsKb")}KB req=${m("req")} api=${m("api")} api-chậm-nhất=${m("apiCham")}ms (${lanh.apiChamTen})`,
+      `js=${m("jsKb")}KB req=${m("req")} api=${m("api")} api-chậm-nhất=${m("apiCham")}ms (${lanh.apiChamTen}) ` +
+      `img=${m("img")} lh3=${m("lh3")}`,
   );
 }
 

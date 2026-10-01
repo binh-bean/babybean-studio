@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -221,13 +222,18 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     chuaCoAnh?: unknown[];
     chuaCoHanMuc?: unknown[];
     canhBaoLark?: number;
+    // BB-344 — số bộ ảnh của tab "Khách gửi ảnh chọn" (cùng hàm với tab).
+    khachGuiAnhChon?: number;
+    // BB-344 — số bộ khách xin mở lại chưa xử lý (cùng nguồn với tab "Yêu cầu mở lại").
+    choMoLai?: number;
   } | null>(null);
 
   // BB-303 — nâng lên phạm vi component (`useCallback`, không còn khai TRONG
   // `useEffect`) để nút "Chuyển chỉnh" của khối "Việc hôm nay" gọi lại được
   // sau khi xác nhận một bộ ảnh, không đợi `branchId` đổi mới tải lại.
-  const loadData = React.useCallback(async () => {
-    setLoading(true);
+  const loadData = React.useCallback(async (im = false) => {
+    // BB-342: `im` = tải lại vì có sự kiện tức thì — không xoá trang thành "Đang tải…".
+    if (im !== true) setLoading(true);
     setError(null);
     try {
       // BB-303 — `full=1`: trang này THẬT SỰ vẽ "Việc hôm nay"/"Mua thêm 7
@@ -254,6 +260,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+  useCapNhatTucThi("nhan-vien", () => void loadData(true));
 
   useEffect(() => {
     let active = true;
@@ -487,6 +494,10 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
           dueSoon: data.stats.dueSoon,
           overdue: data.stats.overdue,
           canhBaoLark: canXuLy?.canhBaoLark,
+          // BB-344: số này = số dòng tab "Khách gửi ảnh chọn" (cùng `layKhachGuiAnhChon`).
+          khachGuiAnhChon: canXuLy?.khachGuiAnhChon,
+          // BB-344: trước đây thiếu — dòng "Khách xin mở lại" không bao giờ hiện ở Bàn làm việc.
+          choMoLai: canXuLy?.choMoLai,
         };
         const dong = dongCanXuLy(merged);
         return (

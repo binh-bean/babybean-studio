@@ -137,7 +137,8 @@ function quyDoiKhungHienThi(
 
 const TEN_CHAT_LIEU: Record<string, string> = {
   Gỗ: "Gỗ",
-  "Cavas/Kim tuyến": "Canvas",
+  // BB-339 — "Cavas/Kim tuyến" trên Lark là ảnh in KIM TUYẾN (không phải canvas).
+  "Cavas/Kim tuyến": "Kim Tuyến",
   "Tráng gương": "Tráng gương",
   "Thủy tinh": "Thủy tinh",
   "Mica HD": "Mica HD",
@@ -152,55 +153,41 @@ const TEN_CHAT_LIEU: Record<string, string> = {
  */
 const MO_TA_CHAT_LIEU: Record<string, string> = vi.gallery.treoTuong.moTaChatLieu;
 
-/** Mỗi chất liệu một cách "vẽ" bằng CSS thuần — không ảnh, không thư viện. */
+/**
+ * Mỗi chất liệu một lớp CSS thuần — không ảnh, không thư viện.
+ *
+ * BB-339 (chủ studio 01/10/2026, ảnh b4865942): thực tế MỌI chất liệu đều in
+ * TRÀN VIỀN, KHÔNG KHUNG, KHÔNG BO GÓC. Bản cũ vẽ viền gỗ dày, viền bạc… như
+ * khung treo tường — gây hiểu nhầm. Nay không còn padding/viền nền nào: tấm ảnh
+ * phủ kín khối, góc vuông; chỉ giữ một nét mép 1px để tách tấm ảnh khỏi tường.
+ * Khung CHỈ được vẽ khi ba mẹ chọn thêm khung (`coKhung`, xem JSX).
+ */
 function lopChatLieu(chatLieu: string | null): React.CSSProperties & { className: string } {
+  const lop = (className: string): React.CSSProperties & { className: string } => ({
+    className,
+    padding: 0,
+    background: "transparent",
+    boxShadow: "inset 0 0 0 1px rgba(0,0,0,.10)",
+  });
   switch (chatLieu) {
     case "Gỗ":
-      return {
-        className: "vien-go",
-        padding: "3.2%",
-        background: "linear-gradient(155deg,#a9744a,#6d4726 65%,#5a3a1f)",
-        boxShadow: "inset 0 0 0 1px rgba(255,255,255,.08), inset 0 2px 6px rgba(0,0,0,.35)",
-      };
+      return lop("vien-go");
     case "Cavas/Kim tuyến":
-      return {
-        className: "vien-canvas",
-        padding: "1.6%",
-        background: "#efe8da",
-        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.06)",
-      };
+      return lop("vien-kimtuyen");
     case "Tráng gương":
-      return {
-        className: "vien-guong",
-        padding: "0.9%",
-        background: "linear-gradient(140deg,#d9dee2,#9aa4ab 55%,#c7ccd0)",
-      };
+      return lop("vien-guong");
     case "Thủy tinh":
-      return {
-        className: "vien-thuytinh",
-        padding: "0.7%",
-        background: "linear-gradient(140deg,#dfeaea,#a9c2c2 55%,#cfe0e0)",
-      };
+      return lop("vien-thuytinh");
     case "Mica HD":
-      return {
-        className: "vien-mica",
-        padding: "0.7%",
-        background: "linear-gradient(140deg,#f2f2f2,#c9c9c9 55%,#e8e8e8)",
-      };
+      return lop("vien-mica");
     default:
-      // UV và mọi chất liệu chưa đặt tên riêng: viền phẳng mảnh.
-      return {
-        className: "vien-uv",
-        padding: "0.5%",
-        background: "#f4f2ee",
-        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)",
-      };
+      return lop("vien-uv");
   }
 }
 
-/** Vân vải canvas — SVG noise nhúng thẳng bằng data URI, không thêm tệp. */
-const VAN_CANVAS =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='7' height='7'%3E%3Cpath d='M0 7 7 0M-1 1 1 -1M6 8 8 6' stroke='%23000' stroke-opacity='0.05'/%3E%3C/svg%3E\")";
+/** BB-339 — ánh lấp lánh nhẹ của chất liệu Kim Tuyến (thay vân vải canvas cũ). */
+const ANH_KIM_TUYEN =
+  "radial-gradient(circle at 20% 30%, rgba(255,255,255,.22) 0 1px, transparent 2px), radial-gradient(circle at 70% 60%, rgba(255,255,255,.18) 0 1px, transparent 2px), radial-gradient(circle at 45% 80%, rgba(255,255,255,.16) 0 1px, transparent 2px)";
 
 const BONG_THEO_HUONG: Record<AnhPhong["huongSang"], string> = {
   // Sáng từ trái → bóng đổ chếch phải-dưới. Sáng từ phải → chếch trái-dưới.
@@ -599,6 +586,8 @@ export function ManTreoTuong({
   if (!mo || !anhDangXem) return null;
 
   const style = lopChatLieu(chatLieu);
+  // BB-339 — UV chưa chọn khung: ảnh giấy, không treo lên tường.
+  const laUvKhongKhung = chatLieu === "UV" && !coKhung;
 
   return (
     <div
@@ -647,7 +636,56 @@ export function ManTreoTuong({
           onClick={() => setBanAn((v) => !v)}
         />
 
-        {viTriHienThi && sanPhamAnh && (
+        {/*
+          BB-339 (ảnh e73e77be) — ảnh UV là ảnh in trên GIẤY ẢNH, CHƯA có
+          khung: không treo lên tường trong demo (dễ hiểu nhầm là khung treo).
+          Chưa chọn khung thì hiện như một tấm ảnh giấy đặt nghiêng trên mặt
+          phẳng, viền giấy mỏng, kèm câu giải thích ngắn.
+        */}
+        {laUvKhongKhung && sanPhamAnh && (
+          <div
+            data-testid="uv-anh-giay"
+            className="pointer-events-none absolute inset-x-0 top-[18%] z-[5] flex justify-center px-6 md:top-[14%] md:pr-[376px]"
+          >
+            {/* Thẻ nền kem (không phải bức tường): tấm ảnh giấy đặt nghiêng, viền giấy mỏng. */}
+            <div className="pointer-events-auto flex w-full max-w-[340px] flex-col items-center gap-4 rounded-3xl bg-[#f3ede5]/95 px-6 pb-5 pt-7 shadow-[0_20px_50px_-20px_rgba(20,14,8,.6)]">
+              <div
+                className="relative cursor-pointer bg-white p-[3%] shadow-[0_10px_22px_-10px_rgba(20,14,8,.5)]"
+                style={{
+                  width: huongKhung === "doc" ? "min(36vw, 170px)" : "min(56vw, 250px)",
+                  aspectRatio: huongKhung === "doc" ? "2 / 3" : "3 / 2",
+                  transform: "rotate(-3deg)",
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={vi.gallery.treoTuong.xemLonAnhBe}
+                onClick={() => setXemLon(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setXemLon(true);
+                  }
+                }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={buildLightboxImageUrl(anhDangXem.id, 1600)}
+                  alt={anhDangXem.fileName}
+                  className="h-full w-full object-cover"
+                  draggable={false}
+                />
+              </div>
+              <p className="text-center text-[12px] leading-relaxed text-bb-fg">
+                {vi.gallery.treoTuong.uvLaAnhGiay}
+                {monKhung.length > 0 && (
+                  <span className="mt-1 block text-bb-fg-muted">{vi.gallery.treoTuong.uvChonKhungDeTreo}</span>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {viTriHienThi && sanPhamAnh && !laUvKhongKhung && (
           <div
             role="button"
             tabIndex={0}
@@ -696,10 +734,11 @@ export function ManTreoTuong({
                   padding: style.padding,
                   background: style.background,
                   boxShadow: style.boxShadow,
-                  borderRadius: coKhung ? 1 : 2,
+                  // BB-339 — tràn viền, góc vuông (không bo) cho mọi chất liệu.
+                  borderRadius: 0,
                 }}
               >
-                <div className="relative h-full w-full overflow-hidden" style={{ borderRadius: 1 }}>
+                <div className="relative h-full w-full overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={buildLightboxImageUrl(anhDangXem.id, 1600)}
@@ -709,8 +748,8 @@ export function ManTreoTuong({
                   />
                   {chatLieu === "Cavas/Kim tuyến" && (
                     <div
-                      className="pointer-events-none absolute inset-0 mix-blend-multiply"
-                      style={{ backgroundImage: VAN_CANVAS }}
+                      className="pointer-events-none absolute inset-0 mix-blend-screen"
+                      style={{ backgroundImage: ANH_KIM_TUYEN, backgroundSize: "9px 9px" }}
                     />
                   )}
                   {(chatLieu === "Tráng gương" || chatLieu === "Thủy tinh" || chatLieu === "Mica HD") && (
@@ -1011,6 +1050,11 @@ export function ManTreoTuong({
             </span>
           </div>
         </div>
+
+        {/* BB-339 — dòng nhỏ luôn hiện (chủ studio 01/10/2026). */}
+        <p data-testid="tham-khao-demo" className="text-[11px] text-bb-fg-muted">
+          {vi.gallery.treoTuong.thamKhaoDemo}
+        </p>
 
         {!xemDuocThoi && (
           <button

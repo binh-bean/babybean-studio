@@ -4,7 +4,7 @@ import React from "react";
 import { formatNgayGioVN, formatSo } from "@/lib/utils/dinh-dang";
 import Link from "next/link";
 import { getDictionary } from "@/i18n";
-import { Select } from "@/components/ui";
+import { Select, OChonTim } from "@/components/ui";
 
 interface LogItem {
   id: string;
@@ -86,7 +86,7 @@ export function NhatKyReport() {
         <div className="flex flex-col gap-1">
           <label className="font-medium">{t.filterAction}</label>
           {/* BB-294 (#19) — select hệ thiết kế, không phải mặc định trình duyệt. */}
-          <Select
+          <OChonTim
             value={action}
             onChange={(e) => setAction(e.target.value)}
             className="h-9 min-h-0 py-1"
@@ -99,7 +99,7 @@ export function NhatKyReport() {
             <option value="selection.patch">{t.actionSelectionPatch}</option>
             <option value="selection.submit">{t.actionSelectionSubmit}</option>
             <option value="staff.role_updated">{t.actionStaffRoleUpdated}</option>
-          </Select>
+          </OChonTim>
         </div>
 
         <div className="flex flex-col gap-1">

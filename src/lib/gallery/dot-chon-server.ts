@@ -313,7 +313,7 @@ export async function chuanBiSanPham(
   const productIds = Array.from(new Set(dauVao.map((d) => d.productId)));
   const { data: products, error } = await admin
     .from("products")
-    .select("id, name, kind, material, list_price, price_confidence, price_samples, is_active")
+    .select("id, name, kind, material, size, list_price, price_confidence, price_samples, is_active")
     .in("id", productIds);
   if (error) throw error;
   const pMap = new Map((products ?? []).map((p) => [p.id as string, p]));
@@ -325,7 +325,7 @@ export async function chuanBiSanPham(
     if (!p || !p.is_active) {
       return { ok: false, code: "NOT_FOUND", message: "Có sản phẩm không tồn tại hoặc đã ngừng kinh doanh" };
     }
-    if (!sanPhamBanChoKhach({ isActive: p.is_active, kind: p.kind, material: p.material })) {
+    if (!sanPhamBanChoKhach({ isActive: p.is_active, kind: p.kind, material: p.material, size: p.size })) {
       return { ok: false, code: "INVALID_INPUT", message: "Sản phẩm này không bán trong mục chọn thêm" };
     }
     if (p.list_price === null || p.list_price === undefined) {
@@ -1045,16 +1045,23 @@ export async function layDanhSachViecDot1(
   admin: SupabaseClient,
   branchIds: string[] | null,
 ): Promise<DongViecDot1[]> {
-  const { data, error } = await admin
-    .from("selections")
-    .select(
-      "gallery_id, nho_studio_chon_them, so_san_pham_in_chua_anh, submitted_at, " +
-        "galleries!inner(title, status, branch_id, customer_id, branches(name))",
-    )
-    .eq("is_primary", true)
-    .or("nho_studio_chon_them.gt.0,so_san_pham_in_chua_anh.gt.0")
-    .in("galleries.status", ["submitted", "in_retouch"])
-    .limit(500);
+  // BB-337 (0082): CSKH bấm "Đã chọn giúp xong" thì dòng rời hàng đợi. Chưa áp
+  // 0082 thì cột chưa có — chạy lại truy vấn cũ (không lọc), không làm trống cả tab.
+  const truyVan = (locDaXuLy: boolean) => {
+    let q = admin
+      .from("selections")
+      .select(
+        "gallery_id, nho_studio_chon_them, so_san_pham_in_chua_anh, submitted_at, " +
+          "galleries!inner(title, status, branch_id, customer_id, branches(name))",
+      )
+      .eq("is_primary", true)
+      .or("nho_studio_chon_them.gt.0,so_san_pham_in_chua_anh.gt.0")
+      .in("galleries.status", ["submitted", "in_retouch"]);
+    if (locDaXuLy) q = q.is("studio_xu_ly_dot1_at", null);
+    return q.limit(500);
+  };
+  let { data, error } = await truyVan(true);
+  if (error && laLoiThieuCot(error)) ({ data, error } = await truyVan(false));
   if (error) {
     if (laLoiChuaApMigration(error)) return [];
     throw error;

@@ -230,14 +230,20 @@ export const vi = {
       anChiTiet: "Ẩn chi tiết",
       xemLonAnhBe: "Xem lớn ảnh của bé",
       dongXemLon: "Đóng xem lớn",
-      thamKhaoKhung: "Mẫu khung chỉ để tham khảo. Studio tư vấn mẫu thật khi chốt đơn.",
+      thamKhaoKhung: "Mẫu khung chỉ để tham khảo. Bean tư vấn mẫu thật khi chốt đơn ạ.",
+      // BB-339 — dòng nhỏ luôn hiện trên màn demo treo tường.
+      thamKhaoDemo: "Hình demo chỉ mang tính tham khảo ạ.",
+      // BB-339 — ảnh UV là ảnh giấy, chưa có khung: không treo lên tường trong demo.
+      uvLaAnhGiay:
+        "Ảnh UV là ảnh in trên giấy ảnh, chưa có khung. Ba mẹ dùng để gài album, hoặc cán lên gỗ để treo hay để đứng ạ.",
+      uvChonKhungDeTreo: "Muốn xem treo trên tường, ba mẹ chọn thêm khung nhé ạ.",
       moTaChatLieu: {
-        "Gỗ": "In trên nền gỗ tự nhiên, vân gỗ hiện rõ ở viền — ấm và mộc.",
-        "Cavas/Kim tuyến": "In trên vải canvas có vân vải nhẹ — cảm giác như tranh vẽ.",
-        "Tráng gương": "Phủ bóng như gương, màu lên rực và sâu.",
-        "Thủy tinh": "In sau lớp kính cường lực, bề mặt phẳng và sáng.",
-        "Mica HD": "In trên tấm mica trong, nhẹ và giữ màu bền.",
-        UV: "Phủ thêm lớp UV bóng bảo vệ mực in.",
+        "Gỗ": "In tràn viền, cán lên tấm gỗ — không khung, góc vuông ạ.",
+        "Cavas/Kim tuyến": "In tràn viền trên chất liệu kim tuyến lấp lánh nhẹ — không khung ạ.",
+        "Tráng gương": "In tràn viền, phủ bóng như gương, màu lên rực và sâu ạ.",
+        "Thủy tinh": "In tràn viền sau lớp kính cường lực, bề mặt phẳng và sáng ạ.",
+        "Mica HD": "In tràn viền trên tấm mica trong, nhẹ và giữ màu bền ạ.",
+        UV: "Ảnh in trên giấy ảnh phủ UV, chưa có khung — để gài album hoặc cán lên gỗ ạ.",
       },
     },
   },
@@ -436,7 +442,17 @@ export const vi = {
       trungChiNhanhKhac: "Trùng số ở chi nhánh khác",
       trong: "Không tìm thấy khách nào khớp.",
       trongBanDau: "Chưa có khách hàng nào trong chi nhánh của bạn.",
-      conNua: "Đang hiện {n} trong tổng {tong} khách. Gõ thêm để thu hẹp.",
+      conNua: "Đang hiện {n} trong tổng {tong} khách.",
+      // BB-337 mục 3 — tải thêm + đồng bộ ngay + trang chi tiết khách.
+      dangHienDu: "Đang hiện đủ {tong} khách.",
+      taiThem: "Tải thêm khách",
+      dangTaiThem: "Đang tải…",
+      dongBoNgay: "Đồng bộ ngay",
+      dangDongBo: "Đang đồng bộ từ Lark…",
+      dongBoXong: "Đã đồng bộ từ Lark: đọc {doc} dòng, thêm {moi} bộ ảnh/khách mới.",
+      dongBoDangChay: "Một lượt đồng bộ khác đang chạy — thử lại sau ít phút.",
+      dongBoGoiY: "Tự đồng bộ mỗi sáng 08:00.",
+      xemTrang: "Mở trang khách hàng",
       loiTai: "Không đọc được danh sách khách hàng.",
 
       hoSo: "Hồ sơ khách",
@@ -665,7 +681,7 @@ export const vi = {
     studioName: "BabyBean Studio",
     // BB-331 (30/09): anh đổi tiêu đề lớn của trang gốc thành câu ký tên của
     // studio — tiếng Anh, giữ nguyên chữ, Playfair không nghiêng.
-    tagline: "Yours truly, Bean",
+    tagline: "Yours truly Bean",
     branchesHeading: "Các chi nhánh",
     lostBefore: "Ảnh của bé được gửi qua ",
     lostStrong: "link riêng",

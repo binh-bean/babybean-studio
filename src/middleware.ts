@@ -11,6 +11,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { HEADER_NGUOI_DUNG, kyNguoiDung } from "@/lib/auth/dau-nguoi-dung";
 
 /** Shape @supabase/ssr passes to setAll. */
 interface CookieToSet {
@@ -23,6 +24,17 @@ const PUBLIC_PATHS = ["/api/auth", "/api/webhooks", "/api/cron"];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  // BB-341 — dấu "đã xác thực" chỉ được do CHÍNH middleware này đặt. Bản gửi
+  // từ ngoài vào (giả mạo) bị xoá trước mọi thứ khác, trên MỌI đường.
+  // Xoá không được thì từ chối luôn (đóng cửa khi nghi ngờ) — request bình
+  // thường không bao giờ mang header này.
+  if (request.headers.has(HEADER_NGUOI_DUNG)) {
+    try {
+      request.headers.delete(HEADER_NGUOI_DUNG);
+    } catch {
+      return new NextResponse(null, { status: 400 });
+    }
+  }
   let response = NextResponse.next({ request });
 
   if (pathname.startsWith("/admin") && !PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
@@ -53,6 +65,20 @@ export async function middleware(request: NextRequest) {
       const redirectResponse = NextResponse.redirect(url);
       applySecurityHeaders(redirectResponse, pathname);
       return redirectResponse;
+    }
+
+    // BB-341 — chuyển lời đáp của getUser() xuống `requireStaff()` (layout,
+    // trang) để nó KHÔNG hỏi Supabase Auth lần hai. Ký bằng APP_SECRET, gắn
+    // với đúng header cookie đi tiếp (đã gồm phiên vừa làm mới, nếu có) — xem
+    // src/lib/auth/dau-nguoi-dung.ts. Không ký được thì thôi: requireStaff tự
+    // hỏi lại như cũ.
+    const dau = await kyNguoiDung(data.user.id, request.headers.get("cookie") ?? "");
+    if (dau) {
+      const headersDi = new Headers(request.headers);
+      headersDi.set(HEADER_NGUOI_DUNG, dau);
+      const tiep = NextResponse.next({ request: { headers: headersDi } });
+      for (const c of response.cookies.getAll()) tiep.cookies.set(c);
+      response = tiep;
     }
   }
 
@@ -91,7 +117,9 @@ function applySecurityHeaders(response: NextResponse, pathname: string): void {
         : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://*.supabase.co",
+      // BB-342: wss — websocket Supabase Realtime (cập nhật tức thì). Không có
+      // thì trình duyệt chặn kết nối, màn chỉ còn lưới đỡ 30 giây.
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
       "frame-ancestors 'none'",
     ].join("; "),
   );

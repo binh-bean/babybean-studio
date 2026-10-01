@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import Link from "next/link";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -573,10 +574,10 @@ export function GalleryList() {
 
   // Tải danh sách bộ ảnh từ API
   const fetchGalleries = useCallback(
-    async (isLoadMore = false, cursorToUse?: string | null) => {
+    async (isLoadMore = false, cursorToUse?: string | null, im = false) => {
       if (isLoadMore) {
         setLoadingMore(true);
-      } else {
+      } else if (!im) {
         setLoading(true);
       }
 
@@ -637,6 +638,14 @@ export function GalleryList() {
   useEffect(() => {
     void fetchGalleries(false);
   }, [fetchGalleries]);
+  // BB-342: trạng thái bộ ảnh đổi (khách chốt, CSKH xác nhận…) — tải lại trang
+  // đầu, lặng lẽ. Đã bấm "Tải thêm" thì thôi: tải lại trang đầu sẽ cắt mất các
+  // trang sau đang xem.
+  const soDongRef = React.useRef(0);
+  soDongRef.current = items.length;
+  useCapNhatTucThi("nhan-vien", () => {
+    if (soDongRef.current <= 50) void fetchGalleries(false, null, true);
+  });
 
   
   useEffect(() => {

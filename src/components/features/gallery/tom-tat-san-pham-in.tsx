@@ -55,6 +55,12 @@ export interface TomTatSanPhamInProps {
    * QUÁ KHỨ/trung tính, không còn chữ "chưa" ngụ ý một việc đang treo.
    */
   khoa?: boolean;
+  /**
+   * BB-339 mục 3 (ảnh a3c16a28) — chủ studio: bấm "Chọn ảnh ngay" ra khối này
+   * nhưng KHÔNG bấm vào để chọn được. Có hàm này (và chưa khoá) thì mỗi món là
+   * một nút mở lưới chọn ảnh cho ĐÚNG món đó (`ChonAnhNhieuTam`, gallery-app).
+   */
+  onChonAnh?: (galleryItemId: string) => void;
 }
 
 /**
@@ -92,7 +98,8 @@ export function loiTrangThai(dong: DongSanPhamIn, khoa: boolean): { chu: string;
   };
 }
 
-export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false }: TomTatSanPhamInProps) {
+export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false, onChonAnh }: TomTatSanPhamInProps) {
+  const chonDuoc = !khoa && Boolean(onChonAnh);
   // Hợp đồng không có hàng in thì không hiện gì. Đây là luật cũ của docs/16
   // mục 3.3 và nó vẫn đúng: không bịa ra ô chọn cho thứ khách chưa mua.
   if (dong.length === 0) return null;
@@ -103,23 +110,28 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false }: TomT
     // (#E8E0D6/`--bb-border`) — nhìn "gắt hơn hẳn mọi thẻ khác". Khai rõ
     // `border-[var(--bb-border)]` để không lặp lỗi này khi có ai đổi màu chữ
     // mặc định của trang.
-    <section className={cn("rounded-xl border border-[var(--bb-border)] bg-surface p-4", className)}>
+    // BB-339 mục 3 — "thanh quá dài": mỗi món một thẻ gọn trong lưới 1/2/3
+    // cột (max-w-4xl), không còn một thanh kéo hết 1600px cho mỗi món.
+    <section className={cn("max-w-4xl rounded-xl border border-[var(--bb-border)] bg-surface p-4", className)}>
       <h3 className="kh-h3">Sản phẩm in trong gói</h3>
       <p className="mt-1 text-sm text-muted-foreground">
         {/* BB-287 mục 5 — "bảng bên phải" sai trên điện thoại (không có bảng
             bên phải ở đó). Đổi thành thao tác đúng trên MỌI thiết bị. */}
         {/* BB-319 K-D2 — câu ngắn (≤ 12 chữ) thay cho một câu 25 chữ; gọi đúng tên nút
             "Đặt in" ở màn xem lớn (không có "biểu tượng khung" nào để bấm). */}
-        Ba mẹ đã trả tiền cho những món này. Mở một tấm ảnh, bấm “Đặt in” để chọn.
+        {chonDuoc
+          ? "Ba mẹ bấm vào từng món để chọn ảnh nhé ạ."
+          : "Những món này đã có sẵn trong gói của ba mẹ ạ."}
       </p>
 
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {dong.map((d) => {
           const tt = loiTrangThai(d, khoa);
+          const tenMon = tenKemSoLuong(d.name, d.quantity);
           return (
             <li key={d.galleryItemId} className="rounded-lg border border-[var(--bb-border)] p-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-sm font-medium">{tenKemSoLuong(d.name, d.quantity)}</p>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-medium">{tenMon}</p>
                 <p
                   className={cn(
                     "shrink-0 text-xs",
@@ -132,6 +144,18 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false }: TomT
                   {tt.chu}
                 </p>
               </div>
+
+              {chonDuoc && (
+                <button
+                  type="button"
+                  data-testid="chon-anh-mon-trong-goi"
+                  onClick={() => onChonAnh?.(d.galleryItemId)}
+                  aria-label={`${tt.thieu ? "Chọn" : "Đổi"} ảnh cho ${tenMon}`}
+                  className="mt-2 inline-flex h-8 items-center rounded-full border border-[var(--bb-border)] bg-white px-3.5 text-[13px] font-medium text-foreground transition hover:bg-surface-2"
+                >
+                  {tt.thieu ? "+ Chọn ảnh" : "Đổi ảnh"}
+                </button>
+              )}
 
               {d.anh.length > 0 && (
                 <ul className="mt-2 flex flex-wrap gap-2">

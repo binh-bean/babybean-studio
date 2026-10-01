@@ -25,6 +25,7 @@
 import { BiaBoAnhEditor } from "./bia-bo-anh-editor";
 import { DongThoiGianHoatDong } from "./dong-thoi-gian";
 import { YeuCauMuaThemBlock } from "./yeu-cau-mua-them";
+import { TimGiaDinhBlock } from "./tim-gia-dinh-admin";
 import { DanhDauDaGiao } from "./danh-dau-da-giao";
 import { getStatusBadgeConfig } from "./gallery-list";
 // BB-312 — khối nổi bật "khách xin mở lại". Component RIÊNG (không viết
@@ -37,10 +38,11 @@ import { PageHeader, PAGE_TITLE_FALLBACK_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
 
 import React from "react";
+import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { MoreHorizontal, Copy, Check, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { OChonTim } from "@/components/ui/o-chon-tim";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { luaChonMoLai, type DotTomTat } from "@/lib/gallery/dot-chon";
 import { cauBaoSauDoiHanMuc, tinhPhatSinhTheoHanMuc } from "@/lib/gallery/tien-phat-sinh";
@@ -213,6 +215,8 @@ interface Detail {
   /** BB-320: phần giảm giá đã ghi (dòng `giam_gia`), nằm TRONG paidAmount. */
   discountAmount?: number;
   outstanding: number;
+  /** BB-344 — số CÒN PHẢI THU (0 = chưa phát sinh: nút xác nhận thanh toán bị khoá). */
+  amountToCollect: number;
   /** BB-215 — khối "Bìa bộ ảnh". */
   coverPhotoId: string | null;
   coverHeadline: string | null;
@@ -336,6 +340,22 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
   React.useEffect(() => {
     void load();
   }, [load]);
+  // BB-342: khách chốt/xin mở lại/mua thêm trên bộ này — chi tiết tự cập nhật.
+  useCapNhatTucThi("nhan-vien", () => void load(), { galleryId });
+
+  /**
+   * BB-337 mục 2 — link từ "Việc cần xử lý" mở đúng khối (`#dot-chon`, `#thanh-toan`,
+   * `#xuat-danh-sach`). Trình duyệt tự cuộn tới `#…` lúc trang mở, nhưng khi đó dữ liệu
+   * chưa về nên khối chưa có trên trang — cuộn lại MỘT lần ngay sau lần tải đầu.
+   */
+  const daCuonHash = React.useRef(false);
+  React.useEffect(() => {
+    if (!detail || daCuonHash.current) return;
+    daCuonHash.current = true;
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView({ block: "start" }));
+  }, [detail]);
 
   /**
    * Lớp chặn thứ hai cho cùng một lỗi.
@@ -1416,9 +1436,17 @@ function KhoiChinh({
         </section>
       )}
 
-      {(detail.dueAmount !== 0 || detail.paidAmount !== 0) && (
-        <section className="rounded-lg border border-[var(--bb-border)] p-4">
-          <h2 className="text-base font-medium">Tiền phát sinh</h2>
+      {/* BB-337 mục 2: trước đây khối này (và form "Xác nhận thanh toán") chỉ hiện khi đã có
+          số phải thu/đã thu — bộ chưa phát sinh tiền (ví dụ khách mua thêm, CSKH chưa nhập
+          giá) thì chi tiết bộ ảnh KHÔNG có chỗ ghi thu, trong khi Việc cần xử lý có. Nay luôn
+          hiện cho người có quyền sửa (trừ bộ đã lưu trữ); `id` để link từ Việc cần xử lý mở đúng khối. */}
+      {(detail.dueAmount !== 0 || detail.paidAmount !== 0 || (canSuaDong && !locked)) && (
+        <section
+          id="thanh-toan"
+          data-testid="khoi-thanh-toan-chi-tiet"
+          className="scroll-mt-6 rounded-lg border border-[var(--bb-border)] p-4"
+        >
+          <h2 className="text-base font-medium">Tiền phát sinh · Xác nhận thanh toán</h2>
           <p className="mt-1 text-sm">
             Phải thu <strong>{formatCurrencyVND(detail.dueAmount)}</strong> · đã thu{" "}
             <strong>{formatCurrencyVND(detail.paidAmount - (detail.discountAmount ?? 0))}</strong>
@@ -1477,7 +1505,8 @@ function KhoiChinh({
           </p>
           <PaymentForm
             disabled={busy}
-            conThieu={detail.outstanding > 0 ? detail.outstanding : 0}
+            conThieu={detail.amountToCollect}
+            chuaPhatSinh={detail.amountToCollect <= 0}
             onSubmit={(a, m, n, pt) => void recordPayment(a, m, n, pt)}
           />
         </section>
@@ -1684,6 +1713,9 @@ function KhoiChinh({
           </div>
         </section>
       )}
+
+      {/* BB-345 — tấm gia đình (link mời) thả tim; ẩn khi chưa có tim / chưa áp 0083. */}
+      <TimGiaDinhBlock galleryId={galleryId} />
 
       <YeuCauMuaThemBlock galleryId={galleryId} />
 
@@ -2132,7 +2164,7 @@ function AddItemForm({
       {/* BB-294 (#19) — select, ô số hệ thiết kế, không phải mặc định trình duyệt. */}
       <label className="flex min-w-56 flex-1 flex-col gap-1 text-xs">
         Thêm sản phẩm
-        <Select
+        <OChonTim
           name="productId"
           value={productId}
           disabled={disabled}
@@ -2148,7 +2180,7 @@ function AddItemForm({
               ))}
             </optgroup>
           ))}
-        </Select>
+        </OChonTim>
       </label>
       <label className="flex flex-col gap-1 text-xs">
         Số lượng

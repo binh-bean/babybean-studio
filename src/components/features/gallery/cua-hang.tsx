@@ -67,6 +67,8 @@ import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
 import { formatKichThuoc, nhanTrangThaiGio, tenKemSoLuong, tenSanPhamChoKhach } from "@/lib/utils/dinh-dang";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { ChonAnhNhieuTam, type AnhTrongLuoiChon } from "./chon-anh-nhieu-tam";
+import { tenChatLieuChoKhach } from "@/lib/products/nhom-san-pham";
+import { anhNhoTheoO, thuLaiAnhQuaRoute } from "@/lib/utils/chon-co-anh";
 
 /** @deprecated dùng `SanPhamCuaHang` từ `@/lib/products/cau-hinh-cua-hang` — giữ tên cũ để không phải sửa mọi chỗ import. */
 export type MonTrongCuaHang = SanPhamCuaHang;
@@ -127,7 +129,21 @@ export interface CuaHangProps {
    * màn "Chọn thêm ảnh · Đợt N" (bản vẽ anh duyệt 29/09/2026). Thiếu = như cũ.
    */
   phuDe?: string | null;
+  /**
+   * BB-339 mục 4 (ảnh 4443ab79) — màn mua thêm không báo số ảnh trong gói, và
+   * không chọn được ảnh cho món TRONG GÓI ngay tại đây. Thiếu = không hiện khối.
+   */
+  trongGoi?: {
+    hanMuc: number | null;
+    daChon: number;
+    mon: Array<{ galleryItemId: string; name: string; quantity: number; laAlbum: boolean; soAnh: number }>;
+    /** Mở lưới chọn ảnh cho một món trong gói (gallery-app). Thiếu = chỉ xem. */
+    onChonAnh?: (galleryItemId: string) => void;
+  };
 }
+
+/** BB-339 — một dòng giỏ đang mở xem lớn (để kiểm tra / đổi ảnh / bỏ). */
+type DongDangXem = DongDaMua & { photoId: string };
 
 function chipButton(dangChon: boolean) {
   return cn(
@@ -150,7 +166,7 @@ const NHAN_TAB: Record<NhomSanPham, string> = {
 /** Một dòng mô tả cho khối sản phẩm — suy ra từ chất liệu/kích thước vì
  * `SanPhamCuaHang` (đồng bộ từ Lark) chưa có trường mô tả riêng. */
 function moTaSanPham(sp: SanPhamCuaHang | null): string {
-  if (!sp) return "Chọn kích thước và chất liệu còn bán bên dưới.";
+  if (!sp) return "Ba mẹ chọn kích thước và chất liệu còn bán bên dưới nhé ạ.";
   // BB-319 — chất liệu đã nằm trong tên ở dòng trên ("Ảnh in UV"), dòng này chỉ nói khổ.
   if (sp.size) return `Khổ ${formatKichThuoc(sp.size)} cm`;
   return sp.material ?? "In ảnh chất lượng cao, giao tận nơi.";
@@ -180,7 +196,8 @@ export function tenThanThienSanPham(nhom: NhomSanPham, sp: SanPhamCuaHang | null
   // BB-319 — tên nội bộ "Edit file" không lên màn khách (cùng luật `tenSanPhamChoKhach`).
   if (sp && /^edit file$/i.test(sp.name.trim())) return tenSanPhamChoKhach(sp);
   if (!sp?.material) return tienTo;
-  const chatLieu = sp.material.trim();
+  // BB-339 — "Cavas/Kim tuyến" (tên Lark) hiện là "Kim Tuyến".
+  const chatLieu = tenChatLieuChoKhach(sp.material.trim()) ?? sp.material.trim();
   if (chatLieu.toLowerCase().startsWith(tienTo.toLowerCase())) return chatLieu;
   return `${tienTo} ${chatLieu}`;
 }
@@ -201,6 +218,7 @@ export function CuaHang({
   presetPhotoId,
   presetNhom,
   phuDe,
+  trongGoi,
 }: CuaHangProps) {
   const nhomMacDinh = THU_TU_NHOM[0] as NhomSanPham;
   const nhomKhaDung = React.useMemo(() => nhomCoHang(danhMuc), [danhMuc]);
@@ -274,6 +292,14 @@ export function CuaHang({
    * `sm` trở lên bỏ qua state này, luôn hiện danh sách (`sm:block`).
    */
   const [moGioMobile, setMoGioMobile] = React.useState(false);
+  /**
+   * BB-339 mục 4 — dòng giỏ đang mở xem lớn. Trước đây ảnh trong giỏ chỉ là một
+   * ô 32px không bấm được: ba mẹ không kiểm tra được đã mua tấm nào, muốn đổi
+   * tấm khác thì không biết làm sao. Nay bấm vào dòng → xem lớn + "Đổi ảnh"/"Bỏ".
+   */
+  const [dongDangXem, setDongDangXem] = React.useState<DongDangXem | null>(null);
+  /** BB-339 — đang đổi ảnh cho dòng này (lưới chọn ảnh mở ở chế độ chọn 1 tấm). */
+  const [doiAnhCho, setDoiAnhCho] = React.useState<DongDangXem | null>(null);
   const hopThoaiRef = React.useRef<HTMLDivElement>(null);
 
   // BB-277 — hộp thoại toàn màn hình phải giữ focus bên trong (Tab quẩn lại)
@@ -301,6 +327,8 @@ export function CuaHang({
     setMoGioMobile(false);
     setDangGuiThem(false);
     setDangHoanTac(false);
+    setDongDangXem(null);
+    setDoiAnhCho(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mo, presetNhom]);
 
@@ -327,6 +355,8 @@ export function CuaHang({
     () => anhDaChonTrongLuoi.map((a) => a.id),
     [anhDaChonTrongLuoi],
   );
+  // Cùng lý do `useMemo` như trên: giữ tham chiếu để lưới không tự xoá lựa chọn.
+  const idDoiAnhChon = React.useMemo(() => (doiAnhCho ? [doiAnhCho.photoId] : []), [doiAnhCho]);
 
   // BB-329 mục 4 — CHẤT LIỆU TRƯỚC, kích thước lọc theo chất liệu (lý do ở
   // `chatLieuCuaNhom`, `src/lib/products/cau-hinh-cua-hang.ts`). Bậc cũ
@@ -563,6 +593,52 @@ export function CuaHang({
             </p>
           ) : (
             <div className="mx-auto max-w-xl pb-6">
+              {trongGoi && (trongGoi.hanMuc != null || trongGoi.mon.length > 0) && (
+                <section
+                  data-testid="trong-goi-cua-hang"
+                  className="mb-1 rounded-2xl border border-[var(--bb-border)] bg-[var(--bb-surface-2)]/60 px-3.5 py-3"
+                >
+                  <p className="text-[13px] text-foreground">
+                    <span className="font-medium">Trong gói</span>
+                    {trongGoi.hanMuc != null && (
+                      <>
+                        {": "}
+                        <span data-testid="trong-goi-dem" className="tabular-nums">
+                          {trongGoi.daChon}/{trongGoi.hanMuc} ảnh
+                        </span>
+                      </>
+                    )}
+                  </p>
+                  {trongGoi.mon.length > 0 && (
+                    <ul className="mt-2 space-y-1.5">
+                      {trongGoi.mon.map((m) => {
+                        const thieu = m.laAlbum ? m.soAnh === 0 : m.soAnh < m.quantity;
+                        return (
+                          <li key={m.galleryItemId} className="flex items-center justify-between gap-3">
+                            <span className="min-w-0 truncate text-[13px] text-foreground">
+                              {tenKemSoLuong(m.name, m.quantity)}
+                              <span className={cn("ml-1.5 tabular-nums", thieu ? "text-[var(--bb-heart,#C4645A)]" : "text-muted-foreground")}>
+                                {m.laAlbum ? `${m.soAnh} ảnh` : `${m.soAnh}/${m.quantity} ảnh`}
+                              </span>
+                            </span>
+                            {trongGoi.onChonAnh && !khoa && (
+                              <button
+                                type="button"
+                                onClick={() => trongGoi.onChonAnh?.(m.galleryItemId)}
+                                aria-label={`${thieu ? "Chọn" : "Đổi"} ảnh trong gói cho ${tenKemSoLuong(m.name, m.quantity)}`}
+                                className="h-7 shrink-0 rounded-full border border-[var(--bb-border)] bg-white px-3 text-[12px] font-medium text-foreground transition hover:bg-surface-2"
+                              >
+                                {thieu ? "Chọn" : "Đổi"}
+                              </button>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
+              )}
+
               {/* Khối sản phẩm — tranh 64px bo 14px viền mảnh + tên serif + một dòng mô tả. */}
               <div className="flex items-center gap-3.5 py-4">
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[14px] border border-[var(--bb-border)] bg-white">
@@ -578,6 +654,12 @@ export function CuaHang({
                     {tenThanThienSanPham(nhomDangXem, sanPham)}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{moTaSanPham(sanPham)}</p>
+                  {/* BB-339 mục 2 — ảnh UV là ảnh giấy, CHƯA có khung: nói rõ để ba mẹ không hiểu nhầm. */}
+                  {nhomDangXem === "anh_in" && chatLieu === "UV" && (
+                    <p data-testid="mo-ta-uv" className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+                      Ảnh in trên giấy ảnh, chưa có khung — để gài album hoặc cán lên gỗ ạ.
+                    </p>
+                  )}
                   {daDat(sanPham?.productId ?? "") > 0 && (
                     <p data-testid="nhan-gio-san-pham" className="mt-0.5 text-[12px] font-medium text-[var(--bb-heart,#C4645A)]">
                       {nhanTrangThaiGio(donDaGui)} · {daDat(sanPham?.productId ?? "")}
@@ -600,7 +682,7 @@ export function CuaHang({
                       TRƯỚC kích thước.
                     */}
                     {dsChatLieu.length === 1 ? (
-                      <p className="text-sm text-foreground">{dsChatLieu[0]}</p>
+                      <p className="text-sm text-foreground">{tenChatLieuChoKhach(dsChatLieu[0] ?? null)}</p>
                     ) : (
                       <div className="flex flex-wrap gap-2">
                         {dsChatLieu.map((cl) => (
@@ -611,7 +693,7 @@ export function CuaHang({
                             onClick={() => setChatLieuChon(cl)}
                             className={chipButton(cl === chatLieu)}
                           >
-                            {cl}
+                            {tenChatLieuChoKhach(cl)}
                           </button>
                         ))}
                       </div>
@@ -866,20 +948,30 @@ export function CuaHang({
                     key={d.id}
                     className="flex items-center gap-2.5 rounded-xl border border-[var(--bb-border)] bg-white px-3 py-2"
                   >
-                    {d.photoId && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`/api/img/${d.photoId}?w=200`}
-                        alt=""
-                        className="h-8 w-8 shrink-0 rounded-md object-cover"
-                      />
-                    )}
-                    <span className="min-w-0 flex-1 text-[13px] leading-snug">
-                      <span className="block truncate">{tenMon(d.productId, d.name)}</span>
-                      <span className="block text-[12px] text-muted-foreground">
-                        {nhanTrangThaiGio(donDaGui)} · ×{d.quantity}
+                    {/* BB-339 mục 4 — dòng có ảnh: bấm vào để xem lớn, đổi ảnh hoặc bỏ. */}
+                    <button
+                      type="button"
+                      disabled={!d.photoId}
+                      onClick={() => d.photoId && setDongDangXem({ ...d, photoId: d.photoId })}
+                      aria-label={d.photoId ? `Xem ảnh của ${tenMon(d.productId, d.name)}` : undefined}
+                      className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left enabled:cursor-pointer enabled:hover:opacity-80"
+                    >
+                      {d.photoId && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/img/${d.photoId}?w=200`}
+                          alt=""
+                          className="h-10 w-10 shrink-0 rounded-md object-cover"
+                        />
+                      )}
+                      <span className="min-w-0 flex-1 text-[13px] leading-snug">
+                        <span className="block truncate">{tenMon(d.productId, d.name)}</span>
+                        <span className="block text-[12px] text-muted-foreground">
+                          {nhanTrangThaiGio(donDaGui)} · ×{d.quantity}
+                          {d.photoId && <span className="ml-1 underline underline-offset-2">Xem</span>}
+                        </span>
                       </span>
-                    </span>
+                    </button>
                     <span className="shrink-0 text-[14px] font-medium">{formatCurrencyVND(d.totalPrice)}</span>
                     <button
                       type="button"
@@ -960,6 +1052,111 @@ export function CuaHang({
           const nguon = tatCaAnh ?? anhDaChon;
           setAnhDaChonTrongLuoi(nguon.filter((a) => photoIds.includes(a.id)));
           setMoLuoiChon(false);
+        }}
+      />
+
+      {/* BB-339 mục 4 — xem lớn một dòng giỏ có ảnh: kiểm tra, đổi ảnh, hoặc bỏ. */}
+      {dongDangXem && !doiAnhCho && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xem ảnh đã mua"
+          data-testid="xem-dong-gio"
+          className="pointer-events-auto fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          // BB-346 — cố ý KHÔNG hiện bàn tay trên nền: con trỏ kế thừa xuống tấm
+          // ảnh và hộp bên trong (cùng lý lẽ nền lightbox ở photo-lightbox.tsx).
+          // Bấm chỗ trống thì đóng, nút "Đóng xem ảnh" vẫn là lối chính.
+          // Xem tests/unit/con-tro-ban-tay.test.ts.
+          data-con-tro="mac-dinh"
+          onClick={() => setDongDangXem(null)}
+        >
+          <div
+            className="flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-background"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative bg-[#1b1714]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                {...anhNhoTheoO(dongDangXem.photoId)}
+                sizes="(min-width: 480px) 448px, 92vw"
+                alt={tenMon(dongDangXem.productId, dongDangXem.name)}
+                className="mx-auto max-h-[60dvh] w-full object-contain"
+                onError={(e) => thuLaiAnhQuaRoute(e.currentTarget)}
+              />
+              <button
+                type="button"
+                aria-label="Đóng xem ảnh"
+                onClick={() => setDongDangXem(null)}
+                className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-lg leading-none text-white"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-3 p-4">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="min-w-0 truncate text-sm font-medium text-foreground">
+                  {tenMon(dongDangXem.productId, dongDangXem.name)} · ×{dongDangXem.quantity}
+                </p>
+                <p className="shrink-0 text-sm font-medium tabular-nums">{formatCurrencyVND(dongDangXem.totalPrice)}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={khoa || dangGuiThem}
+                  onClick={() => setDoiAnhCho(dongDangXem)}
+                  className="h-10 flex-1 rounded-full bg-[var(--bb-fg)] text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
+                >
+                  Đổi ảnh
+                </button>
+                <button
+                  type="button"
+                  disabled={khoa || dangGuiThem}
+                  onClick={async () => {
+                    const d = dongDangXem;
+                    setDangGuiThem(true);
+                    try {
+                      const ok = await onMuaNhieu?.(d.productId, 0, [d.photoId]);
+                      if (ok !== false) setDongDangXem(null);
+                    } finally {
+                      setDangGuiThem(false);
+                    }
+                  }}
+                  className="h-10 flex-1 rounded-full border border-[var(--bb-border)] text-sm font-medium text-foreground transition hover:bg-surface-2 disabled:opacity-40"
+                >
+                  Bỏ khỏi giỏ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BB-339 mục 4 — đổi ảnh của một dòng giỏ: chọn ĐÚNG 1 tấm thay thế. */}
+      <ChonAnhNhieuTam
+        mo={doiAnhCho != null}
+        onDong={() => setDoiAnhCho(null)}
+        tieuDe="Đổi sang tấm khác"
+        toiDa={1}
+        anhDaThaTim={anhDaChon}
+        tatCaAnh={tatCaAnh ?? anhDaChon}
+        daChonSan={idDoiAnhChon}
+        dangLuu={dangGuiThem}
+        onXacNhan={async (photoIds) => {
+          const d = doiAnhCho;
+          const moi = photoIds[0];
+          setDoiAnhCho(null);
+          if (!d || !moi || moi === d.photoId) return;
+          setDangGuiThem(true);
+          try {
+            // Thêm tấm mới với ĐÚNG số lượng cũ, rồi bỏ tấm cũ — số lượng là
+            // tuyệt đối theo từng tấm (cùng đường "Xoá" của dòng giỏ).
+            const ok = await onMuaNhieu?.(d.productId, d.quantity, [moi]);
+            if (ok === false) return;
+            await onMuaNhieu?.(d.productId, 0, [d.photoId]);
+            setDongDangXem(null);
+          } finally {
+            setDangGuiThem(false);
+          }
         }}
       />
     </div>

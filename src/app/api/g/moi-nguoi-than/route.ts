@@ -2,7 +2,8 @@
  * POST   /api/g/moi-nguoi-than — Ba mẹ tạo link vai 'viewer' mời một người
  *        thân (ông bà…) cùng xem và mua thêm — KHÔNG chọn ảnh.
  * GET    /api/g/moi-nguoi-than — Ba mẹ liệt kê những người đã mời cho bộ ảnh
- *        này (nhãn, lúc tạo, trạng thái — KHÔNG bao giờ trả lại mã).
+ *        này (nhãn, lúc tạo, trạng thái; link CÒN SỐNG thì kèm địa chỉ để
+ *        ba mẹ chép/chia sẻ lại — BB-338).
  * DELETE /api/g/moi-nguoi-than?id=<shareLinkId> — Ba mẹ thu hồi một lời mời.
  *
  * OWNER: DEV-BE. Task BB-254.
@@ -20,10 +21,17 @@
  * link (`/api/admin/galleries/[id]/share-link`) — mã trần KHÔNG bao giờ chạm
  * cơ sở dữ liệu, chỉ trả về đúng MỘT LẦN trong phản hồi POST này.
  *
- * KHÔNG lưu `share_link_ma` (bản mã hoá để hiện lại) như route CSKH: màn
- * quản trị không cần hiện lại link của ông bà, và ba mẹ đã cầm link ngay lúc
- * tạo — thêm một bảng ghi mã hoá ở đây là thêm bề mặt rò rỉ không đổi lại
- * được gì.
+ * BB-338 (anh báo 01/10/2026): "ba mẹ mời và tạo link xong, thoát ra vào lại
+ * thì không thấy link để gửi hoặc kiểm tra, chỉ có thu hồi". Trước đây route
+ * này CỐ Ý không lưu bản mã hoá — nay lưu, theo ĐÚNG khuôn mẫu đã duyệt của
+ * link CSKH (BB-201, migration 0070 `share_link_ma`: AES-256-GCM, khoá ở máy
+ * chủ, bảng thu hết quyền của anon/authenticated). Không cần migration mới.
+ *   - Chỉ GET của chính phiên ba mẹ (owner/co_editor) ĐÚNG bộ ảnh mới nhận lại
+ *     địa chỉ; viewer vẫn 403 như cũ.
+ *   - Chỉ trả cho link CÒN SỐNG (active); thu hồi/hết hạn thì không trả.
+ *   - Giải mã xong ĐỐI CHIẾU với `token_hash` — lệch thì thà không trả.
+ *   - Link tạo TRƯỚC bản vá (không có bản mã) → `diaChi: null`; màn ba mẹ
+ *     cho "Tạo lại link" (thu hồi link cũ + tạo link mới cùng nhãn).
  *
  * ---------------------------------------------------------------------------
  * Vì sao CHỈ phiên KHÔNG PHẢI viewer được gọi
@@ -54,6 +62,7 @@ import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-s
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MoiNguoiThanSchema } from "./schema";
 import { diaChiDayDu } from "@/lib/lark/ghi-link-app";
+import { giaiMaMaLink, maHoaMaLink } from "@/lib/auth/ma-link";
 
 export const runtime = "nodejs";
 
@@ -166,6 +175,27 @@ export async function POST(request: Request): Promise<Response> {
       .single();
     if (insertError) throw insertError;
 
+    // 4b. BB-338 — lưu bản MÃ HOÁ để ba mẹ vào lại vẫn thấy link (khuôn mẫu
+    // BB-201/BB-320 của route CSKH). Hỏng ở đây KHÔNG làm hỏng việc tạo link —
+    // link vẫn trả về lần này; chỉ là lần sau không hiện lại được (log để biết).
+    let luuDiaChiDuoc = true;
+    try {
+      const { error: maErr } = await admin
+        .from("share_link_ma")
+        .insert({ share_link_id: link.id, ma_hoa: maHoaMaLink(ma) });
+      if (maErr) throw new Error(maErr.message);
+    } catch (err) {
+      luuDiaChiDuoc = false;
+      console.error(
+        JSON.stringify({
+          evt: "share_link_ma.insert_failed",
+          requestId,
+          shareLinkId: link.id,
+          lyDo: err instanceof Error ? err.message : String(err),
+        }),
+      );
+    }
+
     // 5. Nhật ký — SÁU ký tự đầu, không bao giờ cả mã (cùng luật với route CSKH).
     const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "customer",
@@ -185,11 +215,11 @@ export async function POST(request: Request): Promise<Response> {
         data: {
           shareLinkId: link.id,
           nhan,
-          // Địa chỉ ĐẦY ĐỦ, trả về ĐÚNG MỘT LẦN — không đọc lại được sau lượt
-          // này (cùng luật với mã link nói chung, xem `bam-ma-link.ts`).
+          // Địa chỉ ĐẦY ĐỦ. BB-338: GET đọc lại được nhờ bản mã hoá ở trên.
           diaChiDayDu: diaChiDayDu(duongDan) ?? duongDan,
           duongDan,
           createdAt: link.created_at,
+          luuDiaChiDuoc,
         },
       },
       { status: 200, headers: { "Cache-Control": "no-store" } },
@@ -215,23 +245,57 @@ export async function GET(): Promise<Response> {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("share_links")
-      .select("id, label, status, created_at, expires_at, revoked_at")
+      .select("id, label, status, created_at, expires_at, revoked_at, token_hash")
       .eq("gallery_id", session.galleryId)
       .eq("role", "viewer")
       .order("created_at", { ascending: false });
     if (error) throw error;
 
+    // BB-338 — link CÒN SỐNG thì giải bản mã hoá để ba mẹ chép/chia sẻ lại.
+    const dangSong = (data ?? []).filter((d) => d.status === "active");
+    const maTheoLink = new Map<string, string>();
+    if (dangSong.length > 0) {
+      const { data: maRows, error: maErr } = await admin
+        .from("share_link_ma")
+        .select("share_link_id, ma_hoa")
+        .in(
+          "share_link_id",
+          dangSong.map((d) => d.id),
+        );
+      if (maErr) {
+        console.error(JSON.stringify({ evt: "share_link_ma.read_failed", requestId, lyDo: maErr.message }));
+      }
+      for (const r of maRows ?? []) {
+        const link = dangSong.find((d) => d.id === r.share_link_id);
+        let ma: string | null = null;
+        try {
+          ma = giaiMaMaLink(r.ma_hoa);
+        } catch {
+          ma = null;
+        }
+        // Đối chiếu băm: bản mã lệch link thì thà không trả còn hơn trả nhầm.
+        if (link && ma && bam(ma) === link.token_hash) maTheoLink.set(link.id, ma);
+      }
+    }
+
     return NextResponse.json(
       {
         data: {
-          items: (data ?? []).map((d) => ({
-            id: d.id,
-            nhan: d.label,
-            trangThai: d.status,
-            createdAt: d.created_at,
-            expiresAt: d.expires_at,
-            revokedAt: d.revoked_at,
-          })),
+          items: (data ?? []).map((d) => {
+            const ma = maTheoLink.get(d.id);
+            const duongDan = ma ? `/g/${ma}` : null;
+            return {
+              id: d.id,
+              nhan: d.label,
+              trangThai: d.status,
+              createdAt: d.created_at,
+              expiresAt: d.expires_at,
+              revokedAt: d.revoked_at,
+              // null = link đã thu hồi/hết hạn, hoặc tạo trước BB-338 (không có bản mã).
+              duongDan,
+              diaChiDayDu: duongDan ? (diaChiDayDu(duongDan) ?? duongDan) : null,
+            };
+          }),
         },
       },
       { headers: { "Cache-Control": "no-store" } },

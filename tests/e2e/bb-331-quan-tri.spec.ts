@@ -116,7 +116,7 @@ test("Ảnh vượt hạn mức: mỗi dòng có Xác nhận thanh toán / Mở 
     const hangThaoTac = lienKet.locator("xpath=ancestor::tr[1]/following-sibling::tr[1]");
     const thaoTac = hangThaoTac.getByTestId("thao-tac-vuot-han-muc");
     await expect(thaoTac.getByTestId("nut-xac-nhan-thanh-toan")).toBeVisible();
-    await expect(thaoTac.getByTestId("nut-mo-bo-anh")).toHaveAttribute("href", `/admin/galleries/${d.chinh.id}`);
+    await expect(thaoTac.getByTestId("nut-mo-bo-anh")).toHaveAttribute("href", `/admin/galleries/${d.chinh.id}#thanh-toan`);
     await expect(thaoTac.getByRole("button", { name: "Nhắc khách" })).toBeVisible();
 
     await thaoTac.getByTestId("nut-xac-nhan-thanh-toan").click();

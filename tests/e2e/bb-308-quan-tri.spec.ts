@@ -178,7 +178,8 @@ test.describe("BB-308: màn quản trị — menu ⋯, bộ chọn chi nhánh, a
     // Menu ĐÓNG: các thao tác phụ không được nằm trần trên trang nữa — nếu
     // hoàn nguyên bản vá BB-308 (trả các nút này về thẻ cột phải như trước),
     // các dòng dưới đây phải ĐỎ.
-    await expect(page.getByRole("button", { name: "Đồng bộ lại" })).toHaveCount(0);
+    // "Đồng bộ lại" được đưa trở lại trang (BB-326, anh 29/09: chi tiết bộ ảnh phải có
+    // đủ thao tác xử lý, kể cả đồng bộ Drive) — nên không còn canh nút này vắng mặt.
     await expect(page.getByRole("button", { name: "Đổi thư mục" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Chuẩn bị ảnh bìa" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Gia hạn/ })).toHaveCount(0);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Select } from "@/components/ui/select";
+import { OChonTim } from "@/components/ui/o-chon-tim";
 import { Building2 } from "lucide-react";
 
 interface Branch {
@@ -87,7 +87,7 @@ export function BranchSelector() {
   return (
     <div className="flex items-center gap-2">
       <Building2 className="h-4 w-4 text-[var(--bb-fg-muted)] hidden sm:block" />
-      <Select
+      <OChonTim
         name="branchId"
         value={selected}
         onChange={handleChange}
@@ -100,7 +100,7 @@ export function BranchSelector() {
             {branch.name}
           </option>
         ))}
-      </Select>
+      </OChonTim>
     </div>
   );
 }

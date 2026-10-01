@@ -35,6 +35,8 @@ import { maLarkConHieuLuc } from "@/lib/gallery-status";
 import { dangCheDoChonThem } from "@/lib/gallery/dot-chon";
 import { chotDotChon, layCacDot } from "@/lib/gallery/dot-chon-server";
 import { ChotDotChonSchema } from "./schema";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -125,6 +127,9 @@ export async function POST(request: Request): Promise<Response> {
 
     // Khoá payload KHÔNG được chứa chữ "anh" — `locBoAnh()` cắt mọi khoá khớp
     // (bẫy của BB-200/BB-245): "soTam"/"phuThuTam" thay cho "soAnh"/"tienAnh".
+    // BB-342: nhân viên thấy đợt mới ngay, không F5.
+    await phatSuKienBoAnh({ galleryId: gallery.id, branchId: gallery.branch_id, loai: LOAI_TUC_THI.khachChotDot });
+
     await enqueueLarkNotification({
       branchId: String(gallery.branch_id),
       event: "selection.round_submitted",

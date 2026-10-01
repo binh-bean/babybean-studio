@@ -46,6 +46,8 @@
 import "server-only";
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export interface NoiDungThongBao {
   tieuDe: string;
@@ -223,6 +225,10 @@ export async function guiThongBaoBoAnh(
   noiDung: NoiDungThongBao,
 ): Promise<KetQuaGuiThongBao> {
   const thongBaoId = await ghiHopThu(client, galleryId, noiDung);
+  // BB-342: màn khách đang mở tự tải lại (tiến độ, khoá/mở, chuông) và màn
+  // nhân viên cùng chi nhánh cũng vậy — không cần F5. Sau ghiHopThu để chuông
+  // tải lại là thấy tin; không bao giờ ném.
+  await phatSuKienBoAnh({ galleryId, loai: LOAI_TUC_THI.studioThongBao }, client);
   const soMayNhanDay = await guiPushToiBoAnh(client, galleryId, noiDung, thongBaoId);
   return { daVaoChuong: thongBaoId !== null, soMayNhanDay };
 }

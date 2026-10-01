@@ -121,14 +121,15 @@ describe("BB-279: IDOR nhánh batch của POST /api/g/addons (chọn nhiều t�
     void selectionB;
 
     const { rows: prodIn } = await client.query(
-      `insert into products (name, kind, list_price, price_confidence, price_samples, is_active)
-       values ('Fixture BB-279 In ảnh 30x40', 'print', 100000, 0.9, 10, true) returning id`,
+      // BB-339: hàng in phải có trong bảng giá 01/10 (chất liệu + kích thước) mới bán.
+      `insert into products (name, kind, material, size, list_price, price_confidence, price_samples, is_active)
+       values ('Fixture BB-279 In ảnh 30x40', 'print', 'Gỗ', '30x45', 100000, 0.9, 10, true) returning id`,
     );
     productInId = prodIn[0].id;
 
     const { rows: prodAlbum } = await client.query(
-      `insert into products (name, kind, material, list_price, price_confidence, price_samples, is_active)
-       values ('Fixture BB-279 Album', 'print', 'Album (Ultra HD)', 500000, 0.9, 10, true) returning id`,
+      `insert into products (name, kind, material, size, list_price, price_confidence, price_samples, is_active)
+       values ('Fixture BB-279 Album', 'print', 'Album (Ultra HD)', '20x20', 500000, 0.9, 10, true) returning id`,
     );
     productAlbumId = prodAlbum[0].id;
   });

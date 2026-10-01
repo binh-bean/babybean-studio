@@ -1,6 +1,18 @@
 import { cache } from "react";
 import { createServerClient } from "../supabase/server";
 import { StaffSession, StaffRole } from "../../types/domain";
+import { headers } from "next/headers";
+import { HEADER_NGUOI_DUNG, docNguoiDung } from "./dau-nguoi-dung";
+
+/** Dấu "middleware đã xác thực" của request đang chạy, hoặc `null` ngoài request. */
+async function uidTuMiddleware(): Promise<string | null> {
+  try {
+    const h = await headers();
+    return await docNguoiDung(h.get(HEADER_NGUOI_DUNG), h.get("cookie") ?? "");
+  } catch {
+    return null;
+  }
+}
 
 export class AuthError extends Error {
   constructor(public code: "UNAUTHENTICATED" | "FORBIDDEN", message?: string) {
@@ -30,9 +42,21 @@ export const requireStaff = cache(requireStaffKhongCache);
 
 async function requireStaffKhongCache(): Promise<StaffSession> {
   const supabase = await createServerClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (authError || !user) {
+  // BB-341 — trang /admin: middleware vừa hỏi Supabase Auth cho CHÍNH cookie
+  // này và để lại dấu ký (src/lib/auth/dau-nguoi-dung.ts). Dấu hợp lệ thì dùng
+  // luôn — bớt một lượt gọi Auth nối đuôi mỗi lần mở trang. Không có dấu (route
+  // API, phép thử, dấu hỏng/hết hạn) thì hỏi `getUser()` như cũ.
+  let user: { id: string } | null = null;
+  const uidDaXacThuc = await uidTuMiddleware();
+  if (uidDaXacThuc) {
+    user = { id: uidDaXacThuc };
+  } else {
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (!authError && data.user) user = data.user;
+  }
+
+  if (!user) {
     throw new AuthError("UNAUTHENTICATED");
   }
 

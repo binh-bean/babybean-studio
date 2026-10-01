@@ -13,7 +13,7 @@ import React from "react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
-import { tinhGiamGia } from "@/lib/gallery/tien-phat-sinh";
+import { tinhGiamGia, CAU_CHUA_PHAT_SINH_TIEN } from "@/lib/gallery/tien-phat-sinh";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 
 /** Gửi một lần ghi thu (kèm % giảm nếu có). Trả `outstanding` sau khi ghi. */
@@ -39,15 +39,24 @@ export async function ghiThanhToan(
 }
 
 export function PaymentForm({
-  disabled,
+  disabled: disabledNgoai,
   conThieu,
+  chuaPhatSinh = false,
   onSubmit,
 }: {
   disabled?: boolean;
   /** Số còn thiếu hiện tại (0 nếu đã đủ) — nền để gợi ý số tiền và tính giảm giá. */
   conThieu: number;
+  /**
+   * BB-344 — luật chủ studio "nếu không phát sinh thì khối không nhấn được": true thì
+   * MỌI ô và nút bị khoá và hiện câu "Chưa phát sinh tiền cần thu". Máy chủ cũng từ
+   * chối ghi thu khi số cần thu = 0 (payments/route.ts), nên khoá ở đây không phải
+   * chỗ chặn duy nhất.
+   */
+  chuaPhatSinh?: boolean;
   onSubmit: (amount: number, method: string, note: string, discountPercent: number | null) => void;
 }) {
+  const disabled = disabledNgoai || chuaPhatSinh;
   const [amount, setAmount] = React.useState(conThieu > 0 ? String(conThieu) : "");
   const [method, setMethod] = React.useState("tien_mat");
   const [note, setNote] = React.useState("");
@@ -147,6 +156,11 @@ export function PaymentForm({
       >
         {coGiam ? "Ghi giảm giá và thu" : "Ghi nhận đã thu"}
       </button>
+      {chuaPhatSinh && (
+        <p data-testid="chua-phat-sinh-tien" className="basis-full text-sm text-[var(--bb-fg-muted)]">
+          {CAU_CHUA_PHAT_SINH_TIEN}
+        </p>
+      )}
       {/* Hiện RÕ phần giảm và số khách phải trả — trước khi bấm ghi. */}
       {coGiam && (
         <p data-testid="dong-giam-gia" className="basis-full text-sm">

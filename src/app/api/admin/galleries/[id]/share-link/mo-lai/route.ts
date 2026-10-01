@@ -45,6 +45,8 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -152,6 +154,9 @@ export async function POST(
         daTungThuHoi,
       }),
     );
+
+    // BB-342: màn nhân viên khác cập nhật ngay.
+    await phatSuKienBoAnh({ galleryId, branchId: gallery.branch_id, loai: LOAI_TUC_THI.studioMoLink });
 
     return ok({
       shareLinkId: link.id,

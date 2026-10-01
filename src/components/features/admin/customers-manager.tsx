@@ -106,6 +106,10 @@ export function CustomersManager({
   const [loi, setLoi] = useState<string | null>(null);
   const [dangMo, setDangMo] = useState<string | null>(null);
 
+  const [dangTaiThem, setDangTaiThem] = useState(false);
+  const [dangDongBo, setDangDongBo] = useState(false);
+  const [baoDongBo, setBaoDongBo] = useState<{ ok: boolean; cau: string } | null>(null);
+
   const tai = useCallback(async (q: string) => {
     setDangTai(true);
     setLoi(null);
@@ -123,6 +127,51 @@ export function CustomersManager({
       setDangTai(false);
     }
   }, []);
+
+  /** BB-337 mục 3 — tải trang kế tiếp, nối vào cuối danh sách đang hiện. */
+  async function taiThem() {
+    setDangTaiThem(true);
+    try {
+      const res = await fetch(
+        `/api/admin/customers?q=${encodeURIComponent(tuKhoa.trim())}&offset=${items.length}`,
+        { cache: "no-store" },
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error?.message ?? t.loiTai);
+      const daCo = new Set(items.map((k) => k.id));
+      setItems([...items, ...(json.data.items as DongKhach[]).filter((k) => !daCo.has(k.id))]);
+      setTong(json.data.total);
+    } catch (e) {
+      setLoi(e instanceof Error ? e.message : t.loiTai);
+    } finally {
+      setDangTaiThem(false);
+    }
+  }
+
+  /** BB-337 mục 3 — chạy ngay lượt đồng bộ Lark của cron sáng (chỉ đọc Lark). */
+  async function dongBoNgay() {
+    setDangDongBo(true);
+    setBaoDongBo(null);
+    try {
+      const res = await fetch("/api/admin/customers/dong-bo", { method: "POST" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setBaoDongBo({ ok: false, cau: json?.error?.message ?? "Không đồng bộ được, thử lại giúp." });
+        return;
+      }
+      const d = json.data;
+      setBaoDongBo(
+        d.dangChay
+          ? { ok: false, cau: t.dongBoDangChay }
+          : { ok: true, cau: t.dongBoXong.replace("{doc}", formatSo(d.docDuoc)).replace("{moi}", formatSo(d.taoMoi)) },
+      );
+      await tai(tuKhoa.trim());
+    } catch {
+      setBaoDongBo({ ok: false, cau: "Mất kết nối, thử lại giúp." });
+    } finally {
+      setDangDongBo(false);
+    }
+  }
 
   // Gõ tới đâu tìm tới đó, nhưng chờ người ta gõ xong một nhịp rồi mới hỏi
   // máy chủ — gõ mười chữ số mà bắn mười câu truy vấn là tự làm chậm mình.
@@ -173,7 +222,28 @@ export function CustomersManager({
             {t.xoaTim}
           </Button>
         )}
+        {coQuyenSua && (
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="nut-dong-bo-khach"
+            disabled={dangDongBo}
+            onClick={() => void dongBoNgay()}
+            title={t.dongBoGoiY}
+          >
+            {dangDongBo ? t.dangDongBo : t.dongBoNgay}
+          </Button>
+        )}
       </div>
+      {baoDongBo && (
+        <p
+          role="status"
+          data-testid="bao-dong-bo-khach"
+          className={`text-xs ${baoDongBo.ok ? "text-[var(--bb-fg-muted)]" : "text-[var(--bb-danger)]"} ${anDanhSach}`}
+        >
+          {baoDongBo.cau}
+        </p>
+      )}
       <p className={`text-xs text-[var(--bb-fg-muted)] ${anDanhSach}`}>{t.goiY}</p>
 
       {loi && (
@@ -319,11 +389,25 @@ export function CustomersManager({
 
           {/* Danh sách cắt ở 50 dòng. Nói ra, chứ im lặng thì người ta tưởng
               chi nhánh chỉ có đúng ngần này khách. */}
-          {tong > items.length && (
-            <p className="text-xs text-[var(--bb-fg-muted)]">
-              {t.conNua.replace("{n}", formatSo(items.length)).replace("{tong}", formatSo(tong))}
+          {/* BB-337 mục 3: báo rõ đang hiện bao nhiêu / tổng trong DB, và cho tải tiếp tới hết. */}
+          <div className="flex flex-wrap items-center gap-3" data-testid="chan-danh-sach-khach">
+            <p className="text-xs text-[var(--bb-fg-muted)]" data-testid="dem-khach">
+              {tong > items.length
+                ? t.conNua.replace("{n}", formatSo(items.length)).replace("{tong}", formatSo(tong))
+                : t.dangHienDu.replace("{tong}", formatSo(tong))}
             </p>
-          )}
+            {tong > items.length && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="nut-tai-them-khach"
+                disabled={dangTaiThem}
+                onClick={() => void taiThem()}
+              >
+                {dangTaiThem ? t.dangTaiThem : t.taiThem}
+              </Button>
+            )}
+          </div>
         </>
       )}
       </div>
@@ -474,9 +558,19 @@ function HoSoKhach({
     <Card className="min-w-0 space-y-5 p-4 md:p-6">
       <div className="flex items-start justify-between gap-3">
         <h2 className="font-display text-lg font-semibold">{t.hoSo}</h2>
-        <Button variant="ghost" size="sm" onClick={onDong}>
-          {t.dong}
-        </Button>
+        <div className="flex shrink-0 items-center gap-1">
+          {/* BB-337 mục 3 — trang chi tiết khách: lịch sử chụp, lịch sử mua, tổng giá trị, lượt ghé. */}
+          <Link
+            href={`/admin/customers/${encodeURIComponent(id)}`}
+            data-testid="link-trang-khach"
+            className="inline-flex h-9 items-center rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-3 text-xs font-medium hover:bg-[var(--bb-surface-2)]"
+          >
+            {t.xemTrang}
+          </Link>
+          <Button variant="ghost" size="sm" onClick={onDong}>
+            {t.dong}
+          </Button>
+        </div>
       </div>
 
       {loi && (

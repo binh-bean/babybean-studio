@@ -30,7 +30,7 @@ export const revalidate = 3600; // Cache for 1 hour since branches don't change 
  * BB-331 (30/09/2026) — anh gạch thẻ "Nhân viên studio" ở cột phải:
  *  - Bỏ thẻ đó; lối vào nhân viên chỉ còn nút nhỏ ở góc phải, kiểu kính mờ
  *    (nền trong mờ + backdrop-blur + viền mảnh) thay vì khối xám đậm.
- *  - Tiêu đề lớn đổi thành "Yours truly, Bean" (Playfair, không nghiêng).
+ *  - Tiêu đề lớn đổi thành "Yours truly Bean" (Playfair, không nghiêng).
  *  - Mất cột phải nên dồn về MỘT cột căn giữa ở mọi khổ; danh sách chi nhánh
  *    (nếu có) nằm ngay dưới, cùng bề rộng.
  */

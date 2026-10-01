@@ -13,6 +13,8 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { layDanhSachChoXacNhanDot, layDanhSachViecDot1 } from "@/lib/gallery/dot-chon-server";
+import { gomTheoBoAnh, layDot1ChoXacNhan } from "@/lib/gallery/khach-gui-anh-chon";
+import { layDatChinhSuaChoXuLy } from "@/lib/gallery/tim-gia-dinh-server";
 
 export const runtime = "nodejs";
 
@@ -38,13 +40,17 @@ export async function GET(request: Request): Promise<Response> {
       branchIds = null;
     } else {
       branchIds = staff.branchIds;
-      if (branchIds.length === 0) return ok({ items: [], viecDot1: [], canConfirm: false });
+      if (branchIds.length === 0) return ok({ items: [], viecDot1: [], boAnh: [], canConfirm: false });
     }
 
     const admin = createAdminClient();
-    const [items, viecDot1] = await Promise.all([
+    const [items, viecDot1, dot1, datChinhSua] = await Promise.all([
       layDanhSachChoXacNhanDot(admin, branchIds),
       layDanhSachViecDot1(admin, branchIds),
+      // BB-337 — đợt 1 khách đã chốt, chờ studio xác nhận (trangThaiBoAnh, BB-332).
+      layDot1ChoXacNhan(admin, branchIds),
+      // BB-345 — gia đình đặt chỉnh sửa các tấm đã thả tim (yeu_cau_mua_them loai 'chinh_sua').
+      layDatChinhSuaChoXuLy(admin, branchIds),
     ]);
 
     return ok({
@@ -66,6 +72,8 @@ export async function GET(request: Request): Promise<Response> {
       })),
       // Đợt 1: khách nhờ studio chọn thêm ảnh / chốt khi còn sản phẩm in chưa chọn ảnh.
       viecDot1,
+      // BB-337 — tab "Khách gửi ảnh chọn": MỖI BỘ ẢNH MỘT DÒNG (đợt 1 + mua thêm + nhờ chọn giúp).
+      boAnh: gomTheoBoAnh(dot1, items, viecDot1, datChinhSua),
       canConfirm: staff.permissions.includes("galleries:write"),
     });
   } catch (err) {

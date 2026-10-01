@@ -38,6 +38,8 @@ import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -159,6 +161,9 @@ export async function PATCH(
         ghiChuCskh: ghiChuCskh || null,
       },
     });
+
+    // BB-342: khách thấy trạng thái yêu cầu mua thêm ngay.
+    await phatSuKienBoAnh({ galleryId, branchId: gallery.branch_id, loai: LOAI_TUC_THI.studioMuaThem });
 
     return ok({ id: yeuCauId, trangThai: trangThaiMoi });
   } catch (err) {

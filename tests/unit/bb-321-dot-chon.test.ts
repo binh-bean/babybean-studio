@@ -303,18 +303,19 @@ describe("BB-321 (4): thẻ Lark 'selection.round_submitted' sống sót qua loc
 // ---------------------------------------------------------------------------
 
 describe("BB-321: đợt mua thêm chờ xác nhận vào 'Việc cần xử lý'", () => {
-  it("choDotChon được cộng vào huy hiệu và có dòng riêng dẫn tới tab 'Khách mua thêm'", () => {
-    const d = { choDotChon: 3, choMoLai: 1 };
+  // BB-344: hai trường cũ choDotChon/choStudioChon gộp thành `khachGuiAnhChon` (một dòng, đếm theo bộ ảnh).
+  it("khachGuiAnhChon được cộng vào huy hiệu và có dòng riêng dẫn tới tab 'Khách gửi ảnh chọn'", () => {
+    const d = { khachGuiAnhChon: 3, choMoLai: 1 };
     expect(demSoCanXuLy(d)).toBe(4);
     const dong = dongCanXuLy(d);
     expect(dong.reduce((n, r) => n + r.soLuong, 0)).toBe(demSoCanXuLy(d));
-    const dongDot = dong.find((r) => r.key === "cho-dot-chon");
+    const dongDot = dong.find((r) => r.key === "khach-gui-anh-chon");
     expect(dongDot?.soLuong).toBe(3);
     expect(dongDot?.href).toContain("tab=khach-mua-them");
   });
 
-  it("không có đợt nào chờ thì không hiện dòng", () => {
-    expect(dongCanXuLy({ choDotChon: 0 }).some((r) => r.key === "cho-dot-chon")).toBe(false);
+  it("không có bộ nào chờ thì không hiện dòng", () => {
+    expect(dongCanXuLy({ khachGuiAnhChon: 0 }).some((r) => r.key === "khach-gui-anh-chon")).toBe(false);
   });
 });
 
@@ -464,12 +465,12 @@ describe("BB-321 (7): Lark + Việc cần xử lý cho hai việc của đợt 1
     expect(JSON.stringify(the)).toContain("Còn 1 sản phẩm in chưa chọn ảnh");
   });
 
-  it("choStudioChon vào huy hiệu 'Cần xử lý ngay' và có dòng riêng", () => {
-    const d = { choStudioChon: 2, choDotChon: 1 };
-    expect(demSoCanXuLy(d)).toBe(3);
+  it("khachGuiAnhChon (gồm cả bộ khách nhờ studio chọn giúp) vào 'Cần xử lý ngay' qua MỘT dòng", () => {
+    const d = { khachGuiAnhChon: 2 };
+    expect(demSoCanXuLy(d)).toBe(2);
     const dong = dongCanXuLy(d);
+    expect(dong).toHaveLength(1);
     expect(dong.reduce((n, r) => n + r.soLuong, 0)).toBe(demSoCanXuLy(d));
-    expect(dong.find((r) => r.key === "cho-studio-chon")?.soLuong).toBe(2);
-    expect(dongCanXuLy({ choStudioChon: 0 }).some((r) => r.key === "cho-studio-chon")).toBe(false);
+    expect(dong[0]?.key).toBe("khach-gui-anh-chon");
   });
 });

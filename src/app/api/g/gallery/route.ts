@@ -1,18 +1,73 @@
-import { isSubmittedOrLater, isGalleryLocked, maLarkConHieuLuc, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { isSubmittedOrLater, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import type { NextResponse } from "next/server";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { dangNhapBangMa, datCookiePhien } from "@/lib/auth/dang-nhap-bang-ma";
+import type { GallerySession } from "@/types/domain";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
-import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
+import { nhomSanPham, canGanAnh, sanPhamBanChoKhach, laSanPhamThu } from "@/lib/products/nhom-san-pham";
 import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
-import { nhanHienThi, qua60NgayFileGoc } from "@/lib/lark/trang-thai-hau-ky";
+import { nhanHienThi } from "@/lib/lark/trang-thai-hau-ky";
+import { khoaChonCuaKhach } from "@/lib/gallery/khoa-chon-khach";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
+import { layDuLieuChungBoAnh } from "@/lib/gallery/du-lieu-chung-bo-anh";
 
+/**
+ * BB-341 — MỘT vòng cho lần đầu mở link.
+ *
+ * Trước đây lần đầu ba mẹ bấm link (chưa có cookie), màn khách đi BA vòng nối
+ * đuôi: GET đường này → 401 → POST /api/auth/gallery → GET lại. Đo bản build ở
+ * máy, giả lập 4G (tests/e2e/bb-333-do-toc-do.spec.ts): `/api/auth/gallery`
+ * ~1 s là lượt API chậm nhất của màn khách, nằm thẳng trên đường tới ảnh bìa.
+ *
+ * Nay: CHƯA có phiên dùng được (không cookie, cookie hỏng, link của phiên đã
+ * thu hồi — đúng những ca màn khách vẫn tự POST) mà địa chỉ có `?token=` thì
+ * đổi mã lấy phiên NGAY Ở ĐÂY bằng đúng lõi của POST (`dangNhapBangMa` — giới
+ * hạn lượt theo IP, nhật ký, link thu hồi/hết hạn y như cũ), rồi trả dữ liệu
+ * và đặt cookie trên CÙNG phản hồi.
+ *
+ * KHÔNG đổi: phiên CÒN SỐNG của bộ KHÁC vẫn trả 409 SESSION_MISMATCH (BB-187)
+ * — ca hiếm, màn khách tự POST lại như cũ. Đổi mã thất bại thì trả lỗi kèm
+ * `daThuMa: true` để màn khách không POST lại lần hai (đỡ một vòng, đỡ một lượt
+ * đếm giới hạn).
+ */
 export async function GET(request: Request) {
+  let session: GallerySession;
+  let cookieMoi: { token: string; expiresAt: Date } | null = null;
   try {
-    const session = await requireGallerySession();
+    session = await requireGallerySession();
+  } catch (error) {
+    const ma = new URL(request.url).searchParams.get("token");
+    if (!(error instanceof GallerySessionError)) {
+      console.error("[GET /api/g/gallery]", error);
+      return fail("INTERNAL");
+    }
+    if (!ma) return fail(error.code);
+    try {
+      const kq = await dangNhapBangMa(ma, request);
+      if (!kq.ok) return fail(kq.code, kq.message, { daThuMa: true });
+      session = { ...kq.phien, exp: Math.floor(kq.cookie.expiresAt.getTime() / 1000) };
+      cookieMoi = kq.cookie;
+    } catch (loi) {
+      console.error("[GET /api/g/gallery] đổi mã lấy phiên", loi);
+      return fail("INTERNAL");
+    }
+  }
+  const res = await traDuLieu(request, session, cookieMoi !== null);
+  if (cookieMoi) datCookiePhien(res, cookieMoi);
+  return res;
+}
+
+async function traDuLieu(
+  request: Request,
+  session: GallerySession,
+  /** Phiên vừa ký từ CHÍNH mã trên địa chỉ — khỏi tra lại mã lần hai. */
+  maDaKiem: boolean,
+): Promise<NextResponse> {
+  try {
 
     // -------------------------------------------------------------------
     // BB-187 — MÃ TRÊN THANH ĐỊA CHỈ LÀ NGUỒN ĐÚNG, KHÔNG PHẢI PHIÊN
@@ -56,7 +111,7 @@ export async function GET(request: Request) {
     // đợt 1 chỉ được đọc SAU khi hai phép kiểm đó qua — chạy trước không có
     // nghĩa là trả ra trước.
     const supabase = await createAdminClient();
-    const kiemMaTrenDiaChi: Promise<boolean> = maTrenDiaChi
+    const kiemMaTrenDiaChi: Promise<boolean> = maTrenDiaChi && !maDaKiem
       ? (async () => {
           const { data: linkTheoMa } = await supabase
             .from("share_links")
@@ -112,13 +167,11 @@ export async function GET(request: Request) {
         .single(),
     );
 
-    const pChatSetting = chayNgay(
-      supabase
-        .from("settings")
-        .select("value")
-        .eq("key", "chat.page_url")
-        .is("branch_id", null)
-        .maybeSingle(),
+    // BB-341 — link chat, dải quảng cáo và danh mục mua thêm GIỐNG NHAU cho mọi
+    // bộ ảnh: đọc qua bộ nhớ đệm 5 phút (src/lib/gallery/du-lieu-chung-bo-anh.ts).
+    // Đọc hỏng thì coi như trống — như trước, ba câu này chưa bao giờ làm sập màn khách.
+    const pChung = chayNgay(
+      layDuLieuChungBoAnh(supabase).catch(() => ({ chatSetting: null, banner: [], catalogue: [] })),
     );
 
     // Get subfolders for the gallery
@@ -201,16 +254,7 @@ export async function GET(request: Request) {
      * thêm trong lúc đang chọn ảnh. Bán buổi chụp qua nút "+" trên màn ảnh là
      * đường dẫn tới hiểu nhầm đắt tiền.
      */
-    const pCatalogue = chayNgay(
-      supabase
-        .from("products")
-        .select("id, name, kind, material, size, list_price, price_confidence, price_samples")
-        .eq("is_active", true)
-        .in("kind", ["print", "addon", "edited_photo"])
-        .not("list_price", "is", null)
-        .not("price_confidence", "is", null)
-        .order("list_price", { ascending: true }),
-    );
+    // (Truy vấn danh mục nằm ở layDuLieuChungBoAnh — pChung phía trên.)
 
     /*
       Dải quảng cáo của studio, hiện ở khoảng trống bên tấm ảnh đang xem.
@@ -221,13 +265,7 @@ export async function GET(request: Request) {
 
       Không có ảnh thì trả `null` — màn khách không dựng ô trống.
     */
-    const pBanner = chayNgay(
-      supabase
-        .from("settings")
-        .select("key, value")
-        .in("key", ["gallery.banner_image_url", "gallery.banner_link_url"])
-        .is("branch_id", null),
-    );
+    // (Đọc cài đặt quảng cáo nằm ở layDuLieuChungBoAnh — pChung phía trên.)
 
     // Lấy danh sách ảnh đã đặt vào sản phẩm in (selection_placements)
     const pSelectionItems = chayNgay(
@@ -268,26 +306,22 @@ export async function GET(request: Request) {
     }
 
     const [
-      { data: chatSetting },
+      { chatSetting, banner: rawBanner, catalogue: rawCatalogue },
       { data: subfoldersData },
       { data: selection },
       { count: selectedCount },
       { count: favoriteCount },
       contractSummary,
       { data: rawAddons },
-      { data: rawCatalogue },
-      { data: rawBanner },
       { data: userSelectionItems },
     ] = await Promise.all([
-      pChatSetting,
+      pChung,
       pSubfolders,
       pSelection,
       pSelectedCount,
       pFavoriteCount,
       pContractSummary,
       pAddons,
-      pCatalogue,
-      pBanner,
       pSelectionItems,
     ]);
 
@@ -514,7 +548,10 @@ export async function GET(request: Request) {
     // Lọc TRƯỚC `.map` để `p.is_active` không cần mang qua object đã ánh xạ —
     // truy vấn phía trên đã `.eq("is_active", true)` nên luôn `true` ở đây.
     const catalogue = (rawCatalogue ?? [])
-      .filter((p) => sanPhamBanChoKhach({ isActive: true, kind: p.kind, material: p.material }))
+      .filter((p) => sanPhamBanChoKhach({ isActive: true, kind: p.kind, material: p.material, size: p.size }))
+      // BB-339 — sản phẩm THỬ ("Fixture …"/"TEST …", do phép thử chèn vào bb-dev)
+      // không bao giờ hiện cho khách, kể cả khi chất liệu + cỡ có trong bảng giá.
+      .filter((p) => !laSanPhamThu(p.name))
       .filter((p) => giaDuocBaoTuDong(p))
       .map((p) => ({
         productId: p.id,
@@ -544,25 +581,25 @@ export async function GET(request: Request) {
 
     // BB-327: CSKH mở lại SAU lần cuối Lark đổi trạng thái thì mã Lark cũ
     // không còn khoá/đè nhãn — xem `maLarkConHieuLuc`.
-    const larkHieuLuc = maLarkConHieuLuc(gallery);
+    // BB-285 — luật 60 ngày (docs/21 GĐ1): Lark còn "Đã gửi file gốc" quá 60
+    // ngày thì coi là đóng theo quy định — khoá chọn, câu nhẹ nhàng thay vì
+    // trang lỗi.
+    // BB-285 — khoá chọn dùng CHUNG với `patch_selection_batch`/mutate.ts:
+    // Lark đã sang "Đã chọn hình" trở lên, hoặc quá hạn 60 ngày, thì khoá dù
+    // app còn ghi ready/in_review/submitted. Không trả mã Lark thô cho khách
+    // (xem chú thích cũ dưới đây) — chỉ trả boolean đã tính sẵn.
+    // BB-338 — công thức tách ra `khoaChonCuaKhach` để `/api/g/xin-sua-lai`
+    // dùng ĐÚNG luật này (trước đó route ấy chỉ xét status, lệch với màn khách).
+    const {
+      khoa: khoaChonTheoLark,
+      quaHan60Ngay,
+      larkHieuLuc,
+    } = khoaChonCuaKhach(gallery);
     const tienDo = nhanHienThi(
       gallery.status,
       larkHieuLuc,
       (s) => GALLERY_STATUS_LABEL[s] ?? s,
     );
-    // BB-285 — luật 60 ngày (docs/21 GĐ1): Lark còn "Đã gửi file gốc" quá 60
-    // ngày thì coi là đóng theo quy định — khoá chọn, câu nhẹ nhàng thay vì
-    // trang lỗi.
-    const quaHan60Ngay = qua60NgayFileGoc(
-      larkHieuLuc,
-      gallery.lark_trang_thai_tu ? new Date(gallery.lark_trang_thai_tu) : null,
-      new Date(),
-    );
-    // BB-285 — khoá chọn dùng CHUNG với `patch_selection_batch`/mutate.ts:
-    // Lark đã sang "Đã chọn hình" trở lên, hoặc quá hạn 60 ngày, thì khoá dù
-    // app còn ghi ready/in_review/submitted. Không trả mã Lark thô cho khách
-    // (xem chú thích cũ dưới đây) — chỉ trả boolean đã tính sẵn.
-    const khoaChonTheoLark = isGalleryLocked(gallery.status, larkHieuLuc) || quaHan60Ngay;
 
     const responseData = {
       id: gallery.id,

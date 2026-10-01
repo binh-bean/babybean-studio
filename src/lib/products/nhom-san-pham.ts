@@ -35,6 +35,8 @@
  * từ `nhomSanPham()` ở nơi gọi.
  */
 
+import { coTrongBangGia } from "./bang-gia-01-10";
+
 export type NhomSanPham = "anh_in" | "album" | "khung";
 
 export const TEN_NHOM: Record<NhomSanPham, string> = {
@@ -84,16 +86,52 @@ export function canGanAnh(nhom: NhomSanPham | null): boolean {
   return nhom === "anh_in" || nhom === "khung";
 }
 
+/** Bỏ dấu tiếng Việt, chữ thường — để so khớp tên chất liệu. */
+function boDau(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+}
+
 /**
- * Chất liệu này có phải canvas không (bỏ dấu, không phân biệt hoa/thường).
+ * BB-339 — chất liệu Kim Tuyến. Tên trên Lark là "Cavas/Kim tuyến" (một ô gộp
+ * hai chữ, "Cavas" là lỗi chính tả cũ), nhưng theo bảng giá anh gửi 01/10/2026
+ * đây là ẢNH IN KIM TUYẾN đang bán (30×45 → 80×120), không phải canvas.
+ */
+export function laKimTuyen(material: string | null): boolean {
+  return boDau(material ?? "").includes("kim tuyen");
+}
+
+/**
+ * Chất liệu này có phải canvas THẬT không (bỏ dấu, không phân biệt hoa/thường).
  *
- * Tên thật trên Lark là "Cavas/Kim tuyến" (lỗi chính tả "Cavas" thay vì
- * "Canvas") — so khớp cả hai cách viết để không phụ thuộc vào việc ai đó bên
- * Lark có sửa lỗi chính tả này hay chưa.
+ * BB-339 — "Cavas/Kim tuyến" KHÔNG còn tính là canvas (xem `laKimTuyen`). Chỉ
+ * loại chất liệu ghi canvas/cavas mà không có chữ kim tuyến.
  */
 function laVatLieuCanvas(material: string | null): boolean {
-  const cl = (material ?? "").toLowerCase();
+  if (laKimTuyen(material)) return false;
+  const cl = boDau(material ?? "");
   return cl.includes("canvas") || cl.includes("cavas");
+}
+
+/**
+ * BB-339 — tên chất liệu hiện cho khách. "Cavas/Kim tuyến" → "Kim Tuyến":
+ * không để chữ "Cavas"/"Canvas" lên màn khách. Chất liệu khác giữ nguyên.
+ */
+export function tenChatLieuChoKhach(material: string | null): string | null {
+  if (material == null) return null;
+  return laKimTuyen(material) ? "Kim Tuyến" : material;
+}
+
+/**
+ * BB-339 — cùng luật trên nhưng cho một TÊN sản phẩm/dòng hợp đồng có lẫn chất
+ * liệu ("Cavas/Kim tuyến 40x60" → "Kim Tuyến 40x60").
+ */
+export function tenCoChatLieuChoKhach(ten: string): string {
+  return ten.replace(/ca[n]?vas\s*\/\s*kim\s*tuy[eếề]n/giu, "Kim Tuyến");
 }
 
 /**
@@ -114,19 +152,56 @@ function laVatLieuCanvas(material: string | null): boolean {
  *      `anh_in` để hiển thị màn "xem trên tường"; chủ studio BB-288 xác nhận
  *      lại đó là SAI cho mục đích BÁN: canvas không bán qua hậu kỳ.
  *
+ *      BB-339 — LUẬT MỚI theo bảng giá anh gửi 01/10/2026: "Cavas/Kim tuyến"
+ *      trên Lark là ẢNH IN KIM TUYẾN, ĐANG BÁN (7 cỡ 30×45 → 80×120, giá DB đã
+ *      khớp bảng). BB-288 lọc nhầm nó là canvas nên khách không thấy. Nay chỉ
+ *      loại canvas THẬT (chất liệu ghi canvas mà không có "kim tuyến"); Kim
+ *      Tuyến hiện cho khách bằng tên "Kim Tuyến" (`tenChatLieuChoKhach`).
+ *
+ *   4. BB-339 — anh chốt 01/10/2026 "App ẩn theo bảng giá": hàng in
+ *      (`kind = 'print'`) phải CÓ trong bảng giá 01/10 (`bang-gia-01-10.ts`,
+ *      theo cặp chất liệu + kích thước) — kể cả khi Lark còn ghi đang kinh
+ *      doanh. Bảng chỉ quyết định MÓN NÀO bán; giá vẫn là `list_price` từ Lark.
+ *      `edited_photo` (ảnh chỉnh thêm) không phải hàng in, không xét bảng.
+ *
  * CỐ Ý không sửa `nhomSanPham()` để loại canvas: hàm đó còn được dùng để xếp
  * NHÓM HIỂN THỊ cho hàng đã nằm sẵn trong gói đã mua
  * (`src/lib/products/hang-in-trong-goi.ts`) — hàng trong gói không bị lọc bởi
  * luật bán hàng này (BB-288 mục 4: "không đụng" gallery_items). Hàm này là
  * lớp lọc RIÊNG, chỉ áp cho đường bán hàng mới.
  */
-export function sanPhamBanChoKhach(sp: {
+export function sanPhamBanChoKhach(sp: SanPhamXetBan): boolean {
+  if (!sanPhamThuocNhomBan(sp)) return false;
+  if (sp.kind === "print" && !coTrongBangGia(sp.material, sp.size)) return false;
+  return true;
+}
+
+export interface SanPhamXetBan {
   isActive: boolean;
   kind: string | null;
   material: string | null;
-}): boolean {
+  /** BB-339 — bắt buộc truyền (null nếu không có): bảng giá xét theo kích thước. */
+  size: string | null;
+}
+
+/**
+ * Điều kiện 1–3 ở trên (đang kinh doanh, đúng 3 nhóm, không phải canvas thật),
+ * CHƯA xét bảng giá. Màn "Kích thước đang bán" (Cài đặt) dùng hàm này để còn
+ * liệt kê được món "Không có trong bảng giá — đang ẩn".
+ */
+export function sanPhamThuocNhomBan(sp: Omit<SanPhamXetBan, "size">): boolean {
   if (!sp.isActive) return false;
   if (nhomSanPham(sp.kind, sp.material) === null) return false;
   if (laVatLieuCanvas(sp.material)) return false;
   return true;
+}
+
+/**
+ * BB-339 — sản phẩm THỬ do phép thử chèn vào bb-dev ("Fixture …", "TEST …").
+ * Danh mục khách (`/api/g/gallery`) lọc bỏ — ngày 01/10/2026 "Fixture Khung
+ * kính đa giác 150.000 ₫" sót lại sau một lượt phép thử đã lọt vào màn mua
+ * thêm của khách. Cùng quy ước tên với màn "Kích thước đang bán" (Cài đặt).
+ */
+export function laSanPhamThu(name: string | null | undefined): boolean {
+  return /^(fixture|test)\s/i.test((name ?? "").trim());
 }

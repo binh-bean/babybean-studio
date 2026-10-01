@@ -18,6 +18,7 @@ import { redirect } from "next/navigation";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { SettingsManager } from "@/components/features/admin/settings-manager";
 import { DanhMucKichThuoc } from "@/components/features/admin/danh-muc-kich-thuoc";
+import { DongBoGiaSanPham } from "@/components/features/admin/dong-bo-gia-san-pham";
 import { PageHeader, KhongCoQuyen } from "@/components/features/admin/page-header";
 import { vi } from "@/i18n/vi";
 
@@ -45,6 +46,7 @@ export default async function AdminSettingsPage() {
     <main className="mx-auto min-w-0 max-w-6xl space-y-6">
       <PageHeader title={vi.admin.caiDat.title} description={vi.admin.caiDat.subtitle} />
       <SettingsManager />
+      <DongBoGiaSanPham />
       {/* BB-331: đủ mọi kích thước đang bán (chỉ đọc) + lý do khách chưa thấy. */}
       <DanhMucKichThuoc />
     </main>

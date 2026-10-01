@@ -118,7 +118,11 @@ export function CamOnSauChot({
         Studio đã nhận danh sách{tenBe ? ` của ${tenBe}` : ""}
       </h1>
       <p className="mt-2.5 text-[15px] text-muted-foreground">
-        Cảm ơn ba mẹ đã chọn từng khoảnh khắc.
+        Cảm ơn ba mẹ đã chọn từng khoảnh khắc ạ.
+      </p>
+      {/* BB-338 mục 1 — lời ký của studio, Playfair không nghiêng. */}
+      <p data-testid="loi-ky-bean" className="mt-1.5 font-display text-[18px] font-normal not-italic text-foreground">
+        Yours truly Bean
       </p>
 
       <div className="mt-6 w-full rounded-2xl border border-border bg-surface px-4 text-left">

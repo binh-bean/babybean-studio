@@ -22,8 +22,10 @@
  */
 
 import React from "react";
+import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { Badge } from "@/components/ui/badge";
 import { formatNgayGioVN, formatSo } from "@/lib/utils/dinh-dang";
+import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 
 interface Dong {
   id: string;
@@ -37,6 +39,10 @@ interface Dong {
   nguoiMuaTen?: string | null;
   nguoiMuaSdt?: string | null;
   nguoiMuaNhanLink?: string | null;
+  /** BB-345 — 'chinh_sua' = gia đình đặt chỉnh sửa các tấm đã thả tim. */
+  loai?: string;
+  anhChinhSua?: string[];
+  tamTinh?: number | null;
 }
 
 const NHAN_TRANG_THAI: Record<string, string> = {
@@ -100,6 +106,9 @@ export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
     }
   }, [galleryId]);
 
+  // BB-342: khách gửi yêu cầu mua thêm — khối này tự tải lại (chỉ bộ ảnh này).
+  useCapNhatTucThi("nhan-vien", () => void taiLai(), { galleryId });
+
   React.useEffect(() => {
     dongRef.current = false;
     void taiLai();
@@ -150,10 +159,17 @@ export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
           return (
             <li key={d.id} className="rounded-md border border-[var(--bb-border)] p-3 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  <strong>{d.productName ?? "—"}</strong> ×{d.soLuong}
-                  {d.photoFileName ? ` · ${d.photoFileName}` : ""}
-                </span>
+                {d.loai === "chinh_sua" ? (
+                  <span data-testid="dong-dat-chinh-sua">
+                    <strong>Đặt chỉnh sửa {formatSo(d.soLuong)} tấm</strong>
+                    {d.tamTinh != null && ` · tạm tính ${formatCurrencyVND(d.tamTinh)}`}
+                  </span>
+                ) : (
+                  <span>
+                    <strong>{d.productName ?? "—"}</strong> ×{d.soLuong}
+                    {d.photoFileName ? ` · ${d.photoFileName}` : ""}
+                  </span>
+                )}
                 <Badge variant={kieu}>{NHAN_TRANG_THAI[d.trangThai] ?? d.trangThai}</Badge>
               </div>
               <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
@@ -172,6 +188,11 @@ export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
                 </p>
               )}
               {d.ghiChu && <p className="mt-1 text-xs">{d.ghiChu}</p>}
+              {d.loai === "chinh_sua" && (d.anhChinhSua?.length ?? 0) > 0 && (
+                <p className="mt-1 break-words text-xs text-[var(--bb-fg-muted)]">
+                  Tên tệp: {d.anhChinhSua!.join(", ")}
+                </p>
+              )}
 
               {nuts.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">

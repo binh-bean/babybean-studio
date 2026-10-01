@@ -13,3 +13,10 @@ export function sanPhamCanTat(
   sanPhamHienCo: SanPhamHienCo[],
   boMaLarkDangDoc: Set<string>,
 ): SanPhamHienCo[];
+
+// BB-343 — hàm đọc dòng Lark, được phép thử đối chiếu với bản sao ở
+// src/lib/lark/dong-bo-gia-san-pham.ts (cron + nút "Đồng bộ giá ngay").
+export function classify(name: string, category: string): string | null;
+export function splitName(name: string): { material: string | null; size: string | null };
+export function cellText(value: unknown): string;
+export function cellNumber(value: unknown): number;

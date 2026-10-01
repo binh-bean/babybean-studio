@@ -65,6 +65,8 @@ import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -222,7 +224,7 @@ export async function POST(request: Request): Promise<Response> {
       // BB-288: cùng luật với /api/g/addons và catalogue của /api/g/gallery —
       // chỉ 3 nhóm ảnh in/album/khung đang bán, loại thêm canvas. Trước đây
       // chỗ này chỉ kiểm `nhom === null` nên canvas (nhom = "anh_in") lọt qua.
-      if (!sanPhamBanChoKhach({ isActive: product.is_active, kind: product.kind, material: product.material })) {
+      if (!sanPhamBanChoKhach({ isActive: product.is_active, kind: product.kind, material: product.material, size: product.size })) {
         return fail("INVALID_INPUT", "Sản phẩm này không bán trong màn mua thêm");
       }
       const nhom = nhomSanPham(product.kind, product.material);
@@ -347,6 +349,9 @@ export async function POST(request: Request): Promise<Response> {
         .in("id", photoIds);
       for (const a of anhList ?? []) tenTepTheoPhoto.set(a.id as string, a.file_name as string);
     }
+
+    // BB-342: yêu cầu mua thêm hiện ngay ở màn nhân viên.
+    await phatSuKienBoAnh({ galleryId: gallery.id, branchId: gallery.branch_id, loai: LOAI_TUC_THI.khachMuaThem });
 
     await enqueueLarkNotification({
       branchId: gallery.branch_id,

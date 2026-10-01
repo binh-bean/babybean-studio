@@ -33,6 +33,7 @@
  *   thả tim ở tấm thứ 900      44ms       4,8ms
  */
 
+import { urlAnh, urlAnhDuPhong } from "@/lib/utils/anh-lh3";
 import React, { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Heart, Lock, Printer } from "lucide-react";
 import { cn } from "@/components/ui/utils";
@@ -77,6 +78,8 @@ interface TheAnhProps {
    * không có nút bấm giả. Giá trị đơn — LUẬT 2 đầu tệp.
    */
   dotKhoa: number;
+  /** BB-345 — gia đình (link mời) đã thả tim tấm này. Chỉ lưới của ba mẹ truyền. */
+  giaDinhThich?: boolean;
   /** Vị trí trong lưới. Thiếu (nhánh dự phòng) thì thẻ tự xếp theo dòng chảy. */
   x?: number;
   y?: number;
@@ -97,6 +100,7 @@ const TheAnh = memo(function TheAnh({
   soSanhBat,
   soSanhThuTu,
   dotKhoa,
+  giaDinhThich = false,
   x,
   y,
   w,
@@ -169,7 +173,8 @@ const TheAnh = memo(function TheAnh({
         */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={`/api/img/${photo.id}?w=${chonCoAnhTheoO(w)}`}
+          // BB-341 — thẳng lh3 khi `/api/g/photos` đã trả mã tệp (bỏ vòng 302 qua hàm).
+          src={urlAnh(photo, chonCoAnhTheoO(w))}
           alt={`Ảnh ${thuTu + 1}`}
           loading="lazy"
           decoding="async"
@@ -187,9 +192,7 @@ const TheAnh = memo(function TheAnh({
             const img = e.currentTarget;
             if (img.dataset.qua === "1") return;
             img.dataset.qua = "1";
-            const url = new URL(img.src, window.location.origin);
-            url.searchParams.set("qua", "1");
-            img.src = url.toString();
+            img.src = urlAnhDuPhong(photo.id, chonCoAnhTheoO(w));
           }}
         />
         {/*
@@ -218,6 +221,18 @@ const TheAnh = memo(function TheAnh({
         {soSanhBat && soSanhThuTu > 0 && (
           <span className="pointer-events-none absolute bottom-2 right-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-[#2a2420] text-[12px] font-semibold text-white shadow-sm">
             {soSanhThuTu}
+          </span>
+        )}
+
+        {/* BB-345 — dấu nhỏ "gia đình thích", góc DƯỚI TRÁI: không tranh chỗ tim (dưới phải) và huy hiệu in (trên trái). */}
+        {giaDinhThich && !soSanhBat && (
+          <span
+            data-testid="dau-gia-dinh-thich"
+            className="pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-[#8a4b3c] shadow-sm"
+            title="Gia đình đã thả tim tấm này"
+          >
+            <Heart className="h-3 w-3 fill-current" aria-hidden="true" />
+            Gia đình
           </span>
         )}
 
@@ -329,6 +344,8 @@ export interface LuoiAnhProps {
    * truyền, hành vi y như cũ.
    */
   dotKhoaTheoAnh?: Map<string, number>;
+  /** BB-345 — các tấm gia đình (link mời) đã thả tim. Thiếu prop = không có dấu. */
+  giaDinhThich?: Set<string>;
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
   onToggleSoSanh: (photo: PhotoPublic) => void;
@@ -348,6 +365,7 @@ export function LuoiAnh({
   soSanhBat,
   soSanhTheoAnh,
   dotKhoaTheoAnh,
+  giaDinhThich,
   onToggle,
   onOpen,
   onToggleSoSanh,
@@ -447,6 +465,7 @@ export function LuoiAnh({
               soSanhBat={soSanhBat}
               soSanhThuTu={soSanhTheoAnh.get(photo.id) ?? 0}
               dotKhoa={dotKhoaTheoAnh?.get(photo.id) ?? 0}
+              giaDinhThich={giaDinhThich?.has(photo.id) ?? false}
               onToggle={onToggle}
               onOpen={onOpen}
               onToggleSoSanh={onToggleSoSanh}
@@ -470,6 +489,7 @@ export function LuoiAnh({
                 soSanhBat={soSanhBat}
                 soSanhThuTu={soSanhTheoAnh.get(photo.id) ?? 0}
                 dotKhoa={dotKhoaTheoAnh?.get(photo.id) ?? 0}
+              giaDinhThich={giaDinhThich?.has(photo.id) ?? false}
                 x={vt.x}
                 y={vt.y}
                 w={vt.w}

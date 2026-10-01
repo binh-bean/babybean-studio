@@ -114,9 +114,12 @@ test.describe("BB-314: byte qua /api/img và số lượt 302 trên lưới khá
     // Mô phỏng lh3 THẬT thành công (đã xác nhận bằng tay: 200, image/jpeg —
     // xem bàn giao) — trình duyệt theo điều hướng ra ngoài, KHÔNG quay lại
     // proxy qua onError.
-    await page.route("https://lh3.googleusercontent.com/**", (route) =>
-      route.fulfill({ status: 200, contentType: "image/png", body: IMG_1x1 }),
-    );
+    // BB-341 — đếm luôn lượt trình duyệt đi THẲNG lh3 (không qua /api/img).
+    let soLuotThangLh3 = 0;
+    await page.route("https://lh3.googleusercontent.com/**", (route) => {
+      soLuotThangLh3 += 1;
+      return route.fulfill({ status: 200, contentType: "image/png", body: IMG_1x1 });
+    });
 
     await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -124,6 +127,7 @@ test.describe("BB-314: byte qua /api/img và số lượt 302 trên lưới khá
     let soLuot200 = 0;
     let byteThatQuaApiImg = 0;
     let soLuotAnhLonQuaProxy = 0;
+    let soLuotLuoiQuaHam = 0;
     page.on("response", async (res: PwResponse) => {
       if (!res.url().includes("/api/img/")) return;
       // BB-323 — chỉ tính ảnh CỠ LƯỚI (w ≤ 800), đúng phạm vi bản vá BB-314
@@ -138,6 +142,9 @@ test.describe("BB-314: byte qua /api/img và số lượt 302 trên lưới khá
         if (status === 200) soLuotAnhLonQuaProxy += 1;
         return;
       }
+      // BB-341 — lượt `qua=1` CỐ Ý đi qua proxy (vd. bìa lấy màu chủ đạo cần
+      // ảnh cùng nguồn cho canvas, xem bia-bo-anh.tsx) — không phải ảnh lưới.
+      if (new URL(res.url()).searchParams.get("qua") !== "1") soLuotLuoiQuaHam += 1;
       if (status === 302) {
         soLuot302 += 1;
         return;
@@ -179,7 +186,15 @@ test.describe("BB-314: byte qua /api/img và số lượt 302 trên lưới khá
 
     // ĐÂY là toàn bộ ý nghĩa của phép thử: phần lớn (thực tế mọi) lượt xin
     // ảnh lưới phải là 302 — hàm Vercel không còn ôm byte ảnh cho lưới nữa.
-    expect(soLuot302).toBeGreaterThan(0);
     expect(byteThatQuaApiImg).toBeLessThan(5_000); // gần 0 — không có ảnh thật nào lọt qua proxy
+
+    // BB-341 — lưới nay dựng THẲNG URL lh3 từ `maTepDrive` của /api/g/photos:
+    // không còn lượt /api/img nào cho ảnh lưới (mỗi lượt từng là một lần chạy
+    // hàm Vercel chỉ để trả 302). Kiểm ngược: trả `luoi-anh.tsx` về
+    // `src={`/api/img/${photo.id}?w=…`}` → `302` > 0 → ĐỎ.
+    // eslint-disable-next-line no-console
+    console.log(`[BB-341][lưới] thẳng lh3=${soLuotThangLh3} | /api/img (w≤800, trừ qua=1)=${soLuotLuoiQuaHam}`);
+    expect(soLuotThangLh3).toBeGreaterThan(0);
+    expect(soLuotLuoiQuaHam).toBe(0);
   });
 });

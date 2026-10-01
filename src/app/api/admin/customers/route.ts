@@ -34,7 +34,7 @@ export async function GET(request: Request): Promise<Response> {
     const staff = await requireStaff();
     requirePermission(staff, "customers:read");
 
-    if (staff.branchIds.length === 0) return ok({ items: [], total: 0 });
+    if (staff.branchIds.length === 0) return ok({ items: [], total: 0, offset: 0 });
 
     const url = new URL(request.url);
     const branchFilter = url.searchParams.get("branchId");
@@ -44,6 +44,10 @@ export async function GET(request: Request): Promise<Response> {
     if (branchIds.length === 0) return fail("FORBIDDEN", "Không có quyền xem chi nhánh này");
 
     const q = (url.searchParams.get("q") ?? "").trim();
+    // BB-337 mục 3: "Tải thêm" — trang sau bắt đầu từ `offset`. Trước đây chỉ có
+    // 50 dòng đầu và không có cách nào xem tiếp (anh 01/10: 50 / 486 khách).
+    const offsetTho = Number(url.searchParams.get("offset") ?? "0");
+    const offset = Number.isInteger(offsetTho) && offsetTho > 0 ? Math.min(offsetTho, 100_000) : 0;
     const admin = createAdminClient();
 
     let truyVan = admin
@@ -53,7 +57,9 @@ export async function GET(request: Request): Promise<Response> {
       })
       .in("branch_id", branchIds)
       .order("created_at", { ascending: false })
-      .limit(SO_DONG);
+      // Sắp thêm theo id để phân trang không nhảy dòng khi nhiều khách cùng created_at.
+      .order("id", { ascending: true })
+      .range(offset, offset + SO_DONG - 1);
 
     if (q) {
       /**
@@ -147,6 +153,7 @@ export async function GET(request: Request): Promise<Response> {
 
     return ok({
       total: count ?? khach.length,
+      offset,
       items: khach.map((k) => {
         const bo = demBo.get(k.id);
         return {

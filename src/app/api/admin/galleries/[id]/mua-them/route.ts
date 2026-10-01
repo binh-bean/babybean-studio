@@ -61,11 +61,21 @@ export async function GET(
     const CAC_COT_CU =
       "id, product_id, photo_id, so_luong, ghi_chu, trang_thai, created_at, products(name), photos(file_name)";
 
-    const dayDu = await admin
+    // BB-345 (0083) — yêu cầu "đặt chỉnh sửa" của gia đình: loai/anh_ids/tạm tính.
+    // Chưa áp 0083 thì rớt về câu BB-254 rồi câu cũ, như dưới.
+    const CAC_COT_0083 = CAC_COT_DAY_DU + ", loai, anh_ids, don_gia, tam_tinh";
+    const ban0083 = await admin
       .from("yeu_cau_mua_them")
-      .select(CAC_COT_DAY_DU)
+      .select(CAC_COT_0083)
       .eq("gallery_id", galleryId)
       .order("created_at", { ascending: false });
+    const dayDu = !ban0083.error
+      ? ban0083
+      : await admin
+          .from("yeu_cau_mua_them")
+          .select(CAC_COT_DAY_DU)
+          .eq("gallery_id", galleryId)
+          .order("created_at", { ascending: false });
 
     // Migration 0073 (ten_nguoi_mua/sdt_nguoi_mua/share_link_id) có thể chưa
     // áp. RỚT VỀ BẤT KỲ LỖI NÀO ở câu SELECT đầy đủ — không lọc theo mã lỗi
@@ -84,6 +94,22 @@ export async function GET(
 
     if (error) throw error;
 
+    // BB-345 — tên tệp của các tấm trong yêu cầu chỉnh sửa (khoá theo bộ ảnh này).
+    const idsChinhSua = Array.from(
+      new Set(
+        (data ?? []).flatMap((d) => ((d as { anh_ids?: string[] | null }).anh_ids ?? []) as string[]),
+      ),
+    );
+    const tenTepChinhSua = new Map<string, string>();
+    for (let i = 0; i < idsChinhSua.length; i += 150) {
+      const { data: ps } = await admin
+        .from("photos")
+        .select("id, file_name")
+        .eq("gallery_id", galleryId)
+        .in("id", idsChinhSua.slice(i, i + 150));
+      for (const p of (ps ?? []) as { id: string; file_name: string }[]) tenTepChinhSua.set(p.id, p.file_name);
+    }
+
     return ok({
       items: (data ?? []).map((d) => {
         const anyD = d as unknown as {
@@ -99,6 +125,10 @@ export async function GET(
           ten_nguoi_mua?: string | null;
           sdt_nguoi_mua?: string | null;
           share_links?: { label: string | null } | null;
+          loai?: string | null;
+          anh_ids?: string[] | null;
+          don_gia?: number | string | null;
+          tam_tinh?: number | string | null;
         };
         return {
           id: anyD.id,
@@ -114,6 +144,11 @@ export async function GET(
           nguoiMuaTen: anyD.ten_nguoi_mua ?? null,
           nguoiMuaSdt: anyD.sdt_nguoi_mua ?? null,
           nguoiMuaNhanLink: anyD.share_links?.label ?? null,
+          // BB-345 — 'chinh_sua' = gia đình đặt chỉnh sửa các tấm đã thả tim.
+          loai: anyD.loai ?? "san_pham",
+          anhChinhSua: (anyD.anh_ids ?? []).map((id) => tenTepChinhSua.get(id) ?? id),
+          donGia: anyD.don_gia == null ? null : Number(anyD.don_gia),
+          tamTinh: anyD.tam_tinh == null ? null : Number(anyD.tam_tinh),
         };
       }),
     });

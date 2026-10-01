@@ -60,6 +60,11 @@ const NGOAI_LE: Record<string, string> = {
     "(nó từ chối chốt nếu album chưa có bìa hợp lệ), nên không mất dấu.",
   "g/buoi-chup":
     "Chỉ chọn buổi chụp để mở trong phiên của khách, không ghi dữ liệu nghiệp vụ.",
+  "g/tim-gia-dinh":
+    "BB-345 — người được mời thả/bỏ tim từng tấm: cùng lý lẽ với g/placements, " +
+    "mỗi cú chạm một lượt upsert/xoá vào tim_gia_dinh — bảng đó đã là bản ghi " +
+    "(một dòng mỗi link × tấm, có created_at). Việc có tiền là `dat-chinh-sua` " +
+    "(route con) và nó CÓ ghi nhật ký `mua_them.dat_chinh_sua`.",
   "g/thong-bao":
     "BB-246 — bật/tắt đăng ký Web Push của MỘT TRÌNH DUYỆT (bảng push_dang_ky), " +
     "không phải một quyết định của khách trên bộ ảnh. Không đổi trạng thái bộ " +
@@ -75,6 +80,12 @@ const NGOAI_LE: Record<string, string> = {
     "Chỉ đọc thử một thư mục Drive rồi trả về, không ghi gì.",
   "admin/galleries/tra-lark":
     "BB-325 — chỉ ĐỌC bảng Hậu Kỳ bên Lark (tra theo mã hóa đơn + SĐT) rồi trả về, không ghi gì.",
+  "auth/gallery":
+    "BB-341 (BB-346 cập nhật) — đường này nay chỉ là lớp vỏ gọi `dangNhapBangMa()` " +
+    "(src/lib/auth/dang-nhap-bang-ma.ts), nơi MỖI lượt đổi mã, đúng hay sai, đều " +
+    "ghi một dòng `gallery.auth` vào activity_logs. Dòng đó còn là nguồn đếm của " +
+    "bộ giới hạn 10 lượt/15 phút/IP, nên bỏ ghi là phép thử giới hạn tần suất " +
+    "(tests/security/gallery-auth.test.ts) đỏ ngay.",
   "auth/session":
     "Cấp lại phiên đăng nhập. Lượt vào bằng link khách đã có gallery.auth ở auth/gallery.",
   "auth/logout": "Xoá cookie phiên, không đụng dữ liệu nghiệp vụ.",

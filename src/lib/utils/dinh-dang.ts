@@ -11,6 +11,8 @@
  * chỉ sửa ở đây, không tự viết `toLocaleDateString` hay nối chuỗi ở nơi khác.
  */
 
+import { tenChatLieuChoKhach, tenCoChatLieuChoKhach } from "@/lib/products/nhom-san-pham";
+
 /** "27/9/2026" -> "27/09/2026". Nhận Date hoặc chuỗi ISO. */
 export function formatNgayVN(input: string | Date): string {
   const d = typeof input === "string" ? new Date(input) : input;
@@ -109,7 +111,9 @@ export function formatTien(n: number | null | undefined): string {
  */
 export function formatKichThuoc(input: string | null | undefined): string {
   if (!input) return "";
-  return input.replace(/(\d)\s*[xX]\s*(\d)/g, "$1×$2");
+  // BB-339 — mọi tên sản phẩm lên màn khách đều qua hàm này: "Cavas/Kim tuyến
+  // 40x60" (tên Lark) hiện thành "Kim Tuyến 40×60", không lộ chữ "Cavas".
+  return tenCoChatLieuChoKhach(input).replace(/(\d)\s*[xX]\s*(\d)/g, "$1×$2");
 }
 
 /**
@@ -143,7 +147,7 @@ export function tenSanPhamChoKhach(sp: {
   // Tên nội bộ Lark của file ảnh chỉnh bán thêm ("Edit file") — khách đọc bằng lời của khách.
   if (/^edit file$/i.test(sp.name.trim())) return "Ảnh chỉnh thêm";
   const tienTo = sp.nhom ? TIEN_TO_NHOM_SAN_PHAM[sp.nhom] : undefined;
-  const chatLieu = sp.material?.trim();
+  const chatLieu = tenChatLieuChoKhach(sp.material?.trim() ?? null);
   if (!tienTo || !chatLieu) return formatKichThuoc(sp.name.trim());
   const dau = chatLieu.toLowerCase().startsWith(tienTo.toLowerCase()) ? chatLieu : `${tienTo} ${chatLieu}`;
   return sp.size ? `${dau} ${formatKichThuoc(sp.size)}` : dau;

@@ -17,6 +17,9 @@
  *     gợi ý, route dùng nó để ghi; không hai bên tính hai kiểu.
  */
 
+/** BB-344 — câu hiện (màn hình) và trả về (máy chủ) khi bộ ảnh chưa có khoản nào cần thu. */
+export const CAU_CHUA_PHAT_SINH_TIEN = "Chưa phát sinh tiền cần thu";
+
 /** Loại dòng sổ dành cho phần giảm giá (cột `gallery_payments.payment_method`, không cần cột mới). */
 export const HINH_THUC_GIAM_GIA = "giam_gia";
 
@@ -133,4 +136,30 @@ export function tienVuotHanMucConPhaiThu(p: {
   const lucChot = Number(p.tienLucChot ?? 0);
   const phaiThu = Number.isFinite(lucChot) && lucChot > 0 ? lucChot : p.tienTheoAnh;
   return tienConPhaiThuSauGhiCo(phaiThu, p.daGhiCo);
+}
+
+/**
+ * BB-344 — SỐ TIỀN CÒN PHẢI THU của một bộ ảnh: một con số cho khối "Xác nhận
+ * thanh toán" ở chi tiết bộ ảnh (nút có bấm được không) lẫn route ghi thu (có
+ * nhận dòng tiền không). Luật chủ studio: "nếu không phát sinh thì khối không
+ * nhấn được".
+ *
+ * = (phần vượt hạn mức, đúng công thức báo cáo Ảnh vượt hạn mức:
+ *    `tienVuotHanMucConPhaiThu` — số lúc chốt, chưa chốt thì số theo ảnh)
+ *   + (các đợt MUA THÊM đã xác nhận, `tienDotMuaThem`)
+ *   − mọi khoản đã ghi có (tiền thu + giảm giá). Không âm.
+ *
+ * Đợt mua thêm đã thanh toán rồi thì khoản thu nằm trong `daGhiCo` nên tự trừ
+ * hết — không cần cờ "đã thanh toán" riêng (luật số dư = 0 của BB-332).
+ */
+export function tienCanThuCuaBo(p: {
+  tienTheoAnh: number;
+  tienLucChot: number | null | undefined;
+  /** Tổng `tien_anh + tien_san_pham` của các đợt ≥ 2 đang `da_xac_nhan`. */
+  tienDotMuaThem: number;
+  daGhiCo: number;
+}): number {
+  const vuot = tienVuotHanMucConPhaiThu({ tienTheoAnh: p.tienTheoAnh, tienLucChot: p.tienLucChot, daGhiCo: 0 });
+  const dot = Number.isFinite(p.tienDotMuaThem) ? Math.max(0, p.tienDotMuaThem) : 0;
+  return tienConPhaiThuSauGhiCo(vuot + dot, p.daGhiCo);
 }

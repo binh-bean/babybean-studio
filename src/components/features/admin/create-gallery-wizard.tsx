@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Input, Select, Card, Spinner, Checkbox } from "@/components/ui";
+import { Button, Input, OChonTim, Card, Spinner, Checkbox } from "@/components/ui";
 import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
 import { formatNgayVN, formatSdt } from "@/lib/utils/dinh-dang";
@@ -471,18 +471,18 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={w.branch} required>
-                <Select value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                <OChonTim value={branchId} onChange={(e) => setBranchId(e.target.value)}>
                   <option value="">{w.choose}</option>
                   {(options?.branches ?? []).map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
                     </option>
                   ))}
-                </Select>
+                </OChonTim>
               </Field>
 
               <Field label={w.photographer}>
-                <Select
+                <OChonTim
                   value={photographerId}
                   onChange={(e) => setPhotographerId(e.target.value)}
                   disabled={branchId === ""}
@@ -493,7 +493,7 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
                       {p.name}
                     </option>
                   ))}
-                </Select>
+                </OChonTim>
               </Field>
             </div>
 

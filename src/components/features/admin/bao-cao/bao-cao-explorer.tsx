@@ -15,6 +15,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ArrowDown, ArrowUp, ArrowUpDown, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
+import { OChonTim } from "@/components/ui/o-chon-tim";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
@@ -374,7 +375,7 @@ function NoiDungBaoCao({
 
           {chiNhanhs.length > 0 && (
             <Field label="Chi nhánh" htmlFor="bao-cao-chi-nhanh">
-              <Select
+              <OChonTim
                 id="bao-cao-chi-nhanh"
                 value={chiNhanhChon}
                 onChange={(e) => onDoiFilter({ chiNhanh: e.target.value || null })}
@@ -386,7 +387,7 @@ function NoiDungBaoCao({
                     {c.name}
                   </option>
                 ))}
-              </Select>
+              </OChonTim>
             </Field>
           )}
 

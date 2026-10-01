@@ -10,11 +10,14 @@
  * quyền `settings:system` trước khi dựng.
  */
 import { createServerClient } from "@/lib/supabase/server";
-import { nhomSanPham, sanPhamBanChoKhach, TEN_NHOM, THU_TU_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
+import { nhomSanPham, sanPhamThuocNhomBan, TEN_NHOM, THU_TU_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
+import { coTrongBangGia } from "@/lib/products/bang-gia-01-10";
 import { khoaXepKichThuoc, trangThaiKichThuoc, type TrangThaiKichThuoc } from "@/lib/products/kich-thuoc-dang-ban";
 
 /** BB-335 — câu anh chốt cho kích thước chưa có giá. */
 export const CHU_CHUA_CO_GIA = "Chưa có giá — nhập giá bên Lark rồi đồng bộ";
+/** BB-339 — anh chốt 01/10/2026 "App ẩn theo bảng giá": món Lark còn bán mà không có trong bảng giá. */
+export const CHU_NGOAI_BANG_GIA = "Không có trong bảng giá — đang ẩn";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { CARD_TITLE_CLASS } from "./page-header";
 
@@ -25,6 +28,8 @@ interface Dong {
   listPrice: number | null;
   priceSamples: number;
   trangThai: TrangThaiKichThuoc;
+  /** BB-339 — không có trong bảng giá 01/10 (`bang-gia-01-10.ts`) → khách không thấy. */
+  ngoaiBangGia: boolean;
 }
 
 export async function DanhMucKichThuoc() {
@@ -45,7 +50,9 @@ export async function DanhMucKichThuoc() {
     const name = String(p.name ?? "");
     if (/^(Fixture|TEST) /.test(name)) continue;
     const sp = { isActive: !!p.is_active, kind: p.kind as string | null, material: p.material as string | null };
-    if (!sanPhamBanChoKhach(sp)) continue;
+    // BB-339 — lọc 3 nhóm/không canvas, CHƯA lọc bảng giá: món ngoài bảng giá
+    // vẫn liệt kê ở đây, kèm nhãn "Không có trong bảng giá — đang ẩn".
+    if (!sanPhamThuocNhomBan(sp)) continue;
     const nhom = nhomSanPham(sp.kind, sp.material);
     if (!nhom) continue;
     const trangThai = trangThaiKichThuoc({
@@ -60,9 +67,10 @@ export async function DanhMucKichThuoc() {
       listPrice: p.list_price === null ? null : Number(p.list_price),
       priceSamples: Number(p.price_samples ?? 0),
       trangThai,
+      ngoaiBangGia: p.kind === "print" && !coTrongBangGia(p.material as string | null, p.size as string | null),
     };
     tong += 1;
-    if (trangThai === "khach_thay") khachThay += 1;
+    if (trangThai === "khach_thay" && !dong.ngoaiBangGia) khachThay += 1;
     const m = theoNhom.get(nhom) ?? new Map<string, Dong[]>();
     m.set(dong.material, [...(m.get(dong.material) ?? []), dong]);
     theoNhom.set(nhom, m);
@@ -74,7 +82,8 @@ export async function DanhMucKichThuoc() {
       <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
         Mọi kích thước của ảnh in, album và khung đang kinh doanh, đồng bộ từ danh mục Lark. Khách thấy{" "}
         <strong className="text-[var(--bb-fg)]">{khachThay}</strong>/{tong} kích thước. Kích thước có giá bên Lark
-        (cột Giá Bán, hoặc đã bán ít nhất 1 lần) đều hiện cho khách; kích thước chưa có giá thì ẩn.
+        (cột Giá Bán, hoặc đã bán ít nhất 1 lần) và có trong bảng giá anh gửi 01/10 thì hiện cho khách; kích thước
+        chưa có giá hoặc không có trong bảng giá thì ẩn.
       </p>
       <div className="mt-4 flex flex-col gap-5">
         {THU_TU_NHOM.filter((n) => theoNhom.has(n)).map((nhom) => (
@@ -108,27 +117,30 @@ function BangChatLieu({ theoChatLieu }: { theoChatLieu: [string, Dong[]][] }) {
                   const [b1, b2] = khoaXepKichThuoc(b.size);
                   return a1 - b1 || a2 - b2;
                 })
-                .map((d) => (
+                .map((d) => {
+                  const khachThay = d.trangThai === "khach_thay" && !d.ngoaiBangGia;
+                  return (
                   <span
                     key={d.id}
-                    data-trang-thai={d.trangThai}
+                    data-trang-thai={d.ngoaiBangGia ? "ngoai_bang_gia" : d.trangThai}
                     title={
-                      d.trangThai === "khach_thay"
+                      khachThay
                         ? `Khách thấy · ${formatCurrencyVND(d.listPrice ?? 0)}`
-                        : `Đang ẩn với khách. ${CHU_CHUA_CO_GIA}`
+                        : `Đang ẩn với khách. ${d.ngoaiBangGia ? CHU_NGOAI_BANG_GIA : CHU_CHUA_CO_GIA}`
                     }
                     className={
-                      d.trangThai === "khach_thay"
+                      khachThay
                         ? "rounded-full border border-[var(--bb-border)] px-2.5 py-0.5 text-xs tabular-nums text-[var(--bb-fg)]"
                         : "rounded-full border border-dashed border-[var(--bb-border)] px-2.5 py-0.5 text-xs tabular-nums text-[var(--bb-fg-muted)]"
                     }
                   >
                     {d.size.replace(/x/i, "×")}
-                    {d.trangThai !== "khach_thay" && (
-                      <span className="ml-1">· {CHU_CHUA_CO_GIA}</span>
+                    {!khachThay && (
+                      <span className="ml-1">· {d.ngoaiBangGia ? CHU_NGOAI_BANG_GIA : CHU_CHUA_CO_GIA}</span>
                     )}
                   </span>
-                ))}
+                  );
+                })}
             </span>
           </li>
         ))}

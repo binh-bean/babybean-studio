@@ -16,6 +16,19 @@
  *
  * Phép thử này canh đường đã sửa: ĐẶT số lượng (0 là bỏ mua), một sản phẩm một
  * dòng, và ba luật tiền của BB-105 vẫn nguyên.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-346 — viết lại cho luật bán mới của anh (đều là quyết định đã chốt)
+ * ---------------------------------------------------------------------------
+ *  · 30/09: "kích thước kể cả chưa bán nhưng có giá cũng hiện" — bỏ ngưỡng
+ *    price_confidence >= 0.8 / price_samples >= 5; chỉ cần CÓ GIÁ > 0
+ *    (`giaDuocBaoChoKhach`, BB-335).
+ *  · 01/10: "app chỉ bán đúng các mục trong bảng giá 01/10" — sản phẩm in phải
+ *    có (chất liệu, kích thước) trong `bang-gia-01-10.ts` (`sanPhamBanChoKhach`).
+ *
+ * Nên dữ liệu thử KHÔNG còn vớ đại một dòng của bảng `products` thật: bộ test
+ * tự dựng sản phẩm "Fixture BB-346 …" (chất liệu + kích thước lấy từ bảng giá,
+ * có giá, độ tin cậy để trống như hàng chưa bán lần nào) rồi xoá theo id.
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
@@ -34,8 +47,10 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
   let selectionId = "";
   let shareLinkId = "";
   let spBanDuoc = "";
-  let giaNiemYet = 0;
-  let spKhongBan = "";
+  const giaNiemYet = 123000;
+  /** Mỗi ca "từ chối" một lý do riêng — chặn đúng một vế của luật bán. */
+  const spTuChoi: Record<string, string> = {};
+  const spFixtureIds: string[] = [];
   let anhDaChon = "";
   let anhDaChon2 = "";
   let anhChuaChon = "";
@@ -135,45 +150,52 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     anhBoKhac = pk[0].id;
 
     /*
-      BB-288: giới hạn `kind in ('print', 'edited_photo')` và loại canvas —
-      không thì có thể vớ phải sản phẩm `addon` (Phát Sinh) rẻ hơn, sản phẩm
-      NGOÀI danh mục bán nhưng vẫn đủ giá, và `/api/g/addons` giờ từ chối nó
-      404 (ngoài danh mục) khiến ca này (kỳ vọng 200, mua ĐƯỢC) đỏ nhầm chỗ.
+      BB-346 — sản phẩm thử tự dựng. Bán được = đang kinh doanh + (chất liệu,
+      kích thước) nằm trong bảng giá 01/10 + có giá > 0. Cố ý để
+      price_confidence null và price_samples 0: luật 30/09 không còn đòi
+      ngưỡng độ tin cậy, nên hàng "chưa bán lần nào nhưng có giá" vẫn phải bán.
     */
-    const { rows: sp } = await client.query(
-      `select id, list_price from products
-        where is_active and list_price is not null and price_confidence >= 0.8 and price_samples >= 5
-          and kind in ('print', 'edited_photo')
-          and coalesce(material, '') not ilike '%cavas%'
-          and coalesce(material, '') not ilike '%canvas%'
-        order by list_price limit 1`,
-    );
-    spBanDuoc = sp[0].id;
-    giaNiemYet = Number(sp[0].list_price);
-
-    /*
-      BB-288: chỉ chọn trong đúng nhóm ĐANG BÁN (ảnh in/album/khung, không
-      canvas) — nếu không, ca này có thể ngẫu nhiên vớ phải một sản phẩm
-      NGOÀI danh mục bán (canvas, hoặc kind dịch vụ kèm buổi chụp), và route
-      sẽ trả 404 (ngoài danh mục) thay vì 400 (giá chưa đủ tin cậy) — hai lý
-      do từ chối KHÁC NHAU. Ca này chỉ canh đúng luật giá (BB-105), nên phải
-      loại trừ lý do kia trước.
-    */
-    const { rows: sp2 } = await client.query(
-      `select id from products
-        where is_active
-          and (price_confidence < 0.8 or price_samples < 5 or list_price is null)
-          and kind in ('print', 'edited_photo')
-          and coalesce(material, '') not ilike '%cavas%'
-          and coalesce(material, '') not ilike '%canvas%'
-        limit 1`,
-    );
-    spKhongBan = sp2[0]?.id ?? "";
+    const taoSp = async (
+      ten: string,
+      o: {
+        kind?: string;
+        material: string | null;
+        size: string | null;
+        gia: number | null;
+        active?: boolean;
+      },
+    ) => {
+      const { rows } = await client.query(
+        `insert into products (name, kind, material, size, list_price, price_confidence, price_samples, is_active)
+         values ($1,$2,$3,$4,$5,null,0,$6) returning id`,
+        [`Fixture BB-346 ${ten}`, o.kind ?? "print", o.material, o.size, o.gia, o.active ?? true],
+      );
+      spFixtureIds.push(rows[0].id);
+      return rows[0].id as string;
+    };
+    spBanDuoc = await taoSp("Gỗ 40x60 bán được", { material: "Gỗ", size: "40x60", gia: giaNiemYet });
+    spTuChoi.khongGia = await taoSp("Gỗ 40x60 chưa có giá", { material: "Gỗ", size: "40x60", gia: null });
+    spTuChoi.giaBangKhong = await taoSp("Gỗ 40x60 giá 0", { material: "Gỗ", size: "40x60", gia: 0 });
+    spTuChoi.ngoaiBangChatLieu = await taoSp("Khung kim loại 40x60 có giá", {
+      material: "Khung kim loại",
+      size: "40x60",
+      gia: 150000,
+    });
+    spTuChoi.ngoaiBangKichThuoc = await taoSp("Gỗ 12x34 có giá", { material: "Gỗ", size: "12x34", gia: 150000 });
+    spTuChoi.khongKichThuoc = await taoSp("Gỗ không ghi kích thước", { material: "Gỗ", size: null, gia: 150000 });
+    spTuChoi.khongChatLieu = await taoSp("Không chất liệu 40x60", { material: null, size: "40x60", gia: 150000 });
+    spTuChoi.ngungBan = await taoSp("Gỗ 40x60 ngừng kinh doanh", {
+      material: "Gỗ",
+      size: "40x60",
+      gia: giaNiemYet,
+      active: false,
+    });
   });
 
   afterAll(async () => {
     await client.query("delete from activity_logs where entity_id = $1", [galleryId]);
     await client.query("delete from galleries where id = any($1)", [[galleryId, boKhac]]);
+    if (spFixtureIds.length) await client.query("delete from products where id = any($1)", [spFixtureIds]);
     await client.query("delete from customers where id = $1", [customerId]);
     await client.end();
   });
@@ -211,11 +233,39 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     expect(await demDong()).toEqual([]);
   });
 
-  it("4. Sản phẩm chưa đủ tin cậy về giá thì KHÔNG bán", async () => {
-    if (!spKhongBan) return; // bảng giá sạch thì bỏ qua ca này
+  it("4. Sản phẩm CHƯA CÓ GIÁ, NGOÀI bảng giá 01/10 hoặc đã ngừng kinh doanh thì KHÔNG bán", async () => {
+    /*
+      Luật cũ (price_confidence/price_samples) đã bỏ 30/09 — xem đầu tệp. Mỗi
+      ca dưới đây chặn đúng MỘT vế của luật mới, và không ca nào được là 500:
+      lỗi của khách (sản phẩm không bán được) phải là 4xx có lời nhắn tiếng
+      Việt, không phải lỗi máy chủ.
+    */
     phien();
-    const res = await goi(spKhongBan, 1, anhDaChon);
-    expect(res.status).toBe(400);
+    const muonTuChoi: [string, number][] = [
+      ["khongGia", 400],
+      ["giaBangKhong", 400],
+      ["ngoaiBangChatLieu", 404],
+      ["ngoaiBangKichThuoc", 404],
+      ["khongKichThuoc", 404],
+      ["khongChatLieu", 404],
+      ["ngungBan", 404],
+    ];
+    for (const [khoa, ma] of muonTuChoi) {
+      const res = await goi(spTuChoi[khoa]!, 1, anhDaChon);
+      const json = await res.json();
+      expect(res.status, `${khoa}: ${JSON.stringify(json)}`).toBe(ma);
+      expect(typeof json.error?.message, `${khoa} phải có lời nhắn`).toBe("string");
+      expect(await demDong(), `${khoa} không được ghi dòng nào`).toEqual([]);
+    }
+  });
+
+  it("4b. Hàng trong bảng giá, CÓ giá, chưa từng bán lần nào (độ tin cậy trống) thì BÁN được", async () => {
+    // Đối chiếu với ca 4: chính luật 30/09 — có giá là đủ, không đòi mẫu bán.
+    phien();
+    const res = await goi(spBanDuoc, 1, anhDaChon);
+    expect(res.status).toBe(200);
+    expect(Number((await demDong())[0].unit_price)).toBe(giaNiemYet);
+    await goi(spBanDuoc, 0, anhDaChon);
     expect(await demDong()).toEqual([]);
   });
 

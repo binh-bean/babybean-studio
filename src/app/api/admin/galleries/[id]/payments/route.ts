@@ -54,7 +54,10 @@ import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PAYMENT_METHODS, isPaymentMethod } from "@/lib/payment-methods";
-import { HINH_THUC_GIAM_GIA, tinhGiamGia } from "@/lib/gallery/tien-phat-sinh";
+import { HINH_THUC_GIAM_GIA, tinhGiamGia, CAU_CHUA_PHAT_SINH_TIEN } from "@/lib/gallery/tien-phat-sinh";
+import { layTienCanThu } from "@/lib/gallery/tien-can-thu-server";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -144,13 +147,19 @@ export async function POST(
       .eq("is_primary", true)
       .maybeSingle();
 
+    // BB-344 — luật chủ studio "nếu không phát sinh thì khối không nhấn được": số CÒN PHẢI THU
+    // (cùng hàm với màn chi tiết: vượt hạn mức + đợt mua thêm đã xác nhận − đã ghi có) bằng 0
+    // thì không nhận dòng thu tiền hay giảm giá. Dòng TRỪ (đính chính ghi nhầm) vẫn được —
+    // sổ append-only chỉ sửa sai bằng dòng âm, chặn nó là khoá luôn đường đính chính.
+    const tienCanThu = await layTienCanThu(admin, galleryId);
+    if (tienCanThu.tienCanThu <= 0 && (amount > 0 || coGiamGia)) {
+      return fail("INVALID_INPUT", CAU_CHUA_PHAT_SINH_TIEN);
+    }
+
     // BB-320: số còn thiếu HIỆN TẠI (phải thu − mọi khoản đã ghi có) — nền để tính phần giảm.
     let soTienGiam = 0;
     if (coGiamGia) {
-      const { data: daGhi } = await admin.from("gallery_payments").select("amount").eq("gallery_id", galleryId);
-      const daGhiCo = (daGhi ?? []).reduce((t, r) => t + Number(r.amount), 0);
-      const conThieu = Number(selection?.snapshot_extra_amount ?? 0) - daGhiCo;
-      const kq = tinhGiamGia(conThieu, phanTramGiam);
+      const kq = tinhGiamGia(tienCanThu.tienCanThu, phanTramGiam);
       if (!kq) return fail("INVALID_INPUT", "Không còn khoản nào để giảm giá");
       if (kq.soTienGiam <= 0) {
         return fail("INVALID_INPUT", "Phần giảm quá nhỏ (dưới làm tròn nghìn đồng), tăng phần trăm giúp");
@@ -206,6 +215,9 @@ export async function POST(
       },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
+
+    // BB-342: khách thấy số đã thanh toán ngay, không F5.
+    await phatSuKienBoAnh({ galleryId, branchId: gallery.branch_id, loai: LOAI_TUC_THI.studioThanhToan });
 
     return ok({
       paidAmount: paid,

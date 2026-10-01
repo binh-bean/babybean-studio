@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { AdminSidebar } from "./admin-sidebar";
 import { AdminHeader } from "./admin-header";
+import { TucThiNhanVien } from "./tuc-thi-nhan-vien";
 import { SU_KIEN_VIEC_DOI, tabsChoVai, tongViecCanXuLy, type TabViecCanXuLy } from "@/lib/utils/viec-can-xu-ly-tabs";
 
 export function AdminLayoutShell({
@@ -81,6 +82,8 @@ export function AdminLayoutShell({
         role={role}
         canXuLyCount={canXuLyCount}
       />
+      {/* BB-342: khách làm gì là huy hiệu đếm lại + thông báo góc màn, không F5. */}
+      <TucThiNhanVien />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AdminHeader role={role} hoTen={hoTen} canXuLyCount={canXuLyCount} />
         <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">

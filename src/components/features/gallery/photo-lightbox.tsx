@@ -1,4 +1,5 @@
 "use client";
+import { urlAnhDuPhong, type CoMaTepDrive } from "@/lib/utils/anh-lh3";
 import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
@@ -766,8 +767,8 @@ export function PhotoLightbox({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 ref={isCurrent ? anhHienTaiRef : undefined}
-                src={buildLightboxImageUrl(photo.id, dungAnhNet ? 2048 : 1600)}
-                srcSet={dungAnhNet ? undefined : buildLightboxSrcSet(photo.id)}
+                src={buildLightboxImageUrl(photo.id, dungAnhNet ? 2048 : 1600, (photo as CoMaTepDrive).maTepDrive)}
+                srcSet={dungAnhNet ? undefined : buildLightboxSrcSet(photo.id, (photo as CoMaTepDrive).maTepDrive)}
                 sizes={dungAnhNet ? undefined : "100vw"}
                 alt={photo.fileName || `Ảnh ${idx + 1}`}
                 decoding="async"
@@ -828,8 +829,13 @@ export function PhotoLightbox({
                   img.dataset.qua = "1";
                   const urlLoi = img.currentSrc || img.src;
                   const url = new URL(urlLoi, window.location.origin);
-                  url.searchParams.set("qua", "1");
                   img.removeAttribute("srcset");
+                  // BB-341 — ảnh đi THẲNG lh3 lỗi: lùi về route cũ qua proxy, đúng cỡ đang xem.
+                  if (url.origin !== window.location.origin) {
+                    img.src = urlAnhDuPhong(photo.id, dungAnhNet ? 2048 : 1600);
+                    return;
+                  }
+                  url.searchParams.set("qua", "1");
                   img.src = url.toString();
                 }}
               />

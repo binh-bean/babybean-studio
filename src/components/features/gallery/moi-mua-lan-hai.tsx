@@ -55,6 +55,17 @@
  *   - `batBuocNguoiMua`: bật ô nhập tên + SĐT bắt buộc trước khi gửi — route
  *     `/api/g/mua-them` đòi hai trường này khi phiên là viewer, xem đó mới là
  *     chỗ chặn thật; ở đây chỉ để form không cho bấm gửi lúc thiếu.
+ *
+ * ---------------------------------------------------------------------------
+ * BB-338 — anh báo 01/10/2026 (ảnh "dàn trải", "không thoát được")
+ * ---------------------------------------------------------------------------
+ *   - Danh sách sản phẩm: MỘT cột gọn trong khung giữa màn (max 640px), mỗi
+ *     sản phẩm một dòng — thay lưới hai cột kéo tràn hết bề ngang máy tính.
+ *   - Chọn tấm cho một sản phẩm: mở TẤM CHỌN riêng (không bung giữa danh sách),
+ *     bấm ảnh để chọn/bỏ chọn, có "Huỷ" (trả lại như lúc mở) và "Xong".
+ *   - Nút back của điện thoại đóng tấm chọn rồi tới màn mua thêm
+ *     (`useNutBackDong`), không văng khỏi bộ ảnh.
+ *   - `anhThich`: những tấm người xem đã thả tim trên lưới — hiện trước.
  */
 
 import React from "react";
@@ -63,6 +74,7 @@ import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san
 import { duocMoiMuaLanHai } from "@/lib/gallery/moi-mua-lan-hai-rules";
 import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
 import { formatKichThuoc, tenSanPhamChoKhach } from "@/lib/utils/dinh-dang";
+import { useNutBackDong } from "./use-nut-back-dong";
 
 export interface MonTrongDanhMuc {
   productId: string;
@@ -97,6 +109,7 @@ export function MoiMuaLanHai({
   batBuocNguoiMua = false,
   tieuDe,
   moTa,
+  anhThich,
 }: {
   status: string;
   /** `review.rounds.length` — khác 0 thì KHÔNG mời mua lần hai (bỏ qua khi có `moGate`). */
@@ -109,11 +122,16 @@ export function MoiMuaLanHai({
   batBuocNguoiMua?: boolean;
   tieuDe?: string;
   moTa?: string;
+  /** BB-338 — id các tấm người xem đã thả tim trên lưới (hiện trước trong tấm chọn). */
+  anhThich?: string[];
 }) {
   const [mo, setMo] = React.useState(false);
   const [gio, setGio] = React.useState<DongGioHang[]>([]);
   const [nhomDangXem, setNhomDangXem] = React.useState<NhomSanPham>("anh_in");
   const [monDangChon, setMonDangChon] = React.useState<MonTrongDanhMuc | null>(null);
+  // BB-338 — giỏ lúc MỞ tấm chọn, để "Huỷ" trả lại đúng như cũ.
+  const [gioLucMoChon, setGioLucMoChon] = React.useState<DongGioHang[] | null>(null);
+  const [chiAnhThich, setChiAnhThich] = React.useState(true);
   const [dangGui, setDangGui] = React.useState(false);
   const [loi, setLoi] = React.useState<string | null>(null);
   const [tenNguoiMua, setTenNguoiMua] = React.useState("");
@@ -152,7 +170,20 @@ export function MoiMuaLanHai({
     };
   }, [duocMoiMua]);
 
+  // BB-338 mục 2e — back của điện thoại đóng từng lớp: tấm chọn → màn mua thêm.
+  const dongMuaThem = useNutBackDong(mo, () => {
+    setMo(false);
+    setMonDangChon(null);
+  });
+  const dongTamChon = useNutBackDong(monDangChon !== null, () => {
+    setMonDangChon(null);
+    setGioLucMoChon(null);
+  });
+
   if (!duocMoiMua) return null;
+
+  const dsThich = new Set(anhThich ?? []);
+  const anhCoTim = anhDaChon.filter((a) => dsThich.has(a.id));
 
   const theoNhom = danhMuc.filter((m) => m.nhom === nhomDangXem);
   const soLuongDat = (productId: string, photoId: string | null) =>
@@ -199,7 +230,7 @@ export function MoiMuaLanHai({
       }
       const moi = json?.data?.items ?? [];
       setDsDaGui((cu) => [...cu, ...moi.map((d) => ({ id: d.id, trangThai: d.trangThai }))]);
-      setMo(false);
+      dongMuaThem();
       setGio([]);
     } catch {
       setLoi("Không kết nối được, ba mẹ thử lại giúp em nhé");
@@ -268,6 +299,11 @@ export function MoiMuaLanHai({
           <p className="mt-1.5 text-[13px] text-[#2E2A27]/60">
             {moTa ?? "Khung, ảnh in, album — studio gọi lại báo giá, chưa tính tiền."}
           </p>
+          {anhCoTim.length > 0 && (
+            <p data-testid="so-anh-tha-tim" className="mt-1 text-[13px] font-medium text-heart">
+              Gia đình đã thả tim {anhCoTim.length} tấm
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setMo(true)}
@@ -280,202 +316,321 @@ export function MoiMuaLanHai({
 
       {mo && (
         <div data-testid="man-mua-them-sau-duyet" className="fixed inset-0 z-50 flex flex-col bg-background">
-          <header className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 sm:px-8">
-            <div>
-              <h2 className="kh-h2">
-                {tieuDe ?? "Mua thêm sau khi duyệt"}
-              </h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {moTa ?? "Chọn sản phẩm, studio sẽ gọi xác nhận. Chưa tính tiền lúc này."}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMo(false)}
-              className="h-9 shrink-0 rounded-full border border-border px-4 text-xs font-medium transition hover:bg-surface-2"
-            >
-              Đóng
-            </button>
-          </header>
-
-          <nav className="flex gap-2 overflow-x-auto border-b border-border px-6 py-3 sm:px-8">
-            {THU_TU_NHOM.map((nhom) => (
-              <button
-                key={nhom}
-                type="button"
-                onClick={() => {
-                  setNhomDangXem(nhom);
-                  setMonDangChon(null);
-                }}
-                className={[
-                  "shrink-0 rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
-                  nhom === nhomDangXem
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border text-muted-foreground hover:bg-surface-2",
-                ].join(" ")}
-              >
-                {TEN_NHOM[nhom]}
-              </button>
-            ))}
-          </nav>
-
-          <div className="flex-1 overflow-y-auto px-6 py-4 sm:px-8">
-            {/* Tranh minh hoạ của nhóm đang xem (BB-248), cạnh tiêu đề nhóm. */}
-            <div className="mb-3 flex items-center gap-3">
-              <TranhNho ten={tranhCuaSanPham(nhomDangXem, null, "")} kichThuoc={72} />
-              <h3 className="kh-h3">
-                {TEN_NHOM[nhomDangXem]}
-              </h3>
-            </div>
-
-            {theoNhom.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nhóm này chưa có sản phẩm nào đang bán. Ba mẹ nhắn studio giúp em nhé.
-              </p>
-            ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {theoNhom.map((m) => {
-                  const so = soLuongDat(m.productId, null);
-                  const tranhSanPham = tranhCuaSanPham(m.nhom, m.material, m.name);
-                  const laCanvas = tranhSanPham === "sp-tranh-canvas";
-                  return (
-                    <li key={m.productId} className="rounded-2xl border border-border bg-surface p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-3">
-                          {laCanvas && <TranhNho ten={tranhSanPham} kichThuoc={56} />}
-                          <div className="min-w-0">
-                          <p className="text-sm font-medium">{tenSanPhamChoKhach(m)}</p>
-                          <p className="mt-1 text-sm font-semibold">{formatCurrencyVND(m.unitPrice)}</p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {[m.size ? formatKichThuoc(m.size) : null, m.material].filter(Boolean).join(" · ")} · giá tham khảo
-                          </p>
-                          {gio.some((d) => d.productId === m.productId) && (
-                            <p className="mt-1.5 text-xs font-medium text-moss">
-                              Đang chọn{" "}
-                              {gio
-                                .filter((d) => d.productId === m.productId)
-                                .reduce((n, d) => n + d.soLuong, 0)}
-                            </p>
-                          )}
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          disabled={dangGui}
-                          onClick={() =>
-                            m.canGanAnh
-                              ? setMonDangChon(monDangChon?.productId === m.productId ? null : m)
-                              : datSoLuong(m.productId, so + 1, null)
-                          }
-                          className="h-9 shrink-0 rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
-                        >
-                          {m.canGanAnh ? "Chọn ảnh" : "Chọn"}
-                        </button>
-                      </div>
-
-                      {monDangChon?.productId === m.productId && (
-                        <div className="mt-3 border-t border-border pt-3">
-                          {anhDaChon.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">
-                              Bộ ảnh chưa có tấm nào để chọn.
-                            </p>
-                          ) : (
-                            <>
-                              <p className="mb-2 text-xs text-muted-foreground">
-                                Chọn tấm cần in {tenSanPhamChoKhach(m)}:
-                              </p>
-                              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                                {anhDaChon.map((a) => {
-                                  const dangCo = soLuongDat(m.productId, a.id);
-                                  return (
-                                    <button
-                                      key={a.id}
-                                      type="button"
-                                      disabled={dangGui}
-                                      onClick={() => datSoLuong(m.productId, dangCo + 1, a.id)}
-                                      className={[
-                                        "relative overflow-hidden rounded-xl border-2 transition-colors",
-                                        dangCo > 0 ? "border-moss" : "border-transparent",
-                                      ].join(" ")}
-                                    >
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img
-                                        src={`/api/img/${a.id}?w=200`}
-                                        alt={a.fileName}
-                                        className="aspect-square w-full object-cover"
-                                      />
-                                      {dangCo > 0 && (
-                                        <span className="absolute right-1 top-1 rounded-full bg-moss px-1.5 text-[11px] font-bold text-white">
-                                          {dangCo}
-                                        </span>
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-
-          <footer className="border-t border-border bg-surface px-6 py-4 sm:px-8">
-            {loi && <p className="mb-2 text-xs text-heart">{loi}</p>}
-
-            {/*
-              BB-254 — bắt buộc với viewer (ông bà/người thân): CSKH cần gọi
-              ĐÚNG người vừa gửi, không phải ba mẹ đứng hợp đồng.
-            */}
-            {batBuocNguoiMua && (
-              <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                <input
-                  type="text"
-                  name="tenNguoiMua"
-                  value={tenNguoiMua}
-                  onChange={(e) => setTenNguoiMua(e.target.value)}
-                  maxLength={100}
-                  placeholder="Tên người mua"
-                  disabled={dangGui}
-                  className="h-10 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-foreground"
-                />
-                <input
-                  type="tel"
-                  name="sdtNguoiMua"
-                  value={sdtNguoiMua}
-                  onChange={(e) => setSdtNguoiMua(e.target.value)}
-                  maxLength={10}
-                  placeholder="Số điện thoại (10 số)"
-                  disabled={dangGui}
-                  className="h-10 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-foreground"
-                />
-              </div>
-            )}
-
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs text-muted-foreground">Giá tham khảo</p>
-                {/* BB-305 — giá tham khảo: bỏ font-display, thêm tabular-nums. */}
-                <p className="text-xl font-medium tabular-nums">{formatCurrencyVND(tongTienThamKhao)}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  Studio sẽ gọi xác nhận, chưa tính tiền
+          <header className="border-b border-border">
+            <div className="mx-auto flex w-full max-w-2xl items-start justify-between gap-3 px-4 py-4 sm:px-6">
+              <div className="min-w-0">
+                <h2 className="kh-h2">{tieuDe ?? "Mua thêm sau khi duyệt"}</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {moTa ?? "Chọn sản phẩm, studio sẽ gọi xác nhận. Chưa tính tiền lúc này."}
                 </p>
               </div>
               <button
                 type="button"
-                disabled={gio.length === 0 || dangGui || thieuThongTinNguoiMua}
-                onClick={() => void guiYeuCau()}
-                className="h-11 shrink-0 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                onClick={dongMuaThem}
+                className="h-9 shrink-0 rounded-full border border-border px-4 text-xs font-medium transition hover:bg-surface-2"
               >
-                {dangGui ? "Đang gửi…" : "Gửi yêu cầu cho studio"}
+                Đóng
               </button>
             </div>
+            <nav className="mx-auto flex w-full max-w-2xl gap-2 overflow-x-auto px-4 pb-3 sm:px-6">
+              {THU_TU_NHOM.map((nhom) => (
+                <button
+                  key={nhom}
+                  type="button"
+                  onClick={() => setNhomDangXem(nhom)}
+                  className={[
+                    "shrink-0 rounded-full px-4 py-1.5 text-xs font-medium transition-colors",
+                    nhom === nhomDangXem
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border text-muted-foreground hover:bg-surface-2",
+                  ].join(" ")}
+                >
+                  {TEN_NHOM[nhom]}
+                </button>
+              ))}
+            </nav>
+          </header>
+
+          <div className="flex-1 overflow-y-auto">
+            <div className="mx-auto w-full max-w-2xl px-4 py-4 sm:px-6">
+              {/* Tranh minh hoạ của nhóm đang xem (BB-248), cạnh tiêu đề nhóm. */}
+              <div className="mb-3 flex items-center gap-3">
+                <TranhNho ten={tranhCuaSanPham(nhomDangXem, null, "")} kichThuoc={48} />
+                <h3 className="kh-h3">{TEN_NHOM[nhomDangXem]}</h3>
+              </div>
+
+              {theoNhom.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nhóm này Bean chưa có sản phẩm nào đang bán ạ. Gia đình nhắn Bean giúp nhé ạ.
+                </p>
+              ) : (
+                <ul
+                  data-testid="ds-san-pham-mua-them"
+                  className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface"
+                >
+                  {theoNhom.map((m) => {
+                    const so = soLuongDat(m.productId, null);
+                    const soTam = gio
+                      .filter((d) => d.productId === m.productId && d.photoId !== null)
+                      .reduce((n, d) => n + d.soLuong, 0);
+                    const moTaPhu = [m.size ? formatKichThuoc(m.size) : null, m.material].filter(Boolean).join(" · ");
+                    return (
+                      <li key={m.productId} data-testid="dong-san-pham-mua-them" className="flex items-center gap-3 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{tenSanPhamChoKhach(m)}</p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            <span className="font-semibold text-foreground tabular-nums">{formatCurrencyVND(m.unitPrice)}</span>
+                            {moTaPhu ? ` · ${moTaPhu}` : ""}
+                          </p>
+                          {m.canGanAnh && soTam > 0 && (
+                            <p className="mt-1 text-xs font-medium text-moss">Đã chọn {soTam} tấm</p>
+                          )}
+                        </div>
+
+                        {m.canGanAnh ? (
+                          <button
+                            type="button"
+                            disabled={dangGui}
+                            onClick={() => {
+                              setGioLucMoChon(gio);
+                              setChiAnhThich(anhCoTim.length > 0);
+                              setMonDangChon(m);
+                            }}
+                            className={[
+                              "h-8 shrink-0 rounded-full px-3.5 text-xs font-medium transition disabled:opacity-40",
+                              soTam > 0
+                                ? "border border-border hover:bg-surface-2"
+                                : "bg-primary text-primary-foreground hover:opacity-90",
+                            ].join(" ")}
+                          >
+                            {soTam > 0 ? "Sửa ảnh" : "Chọn ảnh"}
+                          </button>
+                        ) : so === 0 ? (
+                          <button
+                            type="button"
+                            disabled={dangGui}
+                            onClick={() => datSoLuong(m.productId, 1, null)}
+                            className="h-8 shrink-0 rounded-full bg-primary px-3.5 text-xs font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                          >
+                            Chọn
+                          </button>
+                        ) : (
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <button
+                              type="button"
+                              aria-label={`Bớt ${tenSanPhamChoKhach(m)}`}
+                              disabled={dangGui}
+                              onClick={() => datSoLuong(m.productId, so - 1, null)}
+                              className="grid h-8 w-8 place-items-center rounded-full border border-border text-sm transition hover:bg-surface-2"
+                            >
+                              −
+                            </button>
+                            <span className="w-5 text-center text-sm font-medium tabular-nums">{so}</span>
+                            <button
+                              type="button"
+                              aria-label={`Thêm ${tenSanPhamChoKhach(m)}`}
+                              disabled={dangGui}
+                              onClick={() => datSoLuong(m.productId, so + 1, null)}
+                              className="grid h-8 w-8 place-items-center rounded-full border border-border text-sm transition hover:bg-surface-2"
+                            >
+                              +
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <footer className="border-t border-border bg-surface">
+            <div className="mx-auto w-full max-w-2xl px-4 py-3 sm:px-6">
+              {loi && <p className="mb-2 text-xs text-heart">{loi}</p>}
+
+              {/*
+                BB-254 — bắt buộc với viewer (ông bà/người thân): CSKH cần gọi
+                ĐÚNG người vừa gửi, không phải ba mẹ đứng hợp đồng.
+              */}
+              {batBuocNguoiMua && (
+                <div className="mb-3 grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    name="tenNguoiMua"
+                    value={tenNguoiMua}
+                    onChange={(e) => setTenNguoiMua(e.target.value)}
+                    maxLength={100}
+                    placeholder="Tên người mua"
+                    disabled={dangGui}
+                    className="h-10 min-w-0 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-foreground"
+                  />
+                  <input
+                    type="tel"
+                    name="sdtNguoiMua"
+                    value={sdtNguoiMua}
+                    onChange={(e) => setSdtNguoiMua(e.target.value)}
+                    maxLength={10}
+                    placeholder="Số điện thoại (10 số)"
+                    disabled={dangGui}
+                    className="h-10 min-w-0 rounded-full border border-border bg-background px-4 text-sm outline-none focus:border-foreground"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Giá tham khảo</p>
+                  {/* BB-305 — giá tham khảo: bỏ font-display, thêm tabular-nums. */}
+                  <p className="text-xl font-medium tabular-nums">{formatCurrencyVND(tongTienThamKhao)}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">Bean sẽ gọi xác nhận, chưa tính tiền ạ</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={gio.length === 0 || dangGui || thieuThongTinNguoiMua}
+                  onClick={() => void guiYeuCau()}
+                  className="h-11 shrink-0 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                >
+                  {dangGui ? "Đang gửi…" : "Gửi yêu cầu cho studio"}
+                </button>
+              </div>
+            </div>
           </footer>
+        </div>
+      )}
+
+      {/*
+        BB-338 — TẤM CHỌN ẢNH cho một sản phẩm: lớp riêng trên màn mua thêm,
+        không bung giữa danh sách. Bấm ảnh = chọn/bỏ chọn. "Huỷ" trả giỏ về
+        đúng lúc mở; "Xong" giữ lựa chọn. Back của điện thoại = Huỷ.
+      */}
+      {mo && monDangChon && (
+        <div
+          data-testid="tam-chon-anh-mua-them"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Chọn tấm in ${tenSanPhamChoKhach(monDangChon)}`}
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-[#2a2420]/55 sm:items-center sm:p-4"
+        >
+          <div className="flex max-h-[88svh] w-full flex-col overflow-hidden rounded-t-[28px] bg-surface shadow-2xl sm:max-w-2xl sm:rounded-3xl">
+            <div className="flex items-start justify-between gap-3 border-b border-border px-5 pb-3 pt-4">
+              <div className="min-w-0">
+                <p className="kh-h3 truncate">{tenSanPhamChoKhach(monDangChon)}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Gia đình bấm vào tấm muốn in, bấm lại để bỏ chọn ạ.
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Huỷ chọn ảnh"
+                onClick={() => {
+                  if (gioLucMoChon) setGio(gioLucMoChon);
+                  dongTamChon();
+                }}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-base transition hover:bg-surface-2"
+              >
+                ×
+              </button>
+            </div>
+
+            {anhCoTim.length > 0 && (
+              <div className="flex gap-2 px-5 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setChiAnhThich(true)}
+                  className={[
+                    "rounded-full px-3.5 py-1.5 text-xs font-medium",
+                    chiAnhThich ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground",
+                  ].join(" ")}
+                >
+                  Tấm đã thả tim ({anhCoTim.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChiAnhThich(false)}
+                  className={[
+                    "rounded-full px-3.5 py-1.5 text-xs font-medium",
+                    !chiAnhThich ? "bg-primary text-primary-foreground" : "border border-border text-muted-foreground",
+                  ].join(" ")}
+                >
+                  Tất cả ảnh ({anhDaChon.length})
+                </button>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto px-5 py-3">
+              {anhDaChon.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Bộ ảnh chưa có tấm nào để chọn ạ.</p>
+              ) : (
+                <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+                  {(chiAnhThich && anhCoTim.length > 0 ? anhCoTim : anhDaChon).map((a) => {
+                    const dangCo = soLuongDat(monDangChon.productId, a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        data-testid="o-anh-mua-them"
+                        aria-pressed={dangCo > 0}
+                        aria-label={`${dangCo > 0 ? "Bỏ chọn" : "Chọn"} ${a.fileName}`}
+                        onClick={() => datSoLuong(monDangChon.productId, dangCo > 0 ? 0 : 1, a.id)}
+                        className={[
+                          "relative overflow-hidden rounded-lg border-2 transition-colors",
+                          dangCo > 0 ? "border-moss" : "border-transparent",
+                        ].join(" ")}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/api/img/${a.id}?w=200`}
+                          srcSet={`/api/img/${a.id}?w=200 1x, /api/img/${a.id}?w=400 2x`}
+                          alt={a.fileName}
+                          loading="lazy"
+                          className="aspect-square w-full object-cover"
+                          // Cùng luật dự phòng với lưới (BB-314): lh3 lỗi thì thử lại MỘT lần qua `?qua=1`.
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (img.dataset.qua === "1") return;
+                            img.dataset.qua = "1";
+                            img.removeAttribute("srcset");
+                            const url = new URL(img.src, window.location.origin);
+                            url.searchParams.set("qua", "1");
+                            img.src = url.toString();
+                          }}
+                        />
+                        {dangCo > 0 && (
+                          <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-moss text-[11px] font-bold text-white">
+                            ✓
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                onClick={() => setGio((cu) => cu.filter((d) => d.productId !== monDangChon.productId))}
+                className="h-10 rounded-full px-3 text-xs font-medium text-muted-foreground transition hover:bg-surface-2"
+              >
+                Bỏ chọn hết
+              </button>
+              <button
+                type="button"
+                onClick={dongTamChon}
+                className="h-10 rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+              >
+                Xong
+                {(() => {
+                  const n = gio
+                    .filter((d) => d.productId === monDangChon.productId && d.photoId !== null)
+                    .reduce((t, d) => t + d.soLuong, 0);
+                  return n > 0 ? ` · ${n} tấm` : "";
+                })()}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>

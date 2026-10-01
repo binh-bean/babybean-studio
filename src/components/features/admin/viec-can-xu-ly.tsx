@@ -34,7 +34,7 @@ import { LoiDongBoReport } from "./loi-dong-bo-report";
 import { LinkSapHetHanReport } from "./link-sap-het-han-report";
 import { OverQuotaReport } from "./over-quota-report";
 import { YeuCauMoLaiReport } from "./yeu-cau-mo-lai-report";
-import { KhachMuaThemReport } from "./dot-chon-admin";
+import { KhachGuiAnhChonReport } from "./khach-gui-anh-chon-report";
 import { QuenMatKhauReport } from "./quen-mat-khau-report";
 import { formatSo } from "@/lib/utils/dinh-dang";
 import { SU_KIEN_VIEC_DOI, TABS_VIEC_CAN_XU_LY, tabsChoVai as locTabTheoVai, type TabViecCanXuLy } from "@/lib/utils/viec-can-xu-ly-tabs";
@@ -99,14 +99,21 @@ export function ViecCanXuLy({ role }: { role?: string }) {
     <div className="space-y-6">
       <PageHeader
         title="Việc cần xử lý"
-        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại, khách mua thêm chờ xác nhận, nhân viên quên mật khẩu."
+        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại, khách gửi ảnh chọn chờ xác nhận, nhân viên quên mật khẩu."
       />
       <Tabs value={active} onValueChange={onChange}>
-        {/* BB-318: hàng tab xuống dòng thay vì tràn ngang — trên 390px bốn tab không vừa một hàng, và bấm tab từng làm CẢ TRANG trượt sang bên. */}
-        <TabsList className="h-auto flex-wrap justify-start gap-1">
+        {/* BB-318: hàng tab xuống dòng thay vì tràn ngang — trên 390px bốn tab không vừa một hàng, và bấm tab từng làm CẢ TRANG trượt sang bên.
+            BB-338 mục 4 (ảnh anh chụp iPhone 01/10): xuống dòng tự do làm các tab so le, ô to ô nhỏ.
+            Điện thoại: lưới HAI CỘT đều nhau, nhãn trái — số phải; từ `sm` giữ hàng ngang như cũ. */}
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:inline-flex sm:w-auto sm:flex-wrap sm:justify-start">
           {tabsChoVai.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} data-testid={`tab-${tab.value}`}>
-              <span className="flex items-center gap-1.5">
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              data-testid={`tab-${tab.value}`}
+              className="justify-start whitespace-normal text-left sm:justify-center sm:whitespace-nowrap"
+            >
+              <span className="flex w-full items-center justify-between gap-1.5 sm:w-auto sm:justify-start">
                 {tab.label}
                 {/* BB-294 (mục cũ #39) — số huy hiệu sans tabular, không xô lệch khi đổi số. */}
                 {typeof demSo[tab.value] === "number" && demSo[tab.value]! > 0 && (
@@ -140,7 +147,7 @@ export function ViecCanXuLy({ role }: { role?: string }) {
         )}
         {tabsChoVai.some((t) => t.value === "khach-mua-them") && (
           <TabsContent value="khach-mua-them">
-            <KhachMuaThemReport />
+            <KhachGuiAnhChonReport />
           </TabsContent>
         )}
         {tabsChoVai.some((t) => t.value === "lark-da-xoa") && (

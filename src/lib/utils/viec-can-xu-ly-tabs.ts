@@ -71,12 +71,15 @@ export const TABS_VIEC_CAN_XU_LY: DinhNghiaTabViec[] = [
     demSo: demItems,
   },
   {
+    // BB-337 — "Khách gửi ảnh chọn": mỗi BỘ ẢNH một dòng (đợt 1 chờ xác nhận +
+    // đợt mua thêm + nhờ studio chọn giúp). Giữ `value` cũ để link cũ không vỡ.
     value: "khach-mua-them",
-    label: "Khách mua thêm",
+    label: "Khách gửi ảnh chọn",
     api: "/api/admin/reports/dot-chon-cho-xac-nhan",
     hiddenForRoles: ["photoshop_ctv"],
     demSo: (data) => {
-      const d = data as { items?: unknown[]; viecDot1?: unknown[] } | null;
+      const d = data as { boAnh?: unknown[]; items?: unknown[]; viecDot1?: unknown[] } | null;
+      if (Array.isArray(d?.boAnh)) return d.boAnh.length;
       return (d?.items?.length ?? 0) + (d?.viecDot1?.length ?? 0);
     },
   },

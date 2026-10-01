@@ -136,7 +136,8 @@ test.describe("BB-330: chi tiết màn khách", () => {
     await page.getByRole("button", { name: "Tạo link" }).click();
     await expect(page.getByText("Đã tạo link cho")).toBeVisible();
 
-    await page.getByRole("button", { name: "Chia sẻ" }).click();
+    // BB-338: mỗi dòng "Đã mời" cũng có "Chia sẻ" — bấm nút của khối vừa tạo (đứng đầu).
+    await page.getByRole("button", { name: "Chia sẻ" }).first().click();
     const share = (await page.evaluate(() => (window as unknown as { __share: { url?: string }[] }).__share)) ?? [];
     expect(share.length).toBe(1);
     const url = share[0]?.url ?? "";
@@ -197,7 +198,7 @@ test.describe("BB-330: chi tiết màn khách", () => {
     await expect(nut).toHaveCount(0);
 
     await page.locator("footer").last().scrollIntoViewIfNeeded();
-    await expect(page.getByText("Cảm ơn ba mẹ đã yêu thương Baby Bean")).toBeVisible();
+    await expect(page.getByText("Cảm ơn ba mẹ và các con đã yêu thương Bean ạ")).toBeVisible();
   });
 
   test("1: nút tải ở màn xem lớn mở thực đơn 3 lựa chọn", async ({ page }) => {

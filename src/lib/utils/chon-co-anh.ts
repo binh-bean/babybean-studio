@@ -50,3 +50,34 @@ export function chonCoAnhTheoO(oPx: number | undefined, dpr?: number): Thumbnail
   // Ô lớn hơn cả bậc lớn nhất (2048) — trả bậc lớn nhất, không có gì hơn.
   return THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.length - 1] as ThumbnailWidth;
 }
+
+/**
+ * BB-339 (mục 1, ảnh 8a0a4ee3) — ảnh thu nhỏ trong các LƯỚI CHỌN ẢNH phụ (chọn
+ * ảnh để in, chọn ảnh cho sản phẩm trong gói, dòng giỏ). Trước bản vá các lưới
+ * này cứng `?w=200` — ô lưới trên máy tính rộng ~300px CSS, trên điện thoại
+ * ~125px × DPR 2–3 → ảnh 200px bị kéo giãn, nhìn mờ rõ.
+ *
+ * Trả `src` (bậc 400) + `srcSet` 400w/800w để trình duyệt chọn theo `sizes`
+ * và DPR (1x/2x) — `sizes` do nơi gọi truyền, đúng bề rộng ô thật.
+ */
+export function anhNhoTheoO(photoId: string): { src: string; srcSet: string } {
+  const goc = `/api/img/${photoId}`;
+  return {
+    src: `${goc}?w=400`,
+    srcSet: `${goc}?w=400 400w, ${goc}?w=800 800w`,
+  };
+}
+
+/**
+ * `onError` dùng chung cho `anhNhoTheoO`: cùng cơ chế với lưới chính
+ * (`luoi-anh.tsx`, BB-314) — lh3 lỗi thì thử lại ĐÚNG MỘT LẦN qua route với
+ * `?qua=1`, bỏ `srcset` để trình duyệt không tự chọn lại ứng viên lỗi.
+ */
+export function thuLaiAnhQuaRoute(img: HTMLImageElement): void {
+  if (img.dataset.qua === "1") return;
+  img.dataset.qua = "1";
+  const url = new URL(img.currentSrc || img.src, window.location.origin);
+  url.searchParams.set("qua", "1");
+  img.removeAttribute("srcset");
+  img.src = url.toString();
+}

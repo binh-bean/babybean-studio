@@ -109,7 +109,7 @@ async function readTable(auth, baseToken, namePattern) {
  * {fullPhoneNum}. Một hàm cho tất cả,
  * vì đoán sai kiểu thì ra chuỗi "[object Object]" và không ai nhận ra.
  */
-function cellText(value) {
+export function cellText(value) {
   if (value == null) return "";
   if (Array.isArray(value)) {
     return value
@@ -126,7 +126,7 @@ function cellText(value) {
   return String(value);
 }
 
-function cellNumber(value) {
+export function cellNumber(value) {
   return Number(String(cellText(value)).replace(/[^\d]/g, "")) || 0;
 }
 
@@ -139,7 +139,7 @@ function cellNumber(value) {
  * hạn mức chọn ảnh chứ không phải hàng in. Tách riêng, và tách theo tên chính
  * xác chứ không theo chuỗi con: "Edit file Ảnh Phóng" là sản phẩm KHÁC.
  */
-function classify(name, category) {
+export function classify(name, category) {
   if (/^edit file$/i.test(name.trim())) return "edited_photo";
 
   switch (category.trim()) {
@@ -158,7 +158,7 @@ function classify(name, category) {
 }
 
 /** "Gỗ 40x60" -> { material: "Gỗ", size: "40x60" }. "Baby 02" -> không có gì. */
-function splitName(name) {
+export function splitName(name) {
   const m = name.trim().match(/^(.*?)\s*(\d{2,3}\s*[xX]\s*\d{2,3})$/);
   if (!m) return { material: null, size: null };
   const material = m[1].trim();

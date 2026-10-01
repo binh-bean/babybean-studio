@@ -24,6 +24,8 @@ import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { kiemTraNhoStudioChon, kiemTraSanPhamInChuaAnh } from "@/lib/gallery/dot-chon";
 import { demSanPhamInChuaGanAnh, laLoiThieuCot } from "@/lib/gallery/dot-chon-server";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -361,6 +363,14 @@ export async function POST(request: Request): Promise<Response> {
     } catch {
       cacMonMuaThem = [];
     }
+
+    // BB-342: màn nhân viên (Việc cần xử lý, huy hiệu, chi tiết…) tự tải lại. Phát
+    // TRƯỚC tin Lark: việc đã ghi xong, không bắt CSKH chờ thêm lượt gọi Lark.
+    await phatSuKienBoAnh({
+      galleryId: session.galleryId,
+      branchId: gallery.branch_id,
+      loai: LOAI_TUC_THI.khachChotDanhSach,
+    });
 
     await enqueueLarkNotification({
       branchId: gallery.branch_id,

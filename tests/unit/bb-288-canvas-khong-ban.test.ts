@@ -68,11 +68,12 @@ describe("BB-288: canvas không nằm trong danh mục bán cho khách (route gh
     canvasProductId = randomUUID();
     const { error: prodErr } = await supabase.from("products").insert({
       id: canvasProductId,
-      // Tên rõ ràng là dữ liệu giả (AGENTS.md §6) nhưng MATERIAL đúng chữ
-      // thật trên Lark ("Cavas/Kim tuyến") — đó là cái route phải nhận ra.
-      name: "Fixture BB-288 Cavas/Kim tuyến 40x60",
+      // Tên rõ ràng là dữ liệu giả (AGENTS.md §6). BB-339: "Cavas/Kim tuyến"
+      // trên Lark nay là ảnh in Kim Tuyến ĐANG BÁN (bảng giá anh gửi 01/10) —
+      // phép thử này canh canvas THẬT, nên dùng chất liệu "Canvas".
+      name: "Fixture BB-288 Canvas 40x60",
       kind: "print",
-      material: "Cavas/Kim tuyến",
+      material: "Canvas",
       size: "40x60",
       list_price: 850000,
       price_confidence: 1.0,

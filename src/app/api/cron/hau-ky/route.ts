@@ -26,6 +26,16 @@ import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
 import { nhacThongBaoChuaDoc } from "@/lib/thong-bao/nhac-chua-doc";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { kiemTraLaiCacBoLoi, type KetQuaKiemTraLaiNhieu } from "@/lib/drive/kiem-tra-lai-loi";
+import { ghiNhatKy } from "@/lib/nhat-ky";
+import {
+  HANH_DONG_NHAT_KY,
+  KHOA_DONG_BO_GIA,
+  docBangSanPhamTuLark,
+  dongBoGiaSanPham,
+  khoPg,
+  metadataNhatKy,
+  type KetQuaDongBoGia,
+} from "@/lib/lark/dong-bo-gia-san-pham";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -139,6 +149,48 @@ async function chay(request: Request) {
         );
       }
 
+      // BB-343 — đồng bộ GIÁ + trạng thái sản phẩm từ bảng "Sản phẩm" bên Lark.
+      // Gửi nhờ vào cron này vì gói Hobby chỉ có hai cron. Đặt TRƯỚC bước kiểm
+      // lại Drive (bước đó ăn tới 50 giây). Lark lỗi / đọc dưới 80% thì KHÔNG
+      // ghi gì, ghi nhật ký rồi chạy tiếp — không kéo cron đỏ.
+      let dongBoGia: Omit<KetQuaDongBoGia, "doiGia"> | { loi: string } | { boQua: string };
+      try {
+        const { rows: khoa } = await client.query("select pg_try_advisory_lock($1) as ok", [KHOA_DONG_BO_GIA]);
+        if (!khoa[0]?.ok) {
+          dongBoGia = { boQua: "Nút Đồng bộ giá ngay đang chạy" };
+        } else {
+          try {
+            const kq = await dongBoGiaSanPham({
+              kho: khoPg(client),
+              docLark: () =>
+                docBangSanPhamTuLark({
+                  LARK_APP_ID,
+                  LARK_APP_SECRET,
+                  LARK_BASE_APP_TOKEN,
+                }),
+              ghi: true,
+              nguon: "cron",
+            });
+            await ghiNhatKy({
+              actorType: "system",
+              actorLabel: "cron",
+              action: HANH_DONG_NHAT_KY,
+              entityType: "products",
+              metadata: metadataNhatKy(kq),
+            });
+            if (!kq.ok) console.error(JSON.stringify({ evt: "cron.hau_ky.dong_bo_gia_loi", lyDo: kq.loi }));
+            const { doiGia: _doiGia, ...gon } = kq;
+            void _doiGia;
+            dongBoGia = gon;
+          } finally {
+            await client.query("select pg_advisory_unlock($1)", [KHOA_DONG_BO_GIA]).catch(() => {});
+          }
+        }
+      } catch (err) {
+        dongBoGia = { loi: err instanceof Error ? err.message : String(err) };
+        console.error(JSON.stringify({ evt: "cron.hau_ky.dong_bo_gia_hong", lyDo: dongBoGia.loi }));
+      }
+
       // BB-326 mục 5 — bộ ảnh lỗi Drive tự lành: nhân viên bật chia sẻ xong
       // thì sáng hôm sau lỗi tự xoá, không cần ai bấm. Gói Hobby chỉ có hai
       // cron nên gửi nhờ vào lượt này; hỏng thì ghi log, không kéo cron đỏ.
@@ -166,6 +218,7 @@ async function chay(request: Request) {
         baoHinhDaVe: sangHinhDaVe.length,
         nhac,
         nhacChuaDoc,
+        dongBoGia,
         dongBo,
         kiemLaiLoi,
         larkXoaDong,

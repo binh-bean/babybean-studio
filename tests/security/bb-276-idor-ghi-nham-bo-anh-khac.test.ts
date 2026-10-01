@@ -121,7 +121,8 @@ describe("BB-276: IDOR ghi/xoá nhầm dữ liệu của bộ ảnh khác", () =
     khachB = b.khach; boB = b.bo; selectionB = b.selection; anhB = b.anh;
 
     const { rows: prod } = await client.query(
-      `insert into products (name, kind, list_price) values ('Fixture BB-276 In ảnh', 'print', 100000) returning id`,
+      // BB-339: hàng in phải có trong bảng giá 01/10 (chất liệu + kích thước) mới bán.
+      `insert into products (name, kind, material, size, list_price) values ('Fixture BB-276 In ảnh', 'print', 'Gỗ', '40x60', 100000) returning id`,
     );
     productId = prod[0].id;
 

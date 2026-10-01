@@ -221,7 +221,10 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
             aria-disabled={nutChinhBiChan || undefined}
             className={cn(
               // Biến thể MẶC ĐỊNH của Button (bg-primary = mực ở màn khách); chỉ chỉnh cỡ cho vừa viên nổi.
-              "h-9 min-h-0 shrink-0 rounded-full px-4 text-[14px] shadow-none hover:opacity-90",
+              // BB-339 mục 3 (ảnh a3c16a28) — chủ studio: nút "Chốt danh sách"
+              // quá lớn so với viên bao (36px trong viên 44–48px). Nhỏ lại
+              // 32px, chữ 13px cho cân với số đếm và nút giỏ.
+              "h-8 min-h-0 shrink-0 rounded-full px-3.5 text-[13px] shadow-none hover:opacity-90",
               nutChinhBiChan && "opacity-45 hover:opacity-45",
             )}
           >

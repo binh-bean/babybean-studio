@@ -2,7 +2,7 @@
 
 import React from "react";
 import { vi } from "@/i18n";
-import { Select } from "@/components/ui/select";
+import { OChonTim } from "@/components/ui/o-chon-tim";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Table2, Kanban, X, SlidersHorizontal } from "lucide-react";
@@ -234,7 +234,7 @@ export function GalleryFilters({
           >
           {/* Lọc chi nhánh */}
           <div className="w-full sm:w-auto">
-            <Select
+            <OChonTim
               name="branchId"
               value={values.branchId}
               onChange={(e) => onChange({ branchId: e.target.value })}
@@ -247,12 +247,12 @@ export function GalleryFilters({
                   {b.name}
                 </option>
               ))}
-            </Select>
+            </OChonTim>
           </div>
 
           {/* Lọc trạng thái */}
           <div className="w-full sm:w-auto">
-            <Select
+            <OChonTim
               name="status"
               value={values.status}
               onChange={(e) => onChange({ status: e.target.value })}
@@ -270,12 +270,12 @@ export function GalleryFilters({
               <option value="delivered">Đã giao</option>
               <option value="expired">Quá hạn</option>
               <option value="archived">Lưu trữ</option>
-            </Select>
+            </OChonTim>
           </div>
 
           {/* BB-335 — lọc "Photo": lựa chọn là các tên đọc từ cột "photo" bên Lark. */}
           <div className="w-full sm:w-auto">
-            <Select
+            <OChonTim
               name="photo"
               value={values.photo}
               onChange={(e) => onChange({ photo: e.target.value })}
@@ -288,7 +288,7 @@ export function GalleryFilters({
                   {ten}
                 </option>
               ))}
-            </Select>
+            </OChonTim>
           </div>
 
           {/* Lọc khoảng ngày chụp — BB-290 (#34): `<input type="date">` gõ

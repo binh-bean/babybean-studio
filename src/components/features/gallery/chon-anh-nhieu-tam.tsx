@@ -22,6 +22,7 @@ import React from "react";
 import { cn } from "@/components/ui/utils";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { formatSo } from "@/lib/utils/dinh-dang";
+import { anhNhoTheoO, thuLaiAnhQuaRoute } from "@/lib/utils/chon-co-anh";
 
 export interface AnhTrongLuoiChon {
   id: string;
@@ -39,6 +40,18 @@ export interface ChonAnhNhieuTamProps {
   daChonSan?: string[];
   dangLuu: boolean;
   onXacNhan: (photoIds: string[]) => void;
+  /**
+   * BB-339 — tiêu đề riêng (vd "Ảnh cho Gỗ 40×60"); thiếu thì "Chọn ảnh để in".
+   */
+  tieuDe?: string;
+  /**
+   * BB-339 — số tấm TỐI ĐA (suất in trong gói: "Gỗ 40×60 ×2" nhận đúng 2 tấm).
+   * Đủ rồi mà bấm tấm khác: tối đa 1 thì ĐỔI sang tấm mới; lớn hơn 1 thì
+   * không nhận thêm (bỏ bớt một tấm trước). Thiếu = không giới hạn.
+   */
+  toiDa?: number;
+  /** BB-339 — cho phép bấm "Xong" khi chưa chọn tấm nào (bỏ hết ảnh khỏi một suất). */
+  choXongKhiTrong?: boolean;
 }
 
 export function ChonAnhNhieuTam({
@@ -49,6 +62,9 @@ export function ChonAnhNhieuTam({
   daChonSan,
   dangLuu,
   onXacNhan,
+  tieuDe,
+  toiDa,
+  choXongKhiTrong = false,
 }: ChonAnhNhieuTamProps) {
   const [locTatCa, setLocTatCa] = React.useState(anhDaThaTim.length === 0);
   const [daChon, setDaChon] = React.useState<Set<string>>(() => new Set(daChonSan ?? []));
@@ -67,8 +83,16 @@ export function ChonAnhNhieuTam({
   const bat = (id: string) => {
     setDaChon((truoc) => {
       const ke = new Set(truoc);
-      if (ke.has(id)) ke.delete(id);
-      else ke.add(id);
+      if (ke.has(id)) {
+        ke.delete(id);
+        return ke;
+      }
+      if (toiDa != null && ke.size >= toiDa) {
+        // Một suất một tấm: bấm tấm khác là đổi luôn, không bắt bỏ tấm cũ trước.
+        if (toiDa === 1) return new Set([id]);
+        return truoc;
+      }
+      ke.add(id);
       return ke;
     });
   };
@@ -92,7 +116,7 @@ export function ChonAnhNhieuTam({
           ‹
         </button>
         <h2 className="truncate text-center font-display text-xl font-normal leading-tight text-foreground">
-          Chọn ảnh để in
+          {tieuDe ?? "Chọn ảnh để in"}
         </h2>
         <span aria-hidden />
       </header>
@@ -145,12 +169,20 @@ export function ChonAnhNhieuTam({
                     dangChon && "outline outline-2 -outline-offset-2 outline-[var(--bb-fg)]",
                   )}
                 >
+                  {/*
+                    BB-339 mục 1 — trước đây cứng `?w=200` nên ô ~300px (máy
+                    tính) / ~125px × DPR 2–3 (điện thoại) bị kéo giãn, nhìn mờ.
+                    `srcSet` 400w/800w + `sizes` đúng bề rộng ô (3/5/6 cột).
+                  */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/api/img/${a.id}?w=200`}
+                    {...anhNhoTheoO(a.id)}
+                    sizes="(min-width: 1024px) 17vw, (min-width: 640px) 20vw, 34vw"
                     alt={a.fileName}
                     loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover"
+                    onError={(e) => thuLaiAnhQuaRoute(e.currentTarget)}
                   />
                   <span
                     className={cn(
@@ -175,11 +207,13 @@ export function ChonAnhNhieuTam({
         <div className="pointer-events-auto flex h-[52px] items-center justify-between rounded-full border border-[var(--bb-border)] bg-[rgba(253,251,249,0.92)] pl-5 pr-1.5 shadow-[0_6px_24px_-8px_rgba(46,42,39,0.25)] backdrop-blur-[8px]">
           {/* BB-305 — thanh đếm "Đã chọn N tấm" là nội dung: bỏ font-display, tabular-nums cho số. */}
           <p className="text-[16px] font-medium tabular-nums text-foreground">
-            Đã chọn {formatSo(daChon.size)} tấm
+            {toiDa != null
+              ? `Đã chọn ${formatSo(daChon.size)}/${formatSo(toiDa)} tấm`
+              : `Đã chọn ${formatSo(daChon.size)} tấm`}
           </p>
           <button
             type="button"
-            disabled={daChon.size === 0 || dangLuu}
+            disabled={(daChon.size === 0 && !choXongKhiTrong) || dangLuu}
             onClick={() => onXacNhan(Array.from(daChon))}
             className="h-10 shrink-0 rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
           >

@@ -66,6 +66,9 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
         id: prodReliableId,
         name: "Fixture Gỗ tráng gương 20x30",
         kind: "print",
+        // BB-339: hàng in phải có trong bảng giá 01/10 (chất liệu + kích thước).
+        material: "Gỗ",
+        size: "20x30",
         list_price: 250000,
         price_confidence: 0.95,
         price_samples: 10,
@@ -80,6 +83,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
         name: "Fixture Gỗ hiếm mẫu 25x35",
         kind: "print",
         material: "Gỗ",
+        size: "40x60", // BB-339: có trong bảng giá 01/10
         list_price: 1800000,
         // BB-335: 0 lần bán và KHÔNG phải giá nhập bên Lark (độ tin cậy < 1)
         // -> vi phạm luật 2 (cần >= 1 lần bán, hoặc Giá Bán Lark = tin cậy 1).
@@ -91,6 +95,8 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
         id: prodLowConfidenceId,
         name: "Fixture Khung kính đa giác",
         kind: "print",
+        material: "Khung HQ", // BB-339: có trong bảng giá 01/10
+        size: "30x45",
         list_price: 150000,
         price_confidence: 0.5, // hai mức giá hoà nhau -> vi phạm luật 2 (BB-335: cần > 0.5)
         price_samples: 8,
@@ -100,6 +106,8 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
         id: prodNullPriceId,
         name: "Fixture Khung tranh chưa định giá",
         kind: "print",
+        material: "Khung HQ", // BB-339: có trong bảng giá 01/10
+        size: "40x60",
         list_price: null, // vi phạm luật 3 (list_price null)
         price_confidence: null,
         price_samples: 0,

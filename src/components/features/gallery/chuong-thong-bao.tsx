@@ -44,6 +44,7 @@ import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { Bell, X } from "lucide-react";
 import { isSubmittedOrLater } from "@/lib/gallery-status";
 import {
@@ -113,6 +114,9 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
       setDangTai(false);
     }
   }, []);
+
+  // BB-342: tin mới vào chuông (studio xác nhận, nhắc…) — hiện ngay, không F5.
+  useCapNhatTucThi("khach", () => void taiHopThu(), { khoa: galleryId });
 
   // Tải lần đầu, lúc tab mở lại, và khi service worker báo có push mới
   // (public/sw.js gửi `postMessage({ type: "BB_PUSH_NHAN" })` sau khi hiện

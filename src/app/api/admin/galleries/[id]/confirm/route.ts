@@ -12,6 +12,8 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
 
@@ -90,6 +92,9 @@ export async function POST(
       },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
+
+    // BB-342: màn khách đang mở thấy "đã xác nhận" ngay; nhân viên khác thấy việc rời hàng đợi.
+    await phatSuKienBoAnh({ galleryId, branchId: gallery.branch_id, loai: LOAI_TUC_THI.studioXacNhan });
 
     return ok({
       galleryId,

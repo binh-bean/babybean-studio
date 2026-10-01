@@ -17,6 +17,7 @@
 "use client";
 
 import React from "react";
+import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import Link from "next/link";
 import { CARD_TITLE_CLASS } from "./page-header";
 import { YeuCauMoLaiBanner } from "./yeu-cau-mo-lai-banner";
@@ -69,6 +70,8 @@ export function YeuCauMoLaiReport() {
       alive = false;
     };
   }, [tai]);
+  // BB-342: khách vừa xin mở lại — dòng mới hiện ngay, không F5.
+  useCapNhatTucThi("nhan-vien", () => void tai());
 
   if (loading) return <p className="text-sm text-[var(--bb-fg-muted)]">Đang tải…</p>;
   if (error) return <p className="text-sm text-[var(--bb-danger)]">{error}</p>;

@@ -1,5 +1,6 @@
 "use client";
 
+import { taiAnhSongSong } from "@/lib/utils/tai-anh-song-song";
 import dynamic from "next/dynamic";
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
@@ -11,11 +12,14 @@ import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
 import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
+import { useTimGiaDinh } from "@/components/features/gallery/use-tim-gia-dinh";
+import { ThanhDatChinhSua } from "@/components/features/gallery/thanh-dat-chinh-sua";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { ChuongThongBao } from "@/components/features/gallery/chuong-thong-bao";
 import { YeuCauMoLaiTrangThai } from "@/components/features/gallery/yeu-cau-mo-lai-trang-thai";
 import { DotChonTrenManChinh, useDotChon } from "@/components/features/gallery/chon-them-anh";
+import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import {
   cauConThieuTrongGoi,
   coGuiChotDot1,
@@ -83,6 +87,12 @@ const MoiNguoiThan = dynamic(
 );
 const TomTatSanPhamIn = dynamic(
   () => import("@/components/features/gallery/tom-tat-san-pham-in").then((m) => m.TomTatSanPhamIn),
+  { ssr: false },
+);
+// BB-339 mục 3 — lưới chọn ảnh cho MỘT món trong gói (mở từ khối "Trong gói
+// của ba mẹ", từ hộp chốt "Chọn ảnh ngay", và từ cửa hàng).
+const ChonAnhNhieuTam = dynamic(
+  () => import("@/components/features/gallery/chon-anh-nhieu-tam").then((m) => m.ChonAnhNhieuTam),
   { ssr: false },
 );
 const ChonBiaAlbum = dynamic(
@@ -377,7 +387,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
     // không phải gọi lại máy chủ chỉ để biết danh sách.
     void chayTai(photos.map((p) => ({ id: p.id, fileName: p.fileName })));
   }, [chayTai, photos]);
-  const [filter, setFilter] = useState<"all" | "selected" | "unselected">("all");
+  const [filter, setFilter] = useState<"all" | "selected" | "unselected" | "giaDinh">("all");
   const [selectedSubfolder, setSelectedSubfolder] = useState<string>("");
   // BB-213 — tấm trượt "Lưu app ra màn hình chính", mở từ nút ở đầu trang.
   const [moHuongDanLuuApp, setMoHuongDanLuuApp] = useState(false);
@@ -476,6 +486,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
   }, [showSubmitModal]);
   const [placements, setPlacements] = useState<{ photoId: string; galleryItemId: string }[]>([]);
   const [placing, setPlacing] = useState(false);
+  /** BB-339 mục 3 — món trong gói đang mở lưới chọn ảnh (galleryItemId), hoặc null. */
+  const [monDangChonAnh, setMonDangChonAnh] = useState<string | null>(null);
+  /** BB-339 — cặp (ảnh, món) đang chờ máy chủ: bấm lặp lại trong lúc chờ thì bỏ qua. */
+  const placementDangGuiRef = useRef<Set<string>>(new Set());
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   /**
    * BB-218 — màn xem lớn thường xem trong danh sách đã LỌC (`filteredPhotos`).
@@ -643,7 +657,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
     };
   }, [loading, phaiChonBuoiChup, error, gallery]);
 
-  const daChotChoXacNhan = gallery?.status === "submitted" && !moKhoaChon;
+  // BB-338 — `submitted` mà máy chủ đã khoá (Lark "Đã chọn hình" trở lên, hoặc
+  // quá hạn 60 ngày) thì KHÔNG còn là "chờ xác nhận, ba mẹ tự mở lại được":
+  // nút "Chọn thêm ảnh" ở nhánh này bấm xong vẫn bị máy chủ chặn. Rơi sang
+  // nhánh "Yêu cầu sửa lại" — cùng luật với `/api/g/xin-sua-lai`.
+  const daChotChoXacNhan =
+    gallery?.status === "submitted" && !moKhoaChon && gallery?.khoaChonTheoLark !== true;
 
   const isLocked = useMemo(() => {
     if (!gallery) return false;
@@ -659,7 +678,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
   // ảnh chuyển sang khoá (vừa chốt xong), đưa về "Tất cả" — không để lưới kẹt
   // ở một bộ lọc không còn nút nào bấm lại được.
   useEffect(() => {
-    if (isLocked) setFilter((f) => (f === "all" ? f : "all"));
+    if (isLocked) setFilter((f) => (f === "all" || f === "giaDinh" ? f : "all")); // BB-345: chip gia đình vẫn còn khi khoá
   }, [isLocked]);
 
   /*
@@ -740,14 +759,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
       //
       // Nguyên tắc chốt lại, áp cho cả ba mã: **mã trên thanh địa chỉ là nguồn
       // đúng, phiên chỉ là thứ tiện lợi.** Lệch thì phiên thua, luôn luôn.
+      // BB-341: máy chủ nay TỰ đổi mã lấy phiên ngay trong lượt GET đầu (một
+      // vòng thay vì ba). Nó đã thử mà hỏng (`daThuMa`) thì POST lại cũng hỏng
+      // y vậy — hiện lỗi luôn, không tốn thêm vòng.
+      const daThuMa =
+        !res.ok && (await res.clone().json().catch(() => null))?.error?.details?.daThuMa === true;
       const phienCuHong =
-        res.status === 410 || res.status === 403 || res.status === 409;
+        !daThuMa && (res.status === 410 || res.status === 403 || res.status === 409);
       if (phienCuHong) {
         // Đăng nhập lại bằng mã trên URL sẽ thay cookie cũ bằng phiên mới.
         res = new Response(null, { status: 401 });
       }
 
-      if (res.status === 401) {
+      if (res.status === 401 && !daThuMa) {
         // Thử đăng nhập phiên khách với token nếu link không yêu cầu PIN
         const authRes = await fetch("/api/auth/gallery", {
           method: "POST",
@@ -825,30 +849,26 @@ export function GalleryApp({ token }: GalleryAppProps) {
       //
       // Khách trả tiền một buổi chụp rồi chỉ được chọn trong nửa số ảnh.
       setPhotosLoading(true);
-      const tatCaAnh: PhotoPublic[] = [];
-      let cursor: string | undefined;
-      // Chặn trên để một lỗi con trỏ không thành vòng lặp vô tận: 1.235 tấm là
-      // bộ lớn nhất hiện có, 60 trang × 200 là dư gấp nhiều lần.
-      for (let trang = 0; trang < 60; trang++) {
-        const q = new URLSearchParams({ limit: "200" });
-        if (cursor) q.set("cursor", cursor);
-        const photosRes = await fetch(`/api/g/photos?${q}`, { cache: "no-store" });
-        const photosJson = await photosRes.json().catch(() => null);
-        if (!photosRes.ok || !Array.isArray(photosJson?.data)) break;
-
-        tatCaAnh.push(...photosJson.data);
-        // Hiện dần từng trang thay vì chờ trắng màn hình tới tấm cuối: bộ 1.235
-        // tấm mất vài giây, và vài giây nhìn vào trang trống là đủ để ba mẹ
-        // tưởng link hỏng.
-        //
-        // BB-232 — áp hàng chờ ngoại tuyến (nếu còn) lên MỖI trang vừa nhận:
-        // reload lúc còn mất mạng thì tim đã bấm không hiện lại tắt trong lúc
-        // chờ trang cuối tải xong.
-        setPhotos(hangChoTim.apDungLenAnh([...tatCaAnh]));
-
-        if (!photosJson.meta?.hasMore || !photosJson.meta?.cursor) break;
-        cursor = photosJson.meta.cursor;
-      }
+      // BB-341 — xin các trang CÙNG LÚC thay vì nối đuôi (bộ 425 ảnh: 3 vòng →
+      // 1), trang đầu về là hiện ngay. Luật ghép/đi tiếp ở taiAnhSongSong.
+      // BB-232 — áp hàng chờ ngoại tuyến lên MỖI lần danh sách dài thêm.
+      await taiAnhSongSong<PhotoPublic>({
+        soAnhDuKien: gData.photoCount ?? 0,
+        goiTrang: async ({ sau, cursor, limit }) => {
+          const q = new URLSearchParams({ limit: String(limit) });
+          if (sau !== undefined) q.set("sau", String(sau));
+          if (cursor) q.set("cursor", cursor);
+          const photosRes = await fetch(`/api/g/photos?${q}`, { cache: "no-store" });
+          const photosJson = await photosRes.json().catch(() => null);
+          if (!photosRes.ok || !Array.isArray(photosJson?.data)) return null;
+          return {
+            data: photosJson.data as PhotoPublic[],
+            hasMore: !!photosJson.meta?.hasMore,
+            cursor: photosJson.meta?.cursor,
+          };
+        },
+        khiCoThem: (anh) => setPhotos(hangChoTim.apDungLenAnh(anh)),
+      });
       // Tải xong (hoặc còn mất mạng và dừng giữa chừng) — thử gửi luôn hàng
       // chờ cũ nếu mạng đã có lại từ lúc reload tới giờ.
       void hangChoTim.guiNgay();
@@ -872,6 +892,18 @@ export function GalleryApp({ token }: GalleryAppProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, router, hangChoTim.apDungLenAnh, hangChoTim.guiNgay]);
   taiLaiRef.current = () => void loadGallery();
+
+  // BB-342: studio xác nhận/từ chối đợt, mở lại, ghi nhận thanh toán, giao ảnh,
+  // nhắc… — màn tự cập nhật (tiến độ, khoá/mở) mà không F5. Không nạp lại ảnh:
+  // phía studio không đổi tim của ba mẹ.
+  useCapNhatTucThi(
+    "khach",
+    () => {
+      void loadGallery({ silent: true, boQuaAnh: true });
+      void taiLaiDotChon();
+    },
+    { bat: Boolean(gallery?.id), khoa: gallery?.id },
+  );
 
   /**
    * Khách duyệt hoặc yêu cầu sửa. Tải lại cả bộ ảnh sau đó — quyết định này
@@ -1206,17 +1238,44 @@ export function GalleryApp({ token }: GalleryAppProps) {
     }
   };
 
+  /*
+    BB-338 mục 2c — anh báo 01/10/2026: "link mời không chọn được ảnh riêng".
+    Người được mời (vai viewer) KHÔNG chạm danh sách trong gói của ba mẹ (máy
+    chủ vẫn chặn 403 ở /api/g/selection), nhưng được THẢ TIM tấm mình thích
+    để đặt chỉnh sửa / mua thêm. Tim của người xem là của RIÊNG máy đó (lưu ở
+    trình duyệt, theo bộ ảnh) — không ghi vào cơ sở dữ liệu, không lẫn với
+    tim của ba mẹ. Lưới và màn xem lớn của người xem hiện tim CỦA HỌ.
+    BB-345 — tim lưu trên máy chủ (bảng `tim_gia_dinh`, 0083), trình duyệt chỉ
+    là bộ nhớ đệm; ba mẹ thấy "Gia đình thích (N)". Xem `use-tim-gia-dinh.ts`.
+  */
+  const laNguoiXem = gallery?.myRole === "viewer";
+  const {
+    timCuaToi: timNguoiXem,
+    doiTim: doiTimNguoiXem,
+    giaDinhThich,
+    chuaApMigration: timChuaAp0083,
+  } = useTimGiaDinh(gallery?.id, laNguoiXem);
+  /** Nguồn ảnh cho lưới/màn xem lớn: người xem thấy tim CỦA HỌ, ba mẹ thấy như cũ. */
+  const nguonAnh = useMemo(
+    () =>
+      laNguoiXem
+        ? photos.map((p) => ({ ...p, mark: timNguoiXem.has(p.id) ? ("selected" as const) : null }))
+        : photos,
+    [laNguoiXem, photos, timNguoiXem],
+  );
+
   // Lọc danh sách ảnh
   const filteredPhotos = useMemo(() => {
-    return photos.filter((p) => {
+    return nguonAnh.filter((p) => {
       if (selectedSubfolder && p.subfolder !== selectedSubfolder) {
         return false;
       }
       if (filter === "selected") return p.mark === "selected";
       if (filter === "unselected") return p.mark !== "selected";
+      if (filter === "giaDinh") return giaDinhThich.has(p.id);
       return true;
     });
-  }, [photos, filter, selectedSubfolder]);
+  }, [nguonAnh, filter, selectedSubfolder, giaDinhThich]);
 
   /**
    * BB-218 — photoId -> thứ tự 1–4 trong danh sách so sánh. Map (không phải
@@ -1438,17 +1497,28 @@ export function GalleryApp({ token }: GalleryAppProps) {
     return m;
   }, [placements, gallery]);
 
+  /**
+   * Gắn/bỏ một tấm ảnh vào một món TRONG GÓI.
+   *
+   * BB-339 mục 3 — chủ studio: "ảnh chọn cập nhật chậm". Bản cũ đã cập nhật
+   * lạc quan nhưng vẫn bật `placing` (cờ TOÀN CỤC) suốt lúc chờ máy chủ — mọi
+   * nút "Trong gói" ở bảng xem lớn bị khoá và mờ đi (`dangLuu`) cho tới khi
+   * mạng trả lời, nên nhìn như app chậm. Nay: đổi ngay trên màn, KHÔNG khoá
+   * cả bảng; chỉ bỏ qua cú bấm lặp trên ĐÚNG cặp đang chờ; máy chủ từ chối
+   * thì hoàn ĐÚNG thay đổi đó (không ghi đè cả mảng bằng bản chụp cũ — bản
+   * chụp cũ làm mất các thay đổi khác vừa bấm trong lúc chờ).
+   */
   const changePlacement = useCallback(
-    async (photoId: string, galleryItemId: string, add: boolean) => {
-      // Cập nhật giao diện trước, trả lại nếu máy chủ từ chối — cùng cách với
-      // nút thả tim, để khách không phải chờ một vòng mạng mới thấy phản hồi.
-      const before = placements;
-      setPlacements((prev) =>
-        add
-          ? [...prev, { photoId, galleryItemId }]
-          : prev.filter((x) => !(x.photoId === photoId && x.galleryItemId === galleryItemId)),
-      );
-      setPlacing(true);
+    async (photoId: string, galleryItemId: string, add: boolean): Promise<boolean> => {
+      const khoaCap = `${photoId}|${galleryItemId}`;
+      if (placementDangGuiRef.current.has(khoaCap)) return false;
+      placementDangGuiRef.current.add(khoaCap);
+      const apDung = (them: boolean) =>
+        setPlacements((prev) => {
+          const bo = prev.filter((x) => !(x.photoId === photoId && x.galleryItemId === galleryItemId));
+          return them ? [...bo, { photoId, galleryItemId }] : bo;
+        });
+      apDung(add);
       try {
         const res = await fetch("/api/g/placements", {
           method: add ? "POST" : "DELETE",
@@ -1456,18 +1526,41 @@ export function GalleryApp({ token }: GalleryAppProps) {
           body: JSON.stringify({ photoId, galleryItemId }),
         });
         if (!res.ok) {
-          setPlacements(before);
+          apDung(!add);
           const json = await res.json().catch(() => null);
-          setStatusMessage(json?.error?.message ?? "Không lưu được, ba mẹ thử lại giúp.");
+          setStatusMessage(json?.error?.message ?? "Chưa lưu được, ba mẹ thử lại giúp Bean nhé ạ.");
+          return false;
         }
+        return true;
       } catch {
-        setPlacements(before);
-        setStatusMessage("Mất kết nối, ba mẹ thử lại giúp.");
+        apDung(!add);
+        setStatusMessage("Mất kết nối, ba mẹ thử lại giúp Bean nhé ạ.");
+        return false;
       } finally {
-        setPlacing(false);
+        placementDangGuiRef.current.delete(khoaCap);
       }
     },
-    [placements],
+    [],
+  );
+
+  /**
+   * BB-339 mục 3/4 — "Xong" trong lưới chọn ảnh của một món trong gói: so với
+   * ảnh đang gắn, bỏ những tấm bị bỏ chọn TRƯỚC (nhường suất), rồi gắn tấm mới.
+   * Mỗi thay đổi đi qua `changePlacement` (lạc quan, hoàn đúng tấm lỗi).
+   */
+  const ganAnhChoMonTrongGoi = useCallback(
+    async (galleryItemId: string, photoIds: string[]) => {
+      const dangCo = placements.filter((pl) => pl.galleryItemId === galleryItemId).map((pl) => pl.photoId);
+      const bo = dangCo.filter((id) => !photoIds.includes(id));
+      const them = photoIds.filter((id) => !dangCo.includes(id));
+      // Tấm chưa thả tim: máy chủ tự thêm vào danh sách chọn khi gắn
+      // (placements route) — tải lại lặng lẽ để tim/đếm trên màn khớp.
+      const canTaiLai = them.some((id) => photos.find((p) => p.id === id)?.mark !== "selected");
+      await Promise.all(bo.map((id) => changePlacement(id, galleryItemId, false)));
+      await Promise.all(them.map((id) => changePlacement(id, galleryItemId, true)));
+      if (canTaiLai) await loadGallery({ silent: true });
+    },
+    [placements, photos, changePlacement, loadGallery],
   );
 
   /**
@@ -1571,7 +1664,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       }
       setXinSuaLai(false);
       setLyDoSuaLai("");
-      setStatusMessage(json?.data?.loiNhan ?? "Bên mình đã nhận yêu cầu của ba mẹ.");
+      setStatusMessage(json?.data?.loiNhan ?? "Bean đã nhận yêu cầu của ba mẹ ạ.");
       // BB-312 — tải lại để `gallery.reopenRequest` chuyển sang "cho_xu_ly":
       // nút chính đổi nhãn "Đã gửi yêu cầu · lần N" và dải trạng thái hiện ra,
       // không phải đợi khách tự tải lại trang mới thấy.
@@ -1900,7 +1993,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
     );
   }
 
-  const nutLoc = (loai: "all" | "selected" | "unselected", nhan: string, so: number) => (
+  const nutLoc = (loai: "all" | "selected" | "unselected" | "giaDinh", nhan: string, so: number) => (
     <button
       type="button"
       onClick={() => setFilter(loai)}
@@ -1964,8 +2057,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
       <div className="space-y-3">
         <div className="rounded-2xl border border-border bg-surface p-4 text-sm">
           <p className="font-medium">Link này để xem ảnh cùng gia đình</p>
+          {/* BB-338 mục 2b — câu anh duyệt 01/10/2026. */}
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Việc chọn ảnh do ba mẹ đứng tên hợp đồng. Thích tấm nào, nhắn ba mẹ nhé.
+            Ảnh chọn trong gói được ba mẹ thực hiện. Gia đình thích tấm nào có thể đặt chỉnh sửa hoặc mua thêm ảnh in và album in ảnh ạ!
           </p>
         </div>
 
@@ -1981,7 +2075,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
           moGate={dangMoChoKhachXem(gallery.status)}
           batBuocNguoiMua
           tieuDe="Đặt in ảnh này / Mua thêm"
-          moTa="Chọn sản phẩm, để lại tên và số điện thoại. Studio sẽ gọi báo giá."
+          moTa="Gia đình chọn sản phẩm, để lại tên và số điện thoại, Bean sẽ gọi báo giá ạ."
+          anhThich={[...timNguoiXem]}
           danhMuc={(gallery.addons?.catalogue ?? []).map((sp) => ({
             productId: sp.productId,
             name: sp.name,
@@ -2422,8 +2517,12 @@ export function GalleryApp({ token }: GalleryAppProps) {
               {!soSanhBat && (
                 <>
                   {nutLoc("all", vi.gallery.filterAll, photos.length)}
-                  {!isLocked && nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
-                  {!isLocked && nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
+                  {laNguoiXem
+                    ? timNguoiXem.size > 0 && nutLoc("selected", "Đã thả tim", timNguoiXem.size)
+                    : !isLocked && nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
+                  {!laNguoiXem && !isLocked && nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
+                  {/* BB-345 — ba mẹ thấy tấm gia đình (link mời) thích; không tự thêm vào gói. */}
+                  {!laNguoiXem && giaDinhThich.size > 0 && nutLoc("giaDinh", "Gia đình thích", giaDinhThich.size)}
                   {photosLoading && <Spinner className="mb-2.5 h-4 w-4 shrink-0 text-muted-foreground lg:mb-0" />}
                 </>
               )}
@@ -2592,7 +2691,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 </p>
                 <p className="mt-0.5 text-[13px] text-muted-foreground">
                   {daChotChoXacNhan
-                    ? "Bên mình đang xác nhận danh sách của ba mẹ."
+                    ? "Bean đang xác nhận danh sách của ba mẹ ạ!"
                     : // BB-287 mục 5 — báo cáo chấm #27: thiếu `submittedAt`
                       // (dữ liệu dựng tay không có ngày) từng để lại câu
                       // "Ba mẹ đã chốt ngày . Bộ ảnh…" — thiếu ngày, thừa
@@ -2671,19 +2770,28 @@ export function GalleryApp({ token }: GalleryAppProps) {
           <LuoiAnh
             photos={filteredPhotos}
             mutatingIds={mutatingIds}
-            khoa={khoaTim}
+            khoa={laNguoiXem ? false : khoaTim}
             soSanPhamTheoAnh={soSanPhamTheoAnh}
             soSanhBat={soSanhBat}
             soSanhTheoAnh={soSanhTheoAnh}
-            onToggle={handleToggleHeart}
+            onToggle={laNguoiXem ? doiTimNguoiXem : handleToggleHeart}
             onOpen={(idx) => {
               setLightboxDungDanhSachDay(false);
               setLightboxIndex(idx);
             }}
             onToggleSoSanh={onToggleSoSanh}
+            giaDinhThich={laNguoiXem ? undefined : giaDinhThich}
           />
         )}
       </section>
+      {/* BB-345 — thanh "Gia đình đã thả tim N tấm · Đặt chỉnh sửa" của người được mời. */}
+      {laNguoiXem && (
+        <ThanhDatChinhSua
+          soTim={timNguoiXem.size}
+          giaMoiAnh={gallery.extraPhotoPrice}
+          chuaApMigration={timChuaAp0083}
+        />
+      )}
 
       {/* BB-319 K-S1 — bộ đã giao: thẻ bán hàng SAU lưới, cùng lề 24/40 px với các khối dưới. */}
       {dangGiao && (
@@ -2774,6 +2882,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             }))}
             onMoAnh={moAnhTheoId}
             khoa={isLocked}
+            onChonAnh={duocChon ? setMonDangChonAnh : undefined}
           />
         </div>
       )}
@@ -2815,7 +2924,45 @@ export function GalleryApp({ token }: GalleryAppProps) {
         onMuaNhieu={(productId, soLuong, photoIds) => datNhieuAnhMuaThem(productId, soLuong, photoIds)}
         presetPhotoId={presetCuaHang?.photoId ?? null}
         presetNhom={presetCuaHang?.nhom ?? null}
+        // BB-339 mục 4 — "Trong gói: x/y ảnh" + chọn ảnh cho món trong gói ngay tại cửa hàng.
+        trongGoi={{
+          hanMuc,
+          daChon: selectionCounts.selectedCount,
+          mon: hangInTrongGoi.map((sp) => ({
+            galleryItemId: sp.galleryItemId,
+            name: sp.name,
+            quantity: sp.quantity,
+            laAlbum: sp.nhom === "album",
+            soAnh: demAnhTrongDongHang(sp.galleryItemId),
+          })),
+          onChonAnh: duocChon && !isLocked ? setMonDangChonAnh : undefined,
+        }}
       />
+
+      {/* BB-339 mục 3/4 — lưới chọn ảnh cho MỘT món trong gói (z-60, nổi trên cửa hàng). */}
+      {(() => {
+        const mon = monDangChonAnh ? hangInTrongGoi.find((sp) => sp.galleryItemId === monDangChonAnh) : null;
+        if (!mon) return null;
+        const daGan = placements.filter((pl) => pl.galleryItemId === mon.galleryItemId).map((pl) => pl.photoId);
+        return (
+          <ChonAnhNhieuTam
+            key={mon.galleryItemId}
+            mo
+            onDong={() => setMonDangChonAnh(null)}
+            tieuDe={`Ảnh cho ${tenKemSoLuong(mon.name, mon.quantity)}`}
+            toiDa={mon.nhom === "album" ? undefined : mon.quantity}
+            choXongKhiTrong={daGan.length > 0}
+            anhDaThaTim={photos.filter((p) => p.mark === "selected").map((p) => ({ id: p.id, fileName: p.fileName }))}
+            tatCaAnh={photos.map((p) => ({ id: p.id, fileName: p.fileName }))}
+            daChonSan={daGan}
+            dangLuu={false}
+            onXacNhan={(photoIds) => {
+              setMonDangChonAnh(null);
+              void ganAnhChoMonTrongGoi(mon.galleryItemId, photoIds);
+            }}
+          />
+        );
+      })()}
 
       {/* BB-330 — nút tròn "Lên đầu trang", đứng trên thanh đáy (không che). */}
       <NutLenDauTrang />
@@ -3030,7 +3177,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
               className="h-[56px] w-auto object-contain opacity-90"
               style={layerMoVuong}
             />
-            <p className="text-lg text-foreground">Cảm ơn ba mẹ đã yêu thương Baby Bean</p>
+            <p className="text-lg text-foreground">Cảm ơn ba mẹ và các con đã yêu thương Bean ạ</p>
+            {/* BB-338 mục 1 — anh: "Đổi thành Yours truly Bean". Lời ký của studio, Playfair không nghiêng. */}
+            <p data-testid="loi-ky-bean" className="font-display text-[20px] font-normal not-italic text-foreground">
+              Yours truly Bean
+            </p>
             <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground">
               © {new Date().getFullYear()} Baby Bean Studio
             </p>
@@ -3058,7 +3209,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             {gallery.reopenRequest?.trangThai === "cho_xu_ly" ? (
               <>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  Bên mình đã nhận yêu cầu. Studio sẽ liên hệ ba mẹ sớm.
+                  Bean đã nhận yêu cầu và sẽ liên hệ ba mẹ sớm ạ.
                 </p>
                 <div className="mt-5 flex items-center justify-end">
                   <button
@@ -3073,8 +3224,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
             ) : (
               <>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  Bộ ảnh đã sang bước chỉnh, ba mẹ không tự sửa được nữa. Ba mẹ ghi muốn
-                  sửa gì, studio sẽ báo lại ngay.
+                  Bộ ảnh đã khoá chọn nên ba mẹ không tự sửa được nữa ạ. Ba mẹ ghi giúp
+                  Bean muốn sửa gì, Bean sẽ báo lại ngay nhé ạ.
                 </p>
                 {/* BB-312 — vừa bị từ chối thì nhắc lại lý do ngay trong form
                     gửi lần mới, để ba mẹ không phải nhớ lại đã đọc ở đâu. */}
@@ -3430,6 +3581,14 @@ export function GalleryApp({ token }: GalleryAppProps) {
                       type="button"
                       onClick={() => {
                         setShowSubmitModal(false);
+                        // BB-339 mục 3 — mở THẲNG lưới chọn ảnh của món đầu tiên còn
+                        // thiếu (bấm vào ảnh là chọn được), không chỉ cuộn tới khối
+                        // tóm tắt chỉ-đọc như trước.
+                        const dau = dongInThieuAnh[0];
+                        if (dau && !isLocked) {
+                          setMonDangChonAnh(dau.galleryItemId);
+                          return;
+                        }
                         requestAnimationFrame(() =>
                           document
                             .getElementById("trong-goi-cua-ba-me")
@@ -3593,7 +3752,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           // BB-218: mở từ "So sánh với tấm khác" dùng danh sách ĐẦY ĐỦ vì
           // tấm đó có thể không nằm trong bộ lọc đang xem (xem khai báo
           // `lightboxDungDanhSachDay`).
-          photos={lightboxDungDanhSachDay ? photos : filteredPhotos}
+          photos={lightboxDungDanhSachDay ? nguonAnh : filteredPhotos}
           initialIndex={lightboxIndex}
           tenBe={tenBeHienThi || null}
           onClose={() => {
@@ -3603,7 +3762,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             // sánh — ba mẹ đang so dở, không phải đang xem lưới.
             if (lightboxDungDanhSachDay && soSanhBat && duSoSanh(dsSoSanh)) setMoSoSanh(true);
           }}
-          onToggleHeart={handleToggleHeart}
+          onToggleHeart={laNguoiXem ? doiTimNguoiXem : handleToggleHeart}
           onTaiAnh={choPhepTai ? (p) => taiMotAnh({ id: p.id, fileName: p.fileName }) : null}
           // BB-330 — nút tải ở màn xem lớn mở cùng thực đơn với màn ngoài.
           menuTai={
@@ -3618,10 +3777,10 @@ export function GalleryApp({ token }: GalleryAppProps) {
               : null
           }
           mutatingIds={mutatingIds}
-          isLocked={khoaTim}
-          daChon={soAnhDaChon}
-          hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
-          onLuuGhiChu={luuGhiChuAnh}
+          isLocked={laNguoiXem ? false : khoaTim}
+          daChon={laNguoiXem ? timNguoiXem.size : soAnhDaChon}
+          hanMuc={laNguoiXem ? null : gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
+          onLuuGhiChu={laNguoiXem ? undefined : luuGhiChuAnh}
           onSoSanh={onSoSanhTuLightbox}
           dungCho={(anh) => {
             // Gộp đủ ba đường một tấm ảnh thành hàng — cùng ba nguồn với dấu
@@ -3670,7 +3829,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               )
             ) : null
           }
-          bangSanPham={(anh, tong) => (
+          bangSanPham={laNguoiXem ? undefined : (anh, tong) => (
             <BangSanPhamCuaAnh
               tong={tong}
               anhDaChon={anh.mark === "selected"}

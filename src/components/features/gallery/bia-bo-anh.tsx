@@ -1,5 +1,6 @@
 "use client";
 
+import { urlAnh, urlAnhDuPhong } from "@/lib/utils/anh-lh3";
 import { cn } from "@/components/ui/utils";
 import React, { useEffect, useState } from "react";
 import { Clock, Heart, Lock, ArrowDown } from "lucide-react";
@@ -342,6 +343,8 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                 src={`/api/img/${anhBia.id}?w=1600`}
                 srcSet={`/api/img/${anhBia.id}?w=1600 1600w, /api/img/${anhBia.id}?w=2048 2048w`}
                 alt=""
+                // BB-341 — ảnh bìa là LCP của màn khách ở bố cục này cũng như bố cục chính.
+                fetchPriority="high"
                 decoding="async"
                 className="h-full w-full object-cover"
               />
@@ -851,7 +854,8 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                         style={{ flex: `${ti_le} 1 0`, aspectRatio: ti_le }}
                       >
                         <img
-                          src={`/api/img/${p.id}?w=200`}
+                          // BB-341 — thẳng lh3 khi có mã tệp (bỏ vòng 302 qua hàm).
+                          src={urlAnh(p, 200)}
                           alt=""
                           loading="lazy"
                           className="h-full w-full object-cover"
@@ -869,9 +873,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                             const img = e.currentTarget;
                             if (img.dataset.qua === "1") return;
                             img.dataset.qua = "1";
-                            const url = new URL(img.src, window.location.origin);
-                            url.searchParams.set("qua", "1");
-                            img.src = url.toString();
+                            img.src = urlAnhDuPhong(p.id, 200);
                           }}
                         />
                       </button>

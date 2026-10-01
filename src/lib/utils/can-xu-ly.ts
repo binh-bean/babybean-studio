@@ -59,17 +59,14 @@ export interface CanXuLyTongHop {
    */
   choMoLai?: number;
   /**
-   * BB-321 — `GET /api/admin/can-xu-ly` → data.choDotChon: số ĐỢT mua thêm khách
-   * đã chốt và đang chờ CSKH xác nhận/từ chối (src/lib/gallery/dot-chon-server.ts).
-   * Là doanh thu — không để nằm im.
+   * BB-344 — `GET /api/admin/can-xu-ly` → data.khachGuiAnhChon: số BỘ ẢNH trong tab
+   * "Khách gửi ảnh chọn" (BB-337) — đợt 1 chờ xác nhận + đợt mua thêm ≥ 2 + khách
+   * nhờ studio chọn giúp, mỗi bộ một dòng. Lấy từ `layKhachGuiAnhChon`
+   * (src/lib/gallery/khach-gui-anh-chon.ts), CÙNG hàm với tab, nên số ở đây luôn
+   * bằng số dòng của tab. Thay hai trường cũ `choDotChon` + `choStudioChon` (BB-321:
+   * đếm theo đợt, thiếu đợt 1).
    */
-  choDotChon?: number;
-  /**
-   * BB-321 — `GET /api/admin/can-xu-ly` → data.choStudioChon: số bộ ảnh mà khách
-   * NHỜ studio chọn thêm ảnh (đợt 1 chốt thiếu) hoặc chốt khi còn sản phẩm in
-   * chưa chọn ảnh — CSKH phải làm, không để nằm im.
-   */
-  choStudioChon?: number;
+  khachGuiAnhChon?: number;
 }
 
 /**
@@ -88,8 +85,7 @@ export function demSoCanXuLy(d: CanXuLyTongHop | null | undefined): number {
     (d.overdue ?? 0) +
     (d.canhBaoLark ?? 0) +
     (d.choMoLai ?? 0) +
-    (d.choDotChon ?? 0) +
-    (d.choStudioChon ?? 0)
+    (d.khachGuiAnhChon ?? 0)
   );
 }
 
@@ -159,16 +155,10 @@ export function dongCanXuLy(d: CanXuLyTongHop | null | undefined): DongCanXuLy[]
       href: "/admin/viec-can-xu-ly?tab=yeu-cau-mo-lai",
     },
     {
-      key: "cho-dot-chon",
-      nhan: "Khách mua thêm chờ xác nhận",
-      soLuong: d.choDotChon ?? 0,
-      mauCham: "var(--bb-urgent)",
-      href: "/admin/viec-can-xu-ly?tab=khach-mua-them",
-    },
-    {
-      key: "cho-studio-chon",
-      nhan: "Khách nhờ studio chọn ảnh / còn in chưa chọn ảnh",
-      soLuong: d.choStudioChon ?? 0,
+      // BB-344: MỘT dòng cho tab "Khách gửi ảnh chọn" — số = số dòng của tab, bấm mở đúng tab đó.
+      key: "khach-gui-anh-chon",
+      nhan: "Khách gửi ảnh chọn",
+      soLuong: d.khachGuiAnhChon ?? 0,
       mauCham: "var(--bb-urgent)",
       href: "/admin/viec-can-xu-ly?tab=khach-mua-them",
     },

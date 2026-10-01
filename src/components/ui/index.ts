@@ -3,6 +3,7 @@ export * from "./button";
 export * from "./input";
 export * from "./textarea";
 export * from "./select";
+export * from "./o-chon-tim";
 export * from "./checkbox";
 export * from "./switch";
 export * from "./radio";
