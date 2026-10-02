@@ -211,7 +211,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // phông để không phụ thuộc việc màn khách đang dùng phông gì.
     const tenChiNhanh = footer.getByTestId("chan-trang-ten-chi-nhanh");
     // BB-319: một nhãn nhắn tin cho cả màn khách — "Nhắn studio".
-    const nutNhan = footer.getByRole("link", { name: "Nhắn studio" });
+    const nutNhan = footer.getByRole("link", { name: "Nhắn Bean" });
 
     if ((await nutNhan.count()) > 0) {
       const boxTen = (await tenChiNhanh.boundingBox())!;

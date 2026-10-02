@@ -5,6 +5,7 @@ import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Printer, PenLine } from "lucide-react";
 import { cn } from "@/components/ui/utils";
+import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { vi } from "@/i18n";
 import type { PhotoPublic } from "@/types/domain";
 import {
@@ -994,7 +995,7 @@ export function PhotoLightbox({
             {nhanDungCho.map((n) => (
               <span
                 key={n}
-                className="rounded-full border border-[#9db08b]/60 bg-[#6c7a5f]/15 px-3 py-1 text-[12px] text-[#4a5a41]"
+                className={cn(CHIP_NGUYEN_KHOI, "overflow-hidden text-ellipsis rounded-full border border-[#9db08b]/60 bg-[#6c7a5f]/15 px-3 py-1 text-[12px] text-[#4a5a41]")}
               >
                 — {n}
               </span>

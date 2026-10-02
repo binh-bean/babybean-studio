@@ -24,6 +24,7 @@
 
 import React from "react";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { ChevronRight, UserPlus } from "lucide-react";
 import { useNutBackDong } from "./use-nut-back-dong";
 
 interface NguoiDaMoi {
@@ -57,7 +58,17 @@ export function diaChiTuyetDoi(diaChiDayDu: string | undefined, duongDan: string
   }
 }
 
-export function MoiNguoiThan() {
+/**
+ * BB-355 — bản vẽ "Màn khách v8": lối vào màn mời có BA kiểu, cùng một màn mời.
+ *   · "nut-bia"  — nút viền thứ hai trên bìa (đang chọn ảnh), thay khối mời đứng
+ *                  giữa hàng chip và lưới.
+ *   · "hang"     — hàng cuối của thẻ tiến độ gộp (đã gửi, chờ Bean xác nhận).
+ *   · "the"      — thẻ cũ (màn Đã giao, đứng SAU lưới).
+ * Màn mời mở dạng tấm trượt từ đáy (điện thoại) / tấm bên phải (máy tính).
+ */
+export type KieuLoiVaoMoi = "the" | "nut-bia" | "hang";
+
+export function MoiNguoiThan({ kieu = "the" }: { kieu?: KieuLoiVaoMoi } = {}) {
   const [ds, setDs] = React.useState<NguoiDaMoi[] | null>(null);
   const [mo, setMo] = React.useState(false);
   const [nhan, setNhan] = React.useState("");
@@ -206,8 +217,39 @@ export function MoiNguoiThan() {
 
   const dangHoatDong = (ds ?? []).filter((d) => d.trangThai === "active");
 
+  const moMan = () => {
+    setMo(true);
+    setLoi(null);
+    setLinkVuaTao(null);
+  };
+
+  const loiVao =
+    kieu === "nut-bia" ? (
+      <button
+        type="button"
+        data-testid="nut-moi-ong-ba-bia"
+        onClick={moMan}
+        className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#e5dcd2] bg-white px-6 text-[14px] font-medium text-[#2e2a27] transition hover:bg-[#2e2a27]/5 @[64rem]:h-[52px] @[64rem]:w-auto"
+      >
+        <UserPlus className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
+        Mời ông bà cùng xem
+      </button>
+    ) : kieu === "hang" ? (
+      <button
+        type="button"
+        data-testid="hang-moi-ong-ba"
+        onClick={moMan}
+        className="flex h-11 w-full items-center gap-2.5 border-t border-[#e5dcd2] text-left text-[14px] font-medium text-[#2e2a27] lg:h-11 lg:w-auto lg:shrink-0 lg:gap-2 lg:rounded-full lg:border lg:bg-white lg:px-5"
+      >
+        <UserPlus className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} aria-hidden="true" />
+        <span className="flex-1 lg:flex-none">Mời ông bà cùng xem</span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-[#6b6057] lg:hidden" strokeWidth={1.8} aria-hidden="true" />
+      </button>
+    ) : null;
+
   return (
     <>
+      {loiVao ?? (
       <div className="flex items-center gap-3.5 rounded-2xl border border-border bg-surface p-5">
         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -232,22 +274,36 @@ export function MoiNguoiThan() {
         </div>
         <button
           type="button"
-          onClick={() => {
-            setMo(true);
-            setLoi(null);
-            setLinkVuaTao(null);
-          }}
+          onClick={moMan}
           className="h-10 shrink-0 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
         >
           Mời
         </button>
       </div>
+      )}
 
       {mo && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background">
+        // BB-355 — tấm trượt: điện thoại trượt lên từ đáy (cao tối đa 88%), máy tính
+        // là tấm bên phải rộng 480px; nền mờ phía sau bấm vào là đóng.
+        <div className="fixed inset-0 z-50 flex items-end justify-center lg:items-stretch lg:justify-end">
+          <button
+            type="button"
+            aria-hidden="true"
+            tabIndex={-1}
+            onClick={dongMan}
+            className="absolute inset-0 bg-[#2e2a27]/35"
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="tieu-de-moi-ong-ba"
+            data-testid="tam-moi-ong-ba"
+            className="relative flex max-h-[88svh] w-full flex-col rounded-t-[20px] bg-background shadow-[0_-8px_32px_rgba(46,42,39,0.18)] motion-safe:animate-[tam-truot-len_280ms_ease-out] lg:h-full lg:max-h-none lg:w-[480px] lg:rounded-none lg:motion-safe:animate-[tam-truot-trai_280ms_ease-out]"
+          >
+          <span aria-hidden="true" className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-[#e5dcd2] lg:hidden" />
           <header className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 sm:px-8">
             <div>
-              <h2 className="kh-h2">Mời ông bà cùng xem</h2>
+              <h2 id="tieu-de-moi-ong-ba" className="kh-h2">Mời ông bà cùng xem</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Ông bà xem ảnh, thả tim tấm mình thích để đặt mua thêm ạ. Danh sách ảnh trong gói vẫn do ba mẹ chọn.
               </p>
@@ -401,6 +457,7 @@ export function MoiNguoiThan() {
                 })}
               </ul>
             )}
+          </div>
           </div>
         </div>
       )}

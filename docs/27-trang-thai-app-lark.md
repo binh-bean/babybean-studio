@@ -21,28 +21,34 @@
 
 | # | Mã app (`ma`) | Khi nào | Lark "Trạng Thái" | Màn quản trị | Màn khách | Bước khách |
 |---|---|---|---|---|---|---|
-| 1 | `moi_nhap` | Dòng Lark mới chưa thành bộ ảnh, hoặc bộ nháp chưa có link Drive | *(trống)* | Mới nhập | Studio đang chuẩn bị ảnh | — |
-| 2 | `dang_tai` | Có link Drive, đang kéo ảnh (`draft`/`syncing`) | *(trống)* | Đang tải ảnh | Studio đang chuẩn bị ảnh | — |
-| 3 | `loi_tai` | Có link Drive mà tải lỗi (`sync_error`), **hoặc** link đã thuộc bộ/dòng khác (luồng BB-325 hỏi nhân viên chọn) | *(trống)* | Lỗi tải | Studio đang chuẩn bị ảnh | — |
-| 4 | `cho_tao_link` | Đủ ảnh (`ready`) nhưng chưa có Link app | *(trống)* | Chờ tạo Link app | Studio đang chuẩn bị ảnh | — |
-| 5 | `san_sang` | Đủ ảnh + đã có Link app, bộ neo Lark, Lark chưa "Đã gửi file gốc" | *(trống)* | Sẵn sàng | Mời ba mẹ chọn ảnh | Chọn ảnh |
-| 6 | `cho_khach_chon` | Lark "Đã gửi file gốc", hoặc khách đang chọn (`in_review`/mở lại) | Đã gửi file gốc | Chờ khách chọn | Mời ba mẹ chọn ảnh | Chọn ảnh |
-| 7 | `cho_studio_xac_nhan` | Khách bấm chốt (`submitted`) | Đã gửi file gốc | Chờ studio xác nhận | **Đang chờ studio xác nhận** | Studio xác nhận |
-| 8 | `da_chon_hinh` | CSKH xác nhận (`in_retouch`) mà Lark chưa "Đang làm"; hoặc Lark "Đã chọn hình" | Đã chọn hình | Đã chọn hình · chờ chỉnh sửa | Studio đã ghi nhận yêu cầu | Studio xác nhận |
-| 9 | `dang_chinh_sua` | | Đang làm | Đang chỉnh sửa | Đang chỉnh sửa | Chỉnh sửa |
-| 10 | `leader_kiem` | | Leader check hình | Leader đang kiểm ảnh | Đang chỉnh sửa | Chỉnh sửa |
-| 11 | `cho_khach_duyet` | Lark "Đã gửi duyệt", hoặc app `awaiting_approval` | Đã gửi duyệt | Chờ khách duyệt | Ảnh đã chỉnh xong, mời ba mẹ duyệt | Duyệt ảnh |
-| 12 | `dang_sua_theo_yeu_cau` | | Sửa / Sửa lần 2, 3, 4 | Đang sửa theo yêu cầu | Đang sửa theo yêu cầu của ba mẹ | Duyệt ảnh |
-| 13 | `da_chot_cho_in` | Lark "Đã chốt chưa in", hoặc app `approved` | Đã chốt chưa in | Đã chốt, chờ in | Đã chốt ảnh, đang chuẩn bị in | In & giao |
-| 14 | `dang_in` | | Đã gửi in | Đã gửi in | Đang in | In & giao |
-| 15 | `hinh_da_ve` | | Hình đã về | Ảnh đã về, chờ giao | Sản phẩm đã về, mời ba mẹ ghé nhận | In & giao |
-| 16 | `da_giao` | Lark "Đã giao", hoặc app `delivered` | Đã giao | Đã giao | Đã giao | In & giao |
-| 17 | `da_cham_soc` | | Đã chăm sóc khách | Đã chăm sóc khách | Đã giao | In & giao |
-| 18 | `het_han` | App `expired` (link hết hạn, chưa chốt) | — | Link đã hết hạn | Link đã hết hạn | Chọn ảnh |
-| 19 | `luu_tru` | App `archived` | — | Đã lưu trữ | Bộ ảnh không còn mở | — |
+| 1 | `moi_nhap` | Dòng Lark mới chưa thành bộ ảnh, hoặc bộ nháp chưa có link Drive | *(trống)* | Mới nhập | Bean đang chuẩn bị ảnh ạ | — |
+| 2 | `dang_tai` | Có link Drive, đang kéo ảnh (`draft`/`syncing`) | *(trống)* | Đang tải ảnh | Bean đang chuẩn bị ảnh ạ | — |
+| 3 | `loi_tai` | Có link Drive mà tải lỗi (`sync_error`), **hoặc** link đã thuộc bộ/dòng khác (luồng BB-325 hỏi nhân viên chọn) | *(trống)* | Lỗi tải | Bean đang chuẩn bị ảnh ạ | — |
+| 4 | `cho_tao_link` | Đủ ảnh (`ready`) nhưng chưa có Link app | *(trống)* | Chờ tạo Link app | Bean đang chuẩn bị ảnh ạ | — |
+| 5 | `san_sang` | Đủ ảnh + đã có Link app, bộ neo Lark, Lark chưa "Đã gửi file gốc" | *(trống)* | Sẵn sàng | Mời ba mẹ chọn ảnh ạ | Chọn ảnh |
+| 6 | `cho_khach_chon` | Lark "Đã gửi file gốc", hoặc khách đang chọn (`in_review`/mở lại) | Đã gửi file gốc | Chờ khách chọn | Mời ba mẹ chọn ảnh ạ | Chọn ảnh |
+| 7 | `cho_studio_xac_nhan` | Khách bấm chốt (`submitted`) | Đã gửi file gốc | Chờ studio xác nhận | **Bean đang xác nhận danh sách ảnh ạ** | Bean xác nhận |
+| 8 | `da_chon_hinh` | CSKH xác nhận (`in_retouch`) mà Lark chưa "Đang làm"; hoặc Lark "Đã chọn hình" | Đã chọn hình | Đã chọn hình · chờ chỉnh sửa | Bean đã nhận danh sách, ảnh đang chờ chỉnh ạ | Bean xác nhận |
+| 9 | `dang_chinh_sua` | | Đang làm | Đang chỉnh sửa | Bean đang chỉnh ảnh ạ | Chỉnh sửa |
+| 10 | `leader_kiem` | | Leader check hình | Leader đang kiểm ảnh | Bean đang chỉnh ảnh ạ | Chỉnh sửa |
+| 11 | `cho_khach_duyet` | Lark "Đã gửi duyệt", hoặc app `awaiting_approval` | Đã gửi duyệt | Chờ khách duyệt | Ảnh đã chỉnh xong, mời ba mẹ duyệt ạ | Duyệt ảnh |
+| 12 | `dang_sua_theo_yeu_cau` | | Sửa / Sửa lần 2, 3, 4 | Đang sửa theo yêu cầu | Bean đang sửa theo yêu cầu của ba mẹ ạ | Duyệt ảnh |
+| 13 | `da_chot_cho_in` | Lark "Đã chốt chưa in", hoặc app `approved` | Đã chốt chưa in | Đã chốt, chờ in | Ảnh đã chốt, Bean đang chuẩn bị in ạ | In & giao |
+| 14 | `dang_in` | | Đã gửi in | Đã gửi in | Bean đang in sản phẩm ạ | In & giao |
+| 15 | `hinh_da_ve` | | Hình đã về | Ảnh đã về, chờ giao | Sản phẩm đã về, mời ba mẹ ghé nhận ạ | In & giao |
+| 16 | `da_giao` | Lark "Đã giao", hoặc app `delivered` | Đã giao | Đã giao | Ảnh của bé đã hoàn thiện ạ | In & giao |
+| 17 | `da_cham_soc` | | Đã chăm sóc khách | Đã chăm sóc khách | Ảnh của bé đã hoàn thiện ạ | In & giao |
+| 18 | `het_han` | App `expired` (link hết hạn, chưa chốt) | — | Link đã hết hạn | Link đã hết hạn ạ | Chọn ảnh |
+| 19 | `luu_tru` | App `archived` | — | Đã lưu trữ | Bộ ảnh không còn mở ạ | — |
 
-Các bước của thanh tiến độ bên khách (`BUOC_KHACH`): **Chọn ảnh → Studio xác
+Các bước của thanh tiến độ bên khách (`BUOC_KHACH`): **Chọn ảnh → Bean xác
 nhận → Chỉnh sửa → Duyệt ảnh → In & giao**.
+
+**BB-353 — một hàm cho màn khách.** Màn khách chỉ có `status` + giai đoạn Lark đã
+tính sẵn, nên đọc bảng này qua `trangThaiKhach(status, giaiDoan, { khoa })`. Bìa
+(cột `bia` trong mã, gắn tên bé), thẻ tiến trình, màn cảm ơn sau chốt, dải khoá
+đầu lưới và bìa của người thân được mời đều đọc từ đó. Nhãn khách theo giọng Bean:
+tự xưng "Bean", câu nào cũng kết bằng "ạ" (phép thử `bb-353-giong-bean`).
 
 Mã lựa chọn Lark (không đổi khi nhân viên đổi tên hiển thị) ở
 `src/lib/lark/trang-thai-hau-ky.ts` → `TRANG_THAI_LARK`.

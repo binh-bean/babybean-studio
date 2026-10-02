@@ -96,8 +96,8 @@ test.describe("BB-338: mời gia đình + người được mời + thanh tiến
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/g/${maBaMe}`);
     await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: CHO_ANH });
-    const khoi = page.getByTestId("khoi-moi-ong-ba");
-    await khoi.getByRole("button", { name: "Mời", exact: true }).click();
+    // BB-355 (bản vẽ v8 a) — lối mời nay là nút viền thứ hai trên bìa.
+    await page.getByTestId("nut-moi-ong-ba-bia").click();
     await page.fill("#nhan-nguoi-than", "Fixture BB-338 Bà nội");
     await page.getByRole("button", { name: "Tạo link" }).click();
     await expect(page.getByText("Đã tạo link cho")).toBeVisible({ timeout: 15_000 });
@@ -111,7 +111,7 @@ test.describe("BB-338: mời gia đình + người được mời + thanh tiến
     // Thoát ra vào lại.
     await page.reload();
     await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: CHO_ANH });
-    await page.getByTestId("khoi-moi-ong-ba").getByRole("button", { name: "Mời", exact: true }).click();
+    await page.getByTestId("nut-moi-ong-ba-bia").click();
     const dong = page.getByTestId("dong-nguoi-da-moi").filter({ hasText: "Fixture BB-338 Bà nội" });
     await expect(dong).toBeVisible({ timeout: 15_000 });
     await expect(dong.getByTestId("link-nguoi-da-moi")).toContainText("/g/");
@@ -154,10 +154,16 @@ test.describe("BB-338: mời gia đình + người được mời + thanh tiến
     // Tải lại vẫn còn tim (lưu ở máy người xem).
     await page.reload();
     await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: CHO_ANH });
-    await expect(page.getByTestId("so-anh-tha-tim")).toHaveText("Gia đình đã thả tim 1 tấm");
+    // BB-355 (bản vẽ v8 c) — số tim nằm ở thanh đáy "1 tấm · gia đình thích".
+    await expect(page.getByTestId("dem-tim-gia-dinh")).toHaveText(/^1\s*tấm\s*gia đình thích$/);
 
-    // 2d — màn mua thêm: một cột gọn.
-    await page.getByRole("button", { name: "Xem thêm" }).first().click();
+    // 2d — màn mua thêm: một cột gọn. BB-355: mở bằng nút túi ở thanh đáy (thẻ "Xem thêm" đã gỡ).
+    // BB-358 — thanh đáy người xem ẩn khi bìa còn chiếm màn (cùng luật thanh của ba mẹ): cuộn tới lưới trước.
+    await page.evaluate(() => {
+      const the = document.querySelector('[data-testid="the-anh"]');
+      if (the) window.scrollTo(0, the.getBoundingClientRect().top + window.scrollY - 120);
+    });
+    await page.getByRole("button", { name: "Mua ảnh in, album in ảnh" }).click();
     const man = page.getByTestId("man-mua-them-sau-duyet");
     await expect(man).toBeVisible();
     const dongSp = man.getByTestId("dong-san-pham-mua-them");
@@ -178,7 +184,7 @@ test.describe("BB-338: mời gia đình + người được mời + thanh tiến
     await page.screenshot({ path: `${THU_MUC_ANH}/2e-tam-chon-anh-390.png` });
     await tam.getByRole("button", { name: "Huỷ chọn ảnh" }).click();
     await expect(tam).toHaveCount(0);
-    await expect(man.getByRole("button", { name: "Gửi yêu cầu cho studio" })).toBeDisabled();
+    await expect(man.getByRole("button", { name: "Gửi yêu cầu cho Bean" })).toBeDisabled();
 
     // Chọn lại, bấm Xong → dòng sản phẩm báo "Đã chọn 1 tấm".
     await dongSp.first().getByRole("button", { name: "Chọn ảnh" }).click();

@@ -425,7 +425,7 @@ ownIpTest.describe("BB-296 mục #5: đã giao — không còn khối chọn bì
       // Chờ trang tải xong thật sự trước khi chụp — tránh chụp trúng màn
       // "Đang tải…" (assertion ở trên đã qua nên nội dung chắc chắn tồn
       // tại, chỉ cần đợi nó vẽ ra).
-      await page.getByText("Thông tin studio").waitFor({ state: "visible" });
+      await page.getByText("Thông tin Bean").waitFor({ state: "visible" });
       await page.screenshot({ path: `${CHUP}/5-${kho.ten}-da-giao.png` });
     });
   }

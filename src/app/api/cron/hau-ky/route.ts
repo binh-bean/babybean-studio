@@ -21,6 +21,7 @@ import { docTrangThaiTuLark, ghiTrangThaiVaoGalleries } from "@/lib/lark/doc-tra
 import { chayNhacHauKy } from "@/lib/lark/nhac-hau-ky";
 import { dongBoBoAnhTuLark, type KetQuaDongBo } from "@/lib/lark/dong-bo-bo-anh";
 import { xuLyBoAnhMatDongLark } from "@/lib/lark/ban-ghi-moi";
+import { rutHangDoiHook } from "@/lib/lark/hang-doi-hook";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
 import { nhacThongBaoChuaDoc } from "@/lib/thong-bao/nhac-chua-doc";
@@ -77,6 +78,23 @@ async function chay(request: Request) {
     if (!rows[0]?.ok) return NextResponse.json({ data: { boQua: "Lượt khác đang chạy" } });
 
     try {
+      // BB-351 — rút phần còn lại của hàng đợi hook (Lark hỏng lúc hook chạy, hàm hết giờ…).
+      // Chạy TRƯỚC lượt đọc trạng thái toàn bảng bên dưới: chạy sau thì trạng thái đã ghi
+      // rồi, không còn "đổi thật", và mốc báo khách của các bản ghi này mất hẳn.
+      let hangDoiHook: Awaited<ReturnType<typeof rutHangDoiHook>> | { loi: string };
+      try {
+        hangDoiHook = await rutHangDoiHook({
+          client,
+          appId: LARK_APP_ID,
+          appSecret: LARK_APP_SECRET,
+          baseToken: LARK_BASE_APP_TOKEN,
+          dbUrl: SUPABASE_DB_URL,
+        });
+      } catch (err) {
+        hangDoiHook = { loi: err instanceof Error ? err.message : String(err) };
+        console.error(JSON.stringify({ evt: "cron.hau_ky.hang_doi_hook_loi", lyDo: hangDoiHook.loi }));
+      }
+
       // BB-256 — lưới đỡ cho hook: dựng bộ ảnh Lark bắn hụt. Hỏng thì ghi log và
       // chạy tiếp phần trạng thái/nhắc — hai việc độc lập, không để cái này kéo
       // cái kia chết theo.
@@ -225,6 +243,7 @@ async function chay(request: Request) {
         dongBo,
         kiemLaiLoi,
         larkXoaDong,
+        hangDoiHook,
       };
       console.info(JSON.stringify({ evt: "cron.hau_ky.xong", ...ketQua }));
       return NextResponse.json({ data: ketQua });

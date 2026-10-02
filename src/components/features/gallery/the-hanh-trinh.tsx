@@ -1,15 +1,107 @@
 import React from "react";
-import { tranhHanhTrinh, buocHanhTrinh, anhHanhTrinh, NHAN_CHO_XAC_NHAN } from "./hanh-trinh";
+import { tranhHanhTrinh, buocHanhTrinh, anhHanhTrinh } from "./hanh-trinh";
+import { trangThaiKhach } from "@/lib/lark/trang-thai-app-lark";
 import { cn } from "@/components/ui/utils";
 
 interface TheHanhTrinhProps {
   status: string;
   giaiDoan: number | null;
+  /** Không còn dùng làm tiêu đề (BB-353): tiêu đề lấy từ `trangThaiKhach()`, chung nguồn với bìa. */
   nhanTienDo?: string | null;
   photoCount: number;
+  /**
+   * BB-355 — bản vẽ "Màn khách v8" (b): đã gửi, chờ Bean xác nhận. Thẻ GỘP thay
+   * bốn khối cũ (thẻ tiến độ có tranh, thẻ khoá, thẻ đợt chọn, khối mời): tiêu đề
+   * · 5 bước · một dòng phụ · hàng "Mời ông bà cùng xem". Không tranh (anh chốt).
+   * Máy tính: dải ngang rộng bằng lưới — chữ trái, 5 bước giữa, nút phải.
+   */
+  gop?: { dongPhu: string | null; moiOngBa: React.ReactNode } | null;
 }
 
-export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHanhTrinhProps) {
+/** BB-355 — thẻ gộp: không tranh, chữ trái; máy tính thành dải ngang. */
+function TheGop({
+  tieuDe,
+  buoc,
+  hienTai,
+  dongPhu,
+  moiOngBa,
+}: {
+  tieuDe: string;
+  buoc: readonly string[];
+  hienTai: number;
+  dongPhu: string | null;
+  moiOngBa: React.ReactNode;
+}) {
+  return (
+    <div
+      data-testid="the-tien-do-gop"
+      className="rounded-[12px] border border-[#e5dcd2] bg-white px-5 pt-5 lg:grid lg:grid-cols-[minmax(0,1fr)_520px_auto] lg:items-center lg:gap-x-12 lg:px-7 lg:py-6"
+    >
+      <h3 className={cn("kh-h3 text-[#2E2A27] lg:col-start-1 lg:row-start-1", dongPhu ? "lg:self-end" : "lg:row-span-2")}>
+        {tieuDe}
+      </h3>
+      <ol
+        aria-label="5 bước"
+        className="relative mt-[18px] grid grid-cols-5 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:mt-0"
+      >
+        <li aria-hidden="true" className="absolute left-[10%] right-[10%] top-[6px] h-[2px] bg-[#e5dcd2]" />
+        {hienTai > 0 && (
+          <li
+            aria-hidden="true"
+            className="absolute left-[10%] top-[6px] h-[2px] bg-[#2E2A27]"
+            style={{ width: `${(hienTai / (buoc.length - 1)) * 80}%` }}
+          />
+        )}
+        {buoc.map((b, idx) => {
+          const dangHienTai = idx === hienTai;
+          const daQua = idx < hienTai;
+          return (
+            <li
+              key={b}
+              aria-current={dangHienTai ? "step" : undefined}
+              className="relative flex flex-col items-center gap-2 text-center lg:gap-2.5"
+            >
+              <span
+                className={cn(
+                  "rounded-full",
+                  dangHienTai
+                    ? "h-[14px] w-[14px] bg-[#2E2A27] shadow-[0_0_0_4px_#ece3d7]"
+                    : daQua
+                      ? "mt-[2px] h-[10px] w-[10px] bg-[#2E2A27]"
+                      : "mt-[2px] h-[10px] w-[10px] bg-[#e5dcd2]",
+                )}
+              />
+              <span
+                className={cn(
+                  "whitespace-pre-line text-[11px] leading-[1.3] lg:whitespace-nowrap lg:text-[13px]",
+                  dangHienTai ? "font-semibold text-[#2E2A27]" : daQua ? "text-[#2E2A27]" : "text-[#6b6057]",
+                )}
+              >
+                {/* Một phần tử chữ: điện thoại xuống hai dòng (pre-line), máy tính `nowrap` gộp lại một dòng. */}
+                {b.replace(" ", "\n")}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {dongPhu && (
+        <p
+          data-testid="dong-phu-tien-do"
+          className="mt-3.5 text-[13px] leading-snug text-[#6b6057] lg:col-start-1 lg:row-start-2 lg:mt-1.5 lg:self-start"
+        >
+          {dongPhu}
+        </p>
+      )}
+      {moiOngBa ? (
+        <div className="mt-3.5 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:mt-0">{moiOngBa}</div>
+      ) : (
+        <div className="h-5 lg:hidden" />
+      )}
+    </div>
+  );
+}
+
+export function TheHanhTrinh({ status, giaiDoan, photoCount, gop }: TheHanhTrinhProps) {
   // Chỉ hiện khi status từ submitted trở đi (hoặc awaiting_approval, in_retouch).
   // Tuy nhiên, logic này sẽ được quyết định bên gallery-app, nhưng ta cũng kiểm tra ở đây để chắc chắn.
   // `approved` (ba mẹ đã duyệt, chờ in/giao) từng bị bỏ sót ở đây — đúng lúc
@@ -30,7 +122,12 @@ export function TheHanhTrinh({ status, giaiDoan, nhanTienDo, photoCount }: TheHa
   const { buoc, hienTai } = buocHanhTrinh(status, giaiDoan);
   // BB-329 — vừa chốt, CSKH chưa xác nhận: nói đúng là đang CHỜ studio, không
   // nói "đã nhận"/"đã chốt" như thể bộ ảnh đã vào hàng chỉnh.
-  const nhanText = nhanTienDo || (status === "submitted" ? NHAN_CHO_XAC_NHAN : "Tiến độ xử lý");
+  // BB-353 (P0) — tiêu đề thẻ và câu trạng thái trên bìa (`cauBiaKhach`) đọc
+  // CÙNG một dòng của `TRANG_THAI_BO_ANH` qua `trangThaiKhach()`.
+  const nhanText = trangThaiKhach(status, giaiDoan).khach;
+  if (gop) {
+    return <TheGop tieuDe={nhanText} buoc={buoc} hienTai={hienTai} dongPhu={gop.dongPhu} moiOngBa={gop.moiOngBa} />;
+  }
   const anh = anhHanhTrinh(tenTranh);
 
   return (

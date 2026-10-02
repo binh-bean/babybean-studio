@@ -1,3 +1,5 @@
+import { TRANG_THAI_BO_ANH } from "@/lib/lark/trang-thai-app-lark";
+
 export type TenTranh =
   | "tien-do-chon-anh"
   | "chot-thanh-cong"
@@ -117,8 +119,11 @@ export interface HanhTrinhInfo {
  */
 export const BUOC_HANH_TRINH = ["Chờ xác nhận", "Chờ chỉnh", "Đang chỉnh", "Duyệt ảnh", "In/nhận ảnh"] as const;
 
-/** Tiêu đề thẻ khi máy chủ không gửi nhãn riêng (bộ ảnh vừa chốt, CSKH chưa xác nhận). */
-export const NHAN_CHO_XAC_NHAN = "Đang chờ studio xác nhận";
+/**
+ * Tiêu đề thẻ khi bộ ảnh vừa chốt, CSKH chưa xác nhận. BB-353: lấy từ bảng
+ * chung `TRANG_THAI_BO_ANH` (không tự viết chuỗi riêng nữa).
+ */
+export const NHAN_CHO_XAC_NHAN = TRANG_THAI_BO_ANH.cho_studio_xac_nhan.khach;
 
 export function buocHanhTrinh(status: string, giaiDoan: number | null): HanhTrinhInfo {
   const buoc = [...BUOC_HANH_TRINH];

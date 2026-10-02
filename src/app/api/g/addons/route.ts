@@ -10,6 +10,7 @@
  * 3. list_price null thì KHÔNG bán.
  */
 
+import { vi } from "@/i18n";
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -81,7 +82,7 @@ export async function POST(request: Request): Promise<Response> {
     // luật dùng để dựng `catalogue` ở /api/g/gallery (xem nhom-san-pham.ts).
     // Không tin danh mục hiển thị: một productId hợp lệ nhưng ngoài danh mục
     // (vd. canvas, hoặc kind dịch vụ kèm buổi chụp) bị chặn ngay ở đây.
-    if (!sanPhamBanChoKhach({ isActive: product.is_active, kind: product.kind, material: product.material, size: product.size })) {
+    if (!sanPhamBanChoKhach({ name: product.name, isActive: product.is_active, kind: product.kind, material: product.material, size: product.size })) {
       return fail("NOT_FOUND", "Sản phẩm không nằm trong danh mục đang bán");
     }
 
@@ -271,7 +272,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     if (canGanAnh(nhom) && !photoId) {
-      return fail("INVALID_INPUT", "Ba mẹ chọn giúp em tấm ảnh cần in cho sản phẩm này");
+      return fail("INVALID_INPUT", vi.gallery.loiBean.chonAnhCanIn);
     }
 
     if (photoId) {

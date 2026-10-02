@@ -71,7 +71,8 @@ test("gia đình thả tim 3 tấm → đặt chỉnh sửa → ba mẹ thấy '
     await expect(tim).toHaveAttribute("aria-pressed", "true");
   }
   const thanh = page.getByTestId("thanh-dat-chinh-sua");
-  await expect(thanh).toContainText("Gia đình đã thả tim 3 tấm");
+  // BB-355 (bản vẽ v8 c) — thanh đáy "3 tấm · gia đình thích".
+  await expect(thanh.getByTestId("dem-tim-gia-dinh")).toHaveText(/^3\s*tấm\s*gia đình thích$/);
   const { rows: tim } = await du.pg.query(`select count(*)::int n from tim_gia_dinh where share_link_id = $1`, [
     du.A.viewerLinkId,
   ]);
@@ -81,9 +82,15 @@ test("gia đình thả tim 3 tấm → đặt chỉnh sửa → ba mẹ thấy '
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
   await page.locator('img[src*="/api/img/"]').first().waitFor({ state: "visible", timeout: CHO_ANH });
-  await expect(thanh).toContainText("Gia đình đã thả tim 3 tấm");
+  // BB-355 (bản vẽ v8 c) — thanh đáy "3 tấm · gia đình thích".
+  await expect(thanh.getByTestId("dem-tim-gia-dinh")).toHaveText(/^3\s*tấm\s*gia đình thích$/);
 
   // 3. Đặt chỉnh sửa.
+  // BB-358 — thanh đáy người xem ẩn khi bìa còn chiếm màn (cùng luật thanh của ba mẹ): cuộn tới lưới trước.
+  await page.evaluate(() => {
+    const the = document.querySelector('[data-testid="the-anh"]');
+    if (the) window.scrollTo(0, the.getBoundingClientRect().top + window.scrollY - 120);
+  });
   await page.getByTestId("nut-dat-chinh-sua").click();
   const hop = page.getByRole("dialog");
   await expect(hop.getByTestId("tam-tinh-chinh-sua")).toContainText("150.000");

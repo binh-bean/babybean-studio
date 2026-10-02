@@ -1,4 +1,5 @@
 "use client";
+import { vi } from "@/i18n";
 import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 /**
@@ -68,6 +69,7 @@ import { formatKichThuoc, nhanTrangThaiGio, tenKemSoLuong, tenSanPhamChoKhach } 
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { ChonAnhNhieuTam, type AnhTrongLuoiChon } from "./chon-anh-nhieu-tam";
 import { tenChatLieuChoKhach } from "@/lib/products/nhom-san-pham";
+import { demMon, demMonCuaSanPham } from "@/lib/gallery/dem-mon";
 import { anhNhoTheoO, thuLaiAnhQuaRoute } from "@/lib/utils/chon-co-anh";
 
 /** @deprecated dùng `SanPhamCuaHang` từ `@/lib/products/cau-hinh-cua-hang` — giữ tên cũ để không phải sửa mọi chỗ import. */
@@ -169,7 +171,7 @@ function moTaSanPham(sp: SanPhamCuaHang | null): string {
   if (!sp) return "Ba mẹ chọn kích thước và chất liệu còn bán bên dưới nhé ạ.";
   // BB-319 — chất liệu đã nằm trong tên ở dòng trên ("Ảnh in UV"), dòng này chỉ nói khổ.
   if (sp.size) return `Khổ ${formatKichThuoc(sp.size)} cm`;
-  return sp.material ?? "In ảnh chất lượng cao, giao tận nơi.";
+  return sp.material ?? vi.gallery.loiBean.moTaSanPhamMacDinh;
 }
 
 /**
@@ -198,7 +200,8 @@ export function tenThanThienSanPham(nhom: NhomSanPham, sp: SanPhamCuaHang | null
   if (!sp?.material) return tienTo;
   // BB-339 — "Cavas/Kim tuyến" (tên Lark) hiện là "Kim Tuyến".
   const chatLieu = tenChatLieuChoKhach(sp.material.trim()) ?? sp.material.trim();
-  if (chatLieu.toLowerCase().startsWith(tienTo.toLowerCase())) return chatLieu;
+  // BB-361 — "Tờ Album (Ultra HD)" đã chứa "Album": không thành "Album Tờ Album …".
+  if (chatLieu.toLowerCase().includes(tienTo.toLowerCase())) return chatLieu;
   return `${tienTo} ${chatLieu}`;
 }
 
@@ -399,8 +402,9 @@ export function CuaHang({
   );
 
   /** Số lượng đã đặt của một sản phẩm (cộng mọi tấm ảnh). */
-  const daDat = (productId: string) =>
-    daMua.filter((d) => d.productId === productId).reduce((n, d) => n + d.quantity, 0);
+  // BB-358 — một luật đếm (lib/gallery/dem-mon.ts): món = cộng số lượng, ở thẻ, viên giỏ, hộp chốt.
+  const daDat = (productId: string) => demMonCuaSanPham(daMua, productId);
+  const soMonTrongGio = demMon(daMua);
 
   const dangDatPresetChoNhomNay = Boolean(presetPhotoId) && nhomDangXem === presetNhom;
 
@@ -477,7 +481,7 @@ export function CuaHang({
           const ok = await onMuaNhieu?.(sanPham.productId, soLuong, anhVuaThem);
           if (ok === false) return;
           setThongBaoDaThem({
-            text: `${tenSanPhamChoKhach(sanPham)} · ${anhVuaThem.length} ảnh · ${formatCurrencyVND(sanPham.unitPrice * soLuong * anhVuaThem.length)}`,
+            text: `${tenSanPhamChoKhach(sanPham)} · ${demMon([{ quantity: soLuong * anhVuaThem.length }])} món · ${formatCurrencyVND(sanPham.unitPrice * soLuong * anhVuaThem.length)}`,
             // BB-299 mục 4 — "Hoàn tác" xoá ĐÚNG món vừa thêm, dùng API mua
             // thêm có sẵn (đặt số lượng 0 cho đúng các photoId vừa thêm — cùng
             // đường "Xoá" của từng dòng giỏ ở đáy hộp, xem `<footer>` dưới).
@@ -589,7 +593,7 @@ export function CuaHang({
         <div className="flex-1 overflow-y-auto px-6 sm:px-7">
           {nhomKhaDung.length === 0 ? (
             <p className="py-6 text-sm text-muted-foreground">
-              Chưa có sản phẩm nào đang bán. Ba mẹ nhắn studio giúp em nhé.
+              {vi.gallery.loiBean.cuaHangTrong}
             </p>
           ) : (
             <div className="mx-auto max-w-xl pb-6">
@@ -604,7 +608,7 @@ export function CuaHang({
                       <>
                         {": "}
                         <span data-testid="trong-goi-dem" className="tabular-nums">
-                          {trongGoi.daChon}/{trongGoi.hanMuc} ảnh
+                          {trongGoi.daChon}/{trongGoi.hanMuc} tấm
                         </span>
                       </>
                     )}
@@ -618,7 +622,7 @@ export function CuaHang({
                             <span className="min-w-0 truncate text-[13px] text-foreground">
                               {tenKemSoLuong(m.name, m.quantity)}
                               <span className={cn("ml-1.5 tabular-nums", thieu ? "text-[var(--bb-heart,#C4645A)]" : "text-muted-foreground")}>
-                                {m.laAlbum ? `${m.soAnh} ảnh` : `${m.soAnh}/${m.quantity} ảnh`}
+                                {m.laAlbum ? `${m.soAnh} tấm` : `${m.soAnh}/${m.quantity} tấm`}
                               </span>
                             </span>
                             {trongGoi.onChonAnh && !khoa && (
@@ -657,7 +661,7 @@ export function CuaHang({
                   {/* BB-339 mục 2 — ảnh UV là ảnh giấy, CHƯA có khung: nói rõ để ba mẹ không hiểu nhầm. */}
                   {nhomDangXem === "anh_in" && chatLieu === "UV" && (
                     <p data-testid="mo-ta-uv" className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-                      Ảnh in trên giấy ảnh, chưa có khung — để gài album hoặc cán lên gỗ ạ.
+                      {vi.gallery.treoTuong.moTaChatLieu.UV}
                     </p>
                   )}
                   {daDat(sanPham?.productId ?? "") > 0 && (
@@ -800,7 +804,7 @@ export function CuaHang({
                           type="button"
                           disabled={khoa || dangGuiThem}
                           onClick={() => setMoLuoiChon(true)}
-                          aria-label={`Đổi ${anhDaChonTrongLuoi.length} ảnh đã chọn`}
+                          aria-label={`Đổi ${anhDaChonTrongLuoi.length} tấm đã chọn`}
                           className="flex items-center gap-1.5 rounded-[10px] disabled:opacity-40"
                         >
                           {anhDaChonTrongLuoi.slice(0, 4).map((a) => (
@@ -848,7 +852,7 @@ export function CuaHang({
 
               {!sanPham && (
                 <p className="mt-3.5 rounded-xl bg-[var(--bb-surface-2)] px-3.5 py-3 text-sm text-foreground/70">
-                  Loại này studio chưa bán. Ba mẹ nhắn studio giúp em nhé.
+                  {vi.gallery.loiBean.loaiChuaBan}
                 </p>
               )}
             </div>
@@ -926,7 +930,7 @@ export function CuaHang({
                   <path d="M16 10a4 4 0 0 1-8 0" strokeLinecap="round" />
                 </svg>
                 <span>
-                  Giỏ · <b className="font-semibold">{daMua.length} món · {formatCurrencyVND(tongTien)}</b>
+                  Giỏ · <b className="font-semibold">{soMonTrongGio} món · {formatCurrencyVND(tongTien)}</b>
                 </span>
                 <span className="ml-auto flex shrink-0 items-center gap-1 font-medium">
                   Xem giỏ
@@ -940,7 +944,7 @@ export function CuaHang({
               <div className={cn(moGioMobile ? "block" : "hidden", "sm:block")}>
               {/* BB-319 — cùng một lời với viên giỏ điện thoại ("Giỏ · N món · tiền"), không hai cách gọi. */}
               <p className="mb-2 hidden text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground sm:block">
-                Giỏ · {daMua.length} món · {formatCurrencyVND(tongTien)}
+                Giỏ · {soMonTrongGio} món · {formatCurrencyVND(tongTien)}
               </p>
               <ul className="space-y-1.5">
                 {(xemHetGio ? daMua : daMua.slice(0, 2)).map((d) => (
@@ -1003,7 +1007,7 @@ export function CuaHang({
                   onClick={() => setXemHetGio(true)}
                   className="mt-1.5 text-[12px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
                 >
-                  Xem cả {daMua.length} món ›
+                  Xem cả giỏ ›
                 </button>
               )}
               </div>

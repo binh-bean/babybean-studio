@@ -25,6 +25,7 @@
  * nhật ký. Chưa áp migration 0077 → trả CONFLICT bằng câu tiếng Việt, không 500.
  */
 
+import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
@@ -70,7 +71,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!dangCheDoChonThem(gallery.status, maLarkConHieuLuc(gallery))) {
       return fail(
         "CONFLICT",
-        "Studio chưa xác nhận đợt chọn đầu, ba mẹ cứ chọn và chốt ở màn chọn ảnh như bình thường nhé",
+        vi.gallery.loiBean.chuaXacNhanDot1,
       );
     }
 

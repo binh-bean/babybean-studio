@@ -32,7 +32,7 @@ test.describe("BB-141: Màn quản lý admin", () => {
     await pgClient.connect();
     await pgClient.query(
       `INSERT INTO staff_profiles (id, full_name, email, role) VALUES ($1, $2, $3, 'owner')`,
-      [userId, `Test Admin ${runId}`, email]
+      [userId, `Fixture BB-141 Admin ${runId}`, email] // BB-359: tiền tố "Fixture " để db:cleanup nhận ra nếu afterAll hỏng
     );
   });
 

@@ -104,7 +104,7 @@ describe("tomTatDot — MỘT câu, không tự mâu thuẫn", () => {
     const t = tomTatDot({ soAnhMoi: 3, giaMoiAnh: 30_000, gio: [], donGia });
     expect(t.soAnhTinhTien).toBe(3);
     expect(t.tong).toBe(90_000);
-    expect(t.cau.startsWith("3 ảnh mới · ")).toBe(true);
+    expect(t.cau.startsWith("3 tấm mới · ")).toBe(true); // BB-358: đơn vị đếm ảnh là "tấm"
     expect(chiSo(t.cau.split(" · ")[1]!)).toBe("90000");
     expect(t.cau).not.toContain("trong gói");
     expect(t.cau).not.toContain("tính tiền");
@@ -124,7 +124,7 @@ describe("tomTatDot — MỘT câu, không tự mâu thuẫn", () => {
     expect(t.tienSanPham).toBe(290_000);
     expect(t.tong).toBe(380_000);
     const phan = t.cau.split(" · ");
-    expect(phan.slice(0, 2)).toEqual(["3 ảnh mới", "3 sản phẩm"]);
+    expect(phan.slice(0, 2)).toEqual(["3 tấm mới", "3 món"]);
     expect(chiSo(phan[2]!)).toBe(String(t.tong));
   });
 
@@ -174,7 +174,7 @@ describe("oTickChotDot1 / duOTickChotDot1 / coGuiChotDot1", () => {
     const can = oTickChotDot1({ hanMuc: 15, daChon: 12, soSanPhamInChuaAnh: 0 });
     expect(can).toEqual({ soThieu: 3, canDongYStudioChon: true, canBietAnhInCham: false });
     const cau = cauConThieuTrongGoi(can.soThieu);
-    expect(cau).toBe("Còn 3 ảnh trong gói — nhờ studio chọn giúp");
+    expect(cau).toBe("Còn 3 tấm trong gói, ba mẹ nhờ Bean chọn giúp ạ");
     expect(cau.split(/\s+/).filter((w) => w !== "—").length).toBeLessThanOrEqual(12);
   });
   it("đủ hoặc vượt hạn mức, hay chưa biết hạn mức → không hỏi", () => {
@@ -315,10 +315,10 @@ describe("DotChonTrenManChinh — MỘT thẻ trạng thái đợt + lối vào"
     expect(i4).toBeGreaterThan(-1);
     expect(i4).toBeLessThan(i3);
     expect(i3).toBeLessThan(i2);
-    expect(html).toContain("Đang chờ studio xác nhận");
-    expect(html).toContain("Studio chưa nhận đợt này");
+    expect(html).toContain("Bean đang xác nhận đợt này ạ");
+    expect(html).toContain("Bean chưa nhận đợt này");
     expect(html).toMatch(/Lý do: (<!-- -->)?Tấm này trùng đợt trước\./);
-    expect(html).toContain("Studio đã xác nhận");
+    expect(html).toContain("Bean đã xác nhận đợt này ạ");
     expect(html).toContain("UV 10×15 ×2");
     expect(html).not.toContain("10x15");
   });

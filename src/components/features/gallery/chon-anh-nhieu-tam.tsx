@@ -22,6 +22,7 @@ import React from "react";
 import { cn } from "@/components/ui/utils";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { formatSo } from "@/lib/utils/dinh-dang";
+import { vi } from "@/i18n";
 import { anhNhoTheoO, thuLaiAnhQuaRoute } from "@/lib/utils/chon-co-anh";
 
 export interface AnhTrongLuoiChon {
@@ -151,8 +152,8 @@ export function ChonAnhNhieuTam({
         {danhSach.length === 0 ? (
           <p className="mt-8 text-center text-sm text-muted-foreground">
             {locTatCa
-              ? "Bộ ảnh chưa có tấm nào."
-              : "Ba mẹ thả tim chọn vài tấm trước, hoặc bấm \"Tất cả\"."}
+              ? vi.gallery.loiBean.boAnhChuaCoTam
+              : vi.gallery.loiBean.thaTimVaiTamTruoc}
           </p>
         ) : (
           <div className="grid grid-cols-3 gap-1 px-1 sm:grid-cols-5 lg:grid-cols-6">

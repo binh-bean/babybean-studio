@@ -1,3 +1,4 @@
+import { vi } from "@/i18n";
 import { z } from "zod";
 
 /** Một dòng sản phẩm khách bỏ vào đợt — cùng hình dạng với `/api/g/mua-them`. */
@@ -8,7 +9,7 @@ const DongSanPhamSchema = z.object({
     .number({ required_error: "soLuong là bắt buộc" })
     .int("soLuong phải là số nguyên")
     .min(1, "soLuong tối thiểu 1")
-    .max(20, "soLuong tối đa 20 — nhiều hơn thì ba mẹ nhắn thẳng CSKH giúp em"),
+    .max(20, vi.gallery.loiBean.toiDa20),
 });
 
 export const ChotDotChonSchema = z.object({

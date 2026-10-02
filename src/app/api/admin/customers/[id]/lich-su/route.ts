@@ -10,7 +10,7 @@
  *     nơi đã kiểm quyền `galleries:share`);
  *   · lịch sử mua: món mua thêm (`selection_addons` của lượt chọn chính đã chốt) + sổ thu
  *     (`gallery_payments`, tách dòng giảm giá);
- *   · tổng giá trị đã mua (mua thêm) + tổng đã thu;
+ *   · tổng giá trị đã mua (mua thêm + đã thu, xem `tong-gia-tri.ts`) + tổng đã thu;
  *   · số lượt ghé trong năm nay (theo ngày chụp) và ở những chi nhánh nào.
  *
  * Phạm vi chi nhánh: giống GET /api/admin/customers/:id — chỉ bộ ảnh ở chi nhánh
@@ -23,6 +23,7 @@ import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib
 import { createAdminClient } from "@/lib/supabase/admin";
 import { trangThaiBoAnh } from "@/lib/lark/trang-thai-app-lark";
 import { tomTatLuotGhe } from "@/lib/khach-hang/luot-ghe";
+import { tinhTongKhach } from "@/lib/khach-hang/tong-gia-tri";
 
 export const runtime = "nodejs";
 
@@ -172,9 +173,7 @@ export async function GET(
       ngay: p.confirmed_at,
     }));
 
-    const tongMuaThem = muaThem.reduce((t, m) => t + m.thanhTien, 0);
-    const tongDaThu = thanhToan.filter((p) => !p.laGiamGia).reduce((t, p) => t + p.soTien, 0);
-    const tongGiamGia = thanhToan.filter((p) => p.laGiamGia).reduce((t, p) => t + p.soTien, 0);
+    const tong = tinhTongKhach(muaThem, thanhToan);
 
     const lichSuChup = bo.map((g) => {
       const tt = trangThaiBoAnh({
@@ -221,7 +220,7 @@ export async function GET(
       lichSuChup,
       muaThem,
       thanhToan,
-      tong: { tongMuaThem, tongDaThu, tongGiamGia },
+      tong,
       luotGhe,
     });
   } catch (err) {

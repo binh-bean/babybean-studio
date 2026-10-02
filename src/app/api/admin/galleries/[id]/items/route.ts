@@ -26,7 +26,17 @@ import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layChiTietDotQuanTri, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
 import { layKhoaKhiThu } from "@/lib/gallery/xac-nhan-danh-sach";
 import { layTienCanThu } from "@/lib/gallery/tien-can-thu-server";
+import { laDongThanhToan, layDongThanhToanTheoBo } from "@/lib/gallery/han-muc-thanh-toan";
+
+/**
+ * BB-351 (B#12) — dòng hạn mức do thanh toán (`lark_record_id = 'thanh_toan:…'`, BB-348) là số
+ * SUY RA từ sổ thu: sửa/xoá tay là hạn mức lệch khỏi tiền đã thu. Muốn đổi thì ghi dòng đính
+ * chính ở khối Thanh toán — app tự đưa dòng này về đúng số.
+ */
+const CAU_DONG_THANH_TOAN =
+  "Dòng này tự tạo khi thu tiền — không sửa hay xoá tay được. Muốn đổi, ghi một dòng đính chính ở khối Thanh toán.";
 import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
+import { docDauThuGon } from "@/lib/van-hanh/don-rac";
 
 export const runtime = "nodejs";
 
@@ -252,7 +262,13 @@ export async function GET(
     const tienCanThu = await layTienCanThu(admin, gallery.id);
     // BB-349 — khối thu tiền: có cho "xác nhận + khoá" cùng lúc không, có phải cảnh báo không.
     const khoaKhiThu = await layKhoaKhiThu(admin, gallery.id);
-    const dueAmount = Number(primarySel?.snapshot_extra_amount ?? 0);
+    // BB-351 — "Phải thu" = TỔNG phải thu thật của bộ (cùng `layTienCanThu` với route ghi thu và
+    // form gợi ý): vượt hạn mức qua mọi lần chốt + hạn mức đã quy đổi + đợt mua thêm đã xác nhận.
+    // Trước đây lấy riêng `snapshot_extra_amount` (lượt chốt mới nhất) nên sau mở lại / đợt 2 màn
+    // hình báo "khách trả DƯ" cho khách trả đúng (vòng 7, B mục 1).
+    const dueAmount = tienCanThu.tongPhaiThu;
+    // Số khách nhìn thấy ở lần chốt mới nhất — chỉ để câu "số lúc chốt giữ nguyên" khi đổi hạn mức.
+    const snapshotAmount = Number(primarySel?.snapshot_extra_amount ?? 0);
     // `paidAmount` = mọi khoản GHI CÓ cho khách (tiền thu + phần giảm giá) — số còn thiếu tính trên tổng này.
     const paidAmount = (payRows ?? []).reduce((t, r) => t + Number(r.amount), 0);
     // BB-320: riêng phần giảm giá (dòng `giam_gia`), để màn hình tách "đã thu" khỏi "giảm".
@@ -392,11 +408,15 @@ export async function GET(
       addonsAmount,
       paidAmount,
       discountAmount,
-      outstanding: dueAmount - paidAmount,
+      snapshotAmount,
+      // BB-351 — có dấu: âm chỉ khi tổng ghi có THẬT SỰ vượt tổng phải thu.
+      outstanding: tienCanThu.conThieu,
       // BB-344 — số CÒN PHẢI THU (vượt hạn mức + đợt mua thêm đã xác nhận − đã ghi có).
       // 0 = chưa phát sinh tiền: khối "Xác nhận thanh toán" hiện nhưng không bấm được.
       // Cùng hàm với route ghi thu (`layTienCanThu`) nên màn hình và máy chủ không lệch nhau.
       amountToCollect: tienCanThu.tienCanThu,
+      // BB-360 — sản phẩm (ảnh in / khung / album) thu qua Lark: KHÔNG nằm trong số trên.
+      sanPhamQuaLark: tienCanThu.tienSanPhamQuaLark,
       khoaKhiThu,
       revisions: revisions ?? [],
       // BB-312 — xem chú thích ở phần truy vấn phía trên.
@@ -412,6 +432,9 @@ export async function GET(
       driveFolderId: gallery.drive_folder_id ?? null,
       lastSyncedAt: gallery.last_synced_at ?? null,
       syncError: gallery.sync_error ?? null,
+      // BB-357 — danh sách ảnh đã thu gọn (bộ lưu trữ/hết hạn > 6 tháng); null khi
+      // chưa thu gọn, đã Đồng bộ lại, hoặc 0088 chưa áp.
+      thuGon: await docDauThuGon(admin as unknown as Parameters<typeof docDauThuGon>[0], galleryId),
       title: gallery.title,
       status: gallery.status,
       // BB-200 (2/3) — nhãn quản trị + mức cảnh báo, cùng luật với màn khách
@@ -495,7 +518,11 @@ export async function GET(
             coQuyenGuiLink: staff.permissions.includes("galleries:share"),
           }
         : null,
-      items: summary.items,
+      // BB-351 (B#12) — đánh dấu dòng tự tạo khi thu tiền: màn hình chỉ cho xem, không sửa/xoá.
+      items: await (async () => {
+        const dongTT = new Set(((await layDongThanhToanTheoBo(admin, [gallery.id])).get(gallery.id) ?? []).map((d) => d.id));
+        return summary.items.map((it) => ({ ...it, tuThanhToan: dongTT.has(it.id) }));
+      })(),
       // BB-202 — khối "Bìa album" ở màn chi tiết.
       albumCovers,
       // BB-296 mục #6 — xem chú thích ở phần truy vấn phía trên.
@@ -718,12 +745,13 @@ export async function PATCH(
     // cần một migration mới, mà brief cấm áp migration lên bb-dev.
     const { data: dongHienTai, error: loiDoc } = await admin
       .from("gallery_items")
-      .select("quantity, lark_contract_code, parent_item_id")
+      .select("quantity, lark_contract_code, parent_item_id, lark_record_id")
       .eq("id", body.itemId)
       .eq("gallery_id", galleryId)
       .maybeSingle();
     if (loiDoc) throw loiDoc;
     if (!dongHienTai) return fail("NOT_FOUND", "Không tìm thấy sản phẩm này");
+    if (laDongThanhToan(dongHienTai.lark_record_id as string | null)) return fail("INVALID_INPUT", CAU_DONG_THANH_TOAN);
 
     const quantityBefore = Number(dongHienTai.quantity);
     const tachKhoiLark = dongHienTai.lark_contract_code !== null;
@@ -814,10 +842,11 @@ export async function DELETE(
     // vĩnh viễn một dòng hợp đồng thật phải sửa trên Lark).
     const { data: dongHienTai } = await admin
       .from("gallery_items")
-      .select("quantity, lark_contract_code")
+      .select("quantity, lark_contract_code, lark_record_id")
       .eq("id", itemId)
       .eq("gallery_id", galleryId)
       .maybeSingle();
+    if (laDongThanhToan(dongHienTai?.lark_record_id as string | null | undefined)) return fail("INVALID_INPUT", CAU_DONG_THANH_TOAN);
     const tuLark = dongHienTai?.lark_contract_code != null;
 
     // Xoá dòng cha kéo theo thành phần của nó (0014 khai on delete cascade),

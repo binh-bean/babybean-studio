@@ -14,21 +14,40 @@
  */
 
 import { useEffect, useState } from "react";
+import { ShoppingBag } from "lucide-react";
+import { vi } from "@/i18n";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import { useManHinhRong } from "@/components/features/gallery/thanh-chon";
 import { tinhTamTinh } from "@/lib/gallery/tim-gia-dinh";
 
 const KHOA_NGUOI_DAT = "bb-nguoi-dat-chinh-sua";
 
 export function ThanhDatChinhSua({
+  an = false,
   soTim,
   giaMoiAnh,
   chuaApMigration,
+  onMoMua,
 }: {
+  /**
+   * BB-358 (người chấm vòng 8, mục 4 #8) — link gia đình 390: thanh đáy đè nửa nút
+   * "Xem ảnh và thả tim" trên bìa. Cùng luật ẩn với thanh của ba mẹ (`ThanhChon`):
+   * bìa còn chiếm phần lớn màn hoặc đang cuộn xuống thì ẩn, rút khỏi Tab (`inert`).
+   */
+  an?: boolean;
   soTim: number;
   giaMoiAnh: number | null | undefined;
   chuaApMigration: boolean | null;
+  /**
+   * BB-355 — bản vẽ "Màn khách v8" (c): nút túi viền mở màn mua ảnh in/album
+   * (`MoiMuaLanHai`) — thay thẻ "Đặt in ảnh này / Mua thêm" từng chen giữa chip và lưới.
+   */
+  onMoMua?: () => void;
 }) {
   const [mo, setMo] = useState(false);
+  // Chỉ điện thoại/máy tính bảng: bìa máy tính không cao hết màn nên thanh không đè nút chính.
+  const manRong = useManHinhRong(1024);
+  const anThanh = an && !manRong;
   const [ten, setTen] = useState("");
   const [sdt, setSdt] = useState("");
   const [ghiChu, setGhiChu] = useState("");
@@ -47,8 +66,8 @@ export function ThanhDatChinhSua({
     }
   }, []);
 
-  if (soTim <= 0 && !daNhan) return null;
-
+  // BB-355 — thanh LUÔN hiện với người được mời: chưa thả tim thì "0 tấm · Chạm tim
+  // tấm gia đình thích ạ" và nút đen mờ 45% (bản vẽ C-luoi-dien-thoai).
   const dangChuanBi = chuaApMigration !== false;
   const { donGia, tamTinh } = tinhTamTinh(soTim, giaMoiAnh);
 
@@ -88,29 +107,52 @@ export function ThanhDatChinhSua({
       <div aria-hidden="true" className="h-20" />
       <div
         data-testid="thanh-dat-chinh-sua"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pb-[max(12px,env(safe-area-inset-bottom))]"
+        aria-hidden={anThanh || undefined}
+        inert={anThanh}
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[max(16px,env(safe-area-inset-bottom))] transition-all duration-300 ease-out ${
+          anThanh ? "translate-y-[calc(100%+env(safe-area-inset-bottom)+16px)] opacity-0" : "translate-y-0 opacity-100"
+        }`}
       >
-        <div className="pointer-events-auto mx-auto flex h-[56px] w-full max-w-xl items-center gap-2 rounded-full border border-[#e5dcd2] bg-[#fdfbf9]/95 pl-4 pr-1.5 text-[13px] text-[#2e2a27] shadow-[0_4px_20px_rgba(46,42,39,0.12)] backdrop-blur">
-          <span className="min-w-0 flex-1 truncate" role="status">
-            {daNhan && soTim === 0 ? daNhan : `Gia đình đã thả tim ${soTim} tấm`}
-          </span>
-          {soTim > 0 && (
+        <div className="pointer-events-auto mx-auto flex h-16 w-full max-w-xl items-center gap-2 rounded-full border border-[#e5dcd2] bg-[#fdfbf9]/92 pl-[22px] pr-2 text-[#2e2a27] shadow-[0_6px_24px_-8px_rgba(46,42,39,0.25)] backdrop-blur-md">
+          <div className="flex min-w-0 flex-1 flex-col gap-[3px]" role="status" data-testid="dem-tim-gia-dinh">
+            <span className="whitespace-nowrap text-[22px] font-medium leading-none tabular-nums">
+              {soTim} <span className="text-[15px] font-normal">tấm</span>
+            </span>
+            <span className="line-clamp-2 text-[12px] leading-[1.2] text-[#6b6057] sm:text-[13px]">
+              {daNhan && soTim === 0
+                ? daNhan
+                : soTim > 0
+                  ? "gia đình thích"
+                  : vi.gallery.loiBean.nguoiThanChuaThaTim}
+            </span>
+          </div>
+          {onMoMua && (
             <button
               type="button"
-              data-testid="nut-dat-chinh-sua"
-              disabled={dangChuanBi}
-              aria-label={dangChuanBi ? "Đặt chỉnh sửa — đang chuẩn bị" : "Đặt chỉnh sửa"}
-              onClick={() => {
-                setDaNhan(null);
-                setLoi(null);
-                setMo(true);
-              }}
-              className="flex h-11 shrink-0 flex-col items-center justify-center whitespace-nowrap rounded-full bg-[#2e2a27] px-4 text-[13px] font-medium leading-tight text-[#fdfbf9] transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[#2e2a27]/25 disabled:text-[#2e2a27]/70"
+              data-testid="nut-mua-in-nguoi-xem"
+              onClick={onMoMua}
+              aria-label="Mua ảnh in, album in ảnh"
+              title="Mua ảnh in, album in ảnh"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[#e5dcd2] bg-white text-[#2e2a27] transition hover:bg-[#2e2a27]/5"
             >
-              Đặt chỉnh sửa
-              {dangChuanBi && <span className="text-[10.5px] font-normal">đang chuẩn bị</span>}
+              <ShoppingBag className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
             </button>
           )}
+          <button
+            type="button"
+            data-testid="nut-dat-chinh-sua"
+            disabled={dangChuanBi || soTim <= 0}
+            aria-label={dangChuanBi ? "Đặt chỉnh sửa — đang chuẩn bị" : "Đặt chỉnh sửa"}
+            onClick={() => {
+              setDaNhan(null);
+              setLoi(null);
+              setMo(true);
+            }}
+            className="flex h-12 shrink-0 flex-col items-center justify-center whitespace-nowrap rounded-full bg-[#2e2a27] px-4 text-[14px] sm:px-5 font-medium leading-tight text-[#fdfbf9] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Đặt chỉnh sửa
+            {dangChuanBi && soTim > 0 && <span className="text-[10.5px] font-normal">đang chuẩn bị</span>}
+          </button>
         </div>
       </div>
 

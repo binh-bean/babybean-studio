@@ -1,3 +1,4 @@
+import { vi } from "@/i18n";
 import { z } from "zod";
 
 export const CreateAddonSchema = z.object({
@@ -13,7 +14,7 @@ export const CreateAddonSchema = z.object({
     .number({ required_error: "quantity là bắt buộc" })
     .int("quantity phải là số nguyên")
     .min(0, "quantity không âm")
-    .max(99, "Số lượng tối đa 99 — nhiều hơn thì ba mẹ nhắn CSKH giúp em"),
+    .max(99, vi.gallery.loiBean.toiDa99),
 
   /**
    * Ảnh mà sản phẩm này in ra.

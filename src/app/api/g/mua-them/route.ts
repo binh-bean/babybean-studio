@@ -54,6 +54,7 @@
  * migration — cùng cách phòng thủ ADR đã dùng ở BB-245/`notify.ts`.
  */
 
+import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
@@ -157,7 +158,7 @@ export async function POST(request: Request): Promise<Response> {
       if (!tenNguoiMua || !sdtNguoiMua) {
         return fail(
           "INVALID_INPUT",
-          "Vui lòng cho studio xin tên và số điện thoại để gọi lại giúp em",
+          vi.gallery.loiBean.xinTenSdtGoiLai,
         );
       }
     }
@@ -224,14 +225,14 @@ export async function POST(request: Request): Promise<Response> {
       // BB-288: cùng luật với /api/g/addons và catalogue của /api/g/gallery —
       // chỉ 3 nhóm ảnh in/album/khung đang bán, loại thêm canvas. Trước đây
       // chỗ này chỉ kiểm `nhom === null` nên canvas (nhom = "anh_in") lọt qua.
-      if (!sanPhamBanChoKhach({ isActive: product.is_active, kind: product.kind, material: product.material, size: product.size })) {
+      if (!sanPhamBanChoKhach({ name: product.name, isActive: product.is_active, kind: product.kind, material: product.material, size: product.size })) {
         return fail("INVALID_INPUT", "Sản phẩm này không bán trong màn mua thêm");
       }
       const nhom = nhomSanPham(product.kind, product.material);
 
       const photoId = item.photoId ?? null;
       if (canGanAnh(nhom) && !photoId) {
-        return fail("INVALID_INPUT", "Ba mẹ chọn giúp em tấm ảnh cần in cho sản phẩm này");
+        return fail("INVALID_INPUT", vi.gallery.loiBean.chonAnhCanIn);
       }
 
       if (photoId) {
@@ -269,7 +270,7 @@ export async function POST(request: Request): Promise<Response> {
     if (session.role !== "viewer") {
       return fail(
         "CONFLICT",
-        'Ba mẹ mua thêm ở mục "Chọn thêm ảnh" giúp em nhé — chọn ảnh, sản phẩm rồi chốt đợt, studio sẽ xác nhận',
+        vi.gallery.loiBean.muaThemOChonThem,
       );
     }
 

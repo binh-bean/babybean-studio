@@ -110,3 +110,88 @@ export function tabsChoVai(role?: string): DinhNghiaTabViec[] {
 export function tongViecCanXuLy(demSo: Partial<Record<TabViecCanXuLy, number>>): number {
   return Object.values(demSo).reduce<number>((t, n) => t + (typeof n === "number" && n > 0 ? n : 0), 0);
 }
+
+// ---------------------------------------------------------------------------
+// BB-359 — MỘT kết quả đếm cho BỐN chỗ hiển thị
+// ---------------------------------------------------------------------------
+// Vòng 8 (người chấm A, Q-1): cùng một Bàn làm việc mà huy hiệu menu "3", dòng
+// phụ "2 việc cần làm hôm nay", thẻ "Cần xử lý ngay" chỉ có "Khách gửi ảnh chọn 2"
+// (thiếu "Ảnh vượt hạn mức 1"). Ba chỗ đếm bằng ba công thức: huy hiệu = các tab
+// (BB-327), thẻ = `demSoCanXuLy` (BB-283/285: bộ chưa có ảnh, chưa có hạn mức, Lark
+// đỏ/tím… — không có tab nào), dòng phụ = "Việc hôm nay" (hạn chọn ảnh).
+//
+// Nay CẢ BỐN — huy hiệu menu, dòng phụ lời chào, thẻ "Cần xử lý ngay", số trên từng
+// tab — đọc CÙNG MỘT `KetQuaDemViec`, do `demViecCanXuLy` tính một lần ở
+// `AdminLayoutShell` và chia qua React context (dem-viec-context.tsx). Không chỗ nào
+// tự cộng lại.
+
+export interface DongViecCanXuLy {
+  tab: TabViecCanXuLy;
+  nhan: string;
+  soLuong: number;
+  /** Bấm dòng mở đúng tab. */
+  href: string;
+}
+
+export interface KetQuaDemViec {
+  /** Số việc của TỪNG tab hiện cho vai này (tab tải hỏng thì không có khoá). */
+  theoTab: Partial<Record<TabViecCanXuLy, number>>;
+  /** Tổng — số trên huy hiệu menu và dòng phụ. Luôn = tổng `soLuong` của `dong`. */
+  tong: number;
+  /** Mỗi tab có số > 0 là MỘT dòng, theo thứ tự tab — thẻ "Cần xử lý ngay". */
+  dong: DongViecCanXuLy[];
+  /** Route quên mật khẩu báo người này không có quyền — trang ẩn tab đó. */
+  khongCoQuyenQuenMk: boolean;
+}
+
+/** Dựng kết quả từ số từng tab. Thuần — phép thử gọi thẳng. */
+export function ketQuaDemViec(
+  demSo: Partial<Record<TabViecCanXuLy, number>>,
+  role?: string,
+  khongCoQuyenQuenMk = false,
+): KetQuaDemViec {
+  const dong: DongViecCanXuLy[] = [];
+  for (const tab of tabsChoVai(role)) {
+    if (tab.value === "quen-mat-khau" && khongCoQuyenQuenMk) continue;
+    const n = demSo[tab.value];
+    if (typeof n === "number" && n > 0) {
+      dong.push({ tab: tab.value, nhan: tab.label, soLuong: n, href: `/admin/viec-can-xu-ly?tab=${tab.value}` });
+    }
+  }
+  return {
+    theoTab: demSo,
+    tong: dong.reduce((t, d) => t + d.soLuong, 0),
+    dong,
+    khongCoQuyenQuenMk,
+  };
+}
+
+/**
+ * Tải số của mọi tab (đúng route từng tab tải) rồi dựng `KetQuaDemViec`. Không tab
+ * nào trả được thì `null` (huy hiệu ẩn, không bịa số 0). `goi` = `fetch` — phép thử
+ * giả ở biên giới mạng.
+ */
+export async function demViecCanXuLy(
+  role?: string,
+  goi: (url: string, init?: RequestInit) => Promise<Response> = (u, i) => fetch(u, i),
+): Promise<KetQuaDemViec | null> {
+  const demSo: Partial<Record<TabViecCanXuLy, number>> = {};
+  let coNguonNaoOk = false;
+  let khongCoQuyenQuenMk = false;
+  await Promise.all(
+    tabsChoVai(role).map(async (tab) => {
+      try {
+        const res = await goi(tab.api, { cache: "no-store" });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.data) return;
+        coNguonNaoOk = true;
+        if (tab.value === "quen-mat-khau" && json.data.coQuyen === false) khongCoQuyenQuenMk = true;
+        demSo[tab.value] = tab.demSo(json.data);
+      } catch {
+        // Một tab hỏng thì coi là 0 — huy hiệu là phụ.
+      }
+    }),
+  );
+  if (!coNguonNaoOk) return null;
+  return ketQuaDemViec(demSo, role, khongCoQuyenQuenMk);
+}

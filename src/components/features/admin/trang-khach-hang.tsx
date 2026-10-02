@@ -5,8 +5,8 @@
  * (`babybean-assets/BB-334/ban-ve/05-nv-gui-link-mt.png`): cột trái hẹp (link app
  * gia đình, thông tin khách, con số), cột phải rộng (bộ ảnh, lịch sử mua).
  *
- * Phần CHƯA có dữ liệu thì để khung + câu "sắp có", không bịa số:
- *   · "Link app của gia đình" (một link cho mọi buổi chụp) — chờ BB-334.
+ * Phần CHƯA có (link app chung của gia đình, ghi chú chăm sóc) thì ẨN HẲN, không bày thẻ
+ * "sắp có" ra cho nhân viên (BB-354); có dữ liệu thì thêm thẻ vào cột trái.
  * Dữ liệu: GET /api/admin/customers/[id]/lich-su (chỉ đọc).
  */
 
@@ -34,7 +34,7 @@ interface LichSu {
   }>;
   muaThem: Array<{ id: string; galleryId: string | null; galleryTitle: string | null; ten: string; soLuong: number; thanhTien: number; ngay: string | null }>;
   thanhToan: Array<{ id: string; galleryId: string; galleryTitle: string | null; soTien: number; hinhThuc: string; laGiamGia: boolean; ghiChu: string | null; ngay: string }>;
-  tong: { tongMuaThem: number; tongDaThu: number; tongGiamGia: number };
+  tong: { tongMuaThem: number; tongDaThu: number; tongGiamGia: number; tongGiaTri: number };
   luotGhe: { nam: number; soLuot: number; chiNhanh: Array<{ ten: string; soLuot: number }> };
 }
 
@@ -98,7 +98,13 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
       />
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="so-lieu-khach">
-        <TheSoLieu label="Tổng giá trị đã mua" value={formatCurrencyVND(tong.tongMuaThem)} chuNho testId="tong-gia-tri-khach" />
+        <TheSoLieu
+          label="Tổng giá trị đã mua"
+          value={formatCurrencyVND(tong.tongGiaTri)}
+          ghiChu="Mua thêm + đã thu trong app"
+          chuNho
+          testId="tong-gia-tri-khach"
+        />
         <TheSoLieu label="Đã thu" value={formatCurrencyVND(tong.tongDaThu)} chuNho />
         <TheSoLieu label="Số buổi chụp" value={formatSo(lichSuChup.length)} />
         <TheSoLieu
@@ -111,14 +117,6 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
         <div className="flex min-w-0 flex-col gap-6">
-          <section className={KHUNG} data-testid="khung-link-gia-dinh">
-            <h2 className={CARD_TITLE_CLASS}>Link app của gia đình</h2>
-            <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
-              Một link cho mọi buổi chụp của gia đình — <strong>sắp có</strong> (BB-334). Hiện mỗi bộ ảnh có link riêng ở
-              bảng bên cạnh.
-            </p>
-          </section>
-
           <section className={KHUNG}>
             <h2 className={CARD_TITLE_CLASS}>Thông tin khách</h2>
             <dl className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
@@ -131,13 +129,6 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
               <dt className="text-[var(--bb-fg-muted)]">Ngày tạo</dt>
               <dd className="tabular-nums">{formatNgayVN(khach.createdAt)}</dd>
             </dl>
-          </section>
-
-          <section className={KHUNG} data-testid="khung-cham-soc">
-            <h2 className={CARD_TITLE_CLASS}>Chăm sóc khách</h2>
-            <p className="mt-1 text-sm text-[var(--bb-fg-muted)]">
-              Ghi chú chăm sóc, nhắc sinh nhật bé, ưu đãi lần ghé sau — <strong>sắp có</strong>.
-            </p>
           </section>
         </div>
 

@@ -11,7 +11,8 @@
  * chỉ sửa ở đây, không tự viết `toLocaleDateString` hay nối chuỗi ở nơi khác.
  */
 
-import { tenChatLieuChoKhach, tenCoChatLieuChoKhach } from "@/lib/products/nhom-san-pham";
+import { tenChatLieuChoKhach, tenCoChatLieuChoKhach, vietHoaChuDau } from "@/lib/products/nhom-san-pham";
+import { vi } from "@/i18n/vi";
 
 /** "27/9/2026" -> "27/09/2026". Nhận Date hoặc chuỗi ISO. */
 export function formatNgayVN(input: string | Date): string {
@@ -113,7 +114,8 @@ export function formatKichThuoc(input: string | null | undefined): string {
   if (!input) return "";
   // BB-339 — mọi tên sản phẩm lên màn khách đều qua hàm này: "Cavas/Kim tuyến
   // 40x60" (tên Lark) hiện thành "Kim Tuyến 40×60", không lộ chữ "Cavas".
-  return tenCoChatLieuChoKhach(input).replace(/(\d)\s*[xX]\s*(\d)/g, "$1×$2");
+  // BB-361 — chữ đầu viết hoa ("tờ Album …" → "Tờ Album …"); dữ liệu gốc không đổi.
+  return vietHoaChuDau(tenCoChatLieuChoKhach(input).replace(/(\d)\s*[xX]\s*(\d)/g, "$1×$2"));
 }
 
 /**
@@ -149,7 +151,8 @@ export function tenSanPhamChoKhach(sp: {
   const tienTo = sp.nhom ? TIEN_TO_NHOM_SAN_PHAM[sp.nhom] : undefined;
   const chatLieu = tenChatLieuChoKhach(sp.material?.trim() ?? null);
   if (!tienTo || !chatLieu) return formatKichThuoc(sp.name.trim());
-  const dau = chatLieu.toLowerCase().startsWith(tienTo.toLowerCase()) ? chatLieu : `${tienTo} ${chatLieu}`;
+  // BB-361 — chất liệu đã chứa tên nhóm ("Tờ Album (Ultra HD)") thì không ghép thêm "Album" phía trước.
+  const dau = chatLieu.toLowerCase().includes(tienTo.toLowerCase()) ? chatLieu : `${tienTo} ${chatLieu}`;
   return sp.size ? `${dau} ${formatKichThuoc(sp.size)}` : dau;
 }
 
@@ -458,10 +461,12 @@ export function tieuDeHopChot(tenBe: string | null | undefined): string {
  */
 export function cauYeuCauBiaAlbum(tenAlbum: readonly string[]): string {
   const [dau, ...con] = tenAlbum.map((t) => t.trim()).filter(Boolean);
-  if (!dau) return "Chọn ảnh bìa album để chốt.";
+  // BB-355 — giọng Bean (gọi "ba mẹ", kết "ạ"), câu nằm ở `vi.gallery.loiBean`.
+  const L = vi.gallery.loiBean;
+  if (!dau) return L.yeuCauBiaAlbumChung;
   return con.length === 0
-    ? `Chọn ảnh bìa cho ${dau} để chốt.`
-    : `Chọn ảnh bìa cho ${dau} và ${con.length} album nữa để chốt.`;
+    ? L.yeuCauBiaAlbum.replace("{ten}", dau)
+    : L.yeuCauBiaAlbumNhieu.replace("{ten}", dau).replace("{n}", String(con.length));
 }
 
 /**
@@ -471,9 +476,10 @@ export function cauYeuCauBiaAlbum(tenAlbum: readonly string[]): string {
  */
 export function cauNhacThieuAnh(tenSanPham: string, soThieu: number, laAlbum = false): string {
   const ten = tenSanPham.trim() || "Sản phẩm";
+  const L = vi.gallery.loiBean;
   return laAlbum
-    ? `${ten} chưa có ảnh, bổ sung sau được.`
-    : `${ten} còn thiếu ${Math.max(1, soThieu)} ảnh, bổ sung sau được.`;
+    ? L.nhacChuaCoAnh.replace("{ten}", ten)
+    : L.nhacThieuAnh.replace("{ten}", ten).replace("{n}", String(Math.max(1, soThieu)));
 }
 
 /**

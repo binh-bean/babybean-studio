@@ -1,16 +1,18 @@
 import { isSubmittedOrLater, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import type { NextResponse } from "next/server";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { boDangThuGon } from "@/lib/gallery/mo-lai-anh-thu-gon";
 import { dangNhapBangMa, datCookiePhien } from "@/lib/auth/dang-nhap-bang-ma";
 import type { GallerySession } from "@/types/domain";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
-import { nhomSanPham, canGanAnh, sanPhamBanChoKhach, laSanPhamThu } from "@/lib/products/nhom-san-pham";
+import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { nhanHienThi } from "@/lib/lark/trang-thai-hau-ky";
+import { trangThaiKhach } from "@/lib/lark/trang-thai-app-lark";
 import { khoaChonCuaKhach } from "@/lib/gallery/khoa-chon-khach";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layDuLieuChungBoAnh } from "@/lib/gallery/du-lieu-chung-bo-anh";
@@ -166,6 +168,10 @@ async function traDuLieu(
         .eq("id", galleryId)
         .single(),
     );
+
+    // BB-359 (2b) — bộ ảnh đã thu gọn danh sách (BB-357)? Chạy SONG SONG trong đợt 1
+    // (một câu theo khoá chính, không chặn đường mở bộ bình thường). Chưa áp 0088 → false.
+    const pThuGon = chayNgay(boDangThuGon(supabase, galleryId));
 
     // BB-341 — link chat, dải quảng cáo và danh mục mua thêm GIỐNG NHAU cho mọi
     // bộ ảnh: đọc qua bộ nhớ đệm 5 phút (src/lib/gallery/du-lieu-chung-bo-anh.ts).
@@ -548,10 +554,9 @@ async function traDuLieu(
     // Lọc TRƯỚC `.map` để `p.is_active` không cần mang qua object đã ánh xạ —
     // truy vấn phía trên đã `.eq("is_active", true)` nên luôn `true` ở đây.
     const catalogue = (rawCatalogue ?? [])
-      .filter((p) => sanPhamBanChoKhach({ isActive: true, kind: p.kind, material: p.material, size: p.size }))
-      // BB-339 — sản phẩm THỬ ("Fixture …"/"TEST …", do phép thử chèn vào bb-dev)
-      // không bao giờ hiện cho khách, kể cả khi chất liệu + cỡ có trong bảng giá.
-      .filter((p) => !laSanPhamThu(p.name))
+      .filter((p) => sanPhamBanChoKhach({ name: p.name, isActive: true, kind: p.kind, material: p.material, size: p.size }))
+      // BB-339/BB-352 — sản phẩm THỬ ("Fixture …"/"TEST …") bị loại ngay trong
+      // `sanPhamBanChoKhach()` (name ở trên), cùng luật với mọi đường ghi.
       .filter((p) => giaDuocBaoTuDong(p))
       .map((p) => ({
         productId: p.id,
@@ -610,9 +615,13 @@ async function traDuLieu(
       // (docs/21 "Luồng hiển thị"). KHÔNG trả mã Lark hay mức cảnh báo cho
       // khách — đó là chuyện nội bộ studio, không phải thứ ba mẹ cần thấy.
       // `null` = giữ nguyên chữ cũ theo `status` (xem review-panel.tsx).
+      // BB-353 — nhãn khách lấy từ CÙNG bảng với bìa + thẻ tiến trình
+      // (`trangThaiKhach`), giọng Bean; vẫn `null` khi không theo Lark.
       nhanTienDo: quaHan60Ngay
-        ? "Bộ ảnh đã quá hạn chọn — nhắn studio để được hỗ trợ"
-        : tienDo.khach,
+        ? "Bộ ảnh đã quá hạn chọn, ba mẹ nhắn Bean để được hỗ trợ ạ."
+        : tienDo.giaiDoan != null
+          ? trangThaiKhach(gallery.status, tienDo.giaiDoan).khach
+          : null,
       // BB-225 — số giai đoạn (2–11, docs/21) để màn khách chọn tranh "hành
       // trình bộ ảnh". Chỉ là con số giai đoạn, không phải mã Lark.
       giaiDoanTienDo: tienDo.giaiDoan,
@@ -702,6 +711,8 @@ async function traDuLieu(
       review,
       // BB-312 — xem chú thích ở phần tính phía trên.
       reopenRequest,
+      // BB-359 — danh sách ảnh đã thu gọn: màn khách tự gọi POST /api/g/mo-lai-anh.
+      thuGon: await pThuGon,
     };
 
     return ok(responseData);

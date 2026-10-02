@@ -55,6 +55,7 @@
  *    đếm link còn sống (mục 1 đã lo việc đó).
  */
 
+import { vi } from "@/i18n";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
@@ -154,7 +155,7 @@ export async function POST(request: Request): Promise<Response> {
     if ((soTaoTrongNgay ?? 0) >= TOI_DA_TAO_MOI_NGAY) {
       return fail(
         "RATE_LIMITED",
-        "Ba mẹ đã tạo khá nhiều lời mời trong hôm nay, thử lại vào ngày mai giúp em nhé",
+        vi.gallery.loiBean.quaNhieuLoiMoi,
       );
     }
 

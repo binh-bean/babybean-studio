@@ -34,7 +34,8 @@ import {
   type ViecHomNayThoLuoc,
 } from "@/lib/utils/bang-dieu-khien";
 import { THU_TU_HIEN_THI_MUA_THEM } from "@/lib/utils/mua-them-7-ngay";
-import { dongCanXuLy, type CanXuLyTongHop } from "@/lib/utils/can-xu-ly";
+import { dongCanXuLy } from "@/lib/utils/can-xu-ly";
+import { useDemViecCanXuLy } from "./dem-viec-context";
 import { layerMoNgang } from "@/lib/utils/tranh-tan-nen";
 import {
   formatGioVN,
@@ -208,6 +209,8 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     return () => window.removeEventListener("branchChange", xuLyDoiChiNhanh);
   }, []);
 
+  // BB-359: số việc dùng chung với huy hiệu menu và các tab (AdminLayoutShell đếm một lần).
+  const demViec = useDemViecCanXuLy();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -383,8 +386,6 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
   // hôm nay/đã trễ hạn TÍNH TỪ DỮ LIỆU THẬT (`data.viecHomNay`, xếp bằng
   // ĐÚNG hàm dùng cho khối "Việc hôm nay" bên dưới) — không phải con số cố
   // định như trong bản vẽ.
-  const xepHomNay = xepViecHomNay(data.viecHomNay ?? []);
-  const tongViecHomNay = xepHomNay.quaHan.length + xepHomNay.homNay.length;
   // BB-320 (Q-N1): lời chào dùng CHÍNH khối tiêu đề trang chung (PageHeader) —
   // H1 Playfair + mô tả + nút chính bên phải, như mọi màn quản trị khác.
   // BB-303 (bang-dieu-khien.html): nút "+ Tạo bộ ảnh" cạnh lời chào, CÙNG đích
@@ -396,14 +397,14 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
       description={
         <>
           {ngayDayDuVN(new Date())}
-          {tongViecHomNay > 0 && ` · ${formatSo(tongViecHomNay)} việc cần làm hôm nay`}
-          {xepHomNay.quaHan.length > 0 && (
-            <>
-              {", "}
-              <strong className="font-medium text-[var(--bb-danger)]">
-                {formatSo(xepHomNay.quaHan.length)} việc đã trễ hạn
-              </strong>
-            </>
+          {/* BB-359 (vòng 8, Q-1): dòng phụ đọc ĐÚNG số của huy hiệu menu và thẻ "Cần xử
+              lý ngay" (`demViec.tong`). Trước đây là "N việc cần làm hôm nay" đếm theo hạn
+              chọn ảnh — con số thứ ba trên cùng một màn. Hạn chọn ảnh vẫn ở khối "Việc hôm
+              nay" và thẻ số "Quá hạn"/"Sắp hết hạn". */}
+          {demViec && demViec.tong > 0 && (
+            <span data-testid="dong-phu-so-viec" data-so-viec={demViec.tong}>
+              {` · ${formatSo(demViec.tong)} việc cần xử lý`}
+            </span>
           )}
         </>
       }
@@ -421,6 +422,97 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     />
   );
 
+  // BB-359: thẻ "Cần xử lý ngay" hiện ở CẢ nhánh trống (chi nhánh chưa có bộ ảnh nào vẫn
+  // có thể có việc: quên mật khẩu, bộ vừa tạo…) — huy hiệu nói 2 thì thẻ phải có 2 dòng.
+  const theCanXuLyNgay = (() => {
+        // BB-283 (soát 27/09/2026): MỘT khối, MỘT nguồn — không còn bảng
+        // riêng của BB-270 (due_soon/overdue) đứng cạnh huy hiệu sidebar nói
+        // điều khác. `merged`/`dong`/`tong` dùng ĐÚNG hàm sidebar dùng
+        // (`src/lib/utils/can-xu-ly.ts`), nên tổng các dòng ở đây LUÔN khớp
+        // số trên huy hiệu — không tính lại theo cách khác ở đây.
+        // BB-359: thẻ đọc ĐÚNG kết quả đếm của huy hiệu (`demViec.dong` — mỗi tab có số
+        // > 0 là một dòng). Các loại cũ không có tab (chưa có ảnh, chưa có hạn mức, Lark
+        // đỏ/tím, sắp hết hạn chọn) chuyển xuống khối "Bộ ảnh cần để mắt" bên dưới —
+        // không cộng vào số việc.
+        const dong = demViec?.dong ?? [];
+        const deMat = dongCanXuLy({
+          driveChuaChiaSe: canXuLy?.driveChuaChiaSe,
+          chuaCoAnh: canXuLy?.chuaCoAnh,
+          chuaCoHanMuc: canXuLy?.chuaCoHanMuc,
+          dueSoon: data.stats.dueSoon,
+          overdue: data.stats.overdue,
+          canhBaoLark: canXuLy?.canhBaoLark,
+        });
+        return (
+          <Card className="flex flex-col overflow-hidden min-w-0">
+            <CardHeader className="pb-3">
+              <CardTitle className={CARD_TITLE_CLASS}>Cần xử lý ngay</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 p-0">
+              {!demViec ? (
+                <p className="px-6 pb-4 text-sm text-[var(--bb-fg-muted)]">Đang đếm việc…</p>
+              ) : dong.length === 0 ? (
+                // BB-320 (Q-S1): trạng thái trống gọn MỘT dòng, tích rêu của hệ, lề trong 24px như dòng có việc.
+                <p
+                  data-testid="can-xu-ly-ngay-trong"
+                  className="flex items-center gap-2.5 px-6 pb-4 text-sm text-[var(--bb-fg-muted)]"
+                >
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--bb-moss)]" aria-hidden="true" />
+                  Không có cảnh báo nào cần xử lý.
+                </p>
+              ) : (
+                <ul data-testid="can-xu-ly-ngay-rows">
+                  {dong.map((d) => (
+                    <li
+                      key={d.tab}
+                      data-testid={`can-xu-ly-ngay-${d.tab}`}
+                      data-so-viec={d.soLuong}
+                      className="border-t border-[var(--bb-border)] first:border-t-0"
+                    >
+                      <Link
+                        href={d.href}
+                        className="flex items-center gap-3 px-6 py-3 text-sm transition-colors hover:bg-[var(--bb-surface-2)]"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ background: d.tab === "loi-dong-bo" ? "var(--bb-danger)" : "var(--bb-urgent)" }}
+                        />
+                        <span className="flex-1 font-medium text-[var(--bb-fg)]">{d.nhan}</span>
+                        {/* BB-303 (luật phông 28/09/2026): Be Vietnam Pro
+                            tabular-nums thay `font-mono` — nội dung quản trị
+                            chỉ dùng hai phông đã chốt (Playfair Display cho
+                            tiêu đề, Be Vietnam Pro cho phần còn lại kể cả số). */}
+                        <span className="tabular-nums text-[var(--bb-fg-muted)]">{formatSo(d.soLuong)}</span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[var(--bb-fg-muted)]" aria-hidden="true" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {deMat.length > 0 && (
+                // BB-359: các loại BB-283/285 không có tab ở Việc cần xử lý — vẫn cho CSKH
+                // thấy, nhưng tách hẳn khỏi số việc (không cộng vào huy hiệu/dòng phụ).
+                <div data-testid="bo-anh-can-de-mat" className="border-t border-[var(--bb-border)] px-6 py-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--bb-fg-muted)]">
+                    Bộ ảnh cần để mắt · không tính vào số việc
+                  </p>
+                  <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--bb-fg-muted)]">
+                    {deMat.map((d) => (
+                      <li key={d.key}>
+                        <Link href={d.href} className="hover:text-[var(--bb-fg)] hover:underline">
+                          {d.nhan} <span className="tabular-nums">{formatSo(d.soLuong)}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })();
+
   if (data.stats.totalGalleries === 0) {
     // BB-292: tranh trạng thái trống dùng chung cho các màn quản trị
     // (`ngang-quan-tri-trong`) thay vòng tròn icon `Inbox` trơn — cùng ngôn
@@ -436,6 +528,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
       <div className="space-y-6">
         {khoiChao}
         <BanGhiMoiLark />
+        {theCanXuLyNgay}
         {/* BB-294 (mục cũ #32): hàng thẻ số vẫn hiện khi trống — 0 có NGHĨA
             (chưa có gì cần chọn/sắp hết hạn/quá hạn…), không phải một khối
             biến mất khiến trang trông như hỏng. Không bịa số: đây vẫn là
@@ -481,69 +574,7 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
         đứng thứ hai, sau hàng thẻ số — đúng thứ tự CSKH quan tâm là "việc gì
         cần làm ngay" trước rồi mới tới "số liệu tổng quan".
       */}
-      {(() => {
-        // BB-283 (soát 27/09/2026): MỘT khối, MỘT nguồn — không còn bảng
-        // riêng của BB-270 (due_soon/overdue) đứng cạnh huy hiệu sidebar nói
-        // điều khác. `merged`/`dong`/`tong` dùng ĐÚNG hàm sidebar dùng
-        // (`src/lib/utils/can-xu-ly.ts`), nên tổng các dòng ở đây LUÔN khớp
-        // số trên huy hiệu — không tính lại theo cách khác ở đây.
-        const merged: CanXuLyTongHop = {
-          driveChuaChiaSe: canXuLy?.driveChuaChiaSe,
-          chuaCoAnh: canXuLy?.chuaCoAnh,
-          chuaCoHanMuc: canXuLy?.chuaCoHanMuc,
-          dueSoon: data.stats.dueSoon,
-          overdue: data.stats.overdue,
-          canhBaoLark: canXuLy?.canhBaoLark,
-          // BB-344: số này = số dòng tab "Khách gửi ảnh chọn" (cùng `layKhachGuiAnhChon`).
-          khachGuiAnhChon: canXuLy?.khachGuiAnhChon,
-          // BB-344: trước đây thiếu — dòng "Khách xin mở lại" không bao giờ hiện ở Bàn làm việc.
-          choMoLai: canXuLy?.choMoLai,
-        };
-        const dong = dongCanXuLy(merged);
-        return (
-          <Card className="flex flex-col overflow-hidden min-w-0">
-            <CardHeader className="pb-3">
-              <CardTitle className={CARD_TITLE_CLASS}>Cần xử lý ngay</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 p-0">
-              {dong.length === 0 ? (
-                // BB-320 (Q-S1): trạng thái trống gọn MỘT dòng, tích rêu của hệ, lề trong 24px như dòng có việc.
-                <p
-                  data-testid="can-xu-ly-ngay-trong"
-                  className="flex items-center gap-2.5 px-6 pb-4 text-sm text-[var(--bb-fg-muted)]"
-                >
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--bb-moss)]" aria-hidden="true" />
-                  Không có cảnh báo nào cần xử lý.
-                </p>
-              ) : (
-                <ul data-testid="can-xu-ly-ngay-rows">
-                  {dong.map((d) => (
-                    <li key={d.key} className="border-t border-[var(--bb-border)] first:border-t-0">
-                      <Link
-                        href={d.href}
-                        className="flex items-center gap-3 px-6 py-3 text-sm transition-colors hover:bg-[var(--bb-surface-2)]"
-                      >
-                        <span
-                          aria-hidden="true"
-                          className="h-2 w-2 shrink-0 rounded-full"
-                          style={{ background: d.mauCham }}
-                        />
-                        <span className="flex-1 font-medium text-[var(--bb-fg)]">{d.nhan}</span>
-                        {/* BB-303 (luật phông 28/09/2026): Be Vietnam Pro
-                            tabular-nums thay `font-mono` — nội dung quản trị
-                            chỉ dùng hai phông đã chốt (Playfair Display cho
-                            tiêu đề, Be Vietnam Pro cho phần còn lại kể cả số). */}
-                        <span className="tabular-nums text-[var(--bb-fg-muted)]">{formatSo(d.soLuong)}</span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-[var(--bb-fg-muted)]" aria-hidden="true" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })()}
+      {theCanXuLyNgay}
 
       {/* Hàng thẻ số — bản vẽ quan-tri-bang-dieu-khien.webp: nhãn nhỏ trên
           cùng, số lớn bên dưới, chip % so kỳ trước ở góc phải (BB-270). Thẻ

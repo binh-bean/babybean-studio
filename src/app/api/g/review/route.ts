@@ -27,6 +27,7 @@
  * quyết định cuối là của người đứng tên hợp đồng.
  */
 
+import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
@@ -86,7 +87,7 @@ export async function POST(request: Request): Promise<Response> {
       return fail(
         "INVALID_INPUT",
         gallery.status === "approved"
-          ? "Ba mẹ đã duyệt bộ ảnh này rồi, studio đang chuẩn bị in."
+          ? vi.gallery.loiBean.daDuyetDangIn
           : "Bộ ảnh chưa tới bước duyệt ảnh đã chỉnh.",
       );
     }

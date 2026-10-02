@@ -23,7 +23,7 @@ export function QuotaDisplay({ includedQuota, extraPrice, selectedCount, classNa
         <span>Đã chọn: {selectedCount} ảnh</span>
         {/* BB-305 — bỏ nghiêng theo LUẬT PHÔNG mới. */}
         <div className="text-muted-foreground mt-1 text-xs">
-          (Studio sẽ báo lại số ảnh trong gói)
+          (Bean sẽ báo lại số ảnh trong gói ạ)
         </div>
       </div>
     );

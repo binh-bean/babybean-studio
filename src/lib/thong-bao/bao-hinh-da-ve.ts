@@ -9,7 +9,7 @@ import { guiThongBaoBoAnh } from "@/lib/thong-bao/gui-day";
  */
 export async function baoHinhDaVe(galleryId: string): Promise<void> {
   await guiThongBaoBoAnh(createAdminClient(), galleryId, {
-    tieuDe: "Sản phẩm của bé đã về",
+    tieuDe: "Sản phẩm của bé đã về rồi ạ",
     noiDung: "Mời ba mẹ ghé Bean nhận ảnh của bé nhé ạ.",
     loai: "hinh_da_ve",
   });

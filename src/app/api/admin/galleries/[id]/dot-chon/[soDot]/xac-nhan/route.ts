@@ -11,6 +11,7 @@
  * nhận CONFLICT, không ghi đè `confirmed_by` của người bấm trước.
  */
 
+import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
@@ -60,8 +61,8 @@ export async function POST(
 
     // Báo khách qua chuông + đẩy (không qua Lark — đó là kênh Studio→Studio).
     await guiThongBaoBoAnh(admin, galleryId, {
-      tieuDe: `Studio đã xác nhận đợt ${soDot}`,
-      noiDung: "Studio đã nhận đợt ảnh ba mẹ vừa chọn thêm.",
+      tieuDe: vi.gallery.loiBean.tbDotDaXacNhan.replace("{n}", String(soDot)),
+      noiDung: vi.gallery.loiBean.tbDotDaXacNhanNoiDung,
       loai: "dot_chon_xac_nhan",
     });
 

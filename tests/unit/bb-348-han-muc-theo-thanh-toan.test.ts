@@ -195,6 +195,11 @@ describe("BB-348: hạn mức tăng theo thanh toán, không trừ hai lần", (
     expect(await hanMuc(boChot)).toBe(5);
     expect(await conThu(boChot)).toBe(3 * GIA);
     expect(await trongView(boChot)).toBe(3);
+    // BB-351: bộ còn `submitted` = đang nằm ở tab "Khách gửi ảnh chọn" (có form thu tiền riêng) →
+    // KHÔNG hiện thêm ở "Ảnh vượt hạn mức" (một khách một việc). Studio xác nhận xong mà còn nợ
+    // thì bộ quay về báo cáo này với đúng số còn thu.
+    expect(await trongBaoCao(boChot)).toBeNull();
+    await pg.query(`update galleries set status = 'in_retouch' where id = $1`, [boChot]);
     expect((await trongBaoCao(boChot))?.unbilledAmount).toBe(3 * GIA);
   });
 

@@ -93,7 +93,7 @@ test.describe("BB-338: Yêu cầu sửa lại khớp luật khoá của màn kh�
 
     await page.getByRole("button", { name: "Yêu cầu sửa lại" }).first().click();
     await page.getByPlaceholder("Ví dụ: đổi tấm số 12 sang tấm số 15").fill("Fixture BB-338 đổi tấm 2");
-    await page.getByRole("button", { name: "Gửi cho studio" }).click();
+    await page.getByRole("button", { name: "Gửi cho Bean" }).click();
 
     await expect(page.getByText("Bean đã nhận yêu cầu", { exact: false }).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("vẫn đang mở")).toHaveCount(0);

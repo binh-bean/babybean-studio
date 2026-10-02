@@ -3,7 +3,7 @@
  * OWNER: DEV-UI. Task BB-069 completes the remaining copy.
  */
 
-import type { Messages } from "./vi";
+import { vi, type Messages } from "./vi";
 
 export const en: Messages = {
   common: {
@@ -99,6 +99,8 @@ export const en: Messages = {
     },
   },
   gallery: {
+    dangMoLaiAnh: "Bean is reopening all of your baby's photos, please wait a moment",
+    dangMoLaiAnhGiaDinh: "Bean is reopening all of the baby's photos, family, please wait a moment",
     pinTitle: "Enter the last 4 digits of your registered phone number",
     pinSubmit: "View gallery",
     pinWrong: "Wrong PIN, {n} attempts left",
@@ -164,6 +166,9 @@ export const en: Messages = {
     preparing: "Your gallery is being prepared. We will let you know when it is ready.",
     offlineBanner: "Connection lost — your selection is kept and will save when back online.",
 
+    // BB-353 — Bean's customer voice; customer screens ship Vietnamese only, English copy pending (BB-069).
+    loiBean: vi.gallery.loiBean,
+
     lightbox: {
       closeAria: "Close full photo view",
       prevPhoto: "Previous photo",
@@ -188,6 +193,7 @@ export const en: Messages = {
     saveAppPrompt: {
       message: "Save this gallery to your home screen to reopen it in one tap",
       shortLabel: "Save to your home screen to reopen your baby's photos faster",
+      shortLabelGiaDinh: "Save to your home screen so the family can reopen the baby's photos faster",
       howTo: "See how",
       later: "Later",
     },
@@ -211,16 +217,15 @@ export const en: Messages = {
       dongXemLon: "Close full-size view",
       thamKhaoKhung: "Frame sample is for reference only — our staff will confirm the real frame when you check out.",
       thamKhaoDemo: "This demo is for reference only.",
-      uvLaAnhGiay:
-        "A UV print is a photo-paper print with no frame. Slip it into an album, or mount it on wood to hang or stand.",
-      uvChonKhungDeTreo: "Add a frame to preview it on the wall.",
+      uvLaAnhGiay: "A UV print is on photo paper — lovely in an album or standing on a table.",
+      tieuDeAnhGiay: "Paper print for the table",
       moTaChatLieu: {
         "Gỗ": "Full-bleed print mounted on wood — no frame, square corners.",
         "Cavas/Kim tuyến": "Full-bleed print on lightly glittering Kim Tuyến material — no frame.",
         "Tráng gương": "Full-bleed, mirror-glossy finish, colors come out rich and deep.",
         "Thủy tinh": "Full-bleed print behind tempered glass, flat and bright surface.",
         "Mica HD": "Full-bleed print on clear acrylic, light and color-stable.",
-        UV: "Photo-paper print with a UV coat, no frame — for albums or wood mounting.",
+        UV: "Photo-paper print — for albums or standing on a table.",
       },
     },
   },
@@ -350,6 +355,7 @@ export const en: Messages = {
       nhomAnh: "Photos",
       nhomQuangCao: "Promotion",
       nhomLienLac: "Contact",
+      nhomThanhToan: "Payments",
       nhan: {
         "gallery.default_due_days": "Default deadline (days)",
         "gallery.reminder_days": "Remind CS to call on day",
@@ -364,6 +370,7 @@ export const en: Messages = {
         "chat.page_url": "Studio chat page",
         "lark.webhook_url": "Lark group webhook",
         "lark.nhac_noi_bo": "Internal reminders to Lark",
+        "thanh_toan.thu_san_pham_qua_app": "Collect extra product payments in the app",
       },
       moTa: {
         "gallery.default_due_days": "Days from sending the link until the customer must confirm.",
@@ -384,6 +391,8 @@ export const en: Messages = {
         "lark.webhook_url": "Bot that posts into the Lark group. Secret, shown masked.",
         "lark.nhac_noi_bo":
           "Post-production and unconfirmed-selection reminders to Lark, for STAFF only. Does NOT affect customer-facing messages (selection submitted, reopen request, extra purchase, review approve/revise) — those always send. Off because Lark's own automation in another group already covers this.",
+        "thanh_toan.thu_san_pham_qua_app":
+          "Prints, frames, albums bought as extras. Off (default): collected via Lark — not counted in Amount due / Outstanding, shown as a separate line. On: counted and recorded in the app. Photo money (over quota, extra rounds, edit files) is always collected in the app.",
       },
       dangBat: "On",
       dangTat: "Off",

@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { laNhanSuThat } from "@/lib/utils/nhan-su-cong-khai";
 import {
   isValidUsername,
   normalizeUsername,
@@ -88,7 +89,8 @@ export async function GET(): Promise<Response> {
     const staleBefore = Date.now() - STALE_DAYS * 24 * 60 * 60 * 1000;
 
     return ok({
-      staff: (profiles ?? []).map((p) => ({
+      // BB-354: tài khoản Fixture của phép thử không hiện ở màn Nhân sự.
+      staff: (profiles ?? []).filter((p) => laNhanSuThat({ fullName: p.full_name })).map((p) => ({
         id: p.id,
         fullName: p.full_name,
         identifier: toDisplayIdentifier(p.email),

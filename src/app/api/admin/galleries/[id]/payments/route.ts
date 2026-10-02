@@ -78,6 +78,64 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 const MAX_NOTE = 500;
 
+/**
+ * BB-351 — chống ghi trùng (bấm đúp, mạng gửi lại). Hai lớp:
+ *   1. `requestId` do form sinh, một mã cho mỗi lần ghi. Có cột `gallery_payments.ma_yeu_cau`
+ *      (migration 0086, chỉ mục duy nhất) thì trùng mã = không ghi thêm. Chưa áp 0086 thì bỏ qua lớp này.
+ *   2. Lưới đỡ không cần migration: cùng người ghi, cùng bộ, cùng số tiền, cùng hình thức trong
+ *      `CUA_SO_TRUNG_MS` = coi là bấm lặp, không ghi thêm.
+ * Lần trùng trả 200 kèm `trung: true` và số tiền hiện tại — không báo lỗi cho một khoản đã vào sổ.
+ */
+const CUA_SO_TRUNG_MS = 15_000;
+const MA_YEU_CAU_RE = /^[A-Za-z0-9-]{8,64}$/;
+
+/** Cột `ma_yeu_cau` chưa có (0086 chưa áp): PostgREST báo PGRST204 / Postgres 42703. */
+function laLoiThieuCotMaYeuCau(e: { code?: string; message?: string } | null | undefined): boolean {
+  if (!e) return false;
+  return e.code === "PGRST204" || e.code === "42703" || /ma_yeu_cau/.test(e.message ?? "");
+}
+
+/** Số tiền trả về sau khi ghi (hoặc khi nhận ra lần gửi trùng) — MỘT công thức: `layTienCanThu`. */
+async function soTienSauGhi(admin: ReturnType<typeof createAdminClient>, galleryId: string) {
+  const t = await layTienCanThu(admin, galleryId);
+  return {
+    paidAmount: t.daGhiCo,
+    // BB-351: "Phải thu" = tổng phải thu thật (vượt hạn mức qua mọi lần chốt + quy đổi + đợt mua
+    // thêm), không còn là riêng `snapshot_extra_amount` của lượt chốt chính.
+    dueAmount: t.tongPhaiThu,
+    outstanding: t.conThieu,
+    amountToCollect: t.tienCanThu,
+    // BB-360 — phần sản phẩm thu qua Lark (không nằm trong các số trên).
+    sanPhamQuaLark: t.tienSanPhamQuaLark,
+  };
+}
+
+/**
+ * GET — BB-351: số tiền + trạng thái khoá của MỘT bộ cho form thu tiền ở tab "Ảnh vượt hạn mức"
+ * (nhẹ hơn nhiều so với GET /items). Cùng `layTienCanThu` + `layKhoaKhiThu` với màn chi tiết.
+ */
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+): Promise<Response> {
+  const requestId = randomUUID();
+  try {
+    const staff = await requireStaff();
+    requirePermission(staff, "galleries:write");
+    const { id: galleryId } = await context.params;
+    if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
+    const admin = createAdminClient();
+    const { data: gallery } = await admin.from("galleries").select("id, branch_id").eq("id", galleryId).maybeSingle();
+    if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
+    requireBranch(staff, gallery.branch_id);
+    const [tien, khoaKhiThu] = await Promise.all([soTienSauGhi(admin, galleryId), layKhoaKhiThu(admin, galleryId)]);
+    return ok({ ...tien, khoaKhiThu });
+  } catch (err) {
+    if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền xem thanh toán");
+    return failUnexpected(err, requestId);
+  }
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -99,7 +157,11 @@ export async function POST(
       discountPercent?: unknown;
       khoaBoAnh?: unknown;
       chacChan?: unknown;
+      requestId?: unknown;
     } | null;
+    // BB-351 — khoá chống ghi trùng do form gửi (xem CUA_SO_TRUNG_MS).
+    const maYeuCau =
+      typeof body?.requestId === "string" && MA_YEU_CAU_RE.test(body.requestId) ? body.requestId : null;
 
     // BB-320: có giảm giá khi `discountPercent` là số khác 0/rỗng.
     const coGiamGia =
@@ -150,6 +212,41 @@ export async function POST(
 
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     requireBranch(staff, gallery.branch_id);
+
+    // BB-351 — lần gửi trùng: trả số hiện tại, không ghi thêm, không chạy lại khoá/thông báo.
+    let coCotMaYeuCau = false;
+    if (maYeuCau) {
+      const { data: daCo, error: eMa } = await admin
+        .from("gallery_payments")
+        .select("id")
+        .eq("gallery_id", galleryId)
+        .eq("ma_yeu_cau", maYeuCau)
+        .limit(1);
+      if (!eMa) {
+        coCotMaYeuCau = true;
+        if ((daCo ?? []).length > 0) return ok({ ...(await soTienSauGhi(admin, galleryId)), discountAmount: 0, trung: true, daKhoa: false, loiKhoa: null, quotaChange: 0, quotaSkipped: null, thongBao: null });
+      } else if (!laLoiThieuCotMaYeuCau(eMa)) {
+        throw eMa;
+      }
+    }
+    if (amount !== 0 || coGiamGia) {
+      const tu = new Date(Date.now() - CUA_SO_TRUNG_MS).toISOString();
+      const { data: ganDay, error: eGan } = await admin
+        .from("gallery_payments")
+        .select("amount, payment_method")
+        .eq("gallery_id", galleryId)
+        .eq("confirmed_by", staff.staffId)
+        .gte("created_at", tu);
+      if (eGan) throw eGan;
+      const lap = (ganDay ?? []).some((r) =>
+        amount !== 0
+          ? Number(r.amount) === amount && r.payment_method === method
+          : r.payment_method === HINH_THUC_GIAM_GIA,
+      );
+      if (lap) {
+        return ok({ ...(await soTienSauGhi(admin, galleryId)), discountAmount: 0, trung: true, daKhoa: false, loiKhoa: null, quotaChange: 0, quotaSkipped: null, thongBao: null });
+      }
+    }
 
     // Con số khách đã nhìn thấy lúc bấm chốt. Lấy từ lượt chọn chính.
     const { data: selection } = await admin
@@ -206,6 +303,8 @@ export async function POST(
       selection_id: selection?.id ?? null,
       snapshot_extra_amount: selection?.snapshot_extra_amount ?? null,
       confirmed_by: staff.staffId,
+      // BB-351 — chỉ một dòng mang mã (dòng tiền, hoặc dòng giảm khi không có dòng tiền): chỉ mục
+      // duy nhất (gallery_id, ma_yeu_cau) của 0086 không cho dòng thứ hai cùng mã.
     };
     if (coGiamGia) {
       dongGhi.push({
@@ -218,8 +317,17 @@ export async function POST(
     if (amount !== 0) {
       dongGhi.push({ ...chung, amount, payment_method: method, note: note.length > 0 ? note : null });
     }
+    if (coCotMaYeuCau && maYeuCau && dongGhi.length > 0) {
+      // Mọi dòng cùng một câu insert cùng mang khoá (cột không unique một mình; chỉ mục là
+      // (gallery_id, ma_yeu_cau, payment_method)) — xem 0086.
+      for (const d of dongGhi) d.ma_yeu_cau = maYeuCau;
+    }
     // MỘT câu insert cho cả dòng giảm và dòng thu: hoặc cả hai vào sổ, hoặc không dòng nào.
     const { data: dongDaGhi, error: insErr } = await admin.from("gallery_payments").insert(dongGhi).select("id");
+    if (insErr && insErr.code === "23505" && coCotMaYeuCau) {
+      // Hai lần bấm chạy song song, lần kia vừa ghi trước: không ghi thêm.
+      return ok({ ...(await soTienSauGhi(admin, galleryId)), discountAmount: 0, trung: true, daKhoa: false, loiKhoa: null, quotaChange: 0, quotaSkipped: null, thongBao: null });
+    }
     if (insErr) throw insErr;
 
     // BB-349 — khoá cùng lúc ghi thu, bằng ĐÚNG luồng xác nhận cũ (xac-nhan-danh-sach.ts).
@@ -261,15 +369,10 @@ export async function POST(
       console.error(JSON.stringify({ evt: "han_muc_theo_thanh_toan.loi", requestId, loi: e instanceof Error ? e.message : String(e) }));
     }
 
-    // Đọc lại tổng từ cơ sở dữ liệu chứ không cộng dồn trong bộ nhớ: hai người
-    // cùng ghi một lúc thì bản cộng dồn ra số sai.
-    const { data: paidRows } = await admin
-      .from("gallery_payments")
-      .select("amount")
-      .eq("gallery_id", galleryId);
-
-    const paid = (paidRows ?? []).reduce((t, r) => t + Number(r.amount), 0);
-    const due = Number(selection?.snapshot_extra_amount ?? 0);
+    // Đọc lại từ cơ sở dữ liệu chứ không cộng dồn trong bộ nhớ: hai người cùng ghi một lúc
+    // thì bản cộng dồn ra số sai. BB-351: cùng `layTienCanThu` với màn chi tiết + form gợi ý.
+    const sauGhi = await soTienSauGhi(admin, galleryId);
+    const paid = sauGhi.paidAmount;
 
     const { error: logErr } = await admin.from("activity_logs").insert({
       actor_type: "staff",
@@ -295,11 +398,10 @@ export async function POST(
     const thongBao = amount > 0 || coGiamGia ? await baoKhachSauThanhToan(admin, galleryId, daKhoa) : null;
 
     return ok({
-      paidAmount: paid,
-      dueAmount: due,
+      ...sauGhi,
       // BB-320: phần giảm giá vừa ghi (0 nếu lần này không giảm).
       discountAmount: soTienGiam,
-      outstanding: due - paid,
+      trung: false,
       // BB-348: số ảnh hạn mức tăng (âm = giảm) do lần ghi sổ này; null = không đồng bộ được.
       quotaChange: hanMuc ? hanMuc.sau - hanMuc.truoc : null,
       quotaSkipped: hanMuc?.boQua ?? null,

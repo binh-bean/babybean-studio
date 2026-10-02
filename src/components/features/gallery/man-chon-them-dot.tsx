@@ -231,7 +231,7 @@ export function ManChonThemDot({
         error?: { message?: string };
       } | null;
       if (!res.ok) {
-        setLoi(json?.error?.message ?? "Chốt chưa được, ba mẹ thử lại giúp em nhé");
+        setLoi(json?.error?.message ?? vi.gallery.loiBean.chotChuaDuoc);
         // Có tấm vừa bị khoá ở chỗ khác (vd. tab khác vừa chốt): làm mới để huy hiệu đúng.
         if (res.status === 409) onCanTaiLai();
         return;
@@ -240,7 +240,7 @@ export function ManChonThemDot({
       setHoi(false);
       onDaChot(json?.data?.soDot ?? soDot);
     } catch {
-      setLoi("Không kết nối được, ba mẹ thử lại giúp em nhé");
+      setLoi(vi.gallery.loiBean.khongKetNoi);
     } finally {
       setDangGui(false);
     }
@@ -452,7 +452,7 @@ export function ManChonThemDot({
                 {tieuDeHopChotDot(soDot, tenBe)}
               </h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                Studio sẽ xác nhận đợt này rồi báo lại ba mẹ.
+                {vi.gallery.loiBean.seXacNhanDot}
               </p>
 
               <div data-testid="noi-dung-xac-nhan" className="mt-5 space-y-2.5 rounded-2xl bg-surface-2 p-4 text-sm">
@@ -460,7 +460,7 @@ export function ManChonThemDot({
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Ảnh mới</span>
                     <span className="tabular-nums">
-                      <b className="font-semibold">{tom.soAnhMoi} ảnh</b> · {formatCurrencyVND(tom.tienAnh)}
+                      <b className="font-semibold">{tom.soAnhMoi} tấm</b> · {formatCurrencyVND(tom.tienAnh)}
                     </span>
                   </div>
                 )}
@@ -522,8 +522,8 @@ export function ManChonThemDot({
                 <div data-testid="nhac-in-chua-anh-dot" className="mt-4 rounded-2xl bg-[#F3E6DC] p-3.5 text-[13px] text-[#2a2420]">
                   <p className="font-medium">
                     {monChuaAnh.length === 1
-                      ? `${formatKichThuoc(theoMa.get(monChuaAnh[0]!.productId)?.name ?? "Sản phẩm")} chưa có ảnh.`
-                      : `${soMonChuaAnh} sản phẩm chưa có ảnh.`}
+                      ? vi.gallery.loiBean.nhacChuaCoAnh.replace("{ten}", formatKichThuoc(theoMa.get(monChuaAnh[0]!.productId)?.name ?? "Sản phẩm"))
+                      : vi.gallery.loiBean.spInChuaCoAnh.replace("{n}", String(soMonChuaAnh))}
                   </p>
                   <label className="mt-2.5 flex items-start gap-2.5 leading-relaxed">
                     <Checkbox

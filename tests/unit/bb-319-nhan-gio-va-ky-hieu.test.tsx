@@ -91,7 +91,8 @@ describe("K-N1: một ký hiệu kích thước ×", () => {
       },
     });
     expect(g.contract!.items[0]!.name).toBe("Album (Ultra HD) 15×21");
-    expect(g.contract!.items[0]!.components[0]!.name).toBe("tờ 15×21");
+    // BB-361 — tên hiển thị cho khách viết hoa chữ đầu ("tờ" → "Tờ"); dữ liệu gốc không đổi.
+    expect(g.contract!.items[0]!.components[0]!.name).toBe("Tờ 15×21");
     expect(g.albumBia![0]!.name).toBe("Album (Ultra HD) 15×21");
     expect(g.addons!.items[0]!.name).toBe("UV 10×15");
     expect(g.addons!.catalogue![0]!.name).toBe("UV 10×15");

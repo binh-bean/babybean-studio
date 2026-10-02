@@ -27,7 +27,7 @@
  *    có (chất liệu, kích thước) trong `bang-gia-01-10.ts` (`sanPhamBanChoKhach`).
  *
  * Nên dữ liệu thử KHÔNG còn vớ đại một dòng của bảng `products` thật: bộ test
- * tự dựng sản phẩm "Fixture BB-346 …" (chất liệu + kích thước lấy từ bảng giá,
+ * tự dựng sản phẩm "Mẫu kiểm thử BB-346 …" (chất liệu + kích thước lấy từ bảng giá,
  * có giá, độ tin cậy để trống như hàng chưa bán lần nào) rồi xoá theo id.
  */
 
@@ -163,12 +163,14 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
         size: string | null;
         gia: number | null;
         active?: boolean;
+        /** Tên đầy đủ, ghi đè tên "Mẫu kiểm thử BB-346 …" (chỉ ca hàng thử dùng). */
+        tenDayDu?: string;
       },
     ) => {
       const { rows } = await client.query(
         `insert into products (name, kind, material, size, list_price, price_confidence, price_samples, is_active)
          values ($1,$2,$3,$4,$5,null,0,$6) returning id`,
-        [`Fixture BB-346 ${ten}`, o.kind ?? "print", o.material, o.size, o.gia, o.active ?? true],
+        [o.tenDayDu ?? `Mẫu kiểm thử BB-346 ${ten}`, o.kind ?? "print", o.material, o.size, o.gia, o.active ?? true],
       );
       spFixtureIds.push(rows[0].id);
       return rows[0].id as string;
@@ -184,6 +186,14 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
     spTuChoi.ngoaiBangKichThuoc = await taoSp("Gỗ 12x34 có giá", { material: "Gỗ", size: "12x34", gia: 150000 });
     spTuChoi.khongKichThuoc = await taoSp("Gỗ không ghi kích thước", { material: "Gỗ", size: null, gia: 150000 });
     spTuChoi.khongChatLieu = await taoSp("Không chất liệu 40x60", { material: null, size: "40x60", gia: 150000 });
+    // BB-352 (CV-01): đủ giá, đúng chất liệu + cỡ trong bảng giá, đang kinh doanh —
+    // chỉ vì tên "Fixture …" mà KHÔNG được bán qua đường ghi (addons).
+    spTuChoi.hangThu = await taoSp("Gỗ 40x60 hàng thử", {
+      material: "Gỗ",
+      size: "40x60",
+      gia: giaNiemYet,
+      tenDayDu: "Fixture BB-352 Gỗ 40x60 hàng thử",
+    });
     spTuChoi.ngungBan = await taoSp("Gỗ 40x60 ngừng kinh doanh", {
       material: "Gỗ",
       size: "40x60",
@@ -249,6 +259,8 @@ describe("BB-105: mua thêm sản phẩm ngoài gói", () => {
       ["khongKichThuoc", 404],
       ["khongChatLieu", 404],
       ["ngungBan", 404],
+      // BB-352: hàng thử (tên Fixture …) chặn ngay ở đường ghi, không chỉ ở danh mục hiển thị.
+      ["hangThu", 404],
     ];
     for (const [khoa, ma] of muonTuChoi) {
       const res = await goi(spTuChoi[khoa]!, 1, anhDaChon);

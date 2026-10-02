@@ -242,7 +242,7 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     // hơn, GIỮ NGUYÊN quy tắc (bìa album vẫn bắt buộc). Chữ này lặp lại ở cả
     // khối nhắc lẫn dòng lý do khoá nút (cố ý) — `.first()` tránh strict mode.
     // BB-317 K-e — dòng yêu cầu gọi đúng tên sản phẩm (một dòng, không lặp dưới nút).
-    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText(/^Chọn ảnh bìa cho .+ để chốt\.$/);
+    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText(/^Ba mẹ chọn ảnh bìa cho .+ để chốt ạ\.$/);
     // Nút Xác nhận phải bị khoá lại — không cho chốt khi còn thiếu bìa — và
     // lý do khoá phải hiện ngay dưới nút (BB-295 mục #6).
     await expect(page.getByRole("button", { name: "Xác nhận" })).toBeDisabled();

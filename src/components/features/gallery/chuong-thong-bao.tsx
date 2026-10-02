@@ -1,4 +1,5 @@
 "use client";
+import { vi } from "@/i18n";
 import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 /**
@@ -274,7 +275,7 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
 
             {goiIosThemManHinh && (
               <p className="mb-3 rounded-lg bg-[var(--bb-surface-2)] p-2 text-xs text-muted-foreground">
-                Lưu app ra màn hình chính để nhận tin mới ngay.
+                {vi.gallery.loiBean.luuAppNhanTinMoi}
               </p>
             )}
 
@@ -298,7 +299,7 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
                   cảm; đổi thành câu nói rõ ba mẹ sẽ được báo việc gì, ở đâu.
                 */}
                 <p className="mt-2 text-center text-sm text-muted-foreground">
-                  {dangTai ? "Đang tải…" : "Studio sẽ báo ở đây khi ảnh chỉnh xong"}
+                  {dangTai ? "Đang tải…" : vi.gallery.loiBean.chuongTrong}
                 </p>
               </div>
             ) : (

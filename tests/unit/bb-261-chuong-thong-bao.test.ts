@@ -331,7 +331,7 @@ describe("BB-261: nhacThongBaoChuaDoc", () => {
     const [, payloadThoi] = webpushGia.sendNotification.mock.calls[0] as [unknown, string];
     const payload = JSON.parse(payloadThoi) as Record<string, unknown>;
     expect(payload.tieuDe).toBe("Ảnh của bé đã chỉnh xong");
-    expect(payload.noiDung).toBe("Mời ba mẹ xem và duyệt bộ ảnh. (nhắc lại)");
+    expect(payload.noiDung).toBe("Mời ba mẹ xem và duyệt bộ ảnh. (Bean nhắc lại ạ)");
     expect(payload.thongBaoId).toBe("tb-1");
 
     expect(capNhat).toEqual([{ id: "tb-1", patch: expect.objectContaining({ so_lan_nhac: 1 }) }]);

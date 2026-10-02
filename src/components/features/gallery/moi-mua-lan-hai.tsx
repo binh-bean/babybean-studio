@@ -68,6 +68,7 @@
  *   - `anhThich`: những tấm người xem đã thả tim trên lưới — hiện trước.
  */
 
+import { vi } from "@/i18n";
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
@@ -110,6 +111,8 @@ export function MoiMuaLanHai({
   tieuDe,
   moTa,
   anhThich,
+  moNgoai,
+  onDoiMo,
 }: {
   status: string;
   /** `review.rounds.length` — khác 0 thì KHÔNG mời mua lần hai (bỏ qua khi có `moGate`). */
@@ -124,8 +127,19 @@ export function MoiMuaLanHai({
   moTa?: string;
   /** BB-338 — id các tấm người xem đã thả tim trên lưới (hiện trước trong tấm chọn). */
   anhThich?: string[];
+  /**
+   * BB-355 — bản vẽ "Màn khách v8" (c): người được mời mở màn mua từ nút túi ở
+   * thanh đáy, KHÔNG còn thẻ mời mua chen giữa chip và lưới. Có `moNgoai` thì
+   * component không vẽ thẻ mời (chỉ còn màn mua, và thẻ "đã gửi" nếu có), việc
+   * mở/đóng do nơi gọi giữ.
+   */
+  moNgoai?: boolean;
+  onDoiMo?: (mo: boolean) => void;
 }) {
-  const [mo, setMo] = React.useState(false);
+  const [moNoi, setMoNoi] = React.useState(false);
+  const chiMan = moNgoai !== undefined;
+  const mo = chiMan ? moNgoai : moNoi;
+  const setMo = (v: boolean) => (chiMan ? onDoiMo?.(v) : setMoNoi(v));
   const [gio, setGio] = React.useState<DongGioHang[]>([]);
   const [nhomDangXem, setNhomDangXem] = React.useState<NhomSanPham>("anh_in");
   const [monDangChon, setMonDangChon] = React.useState<MonTrongDanhMuc | null>(null);
@@ -204,7 +218,7 @@ export function MoiMuaLanHai({
   async function guiYeuCau() {
     if (gio.length === 0) return;
     if (thieuThongTinNguoiMua) {
-      setLoi("Cho em xin tên và số điện thoại (10 số) nhé.");
+      setLoi(vi.gallery.loiBean.xinTenSdt);
       return;
     }
     setDangGui(true);
@@ -225,7 +239,7 @@ export function MoiMuaLanHai({
         data?: { items?: { id: string; trangThai: string }[] };
       } | null;
       if (!res.ok) {
-        setLoi(json?.error?.message ?? "Gửi không thành công, ba mẹ thử lại giúp em nhé");
+        setLoi(json?.error?.message ?? vi.gallery.loiBean.guiChuaDuoc);
         return;
       }
       const moi = json?.data?.items ?? [];
@@ -233,7 +247,7 @@ export function MoiMuaLanHai({
       dongMuaThem();
       setGio([]);
     } catch {
-      setLoi("Không kết nối được, ba mẹ thử lại giúp em nhé");
+      setLoi(vi.gallery.loiBean.khongKetNoi);
     } finally {
       setDangGui(false);
     }
@@ -243,34 +257,35 @@ export function MoiMuaLanHai({
   // nào đọc ghi chú CSKH (metadata nhật ký nội bộ) — route /api/g/mua-them
   // không trả trường đó nên không có gì để lộ ra đây.
   const NHAN_THAN_THIEN: Record<string, string> = {
-    moi: "Đã gửi, studio sẽ gọi sớm",
-    da_lien_he: "Studio đã liên hệ",
+    moi: vi.gallery.loiBean.daGuiSeGoi,
+    da_lien_he: vi.gallery.loiBean.daLienHe,
     da_chot: "Đã chốt đơn",
     huy: "Đã huỷ",
   };
 
-  if (daGui) {
-    return (
-      <div className="space-y-2 rounded-2xl border border-border bg-surface p-5">
+  const theDaGui = daGui ? (
+      <div data-testid="the-yeu-cau-mua-them" className="space-y-2 rounded-2xl border border-border bg-surface p-5">
         <p className="kh-h3">Yêu cầu mua thêm</p>
         <ul className="space-y-1.5">
           {dsDaGui.map((d) => (
             <li key={d.id} className="flex items-center justify-between gap-3 text-xs">
               <span className="text-muted-foreground">
-                {NHAN_THAN_THIEN[d.trangThai] ?? "Đã gửi, studio sẽ gọi sớm"}
+                {NHAN_THAN_THIEN[d.trangThai] ?? vi.gallery.loiBean.daGuiSeGoi}
               </span>
             </li>
           ))}
         </ul>
         <p className="text-xs text-muted-foreground">
-          Studio sẽ gọi báo giá. Ba mẹ chưa cần làm gì thêm ạ.
+          {vi.gallery.loiBean.seGoiBaoGia}
         </p>
       </div>
-    );
-  }
+  ) : null;
+  if (daGui && !chiMan) return theDaGui;
 
   return (
     <>
+      {chiMan ? theDaGui : (
+      <>
       {/*
         BB-295 mục cũ #27 — báo cáo chấm độc lập: hàng ngang cố định
         (`flex-row`) ép cột chữ xuống còn ~220px trên điện thoại 390px — tiêu
@@ -294,10 +309,10 @@ export function MoiMuaLanHai({
         </div>
         <div className="flex min-w-0 flex-1 flex-col items-start justify-center text-left">
           <p className="kh-h3 text-[#2E2A27]">
-            {tieuDe ?? "Ba mẹ ưng bộ ảnh? In tấm yêu thích lên khung nhé."}
+            {tieuDe ?? vi.gallery.loiBean.moiMuaTieuDe}
           </p>
           <p className="mt-1.5 text-[13px] text-[#2E2A27]/60">
-            {moTa ?? "Khung, ảnh in, album — studio gọi lại báo giá, chưa tính tiền."}
+            {moTa ?? vi.gallery.loiBean.muaHoMoTa}
           </p>
           {anhCoTim.length > 0 && (
             <p data-testid="so-anh-tha-tim" className="mt-1 text-[13px] font-medium text-heart">
@@ -313,6 +328,8 @@ export function MoiMuaLanHai({
           </button>
         </div>
       </div>
+      </>
+      )}
 
       {mo && (
         <div data-testid="man-mua-them-sau-duyet" className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -321,7 +338,7 @@ export function MoiMuaLanHai({
               <div className="min-w-0">
                 <h2 className="kh-h2">{tieuDe ?? "Mua thêm sau khi duyệt"}</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {moTa ?? "Chọn sản phẩm, studio sẽ gọi xác nhận. Chưa tính tiền lúc này."}
+                  {moTa ?? vi.gallery.loiBean.muaThemMoTa}
                 </p>
               </div>
               <button
@@ -491,7 +508,7 @@ export function MoiMuaLanHai({
                   onClick={() => void guiYeuCau()}
                   className="h-11 shrink-0 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
                 >
-                  {dangGui ? "Đang gửi…" : "Gửi yêu cầu cho studio"}
+                  {dangGui ? "Đang gửi…" : vi.gallery.loiBean.guiYeuCau}
                 </button>
               </div>
             </div>

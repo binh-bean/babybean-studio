@@ -19,6 +19,7 @@ import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { SettingsManager } from "@/components/features/admin/settings-manager";
 import { DanhMucKichThuoc } from "@/components/features/admin/danh-muc-kich-thuoc";
 import { DongBoGiaSanPham } from "@/components/features/admin/dong-bo-gia-san-pham";
+import { DonDuLieuVanHanh } from "@/components/features/admin/don-du-lieu-van-hanh";
 import { PageHeader, KhongCoQuyen } from "@/components/features/admin/page-header";
 import { vi } from "@/i18n/vi";
 
@@ -49,6 +50,8 @@ export default async function AdminSettingsPage() {
       <DongBoGiaSanPham />
       {/* BB-331: đủ mọi kích thước đang bán (chỉ đọc) + lý do khách chưa thấy. */}
       <DanhMucKichThuoc />
+      {/* BB-356: dung lượng so với gói Free + dọn dữ liệu vận hành — chỉ Admin. */}
+      {permissions.includes("system:superuser") && <DonDuLieuVanHanh />}
     </main>
   );
 }

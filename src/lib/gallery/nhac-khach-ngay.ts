@@ -1,3 +1,5 @@
+import { vi } from "@/i18n";
+
 /**
  * Nút "Nhắc khách" gửi THẬT tới khách — BB-327.
  *
@@ -28,7 +30,7 @@ export const GIAN_CACH_NHAC_GIAY = 60;
 export function noiDungNhacKhach(): { tieuDe: string; noiDung: string; loai: string } {
   return {
     tieuDe: "Ảnh đang chờ ba mẹ chọn",
-    noiDung: "Studio nhắc nhẹ: ba mẹ mở bộ ảnh và chọn giúp em những tấm ưng ý nhé.",
+    noiDung: vi.gallery.loiBean.nhacChonAnh,
     loai: "nhac_chon_anh",
   };
 }
@@ -44,7 +46,7 @@ export type LoaiNhacKhach = "chon_anh" | "thanh_toan";
 export function noiDungNhacThanhToan(): { tieuDe: string; noiDung: string; loai: string } {
   return {
     tieuDe: "Ảnh chọn thêm của bé",
-    noiDung: "Ba mẹ đã chọn thêm ảnh ngoài gói. Studio nhờ ba mẹ mở bộ ảnh xem phần chọn thêm và thanh toán giúp em nhé.",
+    noiDung: vi.gallery.loiBean.nhacThanhToan,
     loai: "nhac_thanh_toan",
   };
 }

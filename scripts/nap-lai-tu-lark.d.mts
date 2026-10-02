@@ -8,14 +8,36 @@ export interface DbGia {
 
 export const GOC_REPO: string;
 export const MA_BB_DEV: string;
+export const NHOM_GIU: "giu";
+export const NHOM_NAP_LAI_TU_LARK: "nap-lai-tu-lark";
+export const NHOM_XOA_DU_LIEU_THU: "xoa-du-lieu-thu";
+export interface PhanLoaiMotBang {
+  nhom: "giu" | "nap-lai-tu-lark" | "xoa-du-lieu-thu";
+  lyDo: string;
+}
+export const PHAN_LOAI_BANG: Record<string, PhanLoaiMotBang>;
 export const BANG_GIU_NGUYEN: string[];
 export const THU_TU_XOA: string[];
 
+export interface KetQuaPhanLoai {
+  giu: string[];
+  xoa: string[];
+  napLaiTuLark: string[];
+  xoaDuLieuThu: string[];
+  chuaPhanLoai: string[];
+  thieuThuTu: string[];
+}
 export function phanLoaiBang(
   danhSachBangThat: string[],
-  bangGiu?: string[],
-  thuTuXoaDaBiet?: string[],
-): { giu: string[]; xoa: string[]; moi: string[] };
+  phanLoai?: Record<string, PhanLoaiMotBang>,
+  thuTuXoa?: string[],
+): KetQuaPhanLoai;
+export function lyDoDungVoiBangLa(kq: { chuaPhanLoai?: string[]; thieuThuTu?: string[] }): string[];
+export function kiemTraPhanLoaiNhatQuan(
+  phanLoai?: Record<string, PhanLoaiMotBang>,
+  thuTuXoa?: string[],
+): { nhatQuan: boolean; loi: string[] };
+export function bangCamXoa(thuTuXoa: string[], phanLoai?: Record<string, PhanLoaiMotBang>): string[];
 
 export interface CanhFk {
   tu: string;

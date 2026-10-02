@@ -25,7 +25,8 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { NutXuLyDot, dongTomTatDot } from "./dot-chon-admin";
-import { PaymentForm, ghiThanhToan } from "./form-thanh-toan";
+import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./form-thanh-toan";
+import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { NutXuLyDatChinhSua } from "./tim-gia-dinh-admin";
 
@@ -71,6 +72,10 @@ interface ChiTietBo {
   outstanding: number;
   /** BB-344 — số còn phải thu; 0 = chưa phát sinh, form thanh toán bị khoá. */
   amountToCollect: number;
+  /** BB-360 — sản phẩm mua thêm thu qua Lark (không nằm trong `amountToCollect`). */
+  sanPhamQuaLark?: number;
+  /** BB-351 — cùng form BB-349: ô "khoá kèm thu" + "chắc chắn". */
+  khoaKhiThu?: KhoaKhiThu;
   customerChatUrl?: string | null;
 }
 
@@ -276,19 +281,16 @@ function NganXuLy({
     }
   }
 
-  async function thanhToan(amount: number, method: string, note: string, pt: number | null) {
+  async function thanhToan(amount: number, method: string, note: string, pt: number | null, xn: TuyChonXacNhan) {
     setBusy(true);
     setThongBao(null);
     try {
-      const kq = await ghiThanhToan(gid, amount, method, note, pt);
+      const kq = await ghiThanhToan(gid, amount, method, note, pt, xn);
       if (!kq.ok) {
         setThongBao({ ok: false, cau: kq.message });
         return;
       }
-      setThongBao({
-        ok: true,
-        cau: kq.outstanding > 0 ? `Đã ghi. Còn thiếu ${formatCurrencyVND(kq.outstanding)}.` : "Đã ghi. Khách đã trả đủ.",
-      });
+      setThongBao({ ok: true, cau: cauSauKhiThu(kq) });
       await taiChiTiet();
       await onDone();
     } catch {
@@ -456,6 +458,8 @@ function NganXuLy({
             {(ct.discountAmount ?? 0) > 0 && ` · giảm giá ${formatCurrencyVND(ct.discountAmount ?? 0)}`} ·{" "}
             {ct.outstanding > 0 ? (
               <span className="text-[var(--bb-danger)]">còn thiếu {formatCurrencyVND(ct.outstanding)}</span>
+            ) : ct.outstanding < 0 ? (
+              <span className="text-[var(--bb-danger)]">khách trả DƯ {formatCurrencyVND(-ct.outstanding)}</span>
             ) : (
               "không còn thiếu"
             )}
@@ -465,7 +469,9 @@ function NganXuLy({
               disabled={busy}
               conThieu={ct.amountToCollect}
               chuaPhatSinh={ct.amountToCollect <= 0}
-              onSubmit={(a, m, n, pt) => void thanhToan(a, m, n, pt)}
+              khoa={ct.khoaKhiThu}
+              sanPhamQuaLark={ct.sanPhamQuaLark ?? 0}
+              onSubmit={(a, m, n, pt, xn) => thanhToan(a, m, n, pt, xn)}
             />
           )}
         </section>

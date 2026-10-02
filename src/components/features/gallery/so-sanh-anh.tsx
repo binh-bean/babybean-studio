@@ -31,6 +31,7 @@ import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { X, Heart, Pin, PinOff, ChevronLeft, ChevronRight, LayoutGrid } from "lucide-react";
 import { cn } from "@/components/ui/utils";
+import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { vi } from "@/i18n";
 import type { PhotoPublic } from "@/types/domain";
 import { buildLightboxImageUrl, calculateSwipeAction } from "@/lib/utils/lightbox";
@@ -282,11 +283,11 @@ export function SoSanhAnh({
                 onGhim={() => troGhim(vuotPhoto.id)}
               />
             ) : (
-              <p className="px-6 text-center text-sm text-[#6b6057]">Chưa có tấm nào để vuốt sang.</p>
+              <p className="px-6 text-center text-sm text-[#6b6057]">{vi.gallery.loiBean.chuaCoTamDeVuot}</p>
             )}
 
             {dsVuot.length > 0 && (
-              <span className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-md">
+              <span className={cn(CHIP_NGUYEN_KHOI, "pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[12px] font-medium text-white/90 backdrop-blur-md")}>
                 {chiSoVuot + 1} / {dsVuot.length}
               </span>
             )}
@@ -509,7 +510,7 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
               <>
                 {/* BB-310 mục 5 — sage nhạt trên nền kem, cùng công thức với
                     banner "Đã thêm vào giỏ" (cua-hang.tsx) — đã kiểm ở đó. */}
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[#e3eee9] px-2.5 py-1 text-[12px] font-medium text-[#2f4a40]">
+                <span className={cn(CHIP_NGUYEN_KHOI, "inline-flex shrink-0 items-center gap-1 rounded-full bg-[#e3eee9] px-2.5 py-1 text-[12px] font-medium text-[#2f4a40]")}>
                   <span aria-hidden="true">✓</span>
                   Đã chọn
                 </span>

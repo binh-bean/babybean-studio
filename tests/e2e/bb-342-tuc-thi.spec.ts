@@ -202,7 +202,7 @@ test.describe.serial("BB-342: cập nhật tức thì khách ↔ nhân viên", (
       await expect(dong).toBeVisible({ timeout: TOI_DA_MS });
       const msNhanVienThay = Date.now() - lucChot;
       const dot2 = khach.getByTestId("trang-thai-dot-2");
-      await expect(dot2).toContainText("Đang chờ studio xác nhận", { timeout: 30_000 });
+      await expect(dot2).toContainText("Bean đang xác nhận đợt này ạ", { timeout: 30_000 });
       await expect.poll(() => soTrenHuyHieu(page), { timeout: TOI_DA_MS }).toBeGreaterThan(huyHieuTruoc);
       expect(await page.evaluate(() => (window as unknown as { __bb342?: string }).__bb342)).toBe("chua-tai-lai");
 
@@ -215,7 +215,7 @@ test.describe.serial("BB-342: cập nhật tức thì khách ↔ nhân viên", (
       await dong.getByTestId("khoi-dot-2").getByRole("button", { name: "Xác nhận", exact: true }).click();
       expect((await choXacNhan).status()).toBe(200);
       const lucXacNhan = Date.now();
-      await expect(dot2).toContainText("Studio đã xác nhận", { timeout: TOI_DA_MS });
+      await expect(dot2).toContainText("Bean đã xác nhận đợt này ạ", { timeout: TOI_DA_MS });
       const msKhachThay = Date.now() - lucXacNhan;
       console.info(`[BB-342 đo] nhân viên thấy sau ${msNhanVienThay} ms · khách thấy sau ${msKhachThay} ms`);
       expect(await khach.evaluate(() => (window as unknown as { __bb342?: string }).__bb342)).toBe("chua-tai-lai");

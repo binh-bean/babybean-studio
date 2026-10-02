@@ -52,6 +52,8 @@ import { DriveAccessDeniedError, DriveUnavailableError } from "./client";
 const GIAI_DOAN_DAU = ["draft", "syncing", "sync_error"];
 
 const CHUNK = 500;
+/** Trang đọc ảnh đang có — dưới trần 1.000 dòng của PostgREST. */
+const TRANG_DOC = 1000;
 
 export interface SyncResult {
   galleryId: string;
@@ -149,12 +151,25 @@ export async function dongBoBoAnh(
     throw new EmptyFolderError();
   }
 
-  const { data: existing } = await db
-    .from("photos")
-    .select("id, drive_file_id, status")
-    .eq("gallery_id", galleryId);
+  // BB-359 (2c): đọc ảnh đang có THEO TRANG. PostgREST trả tối đa 1.000 dòng một
+  // lượt (max-rows của Supabase) mà không báo lỗi — bộ 1.235 ảnh trước đây chỉ thấy
+  // 1.000 tấm, 235 tấm còn lại bị coi là "mới" và chèn lại (đụng khoá trùng
+  // uq_photos_gallery_drive, cả lượt đồng bộ hỏng). Lỗi đọc thì NÉM — đọc hỏng mà coi
+  // như "chưa có ảnh nào" là chèn trùng cả bộ.
+  const existing: { id: string; drive_file_id: string; status: string }[] = [];
+  for (let tu = 0; ; tu += TRANG_DOC) {
+    const { data: trang, error: loiDoc } = await db
+      .from("photos")
+      .select("id, drive_file_id, status")
+      .eq("gallery_id", galleryId)
+      .order("id", { ascending: true })
+      .range(tu, tu + TRANG_DOC - 1);
+    if (loiDoc) throw loiDoc;
+    existing.push(...((trang ?? []) as typeof existing));
+    if (!trang || trang.length < TRANG_DOC) break;
+  }
 
-  const dangCo = new Map((existing ?? []).map((p) => [p.drive_file_id, p]));
+  const dangCo = new Map(existing.map((p) => [p.drive_file_id, p]));
 
   const them: Record<string, unknown>[] = [];
   const capNhat: Record<string, unknown>[] = [];
@@ -208,8 +223,15 @@ export async function dongBoBoAnh(
     if (error) throw error;
   }
 
+  // BB-359 (2d): photo_count = số ảnh KHÁCH NHÌN THẤY (status 'active'): không tính ảnh
+  // CSKH đã ẩn (luật 1) và ảnh đã mất khỏi Drive (luật 2). Cùng định nghĩa với
+  // `verify:db` ("photo_count khớp số ảnh thật"), với bước thu gọn BB-357, và với số
+  // màn khách dùng để biết còn trang ảnh phía sau (`get_gallery_photos` chỉ trả ảnh
+  // active). Trước đây ghi `conTrenDrive.size` (gồm cả ảnh ẩn) nên bộ có ảnh ẩn
+  // làm verify:db đỏ sau mỗi lần Đồng bộ lại.
+  const soAnhKhachThay = [...them, ...capNhat].filter((d) => d.status === "active").length;
   const ketThuc: Record<string, unknown> = {
-    photo_count: conTrenDrive.size,
+    photo_count: soAnhKhachThay,
     last_synced_at: new Date().toISOString(),
   };
   // Luật 3: chỉ đổi trạng thái khi còn ở giai đoạn đầu.
@@ -234,7 +256,7 @@ export async function dongBoBoAnh(
 
   return {
     galleryId,
-    photoCount: conTrenDrive.size,
+    photoCount: soAnhKhachThay,
     them: them.length,
     capNhat: capNhat.length,
     mat: mat.length,

@@ -28,6 +28,8 @@ export function useNutBackDong(mo: boolean, onDong: () => void): () => void {
   const onDongRef = useRef(onDong);
   onDongRef.current = onDong;
   const lopRef = useRef(0);
+  /** Nút Đóng đã tự gọi `history.back()` — cleanup không đụng lịch sử nữa. */
+  const daBackRef = useRef(false);
 
   useEffect(() => {
     if (!mo || typeof window === "undefined") return;
@@ -46,6 +48,21 @@ export function useNutBackDong(mo: boolean, onDong: () => void): () => void {
     return () => {
       window.removeEventListener("popstate", khiBack);
       soLopDangMo = Math.max(0, lop - 1);
+      // BB-353 — lớp đóng bằng MÃ (chốt xong, "Đặt in tấm này" đóng xem lớn
+      // rồi mở cửa hàng, StrictMode gắn-gỡ-gắn lại…) chứ không bằng Back, mà
+      // mục lịch sử của nó còn nằm trên cùng: hạ số lớp của mục đó về lớp cha.
+      // Không thì lớp mở kế tiếp đẩy một mục CÙNG số lớp, Back bật về mục cũ
+      // này, `lopCua < lop` sai → lớp mới không đóng (Back "chết" một lần).
+      // Không gọi `history.back()` ở đây: lệnh đó chạy trễ, đè lên mục lớp kế
+      // tiếp vừa đẩy.
+      if (!daBackRef.current && lopCua(window.history.state) === lop) {
+        try {
+          window.history.replaceState({ ...(window.history.state ?? {}), bbLop: lop - 1 }, "");
+        } catch {
+          // bỏ qua — chỉ tốn thêm một lần Back không đổi gì.
+        }
+      }
+      daBackRef.current = false;
       lopRef.current = 0;
     };
   }, [mo]);
@@ -54,6 +71,7 @@ export function useNutBackDong(mo: boolean, onDong: () => void): () => void {
     const lop = lopRef.current;
     onDongRef.current();
     if (lop > 0 && typeof window !== "undefined" && lopCua(window.history.state) === lop) {
+      daBackRef.current = true;
       window.history.back();
     }
   }, []);

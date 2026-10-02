@@ -191,7 +191,7 @@ test.describe("BB-246: nút Bật thông báo", () => {
     await expect(chuong).toBeVisible();
     await chuong.click();
     await expect(page.getByText("Thông báo", { exact: true })).toBeVisible();
-    await expect(page.getByText("Studio sẽ báo ở đây khi ảnh chỉnh xong")).toBeVisible();
+    await expect(page.getByText("Bean sẽ báo ba mẹ ở đây khi ảnh chỉnh xong ạ.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Đóng" })).toBeVisible();
   });
 });

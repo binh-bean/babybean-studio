@@ -24,7 +24,8 @@
  * truy vấn nặng thêm) một lần khi trang mở, chỉ lấy độ dài mảng.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useDemViecCanXuLy } from "./dem-viec-context";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { LarkDaXoaReport } from "./lark-da-xoa-report";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -37,7 +38,7 @@ import { YeuCauMoLaiReport } from "./yeu-cau-mo-lai-report";
 import { KhachGuiAnhChonReport } from "./khach-gui-anh-chon-report";
 import { QuenMatKhauReport } from "./quen-mat-khau-report";
 import { formatSo } from "@/lib/utils/dinh-dang";
-import { SU_KIEN_VIEC_DOI, TABS_VIEC_CAN_XU_LY, tabsChoVai as locTabTheoVai, type TabViecCanXuLy } from "@/lib/utils/viec-can-xu-ly-tabs";
+import { TABS_VIEC_CAN_XU_LY, tabsChoVai as locTabTheoVai, type TabViecCanXuLy } from "@/lib/utils/viec-can-xu-ly-tabs";
 
 type TabValue = TabViecCanXuLy;
 
@@ -50,41 +51,19 @@ export function ViecCanXuLy({ role }: { role?: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // BB-327: định nghĩa tab + cách đếm dùng CHUNG với huy hiệu menu
-  // (admin-layout-shell.tsx) — số trên menu luôn bằng tổng số trên các tab.
-  const [khongCoQuyenQuenMk, setKhongCoQuyenQuenMk] = useState(false);
+  // BB-327: định nghĩa tab + cách đếm dùng CHUNG với huy hiệu menu.
+  // BB-359: số trên tab đọc ĐÚNG kết quả đếm của huy hiệu (context do
+  // AdminLayoutShell đặt) — không tự gọi lại các route để đếm riêng; xử lý xong một
+  // việc thì SU_KIEN_VIEC_DOI làm shell đếm lại, tab đổi số theo cùng lúc với huy hiệu.
+  const demViec = useDemViecCanXuLy();
+  const khongCoQuyenQuenMk = demViec?.khongCoQuyenQuenMk ?? false;
   const tabsChoVai = locTabTheoVai(role).filter((t) => !(t.value === "quen-mat-khau" && khongCoQuyenQuenMk));
   const tabParam = searchParams.get("tab");
   const macDinh = tabsChoVai[0]?.value ?? "over-quota";
   const active: TabValue =
     laTabHopLe(tabParam) && tabsChoVai.some((t) => t.value === tabParam) ? tabParam : macDinh;
 
-  const [demSo, setDemSo] = useState<Partial<Record<TabValue, number>>>({});
-
-  useEffect(() => {
-    let alive = true;
-    function demLai() {
-      for (const tab of locTabTheoVai(role)) {
-        fetch(tab.api, { cache: "no-store" })
-          .then((res) => res.json().catch(() => null).then((json) => ({ ok: res.ok, json })))
-          .then(({ ok, json }) => {
-            if (!alive || !ok || !json?.data) return;
-            if (tab.value === "quen-mat-khau" && json.data.coQuyen === false) setKhongCoQuyenQuenMk(true);
-            setDemSo((truoc) => ({ ...truoc, [tab.value]: tab.demSo(json.data) }));
-          })
-          .catch(() => {
-            // Đếm là phụ — hỏng thì thôi, không chặn tab chạy.
-          });
-      }
-    }
-    demLai();
-    // BB-327: xử lý xong một việc (mở lại, từ chối…) thì đếm lại ngay.
-    window.addEventListener(SU_KIEN_VIEC_DOI, demLai);
-    return () => {
-      alive = false;
-      window.removeEventListener(SU_KIEN_VIEC_DOI, demLai);
-    };
-  }, [role]);
+  const demSo: Partial<Record<TabValue, number>> = demViec?.theoTab ?? {};
 
   const onChange = useCallback(
     (value: string) => {
@@ -111,6 +90,7 @@ export function ViecCanXuLy({ role }: { role?: string }) {
               key={tab.value}
               value={tab.value}
               data-testid={`tab-${tab.value}`}
+              data-so-viec={demSo[tab.value] ?? 0}
               className="justify-start whitespace-normal text-left sm:justify-center sm:whitespace-nowrap"
             >
               <span className="flex w-full items-center justify-between gap-1.5 sm:w-auto sm:justify-start">

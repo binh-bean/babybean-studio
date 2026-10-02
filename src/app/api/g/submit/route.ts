@@ -13,6 +13,7 @@
  *    vì ba mẹ bỏ tim tấm đang làm bìa) thì KHÔNG cho chốt.
  */
 
+import { vi } from "@/i18n";
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
@@ -152,7 +153,7 @@ export async function POST(request: Request): Promise<Response> {
     if (quotaVal === null || quotaVal === undefined) {
       return fail(
         "QUOTA_UNKNOWN",
-        "Studio chưa xác định số ảnh trong gói cho bộ ảnh này, vui lòng liên hệ CSKH"
+        vi.gallery.loiBean.chuaCoHanMucGoi
       );
     }
 

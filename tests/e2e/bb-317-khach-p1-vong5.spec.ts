@@ -12,7 +12,7 @@ import { chanLh3TrenTrinhDuyet } from "./helpers/mock-lh3-trinh-duyet";
 const DT = { width: 390, height: 844 };
 const MT = { width: 1440, height: 900 };
 // BB-319 K-D2 đổi lời: "gói của ba mẹ" (lời khách), thả tim thì thêm câu nói rõ tim chưa lưu.
-const CAU_HAN_MUC = "Studio đang cập nhật gói của ba mẹ.";
+const CAU_HAN_MUC = "Bean đang cập nhật gói của ba mẹ ạ.";
 const CAU_HAN_MUC_TIM = `${CAU_HAN_MUC} Tim này chưa được lưu.`;
 
 let d: DuLieuDanhGia5;
@@ -47,7 +47,7 @@ test("K-a: thanh chốt nổi máy tính rộng theo nội dung, số đếm kh�
   expect(dem.chu.replace(/\s+/g, " ").trim()).toBe("17 / 15 tấm");
   const chu = (await thanh.innerText()).replace(/\s+/g, " ");
   expect(chu).not.toContain("…");
-  expect(chu).toContain("Thêm 100.000");
+  expect(chu).toContain("Chọn thêm 2 · 100.000"); // BB-355: chữ bản vẽ v8
   const hop = await thanh.locator("> div").first().boundingBox();
   expect(hop!.width).toBeGreaterThan(425); // vượt trần 420px cũ: rộng theo nội dung
 });
@@ -98,7 +98,7 @@ test("K-f: đang chỉnh (điện thoại) có dòng Studio đang chỉnh ảnh 
   await vao(page, DT, d.dangChinh.token);
   const dong = page.getByTestId("bia-loi-chao");
   await expect(dong).toBeVisible();
-  await expect(dong).toHaveText(/^Studio đang chỉnh ảnh của .+\.$/);
+  await expect(dong).toHaveText(/^Bean .+ của .+ ạ\.$/);
 });
 
 test("K-d: màn đã giao (máy tính) dùng cùng lưới bìa với K1 — ảnh ở cột PHẢI", async ({ page }) => {

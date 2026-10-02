@@ -41,7 +41,10 @@ export async function coBangTimGiaDinh(pg: Client): Promise<boolean> {
   return !!rows[0]?.t;
 }
 
-export async function taoBb345(opts: { taoNhanVien?: boolean; soAnhA?: number } = {}): Promise<DuLieuBb345> {
+export async function taoBb345(
+  opts: { taoNhanVien?: boolean; soAnhA?: number; /** BB-358 — tiền tố tên dữ liệu thử của task gọi. */ nhan?: string } = {},
+): Promise<DuLieuBb345> {
+  const NHAN = opts.nhan ?? NHAN_BB345;
   const runId = Math.random().toString(36).slice(2, 10);
   const pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
   await pg.connect();
@@ -49,20 +52,20 @@ export async function taoBb345(opts: { taoNhanVien?: boolean; soAnhA?: number } 
 
   const { rows: br } = await pg.query(`insert into branches (code, name) values ($1,$2) returning id`, [
     `FX345-${runId}`,
-    `${NHAN_BB345}-${runId} Chi nhánh`,
+    `${NHAN}-${runId} Chi nhánh`,
   ]);
   const branchId = br[0].id as string;
 
   async function dungBo(ten: string, soAnh: number): Promise<BoBb345> {
     const { rows: c } = await pg.query(
       `insert into customers (branch_id, full_name, phone) values ($1,$2,$3) returning id`,
-      [branchId, `${NHAN_BB345}-${runId} Khách ${ten}`, ten === "A" ? "0901000001" : "0901000002"],
+      [branchId, `${NHAN}-${runId} Khách ${ten}`, ten === "A" ? "0901000001" : "0901000002"],
     );
     const { rows: g } = await pg.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url,
                               photo_count, included_quota, extra_photo_price, download_enabled)
        values ($1,$2,$3,'in_review',$4,'https://example.com/bb345',$5,5,$6,false) returning id`,
-      [branchId, c[0].id, `${NHAN_BB345}-${runId} Bộ ${ten}`, `fixture-bb345-${runId}-${ten}`, soAnh, giaMoiAnh],
+      [branchId, c[0].id, `${NHAN}-${runId} Bộ ${ten}`, `fixture-bb345-${runId}-${ten}`, soAnh, giaMoiAnh],
     );
     const id = g[0].id as string;
     const anh: { id: string; fileName: string }[] = [];
@@ -85,12 +88,12 @@ export async function taoBb345(opts: { taoNhanVien?: boolean; soAnhA?: number } 
     const { rows: l2 } = await pg.query(
       `insert into share_links (gallery_id, token_hash, token_prefix, role, label, status)
        values ($1,$2,$3,'viewer',$4,'active') returning id`,
-      [id, sha256(maGiaDinh), maGiaDinh.slice(0, 6), `${NHAN_BB345} Bà nội`],
+      [id, sha256(maGiaDinh), maGiaDinh.slice(0, 6), `${NHAN} Bà nội`],
     );
     const { rows: s } = await pg.query(
       `insert into selections (gallery_id, share_link_id, display_name, is_primary)
        values ($1,$2,$3,true) returning id`,
-      [id, l1[0].id, `${NHAN_BB345}-${runId} ${ten}`],
+      [id, l1[0].id, `${NHAN}-${runId} ${ten}`],
     );
     return {
       id,
@@ -132,7 +135,7 @@ export async function taoBb345(opts: { taoNhanVien?: boolean; soAnhA?: number } 
     if (r.error || !r.data.user) throw r.error ?? new Error("không tạo được tài khoản thử");
     await pg.query(`insert into staff_profiles (id, full_name, email, role) values ($1,$2,$3,'owner')`, [
       r.data.user.id,
-      `${NHAN_BB345}-${runId} Chủ studio`,
+      `${NHAN}-${runId} Chủ studio`,
       email,
     ]);
     await pg.query(`insert into staff_branches (staff_id, branch_id, is_primary) values ($1,$2,true)`, [

@@ -1,3 +1,4 @@
+import { vi } from "@/i18n";
 import { z } from "zod";
 
 /**
@@ -18,7 +19,7 @@ const DongYeuCauSchema = z.object({
     .number({ required_error: "soLuong là bắt buộc" })
     .int("soLuong phải là số nguyên")
     .min(1, "soLuong tối thiểu 1")
-    .max(20, "soLuong tối đa 20 — nhiều hơn thì ba mẹ nhắn thẳng CSKH giúp em"),
+    .max(20, vi.gallery.loiBean.toiDa20),
   ghiChu: z.string().max(500, "Ghi chú tối đa 500 ký tự").nullish(),
 });
 

@@ -10,9 +10,10 @@ import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import type { Page, Browser, BrowserContext } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
-import { duLieuDanhGia5, donDep, type DuLieuDanhGia5 } from "../fixtures/danh-gia";
+import { duLieuDanhGia5, donDep, cheTrongDom, tenNhanVienThat, type DuLieuDanhGia5 } from "../fixtures/danh-gia";
 import { chanLh3TrenTrinhDuyet } from "./helpers/mock-lh3-trinh-duyet";
 import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
+import { tickHopChotDot1 } from "./helpers/tick-hop-chot-dot1";
 
 const DIR = process.env.DANHGIA_RA ?? "C:\\Users\\binh\\Downloads\\claude code\\babybean-assets\\DANHGIA5\\chup";
 fs.mkdirSync(DIR, { recursive: true });
@@ -174,23 +175,20 @@ async function trangQuanTri(
   return { page, ctx };
 }
 
-/** Danh sách nhân sự bb-dev chứa TÊN + EMAIL THẬT của nhân viên: thay bằng dữ liệu mẫu trước khi chụp. */
+/**
+ * Danh sách nhân sự bb-dev chứa TÊN + EMAIL THẬT: thay bằng dữ liệu mẫu trước khi chụp.
+ * BB-359: che theo DANH SÁCH tên nhân sự thật (không theo "@") — xem `cheTrongDom`.
+ */
 async function cheNhanVienThat(page: Page) {
-  await page.evaluate(() => {
-    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-    const nodes: Text[] = [];
-    while (w.nextNode()) nodes.push(w.currentNode as Text);
-    for (const n of nodes) {
-      const t = n.textContent ?? "";
-      if (t.includes("@") && !t.includes("demo.babybean.vn")) {
-        const el = n.parentElement;
-        const ten = el?.previousElementSibling;
-        if (ten) ten.textContent = "Nhân viên mẫu";
-        n.textContent = "nhan.vien.mau@demo.babybean.vn";
-      }
-    }
-    for (const n of nodes) if ((n.textContent ?? "").trim() === "BN") n.textContent = "NV";
-  });
+  const tenThat = await tenNhanVienThat();
+  const daChe = await page.evaluate(
+    ([maHam, ds]) => {
+      const fn = new Function(`return (${maHam})`)() as (r: HTMLElement, t: string[]) => number;
+      return fn(document.body, ds);
+    },
+    [cheTrongDom.toString(), tenThat] as [string, string[]],
+  );
+  ghi(`Q09: đã che ${daChe} dòng nhân sự thật`);
   await page.waitForTimeout(300);
 }
 
@@ -248,7 +246,8 @@ for (const k of ["dt", "mt"] as Kt[]) {
     const ch = page.getByRole("dialog", { name: "Mua thêm sản phẩm" });
     await ch.waitFor({ state: "visible" });
     await page.waitForTimeout(800);
-    await ch.getByRole("button", { name: "Chọn ảnh" }).first().click();
+    // BB-361 (từ vòng 8a): khối "Trong gói" có nút aria "Chọn ảnh trong gói…" — bấm ĐÚNG nút "Chọn ảnh" của sản phẩm.
+    await ch.getByRole("button", { name: "Chọn ảnh", exact: true }).last().click();
     const lc = page.getByRole("dialog", { name: "Chọn ảnh để đặt in" });
     await lc.waitFor({ state: "visible" });
     const a = lc.locator("button:has(img)");
@@ -283,7 +282,7 @@ for (const k of ["dt", "mt"] as Kt[]) {
     await page.waitForTimeout(1500);
     await moHopChot(page);
     await page.fill("#confirm-name-input", "Mẹ Lan");
-    await page.locator("label:has(input[type=checkbox])").first().click();
+    await tickHopChotDot1(page); // BB-361 (từ vòng 8a): hộp chốt có 2–3 ô bắt buộc (BB-321)
     await page.waitForTimeout(500);
     if (k === "dt") {
       await page.mouse.move(195, 500);
@@ -312,7 +311,7 @@ for (const k of ["dt", "mt"] as Kt[]) {
     }
     await page.getByRole("button", { name: "Chốt danh sách" }).first().click();
     await page.fill("#confirm-name-input", "Mẹ Bơ");
-    await page.locator("label:has(input[type=checkbox])").first().click();
+    await tickHopChotDot1(page); // BB-361 (từ vòng 8a): hộp chốt có 2–3 ô bắt buộc (BB-321)
     const xn = page.getByRole("button", { name: "Xác nhận" });
     await expect(xn).toBeEnabled({ timeout: 20_000 });
     await xn.click();

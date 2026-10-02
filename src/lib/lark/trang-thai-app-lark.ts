@@ -47,7 +47,7 @@ export type MaTrangThaiBoAnh =
 /** Các bước của thanh tiến độ bên khách (BB-329 vẽ theo mảng này). */
 export const BUOC_KHACH = [
   "Chọn ảnh",
-  "Studio xác nhận",
+  "Bean xác nhận",
   "Chỉnh sửa",
   "Duyệt ảnh",
   "In & giao",
@@ -55,48 +55,68 @@ export const BUOC_KHACH = [
 
 interface DinhNghia {
   quanTri: string;
+  /** Nhãn khách thấy (tiêu đề thẻ tiến trình) — giọng Bean, kết bằng "ạ" (BB-353). */
   khach: string;
+  /**
+   * BB-353 — câu trạng thái trên BÌA (gắn tên bé vào `{be}`). Cùng một dòng với
+   * `khach`, nên bìa và thẻ tiến trình không thể nói hai trạng thái khác nhau.
+   */
+  bia: string;
   /** Chỉ số trong BUOC_KHACH; null = khách chưa thấy bộ ảnh ở trạng thái này. */
   buocKhach: number | null;
 }
 
 /** Bảng nhãn — docs/27 chép từ đây. */
 export const TRANG_THAI_BO_ANH: Record<MaTrangThaiBoAnh, DinhNghia> = {
-  moi_nhap: { quanTri: "Mới nhập", khach: "Studio đang chuẩn bị ảnh", buocKhach: null },
-  dang_tai: { quanTri: "Đang tải ảnh", khach: "Studio đang chuẩn bị ảnh", buocKhach: null },
-  loi_tai: { quanTri: "Lỗi tải", khach: "Studio đang chuẩn bị ảnh", buocKhach: null },
-  cho_tao_link: { quanTri: "Chờ tạo Link app", khach: "Studio đang chuẩn bị ảnh", buocKhach: null },
-  san_sang: { quanTri: "Sẵn sàng", khach: "Mời ba mẹ chọn ảnh", buocKhach: 0 },
-  cho_khach_chon: { quanTri: "Chờ khách chọn", khach: "Mời ba mẹ chọn ảnh", buocKhach: 0 },
+  moi_nhap: { quanTri: "Mới nhập", khach: "Bean đang chuẩn bị ảnh ạ", bia: "Bean đang chuẩn bị ảnh của {be} ạ.", buocKhach: null },
+  dang_tai: { quanTri: "Đang tải ảnh", khach: "Bean đang chuẩn bị ảnh ạ", bia: "Bean đang chuẩn bị ảnh của {be} ạ.", buocKhach: null },
+  loi_tai: { quanTri: "Lỗi tải", khach: "Bean đang chuẩn bị ảnh ạ", bia: "Bean đang chuẩn bị ảnh của {be} ạ.", buocKhach: null },
+  cho_tao_link: { quanTri: "Chờ tạo Link app", khach: "Bean đang chuẩn bị ảnh ạ", bia: "Bean đang chuẩn bị ảnh của {be} ạ.", buocKhach: null },
+  san_sang: { quanTri: "Sẵn sàng", khach: "Mời ba mẹ chọn ảnh ạ", bia: "Mời ba mẹ chọn ảnh cho {be} ạ.", buocKhach: 0 },
+  cho_khach_chon: { quanTri: "Chờ khách chọn", khach: "Mời ba mẹ chọn ảnh ạ", bia: "Mời ba mẹ chọn ảnh cho {be} ạ.", buocKhach: 0 },
   cho_studio_xac_nhan: {
     quanTri: "Chờ studio xác nhận",
-    khach: "Đang chờ studio xác nhận",
+    khach: "Bean đang xác nhận danh sách ảnh ạ",
+    bia: "Bean đang xác nhận danh sách ảnh của {be} ạ.",
     buocKhach: 1,
   },
   da_chon_hinh: {
     quanTri: "Đã chọn hình · chờ chỉnh sửa",
-    khach: "Studio đã ghi nhận yêu cầu",
+    khach: "Bean đã nhận danh sách, ảnh đang chờ chỉnh ạ",
+    bia: "Bean đã nhận danh sách, ảnh của {be} đang chờ chỉnh ạ.",
     buocKhach: 1,
   },
-  dang_chinh_sua: { quanTri: "Đang chỉnh sửa", khach: "Đang chỉnh sửa", buocKhach: 2 },
-  leader_kiem: { quanTri: "Leader đang kiểm ảnh", khach: "Đang chỉnh sửa", buocKhach: 2 },
+  dang_chinh_sua: { quanTri: "Đang chỉnh sửa", khach: "Bean đang chỉnh ảnh ạ", bia: "Bean đang chỉnh ảnh của {be} ạ.", buocKhach: 2 },
+  leader_kiem: { quanTri: "Leader đang kiểm ảnh", khach: "Bean đang chỉnh ảnh ạ", bia: "Bean đang chỉnh ảnh của {be} ạ.", buocKhach: 2 },
   cho_khach_duyet: {
     quanTri: "Chờ khách duyệt",
-    khach: "Ảnh đã chỉnh xong, mời ba mẹ duyệt",
+    khach: "Ảnh đã chỉnh xong, mời ba mẹ duyệt ạ",
+    bia: "Ảnh của {be} đã chỉnh xong, mời ba mẹ duyệt ạ.",
     buocKhach: 3,
   },
   dang_sua_theo_yeu_cau: {
     quanTri: "Đang sửa theo yêu cầu",
-    khach: "Đang sửa theo yêu cầu của ba mẹ",
+    khach: "Bean đang sửa theo yêu cầu của ba mẹ ạ",
+    bia: "Bean đang sửa ảnh của {be} theo yêu cầu của ba mẹ ạ.",
     buocKhach: 3,
   },
-  da_chot_cho_in: { quanTri: "Đã chốt, chờ in", khach: "Đã chốt ảnh, đang chuẩn bị in", buocKhach: 4 },
-  dang_in: { quanTri: "Đã gửi in", khach: "Đang in", buocKhach: 4 },
-  hinh_da_ve: { quanTri: "Ảnh đã về, chờ giao", khach: "Sản phẩm đã về, mời ba mẹ ghé nhận", buocKhach: 4 },
-  da_giao: { quanTri: "Đã giao", khach: "Đã giao", buocKhach: 4 },
-  da_cham_soc: { quanTri: "Đã chăm sóc khách", khach: "Đã giao", buocKhach: 4 },
-  het_han: { quanTri: "Link đã hết hạn", khach: "Link đã hết hạn", buocKhach: 0 },
-  luu_tru: { quanTri: "Đã lưu trữ", khach: "Bộ ảnh không còn mở", buocKhach: null },
+  da_chot_cho_in: {
+    quanTri: "Đã chốt, chờ in",
+    khach: "Ảnh đã chốt, Bean đang chuẩn bị in ạ",
+    bia: "Ảnh của {be} đã chốt, Bean đang chuẩn bị in ạ.",
+    buocKhach: 4,
+  },
+  dang_in: { quanTri: "Đã gửi in", khach: "Bean đang in sản phẩm ạ", bia: "Bean đang in sản phẩm cho {be} ạ.", buocKhach: 4 },
+  hinh_da_ve: {
+    quanTri: "Ảnh đã về, chờ giao",
+    khach: "Sản phẩm đã về, mời ba mẹ ghé nhận ạ",
+    bia: "Sản phẩm của {be} đã về, mời ba mẹ ghé nhận ạ.",
+    buocKhach: 4,
+  },
+  da_giao: { quanTri: "Đã giao", khach: "Ảnh của bé đã hoàn thiện ạ", bia: "Ảnh của {be} đã hoàn thiện ạ.", buocKhach: 4 },
+  da_cham_soc: { quanTri: "Đã chăm sóc khách", khach: "Ảnh của bé đã hoàn thiện ạ", bia: "Ảnh của {be} đã hoàn thiện ạ.", buocKhach: 4 },
+  het_han: { quanTri: "Link đã hết hạn", khach: "Link đã hết hạn ạ", bia: "Link xem ảnh của {be} đã hết hạn ạ.", buocKhach: 0 },
+  luu_tru: { quanTri: "Đã lưu trữ", khach: "Bộ ảnh không còn mở ạ", bia: "Bộ ảnh của {be} không còn mở ạ.", buocKhach: null },
 };
 
 /** Giai đoạn Lark (trang-thai-hau-ky.ts) → trạng thái app, từ "Đã chọn hình" trở đi. */
@@ -196,4 +216,58 @@ export function trangThaiBoAnh(v: DauVaoTrangThai): TrangThaiBoAnh {
     default:
       return ra("moi_nhap");
   }
+}
+
+/**
+ * BB-353 (P0) — MỘT hàm trạng thái cho màn khách. Bìa (`cauBiaKhach`), thẻ
+ * tiến trình, màn cảm ơn sau chốt, dải khoá đầu lưới và bìa của người thân
+ * được mời đều đọc từ đây — không khối nào tự viết nhãn trạng thái riêng.
+ *
+ * Màn khách chỉ có `status` + `giaiDoanTienDo` (máy chủ đã tính giai đoạn Lark
+ * còn hiệu lực, KHÔNG gửi mã Lark thô). Hàm đưa hai thứ đó về CÙNG bảng
+ * `TRANG_THAI_BO_ANH` mà `trangThaiBoAnh()` (màn quản trị) dùng. Luật y như
+ * `trangThaiBoAnh()`: giai đoạn Lark ≥ 2 là nguồn chuẩn, trừ lúc app đang chờ
+ * duyệt; app đã giao mà Lark còn chậm thì tin app.
+ *
+ * `khoa`: bộ ảnh đang khoá chọn mà bảng vẫn ở bước "chọn ảnh" (khoá vì quá hạn
+ * 60 ngày) → nói thật là đang tạm khoá, không mời chọn tiếp.
+ */
+export const TAM_KHOA_KHACH: Pick<DinhNghia, "khach" | "bia"> = {
+  khach: "Bộ ảnh đang tạm khoá, ba mẹ nhắn Bean để được hỗ trợ ạ",
+  bia: "Bộ ảnh của {be} đang tạm khoá, ba mẹ nhắn Bean để được hỗ trợ ạ.",
+};
+
+export function trangThaiKhach(
+  status: string,
+  giaiDoan: number | null,
+  tuyChon: { khoa?: boolean } = {},
+): TrangThaiBoAnh {
+  let kq: TrangThaiBoAnh;
+  if (giaiDoan != null && giaiDoan >= 2 && status !== "awaiting_approval") {
+    kq = status === "delivered" && giaiDoan < 10 ? ra("da_giao") : ra(THEO_GIAI_DOAN_LARK[giaiDoan] ?? "da_chon_hinh", giaiDoan);
+  } else {
+    kq = trangThaiBoAnh({ status, coDriveLink: true, coLinkApp: true });
+  }
+  if (tuyChon.khoa && (kq.buocKhach ?? 0) === 0) return { ...kq, ...TAM_KHOA_KHACH };
+  return kq;
+}
+
+/** Câu trạng thái trên bìa / màn cảm ơn, gắn tên bé (thiếu tên thì "bé"). */
+export function cauBiaKhach(
+  status: string,
+  giaiDoan: number | null,
+  tenBe?: string | null,
+  tuyChon: { khoa?: boolean } = {},
+): string {
+  return trangThaiKhach(status, giaiDoan, tuyChon).bia.replace("{be}", tenBe?.trim() || "bé");
+}
+
+/**
+ * BB-353 — màn cảm ơn hiện NGAY sau khi bấm Xác nhận, lúc dữ liệu bộ ảnh trên
+ * máy còn là trạng thái cũ ("ready"/"in_review"). Danh sách đã gửi đi rồi, nên
+ * trạng thái nào còn ở bước "chọn ảnh" thì coi là vừa chốt (`submitted`).
+ * (Phép thử e2e bắt được: màn cảm ơn từng nói "đang tạm khoá".)
+ */
+export function trangThaiVuaChot(status: string): string {
+  return (trangThaiKhach(status, null).buocKhach ?? 0) > 0 ? status : "submitted";
 }

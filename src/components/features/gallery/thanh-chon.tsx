@@ -34,7 +34,7 @@ import { vi } from "@/i18n";
  * Mặc định `false` (điện thoại) để khớp render phía máy chủ, tránh lệch
  * hydrate; sau khi gắn xong mới đọc `matchMedia` thật.
  */
-function useManHinhRong(nguong: number): boolean {
+export function useManHinhRong(nguong: number): boolean {
   const [rong, setRong] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia(`(min-width: ${nguong}px)`);
@@ -79,7 +79,9 @@ export interface ThanhChonProps {
 export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0, nutChinhBiChan = false, an = false }: ThanhChonProps) {
 
   const vuot = soTamThem > 0;
-  const canhBao = vuot || soChuaGui > 0;
+  // BB-355 — bản vẽ "Màn khách v8": dòng phụ (kể cả "Chọn thêm 2 · 100.000 ₫") dùng
+  // màu chữ phụ, hồng/đỏ chỉ dành cho tim. Riêng "Chưa lưu" (mất mạng) vẫn là cảnh báo.
+  const canhBao = soChuaGui > 0;
   // BB-307 — chỉ bản "Chưa lưu" đang THẬT SỰ hiện (theo bề rộng màn) mới
   // mang data-testid, xem giải thích ở useManHinhRong() phía trên.
   const manRong = useManHinhRong(1024);
@@ -95,7 +97,9 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
     hanMuc == null
       ? "Gói đang cập nhật"
       : vuot
-        ? `Thêm ${formatCurrencyVND(tienThem)}`
+        ? // BB-358 (A1) — 390px: "Chọn thêm 2 · 100.0…" bị cắt mất số tiền. Lời ngắn
+          // "+2 · 100.000 ₫" và số tiền KHÔNG BAO GIỜ bị cắt (xem khối hiển thị bên dưới).
+          `+${soTamThem} · ${formatCurrencyVND(tienThem)}`
         : hanMuc - daChon > 0
           ? `Còn ${hanMuc - daChon} tấm`
           : "Đủ trong gói";
@@ -103,7 +107,7 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
     hanMuc == null
       ? "Gói đang cập nhật"
       : vuot
-        ? `Thêm ${formatCurrencyVND(tienThem)}`
+        ? `Chọn thêm ${soTamThem} · ${formatCurrencyVND(tienThem)}`
         : hanMuc - daChon > 0
           ? `Còn ${hanMuc - daChon}`
           : "Đủ trong gói";
@@ -156,16 +160,26 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
               <>
                 {" / "}
                 {hanMuc}
-                <span className="hidden lg:inline"> tấm</span>
+                {/* BB-361 (vòng 9, mục 5) — 390 cũng có "tấm" như 1440; chữ nhỏ hơn số để số tiền ở dòng dưới không bị chèn. */}
+                <span data-testid="thanh-chon-don-vi" className="text-[14px] lg:text-[16px]">{" tấm"}</span>
               </>
             )}
           </p>
           {/* Dưới lg: dòng phụ nằm NGAY DƯỚI số đếm, như thẻ điện thoại của bản vẽ. */}
-          <p className={cn("mt-1 truncate text-[12px] lg:hidden", canhBao ? "font-medium text-[#9C4A41]" : "text-[#6b6057]")}>
+          <p
+            data-testid="thanh-chon-dong-phu"
+            className={cn("mt-1 flex min-w-0 whitespace-nowrap text-[12px] lg:hidden", canhBao ? "font-medium text-[#9C4A41]" : "text-[#6b6057]")}
+          >
             {soChuaGui > 0 ? (
-              <span data-testid={hienChuaLuuDienThoai ? "chua-luu" : undefined}>{`${vi.common.unsaved} — ${soChuaGui} tấm`}</span>
+              <span className="truncate" data-testid={hienChuaLuuDienThoai ? "chua-luu" : undefined}>{`${vi.common.unsaved} — ${soChuaGui} tấm`}</span>
+            ) : vuot && hanMuc != null ? (
+              <>
+                <span className="truncate">{`+${soTamThem} ·`}</span>
+                {/* Số tiền là thứ ba mẹ cần đọc: không co, không cắt. */}
+                <span className="shrink-0 tabular-nums" data-testid="thanh-chon-tien-them">&nbsp;{formatCurrencyVND(tienThem)}</span>
+              </>
             ) : (
-              dongPhu
+              <span className="truncate">{dongPhu}</span>
             )}
           </p>
         </div>

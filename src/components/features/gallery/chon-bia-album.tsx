@@ -22,7 +22,9 @@
 
 import React from "react";
 import { Check } from "lucide-react";
+import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
+import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { goiYBiaAlbum, type UngVienBiaAlbum } from "@/lib/products/goi-y-bia-album";
 
 export interface AlbumCanChonBia {
@@ -149,7 +151,7 @@ function KhoiMotAlbum({
           </div>
         </div>
         {!coverPhotoIdHienThi && (
-          <span className="shrink-0 rounded-full bg-heart/15 px-2.5 py-1 text-[11px] font-medium text-heart">
+          <span className={cn(CHIP_NGUYEN_KHOI, "shrink-0 rounded-full bg-heart/15 px-2.5 py-1 text-[11px] font-medium text-heart")}>
             Bắt buộc chọn
           </span>
         )}
@@ -157,7 +159,7 @@ function KhoiMotAlbum({
 
       {anhDaThaTim.length === 0 ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          Thả tim vài tấm trước, rồi chọn một tấm làm bìa.
+          {vi.gallery.loiBean.thaTimTruocChonBia}
         </p>
       ) : (
         <>
@@ -190,7 +192,7 @@ function KhoiMotAlbum({
                     className="aspect-square w-full object-cover"
                   />
                   {dangLaBia && (
-                    <span className="absolute right-1 top-1 flex items-center gap-0.5 rounded-full bg-moss px-1.5 py-0.5 text-[11px] font-bold text-white">
+                    <span className={cn(CHIP_NGUYEN_KHOI, "absolute right-1 top-1 flex items-center gap-0.5 rounded-full bg-moss px-1.5 py-0.5 text-[11px] font-bold text-white")}>
                       <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />
                       Bìa
                     </span>
@@ -258,8 +260,10 @@ export function ChonBiaAlbum({
         <h3 className="kh-h2">Chọn ảnh bìa album</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {/* BB-319 (luật 4) — hai câu ngắn thay một câu 21 chữ. */}
-          Gói của ba mẹ có {albums.length > 1 ? `${albums.length} cuốn album` : "một cuốn album"}. Chọn bìa
-          trong những tấm đã thả tim.
+          {vi.gallery.loiBean.chonBiaAlbumMoTa.replace(
+            "{album}",
+            albums.length > 1 ? `${albums.length} cuốn album` : "một cuốn album",
+          )}
         </p>
       </div>
       {albums.map((album) => (

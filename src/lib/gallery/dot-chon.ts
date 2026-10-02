@@ -21,6 +21,7 @@
  *     lại thành đợt MỚI (số đợt luôn tăng, không dùng lại số cũ).
  */
 
+import { vi } from "@/i18n";
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { laKhoaTheoLark } from "@/lib/lark/trang-thai-hau-ky";
 
@@ -287,13 +288,13 @@ export function giaiThichKhongMoLaiDuoc(status: string): string {
 export function nhanTrangThaiDotChoKhach(trangThai: TrangThaiDot, lyDoTuChoi?: string | null): string {
   switch (trangThai) {
     case "cho_xac_nhan":
-      return "Đang chờ studio xác nhận";
+      return vi.gallery.loiBean.dotChoXacNhan;
     case "da_xac_nhan":
-      return "Studio đã xác nhận";
+      return vi.gallery.loiBean.dotDaXacNhan;
     case "tu_choi":
-      return lyDoTuChoi ? `Studio chưa nhận đợt này: ${lyDoTuChoi}` : "Studio chưa nhận đợt này";
+      return lyDoTuChoi ? vi.gallery.loiBean.dotChuaNhanLyDo.replace("{lyDo}", lyDoTuChoi) : vi.gallery.loiBean.dotChuaNhan;
     case "da_mo_lai":
-      return "Studio đã mở lại — ba mẹ chọn lại giúp em nhé";
+      return vi.gallery.loiBean.dotDaMoLai;
   }
 }
 
@@ -302,7 +303,7 @@ export function nhanTrangThaiDotChoKhach(trangThai: TrangThaiDot, lyDoTuChoi?: s
 // ---------------------------------------------------------------------------
 
 export const CAU_DONG_Y_STUDIO_CHON =
-  "Tôi đồng ý với ảnh studio chọn dùm và không đổi lại";
+  "Tôi đồng ý với ảnh Bean chọn dùm và không đổi lại";
 
 export type KetQuaKiemTra =
   | { ok: true }
@@ -326,7 +327,7 @@ export function kiemTraNhoStudioChon(p: {
     return {
       ok: false,
       code: "INVALID_INPUT",
-      message: `Ba mẹ tick "${CAU_DONG_Y_STUDIO_CHON}" thì studio mới chọn giúp được nhé`,
+      message: vi.gallery.loiBean.canTickDongY.replace("{cau}", CAU_DONG_Y_STUDIO_CHON),
       chiTiet: { loai: "thieu_dong_y_anh_studio_chon", soAnhThieu: p.soAnhThieu },
     };
   }

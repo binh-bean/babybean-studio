@@ -425,7 +425,7 @@ test.describe("BB-305: LUẬT PHÔNG màn khách (Playfair Display + Be Vietnam 
       // Tiêu đề THẬT của màn CamOnSauChot (cam-on-sau-chot.tsx) — không dùng
       // "Cảm ơn ba mẹ…" vì chuỗi đó cũng nằm sẵn trong chân trang tĩnh của
       // màn lưới ảnh phía sau lớp phủ, khớp NGAY cả khi hộp thoại chưa đóng.
-      await expect(page.getByRole("heading", { name: /Studio đã nhận danh sách/ })).toBeVisible({
+      await expect(page.getByRole("heading", { name: /Bean đang xác nhận danh sách/ })).toBeVisible({
         timeout: 15_000,
       });
     });

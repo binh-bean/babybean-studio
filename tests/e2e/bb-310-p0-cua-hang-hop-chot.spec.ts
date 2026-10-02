@@ -262,7 +262,7 @@ ownIpTest.describe("BB-310 mục 2: Hộp chốt — chữ khớp luật, chọn
     // BB-317 K-e — MỘT dòng yêu cầu gọi đúng tên sản phẩm, ≤ 12 chữ, không còn câu lặp dưới nút.
     const dongYeuCau = page.getByTestId("ly-do-khoa-nut-chot");
     await ownIpExpect(dongYeuCau).toBeVisible();
-    await ownIpExpect(dongYeuCau).toHaveText(/^Chọn ảnh bìa cho .+ để chốt\.$/);
+    await ownIpExpect(dongYeuCau).toHaveText(/^Ba mẹ chọn ảnh bìa cho .+ để chốt ạ\.$/);
     await ownIpExpect(page.getByRole("button", { name: "Xác nhận" })).toBeDisabled();
     // BB-317 (Cảm xúc) — tiêu đề hộp chốt gọi tên bé (họ tên đầy đủ khi không nickname).
     await ownIpExpect(page.getByRole("heading", { name: "Chốt ảnh cho bé Nguyễn Minh An" })).toBeVisible();

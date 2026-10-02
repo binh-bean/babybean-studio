@@ -350,7 +350,9 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
       rChu.y,
       `Khối chữ phải bắt đầu dưới đáy ảnh: ảnh={y:${rAnh.y}-${rAnh.y + rAnh.height}}, chữ từ y=${rChu.y}`,
     ).toBeGreaterThanOrEqual(rAnh.y + rAnh.height - 1);
-    ownIpExpect(rAnh.height / DIEN_THOAI.height).toBeGreaterThan(0.5);
+    // BB-355 — bản vẽ "Màn khách v8" (A-bia-dien-thoai): bìa thêm lời chào + nút viền "Mời ông
+    // bà cùng xem", ảnh bìa vẽ 372/844 ≈ 44% màn. Sàn cũ 50% (BB-317 K-b) hạ xuống 40%.
+    ownIpExpect(rAnh.height / DIEN_THOAI.height).toBeGreaterThan(0.4);
     ownIpExpect(rAnh.height / DIEN_THOAI.height).toBeLessThan(0.66);
     // Không lớp tối phủ lên ảnh (lớp gradient cũ của kiểu tạp chí).
     await ownIpExpect(khoiAnh.locator("div[aria-hidden='true']")).toHaveCount(0);
@@ -455,7 +457,7 @@ ownIpTest.describe("BB-289: bốn lỗi admin báo + màn cảm ơn + hộp ch�
       // Nhãn ngày chốt thật (hôm nay), không phải ngày bịa.
       const homNay = new Date();
       const ddmmyyyy = `${String(homNay.getDate()).padStart(2, "0")}/${String(homNay.getMonth() + 1).padStart(2, "0")}/${homNay.getFullYear()}`;
-      await ownIpExpect(camOn.getByText(`Chờ studio xác nhận · ${ddmmyyyy}`)).toBeVisible();
+      await ownIpExpect(camOn.getByText(`Đã gửi · ${ddmmyyyy}`)).toBeVisible();
 
       await page.screenshot({ path: tenAnh("cam-on-sau-chot", DIEN_THOAI), fullPage: false });
 

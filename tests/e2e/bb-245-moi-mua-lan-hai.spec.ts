@@ -146,7 +146,7 @@ test.describe("BB-245: mời mua lần hai", () => {
 
     await expect(page.getByTestId("chon-them-anh")).toBeVisible();
     await expect(page.getByText("Ba mẹ đã ưng bộ ảnh — in tấm yêu thích lên khung nhé?")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Gửi yêu cầu cho studio" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Gửi yêu cầu cho Bean" })).toHaveCount(0);
   });
 
   test("bộ đã DUYỆT nhưng CÓ vòng xin sửa: không có thẻ mời", async ({ page }) => {

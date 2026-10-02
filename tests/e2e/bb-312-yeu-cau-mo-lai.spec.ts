@@ -216,7 +216,7 @@ ownIpTest.describe("BB-312: khách xin mở lại — phản hồi cả hai phí
     await nutYeuCau.click();
 
     await page.getByPlaceholder(/đổi tấm số 12/).fill(`${NHAN} lần 1 — đổi tấm bìa`);
-    await page.getByRole("button", { name: "Gửi cho studio" }).click();
+    await page.getByRole("button", { name: "Gửi cho Bean" }).click();
 
     const daiTrangThaiKhach = page.getByTestId("yeu-cau-mo-lai-trang-thai");
     await ownIpExpect(daiTrangThaiKhach).toContainText("Đã gửi yêu cầu mở lại", { timeout: 15_000 });
@@ -271,7 +271,7 @@ ownIpTest.describe("BB-312: khách xin mở lại — phản hồi cả hai phí
     // 4. KHÁCH thấy lý do từ chối
     // ---------------------------------------------------------------------
     await page.reload();
-    await ownIpExpect(daiTrangThaiKhach).toContainText("Studio phản hồi", { timeout: 15_000 });
+    await ownIpExpect(daiTrangThaiKhach).toContainText("Bean phản hồi", { timeout: 15_000 });
     await ownIpExpect(daiTrangThaiKhach).toContainText("ba mẹ ghé studio nhận nhé");
 
     await chupCaHaiKho(page, "3-khach-bi-tu-choi");
@@ -281,9 +281,9 @@ ownIpTest.describe("BB-312: khách xin mở lại — phản hồi cả hai phí
     // ---------------------------------------------------------------------
     await cuonQuaBia(page);
     await page.getByRole("button", { name: "Yêu cầu sửa lại" }).click();
-    await ownIpExpect(page.getByText(/Lần trước studio phản hồi/)).toBeVisible();
+    await ownIpExpect(page.getByText(/Lần trước Bean phản hồi/)).toBeVisible();
     await page.getByPlaceholder(/đổi tấm số 12/).fill(`${NHAN} lần 2 — vậy đổi bìa được không ạ`);
-    await page.getByRole("button", { name: "Gửi cho studio" }).click();
+    await page.getByRole("button", { name: "Gửi cho Bean" }).click();
     await ownIpExpect(
       page.getByRole("button", { name: /Đã gửi yêu cầu · lần 2/ }),
     ).toBeVisible({ timeout: 15_000 });
@@ -319,7 +319,7 @@ ownIpTest.describe("BB-312: khách xin mở lại — phản hồi cả hai phí
     // 7. KHÁCH thấy đã mở
     // ---------------------------------------------------------------------
     await page.reload();
-    await ownIpExpect(daiTrangThaiKhach).toContainText("Studio đã mở lại", { timeout: 15_000 });
+    await ownIpExpect(daiTrangThaiKhach).toContainText("Bean đã mở lại", { timeout: 15_000 });
 
     await chupCaHaiKho(page, "5-khach-da-mo");
 

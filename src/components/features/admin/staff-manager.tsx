@@ -309,6 +309,7 @@ export function StaffManager({
             {rows.map((row) => (
               <Card
                 key={row.id}
+                data-testid="the-nhan-su"
                 className={`flex min-w-0 flex-col gap-4 p-5 ${row.isActive ? "" : "opacity-60"}`}
               >
                 <div className="flex items-start gap-3">

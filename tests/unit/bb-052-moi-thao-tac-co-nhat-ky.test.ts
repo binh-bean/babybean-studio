@@ -98,6 +98,14 @@ const NGOAI_LE: Record<string, string> = {
   "cron/hau-ky":
     "BB-200 — chỉ ghi bản sao trạng thái đọc từ Lark (lark_trang_thai…) và sổ " +
     "lark_nhac_da_gui; mỗi tin nhắc có dòng trong notifications. Số liệu mỗi lượt ghi console.info.",
+  "admin/galleries/[id]/confirm":
+    "BB-349 dời thân route vào `xacNhanDot1` (src/lib/gallery/xac-nhan-danh-sach.ts): " +
+    "chính hàm đó đổi status sang in_retouch VÀ ghi dòng `gallery.confirm_retouch` vào " +
+    "activity_logs ngay sau. Route chỉ kiểm quyền rồi gọi hàm — ghi thêm ở route là ghi đôi.",
+  "admin/galleries/[id]/dot-chon/[soDot]/xac-nhan":
+    "BB-349 dời thân route vào `xacNhanDotMuaThem` (src/lib/gallery/xac-nhan-danh-sach.ts): " +
+    "chính hàm đó chuyển đợt sang da_xac_nhan VÀ gọi ghiNhatKy `selection.round_confirm`. " +
+    "Route chỉ kiểm quyền, gọi hàm, rồi gửi thông báo đẩy.",
   "admin/galleries/[id]/lam-nong-anh":
     "BB-286 — chỉ kéo trước ảnh từ Drive và ghi vào bộ đệm Storage (bucket " +
     "thumbnails), không đổi bất cứ hàng nào trong cơ sở dữ liệu nghiệp vụ. " +

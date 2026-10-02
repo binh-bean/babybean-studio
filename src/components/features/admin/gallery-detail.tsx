@@ -46,7 +46,7 @@ import { OChonTim } from "@/components/ui/o-chon-tim";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { luaChonMoLai, type DotTomTat } from "@/lib/gallery/dot-chon";
 import { cauBaoSauDoiHanMuc, tinhPhatSinhTheoHanMuc } from "@/lib/gallery/tien-phat-sinh";
-import { PaymentForm, type TuyChonXacNhan } from "./form-thanh-toan";
+import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./form-thanh-toan";
 import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
@@ -150,6 +150,8 @@ interface Component {
 }
 
 interface Item {
+  /** BB-351 (B#12) — dòng hạn mức tự tạo khi thu tiền: chỉ xem, không sửa/xoá. */
+  tuThanhToan?: boolean;
   id: string;
   name: string;
   kind: string;
@@ -206,6 +208,8 @@ interface Detail {
   driveFolderId: string | null;
   lastSyncedAt: string | null;
   syncError: string | null;
+  /** BB-357 — danh sách ảnh đã thu gọn; null = đủ ảnh. */
+  thuGon?: { luc: string; soAnhTruoc: number | null } | null;
   photoCount: number;
   /** BB-290 lượt 2 — "Chốt lúc" trong hàng 4 số liệu; null = khách chưa chốt. */
   submittedAt: string | null;
@@ -215,9 +219,13 @@ interface Detail {
   paidAmount: number;
   /** BB-320: phần giảm giá đã ghi (dòng `giam_gia`), nằm TRONG paidAmount. */
   discountAmount?: number;
+  /** BB-351 — số khách nhìn thấy ở lần chốt mới nhất (`snapshot_extra_amount`); `dueAmount` là tổng phải thu. */
+  snapshotAmount?: number;
   outstanding: number;
   /** BB-344 — số CÒN PHẢI THU (0 = chưa phát sinh: nút xác nhận thanh toán bị khoá). */
   amountToCollect: number;
+  /** BB-360 — sản phẩm mua thêm thu qua Lark (không nằm trong `amountToCollect`). */
+  sanPhamQuaLark?: number;
   /** BB-349 — xem src/lib/gallery/khoa-khi-thu.ts. */
   khoaKhiThu?: KhoaKhiThu;
   /** BB-215 — khối "Bìa bộ ảnh". */
@@ -398,7 +406,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       soAnhDaChon: detail.selectedCount,
       giaAnhVuot: detail.extraPhotoPrice,
       anhDaMuaThem,
-      soTienLucChot: detail.dueAmount,
+      soTienLucChot: detail.snapshotAmount ?? 0,
       dinhDangTien: formatCurrencyVND,
     });
 
@@ -752,7 +760,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     }
   }
 
-  /** Ghi nhận đã thu tiền. Ghi thêm dòng, không sửa đè — bảng là sổ. */
+  /** Ghi nhận đã thu tiền. Ghi thêm dòng, không sửa đè — bảng là sổ. BB-351: cùng `ghiThanhToan` với hai tab. */
   async function recordPayment(
     amount: number,
     method: string,
@@ -763,35 +771,12 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     setBusy(true);
     setNotice(null);
     try {
-      const res = await fetch(`/api/admin/galleries/${galleryId}/payments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount,
-          method,
-          note,
-          ...(discountPercent ? { discountPercent } : {}),
-          ...(xacNhan.khoaBoAnh ? { khoaBoAnh: true } : {}),
-          ...(xacNhan.chacChan ? { chacChan: true } : {}),
-        }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        setNotice(json?.error?.message ?? "Không ghi nhận được");
+      const kq = await ghiThanhToan(galleryId, amount, method, note, discountPercent, xacNhan);
+      if (!kq.ok) {
+        setNotice(kq.message);
         return;
       }
-      const left = json.data.outstanding as number;
-      const giam = Number(json.data.discountAmount ?? 0);
-      setNotice(
-        (json.data.daKhoa ? "Đã xác nhận danh sách và khoá bộ ảnh. " : "") +
-        (json.data.loiKhoa ? `Chưa khoá được: ${json.data.loiKhoa}. ` : "") +
-        (giam > 0 ? `Đã ghi giảm giá ${formatCurrencyVND(giam)}. ` : "") +
-        (left > 0
-          ? `Đã ghi. Còn thiếu ${formatCurrencyVND(left)}.`
-          : left < 0
-            ? `Đã ghi. Khách trả DƯ ${formatCurrencyVND(-left)} — kiểm tra lại giúp.`
-            : "Đã ghi. Khách đã trả đủ."),
-      );
+      setNotice(cauSauKhiThu(kq));
       await load();
     } finally {
       setBusy(false);
@@ -1057,6 +1042,14 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             {detail.syncError && (
               <p className="mt-2 rounded-md border border-[var(--bb-danger)] p-3 text-sm">
                 <strong>Lần kéo ảnh gần nhất hỏng.</strong> {detail.syncError}
+              </p>
+            )}
+
+            {detail.thuGon && (
+              <p data-testid="thu-gon-anh" className="mt-2 rounded-md border border-[var(--bb-border)] p-3 text-sm">
+                <strong>Danh sách ảnh đã thu gọn</strong>
+                {detail.thuGon.soAnhTruoc !== null ? ` (từ ${formatSo(detail.thuGon.soAnhTruoc)} ảnh)` : ""} để tiết kiệm
+                dung lượng — chỉ giữ bìa và ảnh khách đã chọn. Ảnh gốc vẫn trên Drive — bấm Đồng bộ lại để xem đủ.
               </p>
             )}
 
@@ -1517,10 +1510,10 @@ function KhoiChinh({
                 ) : (
                   <>không vượt hạn mức</>
                 )}
-                {moi.tien !== detail.dueAmount && (
+                {(detail.snapshotAmount ?? 0) > 0 && moi.tien !== detail.snapshotAmount && (
                   <span className="text-[var(--bb-fg-muted)]">
                     {" "}
-                    — số khách nhìn thấy lúc chốt ({formatCurrencyVND(detail.dueAmount)}) giữ nguyên
+                    — số khách nhìn thấy lúc chốt ({formatCurrencyVND(detail.snapshotAmount ?? 0)}) giữ nguyên
                   </span>
                 )}
               </p>
@@ -1535,7 +1528,8 @@ function KhoiChinh({
             conThieu={detail.amountToCollect}
             chuaPhatSinh={detail.amountToCollect <= 0}
             khoa={detail.khoaKhiThu}
-            onSubmit={(a, m, n, pt, xn) => void recordPayment(a, m, n, pt, xn)}
+            sanPhamQuaLark={detail.sanPhamQuaLark ?? 0}
+            onSubmit={(a, m, n, pt, xn) => recordPayment(a, m, n, pt, xn)}
           />
         </section>
       )}
@@ -1571,7 +1565,7 @@ function KhoiChinh({
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-medium">
                     <span className="min-w-0 truncate">{item.name}</span>
-                    {canSuaDong && !locked ? (
+                    {canSuaDong && !locked && !item.tuThanhToan ? (
                       <QuantityEditor
                         value={item.quantity}
                         disabled={busy}
@@ -1579,6 +1573,12 @@ function KhoiChinh({
                       />
                     ) : (
                       <span className="text-[var(--bb-fg-muted)]">×{item.quantity}</span>
+                    )}
+                    {/* BB-351 (B#12) — dòng hạn mức do thanh toán: chỉ xem, máy chủ cũng chặn sửa/xoá. */}
+                    {item.tuThanhToan && (
+                      <span data-testid="dong-tu-thanh-toan" className="text-xs text-[var(--bb-fg-muted)]">
+                        — Tự tạo khi thu tiền
+                      </span>
                     )}
                     {/* BB-202 — "Bìa album: <tên tệp>" ngay cạnh dòng hàng, để
                         CSKH không phải mở riêng một chỗ khác mới biết. */}
@@ -1596,7 +1596,7 @@ function KhoiChinh({
                     {item.totalPrice !== null && (
                       <span className="text-sm">{formatCurrencyVND(item.totalPrice)}</span>
                     )}
-                    {!locked && canSuaDong && (
+                    {!locked && canSuaDong && !item.tuThanhToan && (
                       <NutXoaDongHang
                         disabled={busy}
                         onClick={() => void xoaDongHang(item.id, item.name, item.quantity)}

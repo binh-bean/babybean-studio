@@ -17,7 +17,7 @@
 import { z } from "zod";
 
 /** Nhóm để màn hình xếp ô, không ảnh hưởng gì tới dữ liệu. */
-export type NhomCaiDat = "album" | "anh" | "quang-cao" | "lien-lac";
+export type NhomCaiDat = "album" | "anh" | "quang-cao" | "lien-lac" | "thanh-toan";
 
 export interface DinhNghiaCaiDat {
   key: string;
@@ -105,6 +105,15 @@ export const CAI_DAT_SUA_DUOC: DinhNghiaCaiDat[] = [
     xin sửa) — những tin đó luôn gửi bất kể công tắc này.
   */
   { key: "lark.nhac_noi_bo", nhom: "lien-lac", schema: z.boolean() },
+
+  /*
+    --- Thanh toán ------------------------------------------------------------
+    BB-360 — anh chốt 02/10/2026: sản phẩm khách mua thêm (ảnh in / khung / album) đang thu
+    qua Lark, "sau này mới chuyển sang thu trong app". Mặc định TẮT: tiền sản phẩm KHÔNG nằm
+    trong "Phải thu / Còn thiếu"; tiền ảnh (vượt hạn mức, ảnh đợt thêm, Edit file) vẫn thu
+    qua app. Khoá đọc ở `tien-can-thu-server.ts` (`KHOA_THU_SAN_PHAM_QUA_APP`).
+  */
+  { key: "thanh_toan.thu_san_pham_qua_app", nhom: "thanh-toan", schema: z.boolean() },
 ];
 
 export const KHOA_SUA_DUOC = new Set(CAI_DAT_SUA_DUOC.map((c) => c.key));

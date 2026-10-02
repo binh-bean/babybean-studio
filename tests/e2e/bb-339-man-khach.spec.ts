@@ -161,7 +161,7 @@ test.describe("BB-339: sản phẩm trong gói, cửa hàng, demo treo tường"
     const cuaHang = page.getByRole("dialog", { name: "Mua thêm sản phẩm" });
     const khoi = cuaHang.getByTestId("trong-goi-cua-hang");
     await expect(khoi).toBeVisible();
-    await expect(khoi.getByTestId("trong-goi-dem")).toHaveText(/\d+\/10 ảnh/);
+    await expect(khoi.getByTestId("trong-goi-dem")).toHaveText(/\d+\/10 tấm/);
     await expect(khoi.getByRole("button", { name: /ảnh trong gói cho Gỗ 40×60/ })).toBeVisible();
     await page.screenshot({ path: `${THU_MUC_ANH}/4-cua-hang-trong-goi-390.png` });
     await khoi.getByRole("button", { name: /ảnh trong gói cho Gỗ 40×60/ }).click();
@@ -182,19 +182,27 @@ test.describe("BB-339: sản phẩm trong gói, cửa hàng, demo treo tường"
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${THU_MUC_ANH}/5-tuong-mac-dinh-tran-vien.png` });
 
-    const nutUv = manTuong.getByRole("button", { name: "UV bóng", exact: true });
+    // BB-358 (anh 02/10) — tên chỉ là "UV"; UV là ảnh giấy: không khung, không treo tường.
+    // Chất liệu mặc định (đã cán) có lựa chọn khung khi danh mục có khung — ghi lại để so sau.
+    const soLuaChonKhungMacDinh = await manTuong.getByTestId("tuy-chon-boc-khung").count();
+    const nutUv = manTuong.getByRole("button", { name: "UV", exact: true });
     if ((await nutUv.count()) === 0) test.skip(true, "danh mục không có UV");
     await nutUv.click();
     await expect(manTuong.getByTestId("uv-anh-giay")).toBeVisible();
-    await expect(manTuong.getByText(/Ảnh UV là ảnh in trên giấy ảnh, chưa có khung/)).toBeVisible();
+    await expect(manTuong.getByTestId("uv-loi-bean")).toHaveText("UV là ảnh in trên giấy ảnh, hợp để gài album hoặc để bàn ạ.");
+    await expect(manTuong.getByTestId("tuy-chon-boc-khung")).toHaveCount(0);
+    await expect(manTuong.getByRole("checkbox")).toHaveCount(0);
+    const chuUv = await manTuong.innerText();
+    expect(chuUv).not.toMatch(/cán (lên )?gỗ|UV bóng|chọn thêm khung/i);
     await page.screenshot({ path: `${THU_MUC_ANH}/6-tuong-uv-anh-giay.png` });
 
-    const oKhung = manTuong.getByRole("checkbox");
-    if ((await oKhung.count()) > 0) {
-      await oKhung.check();
-      await expect(manTuong.getByTestId("uv-anh-giay")).toBeHidden();
-      await page.waitForTimeout(400);
-      await page.screenshot({ path: `${THU_MUC_ANH}/7-tuong-uv-co-khung.png` });
+    // Chất liệu đã cán (Gỗ): vẫn có lựa chọn bọc khung như cũ, và lại treo trên tường.
+    const nutGo = manTuong.getByRole("button", { name: "Gỗ", exact: true });
+    if ((await nutGo.count()) > 0) {
+      await nutGo.click();
+      await expect(manTuong.getByTestId("uv-anh-giay")).toHaveCount(0);
+      await expect(manTuong.getByTestId("tuy-chon-boc-khung")).toHaveCount(soLuaChonKhungMacDinh);
+      if (soLuaChonKhungMacDinh > 0) await expect(manTuong.getByTestId("tuy-chon-boc-khung")).toBeVisible();
     }
   });
 });

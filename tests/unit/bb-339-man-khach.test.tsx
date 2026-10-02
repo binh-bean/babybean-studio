@@ -98,17 +98,18 @@ describe("BB-339 mục 4 — cửa hàng: Trong gói x/y ảnh, xem/đổi ảnh
   );
 
   it("báo 'Trong gói: 4/15 ảnh' và từng món trong gói có nút chọn", () => {
-    expect(html).toContain("4/15 ảnh");
+    expect(html).toContain("4/15 tấm");
     expect(html).toContain("Chọn ảnh trong gói cho Gỗ 40×60");
-    expect(html).toContain("0/1 ảnh");
+    expect(html).toContain("0/1 tấm");
   });
 
   it("dòng giỏ có ảnh là nút bấm để xem lớn", () => {
     expect(html).toContain("Xem ảnh của Ảnh in UV 10×15");
   });
 
-  it("UV có câu giải thích ảnh giấy, chưa khung", () => {
-    expect(html).toContain("Ảnh in trên giấy ảnh, chưa có khung");
+  it("UV có câu giải thích ảnh giấy (BB-358: không cán gỗ, không khung)", () => {
+    expect(html).toContain("Ảnh in trên giấy ảnh, hợp để gài album hoặc để bàn ạ.");
+    expect(html).not.toMatch(/cán (lên )?gỗ/);
   });
 });
 

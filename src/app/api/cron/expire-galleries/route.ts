@@ -36,6 +36,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { guiLaiThongBaoDangCho } from "@/lib/lark/notify";
 import { quetNhacKhachChuaChot } from "@/lib/gallery/nhac-khach";
 import { chayDonDemHetHan } from "../../../../../scripts/don-dem-het-han";
+import pg from "pg";
+import { KHOA_DON_RAC, dangTrongPhepThu, donRac, ghiNhatKyDonRac } from "@/lib/van-hanh/don-rac";
+import { ghiMocDungLuong } from "@/lib/van-hanh/dung-luong";
 
 export const runtime = "nodejs";
 
@@ -51,7 +54,52 @@ function duocPhep(request: Request): boolean {
   return khoa.some((k) => header === `Bearer ${k}`);
 }
 
+/** Hàm Hobby tối đa 60 giây cho CẢ route; người dọn chỉ được phần còn lại tới mốc này. */
+const NGAN_SACH_ROUTE_MS = 50_000;
+
+/**
+ * BB-356 — dọn dữ liệu vận hành + ghi mốc dung lượng DB. Chạy SAU mọi việc
+ * chính, với phần thời gian còn lại; mỗi loại tối đa TRAN_MOI_LOAI dòng.
+ */
+async function donDuLieuVanHanh(batDau: number): Promise<unknown> {
+  const { SUPABASE_DB_URL } = process.env;
+  if (!SUPABASE_DB_URL) return { boQua: "thiếu SUPABASE_DB_URL" };
+  // Phép thử gọi route này với .env.local của bb-dev: không xoá, không ghi mốc.
+  if (dangTrongPhepThu()) return { boQua: "đang chạy phép thử" };
+  const conLai = NGAN_SACH_ROUTE_MS - (Date.now() - batDau);
+  if (conLai < 5_000) return { boQua: "hết giờ, đêm sau làm" };
+
+  const client = new pg.Client({ connectionString: SUPABASE_DB_URL });
+  await client.connect();
+  try {
+    let moc: unknown = null;
+    try {
+      moc = (await ghiMocDungLuong(client)).at(-1) ?? null;
+    } catch (err) {
+      moc = { loi: err instanceof Error ? err.message : String(err) };
+    }
+    const { rows } = await client.query<{ ok: boolean }>("select pg_try_advisory_lock($1) as ok", [KHOA_DON_RAC]);
+    if (!rows[0]?.ok) return { mocDungLuong: moc, boQua: "một lượt dọn khác đang chạy" };
+    try {
+      const kq = await donRac(client, { thuTruoc: false, hanMs: conLai - 3_000 });
+      await ghiNhatKyDonRac(client, kq, { actorType: "system", actorLabel: "cron" });
+      return {
+        mocDungLuong: moc,
+        tongXoa: kq.tongXoa,
+        tongUocTinhByte: kq.tongUocTinhByte,
+        hetGio: kq.hetGio,
+        loi: kq.ketQua.filter((k) => k.loi).map((k) => k.loai),
+      };
+    } finally {
+      await client.query("select pg_advisory_unlock($1)", [KHOA_DON_RAC]).catch(() => {});
+    }
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 async function chay(request: Request) {
+  const batDau = Date.now();
   if (!duocPhep(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -157,6 +205,17 @@ async function chay(request: Request) {
       donDemHetHan = { loi: err instanceof Error ? err.message : String(err) };
     }
 
+    // 7. BB-356: dọn dữ liệu vận hành (nhật ký cũ, tin đã gửi, khoá chống trùng…)
+    // để DB ở yên trong 500 MB của gói Free. Đi nhờ lượt 01:00 giờ VN, cùng lý do
+    // mục 4/5/6; bọc riêng vì cùng lý do nốt.
+    let donVanHanh: unknown = { boQua: "không chạy được" };
+    try {
+      donVanHanh = await donDuLieuVanHanh(batDau);
+    } catch (err) {
+      console.error("[cron/expire-galleries] dọn dữ liệu vận hành hỏng:", err);
+      donVanHanh = { loi: err instanceof Error ? err.message : String(err) };
+    }
+
     const stats = {
       expiredGalleries: expiredGalleriesCount || 0,
       expiredLinks: expiredLinksCount || 0,
@@ -164,6 +223,7 @@ async function chay(request: Request) {
       larkGuiLai: lark,
       nhacKhachChuaChot: nhac,
       donDemHetHan,
+      donVanHanh,
     };
 
     console.info(JSON.stringify({ evt: "cron.expire_galleries", ...stats }));

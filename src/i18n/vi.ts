@@ -3,6 +3,12 @@
  * OWNER: DEV-UI.
  *
  * Voice: address the customer as "ba mẹ". Short, warm, no technical words.
+ *
+ * BB-353 — giọng Bean cho mọi chuỗi KHÁCH thấy (`gallery`, `api`, `landing`,
+ * `errorPages`, `common.offline`): studio tự xưng "Bean" (không "studio",
+ * "bên mình", "em" — trừ tên thương hiệu "Baby Bean Studio"), gọi khách là
+ * "ba mẹ"/"gia đình", và câu nào cũng kết bằng "ạ". Phép thử
+ * tests/unit/bb-353-giong-bean.test.ts canh luật này trên chính dữ liệu `vi`.
  */
 
 export const vi = {
@@ -17,7 +23,7 @@ export const vi = {
     saving: "Đang lưu…",
     saved: "Đã lưu",
     unsaved: "Chưa lưu",
-    offline: "Mất kết nối. Ảnh ba mẹ chọn sẽ tự lưu khi có mạng",
+    offline: "Mất kết nối ạ. Ảnh ba mẹ chọn sẽ tự lưu khi có mạng ạ.",
     error: "Đã xảy ra lỗi",
     delete: "Xoá",
     edit: "Chỉnh sửa",
@@ -99,11 +105,15 @@ export const vi = {
     },
   },
   gallery: {
-    pinTitle: "Nhập 4 số cuối số điện thoại đã đăng ký",
+    /** BB-359 — bộ cũ đã thu gọn danh sách ảnh, app đang Đồng bộ lại từ Drive. */
+    dangMoLaiAnh: "Bean đang mở lại toàn bộ ảnh của bé, ba mẹ chờ chút ạ",
+    /** BB-360 — cùng câu cho người thân (link mời gia đình, không phải ba mẹ). */
+    dangMoLaiAnhGiaDinh: "Bean đang mở lại toàn bộ ảnh của bé, gia đình chờ chút ạ",
+    pinTitle: "Ba mẹ nhập 4 số cuối số điện thoại đã đăng ký ạ",
     pinSubmit: "Xem bộ ảnh",
-    pinWrong: "Mã PIN chưa đúng, ba mẹ còn {n} lần thử",
-    pinLocked: "Ba mẹ đã nhập sai quá nhiều lần, vui lòng thử lại sau {m} phút",
-    pinHelp: "Không nhớ mã? Ba mẹ gọi {hotline} giúp em nhé",
+    pinWrong: "Mã PIN chưa đúng, ba mẹ còn {n} lần thử ạ",
+    pinLocked: "Ba mẹ đã nhập sai quá nhiều lần, ba mẹ thử lại sau {m} phút giúp Bean ạ",
+    pinHelp: "Ba mẹ quên mã ạ? Ba mẹ gọi {hotline} giúp Bean nhé ạ",
     pinPlaceholder: "••••",
 
     filterAll: "Tất cả",
@@ -114,11 +124,11 @@ export const vi = {
     filterSubfolder: "Thư mục",
 
     quotaSummary: "Đã chọn {selected}/{quota}",
-    quotaExtra: "thêm {count} ảnh = {amount}",
-    quotaWarningTitle: "Ảnh này vượt gói của ba mẹ",
-    quotaWarningBody: "Mỗi ảnh thêm phụ thu {price}. Ba mẹ vẫn chọn ảnh này chứ?",
+    quotaExtra: "thêm {count} tấm = {amount}",
+    quotaWarningTitle: "Ảnh này vượt gói của ba mẹ ạ",
+    quotaWarningBody: "Mỗi ảnh thêm phụ thu {price} ạ. Ba mẹ vẫn chọn ảnh này chứ ạ?",
     quotaWarningDontAsk: "Không hỏi lại trong lần chọn này",
-    quotaHardLimit: "Ba mẹ đã chọn tối đa {max} ảnh cho bộ ảnh này",
+    quotaHardLimit: "Ba mẹ đã chọn tối đa {max} tấm cho bộ ảnh này ạ",
 
     select: "Chọn ảnh này",
     deselect: "Bỏ chọn",
@@ -138,34 +148,167 @@ export const vi = {
     },
 
     reviewCta: "Xem lại và xác nhận",
-    reviewTitle: "Ba mẹ kiểm tra lại giúp em nhé",
-    reviewSubtitle: "{count} ảnh đã chọn · {quota} trong gói · {extra} ảnh thêm",
-    reviewUnusedQuota: "Ba mẹ còn {n} ảnh miễn phí chưa dùng. Chốt luôn ạ?",
+    reviewTitle: "Ba mẹ kiểm tra lại giúp Bean nhé ạ",
+    reviewSubtitle: "{count} tấm đã chọn · {quota} trong gói · {extra} tấm thêm",
+    reviewUnusedQuota: "Ba mẹ còn {n} tấm miễn phí chưa dùng ạ. Ba mẹ chốt luôn ạ?",
     submitCta: "Chốt danh sách",
     submitConfirmTitle: "Xác nhận chốt danh sách",
     // Sửa 24/09/2026: câu cũ "sau khi chốt không đổi được nữa" sai từ quyết định
     // 22/09 (migration 0060) — chốt xong vẫn chọn thêm/đổi được tới khi CSKH xác nhận.
-    submitConfirm: "Chốt xong, bên mình sẽ kiểm và xác nhận. Trước lúc đó ba mẹ vẫn chọn thêm hoặc đổi ảnh được.",
+    submitConfirm: "Chốt xong, Bean sẽ kiểm và xác nhận ạ. Trước lúc đó ba mẹ vẫn chọn thêm hoặc đổi ảnh được ạ.",
     // BB-212 — chủ studio 22/09/2026: "dấu tích ghi xác nhận đúng thông tin".
     submitAgree: "Tôi xác nhận các thông tin trên là đúng",
     parentName: "Tên ba/mẹ xác nhận",
     parentNamePlaceholder: "Nhập tên ba hoặc mẹ",
 
-    doneTitle: "Cảm ơn ba mẹ!",
-    doneBody: "Studio đã nhận danh sách và bắt đầu chỉnh ảnh cho bé.",
-    doneEstimate: "Thời gian dự kiến hoàn thành: {date}",
+    doneTitle: "Cảm ơn ba mẹ ạ!",
+    doneBody: "Bean đã nhận danh sách của ba mẹ và sẽ xác nhận sớm ạ.",
+    doneEstimate: "Bean dự kiến hoàn thành vào {date} ạ",
     saveSummary: "Lưu ảnh tóm tắt",
     viewAgain: "Xem lại bộ ảnh",
 
-    lockedBanner: "Ba mẹ đã chốt ngày {date}. Bộ ảnh đang ở chế độ chỉ xem.",
+    lockedBanner: "Ba mẹ đã chốt ngày {date} ạ. Bộ ảnh đang ở chế độ chỉ xem ạ.",
     expiredTitle: "Link đã hết hạn",
-    expiredBody: "Ba mẹ liên hệ studio để được gửi lại link nhé.",
+    expiredBody: "Ba mẹ nhắn Bean để được gửi lại link nhé ạ.",
     notFoundTitle: "Không tìm thấy bộ ảnh",
-    notFoundBody: "Link không tồn tại hoặc đã bị thu hồi.",
-    photoMissing: "Ảnh này không còn khả dụng, ba mẹ liên hệ studio giúp em nhé",
-    emptyFilter: "Chưa có ảnh nào trong mục này",
-    preparing: "Bộ ảnh đang được chuẩn bị. Studio sẽ báo ba mẹ khi sẵn sàng.",
-    offlineBanner: "Mất kết nối. Ảnh ba mẹ chọn sẽ tự lưu khi có mạng.",
+    notFoundBody: "Link không tồn tại hoặc đã được thu hồi ạ.",
+    photoMissing: "Ảnh này không còn xem được, ba mẹ nhắn Bean giúp nhé ạ",
+    emptyFilter: "Chưa có ảnh nào trong mục này ạ",
+    preparing: "Bean đang chuẩn bị bộ ảnh ạ. Bean sẽ báo ba mẹ khi sẵn sàng ạ.",
+    offlineBanner: "Mất kết nối ạ. Ảnh ba mẹ chọn sẽ tự lưu khi có mạng ạ.",
+
+    /**
+     * BB-353 — MỘT chỗ cho lời Bean nói với ba mẹ trên màn khách và trong lỗi
+     * API khách (`src/app/api/g/**`). Luật giọng: xem đầu tệp; phép thử
+     * tests/unit/bb-353-giong-bean.test.ts canh trên chính dữ liệu này.
+     */
+    loiBean: {
+      camOnChonTungKhoanhKhac: "Cảm ơn ba mẹ đã chọn từng khoảnh khắc ạ.",
+      // BB-358 (A3) — bìa "Đã giao", trước viết thẳng trong bia-bo-anh.tsx ("…Baby Bean giữ trọn ở đây.").
+      camOnDaGiao: "Cảm ơn ba mẹ ạ. Năm đầu đời của {ten}, Bean giữ trọn ở đây ạ.",
+      // BB-358 — câu từng viết thẳng trong components/features/gallery, nay gom về đây để
+      // phép thử giọng (bb-353-giong-bean) thấy; viết lại theo giọng Bean (kết "ạ").
+      thaTimTruocKhiDatIn: "Ba mẹ thả tim tấm này trước, rồi mới đặt in được ạ.",
+      khongBatDuocThongBao: "Bean chưa bật được thông báo, ba mẹ thử lại sau giúp Bean nhé ạ.",
+      khongTatDuocThongBao: "Bean chưa tắt được thông báo, ba mẹ thử lại sau giúp Bean nhé ạ.",
+      boAnhChuaCoTam: "Bộ ảnh chưa có tấm nào ạ.",
+      thaTimVaiTamTruoc: "Ba mẹ thả tim vài tấm trước, hoặc bấm “Tất cả” ạ.",
+      thaTimTruocChonBia: "Ba mẹ thả tim vài tấm trước, rồi chọn một tấm làm bìa ạ.",
+      chonBiaAlbumMoTa: "Gói của ba mẹ có {album} ạ. Ba mẹ chọn bìa trong những tấm đã thả tim ạ.",
+      luuAppNhanTinMoi: "Ba mẹ lưu app ra màn hình chính để nhận tin mới ngay ạ.",
+      moTaSanPhamMacDinh: "In ảnh chất lượng cao, giao tận nơi ạ.",
+      chuaMoDuocDanhSachBuoi: "Bean chưa mở được danh sách buổi chụp, ba mẹ thử lại giúp Bean nhé ạ.",
+      kiemTraMangThuLai: "Bean chưa kết nối được, ba mẹ kiểm tra mạng rồi thử lại giúp Bean nhé ạ.",
+      chuaMoDuocBuoi: "Bean chưa mở được buổi chụp này, ba mẹ thử lại giúp Bean nhé ạ.",
+      linkKhongHetHan: "Link không hết hạn đâu ạ.",
+      chonBuoiChupMoTa: "Ba mẹ chọn buổi chụp muốn xem ạ. Link này là của riêng gia đình mình, không hết hạn, ba mẹ lưu lại để xem nhé ạ.",
+      phongChuaVuaTuong: "Phòng này chưa có cỡ vừa tường ạ. Ba mẹ thử phòng khác nhé ạ.",
+      dangChiXemChuaDat: "Bộ ảnh đang ở chế độ xem nên Bean chưa nhận đặt được ạ.",
+      moiMuaTieuDe: "Ba mẹ ưng bộ ảnh ạ? In tấm yêu thích lên khung nhé ạ.",
+      chuaCoTamDeVuot: "Chưa có tấm nào để vuốt sang ạ.",
+      luuAppMoTrinhDuyet: "{app} không cho lưu app ra màn hình chính ạ. Ba mẹ mở link này bằng Safari hoặc Chrome trước nhé ạ.",
+      luuAppMoNhanhAnhBe: "Ba mẹ lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn ạ.",
+      luuAppIphone: "Trên iPhone, ba mẹ lưu app bằng nút Chia sẻ ạ.",
+      luuAppNhuAppRieng: "Lần sau ba mẹ mở nhanh hơn, như một app riêng ạ.",
+      luuAppMayTinh: "Lần sau ba mẹ mở nhanh hơn, không cần mở lại Zalo hay trình duyệt ạ.",
+      luuAppCanSafari: "Ba mẹ mở bằng Safari hoặc Chrome để lưu app nhé ạ.",
+      // BB-355 — bản vẽ "Màn khách v8". Câu khách thấy gom về đây (giọng Bean, kết "ạ").
+      sanSangChon: "{n} khoảnh khắc của con đã sẵn sàng, ba mẹ thong thả chọn ạ.",
+      vanChonThemDuoc: "Ba mẹ vẫn chọn thêm ảnh được tới khi Bean xác nhận ạ.",
+      nguoiThanGiaiThich:
+        "Ảnh chọn trong gói được ba mẹ thực hiện. Gia đình thích tấm nào có thể đặt chỉnh sửa hoặc mua thêm ảnh in và album in ảnh ạ!",
+      nguoiThanChuaThaTim: "Chạm tim tấm gia đình thích ạ",
+      yeuCauBiaAlbum: "Ba mẹ chọn ảnh bìa cho {ten} để chốt ạ.",
+      yeuCauBiaAlbumNhieu: "Ba mẹ chọn ảnh bìa cho {ten} và {n} album nữa để chốt ạ.",
+      yeuCauBiaAlbumChung: "Ba mẹ chọn ảnh bìa album để chốt ạ.",
+      nhacThieuAnh: "{ten} còn thiếu {n} tấm, bổ sung sau được ạ.",
+      nhacChuaCoAnh: "{ten} chưa có ảnh, bổ sung sau được ạ.",
+      spThieuAnh: "{ten} còn thiếu {n} tấm ạ.",
+      // BB-358 — "món" = một đơn vị sản phẩm, cùng luật `demMon` (lib/gallery/dem-mon.ts).
+      spInChuaCoAnh: "Còn {n} món in chưa có ảnh ạ.",
+      timChuaLuu: "Tim này chưa được lưu ạ.",
+      matMangChuaLuuLyDo: "{lyDo} — có ảnh chọn lúc mất mạng chưa lưu được ạ.",
+      khongKetNoiMayChu: "Bean chưa kết nối được, ba mẹ tải lại trang giúp Bean nhé ạ.",
+      khongGuiDuoc: "Chưa gửi được, ba mẹ thử lại giúp Bean nhé ạ.",
+      khongLuuDuoc: "Chưa lưu được, ba mẹ thử lại giúp Bean nhé ạ.",
+      khongLuuDuocBia: "Chưa lưu được ảnh bìa, ba mẹ thử lại giúp Bean nhé ạ.",
+      matKetNoi: "Mất kết nối, ba mẹ thử lại giúp Bean nhé ạ.",
+      daChotKhongDoi: "Bộ ảnh đã chốt nên ba mẹ chưa đổi được danh sách ạ.",
+      daChotKhongChonThem: "Bộ ảnh đã chốt nên ba mẹ chưa chọn thêm được ạ.",
+      vuotGoi: "Ba mẹ đã chọn quá số ảnh gói cho phép ạ.",
+      soSanhToiDa: "Bean so sánh được tối đa {n} tấm, ba mẹ bỏ bớt một tấm giúp Bean nhé ạ.",
+      soSanhHuongDan: "Ba mẹ chạm vào ảnh theo thứ tự muốn xem ạ.",
+      chuaLuuDoMatMang: "Vài ảnh vừa chọn chưa lưu vì mất mạng ạ. Có mạng rồi ba mẹ chốt lại giúp Bean nhé ạ.",
+      chotChuaDuocLucNay: "Bean chưa chốt được danh sách lúc này, ba mẹ thử lại giúp Bean nhé ạ.",
+      chotMatMang: "Bean chưa nhận được danh sách, ba mẹ kiểm tra mạng rồi thử lại giúp Bean nhé ạ.",
+      khoaChotThieuTen: "Ba mẹ điền tên người xác nhận giúp Bean ạ.",
+      khoaChotThieuTick: "Ba mẹ tích đủ các ô để xác nhận ạ.",
+      khoaChotThieuDongY: "Ba mẹ tích “đã xem kỹ và đồng ý” để xác nhận ạ.",
+      vanThemDuocAnh: "Ba mẹ vẫn thêm được ảnh tới khi Bean xác nhận ạ.",
+      chuongTrong: "Bean sẽ báo ba mẹ ở đây khi ảnh chỉnh xong ạ.",
+      cuaHangTrong: "Bean chưa có sản phẩm nào đang bán ạ. Ba mẹ nhắn Bean để được tư vấn nhé ạ.",
+      loaiChuaBan: "Loại này Bean chưa bán ạ. Ba mẹ nhắn Bean để được tư vấn nhé ạ.",
+      dangSapAnh: "Bean đang sắp ảnh buổi chụp của bé ạ. Ba mẹ mở lại link này sau ít phút nhé ạ.",
+      chuaCoHanMuc: "Bean đang cập nhật gói của ba mẹ ạ.",
+      matMangChuaLuu: "Vài ảnh chọn lúc mất mạng chưa lưu được ạ. Bean đã tải lại danh sách ạ.",
+      duyetChuyenIn: "Cảm ơn ba mẹ ạ. Bean chuyển bộ ảnh sang in ạ.",
+      daNhanYeuCauSua: "Bean đã nhận yêu cầu sửa của ba mẹ ạ.",
+      daChotDanhSach: "Ba mẹ đã chốt danh sách ảnh ạ. Bean đã nhận được thông tin ạ.",
+      guiChoBean: "Gửi cho Bean",
+      chotChuaDuoc: "Chốt chưa được, ba mẹ thử lại giúp Bean nhé ạ",
+      khongKetNoi: "Không kết nối được, ba mẹ thử lại giúp Bean nhé ạ",
+      seXacNhanDot: "Bean sẽ xác nhận đợt này rồi báo lại ba mẹ ạ.",
+      xinTenSdt: "Ba mẹ cho Bean xin tên và số điện thoại (10 số) nhé ạ.",
+      guiChuaDuoc: "Gửi chưa được, ba mẹ thử lại giúp Bean nhé ạ",
+      daGuiSeGoi: "Đã gửi, Bean sẽ gọi sớm ạ",
+      daLienHe: "Bean đã liên hệ ạ",
+      seGoiBaoGia: "Bean sẽ gọi báo giá ạ. Ba mẹ chưa cần làm gì thêm ạ.",
+      muaHoMoTa: "Khung, ảnh in, album: Bean gọi lại báo giá, chưa tính tiền ạ.",
+      muaThemMoTa: "Ba mẹ chọn sản phẩm, Bean sẽ gọi xác nhận ạ. Chưa tính tiền lúc này ạ.",
+      guiYeuCau: "Gửi yêu cầu cho Bean",
+      dangChinhAnh: "Bean đang chỉnh ảnh ạ",
+      dangSuaTheoYeuCau: "Bean đang sửa theo yêu cầu của ba mẹ ạ. Xong Bean sẽ gửi lại link mới ạ.",
+      goiChoBean: "Gọi cho Bean",
+      sePhanHoiSom: "Bean sẽ phản hồi sớm ạ, ba mẹ chưa cần gửi lại ạ.",
+      daMoLai: "Bean đã mở lại, ba mẹ chọn tiếp nhé ạ",
+      daDatMua: "Đã đặt mua ạ. Bean sẽ trao đổi với ba mẹ về ảnh và bìa ạ.",
+      trongGio: "Trong giỏ ạ. Chốt xong, Bean sẽ trao đổi với ba mẹ về ảnh và bìa ạ.",
+      nguoiThanThaTim: "Gia đình thả tim những tấm mình thích, rồi bấm “Đặt chỉnh sửa” hoặc đặt in ảnh ạ.",
+      chonAnhCanIn: "Ba mẹ chọn giúp Bean tấm ảnh cần in cho sản phẩm này ạ",
+      toiDa99: "Số lượng tối đa 99 ạ, nhiều hơn thì ba mẹ nhắn Bean giúp nhé ạ",
+      buoiDangChuanBi: "Bean đang chuẩn bị ạ",
+      buoiDangTai: "Bean đang tải ảnh lên ạ",
+      buoiDaChot: "Ba mẹ đã chốt, Bean đang xác nhận ạ",
+      buoiDaDuyet: "Ba mẹ đã duyệt, Bean đang in ạ",
+      chuaXacNhanDot1: "Bean chưa xác nhận đợt chọn đầu, ba mẹ cứ chọn và chốt ở màn chọn ảnh như bình thường nhé ạ",
+      toiDa20: "Số lượng tối đa 20 ạ, nhiều hơn thì ba mẹ nhắn Bean giúp nhé ạ",
+      quaNhieuLoiMoi: "Ba mẹ đã tạo khá nhiều lời mời trong hôm nay, ba mẹ thử lại vào ngày mai giúp Bean nhé ạ",
+      xinTenSdtGoiLai: "Ba mẹ cho Bean xin tên và số điện thoại để Bean gọi lại nhé ạ",
+      muaThemOChonThem: "Ba mẹ mua thêm ở mục \"Chọn thêm ảnh\" giúp Bean nhé ạ: chọn ảnh, sản phẩm rồi chốt đợt, Bean sẽ xác nhận ạ",
+      daDuyetDangIn: "Ba mẹ đã duyệt bộ ảnh này rồi, Bean đang chuẩn bị in ạ.",
+      chuaCoHanMucGoi: "Bean đang cập nhật số ảnh trong gói của ba mẹ, ba mẹ nhắn Bean giúp nhé ạ",
+      ghiMuonSuaGi: "Ba mẹ ghi giúp Bean muốn sửa gì, để Bean xem có kịp không ạ",
+      daNhanDot: "Bean đã nhận đợt {n} của ba mẹ ạ.",
+      nhoBeanChonGiup: "Còn {n} tấm trong gói, ba mẹ nhờ Bean chọn giúp ạ",
+      dotChoXacNhan: "Bean đang xác nhận đợt này ạ",
+      dotDaXacNhan: "Bean đã xác nhận đợt này ạ",
+      dotChuaNhan: "Bean chưa nhận đợt này ạ",
+      dotDaMoLai: "Bean đã mở lại đợt này, ba mẹ chọn lại giúp Bean nhé ạ",
+      canTickDongY: "Ba mẹ tick \"{cau}\" thì Bean mới chọn giúp được nhé ạ",
+      chonThemChuaSanSang: "Tính năng chọn thêm ảnh chưa sẵn sàng, ba mẹ nhắn Bean giúp nhé ạ",
+      nhacChonAnh: "Bean nhắc nhẹ ạ: ba mẹ mở bộ ảnh và chọn những tấm ưng ý giúp Bean nhé ạ.",
+      nhacThanhToan: "Ba mẹ đã chọn thêm ảnh ngoài gói ạ. Bean nhờ ba mẹ mở bộ ảnh xem phần chọn thêm và thanh toán giúp Bean nhé ạ.",
+      baoLaiHanMuc: "Bean sẽ báo lại số ảnh trong gói cho ba mẹ ạ",
+      tbDotChuaNhan: "Bean chưa nhận đợt {n} ạ",
+      tbDotChuaNhanNoiDung: "Lý do: {lyDo} ạ. Ba mẹ chọn lại giúp Bean nhé ạ.",
+      tbDotDaXacNhan: "Bean đã xác nhận đợt {n} ạ",
+      tbDotDaXacNhanNoiDung: "Bean đã nhận đợt ảnh ba mẹ vừa chọn thêm ạ.",
+      tbMoLaiDot: "Bean đã mở lại đợt {n} ạ",
+      tbMoLaiDotNoiDung: "Ba mẹ chọn lại ảnh của đợt này giúp Bean nhé ạ.",
+      tbMoLaiBo: "Bộ ảnh đã mở lại ạ",
+      tbMoLaiBoNoiDung: "Bean đã mở lại bộ ảnh, ba mẹ chọn tiếp nhé ạ.",
+      dotChuaNhanLyDo: "Bean chưa nhận đợt này ạ. Lý do: {lyDo} ạ",
+    },
 
     lightbox: {
       closeAria: "Đóng xem ảnh lớn",
@@ -177,32 +320,34 @@ export const vi = {
     },
     subfolderAll: "Tất cả",
     subfolderTitle: "Nhóm ảnh",
-    studioInfo: "Thông tin studio",
-    callUs: "Gọi cho bên mình",
-    noteNeedsSelect: "Chọn ảnh này trước rồi mới ghi chú được",
+    studioInfo: "Thông tin Bean",
+    callUs: "Gọi cho Bean",
+    noteNeedsSelect: "Ba mẹ chọn ảnh này trước rồi mới ghi chú được ạ",
     noteHint: "Ghi chú cho thợ chỉnh ảnh này…",
     noteSaved: "Đã lưu ghi chú",
-    noteSaveFailed: "Chưa lưu được ghi chú, thử lại giúp bên mình nhé",
-    noteLocked: "Bộ ảnh đã chốt nên không sửa ghi chú được nữa",
+    noteSaveFailed: "Chưa lưu được ghi chú, ba mẹ thử lại giúp Bean nhé ạ",
+    noteLocked: "Bộ ảnh đã chốt nên không sửa ghi chú được nữa ạ",
     downloadThis: "Tải ảnh này về máy",
     quotaInline: "đã chọn",
     // BB-319 — MỘT nhãn cho việc nhắn tin (bìa, chân trang, thông báo hạn mức, dải xin mở lại).
-    messageStudio: "Nhắn studio",
+    messageStudio: "Nhắn Bean",
     /**
      * BB-240 — thay "Thành phần hợp đồng / Tổng cộng 0 ₫" (dữ liệu nội bộ,
      * dòng "Edit file", tiền hợp đồng) bằng một dòng ba mẹ dùng được: biết
      * gói của mình gồm bao nhiêu tấm chỉnh, không cần đọc cơ cấu hợp đồng.
      * Chỉ hiện khi CSKH đã nhập hạn mức (`gallery.quotaKnown`).
      */
-    packageQuotaLine: "Gói của ba mẹ gồm {n} ảnh chỉnh",
+    packageQuotaLine: "Gói của ba mẹ gồm {n} tấm ảnh chỉnh ạ",
     /** BB-241 — lời gợi ý "Lưu app", thay cho nút biểu tượng khó hiểu. */
     saveAppPrompt: {
-      message: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
+      message: "Ba mẹ lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm ạ",
       // BB-278/BB-281 — nhãn ngắn cho chip một dòng ở đầu trang (thay bản thẻ
       // nổi ở đáy cũ); "message" (câu đầy đủ) vẫn dùng cho `aria-label`.
       // BB-330 — chủ studio (mục cũ "lưu app ra màn hình chính"): câu phải nói
       // NÓ ĐỂ LÀM GÌ, không chỉ tên thao tác.
-      shortLabel: "Lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn",
+      shortLabel: "Lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn ạ",
+      // BB-358 (anh 02/10) — người được mời (link "Mời gia đình"): lời Bean nói với gia đình.
+      shortLabelGiaDinh: "Lưu vào màn hình chính để gia đình mở lại ảnh của bé nhanh hơn ạ",
       howTo: "Xem cách lưu",
       later: "Để sau",
     },
@@ -230,20 +375,19 @@ export const vi = {
       anChiTiet: "Ẩn chi tiết",
       xemLonAnhBe: "Xem lớn ảnh của bé",
       dongXemLon: "Đóng xem lớn",
-      thamKhaoKhung: "Mẫu khung chỉ để tham khảo. Bean tư vấn mẫu thật khi chốt đơn ạ.",
+      thamKhaoKhung: "Mẫu khung chỉ để tham khảo ạ. Bean tư vấn mẫu thật khi chốt đơn ạ.",
       // BB-339 — dòng nhỏ luôn hiện trên màn demo treo tường.
       thamKhaoDemo: "Hình demo chỉ mang tính tham khảo ạ.",
-      // BB-339 — ảnh UV là ảnh giấy, chưa có khung: không treo lên tường trong demo.
-      uvLaAnhGiay:
-        "Ảnh UV là ảnh in trên giấy ảnh, chưa có khung. Ba mẹ dùng để gài album, hoặc cán lên gỗ để treo hay để đứng ạ.",
-      uvChonKhungDeTreo: "Muốn xem treo trên tường, ba mẹ chọn thêm khung nhé ạ.",
+      // BB-358 (anh 02/10) — UV là ảnh giấy: không cán gỗ, không bọc khung, không treo tường.
+      uvLaAnhGiay: "UV là ảnh in trên giấy ảnh, hợp để gài album hoặc để bàn ạ.",
+      tieuDeAnhGiay: "Ảnh giấy để bàn",
       moTaChatLieu: {
         "Gỗ": "In tràn viền, cán lên tấm gỗ — không khung, góc vuông ạ.",
         "Cavas/Kim tuyến": "In tràn viền trên chất liệu kim tuyến lấp lánh nhẹ — không khung ạ.",
         "Tráng gương": "In tràn viền, phủ bóng như gương, màu lên rực và sâu ạ.",
         "Thủy tinh": "In tràn viền sau lớp kính cường lực, bề mặt phẳng và sáng ạ.",
         "Mica HD": "In tràn viền trên tấm mica trong, nhẹ và giữ màu bền ạ.",
-        UV: "Ảnh in trên giấy ảnh phủ UV, chưa có khung — để gài album hoặc cán lên gỗ ạ.",
+        UV: "Ảnh in trên giấy ảnh, hợp để gài album hoặc để bàn ạ.",
       },
     },
   },
@@ -376,6 +520,7 @@ export const vi = {
       nhomAnh: "Ảnh",
       nhomQuangCao: "Quảng cáo",
       nhomLienLac: "Liên lạc",
+      nhomThanhToan: "Thanh toán",
       nhan: {
         "gallery.default_due_days": "Hạn chốt mặc định (ngày)",
         "gallery.reminder_days": "Nhắc CSKH gọi khách vào ngày thứ",
@@ -390,6 +535,7 @@ export const vi = {
         "chat.page_url": "Trang nhắn tin của studio",
         "lark.webhook_url": "Webhook nhóm Lark",
         "lark.nhac_noi_bo": "Nhắc nội bộ vào Lark",
+        "thanh_toan.thu_san_pham_qua_app": "Thu tiền sản phẩm mua thêm trong app",
       },
       moTa: {
         "gallery.default_due_days": "Bao nhiêu ngày kể từ lúc gửi link thì khách phải chốt.",
@@ -410,6 +556,8 @@ export const vi = {
         "lark.webhook_url": "Bot báo tin vào nhóm Lark. Đây là địa chỉ bí mật nên chỉ hiện dạng che.",
         "lark.nhac_noi_bo":
           "Nhắc hậu kỳ và nhắc khách chưa chốt gửi vào Lark cho NHÂN VIÊN. KHÔNG ảnh hưởng tin khách↔studio (khách chốt ảnh, xin mở lại, mua thêm, duyệt/xin sửa) — những tin đó luôn gửi. Đang tắt vì automatic của Lark ở nhóm khác đã lo phần này.",
+        "thanh_toan.thu_san_pham_qua_app":
+          "Ảnh in, khung, album khách mua thêm. Tắt (mặc định): thu qua Lark — không tính vào Phải thu / Còn thiếu, chỉ hiện dòng \"Sản phẩm mua thêm · thu qua Lark\". Bật: cộng vào Phải thu và ghi thu trong app. Tiền ảnh (vượt hạn mức, ảnh đợt thêm, Edit file) luôn thu trong app.",
       },
       dangBat: "Đang bật",
       dangTat: "Đang tắt",
@@ -665,17 +813,17 @@ export const vi = {
   },
   api: {
     invalidInput: "Dữ liệu không hợp lệ",
-    unauthenticated: "Vui lòng mở lại link bộ ảnh",
-    forbidden: "Ba mẹ không có quyền thực hiện thao tác này",
+    unauthenticated: "Ba mẹ mở lại link bộ ảnh giúp Bean ạ",
+    forbidden: "Ba mẹ chưa thực hiện được thao tác này ạ",
     notFound: "Không tìm thấy nội dung",
-    linkExpired: "Link đã hết hạn hoặc đã được thu hồi",
-    galleryLocked: "Bộ ảnh đã được chốt, không thể thay đổi",
-    quotaExceeded: "Đã vượt số ảnh tối đa cho phép",
-    conflict: "Thao tác bị trùng, vui lòng thử lại",
-    rateLimited: "Ba mẹ thao tác quá nhanh, vui lòng chờ một lát",
-    driveAccessDenied: "Thư mục Google Drive chưa được chia sẻ công khai",
-    driveUnavailable: "Không kết nối được Google Drive, vui lòng thử lại",
-    internal: "Có lỗi xảy ra, vui lòng thử lại",
+    linkExpired: "Link đã hết hạn hoặc đã được thu hồi ạ",
+    galleryLocked: "Bộ ảnh đã được chốt nên không thay đổi được nữa ạ",
+    quotaExceeded: "Ba mẹ đã chọn quá số ảnh tối đa ạ",
+    conflict: "Thao tác bị trùng, ba mẹ thử lại giúp Bean ạ",
+    rateLimited: "Ba mẹ thao tác hơi nhanh, ba mẹ chờ một lát giúp Bean ạ",
+    driveAccessDenied: "Thư mục ảnh chưa mở được, Bean đang kiểm tra lại ạ",
+    driveUnavailable: "Chưa tải được ảnh, ba mẹ thử lại giúp Bean ạ",
+    internal: "Có lỗi nhỏ, ba mẹ thử lại giúp Bean ạ",
   },
   landing: {
     studioName: "BabyBean Studio",
@@ -688,18 +836,18 @@ export const vi = {
     // Ba biến thể, chọn theo dữ liệu THẬT của chi nhánh (trang gốc). Soát
     // 24/09/2026: câu cũ bảo "gọi theo số ở dưới" trong khi cả 3 chi nhánh
     // chưa điền hotline — dưới đó không có số nào.
-    lostAfter: ". Chưa nhận được hoặc link không mở được, ba mẹ gọi giúp bên mình theo số ở dưới nhé.",
-    lostAfterNhanTin: ". Chưa nhận được hoặc link không mở được, ba mẹ nhắn cho studio nhé.",
-    lostAfterChiNhanh: ". Chưa nhận được hoặc link không mở được, ba mẹ liên hệ chi nhánh đã chụp giúp bên mình nhé.",
-    messageCta: "Nhắn tin cho studio",
+    lostAfter: ". Chưa nhận được hoặc link không mở được, ba mẹ gọi Bean theo số ở dưới nhé ạ.",
+    lostAfterNhanTin: ". Chưa nhận được hoặc link không mở được, ba mẹ nhắn cho Bean nhé ạ.",
+    lostAfterChiNhanh: ". Chưa nhận được hoặc link không mở được, ba mẹ liên hệ chi nhánh đã chụp giúp Bean nhé ạ.",
+    messageCta: "Nhắn tin cho Bean",
     loginCta: "Nhân viên đăng nhập",
     footer: "© BabyBean Studio",
   },
   errorPages: {
     notFoundTitle: "Không tìm thấy trang",
-    notFoundBody: "Trang ba mẹ tìm không tồn tại hoặc đã bị xoá.",
+    notFoundBody: "Trang ba mẹ tìm không còn nữa ạ.",
     serverErrorTitle: "Đã xảy ra lỗi",
-    serverErrorBody: "Hệ thống đang gặp sự cố nhỏ, ba mẹ vui lòng thử lại sau.",
+    serverErrorBody: "Hệ thống đang gặp sự cố nhỏ, ba mẹ thử lại sau giúp Bean ạ.",
     backHome: "Về trang chủ",
     contactSupport: "Gọi hỗ trợ: {hotline}",
   }

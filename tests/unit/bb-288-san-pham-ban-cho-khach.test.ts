@@ -21,8 +21,8 @@ import {
 } from "@/lib/products/nhom-san-pham";
 import { BANG_GIA_01_10, chatLieuTheoBangGia, coTrongBangGia } from "@/lib/products/bang-gia-01-10";
 
-const ban = (material: string | null, size: string | null, kind = "print", isActive = true) =>
-  sanPhamBanChoKhach({ isActive, kind, material, size });
+const ban = (material: string | null, size: string | null, kind = "print", isActive = true, name: string | null = "Ảnh in") =>
+  sanPhamBanChoKhach({ name, isActive, kind, material, size });
 
 describe("BB-288: sanPhamBanChoKhach — danh mục BÁN cho khách", () => {
   it("Ảnh in (Gỗ, UV, Thủy tinh, Tráng gương, Mica HD) đang kinh doanh, có trong bảng giá -> bán", () => {
@@ -136,5 +136,22 @@ describe("BB-339: sản phẩm thử (Fixture/TEST) không vào danh mục khác
     expect(laSanPhamThu("Gỗ 40x60")).toBe(false);
     expect(laSanPhamThu("Testimonial 20x30")).toBe(false);
     expect(laSanPhamThu(null)).toBe(false);
+  });
+
+  // BB-352 (CV-01): luật thử nằm TRONG sanPhamBanChoKhach(), nên mọi đường ghi
+  // (addons, mua-them, dot-chon) chặn được hàng thử — không chỉ danh mục hiển thị.
+  it("BB-352: cùng chất liệu + cỡ có trong bảng giá, tên Fixture/TEST/Test -> KHÔNG bán; tên thường -> bán", () => {
+    expect(ban("Gỗ", "40x60", "print", true, "Gỗ 40x60")).toBe(true);
+    expect(ban("Gỗ", "40x60", "print", true, "Fixture Ảnh gỗ 40x60")).toBe(false);
+    expect(ban("Gỗ", "40x60", "print", true, "TEST Gỗ 40x60")).toBe(false);
+    expect(ban("Gỗ", "40x60", "print", true, "Test Gỗ 40x60")).toBe(false);
+    expect(ban("Album (Ultra HD)", "20x20", "print", true, "Fixture Album (Ultra HD) 20x20")).toBe(false);
+    expect(ban(null, null, "edited_photo", true, "Fixture Edit file")).toBe(false);
+    expect(ban(null, null, "edited_photo", true, "Edit file")).toBe(true);
+  });
+
+  it("BB-352: tên mẫu kiểm thử mới ('Mẫu kiểm thử BB-352 …') KHÔNG bị coi là hàng thử — phép thử dùng tên này để còn mua được", () => {
+    expect(laSanPhamThu("Mẫu kiểm thử BB-352 Ảnh gỗ 15x21")).toBe(false);
+    expect(ban("Gỗ", "15x21", "print", true, "Mẫu kiểm thử BB-352 Ảnh gỗ 15x21")).toBe(true);
   });
 });

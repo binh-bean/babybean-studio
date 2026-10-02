@@ -41,7 +41,16 @@ import { CARD_TITLE_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
 import { formatNgayVN, tinhTenBiaTuDuLieu, tinhTieuDeBoAnhQuanTri, formatSo } from "@/lib/utils/dinh-dang";
 import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
-import { PaymentForm, ghiThanhToan } from "./form-thanh-toan";
+import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./form-thanh-toan";
+import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
+
+/** BB-351 — số tiền + trạng thái khoá của bộ (GET /payments), cùng nguồn với màn chi tiết. */
+interface ThongTinThu {
+  amountToCollect: number;
+  /** BB-360 — sản phẩm mua thêm thu qua Lark (không nằm trong `amountToCollect`). */
+  sanPhamQuaLark?: number;
+  khoaKhiThu: KhoaKhiThu;
+}
 import { NutNhacKhach } from "./nut-nhac-khach";
 import { NutNhanKhach } from "./nut-nhan-khach";
 
@@ -84,7 +93,24 @@ export function OverQuotaReport() {
   const [moThanhToan, setMoThanhToan] = React.useState<string | null>(null);
   const [dangGhi, setDangGhi] = React.useState(false);
   const [thongBao, setThongBao] = React.useState<{ id: string; ok: boolean; cau: string } | null>(null);
+  // BB-351 — form ở đây là ĐÚNG form BB-349 (khoá kèm thu + "chắc chắn"): đọc trạng thái khoá
+  // và số cần thu của bộ khi mở form, không dùng số của dòng báo cáo.
+  const [thongTinThu, setThongTinThu] = React.useState<Record<string, ThongTinThu | "loi">>({});
   const alive = React.useRef(true);
+
+  const taiThongTinThu = React.useCallback(async (galleryId: string) => {
+    try {
+      const res = await fetch(`/api/admin/galleries/${encodeURIComponent(galleryId)}/payments`, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!alive.current) return;
+      setThongTinThu((cu) => ({
+        ...cu,
+        [galleryId]: res.ok && json?.data ? (json.data as ThongTinThu) : "loi",
+      }));
+    } catch {
+      if (alive.current) setThongTinThu((cu) => ({ ...cu, [galleryId]: "loi" }));
+    }
+  }, []);
 
   const tai = React.useCallback(async () => {
     try {
@@ -118,19 +144,17 @@ export function OverQuotaReport() {
     method: string,
     note: string,
     discountPercent: number | null,
+    xn: TuyChonXacNhan,
   ) {
     setDangGhi(true);
     setThongBao(null);
     try {
-      const kq = await ghiThanhToan(it.galleryId, amount, method, note, discountPercent);
+      const kq = await ghiThanhToan(it.galleryId, amount, method, note, discountPercent, xn);
       if (!kq.ok) {
         setThongBao({ id: it.galleryId, ok: false, cau: kq.message });
         return;
       }
-      const cau =
-        kq.outstanding > 0
-          ? `Đã ghi. Còn thiếu ${formatCurrencyVND(kq.outstanding)}.`
-          : "Đã ghi. Khách đã trả đủ — dòng này rời danh sách.";
+      const cau = cauSauKhiThu(kq, "Khách đã trả đủ — dòng này rời danh sách.");
       setThongBao({ id: it.galleryId, ok: true, cau });
       setMoThanhToan(null);
       await tai();
@@ -152,7 +176,9 @@ export function OverQuotaReport() {
           aria-expanded={moThanhToan === it.galleryId}
           onClick={() => {
             setThongBao(null);
-            setMoThanhToan(moThanhToan === it.galleryId ? null : it.galleryId);
+            const mo = moThanhToan === it.galleryId ? null : it.galleryId;
+            setMoThanhToan(mo);
+            if (mo) void taiThongTinThu(mo);
           }}
           className="inline-flex h-8 items-center whitespace-nowrap rounded-md bg-[var(--bb-fg)] px-3 text-xs font-medium text-[var(--bb-bg)] transition hover:opacity-90"
         >
@@ -179,11 +205,23 @@ export function OverQuotaReport() {
             <p className="text-xs text-[var(--bb-fg-muted)]">
               Còn phải thu <strong className="text-[var(--bb-fg)]">{formatCurrencyVND(it.unbilledAmount)}</strong>
             </p>
-            <PaymentForm
-              disabled={dangGhi}
-              conThieu={it.unbilledAmount > 0 ? it.unbilledAmount : 0}
-              onSubmit={(a, m, n, pt) => void xacNhanThanhToan(it, a, m, n, pt)}
-            />
+            {(() => {
+              const tt = thongTinThu[it.galleryId];
+              if (tt === "loi") {
+                return <p className="mt-2 text-sm text-[var(--bb-danger)]">Không tải được trạng thái thanh toán, đóng rồi mở lại giúp.</p>;
+              }
+              if (!tt) return <p className="mt-2 text-sm text-[var(--bb-fg-muted)]">Đang tải…</p>;
+              return (
+                <PaymentForm
+                  disabled={dangGhi}
+                  conThieu={tt.amountToCollect}
+                  chuaPhatSinh={tt.amountToCollect <= 0}
+                  khoa={tt.khoaKhiThu}
+                  sanPhamQuaLark={tt.sanPhamQuaLark ?? 0}
+                  onSubmit={(a, m, n, pt, xn) => xacNhanThanhToan(it, a, m, n, pt, xn)}
+                />
+              );
+            })()}
           </div>
         )}
         {thongBao?.id === it.galleryId && (

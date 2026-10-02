@@ -168,13 +168,13 @@ test("K-D2: chưa biết hạn mức — lời của khách, ≤ 12 chữ mỗi 
     const tb = page.getByTestId("thong-bao-trang-thai");
     await expect(tb).toBeVisible();
     const cau = (await page.getByTestId("thong-bao-trang-thai-chu").innerText()).replace(/\s+/g, " ").trim();
-    expect(cau).toBe("Studio đang cập nhật gói của ba mẹ. Tim này chưa được lưu.");
+    expect(cau).toBe("Bean đang cập nhật gói của ba mẹ ạ. Tim này chưa được lưu ạ.");
     for (const c of cau.split(/(?<=\.)\s+/)) expect(c.replace(/[.,]/g, "").split(" ").length, c).toBeLessThanOrEqual(12);
     expect(cau).not.toMatch(/CSKH|liên hệ|hạn mức/i);
     const nhan = page.getByTestId("thong-bao-nhan-studio");
     if (coChat) {
       await expect(nhan).toBeVisible();
-      await expect(nhan).toHaveText("Nhắn studio");
+      await expect(nhan).toHaveText("Nhắn Bean");
       await expect(nhan).toHaveAttribute("href", /^https:\/\//);
     } else {
       await expect(nhan).toHaveCount(0);
@@ -182,7 +182,7 @@ test("K-D2: chưa biết hạn mức — lời của khách, ≤ 12 chữ mỗi 
     // Bấm nút Chốt khi bị chặn: một câu ngắn, không mở hộp chốt.
     await tb.getByRole("button", { name: "Đóng" }).click();
     await page.getByTestId("thanh-noi").getByRole("button", { name: "Chốt danh sách" }).evaluate((el) => (el as HTMLElement).click());
-    await expect(page.getByTestId("thong-bao-trang-thai-chu")).toHaveText("Studio đang cập nhật gói của ba mẹ.");
+    await expect(page.getByTestId("thong-bao-trang-thai-chu")).toHaveText("Bean đang cập nhật gói của ba mẹ ạ.");
     await expect(page.getByRole("heading", { name: /Chốt ảnh cho/ })).toHaveCount(0);
   }
 });

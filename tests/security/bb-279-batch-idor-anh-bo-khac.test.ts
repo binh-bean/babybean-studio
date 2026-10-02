@@ -123,13 +123,13 @@ describe("BB-279: IDOR nhánh batch của POST /api/g/addons (chọn nhiều t�
     const { rows: prodIn } = await client.query(
       // BB-339: hàng in phải có trong bảng giá 01/10 (chất liệu + kích thước) mới bán.
       `insert into products (name, kind, material, size, list_price, price_confidence, price_samples, is_active)
-       values ('Fixture BB-279 In ảnh 30x40', 'print', 'Gỗ', '30x45', 100000, 0.9, 10, true) returning id`,
+       values ('Mẫu kiểm thử BB-279 In ảnh 30x40', 'print', 'Gỗ', '30x45', 100000, 0.9, 10, true) returning id`,
     );
     productInId = prodIn[0].id;
 
     const { rows: prodAlbum } = await client.query(
       `insert into products (name, kind, material, size, list_price, price_confidence, price_samples, is_active)
-       values ('Fixture BB-279 Album', 'print', 'Album (Ultra HD)', '20x20', 500000, 0.9, 10, true) returning id`,
+       values ('Mẫu kiểm thử BB-279 Album', 'print', 'Album (Ultra HD)', '20x20', 500000, 0.9, 10, true) returning id`,
     );
     productAlbumId = prodAlbum[0].id;
   });
@@ -153,7 +153,7 @@ describe("BB-279: IDOR nhánh batch của POST /api/g/addons (chọn nhiều t�
       list_price >= 100000 và mọi sản phẩm thật không mang tiền tố này.
     */
     await client.query(
-      `delete from products where name like 'Fixture BB-279 %' and created_at < now() - interval '6 hours'`,
+      `delete from products where (name like 'Fixture BB-279 %' or name like 'Mẫu kiểm thử BB-279 %') and created_at < now() - interval '6 hours'`,
     );
     await client.end();
   });

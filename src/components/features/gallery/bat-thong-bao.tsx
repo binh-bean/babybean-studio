@@ -36,6 +36,7 @@
 
 import React, { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
+import { vi } from "@/i18n";
 import { nhanBietMay } from "@/lib/utils/nhan-biet-may";
 import { isSubmittedOrLater } from "@/lib/gallery-status";
 
@@ -167,7 +168,7 @@ export function BatThongBao({ galleryId, status, onMoHuongDanLuuApp }: BatThongB
 
       setDaBat(true);
     } catch {
-      setLoi("Không bật được thông báo, ba mẹ thử lại sau nhé.");
+      setLoi(vi.gallery.loiBean.khongBatDuocThongBao);
     } finally {
       setDangXuLy(false);
     }
@@ -189,7 +190,7 @@ export function BatThongBao({ galleryId, status, onMoHuongDanLuuApp }: BatThongB
       }
       setDaBat(false);
     } catch {
-      setLoi("Không tắt được, ba mẹ thử lại sau nhé.");
+      setLoi(vi.gallery.loiBean.khongTatDuocThongBao);
     } finally {
       setDangXuLy(false);
     }

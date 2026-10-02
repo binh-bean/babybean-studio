@@ -97,9 +97,12 @@ export interface LoiGoiYLuuAppProps {
    *  tương thích chữ ký cũ, không đọc giá trị bên trong component. */
   daChon: number;
   onXemCachLuu: () => void;
+  /** BB-358 — link "Mời gia đình" (vai xem): lời nói với gia đình, không với ba mẹ. */
+  laNguoiXem?: boolean;
 }
 
-export function LoiGoiYLuuApp({ onXemCachLuu }: LoiGoiYLuuAppProps) {
+export function LoiGoiYLuuApp({ onXemCachLuu, laNguoiXem = false }: LoiGoiYLuuAppProps) {
+  const nhan = laNguoiXem ? vi.gallery.saveAppPrompt.shortLabelGiaDinh : vi.gallery.saveAppPrompt.shortLabel;
   const [hien, setHien] = useState(false);
   const daKichHoat = useRef(false); // đã tự hiện một lần trong phiên này chưa
 
@@ -141,7 +144,7 @@ export function LoiGoiYLuuApp({ onXemCachLuu }: LoiGoiYLuuAppProps) {
     // hướng dẫn đầy đủ.
     <div
       role="status"
-      aria-label={vi.gallery.saveAppPrompt.message}
+      aria-label={laNguoiXem ? nhan : vi.gallery.saveAppPrompt.message}
       data-testid="goi-y-luu-app"
       className={cn(
         // BB-330 — câu dài hơn (nói rõ để làm gì) nên cho xuống 2 dòng ở 390px: bỏ `h-9`
@@ -172,7 +175,7 @@ export function LoiGoiYLuuApp({ onXemCachLuu }: LoiGoiYLuuAppProps) {
         onClick={xemCachLuu}
         className="text-left font-medium hover:underline"
       >
-        {vi.gallery.saveAppPrompt.shortLabel}
+        {nhan}
       </button>
       <button
         type="button"

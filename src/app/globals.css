@@ -110,6 +110,17 @@ button:disabled,
   to { opacity: 1; transform: scale(1); }
 }
 
+/* BB-355 — tấm trượt "Mời ông bà cùng xem": lên từ đáy (điện thoại), vào từ
+   phải (máy tính). Lớp motion-safe ở moi-nguoi-than.tsx. */
+@keyframes tam-truot-len {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes tam-truot-trai {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 /* BB-210 (24/09/2026): bỏ hiệu ứng tim bật khi chạm hai lần — chủ studio xếp
    PHÓNG TO vào P0, và chạm hai lần là cử chỉ mọi trình xem ảnh ba mẹ đã quen
    (Ảnh của iPhone, Google Photos) dùng để phóng, không phải để thả tim. Nút

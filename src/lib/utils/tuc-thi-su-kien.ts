@@ -32,6 +32,8 @@ export const LOAI_TUC_THI = {
    * (+ id bộ ảnh ở kênh nhân viên) — không mã trạng thái, không dữ liệu cá nhân.
    */
   larkTrangThai: "lark.trang_thai",
+  /** BB-359 — bộ đã thu gọn vừa Đồng bộ lại xong: màn khách nạp lại danh sách ảnh. */
+  studioMoLaiAnh: "studio.mo_lai_anh",
 } as const;
 
 /** Loại hợp lệ: chữ thường, số, `_`, `.` — không bao giờ là văn bản tự do. */

@@ -35,6 +35,8 @@
  * Phép thử đỏ-khi-hoàn-nguyên: `tests/unit/cam-on-sau-chot.test.tsx`.
  */
 
+import { vi } from "@/i18n";
+import { cauBiaKhach, trangThaiVuaChot } from "@/lib/lark/trang-thai-app-lark";
 import React from "react";
 import { Check } from "lucide-react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -53,6 +55,12 @@ export function dongSoTamCamOn(soTamDaChon: number, hanMuc: number | null): stri
 
 export interface CamOnSauChotProps {
   tenBe: string | null;
+  /**
+   * BB-353 (P0) — trạng thái bộ ảnh lúc hiện màn cảm ơn (thường `submitted`).
+   * Tiêu đề lấy từ `cauBiaKhach()`, cùng nguồn với bìa + thẻ tiến trình.
+   */
+  trangThai?: string;
+  giaiDoan?: number | null;
   chotLuc: Date;
   soTamDaChon: number;
   hanMuc: number | null;
@@ -60,10 +68,18 @@ export interface CamOnSauChotProps {
   soMonMuaThem: number;
   tienMuaThem: number;
   onXemTienDo: () => void;
+  /**
+   * BB-351 (vòng 7, B mục 2) — studio đã xác nhận danh sách (bộ rời `submitted`). Màn này nghe
+   * tín hiệu tức thì qua `gallery-app.tsx` (useCapNhatTucThi → loadGallery), nên đổi chữ NGAY,
+   * không phải F5: hết "Chờ studio xác nhận… Vẫn thêm được ảnh".
+   */
+  studioDaXacNhan?: boolean;
 }
 
 export function CamOnSauChot({
   tenBe,
+  trangThai = "submitted",
+  giaiDoan = null,
   chotLuc,
   soTamDaChon,
   hanMuc,
@@ -71,6 +87,7 @@ export function CamOnSauChot({
   soMonMuaThem,
   tienMuaThem,
   onXemTienDo,
+  studioDaXacNhan = false,
 }: CamOnSauChotProps) {
   return (
     <div
@@ -111,14 +128,15 @@ export function CamOnSauChot({
       </div>
 
       <p className="mt-4 text-[12px] uppercase tracking-[0.14em] text-muted-foreground">
-        {/* BB-329 — vừa bấm Xác nhận là CHỜ studio xác nhận, chưa "đã chốt". */}
-        Chờ studio xác nhận · {formatNgayVN(chotLuc)}
+        {/* BB-329 — vừa bấm Xác nhận là đã GỬI, chưa "đã chốt". Câu trạng thái nằm ở
+            tiêu đề `cam-on-trang-thai` (BB-353, một hàm `trangThaiKhach`). */}
+        Đã gửi · {formatNgayVN(chotLuc)}
       </p>
-      <h1 className="mt-2 font-display text-[28px] font-light leading-[1.15] sm:text-[32px]">
-        Studio đã nhận danh sách{tenBe ? ` của ${tenBe}` : ""}
+      <h1 data-testid="cam-on-trang-thai" className="mt-2 font-display text-[28px] font-light leading-[1.15] sm:text-[32px]">
+        {cauBiaKhach(trangThaiVuaChot(trangThai), giaiDoan, tenBe, { khoa: true })}
       </h1>
       <p className="mt-2.5 text-[15px] text-muted-foreground">
-        Cảm ơn ba mẹ đã chọn từng khoảnh khắc ạ.
+        {vi.gallery.loiBean.camOnChonTungKhoanhKhac}
       </p>
       {/* BB-338 mục 1 — lời ký của studio, Playfair không nghiêng. */}
       <p data-testid="loi-ky-bean" className="mt-1.5 font-display text-[18px] font-normal not-italic text-foreground">
@@ -157,8 +175,10 @@ export function CamOnSauChot({
         >
           Xem tiến độ
         </button>
-        <p className="mt-3 text-[13px] text-muted-foreground">
-          Vẫn thêm được ảnh tới khi studio xác nhận
+        <p data-testid="cam-on-chu-thich" className="mt-3 text-[13px] text-muted-foreground">
+          {studioDaXacNhan
+            ? `Bean đang chỉnh ảnh của ${tenBe?.trim() || "bé"}, danh sách đã khoá ạ.`
+            : vi.gallery.loiBean.vanThemDuocAnh}
         </p>
       </div>
     </div>

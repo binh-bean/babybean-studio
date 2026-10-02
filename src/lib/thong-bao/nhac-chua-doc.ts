@@ -69,7 +69,7 @@ export async function nhacThongBaoChuaDoc(client: SupabaseClient): Promise<numbe
         await guiPushToiBoAnh(
           client,
           dong.gallery_id,
-          { tieuDe: dong.tieu_de, noiDung: `${dong.noi_dung} (nhắc lại)` },
+          { tieuDe: dong.tieu_de, noiDung: `${dong.noi_dung} (Bean nhắc lại ạ)` },
           dong.id,
         );
 

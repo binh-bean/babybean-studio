@@ -227,7 +227,7 @@ ownIpTest.describe("BB-329 — màn khách: tiến độ, Đặt in, cửa hàng
     await page.goto(`/g/${bc.maLink}`);
     const the = page.locator("#the-hanh-trinh");
     await the.scrollIntoViewIfNeeded();
-    await ownIpExpect(the.getByRole("heading", { name: "Đang chờ studio xác nhận" })).toBeVisible();
+    await ownIpExpect(the.getByRole("heading", { name: "Bean đang xác nhận danh sách ảnh ạ" })).toBeVisible();
     await ownIpExpect(the.locator("[aria-current='step']")).toHaveText("Chờ xác nhận");
     await ownIpExpect(the.getByText("Đã chốt", { exact: true })).toHaveCount(0);
     for (const nhan of ["Chờ xác nhận", "In/nhận ảnh"]) {
@@ -255,14 +255,14 @@ ownIpTest.describe("BB-329 — màn khách: tiến độ, Đặt in, cửa hàng
     await page.reload();
     await the.scrollIntoViewIfNeeded();
     await ownIpExpect(the.locator("[aria-current='step']")).toHaveText("Chờ chỉnh");
-    await ownIpExpect(the.getByRole("heading", { name: "Đang chỉnh sửa" })).toHaveCount(0);
+    await ownIpExpect(the.getByRole("heading", { name: "Bean đang chỉnh ảnh ạ" })).toHaveCount(0);
     await the.screenshot({ path: `${THU_MUC_ANH}/1b-cho-chinh.png` });
 
     await pg.query(`update galleries set lark_trang_thai = 'optmhzW4sL' where id = $1`, [bc.galleryId]);
     await page.reload();
     await the.scrollIntoViewIfNeeded();
     await ownIpExpect(the.locator("[aria-current='step']")).toHaveText("Đang chỉnh");
-    await ownIpExpect(the.getByRole("heading", { name: "Đang chỉnh sửa" })).toBeVisible();
+    await ownIpExpect(the.getByRole("heading", { name: "Bean đang chỉnh ảnh ạ" })).toBeVisible();
     await the.screenshot({ path: `${THU_MUC_ANH}/1c-dang-chinh.png` });
 
     await pg.query(`update galleries set status = 'ready', lark_trang_thai = null where id = $1`, [bc.galleryId]);

@@ -222,7 +222,7 @@ test.describe.serial("BB-321: đợt chọn — khách mua thêm, CSKH xác nh�
     const dot2 = page.getByTestId("trang-thai-dot-2");
     await expect(dot2).toBeVisible({ timeout: 30_000 });
     await expect(dot2).toContainText("Đợt 2 · 2 ảnh");
-    await expect(dot2).toContainText("Đang chờ studio xác nhận");
+    await expect(dot2).toContainText("Bean đang xác nhận đợt này ạ");
     await expect(page.getByTestId("man-chon-them-anh")).toHaveCount(0); // chốt xong quay về màn chính
     await dot2.scrollIntoViewIfNeeded();
     await chupHaiKho(page, "dot-trang-thai-cho", async () => {
@@ -305,9 +305,9 @@ test.describe.serial("BB-321: đợt chọn — khách mua thêm, CSKH xác nh�
     await chanLh3TrenTrinhDuyet(page);
     await page.goto(`/g/${maLink}`);
 
-    await expect(page.getByTestId("trang-thai-dot-2")).toContainText("Studio đã xác nhận", { timeout: 30_000 });
+    await expect(page.getByTestId("trang-thai-dot-2")).toContainText("Bean đã xác nhận đợt này ạ", { timeout: 30_000 });
     const dot3 = page.getByTestId("trang-thai-dot-3");
-    await expect(dot3).toContainText("Studio chưa nhận đợt này");
+    await expect(dot3).toContainText("Bean chưa nhận đợt này");
     await expect(page.getByTestId("ly-do-dot-3")).toContainText("Tấm này trùng đợt trước");
     await chupHaiKho(page, "dot-trang-thai-xac-nhan-tu-choi", async () => {
       await page.getByTestId("trang-thai-cac-dot").scrollIntoViewIfNeeded();

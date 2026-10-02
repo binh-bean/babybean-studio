@@ -14,6 +14,7 @@
  * Việt) chứ không nuốt: ghi đợt mua trên môi trường thiếu bảng phải kêu lên.
  */
 
+import { vi } from "@/i18n";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
@@ -325,7 +326,7 @@ export async function chuanBiSanPham(
     if (!p || !p.is_active) {
       return { ok: false, code: "NOT_FOUND", message: "Có sản phẩm không tồn tại hoặc đã ngừng kinh doanh" };
     }
-    if (!sanPhamBanChoKhach({ isActive: p.is_active, kind: p.kind, material: p.material, size: p.size })) {
+    if (!sanPhamBanChoKhach({ name: p.name, isActive: p.is_active, kind: p.kind, material: p.material, size: p.size })) {
       return { ok: false, code: "INVALID_INPUT", message: "Sản phẩm này không bán trong mục chọn thêm" };
     }
     if (p.list_price === null || p.list_price === undefined) {
@@ -422,7 +423,7 @@ export async function chotDotChon(
     .eq("selection_id", p.selectionId);
   if (eCo) {
     if (laLoiChuaApMigration(eCo)) {
-      return { ok: false, code: "CONFLICT", message: "Tính năng chọn thêm ảnh chưa sẵn sàng, ba mẹ nhắn CSKH giúp em nhé" };
+      return { ok: false, code: "CONFLICT", message: vi.gallery.loiBean.chonThemChuaSanSang };
     }
     throw eCo;
   }
@@ -494,7 +495,7 @@ export async function chotDotChon(
     }
     if (eIns.code === "23505") continue; // trùng số đợt → thử số kế tiếp
     if (laLoiChuaApMigration(eIns)) {
-      return { ok: false, code: "CONFLICT", message: "Tính năng chọn thêm ảnh chưa sẵn sàng, ba mẹ nhắn CSKH giúp em nhé" };
+      return { ok: false, code: "CONFLICT", message: vi.gallery.loiBean.chonThemChuaSanSang };
     }
     throw eIns;
   }

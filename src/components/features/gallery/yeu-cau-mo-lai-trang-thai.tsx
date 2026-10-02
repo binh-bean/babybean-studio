@@ -14,6 +14,7 @@
 
 "use client";
 
+import { vi } from "@/i18n";
 import React from "react";
 import { formatGioVN, formatNgayVN } from "@/lib/utils/dinh-dang";
 
@@ -45,9 +46,9 @@ export function YeuCauMoLaiTrangThai({
   if (!reopenRequest || reopenRequest.trangThai === "khong_co") return null;
 
   const lienHe = zaloOa
-    ? { nhan: "Nhắn studio", href: `https://zalo.me/${zaloOa}` }
+    ? { nhan: "Nhắn Bean", href: `https://zalo.me/${zaloOa}` }
     : hotline
-      ? { nhan: "Gọi cho studio", href: `tel:${hotline}` }
+      ? { nhan: vi.gallery.loiBean.goiChoBean, href: `tel:${hotline}` }
       : null;
 
   if (reopenRequest.trangThai === "cho_xu_ly") {
@@ -62,7 +63,7 @@ export function YeuCauMoLaiTrangThai({
           {reopenRequest.lanThu > 1 && <> · lần {reopenRequest.lanThu}</>}
         </p>
         <p className="mt-0.5 text-[13px] text-muted-foreground">
-          Studio sẽ phản hồi sớm — chưa cần gửi lại.
+          {vi.gallery.loiBean.sePhanHoiSom}
         </p>
       </div>
     );
@@ -75,7 +76,7 @@ export function YeuCauMoLaiTrangThai({
         className="rounded-2xl border border-[#e7cf9f] bg-[#fbf3e2] p-4 text-[#5c4413]"
       >
         <p className="text-sm font-medium">
-          Studio phản hồi: {reopenRequest.lyDoTuChoi ?? "Chưa mở lại được lúc này"}
+          Bean phản hồi: {reopenRequest.lyDoTuChoi ?? "Chưa mở lại được lúc này ạ"}
         </p>
         {reopenRequest.lanThu > 0 && (
           <p className="mt-0.5 text-[13px] opacity-90">Lần {reopenRequest.lanThu}</p>
@@ -100,7 +101,7 @@ export function YeuCauMoLaiTrangThai({
       data-testid="yeu-cau-mo-lai-trang-thai"
       className="rounded-2xl border border-[#bcd0ae] bg-[#eef4e7] p-4 text-[#37471f]"
     >
-      <p className="text-sm font-medium">Studio đã mở lại, ba mẹ chọn tiếp nhé</p>
+      <p className="text-sm font-medium">{vi.gallery.loiBean.daMoLai}</p>
     </div>
   );
 }

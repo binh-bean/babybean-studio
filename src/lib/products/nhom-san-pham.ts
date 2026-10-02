@@ -123,7 +123,37 @@ function laVatLieuCanvas(material: string | null): boolean {
  */
 export function tenChatLieuChoKhach(material: string | null): string | null {
   if (material == null) return null;
-  return laKimTuyen(material) ? "Kim Tuyến" : material;
+  if (laChatLieuUV(material)) return "UV";
+  return laKimTuyen(material) ? "Kim Tuyến" : vietHoaChuDau(material);
+}
+
+/**
+ * BB-361 (người chấm vòng 9, mục 4) — tên hiển thị cho khách luôn viết hoa chữ
+ * đầu: "tờ Album (Ultra HD) 20×20" (tên Lark) đứng đầu dòng cạnh "Ảnh in UV"
+ * viết hoa trông lệch kiểu. Chỉ đổi chữ cái ĐẦU của bản hiển thị; dữ liệu
+ * (Lark/`products`) giữ nguyên.
+ */
+export function vietHoaChuDau(ten: string): string {
+  const m = /^(\s*)(\p{Ll})/u.exec(ten);
+  if (!m) return ten;
+  return m[1] + m[2]!.toLocaleUpperCase("vi") + ten.slice(m[0].length);
+}
+
+/**
+ * BB-358 (anh 02/10/2026) — ảnh in UV là ảnh GIẤY: tên cho khách chỉ là "UV"
+ * (không "UV bóng"), không cán gỗ, không bọc khung, không treo tường. Dữ liệu
+ * (Lark/`products.material`) giữ nguyên — chỉ đổi tên HIỂN THỊ ở đây.
+ */
+export function laChatLieuUV(material: string | null | undefined): boolean {
+  return typeof material === "string" && /^\s*uv(\s*bóng)?\s*$/iu.test(material);
+}
+
+/**
+ * Khung (Khung Hàn Quốc) chỉ bọc quanh chất liệu ĐÃ CÁN (Gỗ, Tráng gương, Thủy
+ * tinh, Mica, Kim Tuyến…). UV là ảnh giấy → không có lựa chọn khung.
+ */
+export function coTheBocKhung(material: string | null | undefined): boolean {
+  return !laChatLieuUV(material);
 }
 
 /**
@@ -131,7 +161,10 @@ export function tenChatLieuChoKhach(material: string | null): string | null {
  * liệu ("Cavas/Kim tuyến 40x60" → "Kim Tuyến 40x60").
  */
 export function tenCoChatLieuChoKhach(ten: string): string {
-  return ten.replace(/ca[n]?vas\s*\/\s*kim\s*tuy[eếề]n/giu, "Kim Tuyến");
+  return ten
+    .replace(/ca[n]?vas\s*\/\s*kim\s*tuy[eếề]n/giu, "Kim Tuyến")
+    // BB-358 — "UV bóng" → "UV" (tên hiển thị; dữ liệu giữ nguyên).
+    .replace(/\bUV\s+bóng/giu, "UV");
 }
 
 /**
@@ -171,12 +204,21 @@ export function tenCoChatLieuChoKhach(ten: string): string {
  * lớp lọc RIÊNG, chỉ áp cho đường bán hàng mới.
  */
 export function sanPhamBanChoKhach(sp: SanPhamXetBan): boolean {
+  // BB-352 (CV-01) — sản phẩm THỬ ("Fixture …", "Test …") không bao giờ bán, ở MỌI
+  // đường ghi (addons, mua-them, dot-chon), không chỉ ở danh mục hiển thị. Trước
+  // đây chỉ /api/g/gallery lọc (BB-339): đoán được id là mua được.
+  if (laSanPhamThu(sp.name)) return false;
   if (!sanPhamThuocNhomBan(sp)) return false;
   if (sp.kind === "print" && !coTrongBangGia(sp.material, sp.size)) return false;
   return true;
 }
 
 export interface SanPhamXetBan {
+  /**
+   * BB-352 — BẮT BUỘC truyền (null nếu không có): thiếu tên thì không phân biệt được
+   * hàng thử, và để tuỳ chọn là cách người sau quên truyền mà tsc không bắt được.
+   */
+  name: string | null;
   isActive: boolean;
   kind: string | null;
   material: string | null;
@@ -189,7 +231,7 @@ export interface SanPhamXetBan {
  * CHƯA xét bảng giá. Màn "Kích thước đang bán" (Cài đặt) dùng hàm này để còn
  * liệt kê được món "Không có trong bảng giá — đang ẩn".
  */
-export function sanPhamThuocNhomBan(sp: Omit<SanPhamXetBan, "size">): boolean {
+export function sanPhamThuocNhomBan(sp: Omit<SanPhamXetBan, "size" | "name">): boolean {
   if (!sp.isActive) return false;
   if (nhomSanPham(sp.kind, sp.material) === null) return false;
   if (laVatLieuCanvas(sp.material)) return false;

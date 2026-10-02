@@ -4,7 +4,8 @@ import React, { useEffect, useState } from "react";
 import { AdminSidebar } from "./admin-sidebar";
 import { AdminHeader } from "./admin-header";
 import { TucThiNhanVien } from "./tuc-thi-nhan-vien";
-import { SU_KIEN_VIEC_DOI, tabsChoVai, tongViecCanXuLy, type TabViecCanXuLy } from "@/lib/utils/viec-can-xu-ly-tabs";
+import { SU_KIEN_VIEC_DOI, demViecCanXuLy, type KetQuaDemViec } from "@/lib/utils/viec-can-xu-ly-tabs";
+import { DemViecProvider } from "./dem-viec-context";
 
 export function AdminLayoutShell({
   children,
@@ -27,29 +28,18 @@ export function AdminLayoutShell({
   // có hạn mức, Lark báo đỏ/tím — những loại không có tab nào trong trang, nên
   // số trên menu không bao giờ khớp danh sách. Đếm lại khi một việc vừa được
   // xử lý (sự kiện SU_KIEN_VIEC_DOI) và khi quay lại cửa sổ. Lỗi thì ẩn.
-  const [canXuLyCount, setCanXuLyCount] = useState<number | null>(null);
+  // BB-359: MỘT kết quả đếm (`demViecCanXuLy`) cho huy hiệu, Bàn làm việc (dòng phụ
+  // + thẻ "Cần xử lý ngay") và số trên các tab — chia qua `DemViecProvider`.
+  const [demViec, setDemViec] = useState<KetQuaDemViec | null>(null);
+  const canXuLyCount = demViec ? demViec.tong : null;
 
   useEffect(() => {
     let alive = true;
 
     async function taiSoCanXuLy() {
-      const demSo: Partial<Record<TabViecCanXuLy, number>> = {};
-      let coNguonNaoOk = false;
-      await Promise.all(
-        tabsChoVai(role).map(async (tab) => {
-          try {
-            const res = await fetch(tab.api, { cache: "no-store" });
-            const json = await res.json().catch(() => null);
-            if (!res.ok || !json?.data) return;
-            coNguonNaoOk = true;
-            demSo[tab.value] = tab.demSo(json.data);
-          } catch {
-            // Một tab hỏng thì coi là 0 — huy hiệu là phụ.
-          }
-        }),
-      );
-      if (!alive || !coNguonNaoOk) return;
-      setCanXuLyCount(tongViecCanXuLy(demSo));
+      const kq = await demViecCanXuLy(role);
+      if (!alive || !kq) return;
+      setDemViec(kq);
     }
 
     let lanCuoi = 0;
@@ -75,6 +65,7 @@ export function AdminLayoutShell({
     // BB-294 (#19) — `giao-dien-quan-tri` khoanh vùng CSS cho nút chính màu
     // mực toàn quản trị; xem khối chú thích cạnh `.giao-dien-quan-tri` trong
     // src/styles/tokens.css.
+    <DemViecProvider value={demViec}>
     <div className="giao-dien-quan-tri flex h-[100dvh] w-full bg-[var(--bb-bg)]">
       <AdminSidebar
         isCollapsed={isSidebarCollapsed}
@@ -91,5 +82,6 @@ export function AdminLayoutShell({
         </main>
       </div>
     </div>
+    </DemViecProvider>
   );
 }

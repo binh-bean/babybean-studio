@@ -213,13 +213,63 @@ export function soAnhHanMucTheoThanhToan(p: {
 export function tienCanThuCuaBo(p: {
   tienTheoAnh: number;
   tienLucChot: number | null | undefined;
-  /** Tổng `tien_anh + tien_san_pham` của các đợt ≥ 2 đang `da_xac_nhan`. */
+  /** BB-360 — TIỀN ẢNH của phần mua thêm (đợt ≥ 2 `tien_anh` + "Edit file" mọi đợt). Luôn thu qua app. */
   tienDotMuaThem: number;
+  /** BB-360 — xem `tienSanPhamTinhVaoPhaiThu`. */
+  tienSanPham?: number;
+  thuSanPhamQuaApp?: boolean;
   daGhiCo: number;
   /** BB-348 — xem `TienHanMucDaQuyDoi`. */
   quyDoi?: TienHanMucDaQuyDoi;
 }): number {
+  return tienConPhaiThuSauGhiCo(tongPhaiThuCuaBo(p), p.daGhiCo);
+}
+
+/**
+ * BB-351 — TỔNG PHẢI THU (chưa trừ khoản ghi có): phần vượt hạn mức + đợt mua thêm đã xác
+ * nhận. Là "Phải thu" duy nhất cho mọi màn hình; "còn thiếu" = tổng này − đã ghi có. Không
+ * dùng riêng `snapshot_extra_amount`: số đó chỉ là lượt chốt mới nhất, thiếu phần hạn mức
+ * đã quy đổi trước đó và các đợt mua thêm — chính là lỗi "khách trả DƯ" vòng 7.
+ */
+export function tongPhaiThuCuaBo(p: {
+  tienTheoAnh: number;
+  tienLucChot: number | null | undefined;
+  /** BB-360 — TIỀN ẢNH của phần mua thêm (luôn thu qua app). */
+  tienDotMuaThem: number;
+  /** BB-360 — tiền SẢN PHẨM (ảnh in / khung / album) mọi đợt; chỉ cộng khi `thuSanPhamQuaApp`. */
+  tienSanPham?: number;
+  thuSanPhamQuaApp?: boolean;
+  quyDoi?: TienHanMucDaQuyDoi;
+}): number {
   const vuot = tienVuotHanMucPhaiThu({ tienTheoAnh: p.tienTheoAnh, tienLucChot: p.tienLucChot, quyDoi: p.quyDoi });
   const dot = Number.isFinite(p.tienDotMuaThem) ? Math.max(0, p.tienDotMuaThem) : 0;
-  return tienConPhaiThuSauGhiCo(vuot + dot, p.daGhiCo);
+  return vuot + dot + tienSanPhamTinhVaoPhaiThu(p.tienSanPham ?? 0, p.thuSanPhamQuaApp === true);
+}
+
+/**
+ * BB-360 — khoá cài đặt (bảng `settings`, `branch_id` null): app có THU tiền sản phẩm mua thêm
+ * (ảnh in / khung / album) không. Anh chốt 02/10/2026: hiện thu qua Lark, "sau này mới chuyển
+ * sang thu trong app" → MẶC ĐỊNH TẮT. Thiếu dòng / đọc hụt / giá trị lạ = tắt.
+ */
+export const KHOA_THU_SAN_PHAM_QUA_APP = "thanh_toan.thu_san_pham_qua_app";
+
+/**
+ * BB-360 — CHỖ RẼ NHÁNH DUY NHẤT của cờ `thanh_toan.thu_san_pham_qua_app`. Màn hình không rẽ:
+ *   · bật  → tiền sản phẩm nằm trong "Phải thu / Còn thiếu / amountToCollect" (như BB-359);
+ *   · tắt  → 0 ở đó; phần này hiện riêng một dòng "Sản phẩm mua thêm: X ₫ · thu qua Lark".
+ */
+export function tienSanPhamTinhVaoPhaiThu(tienSanPham: number, thuSanPhamQuaApp: boolean): number {
+  if (!thuSanPhamQuaApp) return 0;
+  return Number.isFinite(tienSanPham) ? Math.max(0, tienSanPham) : 0;
+}
+
+/** BB-360 — phần sản phẩm thu NGOÀI app (qua Lark): bù đúng phần `tienSanPhamTinhVaoPhaiThu` bỏ ra. */
+export function tienSanPhamThuQuaLark(tienSanPham: number, thuSanPhamQuaApp: boolean): number {
+  const tong = Number.isFinite(tienSanPham) ? Math.max(0, tienSanPham) : 0;
+  return tong - tienSanPhamTinhVaoPhaiThu(tong, thuSanPhamQuaApp);
+}
+
+/** BB-360 — đọc giá trị cờ đã lưu: chỉ đúng `true` (boolean) mới là bật. */
+export function laBatThuSanPhamQuaApp(value: unknown): boolean {
+  return value === true;
 }

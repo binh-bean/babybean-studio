@@ -17,7 +17,7 @@ import { Client } from "pg";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes, createHash } from "node:crypto";
 
-export const NHAN_GOC = "Fixture DANHGIA5";
+export const NHAN_GOC = process.env.DANHGIA_NHAN ?? "Fixture DANHGIA5";
 
 export interface BoAnhFixture {
   id: string;
@@ -265,8 +265,21 @@ async function duLieuDanhGia5Trong(dang: TrangThaiDangDung): Promise<DuLieuDanhG
       await pg.query(`delete from notifications where branch_id = $1`, [r.id]).catch(() => {});
       await pg.query(`delete from galleries where branch_id = $1`, [r.id]).catch(() => {});
       await pg.query(`delete from customers where branch_id = $1`, [r.id]).catch(() => {});
+      // BB-354: nhân sự Fixture của lượt cũ nằm LẠI nếu chỉ gỡ gán chi nhánh — xoá luôn.
+      const { rows: nsCu } = await pg.query(
+        `select staff_id from staff_branches where branch_id = $1`,
+        [r.id],
+      );
       await pg.query(`delete from staff_branches where branch_id = $1`, [r.id]).catch(() => {});
       await pg.query(`delete from branches where id = $1`, [r.id]).catch(() => {});
+      const idsCu = (nsCu as { staff_id: string }[]).map((x) => x.staff_id);
+      if (idsCu.length) {
+        const { rows: chiFixture } = await pg.query(
+          `select id from staff_profiles where id = any($1) and full_name like $2`,
+          [idsCu, `${NHAN_GOC}%`],
+        );
+        await xoaNhanSu(pg, (chiFixture as { id: string }[]).map((x) => x.id)).catch(() => []);
+      }
     }
   } catch {
     // dọn rác cũ là best-effort, không chặn lượt chạy này
@@ -570,6 +583,55 @@ async function xoaBoAnh(pg: Client, id: string): Promise<void> {
   await q("delete from galleries where id = $1");
 }
 
+/**
+ * BB-354 — xoá các nhân sự Fixture theo id, trả về danh sách lỗi (rỗng = sạch).
+ * Gỡ mọi khoá ngoại trỏ vào `staff_profiles` theo catalog (cột cho phép null thì đặt null,
+ * cột bắt buộc thì xoá dòng — chỉ là dòng do chính nhân sự Fixture này tạo), rồi xoá hồ sơ
+ * và tài khoản Supabase Auth. Mỗi bước lỗi được GHI LẠI, không nuốt.
+ */
+async function xoaNhanSu(pg: Client, staffIds: string[]): Promise<string[]> {
+  const loi: string[] = [];
+  if (!staffIds.length) return loi;
+  const thu = async (ten: string, sql: string, val: unknown[]) => {
+    try {
+      await pg.query(sql, val);
+    } catch (e) {
+      loi.push(`${ten}: ${(e as Error).message}`);
+    }
+  };
+  const { rows: tham } = await pg.query(
+    `select cl.relname t, a.attname c, a.attnotnull nn
+       from pg_constraint k
+       join pg_class cl on cl.oid = k.conrelid
+       join pg_namespace n on n.oid = cl.relnamespace and n.nspname = 'public'
+       join pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
+      where k.contype = 'f' and k.confrelid = 'public.staff_profiles'::regclass
+        and cl.relname <> 'staff_branches'`,
+  );
+  for (const t of tham as { t: string; c: string; nn: boolean }[]) {
+    if (!/^[a-z_][a-z0-9_]*$/.test(t.t) || !/^[a-z_][a-z0-9_]*$/.test(t.c)) continue;
+    await thu(
+      `gỡ ${t.t}.${t.c}`,
+      t.nn
+        ? `delete from public.${t.t} where ${t.c} = any($1)`
+        : `update public.${t.t} set ${t.c} = null where ${t.c} = any($1)`,
+      [staffIds],
+    );
+  }
+  await thu("activity_logs", `delete from activity_logs where actor_id = any($1)`, [staffIds]);
+  await thu("staff_branches", `delete from staff_branches where staff_id = any($1)`, [staffIds]);
+  await thu("staff_profiles", `delete from staff_profiles where id = any($1)`, [staffIds]);
+  const supa = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  for (const id of staffIds) {
+    const { error } = await supa.auth.admin.deleteUser(id);
+    // "User not found" = đã hết (cascade/xoá trước) — không phải lỗi.
+    if (error && !/not found/i.test(error.message)) loi.push(`auth.deleteUser ${id.slice(0, 8)}: ${error.message}`);
+  }
+  return loi;
+}
+
 async function donTheoChiNhanh(pg: Client, branchId: string, staffIds: string[]): Promise<void> {
   const { rows: bo } = await pg.query(`select id from galleries where branch_id = $1`, [branchId]);
   for (const b of bo as { id: string }[]) await xoaBoAnh(pg, b.id);
@@ -582,26 +644,121 @@ async function donTheoChiNhanh(pg: Client, branchId: string, staffIds: string[])
     await pg.query(`delete from customers where id = $1`, [k.id]).catch(() => {});
   }
 
-  const supa = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  for (const staffId of staffIds) {
-    await pg.query(`delete from activity_logs where actor_id = $1`, [staffId]).catch(() => {});
-    await pg.query(`delete from staff_branches where staff_id = $1`, [staffId]).catch(() => {});
-    await pg.query(`delete from staff_profiles where id = $1`, [staffId]).catch(() => {});
-    await supa.auth.admin.deleteUser(staffId).catch(() => {});
-  }
+  // BB-354: xoá nhân sự THEO id và KHÔNG nuốt lỗi. Bản cũ `.catch(() => {})` mọi lệnh nên khi
+  // một bảng (share_links.created_by, gallery_payments.confirmed_by, …) còn trỏ vào nhân sự,
+  // lệnh xoá hồ sơ gãy trong im lặng và 4 tài khoản "Fixture DANHGIA5-…" nằm lại ở màn Nhân sự.
+  const loiNhanSu = await xoaNhanSu(pg, staffIds);
 
   await pg.query(`delete from activity_logs where branch_id = $1`, [branchId]).catch(() => {});
   await pg.query(`delete from notifications where branch_id = $1`, [branchId]).catch(() => {});
   await pg.query(`delete from branches where id = $1`, [branchId]).catch(() => {});
+  if (loiNhanSu.length) throw new Error(`Không dọn hết nhân sự Fixture: ${loiNhanSu.join("; ")}`);
 }
 
 export async function donDep(d: DuLieuDanhGia5): Promise<{ conFixture: number }> {
   const { pg } = d;
-  await donTheoChiNhanh(pg, d.branchId, [d.ownerId, d.qlId]);
-  const { rows } = await pg.query(`select count(*)::int n from galleries g join branches b on b.id = g.branch_id where b.name like $1`, [`${NHAN_GOC}%`]);
-  const conFixture = rows[0].n as number;
-  await pg.end();
-  return { conFixture };
+  try {
+    // Lỗi dọn nhân sự được ném ra (BB-354) — afterAll đỏ thay vì để rác nằm lại im lặng.
+    await donTheoChiNhanh(pg, d.branchId, [d.ownerId, d.qlId]);
+    const { rows } = await pg.query(`select count(*)::int n from galleries g join branches b on b.id = g.branch_id where b.name like $1`, [`${NHAN_GOC}%`]);
+    const conFixture = rows[0].n as number;
+    return { conFixture };
+  } finally {
+    await pg.end();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// BB-359 — che MỌI nhân sự thật trước khi chụp màn Nhân sự (Q09)
+// ---------------------------------------------------------------------------
+// Vòng 8 (A): ảnh Q09 lộ tên thật của 2 nhân viên nội bộ vì hàm che cũ chỉ bắt dòng có "@"
+// — tài khoản đăng nhập bằng tên (không có email) lọt qua. Nay che theo DANH SÁCH: mọi
+// `staff_profiles.full_name` KHÔNG bắt đầu bằng "Fixture " (đọc từ bb-dev lúc chạy, không
+// ghi ra đâu), cộng mọi chuỗi có "@" không thuộc miền mẫu. Gặp một tên thật thì che CẢ DÒNG
+// chứa nó (tên, tài khoản, chữ viết tắt trên ảnh đại diện, số điện thoại…).
+
+// BB-361 — vòng 9 (A): Q09 còn lộ 2 TÊN ĐĂNG NHẬP (không "@") của nhân viên nội bộ: màn Nhân sự
+// là lưới THẺ (không phải <tr>/<li>) nên "che cả dòng" chỉ trúng ô họ tên, còn ô tài khoản
+// (`toDisplayIdentifier` = email bỏ đuôi miền nội bộ) đứng cạnh lọt qua. Nay danh sách gồm CẢ họ
+// tên, email VÀ tên đăng nhập hiển thị của mọi nhân sự không phải Fixture — ô nào khớp cũng bị che
+// dù khung chứa là gì; thẻ nhân sự còn mang `data-testid="the-nhan-su"` để che trọn thẻ.
+
+/** Miền email nội bộ của tài khoản đăng nhập bằng tên (khớp `STAFF_DOMAIN`, src/lib/auth/username.ts). */
+const MIEN_NOI_BO = "@staff.babybeanstudio.vn";
+
+/**
+ * Họ tên + email + tên đăng nhập của nhân sự thật trên bb-dev (không phải Fixture). Chỉ giữ
+ * trong bộ nhớ của phép thử, không ghi ra đâu.
+ */
+export async function tenNhanVienThat(): Promise<string[]> {
+  const pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+  await pg.connect();
+  try {
+    const { rows } = await pg.query(
+      `select trim(coalesce(full_name, '')) as ten, lower(trim(coalesce(email, ''))) as email
+         from staff_profiles
+        where coalesce(full_name, '') not like 'Fixture %'`,
+    );
+    const ds = new Set<string>();
+    for (const r of rows) {
+      const ten = String(r.ten ?? "");
+      const email = String(r.email ?? "");
+      if (ten) ds.add(ten);
+      if (email) {
+        ds.add(email);
+        if (email.endsWith(MIEN_NOI_BO)) ds.add(email.slice(0, -MIEN_NOI_BO.length));
+      }
+    }
+    return [...ds];
+  } finally {
+    await pg.end();
+  }
+}
+
+/**
+ * Che trong một cây DOM (chạy trong trình duyệt qua `page.evaluate`, hoặc trong jsdom ở
+ * phép thử đơn vị). Trả số dòng đã che. Hàm TỰ ĐỦ — không dùng biến ngoài, vì
+ * `page.evaluate` chỉ chuyển mã nguồn của nó sang trình duyệt.
+ */
+export function cheTrongDom(root: HTMLElement, tenThat: string[]): number {
+  const ten = new Set(tenThat.map((t) => t.trim().toLowerCase()).filter(Boolean));
+  const laThat = (t: string) => {
+    const s = t.trim();
+    if (!s) return false;
+    if (ten.has(s.toLowerCase())) return true;
+    return s.includes("@") && !s.includes("demo.babybean.vn");
+  };
+  const doc = root.ownerDocument;
+  const w = doc.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+  const nodes: Text[] = [];
+  while (w.nextNode()) nodes.push(w.currentNode as Text);
+  const dong = new Set<Element>();
+  for (const n of nodes) {
+    if (!laThat(n.textContent ?? "")) continue;
+    const el = n.parentElement;
+    const hang = el?.closest("tr, li, [role='row'], [data-testid*='nhan-su'], article") ?? el;
+    if (hang) dong.add(hang);
+  }
+  for (const hang of dong) {
+    const w2 = doc.createTreeWalker(hang, 4);
+    const trong: Text[] = [];
+    while (w2.nextNode()) trong.push(w2.currentNode as Text);
+    for (const n of trong) {
+      const s = (n.textContent ?? "").trim();
+      if (!s) continue;
+      // BB-361 — ô chọn vai trò/nút ("Admin", "CSKH", "Sửa") nằm trong thẻ nhân sự: không phải dữ liệu cá nhân, giữ nguyên.
+      const trongDieuKhien = n.parentElement?.closest("select, option, button, [role='combobox'], [role='option']");
+      if (trongDieuKhien && !laThat(s)) continue;
+      if (laThat(s))
+        n.textContent = s.includes("@")
+          ? "nhan.vien.mau@demo.babybean.vn"
+          : /^[a-z0-9._-]+$/i.test(s)
+            ? "nhanvienmau" // tên đăng nhập (không "@", không khoảng trắng)
+            : "Nhân viên mẫu";
+      else if (/^[A-ZĐ]{1,3}$/.test(s)) n.textContent = "NV"; // chữ viết tắt trên ảnh đại diện
+      else if (/^[a-z0-9._-]{3,}$/i.test(s) && !/^\d+$/.test(s) && s !== "NV") n.textContent = "nhanvienmau"; // tên đăng nhập không "@"
+      else if (/\d{3}[\s.]?\d{3}[\s.]?\d{3,4}/.test(s)) n.textContent = "0901 000 000";
+    }
+  }
+  return dong.size;
 }

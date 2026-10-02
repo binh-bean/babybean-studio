@@ -23,6 +23,15 @@
 import React, { useEffect, useState } from "react";
 import { X, Share2, MoreVertical, ExternalLink, SquarePlus } from "lucide-react";
 import { nhanBietMay, type LoaiThietBi } from "@/lib/utils/nhan-biet-may";
+import { vi } from "@/i18n";
+import { giuA } from "@/lib/utils/giu-a";
+
+/**
+ * BB-361 (người chấm vòng 9, mục 10) — MỘT tiêu đề cho cùng một việc trên mọi
+ * điện thoại (iPhone, Android, Samsung): trước đây iPhone "Thêm vào màn hình
+ * chính" còn Android "Lưu app ra màn hình chính". Lấy đúng chữ của iOS/Android.
+ */
+const TIEU_DE_DIEN_THOAI = "Thêm vào màn hình chính";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -32,6 +41,8 @@ interface BeforeInstallPromptEvent extends Event {
 export interface HuongDanThemManHinhProps {
   mo: boolean;
   onDong: () => void;
+  /** BB-358 — link "Mời gia đình": lời hướng dẫn gọi "gia đình". */
+  laNguoiXem?: boolean;
 }
 
 function dangChayNhuApp(): boolean {
@@ -69,7 +80,7 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
     case "facebook-app":
       return {
         tieuDe: "Mở bằng trình duyệt để lưu app",
-        moTa: `${loai === "zalo-app" ? "Zalo" : "Facebook"} không cho lưu app ra màn hình chính. Ba mẹ mở link này bằng Safari hoặc Chrome trước nhé.`,
+        moTa: vi.gallery.loiBean.luuAppMoTrinhDuyet.replace("{app}", loai === "zalo-app" ? "Zalo" : "Facebook"),
         buoc: [
           {
             bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
@@ -90,22 +101,22 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
       // BB-330 — iPhone Safari: "Thêm vào màn hình chính", câu nói rõ để làm gì,
       // hai bước ngắn có hình (Chia sẻ → Thêm vào MH chính).
       return {
-        tieuDe: "Thêm vào màn hình chính",
-        moTa: "Lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn.",
+        tieuDe: TIEU_DE_DIEN_THOAI,
+        moTa: vi.gallery.loiBean.luuAppMoNhanhAnhBe,
         buoc: [buocChiaSe, buocThemMH],
         nutCaiTrucTiep: false,
       };
     case "ios-khac":
       return {
-        tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Trên iPhone, ba mẹ lưu app bằng nút Chia sẻ.",
+        tieuDe: TIEU_DE_DIEN_THOAI,
+        moTa: vi.gallery.loiBean.luuAppIphone,
         buoc: [buocChiaSe, buocThemMH],
         nutCaiTrucTiep: false,
       };
     case "samsung-internet":
       return {
-        tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Lần sau ba mẹ mở nhanh hơn, như một app riêng.",
+        tieuDe: TIEU_DE_DIEN_THOAI,
+        moTa: vi.gallery.loiBean.luuAppNhuAppRieng,
         buoc: [
           {
             bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
@@ -120,8 +131,8 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
       };
     case "android-chrome":
       return {
-        tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Lần sau ba mẹ mở nhanh hơn, như một app riêng.",
+        tieuDe: TIEU_DE_DIEN_THOAI,
+        moTa: vi.gallery.loiBean.luuAppNhuAppRieng,
         buoc: [
           {
             bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
@@ -139,7 +150,7 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
     case "may-tinh":
       return {
         tieuDe: "Lưu app ra máy tính",
-        moTa: "Mở nhanh hơn ở lần sau, không cần mở lại Zalo/trình duyệt.",
+        moTa: vi.gallery.loiBean.luuAppMayTinh,
         buoc: [
           {
             bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
@@ -154,15 +165,20 @@ function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
       };
     default:
       return {
-        tieuDe: "Lưu app ra màn hình chính",
-        moTa: "Ba mẹ mở bằng Safari hoặc Chrome để lưu app nhé.",
+        tieuDe: TIEU_DE_DIEN_THOAI,
+        moTa: vi.gallery.loiBean.luuAppCanSafari,
         buoc: [],
         nutCaiTrucTiep: false,
       };
   }
 }
 
-export function HuongDanThemManHinh({ mo, onDong }: HuongDanThemManHinhProps) {
+/** BB-358 — người được mời: lời hướng dẫn nói với "gia đình" thay vì "ba mẹ". */
+function choGiaDinh(chu: string): string {
+  return chu.replace(/Ba mẹ/g, "Gia đình").replace(/ba mẹ/g, "gia đình");
+}
+
+export function HuongDanThemManHinh({ mo, onDong, laNguoiXem = false }: HuongDanThemManHinhProps) {
   const [loai, setLoai] = useState<LoaiThietBi>("khac");
   const [promptCai, setPromptCai] = useState<BeforeInstallPromptEvent | null>(null);
 
@@ -187,7 +203,16 @@ export function HuongDanThemManHinh({ mo, onDong }: HuongDanThemManHinhProps) {
 
   if (!mo || dangChayNhuApp()) return null;
 
-  const noiDung = noiDungTheoLoai(loai);
+  const noiDungGoc = noiDungTheoLoai(loai);
+  const doiLoi = (chu: string) => giuA(laNguoiXem ? choGiaDinh(chu) : chu);
+  // BB-361 (vòng 9, mục 2) — mọi câu của tấm hướng dẫn đi qua `giuA`: Android từng để
+  // "…như một app riêng" / "ạ." rơi một chữ xuống dòng riêng.
+  const noiDung = {
+    ...noiDungGoc,
+    tieuDe: giuA(noiDungGoc.tieuDe),
+    moTa: noiDungGoc.moTa ? doiLoi(noiDungGoc.moTa) : noiDungGoc.moTa,
+    buoc: noiDungGoc.buoc.map((b) => ({ ...b, chu: doiLoi(b.chu) })),
+  };
 
   const caiTrucTiep = async () => {
     if (!promptCai) return;
@@ -223,7 +248,7 @@ export function HuongDanThemManHinh({ mo, onDong }: HuongDanThemManHinhProps) {
 
         <h3 className="pr-8 font-display text-xl">{noiDung.tieuDe}</h3>
         {noiDung.moTa && (
-          <p className="mt-1.5 text-sm text-muted-foreground">{noiDung.moTa}</p>
+          <p data-testid="huong-dan-luu-app-mo-ta" className="mt-1.5 text-pretty text-sm text-muted-foreground">{noiDung.moTa}</p>
         )}
 
         {noiDung.buoc.length > 0 && (

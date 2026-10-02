@@ -10,6 +10,7 @@
  * đổi thì đi đường MỞ LẠI (`/reopen` kèm số đợt).
  */
 
+import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
@@ -78,8 +79,8 @@ export async function POST(
     });
 
     await guiThongBaoBoAnh(admin, galleryId, {
-      tieuDe: `Studio chưa nhận đợt ${soDot}`,
-      noiDung: `${lyDo} — ba mẹ chọn lại giúp em nhé.`.slice(0, 300),
+      tieuDe: vi.gallery.loiBean.tbDotChuaNhan.replace("{n}", String(soDot)),
+      noiDung: vi.gallery.loiBean.tbDotChuaNhanNoiDung.replace("{lyDo}", lyDo).slice(0, 300),
       loai: "dot_chon_tu_choi",
     });
 

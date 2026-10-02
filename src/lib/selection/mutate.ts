@@ -1,3 +1,4 @@
+import { vi } from "@/i18n";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isGalleryLocked, maLarkConHieuLuc } from "@/lib/gallery-status";
 import { canSelectMore, type QuotaRules } from "@/lib/selection/quota";
@@ -118,7 +119,7 @@ export async function patchSelection(
     return {
       error: {
         code: "QUOTA_UNKNOWN",
-        message: "Studio sẽ báo lại số ảnh trong gói",
+        message: vi.gallery.loiBean.baoLaiHanMuc,
       },
     };
   }

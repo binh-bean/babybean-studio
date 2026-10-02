@@ -42,6 +42,7 @@
  * thành máy dò xem khách nào đang có buổi chụp nào.
  */
 
+import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -66,15 +67,15 @@ export const runtime = "nodejs";
  * trên màn hình khách.
  */
 const NHAN_TRANG_THAI_KHACH: Record<GalleryStatus, string> = {
-  draft: "Studio đang chuẩn bị",
-  syncing: "Studio đang tải ảnh lên",
-  sync_error: "Studio đang chuẩn bị",
+  draft: vi.gallery.loiBean.buoiDangChuanBi,
+  syncing: vi.gallery.loiBean.buoiDangTai,
+  sync_error: vi.gallery.loiBean.buoiDangChuanBi,
   ready: "Mời ba mẹ chọn ảnh",
   in_review: "Ba mẹ đang chọn ảnh",
-  submitted: "Đã chốt, studio đang chỉnh ảnh",
-  in_retouch: "Studio đang chỉnh ảnh",
+  submitted: vi.gallery.loiBean.buoiDaChot,
+  in_retouch: vi.gallery.loiBean.dangChinhAnh,
   awaiting_approval: "Mời ba mẹ duyệt ảnh đã chỉnh",
-  approved: "Ba mẹ đã duyệt, studio đang in",
+  approved: vi.gallery.loiBean.buoiDaDuyet,
   delivered: "Đã giao",
   expired: "Đã chốt danh sách chọn",
   archived: "Đã lưu trữ",

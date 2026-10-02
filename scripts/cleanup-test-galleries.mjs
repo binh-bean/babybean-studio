@@ -46,6 +46,7 @@
  * Cách chạy:
  *   npm run db:cleanup            # xem trước, không ghi gì
  *   npm run db:cleanup -- --write # xoá thật
+ *   npm run db:cleanup -- --tuoi-gio 1   # sản phẩm thử: hạ mốc tuổi 6 giờ -> 1 giờ
  */
 
 import pg from "pg";
@@ -72,11 +73,28 @@ const BO_THU = `(
  * không ai sửa gì sai. Đo ngày 17/09: một dòng như vậy làm cả bộ phép thử
  * bảo mật đỏ trên `main`.
  *
- * KHÔNG đụng sáu tài khoản `@demo.babybean.vn` — xem ghi chú đầu tệp.
+ * KHÔNG đụng các tài khoản seed `@demo.babybean.vn` (liệt kê đúng từng email ở trên,
+ * khớp `scripts/db-seed.mjs`) — xem ghi chú đầu tệp.
+ *
+ * BB-354: trước đây điều kiện là `email not like '%@demo.babybean.vn'` — nhưng phép thử
+ * `tests/fixtures/danh-gia.ts` đặt email nhân sự Fixture của nó cũng ở miền
+ * `@demo.babybean.vn` (fixture.danhgia5.*), nên script này bỏ qua đúng chúng và bốn tài
+ * khoản "Fixture DANHGIA5-…" nằm lại ở màn Nhân sự. Tên "Fixture " ở đầu đã đủ loại
+ * các tài khoản seed (tên thật của chúng không bắt đầu bằng chữ này).
  */
 const NHAN_SU_THU = `(
-  sp.full_name like 'Fixture %'
-  and sp.email not like '%@demo.babybean.vn'
+  (
+    sp.full_name like 'Fixture %'
+    -- BB-359: tài khoản bb-141-admin-galleries.spec.ts dựng trước khi đổi sang "Fixture "
+    -- ("Test Admin <runId>", email test_admin_<runId>@demo.babybean.vn). Khớp CẢ tên lẫn
+    -- email theo đúng khuôn của phép thử — không bắt chữ "test" nằm giữa tên thật.
+    or (sp.full_name ~ '^Test Admin [a-z0-9]{6,10}$'
+        and sp.email ~ '^test_admin_[a-z0-9]{6,10}@demo\.babybean\.vn$')
+  )
+  and sp.email not in (
+    'owner@demo.babybean.vn', 'manager.q1@demo.babybean.vn', 'cs.q1@demo.babybean.vn',
+    'photo.q1@demo.babybean.vn', 'retouch.td@demo.babybean.vn'
+  )
 )`;
 
 /** Khách do máy dựng ra. */
@@ -88,23 +106,49 @@ const KHACH_THU = `(
 )`;
 
 /**
- * Sản phẩm do phép thử dựng ra (BB-309). Cả hai tiền tố: "Fixture " là quy
- * ước mới (xem AGENTS.md và tests/unit/addons.test.ts), "TEST " là tiền tố cũ
- * còn sót lại từ trước khi đổi quy ước — vẫn phải nhận diện được, không thì
- * rác cũ nằm lại vĩnh viễn.
+ * Sản phẩm do phép thử dựng ra (BB-309, BB-352). Bốn tiền tố, và CHỈ bốn tiền tố:
+ *
+ *   "Fixture"   quy ước hiện hành (xem AGENTS.md, tests/unit/addons.test.ts).
+ *               BB-352: bỏ dấu cách sau chữ — một sản phẩm "Fixture" trần cũng
+ *               nhận ra. 01/10/2026 tám sản phẩm "Fixture Gói Baby 01"… còn đang
+ *               bán trên bb-dev (rò từ placements-and-watermark và
+ *               submit-and-confirm).
+ *   "Test BB"   quy ước cũ ("Test BB105 …") trước khi đổi sang "Fixture".
+ *   "TEST "     tiền tố cũ hơn nữa, có từ BB-309 — giữ nguyên, không mở rộng.
+ *   "Mẫu kiểm thử"  tên MỚI (BB-352) cho hàng phép thử phải MUA được qua API — tên
+ *               "Fixture …" bị `sanPhamBanChoKhach()` chặn nên không dùng được. Hàng
+ *               này nằm trong bảng giá nên một dòng rò là khách THẤY và MUA được:
+ *               cần lưới đỡ theo tuổi y như ba tiền tố trên.
  *
  * KHÔNG lọc theo chữ "test" nằm giữa tên, cùng lý do với KHACH_THU ở trên.
  *
- * CHỈ nhận sản phẩm cũ hơn 6 GIỜ (`created_at`). Bộ test tự dọn đúng sản
- * phẩm của mình ở `afterAll` — dọn ở đây chỉ nên vá lượt nào CHẾT GIỮA CHỪNG.
- * Không có mốc tuổi, script này (chạy tay hoặc theo lịch) có thể xoá/tắt một
- * sản phẩm Fixture của một bộ test ĐANG CHẠY DỞ trên máy khác, làm ca đó đỏ
- * oan — không phải vì mã sai, mà vì hai lượt chạy giẫm lên nhau.
+ * CHỈ nhận sản phẩm cũ hơn `tuoiGio` GIỜ (`created_at`), mặc định 6. Bộ test tự
+ * dọn đúng sản phẩm của mình ở `afterAll` — dọn ở đây chỉ nên vá lượt nào CHẾT
+ * GIỮA CHỪNG. Không có mốc tuổi, script này (chạy tay hoặc theo lịch) có thể
+ * xoá/tắt một sản phẩm Fixture của một bộ test ĐANG CHẠY DỞ trên máy khác, làm
+ * ca đó đỏ oan. Cờ `--tuoi-gio <số>` hạ mốc xuống khi người chạy biết chắc không
+ * phép thử nào đang chạy (vd sau sự cố rò, khi chưa qua mốc 6 giờ).
  */
-const SAN_PHAM_THU = `(
-  (p.name like 'Fixture %' or p.name like 'TEST %')
-  and p.created_at < now() - interval '6 hours'
+function sanPhamThu(tuoiGio) {
+  return `(
+  (p.name like 'Fixture%' or p.name like 'Test BB%' or p.name like 'TEST %' or p.name like 'Mẫu kiểm thử%')
+  and p.created_at < now() - interval '${Number(tuoiGio)} hours'
 )`;
+}
+
+/** Đọc `--tuoi-gio <số>`; mặc định 6. Số không hợp lệ thì dừng, không đoán. */
+function docTuoiGio(argv) {
+  const i = argv.indexOf("--tuoi-gio");
+  if (i === -1) return 6;
+  const v = Number(argv[i + 1]);
+  if (!Number.isFinite(v) || v < 0) {
+    console.error("--tuoi-gio cần một số >= 0 (giờ). Vd: --tuoi-gio 1");
+    process.exit(2);
+  }
+  return v;
+}
+
+const SAN_PHAM_THU = sanPhamThu(docTuoiGio(process.argv));
 
 async function main() {
   const dbUrl = process.env.SUPABASE_DB_URL;
@@ -148,7 +192,7 @@ async function main() {
       `select sp.full_name from staff_profiles sp where ${NHAN_SU_THU} order by sp.full_name`,
     );
     console.log(`Nhân sự do phép thử dựng: ${nsXem.length}`);
-    for (const x of nsXem) console.log(`   ${x.full_name}`);
+    for (const x of nsXem) console.log(`   ${x.full_name}  (cùng tài khoản đăng nhập sẽ bị xoá theo)`);
     console.log(`Khách do máy dựng: ${kh.length}`);
     for (const k of kh) console.log(`   ${k.full_name}`);
 
@@ -290,8 +334,39 @@ async function main() {
       if (vet[0].n > 0) {
         console.log(`   ${ns.length} nhân sự Fixture nhưng có dấu vết trên bộ ảnh — GIỮ LẠI.`);
       } else {
-        await xoa("gán chi nhánh", `delete from staff_branches where staff_id = any($1)`, [nIds]);
-        await xoa("nhân sự do phép thử dựng", `delete from staff_profiles where id = any($1)`, [nIds]);
+        // BB-354: nhân sự còn được ~20 bảng khác trỏ tới (người tạo link, người xác nhận
+        // thanh toán, …). Gỡ theo information_schema trong một savepoint: cột cho phép
+        // null thì đặt null; cột bắt buộc còn dòng thì GIỮ nhân sự lại và báo, không ép.
+        const { rows: tham } = await client.query(
+          `select cl.relname t, a.attname c, a.attnotnull nn
+             from pg_constraint k
+             join pg_class cl on cl.oid = k.conrelid
+             join pg_namespace n on n.oid = cl.relnamespace and n.nspname = 'public'
+             join pg_attribute a on a.attrelid = k.conrelid and a.attnum = k.conkey[1]
+            where k.contype = 'f' and k.confrelid = 'public.staff_profiles'::regclass
+              and cl.relname not in ('staff_branches')`,
+        );
+        await client.query("savepoint nhan_su_thu");
+        try {
+          for (const t of tham) {
+            if (!/^[a-z_][a-z0-9_]*$/.test(t.t) || !/^[a-z_][a-z0-9_]*$/.test(t.c)) continue;
+            if (t.nn) {
+              const { rows: con } = await client.query(`select count(*)::int n from public.${t.t} where ${t.c} = any($1)`, [nIds]);
+              if (con[0].n > 0) throw new Error(`${con[0].n} dòng ở ${t.t}.${t.c} còn trỏ vào nhân sự Fixture`);
+            } else {
+              await client.query(`update public.${t.t} set ${t.c} = null where ${t.c} = any($1)`, [nIds]);
+            }
+          }
+          await xoa("gán chi nhánh", `delete from staff_branches where staff_id = any($1)`, [nIds]);
+          await xoa("nhân sự do phép thử dựng", `delete from staff_profiles where id = any($1)`, [nIds]);
+          // Mỗi nhân viên còn một tài khoản đăng nhập (Supabase Auth) cùng `id`. Xoá hồ sơ
+          // mà để tài khoản lại là rác ngầm; xoá tài khoản thì hồ sơ tự theo (on delete cascade).
+          await xoa("tài khoản đăng nhập của nhân sự Fixture", `delete from auth.users where id = any($1)`, [nIds]);
+          await client.query("release savepoint nhan_su_thu");
+        } catch (e) {
+          await client.query("rollback to savepoint nhan_su_thu");
+          console.log(`   Giữ ${ns.length} nhân sự Fixture: ${e.message}`);
+        }
       }
     }
 

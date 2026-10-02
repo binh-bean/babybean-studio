@@ -34,7 +34,7 @@ const DEFAULT_MESSAGE: Record<ErrorCode, string> = {
   SESSION_MISMATCH: "Phiên đang mở thuộc về một link khác",
   GALLERY_LOCKED: "Album đã được chốt, không thể thay đổi",
   QUOTA_EXCEEDED: "Đã vượt số ảnh tối đa cho phép",
-  QUOTA_UNKNOWN: "Studio sẽ báo lại số ảnh trong gói, vui lòng liên hệ CSKH",
+  QUOTA_UNKNOWN: "Bean sẽ báo lại số ảnh trong gói cho ba mẹ ạ",
   CONFLICT: "Thao tác bị trùng, vui lòng thử lại",
   RATE_LIMITED: "Bạn thao tác quá nhanh, vui lòng chờ một lát",
   DRIVE_ACCESS_DENIED: "Thư mục Google Drive chưa được chia sẻ công khai",

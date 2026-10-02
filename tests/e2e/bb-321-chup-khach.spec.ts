@@ -237,10 +237,10 @@ for (const k of ["dt", "mt"] as Kt[]) {
     // 4. Trạng thái đợt trên màn chính — MỘT thẻ, đúng chỗ dải BB-312.
     await expect(page.getByTestId("man-chon-them-anh")).toHaveCount(0);
     const dot4 = page.getByTestId("trang-thai-dot-4");
-    await expect(dot4).toContainText("Đang chờ studio xác nhận", { timeout: 20_000 });
-    await expect(page.getByTestId("trang-thai-dot-3")).toContainText("Studio chưa nhận đợt này");
+    await expect(dot4).toContainText("Bean đang xác nhận đợt này ạ", { timeout: 20_000 });
+    await expect(page.getByTestId("trang-thai-dot-3")).toContainText("Bean chưa nhận đợt này");
     await expect(page.getByTestId("ly-do-dot-3")).toHaveText("Lý do: Tấm này trùng đợt trước.");
-    await expect(page.getByTestId("trang-thai-dot-2")).toContainText("Studio đã xác nhận");
+    await expect(page.getByTestId("trang-thai-dot-2")).toContainText("Bean đã xác nhận đợt này ạ");
     await expect(page.getByTestId("trang-thai-dot-2")).toContainText("UV 10×15 ×2");
     await page.getByTestId("thong-bao-trang-thai").getByRole("button").click().catch(() => {});
     // Bản vẽ duyệt: khối "Bộ ảnh đang ở chế độ xem lại" nằm TRÊN thẻ các đợt.
@@ -273,9 +273,9 @@ for (const k of ["dt", "mt"] as Kt[]) {
 
     const khoiA = page.getByTestId("nhac-nho-studio-chon");
     const khoiB = page.getByTestId("nhac-in-chua-anh");
-    await expect(khoiA).toContainText("Còn 3 ảnh trong gói — nhờ studio chọn giúp");
+    await expect(khoiA).toContainText("Còn 3 ảnh trong gói, ba mẹ nhờ Bean chọn giúp ạ");
     await expect(khoiA).toContainText(CAU_DONG_Y_STUDIO_CHON);
-    await expect(khoiB).toContainText("Gỗ 20×30 còn thiếu 1 ảnh.");
+    await expect(khoiB).toContainText("Gỗ 20×30 còn thiếu 1 ảnh ạ."); // BB-355: giọng Bean
     await expect(khoiB).toContainText(CAU_BIET_ANH_IN_CHAM);
 
     const nut = page.getByRole("button", { name: "Xác nhận", exact: true });
@@ -283,7 +283,7 @@ for (const k of ["dt", "mt"] as Kt[]) {
     // dùm BẮT BUỘC (không có đường thứ ba), và ô ảnh in cũng bắt buộc.
     await page.getByTestId("o-xac-nhan-chot").setChecked(true, { force: true });
     await expect(nut).toBeDisabled();
-    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText("Tích đủ các ô để xác nhận");
+    await expect(page.getByTestId("ly-do-khoa-nut-chot")).toHaveText("Ba mẹ tích đủ các ô để xác nhận ạ."); // BB-355: giọng Bean
     await khoiA.getByText(CAU_DONG_Y_STUDIO_CHON).click();
     await expect(nut).toBeDisabled(); // còn ô ảnh in
 

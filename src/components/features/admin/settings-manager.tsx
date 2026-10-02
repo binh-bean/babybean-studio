@@ -24,7 +24,7 @@ const t = vi.admin.caiDat;
 
 interface CaiDat {
   key: string;
-  nhom: "album" | "anh" | "quang-cao" | "lien-lac";
+  nhom: "album" | "anh" | "quang-cao" | "lien-lac" | "thanh-toan";
   /** Kiểu ô, suy từ schema ở máy chủ — không đoán theo giá trị đang lưu. */
   kieu: "bat-tat" | "so" | "mang-so" | "chu";
   biMat: boolean;
@@ -37,6 +37,7 @@ const NHOM: { id: CaiDat["nhom"]; ten: string }[] = [
   { id: "anh", ten: t.nhomAnh },
   { id: "quang-cao", ten: t.nhomQuangCao },
   { id: "lien-lac", ten: t.nhomLienLac },
+  { id: "thanh-toan", ten: t.nhomThanhToan },
 ];
 
 /** Mỗi khoá một câu nói rõ nó ảnh hưởng tới ai — xem `t.moTa`. */

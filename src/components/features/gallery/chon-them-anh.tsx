@@ -235,7 +235,7 @@ export function DotChonTrenManChinh({
               <BieuTuongTrangThai trangThai={d.trangThai} />
               <div className="min-w-0 flex-1">
                 <p className="font-medium tabular-nums">
-                  Đợt {d.soDot} · {d.soAnh} ảnh
+                  Đợt {d.soDot} · {d.soAnh} tấm
                   {d.tong > 0 && <> · {formatCurrencyVND(d.tong)}</>}
                 </p>
                 <p className="mt-0.5 text-[13px] text-muted-foreground">{nhanTrangThaiDotChoKhach(d.trangThai)}</p>

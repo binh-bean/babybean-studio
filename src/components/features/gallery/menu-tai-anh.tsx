@@ -121,7 +121,7 @@ export function MenuTaiAnh({
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-foreground hover:bg-surface-2"
             >
               <MuiTenTai className="shrink-0 text-muted-foreground" />
-              Tải {soDaChon} ảnh đã chọn
+              Tải {soDaChon} tấm đã chọn
             </button>
           )}
           <button
@@ -134,7 +134,7 @@ export function MenuTaiAnh({
             <span>
               Tải cả bộ
               <span className="block text-xs text-muted-foreground">
-                {formatSo(soAnh)} ảnh · {dungLuong} · ảnh gốc
+                {formatSo(soAnh)} tấm · {dungLuong} · ảnh gốc
               </span>
             </span>
           </button>

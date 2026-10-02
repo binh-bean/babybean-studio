@@ -115,9 +115,15 @@ test("3. Danh sách khách: báo số đang hiện / tổng, 'Tải thêm khách
   }
 });
 
-test("4. Trang chi tiết khách: lịch sử chụp, lịch sử mua, tổng giá trị, lượt ghé, khung 'sắp có'", async ({ browser, baseURL }) => {
+test("4. Trang chi tiết khách: lịch sử chụp, lịch sử mua, tổng giá trị, lượt ghé, không lộ mã việc nội bộ", async ({ browser, baseURL }) => {
   const { rows } = await d.pg.query(`select customer_id from galleries where id = $1`, [d.daGiao.id]);
   const khachId = rows[0].customer_id as string;
+  // BB-354: khách đã trả 350.000 ₫ trong app, không mua thêm — "Tổng giá trị đã mua" KHÔNG được là 0 ₫.
+  // (Dòng sổ thuộc bộ Fixture, bị xoá theo bộ ở afterAll.)
+  await d.pg.query(
+    `insert into gallery_payments (gallery_id, amount, payment_method, confirmed_by, note) values ($1, 350000, 'chuyen_khoan', $2, 'Fixture thu thử')`,
+    [d.daGiao.id, d.ownerId],
+  );
   const { page, ctx } = await mo(browser, baseURL!, `/admin/customers/${khachId}`);
   try {
     const trang = page.getByTestId("trang-khach-hang");
@@ -127,7 +133,12 @@ test("4. Trang chi tiết khách: lịch sử chụp, lịch sử mua, tổng gi
     await expect(trang.getByTestId("tong-gia-tri-khach")).toBeVisible();
     // Fixture chụp "current_date - 20" → năm nay có 1 lượt ghé.
     await expect(trang.getByTestId("luot-ghe-nam-nay")).toContainText("1");
-    await expect(trang.getByTestId("khung-link-gia-dinh")).toContainText("sắp có");
+    // BB-354: không bày thẻ "sắp có" và không lộ mã việc nội bộ (BB-xxx) cho nhân viên.
+    await expect(trang.getByTestId("khung-link-gia-dinh")).toHaveCount(0);
+    await expect(trang.getByTestId("khung-cham-soc")).toHaveCount(0);
+    expect(await trang.innerText()).not.toMatch(/BB-\d+/);
+    await expect(trang.getByTestId("tong-gia-tri-khach")).toContainText("Mua thêm + đã thu trong app");
+    await expect(trang.getByTestId("tong-gia-tri-khach")).toContainText("350.000");
     await expect(trang.getByTestId("lich-su-mua")).toBeVisible();
     await trang.screenshot({ path: path.join(THU_MUC, "trang-khach-hang.png") });
   } finally {

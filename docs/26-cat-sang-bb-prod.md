@@ -14,6 +14,14 @@ tiêu mở: **06/10/2026**.
 qua 0051-0075; C2: chep-cau-hinh có thể trùng khoá chính branches) và sáu lỗi
 nên sửa (S1-S6). Chi tiết từng chỗ sửa ghi ngay tại bước liên quan.
 
+**Bản 01/10/2026 (BB-352) — vá tám chỗ thiếu mà vòng 7 (soát C) tìm ra**
+(`scratchpad/danh-gia/13-vong7-C-phan-bien.md`, mục 3). Mỗi chỗ vá nằm ngay tại
+bước liên quan, và có ô ☐ để anh tích khi làm xong:
+mục **3a** (dãy migration 0076–0085) · **5c** (Realtime) · **7** (bảng nào giữ,
+bảng nào xoá) · **8a** (biến môi trường đầy đủ, gồm `APP_SECRET`, VAPID, loại
+chuỗi kết nối) · **11** (hai Automation của Lark) · **11b** (thứ tự chạy cron và
+đồng bộ sau khi cắt).
+
 ---
 
 ## 0. Trước khi bắt đầu — hai chốt an toàn
@@ -45,7 +53,9 @@ npm run db:backup:prod
 ```
 
 **Kiểm:** lệnh in ra đường dẫn tệp `.sql` và số dòng > 0 cho ít nhất
-`branches`, `packages`, `customers`, `galleries` (457 bộ hôm nay). Thoát mã 0.
+`branches`, `packages`, `customers`, `galleries` (con số "457 bộ" ở các chỗ
+trong tài liệu này là số của ngày 28/09, đã cũ — bb-dev ngày 01/10 có 499 bộ;
+chỉ cần > 0 và khớp với những gì anh biết). Thoát mã 0.
 
 **Đường lùi:** không áp dụng — đây CHÍNH LÀ đường lùi cho mọi bước sau, cho
 tới mốc "khách đầu tiên bấm chọn ảnh" (xem mục 0.3). Giữ tệp này tới khi
@@ -116,8 +126,13 @@ lượt `npm run test`, bắt được đúng lớp lỗi này nếu tái diễn
 1. Lệnh trên thoát mã 0 và dòng cuối in "**Chín mốc đều đạt**" — chín mốc vẫn
    in ra để CHẨN ĐOÁN cấu trúc, dù không còn là thứ quyết định áp gì.
 2. Chạy cổng `verify:db` trên bb-prod (xem khung dưới) — phải ra **đủ N/N**
-   mốc (không chắc vẫn là 17 — kho có thể đã thêm mốc mới từ lúc `docs/18`
-   viết; đọc số N thật do chính lệnh in ra, không chép cứng "17" vào đây).
+   mốc. Từ BB-352 cổng có **23 mốc** (trước đó 17) vì đã thêm sáu phép kiểm
+   riêng cho dãy 0052–0085: bảng mới tồn tại, RLS bật, `anon` không có quyền
+   nào, khoá công khai không đọc được, 23 cột mới tồn tại, hai hàm viết lại
+   (`get_admin_galleries` 14 tham số, `get_gallery_photos` 6 tham số) đúng chữ
+   ký. **Nếu bb-prod ra 17/17 thì đang chạy cổng cũ — không tin con số đó**:
+   cổng cũ không biết dãy 0077–0085 nên xanh cả khi bb-prod thiếu hẳn dãy ấy.
+   Số N thật là số do chính lệnh in ra; không chép cứng vào đây.
 3. Đo lại RIÊNG mốc quyền mặc định (0050) — đây là mốc **nặng nhất** trong
    chín mốc (đã từng làm lộ đọc/ghi/xoá `share_links` và `staff_profiles` qua
    `anon` trên bb-prod trước khi vá, xem `docs/18` §2.0b). Dòng "Vật sinh sau
@@ -125,6 +140,37 @@ lượt `npm run test`, bắt được đúng lớp lỗi này nếu tái diễn
    bảng "SAU KHI VÁ" của lệnh ở bước 3 phải cả hai đều `OK`. Nếu một trong hai
    không `OK`: **DỪNG, không đi tiếp sang bước 4**, báo anh ngay — đây đúng là
    lớp lỗi từng để lộ dữ liệu 457 nhà thật một lần rồi.
+
+### 3a. Dãy migration phải áp lên bb-prod (BB-352)
+
+Bản cũ của runbook chỉ nhắc 0067–0075. Dãy đầy đủ từ lúc bảng theo dõi ra đời:
+
+| Số | Làm gì |
+|---|---|
+| 0076 | Tạo bảng theo dõi `schema_migrations` — bảng GIỮ NGUYÊN, `db:nap-lai` không bao giờ xoá |
+| 0077 | Đợt chọn thêm ảnh: bảng `selection_rounds`, cột `dot` ở ảnh/mua thêm, cờ ở `selections` |
+| ~~0078~~ | **Không tồn tại** — số bỏ trống, không phải tệp bị mất |
+| 0079 | "Bản ghi mới từ Lark": bảng `lark_ban_ghi_moi`, cột `galleries.lark_dong_da_xoa_luc` |
+| 0080 | Mua thêm đã thanh toán: mã hoá đơn, mã phiếu thu |
+| 0081 | `galleries.lark_photo`, viết lại hàm `get_admin_galleries` (14 tham số) |
+| 0082 | Studio xử lý đợt 1 (`selections.studio_xu_ly_dot1_at/_boi`) |
+| 0083 | Tim của link mời gia đình: bảng `tim_gia_dinh`, cột mới của `yeu_cau_mua_them` |
+| ~~0084~~ | **Không tồn tại** — như 0078 |
+| 0085 | Viết lại hàm `get_gallery_photos` (6 tham số, trả mã tệp Drive) |
+
+(Đầu tệp 0083 vẫn ghi "viết nhưng chưa áp" — câu đó đã cũ, bb-dev áp từ 01/10.)
+
+☐ 1. `npm run db:so-migration -- --dich .env.prod.local` liệt kê **đủ** các số
+   trên trong mục "Tệp migration đích còn thiếu" (cộng dãy 0045–0075).
+☐ 2. Sau `--thuc-thi`, chạy lại lệnh đó: "còn thiếu" = **0**.
+☐ 3. `node --env-file=.env.prod.local scripts/verify-db.mjs` ra **23/23**, và
+   riêng bốn dòng "Bảng mới: …", "23 cột mới …", "Hàm viết lại …" đều ĐẠT.
+☐ 4. Không có 0078 / 0084 trong danh sách thiếu (nếu công cụ đòi chúng: DỪNG,
+   báo Claude — đó là lỗi của công cụ, không phải tệp thiếu).
+☐ 5. **0088 (mốc trạng thái + dấu thu gọn ảnh) và 0089 (reindex `photos`)** —
+   anh chốt 02/10: áp NGAY TRƯỚC khi lên bb-prod, KHÔNG áp sớm lên bb-dev. 0089
+   chỉ dựng lại 4 chỉ mục (bớt ~22 MB, khoá ghi `photos` vài giây) — chạy SAU bước
+   7 (`db:nap-lai --nap`) để chỉ mục dựng trên dữ liệu đã nạp sạch.
 
 ### Cổng `verify:db` trên bb-prod
 
@@ -256,6 +302,37 @@ bb-dev, không khớp qua `id` nào của nguồn).
 
 ---
 
+## 5c. Realtime trên bb-prod (BB-352 — bản cũ KHÔNG có bước nào cho việc này)
+
+**Ai làm:** anh (Supabase Dashboard); Claude kiểm.
+
+Từ BB-342, màn khách và màn nhân viên tự cập nhật không cần F5 nhờ Supabase
+Realtime. Máy chủ app phát tin bằng khoá `service_role` tới **kênh công khai**
+(không dùng kênh riêng tư vì khách không có tài khoản Supabase). Nếu bb-prod chỉ
+cho kênh riêng tư thì việc phát tin **hỏng âm thầm** — không có lỗi nào hiện ra,
+màn chỉ còn tự hỏi lại mỗi 30 giây.
+
+☐ 1. Supabase Dashboard → dự án **bb-prod** → **Project Settings** →
+   **Realtime** (chưa chắc tên: có thể nằm ở mục **Realtime → Settings**).
+☐ 2. Bảo đảm Realtime đang **bật** cho dự án.
+☐ 3. Bật **Allow public access** (cho phép kênh công khai). Lưu.
+☐ 4. Ghi lại hạn mức gói Free để biết khi nào chạm trần: **200 kết nối đồng
+   thời, 2 triệu tin mỗi tháng** (số theo báo cáo vòng 7 — anh kiểm lại trên
+   trang giá của Supabase, vì họ có thể đổi). Mỗi khách đang mở link là một kết
+   nối; mỗi nhân viên đang mở màn quản trị cũng là một.
+☐ 5. **Kiểm (làm sau bước 8, khi app đã trỏ vào bb-prod):** mở một bộ ảnh bằng
+   link khách trên điện thoại, mở màn quản trị của đúng bộ đó trên máy tính. Thả
+   tim một tấm ở màn khách: màn quản trị đổi **không cần F5**. Hoặc mở DevTools →
+   **Network** → lọc **WS**, thấy kết nối tới `…supabase.co/realtime/…` ở trạng
+   thái đang mở.
+☐ 6. Nếu không thấy gì đổi: kiểm lại bước 3 trước tiên, rồi báo Claude đọc log
+   `tuc_thi.phat_hong` trên Vercel.
+
+**Đường lùi:** tắt lại **Allow public access** (app vẫn chạy, chỉ mất tính năng
+tự cập nhật tức thì).
+
+---
+
 ## 6. `db:chep-cau-hinh` — chép cấu hình từ bb-dev sang bb-prod
 
 **Ai làm:** Claude chạy; anh duyệt số đếm trước khi gõ `--ghi`. **Làm SAU khi
@@ -365,9 +442,53 @@ npm run db:nap-lai -- --env .env.prod.local --nap --that-su-la-bb-prod
 `--that-su-la-bb-prod` bắt buộc cho **mọi** thao tác ghi (`--xoa`, `--nap`) khi
 mã dự án là bb-prod — cùng cơ chế với `--that-su-la-bb-dev` đã có.
 
-Sáu bảng cấu hình (`branches`, `staff_profiles`, `staff_branches`, `roles`,
-`settings`, `packages`) **không bị `--xoa` đụng tới** — đúng những bảng bước 6
-vừa chép sang.
+### 7.0. Bảng nào giữ, bảng nào xoá (BB-352 — sửa lỗi P1 vòng 7)
+
+Bản cũ của công cụ có luật "bảng lạ thì tự xoá". Luật đó đã **xoá nhầm
+`schema_migrations`** (sổ ghi 39 migration đã áp — mất sổ này là `migrate-prod`
+áp lại cả dãy 0045+ lên cơ sở dữ liệu đã có dữ liệu, và bước kiểm "Tệp migration
+đích còn thiếu = 0" báo thiếu toàn bộ) và xếp chín bảng mới sai chỗ. Nay **mọi
+bảng phải có tên trong bảng phân loại** `PHAN_LOAI_BANG`
+(`scripts/nap-lai-tu-lark.mjs`), và **gặp bảng chưa có tên thì công cụ DỪNG ở
+mọi chế độ** (kể cả `--dem`), in ra tên bảng và không làm gì cả.
+
+**Giữ nguyên (7 bảng) — `--xoa` không đụng tới:** `branches`, `staff_profiles`,
+`staff_branches`, `roles`, `settings`, `packages` (sáu bảng bước 6 vừa chép
+sang) và **`schema_migrations`** (mới).
+
+**Xoá rồi `--nap` dựng lại từ Lark / Drive (8 bảng):** `customers`, `babies`,
+`shoots`, `galleries`, `photos`, `gallery_items`, `products`, và
+`lark_ban_ghi_moi` (bản sao dòng Hậu Kỳ chưa có bộ ảnh — hook và cron dựng lại).
+
+**Xoá, KHÔNG nạp lại — dữ liệu dùng thử của app (20 bảng):** lựa chọn của khách
+(`selections`, `selection_items`, `selection_addons`, `selection_addon_photos`,
+`selection_placements`, `selection_ops`, `selection_rounds`, `album_covers`),
+link (`share_links`, `share_link_ma`, `tim_gia_dinh`), thông báo (`push_dang_ky`,
+`thong_bao_khach`, `notifications`), `lark_nhac_da_gui`, `yeu_cau_mua_them`,
+`revision_requests`, `deliveries`, `activity_logs` và **`gallery_payments`**.
+
+Hệ quả anh cần biết (chỉ đúng khi chưa có khách thật dùng):
+
+- `push_dang_ky` bị xoá → khách nào đã bật thông báo thì phải **bật lại**.
+- `lark_nhac_da_gui` bị xoá → lượt cron 08:00 kế tiếp có thể **nhắc lại một lần**
+  các mốc chưa quá trễ (bộ ảnh mới có id mới nên sổ cũ cũng không còn khớp).
+- `share_links` bị xoá → mọi link đã gửi **chết** (xem mục 7b).
+- `gallery_payments` bị xoá → **mất sổ thu tiền**. Lệnh `--dem` in cảnh báo đỏ
+  nếu bảng này còn dòng. **Nếu có một đồng tiền thật nào trong đó: DỪNG.**
+
+**Từ lúc khách đầu tiên bấm chọn ảnh hay có một khoản thu thật trên bb-prod
+(mục 0.3): KHÔNG chạy `--xoa` trên bb-prod nữa.** Công cụ này sinh ra cho việc
+dựng lại từ đầu TRƯỚC ngày mở, không phải để sửa dữ liệu đang chạy.
+
+☐ 1. `npm run db:nap-lai -- --env .env.prod.local --dem` in được **ba khối**
+   (GIỮ NGUYÊN / XOÁ rồi nạp lại / XOÁ dữ liệu dùng thử) và **không** có dòng
+   "DỪNG — không làm gì cả". Nếu có dòng đó: bảng mới vừa xuất hiện — báo Claude
+   thêm vào bảng phân loại, không tự gõ lệnh ép.
+☐ 2. `schema_migrations` có tên trong khối **GIỮ NGUYÊN**. Sau `--xoa`, chạy
+   lại `npm run db:so-migration -- --dich .env.prod.local`: "Tệp migration đích
+   còn thiếu" vẫn là **0** (nếu bảng này bị xoá thì nó sẽ báo thiếu toàn bộ).
+☐ 3. Anh đọc khối "XOÁ dữ liệu dùng thử", thấy số dòng của `gallery_payments`
+   và `selections` đúng là dữ liệu thử.
 
 ### S4 — tệp mốc sao lưu ghi mã dự án, từ chối xoá nếu lệch
 
@@ -380,7 +501,7 @@ chỉ kiểm "có bản sao lưu < 24 giờ" như trước.
 
 **Kiểm:**
 
-1. `--xoa` in "Đã xoá:" kèm số dòng khớp số đã duyệt ở `--dem`.
+1. `--xoa` in "Đã xoá:" kèm số dòng khớp số đã duyệt ở `--dem` (28 bảng; **không** có `schema_migrations` trong danh sách đó).
 2. `--nap` in `[OK]` cho đủ 5 bước (danh mục sản phẩm → hậu kỳ → hợp đồng →
    chỉnh sửa → ảnh Drive), thoát mã 0.
 3. Đếm lại: `node --env-file=.env.prod.local scripts/verify-db.mjs` — vẫn đủ
@@ -444,7 +565,9 @@ CHƯA CÓ trên Production — xem `docs/11` §5 cuối mục):**
   nó là Vercel tự gắn `Authorization: Bearer <giá trị>` vào mọi lượt cron nó
   gọi. Thiếu thì `expire-galleries` và `hau-ky` (bên dưới) đều 401 mọi lượt.
 - `SUPABASE_DB_URL` — chuỗi kết nối Postgres **của bb-prod** (route
-  `hau-ky`/`sync-lark` nối thẳng Postgres, không qua PostgREST).
+  `hau-ky`/`sync-lark` nối thẳng Postgres, không qua PostgREST). **Phải là chuỗi
+  Session pooler, cổng 5432 — không phải Transaction pooler (6543); lý do và
+  cách kiểm ở mục 8a ô 9.**
 
 **`SYNC_CRON_SECRET` vẫn phải có** trên Production (đường kéo Lark định kỳ,
 `docs/11` §5a) — kiểm nó đã tồn tại trong cùng lượt này, không đợi tới mục 10.
@@ -469,6 +592,108 @@ biến chưa vào bản dựng — Redeploy lại rồi thử lại. Ra `500` �
 `SUPABASE_DB_URL` sai hoặc chưa Redeploy.
 
 **Đường lùi (P1 — khách không mở được album):** xem mục 9.
+
+---
+
+## 8a. Biến môi trường Production — danh sách ĐẦY ĐỦ (BB-352)
+
+**Ai làm:** anh dán giá trị (khoá bí mật — việc của người). Claude **chỉ kiểm
+tên biến**, không đọc giá trị: `vercel env ls production` (lệnh này liệt kê tên,
+không in giá trị).
+
+Mục 8 ở trên mới nhắc năm biến. Mã trong `src/` đọc nhiều biến hơn thế; thiếu
+biến nào là một tính năng **im lặng không chạy** (không có màn hình đỏ). Làm lần
+lượt, tích từng ô:
+
+### A. `APP_SECRET` — một khoá, bốn việc, KHÔNG BAO GIỜ ĐỔI
+
+☐ 1. `APP_SECRET` **đã có** trên Production, dài **từ 32 ký tự** (ngắn hơn là
+   mã ném lỗi ngay lúc dùng). Kiểm bằng `vercel env ls production` thấy tên này.
+☐ 2. **Giữ NGUYÊN giá trị đang chạy.** Đổi ba biến Supabase ở mục 8 **không**
+   kéo theo việc đổi `APP_SECRET`. Không "cho an toàn hơn" mà đổi khi cắt.
+☐ 3. Mọi nơi chạy mã này trên cùng dữ liệu phải **cùng một giá trị**: Production
+   trên Vercel, và các tệp `.env.local` / `.env.prod.local` của Claude khi chạy
+   script đụng tới mã hoá link (như `lark:ghi-link`). Hai nơi khác giá trị là hai
+   nơi không đọc được dữ liệu của nhau.
+
+Khoá này làm bốn việc cùng lúc:
+
+| Việc | Đổi khoá thì |
+|---|---|
+| Phiên của khách (cookie `bb_gs`) | Mọi khách đang mở link bị văng ra |
+| Dấu ký giữa middleware và màn nhân viên (BB-341) | Chỉ chậm hơn một nhịp, tự lành |
+| Tên kênh cập nhật tức thì (BB-342) | Mọi kênh đổi tên; màn đang mở mất tự cập nhật tới khi tải lại |
+| Mã hoá bảng `share_link_ma` (link "hiện lại" ở màn quản trị) | **Mọi link CSKH và ba mẹ đang "hiện lại" thành rỗng**, không khôi phục được |
+
+`docs/11` §5 có một dòng ghi "mỗi môi trường một giá trị khác nhau". Dòng đó
+đúng cho Preview, **không áp dụng cho lúc cắt**: Production giữ giá trị đang chạy.
+
+### B. Địa chỉ gốc và thông báo đẩy
+
+☐ 4. `NEXT_PUBLIC_APP_URL` = `https://hauky.babybeanstudio.vn` (không dấu `/` ở
+   cuối). Link mời gia đình và tin Lark ghép địa chỉ từ biến này. Biến
+   `NEXT_PUBLIC_…` được **nướng vào bản dựng** — sửa xong phải Redeploy.
+☐ 5. Ba biến thông báo đẩy (BB-246): `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
+   `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (dạng `mailto:<email studio>`).
+   **Không tạo cặp khoá mới** — đổi cặp khoá thì mọi trình duyệt đã đăng ký phải
+   đăng ký lại. Dùng lại cặp khoá đang chạy (tệp
+   `babybean-backups/KHOA-THONG-BAO-VERCEL.txt` theo `docs/20`). Thiếu: nút "Bật
+   thông báo" của khách không hoạt động, và không có lỗi nào hiện ra.
+
+### C. Lark, Drive, lịch chạy
+
+☐ 6. `LARK_APP_ID`, `LARK_APP_SECRET`, `LARK_BASE_APP_TOKEN` — cả ba (cron
+   `hau-ky`, hook và ghi "Link app" đều cần). Tuỳ chọn: `LARK_BASE_URL`.
+☐ 7. `GOOGLE_DRIVE_API_KEY` (đồng bộ ảnh và ảnh bìa).
+☐ 8. `CRON_SECRET` và `SYNC_CRON_SECRET` (đã nêu ở mục 8). `SYNC_CRON_SECRET` là
+   giá trị nằm trong **hai Automation của Lark** (mục 11a) — đổi một nơi mà không
+   đổi nơi kia là Lark nhận 401.
+
+### D. Loại chuỗi kết nối `SUPABASE_DB_URL` — phải là SESSION pooler
+
+☐ 9. `SUPABASE_DB_URL` của bb-prod phải là chuỗi **Session pooler** (Supabase
+   Dashboard bb-prod → **Connect** → **Connection string** → **Session pooler**;
+   cổng **5432**, tên người dùng có dạng `postgres.<mã dự án>`).
+
+   **Không dùng Transaction pooler (cổng 6543).** Lý do kiểm từ mã: hook Lark,
+   cron `hau-ky`, nút "Đồng bộ giá" và "Bản ghi mới từ Lark" đều mở MỘT kết nối
+   rồi gọi `pg_try_advisory_lock` / `pg_advisory_unlock` để hai lượt không chạy
+   chồng nhau. Khoá kiểu này gắn với **phiên** (một kết nối cố định). Transaction
+   pooler đổi kết nối sau mỗi câu lệnh, nên khoá mất tác dụng: hai lượt cùng
+   chạy được, hoặc khoá "kẹt" ở kết nối mà không ai gọi unlock được.
+   (Ghi chú cho người đọc brief gốc: nhiều tài liệu nói "serverless nên dùng
+   transaction pooler" — đúng với mã không dùng khoá phiên, **không đúng với mã
+   này**.) Không dùng kết nối thẳng `db.<mã>.supabase.co` vì gói Free của Supabase
+   chỉ cho IPv6 (theo tài liệu Supabase — kiểm lại nếu họ đổi), còn Vercel gọi ra
+   bằng IPv4.
+
+   Kiểm mà không để lộ khoá — lệnh này chỉ in cổng và loại máy chủ:
+
+   ```bash
+   node --env-file=.env.prod.local -e "const u=new URL(process.env.SUPABASE_DB_URL); console.log('cổng', u.port||5432, /pooler\.supabase\.com$/.test(u.hostname)?'pooler':'khác', /^postgres\./.test(decodeURIComponent(u.username))?'user có tiền tố postgres.<mã>':'user thiếu tiền tố')"
+   ```
+
+   Phải ra `cổng 5432 pooler user có tiền tố postgres.<mã>`. (bb-dev hôm nay ra
+   đúng như vậy — đã đo 01/10/2026.) Giá trị đặt trên **Vercel** là chuỗi anh
+   dán; tệp `.env.prod.local` chỉ là bản sao để Claude kiểm, nên nhớ so hai nơi
+   cùng loại.
+
+### E. CẤM đặt trên Production
+
+☐ 10. **KHÔNG được có** biến `PHEP_THU_TRINH_DUYET` (và `CHO_PHEP_GOI_MANG_TRONG_PHEP_THU`)
+   trên Production. `PHEP_THU_TRINH_DUYET=1` làm app **tắt mọi lượt gửi tin và
+   ghi "Link app" sang Lark, và tắt ghi bộ đệm ảnh** — vì tưởng đang chạy phép
+   thử. Không có cảnh báo: Lark chỉ đơn giản im. Kiểm: `vercel env ls production`
+   **không** liệt kê hai tên này. Cũng không đặt `NODE_ENV=test` hay `VITEST`.
+☐ 11. Sau Redeploy, làm một việc có tin Lark đi kèm (ví dụ bước 4 của mục 13: cấp
+   link thử cho chính anh rồi thao tác) và xác nhận nhóm Lark **có nhận tin**.
+   Không nhận được thì kiểm lại ô 10 trước tiên.
+
+**Kiểm cuối:** ☐ 12. `vercel env ls production` thấy đủ: `APP_SECRET`,
+`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+`VAPID_SUBJECT`, `LARK_APP_ID`, `LARK_APP_SECRET`, `LARK_BASE_APP_TOKEN`,
+`GOOGLE_DRIVE_API_KEY`, `CRON_SECRET`, `SYNC_CRON_SECRET`, `SUPABASE_DB_URL`, ba
+biến Supabase — và **không** thấy hai tên cấm ở ô 10.
 
 ---
 
@@ -516,21 +741,120 @@ và artifact mới là đủ.
 
 ---
 
-## 11. Lark webhook/cron — chỉ kiểm, không đổi
+## 11. Lark gọi vào app — hook, cron, workflow (BB-352: viết lại)
 
-**Ai làm:** Claude kiểm; không cần anh làm gì nếu qua.
+**Ai làm:** Claude kiểm; **anh** sửa Automation trên Lark nếu kiểm ra sai.
 
-Đường kéo Lark (`sync-lark.yml`, GitHub Actions) gọi vào **CÙNG MỘT domain**
-(`hauky.babybeanstudio.vn`) trước và sau khi cắt — domain không đổi, chỉ
-Supabase phía sau đổi. `SYNC_CRON_SECRET` và `APP_URL` (GitHub Secrets) không
-cần sửa.
+Lark đi vào app bằng **ba đường**, và bản cũ của mục này chỉ nói về đường thứ ba:
 
-**Kiểm:** GitHub → tab **Actions** → workflow kéo Lark → chạy tay một lần
-(**Run workflow**) → dấu tích xanh → `select value from settings where
-key = 'lark_retouch_last_sync'` trên bb-prod có mốc thời gian mới (đã chép
-đúng `lark.webhook_url` ở bước 6, nên tin nhắn báo lỗi/xác nhận đi đúng nhóm
-Lark của studio). Lưu ý: `lark_retouch_last_sync` cố ý KHÔNG được chép ở
-bước 6 (S3) — mốc này phải sinh MỚI trên bb-prod từ lượt chạy thật đầu tiên.
+| Đường | Chạy khi nào | Trạng thái hôm nay |
+|---|---|---|
+| 1. **Hook** `POST /api/lark/hook` | Vài giây sau mỗi lần sửa/thêm dòng Hậu Kỳ, do **hai Automation trên Lark** gọi | Đường chính. Cấu hình trên Lark (`docs/28`) |
+| 2. **Cron** `/api/cron/hau-ky` | 08:00 mỗi ngày, Vercel gọi | Lưới đỡ của hook. Gánh 6 việc trong trần 60 giây (mục 11b) |
+| 3. **Workflow** `sync-lark.yml` | Chỉ khi bấm tay — **dòng `schedule` đang bị comment** | KHÔNG có lịch. Xem mục 11c |
+
+Hệ quả: ngoài hook, mỗi ngày app chỉ còn **một** lượt tự kéo lại (08:00). Câu
+"lượt 5 phút" ở một số chú thích trong mã là câu của thiết kế cũ, **không đúng
+với hôm nay**.
+
+### 11a. Hai Automation của Lark phải trỏ vào PRODUCTION
+
+Hai Automation (`Gửi sang app khi sửa dòng Hậu Kỳ`, `Gửi sang app khi thêm dòng
+Hậu Kỳ` — cách tạo ở `docs/28` mục 3 và 4) gọi **một địa chỉ**. Domain
+`hauky.babybeanstudio.vn` không đổi khi cắt (nó là domain Production của Vercel);
+cái đổi là cơ sở dữ liệu phía sau. Nên việc cần kiểm là **địa chỉ đúng và bí mật
+đúng**, không phải đổi địa chỉ:
+
+☐ 1. Lark Base → bảng **Hậu Kỳ** → **Automation**: có đúng **hai** Automation
+   như `docs/28`, cả hai đang **Bật**.
+☐ 2. Trong từng cái, bước **Gửi yêu cầu HTTP**: URL là chính xác
+   `https://hauky.babybeanstudio.vn/api/lark/hook`. **Không** phải địa chỉ
+   `*.vercel.app`, **không** phải địa chỉ xem trước (Preview) của một nhánh,
+   **không** phải `localhost` hay đường hầm (ngrok…) từ lúc thử. Địa chỉ trỏ nhầm
+   vào đâu thì tin cập nhật đi vào đó và bb-prod không bao giờ nhận được.
+☐ 3. Header `Authorization` = `Bearer <SYNC_CRON_SECRET>` với giá trị **giống hệt**
+   `SYNC_CRON_SECRET` đặt trên Vercel Production (mục 8a ô 8). Đây là việc của
+   anh, Claude không đọc được giá trị.
+☐ 4. **TRƯỚC khi đổi ba biến Supabase (bước 8):** rút sạch hàng đợi hook trên
+   bb-dev. Hook xếp dòng chờ vào `settings` khoá `lark_hook_queue` khi đang bận.
+   Claude đọc giá trị: phải là rỗng (`[]`) hoặc không có khoá. Nếu còn dòng: chạy
+   tay cron `hau-ky` một lượt (curl ở mục 8) để app đọc lại bảng Hậu Kỳ, rồi đọc
+   lại khoá. Vẫn còn: DỪNG, báo Claude. (Không làm bước này thì các dòng đang
+   chờ ở bb-dev bị bỏ lại — cron 08:00 sáng mai chỉ dựng lại được một phần.)
+☐ 5. **Sau khi cắt (sau bước 8 và Redeploy):** trên Lark sửa một dòng Hậu Kỳ
+   **của studio** (khách giả, tên "Test nội bộ" — **không** sửa dòng khách thật,
+   vì ba mẹ đã bật thông báo sẽ nhận chuông thật; `docs/28` mục 5). Trong 10 giây:
+   - lịch sử chạy của Automation trên Lark: **HTTP 200** và `"message":"Success"`;
+   - Claude đọc dòng bộ ảnh tương ứng **trên bb-prod** thấy thay đổi.
+☐ 6. Ghi nhớ và nói với cả nhóm: **từ lúc này bb-dev KHÔNG còn nhận cập nhật từ
+   Lark.** Muốn lùi về bb-dev (mục 9) thì phải chạy cron `hau-ky` một lượt để
+   bb-dev bắt kịp những gì đã đổi trên Lark trong lúc đó.
+
+### 11b. Thứ tự chạy cron và đồng bộ ngay sau khi cắt
+
+Cron `hau-ky` làm **sáu việc** nối đuôi nhau trong **60 giây** (trần của gói
+Hobby), theo đúng thứ tự này: (1) dựng bộ ảnh từ Lark, (2) đọc trạng thái hậu kỳ,
+(3) xử lý bộ ảnh mà Lark đã xoá dòng, (4) gửi tin nhắc hậu kỳ và nhắc thông báo
+chưa đọc, (5) **đồng bộ giá + trạng thái sản phẩm** từ bảng "Sản phẩm" của Lark,
+(6) kiểm lại bộ lỗi Drive (dừng ở giây 50). Lượt đầu trên bb-prod chưa có ai đo,
+nên chạy tay có đồng hồ. **Chạy TUẦN TỰ, không chạy hai lệnh cùng lúc** — các lệnh
+dùng chung khoá tư vấn nên lệnh sau sẽ "nhường" và trả về như thể thành công.
+
+Làm đúng thứ tự sau, mỗi bước chờ bước trước xong:
+
+☐ 1. **Sau Redeploy ở mục 8:** `expire-galleries` trả 200 (curl ở mục 8). Việc
+   này cũng gửi lại tin Lark hỏng, vì nó gọi cùng hàm với `flush-notifications`.
+☐ 2. **Chạy tay `hau-ky` một lượt, có bấm giờ:**
+
+   ```bash
+   curl -i -w "\nthoi_gian=%{time_total}s\n" -H "Authorization: Bearer <dán CRON_SECRET tại đây>" \
+     https://hauky.babybeanstudio.vn/api/cron/hau-ky
+   ```
+
+   Đọc phần JSON trả về. Phải thấy:
+   - HTTP **200** (không 500); `thoi_gian` **dưới 60 giây**. Gần 60 thì báo
+     Claude — cron sẽ bị cắt giữa chừng mỗi sáng;
+   - `larkXoaDong`: là một đối tượng số liệu, **không** có khoá `loi`. Nếu lượt
+     đầu báo nhiều bộ "mất dòng Lark" bất thường (hơn mấy chục): **DỪNG** — trần
+     xoá là theo lượt, không phải theo ngày; hỏi Claude trước khi chạy lại;
+   - `dongBoGia`: có số liệu, **không** có `loi` và không phải `boQua`. Nếu
+     `boQua` ("nút Đồng bộ giá ngay đang chạy") thì chờ 1 phút rồi chạy lại;
+   - `kiemLaiLoi`: có số liệu, hoặc `boQua: "Hết giờ trong lượt này"` (chấp nhận
+     được ở lượt đầu, vì bước (6) chỉ chạy khi còn dư giờ).
+☐ 3. **Đồng bộ giá:** nếu `dongBoGia` ở ô 2 báo `loi`, hoặc đọc dưới 80% bảng
+   "Sản phẩm" của Lark (nên không ghi gì), anh vào màn quản trị bấm **Đồng bộ giá
+   ngay**, đọc kết quả, rồi mới tiếp tục. Giá khách thấy phải khớp bảng giá 01/10.
+☐ 4. **Đồng bộ dựng bộ ảnh:** GitHub → tab **Actions** → **Sync Lark Retouch** →
+   **Run workflow** (chạy tay). Dấu tích xanh, rồi Claude đọc khoá
+   `lark_retouch_last_sync` trong bảng `settings` của bb-prod: phải có mốc thời
+   gian **mới** (mốc này cố ý không được chép ở bước 6 — phải tự sinh ra từ lượt
+   chạy thật này).
+☐ 5. **Gửi lại tin Lark hỏng:** gọi `.../api/cron/flush-notifications` với cùng
+   kiểu `curl` ở ô 2, phải ra **200**. Lưu ý: **route này KHÔNG có lịch chạy nào**
+   (không nằm trong `vercel.json`, không có workflow gọi). Tin Lark gửi hụt hôm
+   nay chỉ được gửi lại **một lần mỗi ngày**, nhờ cron `expire-galleries` (01:00
+   giờ Việt Nam) gọi chung hàm. Khi thấy "tin báo chốt không tới nhóm", nó có
+   thể chờ tới 24 giờ.
+☐ 6. **Thử hook (mục 11a ô 5)** — làm SAU các ô 2–5, không trước, để dòng thử
+   không bị dựng hai lần.
+☐ 7. **Ngày hôm sau, sau 08:00:** Claude đọc log Vercel của lượt cron tự chạy:
+   dòng `cron.hau_ky.xong` có mặt và không có `cron.hau_ky.failed`. Một cron chưa
+   từng tự chạy trên bb-prod thì chưa thể coi là "đã chạy".
+
+**Thứ tự rút ra:** `expire-galleries` → `hau-ky` (đã gồm giá) → `sync-lark` →
+`flush-notifications` → thử hook. Không đảo, không song song.
+
+### 11c. Lưới đỡ định kỳ — vì sao đang tắt (CHƯA bật)
+
+`.github/workflows/sync-lark.yml` được tạo hôm 15/09/2026 (BB-152) với dòng
+`schedule` **đã comment sẵn** ("chủ studio có thể mở comment để lên lịch tự
+động"). Chưa ai bật: nó cần GitHub Secrets `SYNC_CRON_SECRET` + `APP_URL` và một
+quyết định của anh. `flush-notifications` thì bị gỡ khỏi `vercel.json` vì gói
+Hobby chỉ cho 2 cron mỗi ngày một lần, và cả hai chỗ đã dùng (`expire-galleries`,
+`hau-ky`). Đề xuất bật lưới đỡ nằm ở bản bàn giao BB-352 — **anh quyết, không tự
+bật**.
+
+☐ 8. Nếu anh duyệt đề xuất đó: làm xong thì ghi vào đây ngày bật và ai bật.
 
 ---
 
@@ -639,7 +963,7 @@ npm run db:nap-lai -- --xoa --xac-nhan <mã in ở --dem> --that-su-la-bb-dev
 ```
 
 Giữ nguyên nhân sự (`staff_profiles`, `staff_branches`, `roles`) — `--xoa`
-không đụng sáu bảng cấu hình, đúng như mọi lần chạy `db:nap-lai` khác. Sau bước
+không đụng bảy bảng GIỮ NGUYÊN (sáu bảng cấu hình và `schema_migrations`, xem mục 7.0), đúng như mọi lần chạy `db:nap-lai` khác. Sau bước
 này bb-dev trở thành cơ sở dữ liệu THỬ (agent tiếp tục có khoá, tiếp tục chạy
 phép thử lên đó — đúng vai trò cũ trước khi có tên thật, xem `docs/18` §4).
 

@@ -16,6 +16,7 @@
  * phần gói còn trống không dùng ở đợt sau — nên câu của đợt KHÔNG có vế "trong gói".
  */
 
+import { vi } from "@/i18n";
 import { demSanPhamInChuaAnh, tinhTienDot } from "@/lib/gallery/dot-chon";
 import { canGanAnh, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -140,7 +141,7 @@ export function tomTatDot(p: {
     cau = "Chưa chọn ảnh mới";
   } else {
     const phan: string[] = [];
-    if (soAnhMoi > 0) phan.push(`${soAnhMoi} ảnh mới`);    if (soSanPham > 0) phan.push(`${soSanPham} sản phẩm`);
+    if (soAnhMoi > 0) phan.push(`${soAnhMoi} tấm mới`);    if (soSanPham > 0) phan.push(`${soSanPham} món`);
     phan.push(formatCurrencyVND(tien.tong));
     cau = phan.join(" · ");
   }
@@ -160,9 +161,9 @@ export function tomTatDot(p: {
 // Chữ
 // ---------------------------------------------------------------------------
 
-/** Phần giá của dòng đầu màn đợt: "30.000 ₫/ảnh" (rỗng nếu studio chưa đặt giá). */
+/** Phần giá của dòng đầu màn đợt: "30.000 ₫/tấm" (rỗng nếu studio chưa đặt giá; BB-358: đơn vị đếm ảnh là "tấm"). */
 export function dongDauManDot(giaMoiAnh: number): string {
-  return giaMoiAnh > 0 ? `${formatCurrencyVND(giaMoiAnh)}/ảnh` : "";
+  return giaMoiAnh > 0 ? `${formatCurrencyVND(giaMoiAnh)}/tấm` : "";
 }
 
 /**
@@ -188,7 +189,7 @@ export function tieuDeHopChotDot(soDot: number, tenBe: string | null | undefined
 
 /** Dòng đầu khối "chọn thiếu": ≤ 12 chữ. */
 export function cauConThieuTrongGoi(soThieu: number): string {
-  return `Còn ${soThieu} ảnh trong gói — nhờ studio chọn giúp`;
+  return vi.gallery.loiBean.nhoBeanChonGiup.replace("{n}", String(soThieu));
 }
 
 export interface OTickChotDot1 {

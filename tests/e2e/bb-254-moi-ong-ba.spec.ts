@@ -179,12 +179,12 @@ test.describe("BB-254: mời ông bà cùng xem", () => {
     await pageOngBa.getByPlaceholder("Tên người mua").fill("Fixture Bà Nội");
     await pageOngBa.getByPlaceholder("Số điện thoại (10 số)").fill(soGia());
 
-    const nutGui = pageOngBa.getByRole("button", { name: "Gửi yêu cầu cho studio" });
+    const nutGui = pageOngBa.getByRole("button", { name: "Gửi yêu cầu cho Bean" });
     await expect(nutGui).toBeEnabled();
     await nutGui.click();
 
     if (coBang) {
-      await expect(pageOngBa.getByText("Đã gửi, studio sẽ gọi sớm")).toBeVisible();
+      await expect(pageOngBa.getByText("Đã gửi, Bean sẽ gọi sớm ạ")).toBeVisible();
       if (coCotNguoiMua) {
         const { rows } = await pg.query(
           "select ten_nguoi_mua, sdt_nguoi_mua from yeu_cau_mua_them where gallery_id = $1",

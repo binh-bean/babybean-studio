@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
+import { donFixtureTheoId, type KhachSupabaseToiThieu } from "../fixtures/don-dep-theo-id";
 import { POST as postAddon } from "@/app/api/g/addons/route";
 import { GET as getGallery } from "@/app/api/g/gallery/route";
 import * as galleryAuth from "@/lib/auth/gallery-session";
@@ -64,7 +65,8 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     const prods = [
       {
         id: prodReliableId,
-        name: "Fixture Gỗ tráng gương 20x30",
+        // BB-352: KHÔNG đặt tên "Fixture …"/"Test …" cho hàng phép thử MUA qua API — `sanPhamBanChoKhach()` chặn tên đó (hàng thử không bao giờ bán). Dùng "Mẫu kiểm thử BB-xxx …" kèm chất liệu + cỡ có trong bảng giá 01/10; afterAll xoá theo id, và `npm run db:cleanup` có lưới đỡ theo tuổi cho tiền tố này.
+        name: "Mẫu kiểm thử BB-105 Gỗ tráng gương 20x30",
         kind: "print",
         // BB-339: hàng in phải có trong bảng giá 01/10 (chất liệu + kích thước).
         material: "Gỗ",
@@ -80,7 +82,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
         // phải `shoot_package` — từ BB-288, `/api/g/addons` chặn
         // `shoot_package` NGAY ở luật nhóm (404 "ngoài danh mục"), trước khi
         // chạm tới luật giá (400) mà ca này muốn canh riêng.
-        name: "Fixture Gỗ hiếm mẫu 25x35",
+        name: "Mẫu kiểm thử BB-105 Gỗ hiếm mẫu 25x35",
         kind: "print",
         material: "Gỗ",
         size: "40x60", // BB-339: có trong bảng giá 01/10
@@ -93,7 +95,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       },
       {
         id: prodLowConfidenceId,
-        name: "Fixture Khung kính đa giác",
+        name: "Mẫu kiểm thử BB-105 Khung kính đa giác",
         kind: "print",
         material: "Khung HQ", // BB-339: có trong bảng giá 01/10
         size: "30x45",
@@ -104,7 +106,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       },
       {
         id: prodNullPriceId,
-        name: "Fixture Khung tranh chưa định giá",
+        name: "Mẫu kiểm thử BB-105 Khung tranh chưa định giá",
         kind: "print",
         material: "Khung HQ", // BB-339: có trong bảng giá 01/10
         size: "40x60",
@@ -208,13 +210,13 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
     if (shareLinkId) {
       await supabase.from("share_links").delete().eq("id", shareLinkId);
     }
-    if (galleryId) {
-      await supabase.from("galleries").delete().eq("id", galleryId);
-    }
-    if (createdProductIds.length > 0) {
-      await supabase.from("products").delete().in("id", createdProductIds);
-    }
-  });
+    // BB-352: hàng "Mẫu kiểm thử …" nằm trong bảng giá nên MỘT DÒNG RÒ LÀ KHÁCH THẤY
+    // VÀ MUA ĐƯỢC. Xoá theo id và KHÔNG nuốt lỗi (bản cũ bỏ `{ error }`).
+    await donFixtureTheoId(supabase as unknown as KhachSupabaseToiThieu, {
+      galleryIds: galleryId ? [galleryId] : [],
+      productIds: createdProductIds,
+    });
+  }, 60_000);
 
   it("Test 1: Mua sản phẩm đủ tin cậy -> tạo dòng, giá đúng bằng list_price", async () => {
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(session);

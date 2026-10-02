@@ -21,20 +21,50 @@ import { CAU_KHACH_DANG_SUA, type KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu"
 export interface TuyChonXacNhan {
   khoaBoAnh?: boolean;
   chacChan?: boolean;
+  /**
+   * BB-351 — khoá chống ghi trùng: form sinh MỘT mã cho mỗi lần ghi; bấm đúp / mạng gửi lại
+   * cùng mã thì máy chủ chỉ ghi một dòng sổ (payments/route.ts).
+   */
+  maYeuCau?: string;
 }
 
-/** Gửi một lần ghi thu (kèm % giảm nếu có). Trả `outstanding` sau khi ghi. */
+export type KetQuaGhiThu =
+  | {
+      ok: true;
+      /** Còn thiếu sau khi ghi, CÓ DẤU (âm = khách thật sự trả dư) — cùng công thức `layTienCanThu`. */
+      outstanding: number;
+      discountAmount: number;
+      daKhoa: boolean;
+      loiKhoa: string | null;
+      /** BB-351 — máy chủ nhận ra lần gửi trùng, không ghi thêm dòng nào. */
+      trung: boolean;
+    }
+  | { ok: false; message: string };
+
+/**
+ * Gửi một lần ghi thu (kèm % giảm, kèm "khoá" + "chắc chắn" nếu có). MỘT hàm cho cả ba nơi
+ * thu tiền: chi tiết bộ ảnh, tab "Khách gửi ảnh chọn", tab "Ảnh vượt hạn mức" (BB-351).
+ */
 export async function ghiThanhToan(
   galleryId: string,
   amount: number,
   method: string,
   note: string,
   discountPercent: number | null,
-): Promise<{ ok: true; outstanding: number; discountAmount: number } | { ok: false; message: string }> {
+  xacNhan: TuyChonXacNhan = {},
+): Promise<KetQuaGhiThu> {
   const res = await fetch(`/api/admin/galleries/${encodeURIComponent(galleryId)}/payments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(discountPercent ? { amount, method, note, discountPercent } : { amount, method, note }),
+    body: JSON.stringify({
+      amount,
+      method,
+      note,
+      ...(discountPercent ? { discountPercent } : {}),
+      ...(xacNhan.khoaBoAnh ? { khoaBoAnh: true } : {}),
+      ...(xacNhan.chacChan ? { chacChan: true } : {}),
+      ...(xacNhan.maYeuCau ? { requestId: xacNhan.maYeuCau } : {}),
+    }),
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) return { ok: false, message: json?.error?.message ?? "Không ghi nhận được" };
@@ -42,7 +72,34 @@ export async function ghiThanhToan(
     ok: true,
     outstanding: Number(json?.data?.outstanding ?? 0),
     discountAmount: Number(json?.data?.discountAmount ?? 0),
+    daKhoa: json?.data?.daKhoa === true,
+    loiKhoa: typeof json?.data?.loiKhoa === "string" ? json.data.loiKhoa : null,
+    trung: json?.data?.trung === true,
   };
+}
+
+/** BB-351 — câu báo sau khi ghi thu, dùng chung ba nơi (không nơi nào tự viết câu "trả DƯ" riêng). */
+export function cauSauKhiThu(kq: Extract<KetQuaGhiThu, { ok: true }>, khiDu = "Khách đã trả đủ."): string {
+  if (kq.trung) return "Lần bấm này trùng với lần ghi vừa xong — sổ chỉ ghi MỘT dòng.";
+  const left = kq.outstanding;
+  return (
+    (kq.daKhoa ? "Đã xác nhận danh sách và khoá bộ ảnh. " : "") +
+    (kq.loiKhoa ? `Chưa khoá được: ${kq.loiKhoa}. ` : "") +
+    (kq.discountAmount > 0 ? `Đã ghi giảm giá ${formatCurrencyVND(kq.discountAmount)}. ` : "") +
+    (left > 0
+      ? `Đã ghi. Còn thiếu ${formatCurrencyVND(left)}.`
+      : left < 0
+        ? `Đã ghi. Khách trả DƯ ${formatCurrencyVND(-left)} — kiểm tra lại giúp.`
+        : `Đã ghi. ${khiDu}`)
+  );
+}
+
+function maMoi(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+  }
 }
 
 export function PaymentForm({
@@ -50,6 +107,7 @@ export function PaymentForm({
   conThieu,
   chuaPhatSinh = false,
   khoa,
+  sanPhamQuaLark = 0,
   onSubmit,
 }: {
   disabled?: boolean;
@@ -69,15 +127,26 @@ export function PaymentForm({
    * được. Không truyền = như cũ (chỉ ghi tiền).
    */
   khoa?: KhoaKhiThu;
+  /**
+   * BB-360 — tiền sản phẩm mua thêm (ảnh in / khung / album) đang THU QUA LARK — không nằm
+   * trong `conThieu`. > 0 thì hiện một dòng riêng để "Mua thêm X ₫" cạnh "Phải thu 0 ₫" hết mơ hồ.
+   */
+  sanPhamQuaLark?: number;
   onSubmit: (
     amount: number,
     method: string,
     note: string,
     discountPercent: number | null,
     xacNhan: TuyChonXacNhan,
-  ) => void;
+  ) => void | Promise<void>;
 }) {
-  const disabled = disabledNgoai || chuaPhatSinh;
+  // BB-351 — chống bấm đúp: khoá nút ngay trong lượt bấm (không đợi `busy` của trang render
+  // lại) và gửi kèm một mã cho mỗi lần ghi; xong lần này mới sinh mã mới.
+  const dangGuiRef = React.useRef(false);
+  const [dangGui, setDangGui] = React.useState(false);
+  const maYeuCauRef = React.useRef<string>("");
+  if (!maYeuCauRef.current) maYeuCauRef.current = maMoi();
+  const disabled = disabledNgoai || chuaPhatSinh || dangGui;
   const [amount, setAmount] = React.useState(conThieu > 0 ? String(conThieu) : "");
   const [method, setMethod] = React.useState("tien_mat");
   const [note, setNote] = React.useState("");
@@ -123,6 +192,11 @@ export function PaymentForm({
 
   return (
     <div className="mt-3 flex flex-wrap items-end gap-2">
+      {sanPhamQuaLark > 0 && (
+        <p data-testid="dong-san-pham-qua-lark" className="basis-full text-sm text-[var(--bb-fg-muted)]">
+          Sản phẩm mua thêm: <strong className="text-[var(--bb-fg)]">{formatCurrencyVND(sanPhamQuaLark)}</strong> · thu qua Lark
+        </p>
+      )}
       {/* BB-294 (#19) — ô số, select, ô nhập hệ thiết kế, không phải mặc định trình duyệt. */}
       <label className="flex flex-col gap-1 text-xs">
         Giảm giá %
@@ -185,12 +259,22 @@ export function PaymentForm({
       <button
         type="button"
         disabled={disabled || !valid || !duChacChan}
-        onClick={() =>
-          onSubmit(amountOk ? parsed : 0, method, note.trim(), coGiam ? phanTram : null, {
-            khoaBoAnh: seKhoa,
-            chacChan: canChacChan && chacChan,
-          })
-        }
+        onClick={() => {
+          if (dangGuiRef.current) return;
+          dangGuiRef.current = true;
+          setDangGui(true);
+          void Promise.resolve(
+            onSubmit(amountOk ? parsed : 0, method, note.trim(), coGiam ? phanTram : null, {
+              khoaBoAnh: seKhoa,
+              chacChan: canChacChan && chacChan,
+              maYeuCau: maYeuCauRef.current,
+            }),
+          ).finally(() => {
+            dangGuiRef.current = false;
+            maYeuCauRef.current = maMoi();
+            setDangGui(false);
+          });
+        }}
         className="rounded-md border border-[var(--bb-border)] px-3 py-2 text-sm disabled:opacity-40"
       >
         {coGiam ? "Ghi giảm giá và thu" : "Ghi nhận đã thu"}

@@ -17,6 +17,7 @@
  */
 
 import pg from "pg";
+import { kiemDayMigrationMoi } from "./lib/kiem-cau-truc-day-moi.mjs";
 
 const REQUIRE_SEED = process.argv.includes("--seed");
 
@@ -81,7 +82,7 @@ async function main() {
   // RLS is the whole security model; a single table without it is a hole.
   const noRls = tables.rows.filter((r) => !r.rowsecurity).map((r) => r.tablename);
   check("RLS bật trên mọi bảng", noRls.length === 0,
-    noRls.length ? `chưa bật: ${noRls.join(", ")}` : `${EXPECTED_TABLES.length}/${EXPECTED_TABLES.length}`);
+    noRls.length ? `chưa bật: ${noRls.join(", ")}` : `${tables.rows.length}/${tables.rows.length} bảng trong schema public`);
 
   // Lưới an toàn cho BẢNG SẮP CÓ. Phép kiểm ngay trên chỉ thấy bảng đang có, và
   // nó chạy sau khi bảng đã tồn tại — tức là sau khi cửa đã mở một lúc. Event
@@ -374,6 +375,23 @@ async function main() {
         : "không bộ nào",
     );
 
+
+  // -----------------------------------------------------------------------
+  // BB-352 — dãy migration 0052–0085
+  // -----------------------------------------------------------------------
+  // Mọi phép kiểm ở trên trả lời "bảng cũ còn đứng không". Chúng KHÔNG thấy một
+  // cơ sở dữ liệu thiếu cả dãy 0077–0085 (bb-prod trước giờ cắt): cổng từng xanh
+  // 17/17 trên đúng cơ sở dữ liệu đó. Sáu phép kiểm dưới đây hỏi thẳng về dãy ấy.
+  // Danh sách bảng/cột/hàm và logic nằm ở scripts/lib/kiem-cau-truc-day-moi.mjs,
+  // có phép thử đơn vị chứng minh cổng ĐỎ được khi thiếu một phần tử.
+  for (const r of await kiemDayMigrationMoi({
+    client,
+    tables: tables.rows,
+    apiUrl,
+    publishableKey,
+  })) {
+    check(r.name, r.pass, r.detail);
+  }
 
   if (REQUIRE_SEED) {
     const counts = {};

@@ -26,6 +26,7 @@
  * đâu, đã in chưa. App chỉ mang lời của ba mẹ tới đúng chỗ, kèm lý do.
  */
 
+import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
@@ -57,7 +58,7 @@ export async function POST(request: Request): Promise<Response> {
     const body = (jsonBody.ok ? jsonBody.data : null) as { lyDo?: string; soDot?: unknown } | null;
     const lyDo = (body?.lyDo ?? "").trim();
     if (lyDo.length === 0) {
-      return fail("INVALID_INPUT", "Ba mẹ ghi giúp em muốn sửa gì, để bên mình xem có kịp không");
+      return fail("INVALID_INPUT", vi.gallery.loiBean.ghiMuonSuaGi);
     }
     if (lyDo.length > MAX_LY_DO) {
       return fail("INVALID_INPUT", `Lời nhắn tối đa ${MAX_LY_DO} ký tự`);

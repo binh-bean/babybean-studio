@@ -3,10 +3,12 @@
 import { urlAnh, urlAnhDuPhong } from "@/lib/utils/anh-lh3";
 import { cn } from "@/components/ui/utils";
 import React, { useEffect, useState } from "react";
-import { Clock, Heart, Lock, ArrowDown } from "lucide-react";
+import { Clock, Heart, Lock, ArrowDown, PencilLine, ShoppingBag } from "lucide-react";
 import { tinhDoSang, chonMauChu } from "@/lib/utils/do-sang";
 import { coChuTieuDeBia, dongChiNhanh, formatSo } from "@/lib/utils/dinh-dang";
 import { vi } from "@/i18n";
+import { cauBiaKhach } from "@/lib/lark/trang-thai-app-lark";
+import { giuA } from "@/lib/utils/giu-a";
 
 
 /** Vùng chữ nằm trên ảnh, theo tỉ lệ chiều cao [từ, đến] — mỗi kiểu chữ bìa. */
@@ -73,6 +75,26 @@ export interface BiaBoAnhProps {
    * như đang mở (giữ nguyên câu cũ).
    */
   trangThai?: string | null;
+  /**
+   * BB-353 (P0) — giai đoạn tiến độ máy chủ gửi (`giaiDoanTienDo`). Câu trạng
+   * thái của bìa lấy từ `cauBiaKhach(trangThai, giaiDoanTienDo)` — CÙNG dòng
+   * bảng `TRANG_THAI_BO_ANH` với tiêu đề thẻ tiến trình, nên bìa không thể nói
+   * "đang chỉnh" khi thẻ còn "chờ xác nhận".
+   */
+  giaiDoanTienDo?: number | null;
+  /**
+   * BB-353 mục 5 — người thân được mời (link gia đình, vai xem): không chọn ảnh
+   * vào gói, chỉ thả tim rồi "Đặt chỉnh sửa"/đặt in. Bìa nói đúng việc đó và
+   * không bày hạn mức gói.
+   */
+  laNguoiXem?: boolean;
+  /**
+   * BB-355 — bản vẽ "Màn khách v8" (a): "Mời ông bà cùng xem" là nút viền thứ
+   * hai trên bìa (thay nút "Nhắn studio" — đầu trang đã có biểu tượng tin nhắn),
+   * không còn là khối riêng giữa hàng chip và lưới. `gallery-app` truyền nút
+   * (`<MoiNguoiThan kieu="nut-bia" />`) chỉ cho ba mẹ (không phải người xem).
+   */
+  nutMoiOngBa?: React.ReactNode;
   onBatDau: () => void;
   /**
    * BB-296 mục #2 — báo cáo chấm độc lập lần 3: trình thiết kế bìa quản trị
@@ -189,6 +211,9 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     onTaiCaBo,
     ngayGiao,
     trangThai,
+    giaiDoanTienDo = null,
+    laNguoiXem = false,
+    nutMoiOngBa,
     onBatDau,
     placeholderChuaCoAnh,
   } = props;
@@ -230,27 +255,34 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
   const ngay = ngayDep(ngayChup);
   const conNgay = khoa ? null : conMayNgay(hanChot);
 
-  const nhanNut = khoa
-    ? "Xem lại bộ ảnh"
-    : daChon > 0
-      ? `Tiếp tục chọn · ${daChon}${hanMuc ? ` / ${hanMuc}` : ""} tấm`
-      : "Bắt đầu chọn ảnh";
+  const nhanNut = laNguoiXem
+    ? "Xem ảnh và thả tim"
+    : khoa
+      ? "Xem lại bộ ảnh"
+      : daChon > 0
+        ? `Tiếp tục chọn · ${daChon}${hanMuc ? ` / ${hanMuc}` : ""} tấm`
+        : "Bắt đầu chọn ảnh";
 
   const tieuDeBia = coverHeadline?.trim() || tenBe || "Khoảnh khắc của con";
 
   // BB-287 mục 5 — câu chào MẶC ĐỊNH (không ghi đè khi studio đã tự soạn
-  // `loiChao`) phải nói đúng việc ba mẹ cần biết ở TRẠNG THÁI hiện tại, không
-  // mời "thong thả chọn nhé" khi đã hết việc để chọn.
-  // BB-295 mục #14 — báo cáo chấm độc lập: câu chào khi đã khoá chờ chỉnh
-  // đổi thành đúng câu người chấm yêu cầu ("Studio đang chỉnh ảnh của bé"),
-  // gắn tên bé thật khi có thay vì chữ "con" chung chung.
+  // `loiChao`) phải nói đúng việc ba mẹ cần biết ở TRẠNG THÁI hiện tại.
+  // BB-353 (P0) — người chấm vòng 7: vừa chốt, bìa ghi "Studio đang chỉnh ảnh"
+  // trong khi thẻ tiến trình ghi "Đang chờ studio xác nhận". Câu bìa nay lấy
+  // từ `cauBiaKhach()` — cùng bảng với tiêu đề thẻ tiến trình (`trangThaiKhach`).
+  // Người thân được mời: lúc bộ còn mở chọn thì bìa hướng dẫn thả tim; đã khoá
+  // thì nói đúng trạng thái như mọi khối khác (cùng `cauBiaKhach`).
   const loiChaoMacDinh =
-    trangThai === "delivered"
-      ? "Ảnh của bé đã hoàn thiện."
-      : khoa
-        ? `Studio đang chỉnh ảnh của ${tenBe?.trim() || "bé"}.`
-        : `${formatSo(soAnh)} khoảnh khắc của con đã sẵn sàng. Ba mẹ thong thả chọn nhé.`;
-  const loiChaoBia = loiChao?.trim() || loiChaoMacDinh;
+    laNguoiXem && !khoa
+      ? vi.gallery.loiBean.nguoiThanThaTim
+      : trangThai === "delivered" || khoa
+        ? cauBiaKhach(trangThai ?? "ready", giaiDoanTienDo, tenBe, { khoa })
+        : vi.gallery.loiBean.sanSangChon.replace("{n}", formatSo(soAnh));
+  // BB-353 — khi đã khoá (sau chốt) hoặc với người thân được mời, câu trạng
+  // thái/hướng dẫn thắng lời chào studio tự soạn (lời chào viết cho lúc mời
+  // ba mẹ chọn, đặt sau chốt sẽ lại nói ngược thẻ tiến trình).
+  // BB-358 (A2) — "ạ" gắn vào chữ trước (`giuA`): không còn "ạ." đứng một mình một dòng.
+  const loiChaoBia = giuA(khoa || laNguoiXem ? loiChaoMacDinh : loiChao?.trim() || loiChaoMacDinh);
 
   const MetaInfo = () => (
     <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] opacity-90">
@@ -312,10 +344,14 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     const tenHienThi = tenBe?.trim() || "bé";
     // BB-319 (luật 4) — hai câu ≤ 12 chữ thay một câu 16 chữ; vẫn gọi tên bé, và
     // tên bé không bị ngắt giữa hai dòng ("Bé / Xoài").
-    const camOn: React.ReactNode = loiChao?.trim() || (
+    // BB-358 (A3) — câu nằm trong `vi.gallery.loiBean.camOnDaGiao` (phép thử giọng BB-353 thấy được):
+    // Bean tự xưng "Bean", câu nào cũng kết "ạ". Tên bé vẫn không bị ngắt giữa hai dòng.
+    const [camOnTruoc, camOnSau = ""] = giuA(vi.gallery.loiBean.camOnDaGiao).split("{ten}");
+    const camOn: React.ReactNode = giuA(loiChao?.trim()) || (
       <>
-        Cảm ơn ba mẹ. Năm đầu đời của <span className="whitespace-nowrap">{tenHienThi}</span>, Baby Bean
-        giữ trọn ở đây.
+        {camOnTruoc}
+        <span className="whitespace-nowrap">{tenHienThi}</span>
+        {camOnSau}
       </>
     );
 
@@ -382,14 +418,14 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                 className="h-12 w-12 shrink-0 rounded-lg object-cover lg:h-14 lg:w-14"
               />
               {/* BB-305 — đoạn cảm ơn là nội dung (đoạn văn), không phải tiêu đề: Be Vietnam Pro. */}
-              <p className="text-[15px] leading-snug text-[#4a423b]">{camOn}</p>
+              <p className="text-pretty text-[15px] leading-snug text-[#4a423b]">{camOn}</p>
             </div>
 
             {/* BB-319 — số ảnh đã nằm trên nút "Tải cả bộ · N ảnh": dòng phụ không lặp lại
                 (và không gọi ảnh gốc là "ảnh đã chỉnh"). Không cho tải thì dòng phụ nói số ảnh. */}
             <DongMeta
               className="mt-3 text-[13px] text-[#6b6057]"
-              muc={[sessionType, !choPhepTai && soAnh > 0 ? `${formatSo(soAnh)} ảnh` : null, dongChiNhanh(chiNhanh)]}
+              muc={[sessionType, !choPhepTai && soAnh > 0 ? `${formatSo(soAnh)} tấm` : null, dongChiNhanh(chiNhanh)]}
             />
 
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2.5 lg:mt-7 lg:gap-3">
@@ -405,7 +441,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
                   </svg>
-                  Tải cả bộ{soAnh > 0 ? ` · ${formatSo(soAnh)} ảnh` : ""}
+                  Tải cả bộ{soAnh > 0 ? ` · ${formatSo(soAnh)} tấm` : ""}
                 </button>
               )}
               {/* Điện thoại: nút chữ gọn (lưới ảnh ngay bên dưới); máy tính: nút viền như bìa K1. */}
@@ -448,7 +484,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                 khỏi khối chữ bìa để không lặp; chỉ còn ngày · chi nhánh. */}
             <DongMeta className="text-[12px] uppercase tracking-[0.16em] opacity-85 mb-4" muc={[ngay, chiNhanh]} />
             <h1 className="font-display text-[54px] @[40rem]:text-[68px] @[64rem]:text-[84px] font-light leading-[0.98] tracking-[-0.02em]">{tieuDeBia}</h1>
-            <p className="mt-5 text-[15px] leading-relaxed opacity-90">{loiChaoBia}</p>
+            <p className="mt-5 text-pretty text-[15px] leading-relaxed opacity-90">{loiChaoBia}</p>
             <div className="flex justify-center w-full"><MetaInfo /></div>
             <button onClick={onBatDau} className={`mt-8 inline-flex h-[52px] items-center justify-center gap-2 rounded-full px-7 text-[15px] font-medium shadow-lg transition active:scale-[0.98] ${btnClass}`}>
               {nhanNut} <ArrowDown className="h-4 w-4" />
@@ -473,7 +509,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
             {/* BB-278 — "Baby Bean" chuyển lên thanh thương hiệu đầu trang. */}
             <DongMeta className="uppercase tracking-[0.2em] mb-2 text-[12px] opacity-90" muc={[ngay, chiNhanh]} />
             <h1 className="font-display text-[48px] @[40rem]:text-[60px] @[64rem]:text-[72px] font-light leading-[1] tracking-[-0.02em] mb-4">{tieuDeBia}</h1>
-            <p className="text-[15px] leading-relaxed opacity-90 max-w-md">{loiChaoBia}</p>
+            <p className="max-w-md text-pretty text-[15px] leading-relaxed opacity-90">{loiChaoBia}</p>
             <MetaInfo />
             <button onClick={onBatDau} className={`mt-6 inline-flex h-[52px] items-center justify-center gap-2 rounded-full px-7 text-[15px] font-medium shadow-lg transition active:scale-[0.98] ${btnClass}`}>
               {nhanNut} <ArrowDown className="h-4 w-4" />
@@ -498,7 +534,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
             {/* BB-278 — "Baby Bean" chuyển lên thanh thương hiệu đầu trang. */}
             <DongMeta className="text-[12px] uppercase tracking-[0.16em] opacity-85 mb-4" muc={[ngay, chiNhanh]} />
             <h1 className="font-display text-[50px] @[40rem]:text-[64px] @[64rem]:text-[76px] font-light leading-[0.98] tracking-[-0.02em] max-w-lg mt-4">{tieuDeBia}</h1>
-            <p className="mt-4 text-[15px] leading-relaxed opacity-90 max-w-md">{loiChaoBia}</p>
+            <p className="mt-4 max-w-md text-pretty text-[15px] leading-relaxed opacity-90">{loiChaoBia}</p>
             <MetaInfo />
             <button onClick={onBatDau} className={`mt-8 inline-flex h-[52px] self-start items-center justify-center gap-2 rounded-full px-7 text-[15px] font-medium shadow-lg transition active:scale-[0.98] ${btnClass}`}>
               {nhanNut} <ArrowDown className="h-4 w-4" />
@@ -723,19 +759,62 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
             )}
 
             {/* Lời chào — máy tính luôn hiện (bản vẽ `.loi`). BB-317 K-f: điện thoại chỉ hiện khi bộ ảnh
-                đang KHOÁ, để dòng trạng thái "Studio đang chỉnh ảnh của …" có mặt ở cả hai khổ. */}
-            <p
-              data-testid="bia-loi-chao"
-              className={cn(
-                "mt-3 max-w-[29rem] text-[14px] leading-relaxed text-[#4a423b] @[64rem]:mt-5 @[64rem]:block @[64rem]:text-[15px]",
-                khoa ? "block" : "hidden",
-              )}
-            >
-              {loiChaoBia}
-            </p>
+                đang KHOÁ, để dòng trạng thái (BB-353: `cauBiaKhach`) có mặt ở cả hai khổ. */}
+            {laNguoiXem ? (
+              <>
+                {/* BB-355 (c) — dòng trạng thái (chấm rêu) CHỈ khi bộ ảnh đã khoá: cùng câu
+                    `cauBiaKhach` với bìa ba mẹ (BB-353). Đang mở chọn thì ẩn. */}
+                {khoa && (
+                  <p className="mt-3.5 flex items-start gap-2.5 text-[15px] font-medium leading-normal @[64rem]:mt-5">
+                    <span aria-hidden="true" className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#4f5b45]" />
+                    <span data-testid="bia-loi-chao" className="text-pretty">{loiChaoBia}</span>
+                  </p>
+                )}
+                <p
+                  data-testid="bia-giai-thich-nguoi-xem"
+                  className={cn(
+                    "max-w-[35rem] text-[15px] leading-normal text-[#6b6057]",
+                    khoa ? "mt-2" : "mt-3.5 @[64rem]:mt-5",
+                  )}
+                >
+                  {vi.gallery.loiBean.nguoiThanGiaiThich}
+                </p>
+                <ol
+                  aria-label="Cách xem cùng gia đình"
+                  data-testid="bia-3-buoc-nguoi-xem"
+                  className="mt-4 grid grid-cols-3 gap-2 @[64rem]:mt-6 @[64rem]:flex @[64rem]:gap-7"
+                >
+                  {(
+                    [
+                      [Heart, "Thả tim tấm gia đình thích"],
+                      [PencilLine, "Bấm Đặt chỉnh sửa"],
+                      [ShoppingBag, "Mua ảnh in, album in ảnh"],
+                    ] as const
+                  ).map(([Icon, nhan]) => (
+                    <li
+                      key={nhan}
+                      className="flex flex-col items-center gap-1.5 text-center @[64rem]:flex-row @[64rem]:gap-2.5 @[64rem]:text-left"
+                    >
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#f2ebe1] text-[#2e2a27]">
+                        <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
+                      </span>
+                      <span className="text-[13px] leading-[1.35]">{nhan}</span>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            ) : (
+              <p
+                data-testid="bia-loi-chao"
+                className="mt-3 max-w-[29rem] text-pretty text-[15px] leading-normal text-[#2e2a27] @[64rem]:mt-5"
+              >
+                {/* BB-355 — bản vẽ v8 (a): lời chào hiện cả ở điện thoại (trước K-f chỉ khi khoá). */}
+                {loiChaoBia}
+              </p>
+            )}
 
             {/* Dòng phụ ngày/chi nhánh — CHỈ điện thoại (bản vẽ `.meta`). */}
-            {(ngay || chiNhanh) && (
+            {(ngay || chiNhanh) && !laNguoiXem && (
               <div data-testid="bia-meta-dt" className="mt-3 flex flex-col items-start gap-y-0.5 text-[13px] text-[#6b6057] @[64rem]:hidden">
                 {ngay && (
                   <span className="inline-flex items-center gap-1.5">
@@ -762,6 +841,12 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                     <p className="mt-1 text-[15px]">{chiNhanh}</p>
                   </div>
                 )}
+                {laNguoiXem && soAnh > 0 && (
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.1em] text-[#8a8078]">Bộ ảnh</p>
+                    <p className="mt-1 text-[15px]">{formatSo(soAnh)} tấm</p>
+                  </div>
+                )}
                 {hanMuc != null && (
                   <div>
                     <p className="text-[11px] uppercase tracking-[0.1em] text-[#8a8078]">Trong gói</p>
@@ -773,7 +858,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
               </div>
             )}
 
-            {khoa && (
+            {khoa && !laNguoiXem && (
               <div className="mt-4 hidden items-center gap-1.5 rounded-full border border-[#2e2a27]/15 px-3.5 text-[14px] text-[#4a423b] @[64rem]:inline-flex @[64rem]:h-[36px]">
                 <Lock className="h-[15px] w-[15px]" strokeWidth={1.8} aria-hidden="true" />
                 Đã chốt danh sách
@@ -781,7 +866,15 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
             )}
 
             {/* Nút chính (bản vẽ `.nut-k`/`.hang .nut`) + "Nhắn cho studio" (chỉ máy tính, bản vẽ `.hang .chip`). */}
-            <div className="mt-6 flex items-center gap-3.5 @[64rem]:mt-8">
+            {/* BB-355 (a) — nút viền thứ hai "Mời ông bà cùng xem": điện thoại xếp dưới nút chính
+                (cao 44, khe 10), máy tính đứng cạnh (cao 52, khe 12) — thay chỗ "Nhắn studio". */}
+            <div
+              className={cn(
+                "flex @[64rem]:mt-8 @[64rem]:flex-row @[64rem]:items-center @[64rem]:gap-3",
+                nutMoiOngBa ? "mt-[22px] flex-col items-stretch gap-2.5" : "mt-6 items-center gap-3.5",
+                laNguoiXem && "mt-[18px]",
+              )}
+            >
               <button
                 type="button"
                 onClick={onBatDau}
@@ -789,7 +882,8 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
               >
                 {nhanNut} <ArrowDown className="h-4 w-4 -rotate-90" aria-hidden="true" />
               </button>
-              {chatUrl && (
+              {nutMoiOngBa}
+              {!nutMoiOngBa && chatUrl && (
                 <a
                   href={chatUrl}
                   target="_blank"
@@ -803,8 +897,14 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
 
             {/* Dòng cuối điện thoại: N ảnh · M tấm trong gói · Chọn trước dd/mm (bản vẽ `.duoi`; BB-319: một dấu ngăn "·" cho cả app, không lẫn "|"). */}
             {(soAnh > 0 || hanMuc != null || conNgay != null) && (
-              <div className="mt-3.5 flex flex-wrap justify-center gap-3 text-center text-[12px] text-[#6b6057] @[64rem]:hidden">
-                {soAnh > 0 && <span>{formatSo(soAnh)} ảnh</span>}
+              <div className="mt-3.5 flex flex-wrap justify-center gap-3 text-center text-[13px] text-[#6b6057] @[64rem]:hidden">
+                {soAnh > 0 && <span>{formatSo(soAnh)} tấm</span>}
+                {laNguoiXem && ngay && (
+                  <>
+                    {soAnh > 0 && <span aria-hidden="true" className="opacity-45">·</span>}
+                    <span>Chụp ngày {ngay}</span>
+                  </>
+                )}
                 {hanMuc != null && (
                   <>
                     {soAnh > 0 && <span aria-hidden="true" className="opacity-45">·</span>}
@@ -817,17 +917,17 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                     <span>Chọn trước {ngayDep(hanChot)}</span>
                   </>
                 )}
-                {khoa && (
+                {khoa && !laNguoiXem && (
                   <>
                     <span aria-hidden="true" className="opacity-45">·</span>
-                    <span>Đã chốt danh sách</span>
+                    <span>{trangThai === "submitted" ? "Đã gửi danh sách" : "Đã chốt danh sách"}</span>
                   </>
                 )}
               </div>
             )}
 
             {/* Dải "Vài khoảnh khắc trong bộ" — CHỈ máy tính (bản vẽ `.dai`). */}
-            {anhXemTruoc.length > 0 && (
+            {anhXemTruoc.length > 0 && !laNguoiXem && (
               <div className="mt-9 hidden @[64rem]:block">
                 <div className="mb-3 flex items-baseline justify-between">
                   <span className="text-[11px] uppercase tracking-[0.1em] text-[#8a8078]">
@@ -838,7 +938,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
                     onClick={onBatDau}
                     className="text-[13px] text-[#6b6057] underline underline-offset-[3px] hover:text-[#2e2a27]"
                   >
-                    Xem cả {formatSo(soAnh)} ảnh
+                    Xem cả {formatSo(soAnh)} tấm
                   </button>
                 </div>
                 <div className="flex gap-2">

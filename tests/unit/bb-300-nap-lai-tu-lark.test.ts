@@ -84,19 +84,12 @@ function taoClientGia(duLieuTheoBang: BangGia = {}) {
 }
 
 describe("phanLoaiBang — phân loại giữ / xoá", () => {
-  it("giữ đúng 6 bảng cấu hình, xoá phần còn lại (BB-311: products chuyển sang xoá, packages vẫn giữ)", () => {
+  it("giữ đúng 7 bảng (BB-352: thêm schema_migrations), xoá phần còn lại theo thứ tự đã khai", () => {
     const bangThat = [...BANG_GIU_NGUYEN, ...THU_TU_XOA];
-    const { giu, xoa, moi } = phanLoaiBang(bangThat);
+    const { giu, xoa, chuaPhanLoai } = phanLoaiBang(bangThat);
     expect(giu.sort()).toEqual([...BANG_GIU_NGUYEN].sort());
     expect(xoa).toEqual(THU_TU_XOA);
-    expect(moi).toEqual([]);
-  });
-
-  it("bảng lạ chưa từng phân loại rơi vào diện xoá và được đánh dấu mới", () => {
-    const bangThat = [...BANG_GIU_NGUYEN, ...THU_TU_XOA, "mot_bang_moi_2027"];
-    const { xoa, moi } = phanLoaiBang(bangThat);
-    expect(xoa).toContain("mot_bang_moi_2027");
-    expect(moi).toEqual(["mot_bang_moi_2027"]);
+    expect(chuaPhanLoai).toEqual([]);
   });
 
   it("không bảng giữ nguyên nào lọt vào danh sách xoá", () => {
@@ -132,6 +125,27 @@ describe("kiemTraThuTuAnToan — thứ tự xoá phải khớp khoá ngoại th�
       { tu: "galleries", den: "customers", batBuoc: true },
       { tu: "shoots", den: "customers", batBuoc: true },
       { tu: "babies", den: "customers", batBuoc: true },
+      // BB-352 — các bảng 0062–0083 (khoá ngoại đọc từ migration, viết tay ở đây).
+      { tu: "selection_addon_photos", den: "selection_addons", batBuoc: true },
+      { tu: "selection_addon_photos", den: "selection_items", batBuoc: true },
+      { tu: "album_covers", den: "galleries", batBuoc: true },
+      { tu: "album_covers", den: "selections", batBuoc: true },
+      { tu: "album_covers", den: "gallery_items", batBuoc: true },
+      { tu: "album_covers", den: "selection_items", batBuoc: true },
+      { tu: "selection_rounds", den: "galleries", batBuoc: true },
+      { tu: "selection_rounds", den: "selections", batBuoc: true },
+      { tu: "share_link_ma", den: "share_links", batBuoc: true },
+      { tu: "tim_gia_dinh", den: "galleries", batBuoc: true },
+      { tu: "tim_gia_dinh", den: "share_links", batBuoc: true },
+      { tu: "tim_gia_dinh", den: "photos", batBuoc: true },
+      { tu: "push_dang_ky", den: "galleries", batBuoc: true },
+      { tu: "thong_bao_khach", den: "galleries", batBuoc: true },
+      { tu: "lark_nhac_da_gui", den: "galleries", batBuoc: true },
+      { tu: "yeu_cau_mua_them", den: "galleries", batBuoc: true },
+      { tu: "yeu_cau_mua_them", den: "products", batBuoc: true }, // KHÔNG cascade — lỗi thật nếu đứng sau products
+      { tu: "yeu_cau_mua_them", den: "photos", batBuoc: false },
+      { tu: "lark_ban_ghi_moi", den: "branches", batBuoc: false },
+      { tu: "lark_ban_ghi_moi", den: "galleries", batBuoc: false },
     ];
     const { anToan, loi } = kiemTraThuTuAnToan(THU_TU_XOA, canhFk);
     expect(loi).toEqual([]);

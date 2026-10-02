@@ -54,10 +54,10 @@
  *   settings        cài đặt         — cấu hình vận hành, không phải dữ liệu
  *                                     khách.
  *
- * Mọi bảng KHÔNG có tên ở trên bị coi là dữ liệu nghiệp vụ và sẽ bị xoá. Đây
- * là lựa chọn AN TOÀN THEO HƯỚNG NGƯỢC: một bảng mới thêm sau này mà quên xếp
- * loại sẽ tự động rơi vào diện xoá-và-liệt-kê, chứ không lặng lẽ nằm lại — im
- * lặng giữ lại rác là đúng thứ BB-300 được giao để dọn.
+ * BB-352 (01/10/2026): luật cũ "bảng lạ tự rơi vào diện xoá" đã bỏ — nó xoá nhầm
+ * `schema_migrations` và cho chín bảng mới đứng sai chỗ trong thứ tự xoá. Nay MỌI
+ * bảng phải có tên trong PHAN_LOAI_BANG (giữ / nạp lại từ Lark / xoá dữ liệu
+ * thử), và gặp bảng chưa có tên thì công cụ DỪNG ở mọi chế độ. Xem PHAN_LOAI_BANG.
  *
  * ---------------------------------------------------------------------------
  * Thứ tự xoá
@@ -135,14 +135,114 @@ export const MA_BB_DEV = "ohkfoqqsrpvsponiwcij";
  *             sẽ nạp lại từ đâu (viết script đồng bộ mới, hay chấp nhận gõ
  *             tay lại toàn bộ gói chụp sau khi xoá?).
  */
-export const BANG_GIU_NGUYEN = ["branches", "staff_profiles", "staff_branches", "roles", "settings", "packages"];
+/**
+ * ---------------------------------------------------------------------------
+ * 01/10/2026 — BB-352: MỌI bảng phải có tên trong bảng phân loại này
+ * ---------------------------------------------------------------------------
+ * Lỗi cũ (vòng 7, soát C): bảng lạ "rơi vào diện xoá, kèm cảnh báo". Hai bảng
+ * mới thêm sau BB-300 đã làm lộ chỗ hổng của luật đó:
+ *
+ *   - `schema_migrations` (0076) bị xếp vào "sẽ xoá" — `--xoa` xoá sổ ghi nhận
+ *     39 migration đã áp, và `migrate-prod` sau đó áp lại cả dãy 0045+ lên một
+ *     cơ sở dữ liệu đã có dữ liệu thật.
+ *   - Chín bảng 0062–0083 (`yeu_cau_mua_them`…) đứng cuối danh sách xoá, SAU
+ *     `products` — mà `yeu_cau_mua_them.product_id` là khoá ngoại BẮT BUỘC không
+ *     cascade tới `products`, nên `delete from products` sẽ gãy giữa giao dịch.
+ *
+ * Nay luật là: **bảng chưa có trong PHAN_LOAI_BANG thì công cụ DỪNG, không làm
+ * gì cả** (xem `phanLoaiBang().chuaPhanLoai`). Thêm bảng mới = thêm một dòng ở
+ * đây, kèm lý do, rồi mới chạy được. Không còn "im lặng xoá" nữa.
+ *
+ * Ba nhóm:
+ *   "giu"             GIỮ NGUYÊN — cấu hình / sổ ghi nhận của chính app.
+ *   "nap-lai-tu-lark" XOÁ rồi `--nap` dựng lại từ Lark (và ảnh từ Drive).
+ *   "xoa-du-lieu-thu" XOÁ, KHÔNG nạp lại — Lark không biết tới chúng; đây là dữ
+ *                     liệu app sinh ra khi dùng thử (lựa chọn của khách, link,
+ *                     thông báo, sổ thu). CHỈ đúng khi chưa có khách thật dùng:
+ *                     từ lúc khách đầu tiên bấm chọn ảnh trên bb-prod, KHÔNG
+ *                     chạy `--xoa` trên bb-prod nữa (docs/26 mục 0.3).
+ */
+export const NHOM_GIU = "giu";
+export const NHOM_NAP_LAI_TU_LARK = "nap-lai-tu-lark";
+export const NHOM_XOA_DU_LIEU_THU = "xoa-du-lieu-thu";
+
+export const PHAN_LOAI_BANG = {
+  // ---- giữ nguyên ----------------------------------------------------------
+  branches: { nhom: NHOM_GIU, lyDo: "chi nhánh — Lark không có bảng chi nhánh của app" },
+  staff_profiles: { nhom: NHOM_GIU, lyDo: "nhân sự — tài khoản đăng nhập nằm ở auth.users" },
+  staff_branches: { nhom: NHOM_GIU, lyDo: "nhân sự ↔ chi nhánh, đi cùng staff_profiles" },
+  roles: { nhom: NHOM_GIU, lyDo: "vai trò tự tạo trong app (BB-172)" },
+  settings: { nhom: NHOM_GIU, lyDo: "cài đặt vận hành (webhook, hàng đợi hook, mốc đồng bộ)" },
+  packages: { nhom: NHOM_GIU, lyDo: "gói chụp — danh mục app tự quản, không script nào nạp lại" },
+  schema_migrations: {
+    nhom: NHOM_GIU,
+    lyDo: "sổ ghi nhận migration đã áp (0076) — xoá là migrate-prod áp lại cả dãy lên dữ liệu thật",
+  },
+
+  // ---- xoá rồi nạp lại từ Lark / Drive -------------------------------------
+  customers: { nhom: NHOM_NAP_LAI_TU_LARK, lyDo: "khách — sync:hauky" },
+  babies: { nhom: NHOM_NAP_LAI_TU_LARK, lyDo: "bé — sync:hauky" },
+  shoots: { nhom: NHOM_NAP_LAI_TU_LARK, lyDo: "buổi chụp — sync:hauky" },
+  galleries: { nhom: NHOM_NAP_LAI_TU_LARK, lyDo: "bộ ảnh — sync:hauky" },
+  photos: { nhom: NHOM_NAP_LAI_TU_LARK, lyDo: "ảnh — bước đồng bộ Drive của --nap" },
+  gallery_items: { nhom: NHOM_NAP_LAI_TU_LARK, lyDo: "dòng hàng hợp đồng — sync:contracts" },
+  products: { nhom: NHOM_NAP_LAI_TU_LARK, lyDo: "danh mục sản phẩm — sync:catalog (BB-311)" },
+  lark_ban_ghi_moi: {
+    nhom: NHOM_NAP_LAI_TU_LARK,
+    lyDo: "bản sao chỉ-đọc của dòng Hậu Kỳ chưa có bộ ảnh (0079) — hook/cron dựng lại",
+  },
+
+  // ---- xoá, KHÔNG nạp lại: dữ liệu dùng thử của app ------------------------
+  selection_placements: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "ảnh đặt vào sản phẩm in" },
+  selection_addon_photos: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "ảnh trong album mua thêm (0062)" },
+  selection_addons: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "sản phẩm khách mua thêm" },
+  selection_ops: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "nhật ký thao tác chọn ảnh" },
+  selection_items: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "ảnh khách thả tim / chọn" },
+  selection_rounds: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "đợt chọn thêm ảnh (0077)" },
+  selections: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "lượt chọn của khách" },
+  album_covers: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "bìa album khách chọn (0075)" },
+  gallery_payments: {
+    nhom: NHOM_XOA_DU_LIEU_THU,
+    lyDo: "sổ ghi thu — CHỈ là dữ liệu thử trước ngày mở; sau đó là sổ tiền thật, không được xoá",
+  },
+  share_links: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "link chia sẻ — mã mới sau khi nạp" },
+  share_link_ma: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "bản mã hoá của link (0070), đi cùng share_links" },
+  tim_gia_dinh: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "tim của link mời gia đình (0083)" },
+  push_dang_ky: {
+    nhom: NHOM_XOA_DU_LIEU_THU,
+    lyDo: "đăng ký thông báo đẩy (0071) — gắn gallery_id cũ nên mồ côi; khách phải bật lại",
+  },
+  thong_bao_khach: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "hộp thư chuông của khách (0074)" },
+  lark_nhac_da_gui: {
+    nhom: NHOM_XOA_DU_LIEU_THU,
+    lyDo: "sổ tin nhắc đã gửi (0067) — bộ ảnh mới id mới; cron kế tiếp có thể nhắc lại mốc chưa quá trễ một lần",
+  },
+  yeu_cau_mua_them: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "yêu cầu mua lần hai của khách (0072)" },
+  revision_requests: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "vòng duyệt ảnh chỉnh" },
+  deliveries: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "giao hàng" },
+  activity_logs: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "nhật ký thao tác" },
+  notifications: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "hàng đợi tin Lark" },
+};
+
+/** Bảng KHÔNG bao giờ bị xoá — suy từ PHAN_LOAI_BANG, không khai hai lần. */
+export const BANG_GIU_NGUYEN = Object.entries(PHAN_LOAI_BANG)
+  .filter(([, v]) => v.nhom === NHOM_GIU)
+  .map(([k]) => k);
 
 /**
  * Thứ tự xoá bảng nghiệp vụ, lá trước gốc sau. Danh sách này được kiểm lại
  * bằng `kiemTraThuTuAnToan()` trước khi --xoa thật sự chạy — xem đầu tệp.
+ *
+ * Phải khớp PHAN_LOAI_BANG: mọi bảng nhóm "nap-lai-tu-lark" / "xoa-du-lieu-thu"
+ * có mặt ở đây đúng một lần, và không bảng nhóm "giu" nào có mặt
+ * (`kiemTraPhanLoaiNhatQuan()` canh, phép thử chạy mỗi lượt `npm test`).
  */
 export const THU_TU_XOA = [
   "selection_placements",
+  // 0062: tham chiếu selection_addons và selection_items — đứng TRƯỚC cả hai.
+  "selection_addon_photos",
+  // 0075: tham chiếu selections, gallery_items, selection_items — đứng TRƯỚC cả ba.
+  "album_covers",
   "selection_addons",
   "selection_ops",
   "selection_items",
@@ -151,10 +251,22 @@ export const THU_TU_XOA = [
   "selection_rounds",
   "gallery_payments",
   "selections",
+  // 0083 / 0070: tham chiếu share_links — đứng TRƯỚC share_links.
+  "tim_gia_dinh",
+  "share_link_ma",
   "share_links",
+  // 0071 / 0074 / 0067: chỉ trỏ galleries (cascade); đặt sớm cho gọn.
+  "push_dang_ky",
+  "thong_bao_khach",
+  "lark_nhac_da_gui",
+  // 0072: product_id BẮT BUỘC, KHÔNG cascade -> phải đứng TRƯỚC products.
+  "yeu_cau_mua_them",
   "revision_requests",
   "deliveries",
   "gallery_items",
+  // 0079: bản sao dòng Hậu Kỳ; branch_id/gallery_id đều "set null" nên thứ tự
+  // không bắt buộc, đặt trước galleries cho nhất quán.
+  "lark_ban_ghi_moi",
   // 28/09/2026 (BB-311 mục B): products chuyển từ GIỮ sang XOÁ — xem lý do ở
   // BANG_GIU_NGUYEN. Phải đứng SAU gallery_items và selection_addons (khoá
   // ngoại NOT NULL products.id <- gallery_items.product_id,
@@ -175,22 +287,88 @@ export const THU_TU_XOA = [
 // ============================================================================
 
 /**
- * Chia danh sách bảng thực tế của schema public thành giữ / xoá.
- * Bảng lạ (không có trong BANG_GIU_NGUYEN, thấy lần đầu) mặc định rơi vào xoá,
- * và được đánh dấu `moi: true` để người chạy phải để ý.
+ * Chia danh sách bảng thực tế của schema public thành giữ / xoá / CHƯA PHÂN LOẠI.
+ *
+ * BB-352: bảng không có tên trong `phanLoai` KHÔNG còn được tự xếp vào "xoá".
+ * Nó nằm riêng ở `chuaPhanLoai` và người gọi (main) phải DỪNG khi danh sách này
+ * không rỗng. `xoa` chỉ gồm bảng đã phân loại là nhóm xoá, theo `thuTuXoa`.
+ *
+ * Bảng có trong `phanLoai` nhưng chưa tồn tại ở cơ sở dữ liệu (migration chưa
+ * áp) được bỏ qua tự nhiên — không phải lỗi.
  */
-export function phanLoaiBang(danhSachBangThat, bangGiu = BANG_GIU_NGUYEN, thuTuXoaDaBiet = THU_TU_XOA) {
-  const tapGiu = new Set(bangGiu);
-  const tapDaBiet = new Set(thuTuXoaDaBiet);
-  const giu = danhSachBangThat.filter((t) => tapGiu.has(t)).sort();
-  const xoa = danhSachBangThat.filter((t) => !tapGiu.has(t));
-  const xoaDaSap = thuTuXoaDaBiet.filter((t) => xoa.includes(t));
-  const xoaMoi = xoa.filter((t) => !tapDaBiet.has(t)).sort();
+export function phanLoaiBang(danhSachBangThat, phanLoai = PHAN_LOAI_BANG, thuTuXoa = THU_TU_XOA) {
+  const that = new Set(danhSachBangThat);
+  const giu = danhSachBangThat.filter((t) => phanLoai[t]?.nhom === NHOM_GIU).sort();
+  const chuaPhanLoai = danhSachBangThat.filter((t) => !phanLoai[t]).sort();
+  const xoa = thuTuXoa.filter((t) => that.has(t) && phanLoai[t] && phanLoai[t].nhom !== NHOM_GIU);
+  // Bảng đã phân loại là "xoá" nhưng quên đưa vào THU_TU_XOA: không có chỗ trong
+  // thứ tự xoá nên không thể xoá an toàn — cũng là một lý do để DỪNG.
+  const thieuThuTu = danhSachBangThat
+    .filter((t) => phanLoai[t] && phanLoai[t].nhom !== NHOM_GIU && !thuTuXoa.includes(t))
+    .sort();
   return {
     giu,
-    xoa: [...xoaDaSap, ...xoaMoi],
-    moi: xoaMoi,
+    xoa,
+    napLaiTuLark: xoa.filter((t) => phanLoai[t].nhom === NHOM_NAP_LAI_TU_LARK),
+    xoaDuLieuThu: xoa.filter((t) => phanLoai[t].nhom === NHOM_XOA_DU_LIEU_THU),
+    chuaPhanLoai,
+    thieuThuTu,
   };
+}
+
+/**
+ * Quy tắc DỪNG: trả về danh sách lý do không được tiếp tục (rỗng = được).
+ * Gom một chỗ để phép thử gọi thẳng, và để mọi chế độ (--dem, --sao-luu,
+ * --xoa, --khoi-phuc) dùng chung MỘT luật — không chế độ nào được đi tiếp khi
+ * còn bảng chưa biết xử lý ra sao.
+ */
+export function lyDoDungVoiBangLa({ chuaPhanLoai = [], thieuThuTu = [] }) {
+  const loi = [];
+  if (chuaPhanLoai.length) {
+    loi.push(
+      `Có ${chuaPhanLoai.length} bảng CHƯA PHÂN LOẠI: ${chuaPhanLoai.join(", ")}. ` +
+        "Công cụ không đoán giữ hay xoá. Thêm từng bảng vào PHAN_LOAI_BANG trong " +
+        "scripts/nap-lai-tu-lark.mjs (giữ / nạp lại từ Lark / xoá dữ liệu thử, kèm lý do) " +
+        "và vào THU_TU_XOA nếu là bảng xoá, rồi chạy lại.",
+    );
+  }
+  if (thieuThuTu.length) {
+    loi.push(
+      `Bảng đã phân loại là xoá nhưng THIẾU trong THU_TU_XOA: ${thieuThuTu.join(", ")}. ` +
+        "Không có chỗ trong thứ tự xoá nên không xoá an toàn được.",
+    );
+  }
+  return loi;
+}
+
+/**
+ * Kiểm bảng phân loại khớp với THU_TU_XOA (không cần cơ sở dữ liệu). Phép thử
+ * đơn vị gọi hàm này mỗi lượt `npm test`: thêm một dòng vào PHAN_LOAI_BANG mà
+ * quên THU_TU_XOA (hoặc ngược lại) là đỏ ngay ở máy dev, không đợi tới lúc chạy
+ * thật trên bb-prod.
+ */
+export function kiemTraPhanLoaiNhatQuan(phanLoai = PHAN_LOAI_BANG, thuTuXoa = THU_TU_XOA) {
+  const loi = [];
+  const dem = new Map();
+  for (const t of thuTuXoa) dem.set(t, (dem.get(t) ?? 0) + 1);
+  for (const [t, n] of dem) if (n > 1) loi.push(`${t} xuất hiện ${n} lần trong THU_TU_XOA`);
+  for (const t of thuTuXoa) {
+    if (!phanLoai[t]) loi.push(`${t} có trong THU_TU_XOA nhưng chưa có trong PHAN_LOAI_BANG`);
+    else if (phanLoai[t].nhom === NHOM_GIU) loi.push(`${t} thuộc nhóm GIỮ mà lại nằm trong THU_TU_XOA`);
+  }
+  for (const [t, v] of Object.entries(phanLoai)) {
+    if (![NHOM_GIU, NHOM_NAP_LAI_TU_LARK, NHOM_XOA_DU_LIEU_THU].includes(v.nhom)) {
+      loi.push(`${t}: nhóm "${v.nhom}" không hợp lệ`);
+    }
+    if (!v.lyDo || !String(v.lyDo).trim()) loi.push(`${t}: thiếu lý do phân loại`);
+    if (v.nhom !== NHOM_GIU && !dem.has(t)) loi.push(`${t} là bảng xoá nhưng thiếu trong THU_TU_XOA`);
+  }
+  return { nhatQuan: loi.length === 0, loi };
+}
+
+/** Bảng KHÔNG bao giờ được nằm trong một lệnh xoá — lớp chốt cuối của xoaSachGiaoDich. */
+export function bangCamXoa(thuTuXoa, phanLoai = PHAN_LOAI_BANG) {
+  return thuTuXoa.filter((t) => t === "schema_migrations" || phanLoai[t]?.nhom === NHOM_GIU);
 }
 
 /**
@@ -491,6 +669,13 @@ export function ghiMocSaoLuuGanNhat(gocSaoLuu, thuMucBanSaoLuu) {
  * Gỡ galleries.cover_photo_id trước khi xoá photos để phá vòng.
  */
 export async function xoaSachGiaoDich(client, thuTuXoa) {
+  // Lớp chốt cuối, độc lập với phanLoaiBang: dù ai đó gọi hàm này với danh sách
+  // nào, bảng GIỮ NGUYÊN (nhất là schema_migrations) không bao giờ bị xoá — và
+  // việc từ chối xảy ra TRƯỚC `begin`, chưa chạm một dòng nào.
+  const cam = bangCamXoa(thuTuXoa);
+  if (cam.length) {
+    throw new Error(`Từ chối xoá bảng thuộc nhóm GIỮ NGUYÊN: ${cam.join(", ")}`);
+  }
   await client.query("begin");
   try {
     const dem = {};
@@ -731,7 +916,16 @@ async function main() {
   await client.connect();
   try {
     const bangThat = await danhSachBangThat(client);
-    const { giu, xoa, moi } = phanLoaiBang(bangThat);
+    const { giu, xoa, napLaiTuLark, xoaDuLieuThu, chuaPhanLoai, thieuThuTu } = phanLoaiBang(bangThat);
+
+    // BB-352: bảng lạ -> DỪNG ở MỌI chế độ (kể cả --dem), trước khi làm gì.
+    // --dem dừng luôn để không in ra một mã xác nhận cho một danh sách chưa đủ.
+    const lyDoDung = lyDoDungVoiBangLa({ chuaPhanLoai, thieuThuTu });
+    if (lyDoDung.length) {
+      console.error("DỪNG — không làm gì cả:");
+      for (const l of lyDoDung) console.error(`   - ${l}`);
+      process.exit(2);
+    }
 
     if (laSaoLuu) {
       const dichChon = argv[iSaoLuu + 1];
@@ -745,7 +939,7 @@ async function main() {
         process.exit(2);
       }
       const canh = await canhKhoaNgoai(client);
-      const antoan = kiemTraThuTuAnToan(THU_TU_XOA, canh);
+      const antoan = kiemTraThuTuAnToan(xoa, canh);
       if (!antoan.anToan) {
         console.error("Thứ tự xoá hardcode không còn khớp sơ đồ khoá ngoại hiện tại:");
         for (const l of antoan.loi) console.error(`   ${l}`);
@@ -789,13 +983,13 @@ async function main() {
         process.exit(2);
       }
       const canh = await canhKhoaNgoai(client);
-      const antoan = kiemTraThuTuAnToan(THU_TU_XOA, canh);
+      const antoan = kiemTraThuTuAnToan(xoa, canh);
       if (!antoan.anToan) {
         console.error("Thứ tự xoá hardcode không còn khớp sơ đồ khoá ngoại hiện tại:");
         for (const l of antoan.loi) console.error(`   ${l}`);
         process.exit(2);
       }
-      const thuTuKhoiPhuc = [...THU_TU_XOA].reverse();
+      const thuTuKhoiPhuc = [...xoa].reverse();
       const dem = await khoiPhucGiaoDich(client, thuTuKhoiPhuc, thuMucNguon);
       console.log(`Đã khôi phục từ ${thuMucNguon}:`);
       for (const [b, n] of Object.entries(dem)) console.log(`   ${String(n).padStart(6)}  ${b}`);
@@ -831,7 +1025,7 @@ async function main() {
       }
 
       const canh = await canhKhoaNgoai(client);
-      const antoan = kiemTraThuTuAnToan(THU_TU_XOA, canh);
+      const antoan = kiemTraThuTuAnToan(xoa, canh);
       if (!antoan.anToan) {
         console.error("Thứ tự xoá hardcode không còn khớp sơ đồ khoá ngoại hiện tại:");
         for (const l of antoan.loi) console.error(`   ${l}`);
@@ -879,15 +1073,19 @@ async function main() {
     }
 
     if (laDem) {
-      console.log(`Bảng giữ nguyên (${giu.length}) — cấu hình / sản phẩm / chi nhánh / nhân sự / cài đặt:`);
-      for (const b of giu) console.log(`   ${b}`);
-      if (moi.length) {
-        console.log(`\nBảng MỚI chưa từng phân loại, mặc định coi là dữ liệu nghiệp vụ (sẽ bị xoá):`);
-        for (const b of moi) console.log(`   ${b}`);
-      }
-      console.log(`\nBảng nghiệp vụ sẽ bị xoá (${xoa.length}):`);
+      console.log(`Bảng GIỮ NGUYÊN (${giu.length}) — không bao giờ bị --xoa đụng tới:`);
+      for (const b of giu) console.log(`   ${b}  — ${PHAN_LOAI_BANG[b].lyDo}`);
       const dem = await demBang(client, xoa);
-      for (const b of xoa) console.log(`   ${String(dem[b]).padStart(6)}  ${b}`);
+      console.log(`\nXOÁ rồi --nap dựng lại từ Lark / Drive (${napLaiTuLark.length}):`);
+      for (const b of napLaiTuLark) console.log(`   ${String(dem[b]).padStart(6)}  ${b}`);
+      console.log(`\nXOÁ vì là dữ liệu dùng thử của app, KHÔNG nạp lại (${xoaDuLieuThu.length}):`);
+      for (const b of xoaDuLieuThu) console.log(`   ${String(dem[b]).padStart(6)}  ${b}`);
+      if ((dem.gallery_payments ?? 0) > 0) {
+        console.log(
+          `\n!! gallery_payments có ${dem.gallery_payments} dòng sổ thu sẽ bị xoá. Chỉ đúng khi đó là dữ liệu ` +
+            "THỬ trước ngày mở. Nếu có tiền thật của khách: DỪNG.",
+        );
+      }
       const tongXoa = Object.values(dem).reduce((a, b) => a + b, 0);
       console.log(`\nTổng: ${tongXoa} dòng sẽ bị xoá, ${giu.length} bảng giữ nguyên.`);
 

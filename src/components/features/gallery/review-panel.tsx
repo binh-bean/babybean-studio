@@ -32,6 +32,7 @@
 
 "use client";
 
+import { vi } from "@/i18n";
 import React from "react";
 import { canApprove, canRequestRevision } from "@/lib/selection/review-rules";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
@@ -153,7 +154,7 @@ export function ReviewPanel({
         <div>
           <p className="kh-h3">
             {status === "in_retouch"
-              ? (nhanTienDo ?? "Studio đang chỉnh ảnh")
+              ? (nhanTienDo ?? vi.gallery.loiBean.dangChinhAnh)
               : status === "awaiting_approval"
                 ? "Ảnh đã chỉnh xong, mời ba mẹ xem"
                 : // BB-295 mục #15 — báo cáo chấm: "đã giao" (khách đã nhận đủ ảnh
@@ -166,7 +167,7 @@ export function ReviewPanel({
           </p>
           {status === "in_retouch" && review.rounds.some((r) => !r.resolved) && (
             <p className="mt-1 text-xs text-muted-foreground">
-              Studio đang sửa theo yêu cầu. Xong sẽ gửi lại link mới.
+              {vi.gallery.loiBean.dangSuaTheoYeuCau}
             </p>
           )}
         </div>
@@ -194,7 +195,7 @@ export function ReviewPanel({
       {canDecide && !review.finalDriveUrl && (
         <p className="text-xs text-heart">
           Chưa có link ảnh đã chỉnh. Ba mẹ gọi giúp hotline{" "}
-          <span className="font-semibold">{hotline}</span> để studio gửi lại.
+          <span className="font-semibold">{hotline}</span> để Bean gửi lại ạ.
         </p>
       )}
 
@@ -260,7 +261,7 @@ export function ReviewPanel({
             <li key={r.round} className="text-xs">
               <span className="text-muted-foreground">
                 Lần {r.round} · {formatNgayVN(r.createdAt)}
-                {r.resolved ? " · studio đã sửa" : " · studio đang sửa"}
+                {r.resolved ? " · Bean đã sửa" : " · Bean đang sửa"}
               </span>
               <br />
               {r.note}

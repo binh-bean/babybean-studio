@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
+import { donFixtureTheoId, type KhachSupabaseToiThieu } from "../fixtures/don-dep-theo-id";
 import { NextRequest } from "next/server";
 import { POST as postPlacement, DELETE as deletePlacement } from "@/app/api/g/placements/route";
 import { GET as getGallery } from "@/app/api/g/gallery/route";
@@ -65,14 +66,12 @@ describe("BB-113: Đặt ảnh vào sản phẩm in & BB-108: Gỡ công tắc w
   });
 
   afterAll(async () => {
-    // Dọn dẹp dữ liệu test
-    if (createdGalleryIds.length > 0) {
-      await supabase.from("galleries").delete().in("id", createdGalleryIds);
-    }
-    if (createdProductIds.length > 0) {
-      await supabase.from("products").delete().in("id", createdProductIds);
-    }
-  });
+    // BB-352: xoá THEO ID và KHÔNG nuốt lỗi. Bản cũ gọi delete() rồi bỏ đó —
+    // supabase-js trả { error } chứ không ném, nên một lượt xoá hỏng để lại
+    // "Fixture …" đang bán trên bb-dev mà phép thử vẫn xanh (01/10/2026).
+    // 60 giây: hook mặc định chỉ 10 giây, không đủ cho xoá bộ ảnh kéo theo ảnh.
+    await donFixtureTheoId(supabase as unknown as KhachSupabaseToiThieu, { galleryIds: createdGalleryIds, productIds: createdProductIds });
+  }, 60_000);
 
   // Helper tạo bộ ảnh kèm ảnh và các dòng hợp đồng
   async function setupGallery(options?: {

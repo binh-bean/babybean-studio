@@ -1,21 +1,11 @@
 import pg from "pg";
 import { NextResponse } from "next/server";
-import {
-  larkAuth,
-  readLarkRecord,
-  syncSingleRetouchRecord,
-} from "@/lib/lark/sync-retouch";
 import { readJsonBody } from "@/lib/api-response";
-import { taoDocMotBanGhi } from "@/lib/lark/doc-trang-thai-lark";
-import { capNhatTrangThaiTuHook } from "@/lib/lark/cap-nhat-tu-hook";
-import { baoHinhDaVe } from "@/lib/thong-bao/bao-hinh-da-ve";
-import { baoMocKhach } from "@/lib/thong-bao/bao-moc-khach";
-import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
-import { ghiBanGhiMoi } from "@/lib/lark/ban-ghi-moi";
+import { KHOA_HOOK_LARK, docHangDoi, themVaoHangDoi, xuLyHangDoiHook } from "@/lib/lark/hang-doi-hook";
 
 export const runtime = "nodejs";
 
-const LOCK_ID = 152111; // ID khoá chia sẻ với cron/sync-lark
+const LOCK_ID = KHOA_HOOK_LARK; // ID khoá chia sẻ với cron/sync-lark
 
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -53,7 +43,8 @@ export async function POST(request: Request) {
     await client.connect();
   } catch (err) {
     console.error("[Lark Hook] Lỗi kết nối DB:", err);
-    return NextResponse.json({ message: "Lỗi kết nối DB" }, { status: 200 });
+    // BB-351: chưa ghi được vào hàng đợi → bản ghi chỉ còn ở phía Lark; báo lỗi thật.
+    return NextResponse.json({ message: "Lỗi kết nối DB" }, { status: 503 });
   }
 
   try {
@@ -70,104 +61,38 @@ export async function POST(request: Request) {
 
     if (!locked) {
       console.log(`[Lark Hook] Khoá bận, đưa bản ghi ${recordId} vào hàng đợi`);
-      await client.query(`
-        insert into settings (key, value)
-        values ('lark_hook_queue', jsonb_build_object('record_ids', jsonb_build_array($1::text)))
-        on conflict (key, coalesce(branch_id, '00000000-0000-0000-0000-000000000000'::uuid))
-        do update set value = jsonb_set(
-          settings.value, 
-          '{record_ids}', 
-          (coalesce(settings.value->'record_ids', '[]'::jsonb) || jsonb_build_array($1::text))
-        )
-      `, [recordId]);
+      await themVaoHangDoi(client, [recordId]);
       return NextResponse.json({ skipped: "busy_queued" }, { status: 200 });
     }
 
-    let recordIdsToProcess = [recordId];
-    try {
-      const { rows: queueRows } = await client.query(`select value from settings where key = 'lark_hook_queue' and branch_id is null`);
-      if (queueRows.length > 0 && queueRows[0].value?.record_ids) {
-        const queuedIds = queueRows[0].value.record_ids;
-        if (Array.isArray(queuedIds)) {
-          recordIdsToProcess = [...new Set([...queuedIds, recordId])];
-        }
-        await client.query(`update settings set value = '{"record_ids": []}'::jsonb where key = 'lark_hook_queue' and branch_id is null`);
-      }
-    } catch (err) {
-      console.error("[Lark Hook] Lỗi đọc hàng đợi:", err);
-    }
+    // BB-351 — ghi bản ghi vừa nhận VÀO hàng đợi trước tiên, rồi mới xử lý; chỉ bản ghi
+    // xong trọn mới được rút ra (xem src/lib/lark/hang-doi-hook.ts). Trước đây hàng đợi bị
+    // ghi đè `[]` ngay đây, Lark hỏng sau đó là mất hết bản ghi đang chờ.
+    await themVaoHangDoi(client, [recordId]);
+    const { recordIds: dangCho } = await docHangDoi(client);
+    const recordIdsToProcess = [...new Set([...dangCho, recordId])];
 
-    // Load master data
-    const { rows: branchRows } = await client.query(
-      `select id, code, name from branches where is_active = true`
+    const kq = await xuLyHangDoiHook({ client, recordIds: recordIdsToProcess, appId, appSecret, baseToken, dbUrl });
+
+    // Bản ghi Lark vừa đẩy sang chưa xử lý được → 503 để automation thấy lỗi (và gửi lại
+    // nếu nó có thử lại). Bản ghi vẫn nằm trong hàng đợi: lượt hook sau hoặc cron 08:00 rút.
+    const banGhiNayHong = kq.conLai.includes(recordId) || kq.boQua.includes(recordId);
+    return NextResponse.json(
+      {
+        message: banGhiNayHong ? "Chưa xử lý được, đã giữ trong hàng đợi" : "Success",
+        results: kq.results,
+        trangThai: kq.trangThai,
+        conTrongHangDoi: kq.conLai,
+        boQuaVinhVien: kq.boQua,
+        ...(kq.loiChung ? { loi: kq.loiChung } : {}),
+      },
+      { status: banGhiNayHong ? 503 : 200 },
     );
-    const { rows: staffRows } = await client.query(
-      `select id, full_name as "fullName", role from staff_profiles where is_active = true`
-    );
-
-    // Xác thực Lark
-    const auth = await larkAuth(appId, appSecret);
-    
-    const results = [];
-    for (const rId of recordIdsToProcess) {
-      try {
-        // Đọc bảng, lấy đúng 1 bản ghi
-        const { record } = await readLarkRecord(auth, baseToken, /h[aậ]u\s*k[yỳ]/i, rId);
-
-        // Xử lý bản ghi
-        const res = await syncSingleRetouchRecord({
-          client,
-          record,
-          branches: branchRows,
-          staffList: staffRows,
-          write: true,
-          index: 0,
-          dbUrl,
-        });
-        results.push({ record_id: rId, result: res });
-
-        // BB-332 — dòng mới (đủ tên+SĐT+gói, Trạng Thái + Link app trống) vào khối "Bản
-        // ghi mới từ Lark" ngay, không đợi lượt 5 phút. Hỏng (vd chưa áp 0079)
-        // thì chỉ ghi log — không làm hỏng phần dựng bộ ảnh ở trên.
-        try {
-          await ghiBanGhiMoi(client, record, branchRows, dbUrl);
-        } catch (err) {
-          console.error(`[Lark Hook] Không ghi được bản ghi mới ${rId}:`, err);
-        }
-      } catch (err) {
-        console.error(`[Lark Hook] Lỗi xử lý bản ghi ${rId}:`, err);
-        results.push({ record_id: rId, error: String(err) });
-      }
-    }
-
-    // BB-252 — trạng thái hậu kỳ (Trạng Thái / Cảnh Báo) cập nhật NGAY, không
-    // đợi cron 08:00; bộ vừa sang "Hình đã về" thì báo ba mẹ luôn. BB-347: mọi lần đổi
-    // thật còn phát tín hiệu tức thì, và hai mốc "Đã xác nhận danh sách" / "Đang chỉnh sửa" có chuông. Lỗi ở đây
-    // không được làm hỏng phần dựng bộ ảnh phía trên — cron sáng mai đỡ lại.
-    let trangThai: Awaited<ReturnType<typeof capNhatTrangThaiTuHook>> | null = null;
-    try {
-      trangThai = await capNhatTrangThaiTuHook({
-        client,
-        recordIds: recordIdsToProcess,
-        docMotBanGhi: await taoDocMotBanGhi({ auth, baseToken }),
-        bao: baoHinhDaVe,
-        baoMoc: baoMocKhach,
-        phat: (suKien) => phatSuKienBoAnh(suKien),
-      });
-    } catch (err) {
-      console.error("[Lark Hook] Lỗi cập nhật trạng thái hậu kỳ:", err);
-    }
-
-    return NextResponse.json({
-      message: "Success",
-      results: results,
-      trangThai,
-    }, { status: 200 });
 
   } catch (error) {
     console.error("[Lark Hook] Lỗi xử lý:", error);
-    // Bắt buộc trả 200 để Lark không thử lại vô hạn
-    return NextResponse.json({ message: "Lỗi xử lý nhưng trả 200 để báo Lark" }, { status: 200 });
+    // BB-351: lỗi DB trước khi kịp ghi hàng đợi — báo lỗi thật, không giả vờ thành công.
+    return NextResponse.json({ message: "Lỗi xử lý hook" }, { status: 503 });
   } finally {
     // Luôn thử unlock (nếu không giữ thì cũng không lỗi)
     await client.query("select pg_advisory_unlock($1)", [LOCK_ID]);

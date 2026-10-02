@@ -24,6 +24,7 @@
  * hẳn khỏi hệ thống).
  */
 
+import { vi } from "@/i18n";
 import { useCallback, useEffect, useState } from "react";
 import { Camera, ChevronRight, AlertCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
@@ -67,12 +68,12 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
       const res = await fetch("/api/g/buoi-chup", { cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
-        setLoi(json?.error?.message ?? "Chưa mở được danh sách buổi chụp, ba mẹ thử lại giúp");
+        setLoi(json?.error?.message ?? vi.gallery.loiBean.chuaMoDuocDanhSachBuoi);
         return;
       }
       setDanhSach((json?.data?.buoiChup ?? []) as BuoiChupTomTat[]);
     } catch {
-      setLoi("Không kết nối được. Ba mẹ kiểm tra mạng rồi thử lại nhé.");
+      setLoi(vi.gallery.loiBean.kiemTraMangThuLai);
     } finally {
       setDangTai(false);
     }
@@ -98,13 +99,13 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
       });
       if (!res.ok) {
         const json = await res.json().catch(() => null);
-        setLoi(json?.error?.message ?? "Chưa mở được buổi chụp này, ba mẹ thử lại giúp");
+        setLoi(json?.error?.message ?? vi.gallery.loiBean.chuaMoDuocBuoi);
         setDangMo(null);
         return;
       }
       onDaChonBuoi();
     } catch {
-      setLoi("Không kết nối được, ba mẹ thử lại giúp");
+      setLoi(vi.gallery.loiBean.khongKetNoi);
       setDangMo(null);
     }
   };
@@ -137,8 +138,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
         </div>
         <h1 className="font-display text-2xl font-light">Album đang được chuẩn bị</h1>
         <p className="mb-6 mt-2 text-sm text-muted-foreground">
-          Studio đang sắp ảnh buổi chụp của bé. Ba mẹ mở lại link này sau ít phút nhé.
-          Link không hết hạn đâu ạ.
+          {vi.gallery.loiBean.dangSapAnh} {vi.gallery.loiBean.linkKhongHetHan}
         </p>
         <button
           type="button"
@@ -159,8 +159,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
             Album của bé
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Ba mẹ chọn buổi chụp muốn xem ạ. Link này là của riêng gia đình mình.
-            Link không hết hạn, ba mẹ lưu lại để xem nhé.
+            {vi.gallery.loiBean.chonBuoiChupMoTa}
           </p>
         </header>
 
@@ -213,7 +212,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       {ngay ? `Chụp ngày ${ngay}` : "Chưa ghi ngày chụp"}
                       {" · "}
-                      {formatSo(buoi.soAnh)} ảnh
+                      {formatSo(buoi.soAnh)} tấm
                     </p>
                     <p className="mt-1 text-xs text-moss">{buoi.nhanTrangThai}</p>
                   </div>

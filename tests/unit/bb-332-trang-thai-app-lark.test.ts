@@ -44,7 +44,7 @@ describe("BB-332: trangThaiBoAnh", () => {
   it("Lark sang 'Đã gửi file gốc' → Chờ khách chọn", () => {
     const t = trangThaiBoAnh({ status: "ready", larkTrangThai: FILE_GOC, ...co });
     expect(t.ma).toBe("cho_khach_chon");
-    expect(t.khach).toBe("Mời ba mẹ chọn ảnh");
+    expect(t.khach).toBe("Mời ba mẹ chọn ảnh ạ");
     expect(BUOC_KHACH[t.buocKhach!]).toBe("Chọn ảnh");
   });
 
@@ -52,18 +52,18 @@ describe("BB-332: trangThaiBoAnh", () => {
     expect(trangThaiBoAnh({ status: "ready", ...co, coBanGhiLark: false }).ma).toBe("cho_khach_chon");
   });
 
-  it("khách bấm chốt → 'Đang chờ studio xác nhận', KHÔNG phải 'Đã chốt'", () => {
+  it("khách bấm chốt → 'Bean đang xác nhận danh sách ảnh ạ', KHÔNG phải 'Đã chốt'", () => {
     const t = trangThaiBoAnh({ status: "submitted", larkTrangThai: FILE_GOC, ...co });
     expect(t.ma).toBe("cho_studio_xac_nhan");
-    expect(t.khach).toBe("Đang chờ studio xác nhận");
-    expect(BUOC_KHACH[t.buocKhach!]).toBe("Studio xác nhận");
+    expect(t.khach).toBe("Bean đang xác nhận danh sách ảnh ạ");
+    expect(BUOC_KHACH[t.buocKhach!]).toBe("Bean xác nhận");
   });
 
   it("CSKH xác nhận mà Lark chưa 'Đang làm' → Đã chọn hình (xếp hàng), KHÔNG 'Đang chỉnh sửa'", () => {
     for (const lark of [null, FILE_GOC, DA_CHON_HINH]) {
       const t = trangThaiBoAnh({ status: "in_retouch", larkTrangThai: lark, ...co });
       expect(t.ma).toBe("da_chon_hinh");
-      expect(t.khach).toBe("Studio đã ghi nhận yêu cầu");
+      expect(t.khach).toBe("Bean đã nhận danh sách, ảnh đang chờ chỉnh ạ");
     }
   });
 

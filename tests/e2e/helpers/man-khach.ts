@@ -298,7 +298,7 @@ export const KHUNG_PHU: KhungPhu[] = [
     di: async (p, d) => {
       await vaoBo(p, d, "dt", d.daGiao.token);
       await p.getByRole("button", { name: "Xem thêm" }).first().click();
-      await p.getByRole("button", { name: "Gửi yêu cầu cho studio" }).waitFor({ state: "visible" });
+      await p.getByRole("button", { name: "Gửi yêu cầu cho Bean" }).waitFor({ state: "visible" });
       await p.waitForTimeout(500);
     },
   },

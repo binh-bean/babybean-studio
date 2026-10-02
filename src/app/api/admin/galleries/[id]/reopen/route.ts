@@ -44,6 +44,7 @@
  * này mở lại" chỉ trả lời được nếu lúc đó có người viết vào.
  */
 
+import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
@@ -129,8 +130,8 @@ export async function POST(
         metadata: { soDot: dotYeuCau, tuTrangThai: gallery.status, lyDo: reason },
       });
       await guiThongBaoBoAnh(admin, galleryId, {
-        tieuDe: `Studio đã mở lại đợt ${dotYeuCau}`,
-        noiDung: "Ba mẹ chọn lại ảnh của đợt này nhé.",
+        tieuDe: vi.gallery.loiBean.tbMoLaiDot.replace("{n}", String(dotYeuCau)),
+        noiDung: vi.gallery.loiBean.tbMoLaiDotNoiDung,
         loai: "reopen_da_mo",
       });
       return ok({ status: gallery.status, soDot: dotYeuCau, reopenedAt: new Date().toISOString() });
@@ -189,8 +190,8 @@ export async function POST(
     // Studio→Studio, xem docs/21). Không bao giờ ném (guiThongBaoBoAnh tự
     // nuốt lỗi), nên không cần try/catch riêng ở đây.
     await guiThongBaoBoAnh(admin, galleryId, {
-      tieuDe: "Bộ ảnh đã mở lại",
-      noiDung: "Studio đã mở lại bộ ảnh, ba mẹ chọn tiếp nhé.",
+      tieuDe: vi.gallery.loiBean.tbMoLaiBo,
+      noiDung: vi.gallery.loiBean.tbMoLaiBoNoiDung,
       loai: "reopen_da_mo",
     });
 

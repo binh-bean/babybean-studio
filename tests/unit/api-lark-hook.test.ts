@@ -1,6 +1,22 @@
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
+
+/*
+ * BB-351 — trước đây tệp này gọi hook THẬT trên bb-dev (`SUPABASE_DB_URL`) và mỗi lần
+ * `npm run test` là đọc/ghi đè hàng đợi THẬT `lark_hook_queue` (người soát C vòng 7 xoá
+ * trắng hàng đợi thật đúng kiểu này). Nay `pg` là bản giả trong bộ nhớ: không đụng DB thật.
+ */
+vi.mock("pg", async () => (await import("../helpers/pg-gia-hang-doi")).moduleGia);
+vi.mock("@/lib/lark/doc-trang-thai-lark", async (goc) => ({
+  ...(await goc<typeof import("@/lib/lark/doc-trang-thai-lark")>()),
+  taoDocMotBanGhi: async () => async () => null,
+}));
+vi.mock("@/lib/lark/ban-ghi-moi", () => ({ ghiBanGhiMoi: async () => "bo_qua" }));
+vi.mock("@/lib/thong-bao/bao-hinh-da-ve", () => ({ baoHinhDaVe: async () => {} }));
+vi.mock("@/lib/thong-bao/bao-moc-khach", () => ({ baoMocKhach: async () => {} }));
+vi.mock("@/lib/supabase/tuc-thi", () => ({ phatSuKienBoAnh: async () => {} }));
+
 import { POST } from "@/app/api/lark/hook/route";
-import pg from "pg";
+import { khoGia } from "../helpers/pg-gia-hang-doi";
 
 vi.mock("@/lib/lark/sync-retouch", () => {
   return {
@@ -20,17 +36,16 @@ vi.mock("@/lib/lark/sync-retouch", () => {
 });
 
 describe("BB-179: API POST /api/lark/hook", () => {
-  let client: pg.Client;
   const SECRET = "test-secret";
-  const LOCK_ID = 152111;
 
   beforeAll(async () => {
     process.env.SYNC_CRON_SECRET = SECRET;
     process.env.LARK_BASE_APP_TOKEN = "test-base";
     process.env.LARK_APP_ID = "test-appid";
     process.env.LARK_APP_SECRET = "test-appsec";
-    // SUPABASE_DB_URL is already present in test environment
+    process.env["SUPABASE_DB_URL"] = "postgres://gia-bb351";
   });
+  beforeEach(() => khoGia.datLai());
 
   function createRequest(body: unknown, authHeader: string | null) {
     const headers = new Headers();
@@ -54,80 +69,41 @@ describe("BB-179: API POST /api/lark/hook", () => {
     expect(res.status).toBe(401);
   });
 
-  it("3. Mã bản ghi không tồn tại thì 200 và ghi lỗi vào results", async () => {
+  it("3. Mã bản ghi đọc hỏng thì 503, ghi lỗi vào results và GIỮ bản ghi trong hàng đợi (BB-351)", async () => {
     // mock readLarkRecord will throw for rec_not_found
     const req = createRequest({ record_id: "rec_not_found" }, `Bearer ${SECRET}`);
     const res = await POST(req);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
     const body = await res.json();
-    expect(body.message).toBe("Success");
     expect(body.results[0].error).toMatch(/Lỗi đọc bản ghi/);
+    expect(khoGia.hangDoi()).toEqual(["rec_not_found"]);
   });
 
   it("4. Đang có lượt chạy thì chờ 1s rồi 200 kèm busy_queued", async () => {
-    // Cầm lock từ 1 connection khác
-    client = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL });
-    await client.connect();
-    await client.query("select pg_try_advisory_lock($1)", [LOCK_ID]);
-
-    try {
-      const req = createRequest({ record_id: "rec1" }, `Bearer ${SECRET}`);
-      const res = await POST(req);
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.skipped).toBe("busy_queued");
-
-      const queueRes = await client.query("select value from settings where key = 'lark_hook_queue'");
-      expect(queueRes.rows[0].value.record_ids).toContain("rec1");
-    } finally {
-      await client.query("select pg_advisory_unlock($1)", [LOCK_ID]);
-      await client.end();
-    }
+    khoGia.khoaDangBan = true;
+    const res = await POST(createRequest({ record_id: "rec1" }, `Bearer ${SECRET}`));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.skipped).toBe("busy_queued");
+    expect(khoGia.hangDoi()).toContain("rec1");
   });
 
   /**
-   * Ca quan trọng nhất của BB-182, và là thứ ca 4 chưa chứng minh được.
-   *
-   * Ca 4 chỉ nói "đã xếp vào hàng đợi". Nhưng hàng đợi không ai rút thì cũng
-   * là mất — chỉ khác chỗ mất có dấu vết.
-   *
-   * Lỗi gốc: lúc bận trả 200 nên Lark coi như xong và KHÔNG gọi lại. Nhân viên
-   * sửa hai dòng sát nhau thì dòng thứ hai rơi mất trong im lặng. Bản vá chỉ đúng
-   * nếu lượt gọi KẾ TIẾP rút được bản ghi đó ra xử.
+   * Ca quan trọng nhất của BB-182: bản ghi bị xếp hàng lúc bận phải được lượt gọi
+   * KẾ TIẾP rút ra xử, và hàng đợi trống sau khi xử xong.
    */
   it("6. Bản ghi bị xếp hàng được xử ở lượt gọi kế tiếp, không rơi mất", async () => {
-    const con = new pg.Client({ connectionString: process.env.SUPABASE_DB_URL });
-    await con.connect();
+    khoGia.khoaDangBan = true;
+    const res1 = await POST(createRequest({ record_id: "rec_xep_hang" }, `Bearer ${SECRET}`));
+    expect((await res1.json()).skipped).toBe("busy_queued");
 
-    try {
-      // 1. Cầm khoá từ một kết nối khác — giả lập đang có lượt chạy.
-      await con.query("select pg_try_advisory_lock($1)", [LOCK_ID]);
-      const res1 = await POST(createRequest({ record_id: "rec_xep_hang" }, `Bearer ${SECRET}`));
-      expect((await res1.json()).skipped).toBe("busy_queued");
-
-      // 2. Nhả khoá, rồi gọi một bản ghi KHÁC.
-      await con.query("select pg_advisory_unlock($1)", [LOCK_ID]);
-      const res2 = await POST(createRequest({ record_id: "rec_sau" }, `Bearer ${SECRET}`));
-      const body2 = await res2.json();
-
-      // 3. Lượt này phải xử CẢ bản ghi bị xếp hàng lẫn bản ghi mới.
-      const daXu = (body2.results ?? []).map((r: { record_id: string }) => r.record_id);
-      expect(
-        daXu,
-        "bản ghi bị xếp hàng không được rút ra — lỗi BB-182 đã quay lại",
-      ).toContain("rec_xep_hang");
-      expect(daXu).toContain("rec_sau");
-
-      // 4. Hàng đợi phải trống sau khi rút.
-      const q = await con.query(
-        "select value from settings where key = 'lark_hook_queue' and branch_id is null",
-      );
-      const conLai = q.rows[0]?.value?.record_ids ?? [];
-      expect(conLai, "hàng đợi chưa được dọn sau khi xử").not.toContain("rec_xep_hang");
-    } finally {
-      await con.query("select pg_advisory_unlock_all()").catch(() => {});
-      await con.end();
-    }
+    khoGia.khoaDangBan = false;
+    const res2 = await POST(createRequest({ record_id: "rec_sau" }, `Bearer ${SECRET}`));
+    const body2 = await res2.json();
+    const daXu = (body2.results ?? []).map((r: { record_id: string }) => r.record_id);
+    expect(daXu, "bản ghi bị xếp hàng không được rút ra — lỗi BB-182 đã quay lại").toContain("rec_xep_hang");
+    expect(daXu).toContain("rec_sau");
+    expect(khoGia.hangDoi(), "hàng đợi chưa được dọn sau khi xử").toEqual([]);
   });
 
   it("5. Chạy thành công", async () => {

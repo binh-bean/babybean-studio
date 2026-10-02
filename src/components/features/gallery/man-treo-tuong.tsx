@@ -51,6 +51,7 @@ import {
 } from "@/lib/gallery/khung-tren-tuong";
 import { MAU_KHUNG, MAU_KHUNG_MAC_DINH } from "@/lib/gallery/mau-khung";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
+import { coTheBocKhung, laChatLieuUV } from "@/lib/products/nhom-san-pham";
 
 export interface AnhTreoTuong {
   id: string;
@@ -142,7 +143,8 @@ const TEN_CHAT_LIEU: Record<string, string> = {
   "Tráng gương": "Tráng gương",
   "Thủy tinh": "Thủy tinh",
   "Mica HD": "Mica HD",
-  UV: "UV bóng",
+  // BB-358 (anh 02/10) — tên cho khách chỉ là "UV" (dữ liệu giữ nguyên).
+  UV: "UV",
 };
 
 /**
@@ -223,6 +225,10 @@ export function ManTreoTuong({
   // mở màn.
   const [co, setCo] = useState<CoKhungCm>("");
   const [coKhung, setCoKhung] = useState(false);
+  // BB-358 (anh 02/10) — UV là ảnh giấy: không bọc khung. Đổi sang UV thì bỏ khung đang bật.
+  useEffect(() => {
+    if (!coTheBocKhung(chatLieu)) setCoKhung(false);
+  }, [chatLieu]);
   const [maMauKhung, setMaMauKhung] = useState(MAU_KHUNG_MAC_DINH.ma);
   const [manRong, setManRong] = useState(false);
 
@@ -586,8 +592,9 @@ export function ManTreoTuong({
   if (!mo || !anhDangXem) return null;
 
   const style = lopChatLieu(chatLieu);
-  // BB-339 — UV chưa chọn khung: ảnh giấy, không treo lên tường.
-  const laUvKhongKhung = chatLieu === "UV" && !coKhung;
+  // BB-358 (anh 02/10) — UV là ảnh giấy: KHÔNG BAO GIỜ treo lên tường, không khung.
+  // Hiện như một tấm ảnh giấy nhỏ đứng nghiêng trên mặt bàn, không có bức tường trống.
+  const laUvKhongKhung = laChatLieuUV(chatLieu);
 
   return (
     <div
@@ -620,9 +627,24 @@ export function ManTreoTuong({
           chamBatDau.current = null;
         }}
       >
+        {laUvKhongKhung && (
+          <div
+            data-testid="nen-ban-uv"
+            aria-hidden="true"
+            // Như ảnh phòng: chạm nền ẩn/hiện bảng, không hiện bàn tay (tests/unit/con-tro-ban-tay.test.ts).
+            data-con-tro="mac-dinh"
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(70% 45% at 50% 30%, rgba(255,252,246,.9) 0%, rgba(255,252,246,0) 70%), linear-gradient(180deg, #f1e9de 0%, #ebe1d4 52%, #dccab6 52.3%, #cfbaa3 100%)",
+            }}
+            onClick={() => setBanAn((v) => !v)}
+          />
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={phong.tep}
+          hidden={laUvKhongKhung}
           src={`/tuong/${phong.tep}`}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
@@ -645,16 +667,17 @@ export function ManTreoTuong({
         {laUvKhongKhung && sanPhamAnh && (
           <div
             data-testid="uv-anh-giay"
-            className="pointer-events-none absolute inset-x-0 top-[18%] z-[5] flex justify-center px-6 md:top-[14%] md:pr-[376px]"
+            className="pointer-events-none absolute inset-x-0 top-[12%] z-[5] flex justify-center px-6 md:top-[17%] md:pr-[376px]"
           >
-            {/* Thẻ nền kem (không phải bức tường): tấm ảnh giấy đặt nghiêng, viền giấy mỏng. */}
-            <div className="pointer-events-auto flex w-full max-w-[340px] flex-col items-center gap-4 rounded-3xl bg-[#f3ede5]/95 px-6 pb-5 pt-7 shadow-[0_20px_50px_-20px_rgba(20,14,8,.6)]">
+            {/* Tấm ảnh giấy nhỏ đứng nghiêng trên mặt bàn, bóng mềm — không tường, không khung. */}
+            <div className="pointer-events-auto flex w-full max-w-[360px] flex-col items-center gap-6">
               <div
-                className="relative cursor-pointer bg-white p-[3%] shadow-[0_10px_22px_-10px_rgba(20,14,8,.5)]"
+                className="relative cursor-pointer bg-white p-[3.5%]"
                 style={{
-                  width: huongKhung === "doc" ? "min(36vw, 170px)" : "min(56vw, 250px)",
+                  width: huongKhung === "doc" ? "min(44vw, 210px)" : "min(62vw, 300px)",
                   aspectRatio: huongKhung === "doc" ? "2 / 3" : "3 / 2",
-                  transform: "rotate(-3deg)",
+                  transform: "rotate(-4deg)",
+                  boxShadow: "0 22px 34px -14px rgba(46,42,39,.45), 0 3px 8px rgba(46,42,39,.12)",
                 }}
                 role="button"
                 tabIndex={0}
@@ -675,11 +698,11 @@ export function ManTreoTuong({
                   draggable={false}
                 />
               </div>
-              <p className="text-center text-[12px] leading-relaxed text-bb-fg">
+              <p
+                data-testid="uv-loi-bean"
+                className="rounded-full bg-white/80 px-4 py-2 text-center text-[13px] leading-snug text-[#2e2a27] shadow-[0_2px_10px_-4px_rgba(46,42,39,.25)] backdrop-blur-sm"
+              >
                 {vi.gallery.treoTuong.uvLaAnhGiay}
-                {monKhung.length > 0 && (
-                  <span className="mt-1 block text-bb-fg-muted">{vi.gallery.treoTuong.uvChonKhungDeTreo}</span>
-                )}
               </p>
             </div>
           </div>
@@ -844,6 +867,8 @@ export function ManTreoTuong({
         */}
         <div
           ref={cumPhongRef}
+          // BB-358 — UV không treo tường: không bày ảnh phòng nên ẩn cụm chọn phòng.
+          hidden={laUvKhongKhung}
           className="absolute left-1/2 top-16 z-20 flex -translate-x-1/2 gap-2 rounded-full bg-black/35 p-1.5 backdrop-blur-sm sm:top-4"
         >
           {THU_TU_PHONG.map((ma) => (
@@ -911,7 +936,7 @@ export function ManTreoTuong({
               một dòng.
             */}
             <h2 className="kh-h3 text-bb-fg">
-              Treo lên tường nhà mình
+              {laUvKhongKhung ? vi.gallery.treoTuong.tieuDeAnhGiay : "Treo lên tường nhà mình"}
             </h2>
           </div>
           <button
@@ -969,13 +994,17 @@ export function ManTreoTuong({
 
         {coVua.length === 0 && (
           <p className="text-xs text-bb-fg-muted">
-            Phòng này chưa có cỡ vừa tường. Ba mẹ thử phòng khác nhé.
+            {vi.gallery.loiBean.phongChuaVuaTuong}
           </p>
         )}
 
-        {monKhung.length > 0 && (
+        {/* BB-358 — Khung Hàn Quốc chỉ bọc chất liệu đã cán (Gỗ, Tráng gương…); UV là ảnh giấy, không có khung. */}
+        {monKhung.length > 0 && coTheBocKhung(chatLieu) && (
           <div className="space-y-2">
-            <label className="flex cursor-pointer items-center justify-between rounded-2xl bg-bb-surface-2 px-3.5 py-2">
+            <label
+              data-testid="tuy-chon-boc-khung"
+              className="flex cursor-pointer items-center justify-between rounded-2xl bg-bb-surface-2 px-3.5 py-2"
+            >
               <span className="text-xs font-medium text-bb-fg">Bọc khung HQ</span>
               <input
                 type="checkbox"
@@ -1067,7 +1096,7 @@ export function ManTreoTuong({
           </button>
         )}
         {xemDuocThoi && (
-          <p className="text-center text-xs text-bb-fg-muted">Bộ ảnh đang chỉ xem, chưa đặt được.</p>
+          <p className="text-center text-xs text-bb-fg-muted">{vi.gallery.loiBean.dangChiXemChuaDat}</p>
         )}
       </div>
 

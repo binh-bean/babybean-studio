@@ -35,8 +35,9 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { HINH_THUC_GIAM_GIA, tienVuotHanMucConPhaiThu } from "@/lib/gallery/tien-phat-sinh";
-import { layDongThanhToanTheoBo, tinhTienQuyDoi } from "@/lib/gallery/han-muc-thanh-toan";
+import { HINH_THUC_GIAM_GIA } from "@/lib/gallery/tien-phat-sinh";
+import { layTienCanThuNhieuBo } from "@/lib/gallery/tien-can-thu-server";
+import { layKhachGuiAnhChon } from "@/lib/gallery/khach-gui-anh-chon";
 
 export const runtime = "nodejs";
 
@@ -66,6 +67,14 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const admin = createAdminClient();
+
+    // BB-351 (vòng 7, B mục 3) — MỘT khách chỉ là MỘT việc. Bộ đang nằm ở tab "Khách gửi ảnh
+    // chọn" (chờ xác nhận danh sách / đợt mua thêm / nhờ chọn giúp / đặt chỉnh sửa) thì KHÔNG
+    // hiện ở đây nữa: tab đó đã có đủ form thu tiền (cùng form BB-349) + xác nhận, nên CSKH xử
+    // lý một chỗ. Xác nhận xong mà còn nợ thì bộ tự quay về tab này. Chọn cách lọc (thay vì
+    // đếm "bộ khác nhau" ở huy hiệu) để số trên từng tab CỘNG LẠI đúng bằng huy hiệu menu.
+    const pDangOKhachGui = layKhachGuiAnhChon(admin, branchIds).then((ds) => new Set(ds.map((d) => d.galleryId)));
+    pDangOKhachGui.catch(() => {});
 
     // BB-333 — câu đếm "chưa biết hạn mức" không phụ thuộc gì vào danh sách
     // bên dưới: gửi đi NGAY, chạy song song với câu đọc view (trước đây nó đi
@@ -101,7 +110,8 @@ export async function GET(request: Request): Promise<Response> {
       unbilled_amount: string | number | null;
     };
 
-    const rowsTyped = (rows ?? []) as unknown as Row[];
+    const dangOKhachGui = await pDangOKhachGui;
+    const rowsTyped = ((rows ?? []) as unknown as Row[]).filter((r) => !dangOKhachGui.has(r.gallery_id));
 
     // BB-320 (Q-D2): CSKH phải biết GỌI AI để thu tiền — view chỉ có mã hợp đồng,
     // không có tên bé/khách. Tra thêm tên theo đúng các bộ ảnh vừa lấy (ba lượt
@@ -110,7 +120,7 @@ export async function GET(request: Request): Promise<Response> {
     // chốt) không phụ thuộc nhau: chạy SONG SONG thay vì nối đuôi. Nội dung mỗi
     // lượt giữ nguyên như trước.
     const idsBo = rowsTyped.map((r) => r.gallery_id);
-    const [tenTheoBo, daThuTheoBo, lucChotTheoBo, dongTTTheoBo] = await Promise.all([
+    const [tenTheoBo, daThuTheoBo, tienTheoBo] = await Promise.all([
       // BB-320 (Q-D2): CSKH phải biết GỌI AI để thu tiền — view chỉ có mã hợp đồng,
       // không có tên bé/khách. Tra thêm tên theo đúng các bộ ảnh vừa lấy (ba lượt
       // nhỏ theo id, không truy vấn nặng). Tra hỏng thì để trống — dòng vẫn hiện, chỉ thiếu tên.
@@ -168,28 +178,10 @@ export async function GET(request: Request): Promise<Response> {
         return daThuTheoBo;
       })(),
 
-      // BB-327: số khách nhìn thấy LÚC CHỐT (cùng số sổ thu tiền + màn chi tiết dùng).
-      (async () => {
-        const lucChotTheoBo = new Map<string, { tien: number | undefined; luc: string | null }>();
-        if (rowsTyped.length > 0) {
-          const { data: selRows, error: selErr } = await admin
-            .from("selections")
-            .select("gallery_id, snapshot_extra_amount, submitted_at")
-            .eq("is_primary", true)
-            .in("gallery_id", idsBo);
-          if (selErr) throw selErr;
-          for (const s of selRows ?? []) {
-            lucChotTheoBo.set(String(s.gallery_id), {
-              tien: s.snapshot_extra_amount !== null ? Number(s.snapshot_extra_amount) : undefined,
-              luc: (s.submitted_at as string | null) ?? null,
-            });
-          }
-        }
-        return lucChotTheoBo;
-      })(),
-
-      // BB-348: dòng hạn mức do thanh toán — cộng lại giá trị để không trừ hai lần (cùng `layTienCanThu`).
-      layDongThanhToanTheoBo(admin, idsBo),
+      // BB-351 — "còn phải thu" của từng bộ từ ĐÚNG hàm của màn chi tiết + route ghi thu
+      // (`layTienCanThuNhieuBo`): phần vượt hạn mức (số lúc chốt mới nhất + hạn mức đã quy đổi,
+      // BB-327/348) sau mọi khoản ghi có. Không còn công thức thứ hai trong báo cáo này.
+      layTienCanThuNhieuBo(admin, idsBo),
     ]);
 
     const items = rowsTyped.map((r) => ({
@@ -209,16 +201,7 @@ export async function GET(request: Request): Promise<Response> {
       unbilledCount: r.unbilled_count,
       extraPhotoPrice: Number(r.extra_photo_price ?? 0),
       // Số theo ảnh (view) trừ mọi khoản đã ghi có; giữ hai phần để màn hình nói rõ đã trừ gì.
-      unbilledAmount: tienVuotHanMucConPhaiThu({
-        tienTheoAnh: Number(r.unbilled_amount ?? 0),
-        tienLucChot: lucChotTheoBo.get(r.gallery_id)?.tien,
-        daGhiCo: (daThuTheoBo.get(r.gallery_id)?.daThu ?? 0) + (daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0),
-        quyDoi: tinhTienQuyDoi(
-          dongTTTheoBo.get(r.gallery_id) ?? [],
-          Number(r.extra_photo_price ?? 0),
-          lucChotTheoBo.get(r.gallery_id)?.luc,
-        ),
-      }),
+      unbilledAmount: tienTheoBo.get(r.gallery_id)?.conThieuVuot ?? 0,
       daThu: daThuTheoBo.get(r.gallery_id)?.daThu ?? 0,
       giamGia: daThuTheoBo.get(r.gallery_id)?.giamGia ?? 0,
     }))

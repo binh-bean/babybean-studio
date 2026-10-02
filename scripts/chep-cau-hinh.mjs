@@ -279,7 +279,9 @@ export function nanIdTheoBanDo(banDo, id) {
  * hình: chép nguyên giá trị nguồn sang một cơ sở dữ liệu mới nạp là nói dối
  * "đã đồng bộ tới giờ này" trong khi đích chưa có gì.
  */
-const KHOA_SETTINGS_LOAI_TRU = new Set(["lark_hook_queue", "lark_retouch_last_sync"]);
+// BB-356: `van_hanh.dung_luong_db` là mốc đo dung lượng CỦA CHÍNH DB nguồn — chép sang
+// đích là vẽ cho đích một đường tăng trưởng không phải của nó.
+const KHOA_SETTINGS_LOAI_TRU = new Set(["lark_hook_queue", "lark_retouch_last_sync", "van_hanh.dung_luong_db"]);
 export function laKhoaTrangThaiDongBo(key) {
   return KHOA_SETTINGS_LOAI_TRU.has(key) || /(_last_sync|_cursor)$/i.test(key);
 }

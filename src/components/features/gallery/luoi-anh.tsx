@@ -37,6 +37,7 @@ import { urlAnh, urlAnhDuPhong } from "@/lib/utils/anh-lh3";
 import React, { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Heart, Lock, Printer } from "lucide-react";
 import { cn } from "@/components/ui/utils";
+import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { chonCoAnhTheoO } from "@/lib/utils/chon-co-anh";
 import { vi } from "@/i18n";
 import type { PhotoPublic } from "@/types/domain";
@@ -228,7 +229,7 @@ const TheAnh = memo(function TheAnh({
         {giaDinhThich && !soSanhBat && (
           <span
             data-testid="dau-gia-dinh-thich"
-            className="pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-[#8a4b3c] shadow-sm"
+            className={cn(CHIP_NGUYEN_KHOI, "pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-[#8a4b3c] shadow-sm")}
             title="Gia đình đã thả tim tấm này"
           >
             <Heart className="h-3 w-3 fill-current" aria-hidden="true" />
@@ -239,7 +240,7 @@ const TheAnh = memo(function TheAnh({
         {/* Tấm đã dùng làm sản phẩm in — màu rêu, bên TRÁI, không đấu với tim. */}
         {soSanPham > 0 && (
           <span
-            className="pointer-events-none absolute left-2 top-2 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-moss shadow-sm"
+            className={cn(CHIP_NGUYEN_KHOI, "pointer-events-none absolute left-2 top-2 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-moss shadow-sm")}
             title={`Tấm này đang làm ${soSanPham} sản phẩm`}
           >
             <Printer className="h-3 w-3" aria-hidden="true" />

@@ -31,8 +31,10 @@
  * chung" nữa — thợ in phải biết in tấm nào.
  */
 
+import { vi } from "@/i18n";
 import React from "react";
 import { cn } from "@/components/ui/utils";
+import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatKichThuoc, nhanTrangThaiGio } from "@/lib/utils/dinh-dang";
@@ -197,7 +199,7 @@ export function BangSanPhamCuaAnh({
   if (!anhDaChon) {
     return (
       <p className={cn("text-xs leading-relaxed", T.chuMoHon)}>
-        Thả tim chọn tấm này trước, rồi mới đặt in được.
+        {vi.gallery.loiBean.thaTimTruocKhiDatIn}
       </p>
     );
   }
@@ -352,11 +354,14 @@ export function BangSanPhamCuaAnh({
                   )}
                 >
                   <span className="min-w-0">
-                    <span className="block font-medium">
-                      {al.name}
+                    {/* BB-361 — tên + chip trên một hàng co giãn: thiếu chỗ thì chip xuống dòng NGUYÊN KHỐI. */}
+                    <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium">
+                      <span className="min-w-0">{al.name}</span>
                       <span
+                        data-testid="chip-trong-goi"
                         className={cn(
-                          "ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-normal",
+                          CHIP_NGUYEN_KHOI,
+                          "rounded-full px-1.5 py-0.5 text-[11px] font-normal leading-tight",
                           sang ? "bg-[#2E2A27]/[0.08] text-[#6b6057]" : "bg-white/15 text-white/70",
                         )}
                       >
@@ -391,8 +396,8 @@ export function BangSanPhamCuaAnh({
                   <span className="block font-medium">{al.name}</span>
                   <span className={cn("block", T.chuMo)}>
                     {donDaGui
-                      ? "Đã đặt mua. Studio sẽ trao đổi với ba mẹ về ảnh và bìa."
-                      : "Trong giỏ. Chốt xong, studio sẽ trao đổi về ảnh và bìa."}
+                      ? vi.gallery.loiBean.daDatMua
+                      : vi.gallery.loiBean.trongGio}
                   </span>
                 </span>
               </li>
@@ -509,6 +514,7 @@ export function BangSanPhamCuaAnh({
                       {daDat > 0 && (
                         <span
                           className={cn(
+                            CHIP_NGUYEN_KHOI,
                             "rounded-full px-2 py-0.5 text-[11px]",
                             sang ? "bg-[#7FA99B]/25 text-[#2f4a40]" : "bg-[#7FA99B]/25 text-[#cfe6dd]",
                           )}

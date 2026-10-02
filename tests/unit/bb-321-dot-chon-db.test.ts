@@ -454,7 +454,7 @@ describe("BB-321: đợt chọn chạy thật trên cơ sở dữ liệu", () =>
     expect(co.status).toBe(200);
     const { data } = await (await docDot()).json();
     expect(data.cheDoChonThem).toBe(true);
-    expect(data.cauDongY.studioChon).toBe("Tôi đồng ý với ảnh studio chọn dùm và không đổi lại");
+    expect(data.cauDongY.studioChon).toBe("Tôi đồng ý với ảnh Bean chọn dùm và không đổi lại");
     expect(data.cauDongY.bietAnhInCham).toBe("Tôi biết chưa chọn ảnh in thì nhận ảnh chậm hơn");
     await client.query("update galleries set lark_trang_thai = null, lark_trang_thai_tu = null where id = $1", [galleryId]);
     await datTrangThai("in_retouch");

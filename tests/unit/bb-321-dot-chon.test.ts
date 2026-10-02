@@ -248,8 +248,8 @@ describe("BB-321 (3): trạng thái mở lại được — một nguồn cho ro
 
 describe("BB-321: chữ hiển thị cho khách theo trạng thái đợt", () => {
   it("chờ / đã xác nhận / từ chối kèm lý do / mở lại", () => {
-    expect(nhanTrangThaiDotChoKhach("cho_xac_nhan")).toBe("Đang chờ studio xác nhận");
-    expect(nhanTrangThaiDotChoKhach("da_xac_nhan")).toBe("Studio đã xác nhận");
+    expect(nhanTrangThaiDotChoKhach("cho_xac_nhan")).toBe("Bean đang xác nhận đợt này ạ");
+    expect(nhanTrangThaiDotChoKhach("da_xac_nhan")).toBe("Bean đã xác nhận đợt này ạ");
     expect(nhanTrangThaiDotChoKhach("tu_choi", "Tấm này đã in xong")).toContain("Tấm này đã in xong");
     expect(nhanTrangThaiDotChoKhach("da_mo_lai")).toContain("mở lại");
   });
@@ -363,7 +363,7 @@ describe("BB-321 (5): đợt 1 chốt THIẾU ảnh — nhờ studio chọn bổ
   });
 
   it("câu tick đúng chữ chủ studio duyệt", () => {
-    expect(CAU_DONG_Y_STUDIO_CHON).toBe("Tôi đồng ý với ảnh studio chọn dùm và không đổi lại");
+    expect(CAU_DONG_Y_STUDIO_CHON).toBe("Tôi đồng ý với ảnh Bean chọn dùm và không đổi lại");
   });
 });
 

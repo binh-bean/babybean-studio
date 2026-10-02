@@ -130,8 +130,8 @@ test.describe("BB-330: chi tiết màn khách", () => {
       `og:url của trang bộ ảnh đang là "${ogUrl}" — Zalo/Messenger sẽ mở trang chủ thay vì bộ ảnh`,
     ).toBe(true);
 
-    await expect(page.getByText("Mời ông bà cùng xem")).toBeVisible();
-    await page.getByRole("button", { name: "Mời", exact: true }).click();
+    // BB-355 (bản vẽ v8 a) — lối mời là nút viền thứ hai trên bìa.
+    await page.getByTestId("nut-moi-ong-ba-bia").click();
     await page.getByPlaceholder("Ví dụ: Bà nội").fill("Bà nội");
     await page.getByRole("button", { name: "Tạo link" }).click();
     await expect(page.getByText("Đã tạo link cho")).toBeVisible();
@@ -158,16 +158,15 @@ test.describe("BB-330: chi tiết màn khách", () => {
     expect(rows.map((r) => r.role)).toEqual(["viewer"]);
   });
 
-  test("5: thẻ Mời ông bà có ở máy tính 1440", async ({ page }) => {
+  test("5: nút Mời ông bà có ở máy tính 1440", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await chanLh3TrenTrinhDuyet(page);
     await page.goto(`/g/${maLink}`);
     await expect(page.getByAltText("Ảnh 1").first()).toBeVisible({ timeout: 45_000 });
-    const the = page.getByTestId("khoi-moi-ong-ba");
-    await expect(the).toHaveCount(1);
-    await the.scrollIntoViewIfNeeded();
-    await expect(the.getByText("Mời ông bà cùng xem")).toBeVisible();
-    await expect(the.getByRole("button", { name: "Mời", exact: true })).toBeVisible();
+    // BB-355 (bản vẽ v8 a) — khối mời giữa chip và lưới đã gỡ; lối mời là nút viền trên bìa.
+    const nut = page.getByTestId("bia-bo-anh").getByRole("button", { name: "Mời ông bà cùng xem" });
+    await expect(nut).toHaveCount(1);
+    await expect(nut).toBeVisible();
   });
 
   test("3 + 2: nút Lên đầu trang (390×844) — hiện sau 1,5 màn, không che thanh đáy, về đầu; câu cảm ơn", async ({ page }) => {
@@ -223,7 +222,7 @@ test.describe("BB-330: chi tiết màn khách", () => {
     await expect(menu).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: "Tải ảnh đang xem" })).toBeVisible();
     await expect(menu.getByRole("menuitem", { name: /Tải cả bộ/ })).toBeVisible();
-    await expect(menu.getByRole("menuitem", { name: /Tải \d+ ảnh đã chọn/ })).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: /Tải \d+ tấm đã chọn/ })).toBeVisible();
     await expect(menu.getByRole("menuitem")).toHaveCount(3);
     // Mở thực đơn KHÔNG tải ngay, và màn xem lớn vẫn mở.
     await expect(page.getByTestId("chi-so-anh")).toBeVisible();
