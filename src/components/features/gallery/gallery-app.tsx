@@ -30,7 +30,7 @@ import {
 import { CAU_BIET_ANH_IN_CHAM, CAU_DONG_Y_STUDIO_CHON, dangCheDoChonThem } from "@/lib/gallery/dot-chon";
 import { Checkbox } from "@/components/ui/checkbox";
 import { demMon, demMonInChuaAnhHienThi } from "@/lib/gallery/dem-mon";
-import { giuA } from "@/lib/utils/giu-a";
+import { giuA, giuCuoi } from "@/lib/utils/giu-a";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
 import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
@@ -118,6 +118,7 @@ import {
   chuanHoaKyHieuKichThuocTrongGallery,
   tenKemSoLuong,
   tenSanPhamChoKhach,
+  tenDongTrongGoiChoKhach,
   formatKichThuoc,
   formatSo,
 } from "@/lib/utils/dinh-dang";
@@ -1484,7 +1485,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         .filter((sp) => !albumThieuBia.some((a) => a.galleryItemId === sp.galleryItemId))
         .map((sp) => ({
           galleryItemId: sp.galleryItemId,
-          name: sp.name,
+          name: tenDongTrongGoiChoKhach(sp.name, sp.nhom),
           soThieu: Math.max(1, sp.quantity - demAnhTrongDongHang(sp.galleryItemId)),
           nhom: sp.nhom,
         })),
@@ -1989,7 +1990,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
       }
     : daChotChoXacNhan
       ? // Đã chốt, CSKH chưa xác nhận: mở lại là việc của chính ba mẹ.
-        { nhan: "Chọn thêm ảnh", onClick: () => setMoKhoaChon(true) }
+        // BB-362 (vòng 9–10) — "Chọn thêm ảnh" đã là lối mua đợt 2 (trả tiền) sau khi
+        // Bean xác nhận; ở đây là sửa lại danh sách trong gói, nên gọi đúng việc.
+        { nhan: "Sửa danh sách", onClick: () => setMoKhoaChon(true) }
       : // Đã khoá thật: không sửa thẳng được, nhưng phải có ĐƯỜNG NÓI.
         // BB-312 — đang có yêu cầu CHƯA XỬ LÝ thì nhãn nói rõ, tránh cảm
         // giác "bấm gửi yêu cầu mới" khi thật ra chỉ có chỗ xem lại trạng
@@ -3043,7 +3046,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
           daChon: selectionCounts.selectedCount,
           mon: hangInTrongGoi.map((sp) => ({
             galleryItemId: sp.galleryItemId,
-            name: sp.name,
+            // BB-362 — một tên cho một món: "Ảnh in UV 10×15" như giỏ và xem lớn.
+            name: tenDongTrongGoiChoKhach(sp.name, sp.nhom),
             quantity: sp.quantity,
             laAlbum: sp.nhom === "album",
             soAnh: demAnhTrongDongHang(sp.galleryItemId),
@@ -3240,8 +3244,11 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 </p>
               )}
             </div>
-            {gallery.branch.chatUrl && (
+            {/* BB-362 (vòng 10, K12) — thông báo "Bean đang cập nhật gói" đã mang nút
+                "Nhắn Bean": lúc nó đang hiện, chân trang không lặp nút thứ hai. */}
+            {gallery.branch.chatUrl && !(statusMessage?.startsWith(CAU_CHUA_CO_HAN_MUC) ?? false) && (
               <a
+                data-testid="chan-trang-nhan-bean"
                 href={gallery.branch.chatUrl}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -3720,7 +3727,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
                   </div>
                   <label className="mt-2.5 flex items-start gap-2.5 leading-relaxed">
                     <Checkbox checked={bietAnhInChamDot1} onCheckedChange={setBietAnhInChamDot1} className="mt-0.5" />
-                    <span>{dotChon.tt?.cauDongY?.bietAnhInCham ?? CAU_BIET_ANH_IN_CHAM}</span>
+                    <span>{giuCuoi(dotChon.tt?.cauDongY?.bietAnhInCham ?? CAU_BIET_ANH_IN_CHAM)}</span>
                   </label>
                 </div>
               )}
@@ -3845,7 +3852,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         <div className="fixed inset-x-6 bottom-[84px] z-[60] mx-auto max-w-xl rounded-2xl border border-border bg-surface p-3 text-sm shadow-lg">
           <div className="flex items-center justify-between gap-3">
             <span className="min-w-0 truncate">
-              Đang tải {formatSo(tienDoTai.daXong)}/{formatSo(tienDoTai.tong)} tấm
+              Đang tải {formatSo(tienDoTai.daXong)} / {formatSo(tienDoTai.tong)} tấm
               {tienDoTai.dangTai ? ` · ${tienDoTai.dangTai}` : ""}
             </span>
             {tienDoTai.daXong < tienDoTai.tong && (
@@ -3909,7 +3916,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             for (const pl of placements) {
               if (pl.photoId !== anh.id) continue;
               const sp = hangInTrongGoi.find((h) => h.galleryItemId === pl.galleryItemId);
-              if (sp) nhan.push(`${sp.name} · trong gói`);
+              if (sp) nhan.push(`${tenDongTrongGoiChoKhach(sp.name, sp.nhom)} · trong gói`);
             }
             for (const m of gallery.addons?.items ?? []) {
               if (m.photoId === anh.id) nhan.push(tenKemSoLuong(tenMonGio(m.productId, m.name), m.quantity));
@@ -3957,7 +3964,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               dangLuu={placing}
               suatTrongGoi={suatInTrongGoi.map((sp) => ({
                 galleryItemId: sp.galleryItemId,
-                name: sp.name,
+                name: tenDongTrongGoiChoKhach(sp.name, sp.nhom),
                 quantity: sp.quantity,
                 daDat: demAnhTrongDongHang(sp.galleryItemId),
                 coAnhNay: placements.some(
@@ -3966,7 +3973,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
               }))}
               albumTrongGoi={albumTrongGoi.map((sp) => ({
                 galleryItemId: sp.galleryItemId,
-                name: sp.quantity > 1 ? `${sp.name} ×${sp.quantity}` : sp.name,
+                name: tenKemSoLuong(tenDongTrongGoiChoKhach(sp.name, sp.nhom), sp.quantity),
                 soAnh: demAnhTrongDongHang(sp.galleryItemId),
                 coAnhNay: placements.some(
                   (pl) => pl.galleryItemId === sp.galleryItemId && pl.photoId === anh.id,
@@ -4096,7 +4103,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
             }))}
           suatTrongGoi={suatInTrongGoi.map((sp) => ({
             galleryItemId: sp.galleryItemId,
-            name: sp.name,
+            name: tenDongTrongGoiChoKhach(sp.name, sp.nhom),
             quantity: sp.quantity,
           }))}
           placements={placements}

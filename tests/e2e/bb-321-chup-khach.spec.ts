@@ -157,13 +157,13 @@ for (const k of ["dt", "mt"] as Kt[]) {
     // Thẻ trên màn chính (chưa có đợt nào) → lối vào.
     const the = page.getByTestId("chon-them-anh");
     await expect(the).toBeVisible({ timeout: 30_000 });
-    await expect(the).toContainText("Thêm ảnh cho bé Mít");
+    await expect(the).toContainText("Thêm ảnh cho Bé Mít");
     await the.getByRole("button", { name: "Chọn thêm ảnh" }).click();
 
     // 1. Lưới đợt 2 — ĐÚNG lưới màn chính: 12 tấm đợt 1 mang huy hiệu, không có tim.
     const man = page.getByTestId("man-chon-them-anh");
     await expect(man).toBeVisible();
-    await expect(man.getByTestId("dong-dau-man-dot")).toHaveText(/^Chọn thêm ảnh cho bé Mít · 30\.000\s₫\/ảnh$/);
+    await expect(man.getByTestId("dong-dau-man-dot")).toHaveText(/^Chọn thêm ảnh cho Bé Mít · 30\.000\s₫\/ảnh$/);
     await expect(man.getByTestId("cau-tong-dot")).toHaveText("Chưa chọn ảnh mới");
     await expect(man.getByTestId("nut-chot-dot")).toBeDisabled();
     const chipDaChon = man.getByRole("button", { name: /^Đã chọn/ });
@@ -215,7 +215,7 @@ for (const k of ["dt", "mt"] as Kt[]) {
     await man.getByTestId("nut-chot-dot").click();
     const hop = page.getByTestId("hop-xac-nhan-dot");
     await expect(hop).toBeVisible();
-    await expect(hop.getByRole("heading")).toHaveText("Chốt đợt 2 cho bé Mít");
+    await expect(hop.getByRole("heading")).toHaveText("Chốt đợt 2 cho Bé Mít");
     await expect(hop.getByTestId("tong-tien-dot")).toHaveText(tongThanh);
     await expect(hop).not.toContainText("trong gói");
     await expect(hop.getByTestId("nhac-in-chua-anh-dot")).toContainText(CAU_BIET_ANH_IN_CHAM);

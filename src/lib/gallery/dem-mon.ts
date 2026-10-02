@@ -45,3 +45,39 @@ export function demMonInChuaAnhHienThi(
   const soAlbum = demMon(albumThieuBia);
   return Math.max(0, Math.max(0, Math.trunc(soMayChuDem)) - soAlbum);
 }
+
+/**
+ * BB-362 (người chấm vòng 10, mục 3) — viên giỏ máy tính ghi "Giỏ · 6 món ·
+ * 120.000 ₫" nhưng chỉ hiện 2 dòng đầu (80.000 ₫); phần còn lại nấp sau "Xem
+ * cả giỏ ›" không có số nào, nên ba mẹ cộng không ra con số ở tiêu đề.
+ *
+ * Chia giỏ thành phần HIỆN và phần ẨN, kèm số món + tiền của phần ẩn, để dòng
+ * "+N món khác · X ₫" luôn bù đúng: tiền(hiện) + an.tien = tổng giỏ, và
+ * demMon(hiện) + an.soMon = demMon(giỏ). Cùng luật đếm `demMon`.
+ */
+export interface DongGio extends DongCoSoLuong {
+  totalPrice: number;
+}
+
+export interface PhanGioAn {
+  soDong: number;
+  soMon: number;
+  tien: number;
+}
+
+export function chiaDongGio<T extends DongGio>(
+  dong: ReadonlyArray<T>,
+  xemHet: boolean,
+  soDongToiDa = 2,
+): { hien: T[]; an: PhanGioAn } {
+  const hien = xemHet ? dong.slice() : dong.slice(0, Math.max(0, soDongToiDa));
+  const conLai = dong.slice(hien.length);
+  return {
+    hien,
+    an: {
+      soDong: conLai.length,
+      soMon: demMon(conLai),
+      tien: conLai.reduce((t, d) => t + (Number.isFinite(d.totalPrice) ? d.totalPrice : 0), 0),
+    },
+  };
+}

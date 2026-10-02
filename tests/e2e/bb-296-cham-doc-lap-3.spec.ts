@@ -275,7 +275,7 @@ ownIpTest.describe("BB-296 mục #3: treo tường — khung theo hướng ảnh
       if ((await nutDatIn.count()) > 0) {
         await nutDatIn.click();
       }
-      const nutXemTuong = page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first();
+      const nutXemTuong = page.getByRole("button", { name: /Xem trên tường nhà/ }).first();
       const moDuocTuTamTruot = await nutXemTuong
         .waitFor({ state: "visible", timeout: 8_000 })
         .then(() => true)

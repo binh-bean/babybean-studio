@@ -434,7 +434,7 @@ ownIpTest.describe("BB-298: bìa (bản vẽ BB-297), đã giao, xem lớn máy 
     const hop = page.locator('div[role="dialog"][aria-modal="true"]');
     await ownIpExpect(hop).toBeVisible({ timeout: 10000 });
 
-    const nutTuong = hop.getByRole("button", { name: /Xem trên tường nhà mình/ });
+    const nutTuong = hop.getByRole("button", { name: /Xem trên tường nhà/ });
     // Sản phẩm treo tường có thể không nằm trong danh mục fixture (danh mục
     // là dữ liệu chung của bb-dev) — chỉ canh màu KHI nút thật sự có.
     if ((await nutTuong.count()) > 0) {

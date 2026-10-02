@@ -122,7 +122,7 @@ test("(b) đã gửi — 390: chip → thẻ gộp → lưới; bìa và thẻ c
   await expect(the).toBeVisible();
   const tieuDe = ((await the.getByRole("heading", { level: 3 }).innerText()) ?? "").trim();
   await expect(the.locator('[aria-current="step"]')).toHaveText(/Chờ\s*xác nhận/);
-  await expect(the.getByTestId("dong-phu-tien-do")).toHaveText("Ba mẹ vẫn chọn thêm ảnh được tới khi Bean xác nhận ạ.");
+  await expect(the.getByTestId("dong-phu-tien-do")).toHaveText("Ba mẹ vẫn sửa danh sách được tới khi Bean xác nhận ạ.");
   await expect(the.getByRole("button", { name: "Mời ông bà cùng xem" })).toBeVisible();
   await expect(the.locator("img")).toHaveCount(0); // anh chốt: bỏ tranh trong thẻ sau khi gửi
 
@@ -133,12 +133,13 @@ test("(b) đã gửi — 390: chip → thẻ gộp → lưới; bìa và thẻ c
   const goc = tieuDe.replace(/ ạ$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   expect(bia, `bìa "${bia}" lệch thẻ "${tieuDe}"`).toMatch(new RegExp(`^${goc} của .+ ạ\\.$`));
 
-  // Thanh chọn (hiện khi đã qua bìa): "Chọn thêm ảnh" là nút chính, cửa hàng vào bằng nút túi.
+  // Thanh chọn (hiện khi đã qua bìa): "Sửa danh sách" là nút chính (BB-362: "Chọn thêm ảnh"
+  // dành cho đợt mua thêm sau khi Bean xác nhận), cửa hàng vào bằng nút túi.
   await page.locator("#dau-luoi-anh").evaluate((el) => el.scrollIntoView({ block: "start" }));
   await page.mouse.wheel(0, -40);
   await page.waitForTimeout(700);
   const thanh = page.getByTestId("thanh-noi");
-  await expect(thanh.getByRole("button", { name: "Chọn thêm ảnh" })).toBeVisible();
+  await expect(thanh.getByRole("button", { name: "Sửa danh sách" })).toBeVisible();
   await expect(thanh.getByRole("button", { name: "Mua thêm" })).toBeVisible();
   await page.screenshot({ path: `${THU_MUC_ANH}/b-dau-luoi-390.png` });
 });

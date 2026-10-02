@@ -214,7 +214,7 @@ export const vi = {
       luuAppCanSafari: "Ba mẹ mở bằng Safari hoặc Chrome để lưu app nhé ạ.",
       // BB-355 — bản vẽ "Màn khách v8". Câu khách thấy gom về đây (giọng Bean, kết "ạ").
       sanSangChon: "{n} khoảnh khắc của con đã sẵn sàng, ba mẹ thong thả chọn ạ.",
-      vanChonThemDuoc: "Ba mẹ vẫn chọn thêm ảnh được tới khi Bean xác nhận ạ.",
+      vanChonThemDuoc: "Ba mẹ vẫn sửa danh sách được tới khi Bean xác nhận ạ.",
       nguoiThanGiaiThich:
         "Ảnh chọn trong gói được ba mẹ thực hiện. Gia đình thích tấm nào có thể đặt chỉnh sửa hoặc mua thêm ảnh in và album in ảnh ạ!",
       nguoiThanChuaThaTim: "Chạm tim tấm gia đình thích ạ",

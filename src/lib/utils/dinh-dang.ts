@@ -157,6 +157,33 @@ export function tenSanPhamChoKhach(sp: {
 }
 
 /**
+ * BB-362 (người chấm vòng 10) — tên một dòng hợp đồng (gallery_items.name, lấy
+ * từ Lark) khi hiện ở QUẢN TRỊ: viết hoa chữ đầu + ký hiệu "×" — "tờ Album
+ * (Ultra HD) 20x20" → "Tờ Album (Ultra HD) 20×20", cùng kiểu màn khách. Dữ liệu
+ * giữ nguyên, chỉ đổi bản hiển thị.
+ */
+export function tenHienThiSanPham(ten: string): string {
+  return vietHoaChuDau(formatKichThuoc(ten.trim()));
+}
+
+/**
+ * BB-362 (người chấm vòng 10, mục 5) — tên một món IN TRONG GÓI ở màn khách,
+ * cùng định dạng `tenSanPhamChoKhach` ("Ảnh in UV 10×15"). Dòng hợp đồng chỉ có
+ * tên Lark ("UV 10x15") và nhóm, không có chất liệu/kích thước tách riêng, nên
+ * ghép tiền tố nhóm khi tên chưa tự nói nhóm — trước đây khối "Trong gói" hiện
+ * "UV 10×15" còn giỏ/xem lớn hiện "Ảnh in UV 10×15" cho cùng một món.
+ */
+export function tenDongTrongGoiChoKhach(ten: string, nhom?: string | null): string {
+  const goc = vietHoaChuDau(formatKichThuoc(tenCoChatLieuChoKhach(ten.trim())));
+  const tienTo = nhom ? TIEN_TO_NHOM_SAN_PHAM[nhom] : undefined;
+  if (!tienTo) return goc;
+  const thuong = goc.toLocaleLowerCase("vi");
+  // "Ảnh phóng 30×45", "Tờ Album …", "Khung HQ …" đã tự nói nhóm → giữ nguyên.
+  if (thuong.includes(tienTo.toLocaleLowerCase("vi")) || (nhom === "anh_in" && thuong.startsWith("ảnh"))) return goc;
+  return `${tienTo} ${goc}`;
+}
+
+/**
  * BB-319 (luật 5, K-D1) — nhãn trạng thái của món trong giỏ phải nói ĐÚNG sự
  * thật: mới thêm vào giỏ (đơn chưa gửi) là "Trong giỏ"; chỉ khi ba mẹ đã chốt
  * gửi đơn mới là "Đã đặt mua". Vòng 6 bắt "Đã đặt mua" hiện lúc món mới nằm

@@ -24,6 +24,7 @@
 
 import React from "react";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { giuA } from "@/lib/utils/giu-a";
 import { ChevronRight, UserPlus } from "lucide-react";
 import { useNutBackDong } from "./use-nut-back-dong";
 
@@ -304,8 +305,9 @@ export function MoiNguoiThan({ kieu = "the" }: { kieu?: KieuLoiVaoMoi } = {}) {
           <header className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 sm:px-8">
             <div>
               <h2 id="tieu-de-moi-ong-ba" className="kh-h2">Mời ông bà cùng xem</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Ông bà xem ảnh, thả tim tấm mình thích để đặt mua thêm ạ. Danh sách ảnh trong gói vẫn do ba mẹ chọn.
+              {/* BB-362 — "ạ." từng mở đầu dòng 2 ở 1440: gắn "ạ" vào chữ trước bằng giuA. */}
+              <p className="mt-0.5 text-pretty text-xs text-muted-foreground">
+                {giuA("Ông bà xem ảnh, thả tim tấm mình thích để đặt mua thêm ạ. Danh sách ảnh trong gói vẫn do ba mẹ chọn.")}
               </p>
             </div>
             <button

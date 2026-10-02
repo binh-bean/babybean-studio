@@ -35,6 +35,7 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatKichThuoc, formatSo } from "@/lib/utils/dinh-dang";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { CAU_BIET_ANH_IN_CHAM, soDotKeTiep } from "@/lib/gallery/dot-chon";
+import { giuCuoi } from "@/lib/utils/giu-a";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import type { SanPhamCuaHang } from "@/lib/products/cau-hinh-cua-hang";
 import type { PhotoPublic } from "@/types/domain";
@@ -532,7 +533,7 @@ export function ManChonThemDot({
                       className="mt-0.5"
                       aria-label={tt.cauDongY?.bietAnhInCham ?? CAU_BIET_ANH_IN_CHAM}
                     />
-                    <span>{tt.cauDongY?.bietAnhInCham ?? CAU_BIET_ANH_IN_CHAM}</span>
+                    <span>{giuCuoi(tt.cauDongY?.bietAnhInCham ?? CAU_BIET_ANH_IN_CHAM)}</span>
                   </label>
                 </div>
               )}

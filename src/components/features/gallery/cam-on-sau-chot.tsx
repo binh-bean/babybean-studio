@@ -143,18 +143,20 @@ export function CamOnSauChot({
         Yours truly Bean
       </p>
 
-      <div className="mt-6 w-full rounded-2xl border border-border bg-surface px-4 text-left">
+      {/* BB-362 (vòng 9–10, K09) — khối tóm tắt CHỈ ĐỌC: nền be, không viền trắng
+          (viền + nền trắng trông như ô nhập). */}
+      <div data-testid="cam-on-tom-tat" className="mt-6 w-full rounded-2xl bg-surface-2 px-4 text-left">
         <div className="flex h-[46px] items-center gap-3 text-[15px]">
           <span data-testid="cam-on-dong-so-tam">{dongSoTamCamOn(soTamDaChon, hanMuc)}</span>
         </div>
         {coBia != null && (
-          <div className="flex h-[46px] items-center gap-3 border-t border-[#f0e9e0] text-[15px]">
+          <div className="flex h-[46px] items-center gap-3 border-t border-[var(--bb-border)] text-[15px]">
             <span>Bìa album</span>
             <span className="ml-auto text-[13px] text-muted-foreground">{coBia ? "Đã chọn" : "Cần chọn"}</span>
           </div>
         )}
         {soMonMuaThem > 0 && (
-          <div className="flex h-[46px] items-center gap-3 border-t border-[#f0e9e0] text-[15px]">
+          <div className="flex h-[46px] items-center gap-3 border-t border-[var(--bb-border)] text-[15px]">
             <span>Mua thêm {soMonMuaThem} món</span>
             <span className="ml-auto text-[13px] text-muted-foreground">{formatCurrencyVND(tienMuaThem)}</span>
           </div>

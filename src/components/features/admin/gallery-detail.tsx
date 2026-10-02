@@ -41,6 +41,7 @@ import React from "react";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { MoreHorizontal, Copy, Check, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OChonTim } from "@/components/ui/o-chon-tim";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -64,6 +65,7 @@ import {
   dongThongTinBoAnhQuanTri,
   formatSo,
   formatTien,
+  tenHienThiSanPham,
 } from "@/lib/utils/dinh-dang";
 /**
  * BB-296 mục #6 — tên thân thiện cho một dòng "Mua thêm", cùng luật với
@@ -942,14 +944,15 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                     Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>
                   </p>
                 )}
-                <button
+                {/* BB-362 — nút chính quản trị dùng chung `Button variant="muc"` (góc 8px). */}
+                <Button
                   type="button"
+                  variant="muc"
                   disabled={busy}
                   onClick={() => void confirmSubmission()}
-                  className="rounded-full bg-[var(--bb-fg)] px-4 py-2.5 text-sm font-medium text-[var(--bb-bg)] disabled:opacity-40"
                 >
                   Xác nhận và chuyển sang chỉnh ảnh
-                </button>
+                </Button>
               </div>
             )}
           </>
@@ -1241,14 +1244,15 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               Khách còn thiếu <strong>{formatCurrencyVND(detail.outstanding)}</strong>
             </p>
           )}
-          <button
+          <Button
             type="button"
+            variant="muc"
             disabled={busy}
             onClick={() => void confirmSubmission()}
-            className="w-full rounded-full bg-[var(--bb-fg)] px-4 py-3 text-sm font-medium text-[var(--bb-bg)] disabled:opacity-40"
+            className="w-full"
           >
             Xác nhận và chuyển sang chỉnh ảnh
-          </button>
+          </Button>
         </div>
       )}
       {/* Đệm dưới cùng bằng chiều cao thanh ghim, để nội dung cuối trang
@@ -1564,7 +1568,7 @@ function KhoiChinh({
               <li key={item.id} className="rounded-md border border-[var(--bb-border)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-medium">
-                    <span className="min-w-0 truncate">{item.name}</span>
+                    <span className="min-w-0 truncate">{tenHienThiSanPham(item.name)}</span>
                     {canSuaDong && !locked && !item.tuThanhToan ? (
                       <QuantityEditor
                         value={item.quantity}
@@ -1610,7 +1614,7 @@ function KhoiChinh({
                     {item.components.map((c) => (
                       <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
                         <span>
-                          {c.name} <span className="text-[var(--bb-fg-muted)]">×{c.quantity}</span>
+                          {tenHienThiSanPham(c.name)} <span className="text-[var(--bb-fg-muted)]">×{c.quantity}</span>
                           {c.kind === "edited_photo" && (
                             <span className="ml-2 text-xs text-[var(--bb-fg-muted)]">
                               (đây là hạn mức ảnh)

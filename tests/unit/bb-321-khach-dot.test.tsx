@@ -209,10 +209,10 @@ describe("oTickChotDot1 / duOTickChotDot1 / coGuiChotDot1", () => {
 
 describe("chữ tên bé", () => {
   it("không lặp 'bé'", () => {
-    expect(cumTenBe("Mít")).toBe("bé Mít");
-    expect(cumTenBe("Bé Na")).toBe("bé Na"); // tên gọi có sẵn "Bé" (tinhTenBiaTuDuLieu), đứng giữa câu
-    expect(tieuDeHopChotDot(2, "Bé Mít")).toBe("Chốt đợt 2 cho bé Mít");
-    expect(tieuDeHopChotDot(2, "Mít")).toBe("Chốt đợt 2 cho bé Mít");
+    expect(cumTenBe("Mít")).toBe("Bé Mít");
+    expect(cumTenBe("bé Na")).toBe("Bé Na"); // BB-362: viết hoa "Bé" như bìa, không lặp "Bé Bé"
+    expect(tieuDeHopChotDot(2, "Bé Mít")).toBe("Chốt đợt 2 cho Bé Mít");
+    expect(tieuDeHopChotDot(2, "Mít")).toBe("Chốt đợt 2 cho Bé Mít");
     expect(tieuDeHopChotDot(3, null)).toBe("Chốt đợt 3");
   });
 });

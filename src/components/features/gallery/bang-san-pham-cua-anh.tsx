@@ -249,8 +249,9 @@ export function BangSanPhamCuaAnh({
             className="h-14 w-14 shrink-0 rounded-lg object-cover"
           />
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-[#2E2A27]">Xem trên tường nhà mình</span>
-            <span className="block text-[11px] text-[#6b6057]">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
+            {/* BB-362 — bảng bên 1440 rộng 255px: "nhà / mình" từng gãy; rút tiêu đề, giữ một dòng. */}
+            <span className="block whitespace-nowrap text-sm font-semibold text-[#2E2A27]">Xem trên tường nhà</span>
+            <span className="block text-pretty text-[11px] text-[#6b6057]">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
           </span>
           <span className="shrink-0 text-base leading-none text-[#8a8078]">→</span>
         </button>
@@ -261,7 +262,7 @@ export function BangSanPhamCuaAnh({
           className="flex w-full items-center justify-between gap-2 rounded-xl bg-[#2E2A27] px-3.5 py-3 text-left ring-1 ring-white/10 transition hover:bg-[#3a352f]"
         >
           <span>
-            <span className="block text-sm font-semibold text-[#fdfbf9]">Xem trên tường nhà mình</span>
+            <span className="block whitespace-nowrap text-sm font-semibold text-[#fdfbf9]">Xem trên tường nhà</span>
             <span className="block text-[11px] text-[#fdfbf9]/70">Ướm đúng cỡ, đúng chất liệu, giá thật</span>
           </span>
           <span className="shrink-0 text-base leading-none text-[#fdfbf9]">→</span>

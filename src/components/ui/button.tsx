@@ -9,6 +9,15 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-[var(--bb-primary)] text-[var(--bb-primary-fg)] shadow hover:opacity-90 active:opacity-100",
+        /*
+         * BB-362 (vòng 10, P1 quản trị) — NÚT CHÍNH màu mực, một hình dạng cho cả
+         * quản trị: góc 8px (`--bb-radius-sm`, hệ thiết kế: "nút quản trị 8px";
+         * viên tròn chỉ dành cho nút khách). Trước đây Q01/Q04 tự viết lớp
+         * `rounded-full` riêng nên lệch Q02/Q03/Q08/Q09/Q11. Mọi nút chính mực ở
+         * quản trị/đăng nhập đi qua biến thể này (hoặc `buttonVariants`).
+         */
+        muc:
+          "bg-[var(--bb-fg)] text-[var(--bb-bg)] shadow hover:opacity-90 active:opacity-100",
         accent:
           "bg-[var(--bb-accent)] text-[var(--bb-accent-fg)] shadow hover:opacity-90 active:opacity-100",
         secondary:

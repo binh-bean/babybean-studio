@@ -50,7 +50,7 @@ describe("BB-339 mục 1 — lưới chọn ảnh dùng ảnh nét theo srcset",
       />,
     );
     expect(html).toContain("Ảnh cho Gỗ 40×60");
-    expect(html).toContain("Đã chọn 1/1 tấm");
+    expect(html).toContain("Đã chọn 1 / 1 tấm"); // BB-362: một kiểu "x / y"
   });
 });
 
@@ -63,7 +63,7 @@ describe("BB-339 mục 3 — món trong gói bấm vào chọn ảnh được", 
   it("chưa khoá + có onChonAnh: mỗi món một nút chọn ảnh", () => {
     const html = renderToStaticMarkup(<TomTatSanPhamIn dong={dong} onMoAnh={() => {}} onChonAnh={() => {}} />);
     expect(html.match(/data-testid="chon-anh-mon-trong-goi"/g)?.length).toBe(2);
-    expect(html).toContain("Chọn ảnh cho Gỗ 40×60");
+    expect(html).toContain("Chọn ảnh cho Ảnh in Gỗ 40×60"); // BB-362: cùng tên với giỏ
   });
 
   it("đã khoá: không có nút chọn ảnh", () => {
@@ -98,9 +98,9 @@ describe("BB-339 mục 4 — cửa hàng: Trong gói x/y ảnh, xem/đổi ảnh
   );
 
   it("báo 'Trong gói: 4/15 ảnh' và từng món trong gói có nút chọn", () => {
-    expect(html).toContain("4/15 tấm");
+    expect(html).toContain("4 / 15 tấm");
     expect(html).toContain("Chọn ảnh trong gói cho Gỗ 40×60");
-    expect(html).toContain("0/1 tấm");
+    expect(html).toContain("0 / 1 tấm");
   });
 
   it("dòng giỏ có ảnh là nút bấm để xem lớn", () => {

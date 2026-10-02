@@ -167,15 +167,15 @@ export function dongDauManDot(giaMoiAnh: number): string {
 }
 
 /**
- * "bé Mít" — cụm tên bé đứng GIỮA câu: không lặp chữ "bé", và chữ "Bé" có sẵn
- * trong tên gọi (`tinhTenBiaTuDuLieu` trả "Bé Mít") viết thường cho đúng giữa câu.
- * Thiếu tên → "bé".
+ * "Bé Mít" — cụm tên bé đứng GIỮA câu: không lặp chữ "Bé"; viết hoa như bìa
+ * (BB-362, "Ảnh của Bé Xoài"). Thiếu tên → "bé".
  */
 export function cumTenBe(tenBe: string | null | undefined): string {
   const ten = (tenBe ?? "").trim();
   if (!ten) return "bé";
   const [tuDau = "", ...conLai] = ten.split(/\s+/);
-  return tuDau.toLowerCase() === "bé" ? ["bé", ...conLai].join(" ") : `bé ${ten}`;
+  // BB-362 (vòng 10, mục 8) — viết "Bé Mít" như bìa ("Ảnh của Bé Xoài"), không "bé Mít".
+  return tuDau.toLowerCase() === "bé" ? ["Bé", ...conLai].join(" ") : `Bé ${ten}`;
 }
 
 /** Tiêu đề hộp xác nhận: "Chốt đợt 2 cho bé Mít". */

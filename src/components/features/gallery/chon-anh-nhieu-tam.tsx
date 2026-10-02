@@ -209,7 +209,7 @@ export function ChonAnhNhieuTam({
           {/* BB-305 — thanh đếm "Đã chọn N tấm" là nội dung: bỏ font-display, tabular-nums cho số. */}
           <p className="text-[16px] font-medium tabular-nums text-foreground">
             {toiDa != null
-              ? `Đã chọn ${formatSo(daChon.size)}/${formatSo(toiDa)} tấm`
+              ? `Đã chọn ${formatSo(daChon.size)} / ${formatSo(toiDa)} tấm`
               : `Đã chọn ${formatSo(daChon.size)} tấm`}
           </p>
           <button

@@ -119,12 +119,13 @@ function LoginForm() {
         />
       </label>
 
-      {/* Bản vẽ dang-nhap.webp: nút chính viên tròn màu mực (#2E2A27 = --bb-fg),
-          không phải hồng đất mặc định của <Button variant="default">. */}
+      {/* Nút chính màu mực (--bb-fg). BB-362: cùng hình dạng nút chính của quản trị
+          (biến thể `muc`, góc 8px) — không còn viên tròn riêng ở màn này. */}
       <Button
         type="submit"
+        variant="muc"
         disabled={busy}
-        className="w-full rounded-full bg-[var(--bb-fg)] text-[var(--bb-bg)] hover:opacity-90"
+        className="w-full"
       >
         {busy ? vi.admin.login.loggingIn : vi.admin.login.submit}
       </Button>
@@ -199,7 +200,7 @@ function QuenMatKhau() {
               placeholder="ten.dang.nhap"
             />
           </label>
-          <Button type="submit" variant="outline" disabled={dangGui || taiKhoan.trim().length === 0} className="w-full rounded-full">
+          <Button type="submit" variant="outline" disabled={dangGui || taiKhoan.trim().length === 0} className="w-full">
             {dangGui ? "Đang gửi…" : "Gửi yêu cầu cho admin"}
           </Button>
         </>

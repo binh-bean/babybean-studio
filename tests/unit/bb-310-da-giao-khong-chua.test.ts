@@ -41,7 +41,7 @@ describe("BB-310 mục 3: loiTrangThai — album rỗng KHÔNG còn chữ 'Chưa
     const r = loiTrangThai(dongAnhIn(2, [{ id: "p1", fileName: "a.jpg" }]), true);
     expect(r.thieu).toBe(true);
     // BB-319 (luật 4): "suất" là chữ nội bộ — nói bằng số tấm của khách.
-    expect(r.chu).toBe("Có 1/2 tấm");
+    expect(r.chu).toBe("Có 1 / 2 tấm");
   });
 
   it("ảnh in thiếu, CHƯA khoá → 'Còn thiếu N tấm' (BB-319: không dùng chữ nội bộ 'suất')", () => {

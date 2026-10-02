@@ -31,7 +31,7 @@
 import React from "react";
 import { cn } from "@/components/ui/utils";
 import { conThieuAnh, type HangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
-import { tenKemSoLuong } from "@/lib/utils/dinh-dang";
+import { tenDongTrongGoiChoKhach, tenKemSoLuong } from "@/lib/utils/dinh-dang";
 
 export interface DongSanPhamIn extends HangInTrongGoi {
   /** Ảnh đã xếp vào dòng hàng này. */
@@ -91,7 +91,7 @@ export function loiTrangThai(dong: DongSanPhamIn, khoa: boolean): { chu: string;
   return {
     chu: thieu
       ? khoa
-        ? `Có ${daCo}/${dong.quantity} tấm`
+        ? `Có ${daCo} / ${dong.quantity} tấm`
         : `Còn thiếu ${dong.quantity - daCo} tấm`
       : `Đủ ${dong.quantity} tấm`,
     thieu,
@@ -127,7 +127,8 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false, onChon
       <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {dong.map((d) => {
           const tt = loiTrangThai(d, khoa);
-          const tenMon = tenKemSoLuong(d.name, d.quantity);
+          // BB-362 — cùng một tên với giỏ/xem lớn: "Ảnh in UV 10×15", không "UV 10×15".
+          const tenMon = tenKemSoLuong(tenDongTrongGoiChoKhach(d.name, d.nhom), d.quantity);
           return (
             <li key={d.galleryItemId} className="rounded-lg border border-[var(--bb-border)] p-3">
               <div className="flex items-start justify-between gap-3">
@@ -135,10 +136,10 @@ export function TomTatSanPhamIn({ dong, onMoAnh, className, khoa = false, onChon
                 <p
                   className={cn(
                     "shrink-0 text-xs",
-                    // BB-287 mục #23 — cam #D97706 không nằm trong bảng màu;
-                    // terracotta (heart) là màu nhấn trạng thái "cần chú ý"
-                    // dùng chung cho màn khách.
-                    tt.thieu && !khoa ? "font-medium text-heart" : "text-muted-foreground",
+                    // BB-362 (vòng 10, K12) — hồng đất `heart` chỉ dành cho tim đã chọn
+                    // (hệ thiết kế); "Còn thiếu" tô hồng đất đọc như báo động. Thiếu
+                    // ảnh là việc nhẹ nhàng: chữ mực đậm vừa, không màu cảnh báo.
+                    tt.thieu && !khoa ? "font-medium text-foreground" : "text-muted-foreground",
                   )}
                 >
                   {tt.chu}

@@ -117,7 +117,7 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
     await tamDau.click();
     const anhLon = page.getByRole("dialog").first();
     await expect(anhLon).toBeVisible();
-    await page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first().click();
+    await page.getByRole("button", { name: /Xem trên tường nhà/ }).first().click();
 
     const manTuong = page.getByRole("dialog", { name: "Xem ảnh trên tường" });
     await expect(manTuong).toBeVisible();
@@ -132,7 +132,7 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
 
     await page.keyboard.press("Escape");
     await expect(manTuong).toBeHidden();
-    await expect(page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Xem trên tường nhà/ }).first()).toBeVisible();
   });
 
   test("treo tường: bật Khung hiện hàng mẫu, chọn mẫu khác đổi border-image, thấy câu tham khảo", async ({
@@ -158,7 +158,7 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
     await expect(tamDau.getByRole("button", { name: "Bỏ chọn" })).toBeVisible();
 
     await tamDau.click();
-    await page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first().click();
+    await page.getByRole("button", { name: /Xem trên tường nhà/ }).first().click();
 
     const manTuong = page.getByRole("dialog", { name: "Xem ảnh trên tường" });
     await expect(manTuong).toBeVisible();
@@ -260,7 +260,7 @@ test.describe("BB-217 + BB-218: so sánh nhiều tấm, treo ảnh lên tường
     await expect(tamDau.getByRole("button", { name: "Bỏ chọn" })).toBeVisible();
 
     await tamDau.click();
-    await page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first().click();
+    await page.getByRole("button", { name: /Xem trên tường nhà/ }).first().click();
 
     const manTuong = page.getByRole("dialog", { name: "Xem ảnh trên tường" });
     await expect(manTuong).toBeVisible();

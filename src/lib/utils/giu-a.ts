@@ -17,3 +17,17 @@ export function giuA(cau: string | null | undefined): string | null | undefined 
   if (typeof cau !== "string") return cau;
   return cau.replace(TRUOC_A, `${KHOANG_KHONG_NGAT}$1`);
 }
+
+/**
+ * BB-362 (người chấm vòng 10, K08) — chữ cuối câu rơi một mình xuống dòng
+ * ("…nhận ảnh chậm / hơn"). Gắn HAI chữ cuối bằng khoảng trắng không ngắt để
+ * dòng cuối luôn có ít nhất hai chữ. Câu một chữ giữ nguyên.
+ */
+const TRUOC_CHU_CUOI = /[ \t\n\r]+(\S+)\s*$/u;
+
+export function giuCuoi(cau: string): string;
+export function giuCuoi(cau: string | null | undefined): string | null | undefined;
+export function giuCuoi(cau: string | null | undefined): string | null | undefined {
+  if (typeof cau !== "string") return cau;
+  return giuA(cau).replace(TRUOC_CHU_CUOI, `${KHOANG_KHONG_NGAT}$1`);
+}

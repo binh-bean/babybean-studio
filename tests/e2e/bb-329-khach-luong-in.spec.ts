@@ -193,7 +193,7 @@ ownIpTest.describe("BB-329 — màn khách: tiến độ, Đặt in, cửa hàng
     await ownIpExpect(theDau.getByRole("button", { name: "Bỏ chọn" })).toBeVisible();
     await theDau.click();
     await page.getByRole("button", { name: "Sản phẩm cho tấm ảnh này" }).click();
-    const nutTuong = page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first();
+    const nutTuong = page.getByRole("button", { name: /Xem trên tường nhà/ }).first();
     const coNut = await nutTuong
       .waitFor({ state: "visible", timeout: 8_000 })
       .then(() => true)

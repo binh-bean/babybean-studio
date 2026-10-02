@@ -129,7 +129,7 @@ test.describe("BB-339: sản phẩm trong gói, cửa hàng, demo treo tường"
     await o.nth(2).click();
     await expect(o.nth(2)).toHaveAttribute("aria-pressed", "true");
     await expect(o.nth(1)).toHaveAttribute("aria-pressed", "false");
-    await expect(luoi.getByText("Đã chọn 1/1 tấm")).toBeVisible();
+    await expect(luoi.getByText("Đã chọn 1 / 1 tấm")).toBeVisible();
     await page.screenshot({ path: `${THU_MUC_ANH}/2-luoi-chon-anh-trong-goi.png` });
     const daLuu = page.waitForResponse(
       (r) => r.url().includes("/api/g/placements") && r.request().method() === "POST",
@@ -161,10 +161,10 @@ test.describe("BB-339: sản phẩm trong gói, cửa hàng, demo treo tường"
     const cuaHang = page.getByRole("dialog", { name: "Mua thêm sản phẩm" });
     const khoi = cuaHang.getByTestId("trong-goi-cua-hang");
     await expect(khoi).toBeVisible();
-    await expect(khoi.getByTestId("trong-goi-dem")).toHaveText(/\d+\/10 tấm/);
-    await expect(khoi.getByRole("button", { name: /ảnh trong gói cho Gỗ 40×60/ })).toBeVisible();
+    await expect(khoi.getByTestId("trong-goi-dem")).toHaveText(/\d+ \/ 10 tấm/);
+    await expect(khoi.getByRole("button", { name: /ảnh trong gói cho (Ảnh in )?Gỗ 40×60/ })).toBeVisible();
     await page.screenshot({ path: `${THU_MUC_ANH}/4-cua-hang-trong-goi-390.png` });
-    await khoi.getByRole("button", { name: /ảnh trong gói cho Gỗ 40×60/ }).click();
+    await khoi.getByRole("button", { name: /ảnh trong gói cho (Ảnh in )?Gỗ 40×60/ }).click();
     await expect(page.getByRole("heading", { name: "Ảnh cho Gỗ 40×60" })).toBeVisible();
   });
 
@@ -175,7 +175,7 @@ test.describe("BB-339: sản phẩm trong gói, cửa hàng, demo treo tường"
     await tam.getByRole("button", { name: "Chọn ảnh này" }).click();
     await expect(tam.getByRole("button", { name: "Bỏ chọn" })).toBeVisible();
     await tam.click();
-    await page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first().click();
+    await page.getByRole("button", { name: /Xem trên tường nhà/ }).first().click();
     const manTuong = page.getByRole("dialog", { name: "Xem ảnh trên tường" });
     await expect(manTuong).toBeVisible();
     await expect(manTuong.getByTestId("tham-khao-demo")).toHaveText("Hình demo chỉ mang tính tham khảo ạ.");

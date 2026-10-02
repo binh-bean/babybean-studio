@@ -238,7 +238,7 @@ ownIpTest.describe("BB-275: bố cục các màn phụ của màn khách", () =>
 
       // 1b. TREO LÊN TƯỜNG (từ trong lightbox, chỉ khi có danh mục ảnh in) ---
       if (bc.coDanhMucAnhIn) {
-        const nutTuong = page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first();
+        const nutTuong = page.getByRole("button", { name: /Xem trên tường nhà/ }).first();
         if (await nutTuong.isVisible().catch(() => false)) {
           await nutTuong.click();
           const manTuong = page.getByRole("dialog", { name: "Xem ảnh trên tường" });

@@ -412,7 +412,9 @@ async function duLieuDanhGia5Trong(dang: TrangThaiDangDung): Promise<DuLieuDanhG
        snapshot_selected_count = 15, snapshot_extra_count = 0, snapshot_extra_amount = 0 where id = $1`,
     [daChotSelectionId],
   );
-  await pg.query(`update galleries set submitted_at = now() - interval '1 day' where id = $1`, [daChotRaw.bo.id]);
+  // BB-362 — luồng chốt thật ghi hạn mức chụp nhanh vào galleries.included_quota (máy chủ đọc nó
+  // khi đã có snapshot). Thiếu cột này ảnh chụp hiện "15 / 0 tấm"; gói Edit file 15 → hạn mức 15.
+  await pg.query(`update galleries set submitted_at = now() - interval '1 day', included_quota = 15 where id = $1`, [daChotRaw.bo.id]);
   const daChotCoverId = daChotRaw.anhTheoSort.get(2);
   if (daChotCoverId) await pg.query(`update galleries set cover_photo_id = $1 where id = $2`, [daChotCoverId, daChotRaw.bo.id]);
 

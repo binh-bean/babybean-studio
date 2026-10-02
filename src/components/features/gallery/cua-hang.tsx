@@ -69,7 +69,7 @@ import { formatKichThuoc, nhanTrangThaiGio, tenKemSoLuong, tenSanPhamChoKhach } 
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { ChonAnhNhieuTam, type AnhTrongLuoiChon } from "./chon-anh-nhieu-tam";
 import { tenChatLieuChoKhach } from "@/lib/products/nhom-san-pham";
-import { demMon, demMonCuaSanPham } from "@/lib/gallery/dem-mon";
+import { chiaDongGio, demMon, demMonCuaSanPham } from "@/lib/gallery/dem-mon";
 import { anhNhoTheoO, thuLaiAnhQuaRoute } from "@/lib/utils/chon-co-anh";
 
 /** @deprecated dùng `SanPhamCuaHang` từ `@/lib/products/cau-hinh-cua-hang` — giữ tên cũ để không phải sửa mọi chỗ import. */
@@ -405,6 +405,8 @@ export function CuaHang({
   // BB-358 — một luật đếm (lib/gallery/dem-mon.ts): món = cộng số lượng, ở thẻ, viên giỏ, hộp chốt.
   const daDat = (productId: string) => demMonCuaSanPham(daMua, productId);
   const soMonTrongGio = demMon(daMua);
+  // BB-362 — phần giỏ đang nấp sau "Xem cả giỏ": dòng "+N món khác · X ₫" bù đúng tiêu đề.
+  const gioChia = chiaDongGio(daMua, xemHetGio);
 
   const dangDatPresetChoNhomNay = Boolean(presetPhotoId) && nhomDangXem === presetNhom;
 
@@ -608,7 +610,7 @@ export function CuaHang({
                       <>
                         {": "}
                         <span data-testid="trong-goi-dem" className="tabular-nums">
-                          {trongGoi.daChon}/{trongGoi.hanMuc} tấm
+                          {trongGoi.daChon} / {trongGoi.hanMuc} tấm
                         </span>
                       </>
                     )}
@@ -621,8 +623,8 @@ export function CuaHang({
                           <li key={m.galleryItemId} className="flex items-center justify-between gap-3">
                             <span className="min-w-0 truncate text-[13px] text-foreground">
                               {tenKemSoLuong(m.name, m.quantity)}
-                              <span className={cn("ml-1.5 tabular-nums", thieu ? "text-[var(--bb-heart,#C4645A)]" : "text-muted-foreground")}>
-                                {m.laAlbum ? `${m.soAnh} tấm` : `${m.soAnh}/${m.quantity} tấm`}
+                              <span className={cn("ml-1.5 tabular-nums", thieu ? "font-medium text-foreground" : "text-muted-foreground")}>
+                                {m.laAlbum ? `${m.soAnh} tấm` : `${m.soAnh} / ${m.quantity} tấm`}
                               </span>
                             </span>
                             {trongGoi.onChonAnh && !khoa && (
@@ -947,7 +949,7 @@ export function CuaHang({
                 Giỏ · {soMonTrongGio} món · {formatCurrencyVND(tongTien)}
               </p>
               <ul className="space-y-1.5">
-                {(xemHetGio ? daMua : daMua.slice(0, 2)).map((d) => (
+                {gioChia.hien.map((d) => (
                   <li
                     key={d.id}
                     className="flex items-center gap-2.5 rounded-xl border border-[var(--bb-border)] bg-white px-3 py-2"
@@ -1001,13 +1003,17 @@ export function CuaHang({
                   </li>
                 ))}
               </ul>
-              {!xemHetGio && daMua.length > 2 && (
+              {gioChia.an.soDong > 0 && (
                 <button
                   type="button"
+                  data-testid="gio-phan-an"
                   onClick={() => setXemHetGio(true)}
-                  className="mt-1.5 text-[12px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                  className="mt-1.5 flex w-full items-center justify-between gap-2 rounded-xl border border-dashed border-[var(--bb-border)] px-3 py-2 text-left text-[12px] text-muted-foreground transition hover:text-foreground"
                 >
-                  Xem cả giỏ ›
+                  <span>
+                    +{gioChia.an.soMon} món khác · <span className="tabular-nums">{formatCurrencyVND(gioChia.an.tien)}</span>
+                  </span>
+                  <span className="shrink-0 font-medium underline underline-offset-2">Xem cả giỏ ›</span>
                 </button>
               )}
               </div>

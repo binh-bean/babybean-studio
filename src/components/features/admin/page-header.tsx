@@ -20,6 +20,7 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/components/ui/utils";
+import { buttonVariants } from "@/components/ui/button";
 import { layerMoVuong } from "@/lib/utils/tranh-tan-nen";
 
 // BB-326 mục 6 — Playfair 30px không khai `line-height`/`letter-spacing` nên
@@ -135,7 +136,7 @@ export function KhongCoQuyen({ mota }: { mota: string }) {
       <p className={cn("mt-2", PAGE_DESCRIPTION_CLASS)}>{mota}</p>
       <a
         href="/admin"
-        className="mt-6 inline-flex h-10 items-center rounded-[var(--bb-radius-sm)] bg-[var(--bb-fg)] px-4 text-sm font-medium text-white hover:opacity-90"
+        className={cn(buttonVariants({ variant: "muc" }), "mt-6")}
       >
         Về Bàn làm việc
       </a>

@@ -410,7 +410,7 @@ ownIpTest.describe("BB-277: màn khách — axe + bàn phím", () => {
     const tamBangSanPham = page.getByRole("dialog", { name: "In ảnh này" });
     await tamBangSanPham.waitFor({ state: "visible" });
 
-    const nutTuong = page.getByRole("button", { name: /Xem trên tường nhà mình/ }).first();
+    const nutTuong = page.getByRole("button", { name: /Xem trên tường nhà/ }).first();
     if (!(await nutTuong.isVisible().catch(() => false))) {
       ownIpTest.skip(true, "Không thấy nút Xem trên tường nhà mình trong bảng sản phẩm hiện tại");
       return;

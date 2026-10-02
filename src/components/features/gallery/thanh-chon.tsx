@@ -160,10 +160,11 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
               <>
                 {" / "}
                 {hanMuc}
-                {/* BB-361 (vòng 9, mục 5) — 390 cũng có "tấm" như 1440; chữ nhỏ hơn số để số tiền ở dòng dưới không bị chèn. */}
-                <span data-testid="thanh-chon-don-vi" className="text-[14px] lg:text-[16px]">{" tấm"}</span>
               </>
             )}
+            {/* BB-361 (vòng 9, mục 5) — 390 cũng có "tấm" như 1440; chữ nhỏ hơn số để số tiền ở dòng dưới không bị chèn.
+                BB-362 (vòng 10, K12) — gói chưa rõ hạn mức cũng ghi "0 tấm", không để số trơ trọi. */}
+            <span data-testid="thanh-chon-don-vi" className="text-[14px] lg:text-[16px]">{" tấm"}</span>
           </p>
           {/* Dưới lg: dòng phụ nằm NGAY DƯỚI số đếm, như thẻ điện thoại của bản vẽ. */}
           <p
