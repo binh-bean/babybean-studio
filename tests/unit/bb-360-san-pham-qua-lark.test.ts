@@ -21,6 +21,7 @@ vi.mock("server-only", () => ({}));
 
 import {
   KHOA_THU_SAN_PHAM_QUA_APP,
+  KHOA_THU_SAN_PHAM_QUA_APP_TU,
   laBatThuSanPhamQuaApp,
   tienCanThuCuaBo,
   tienSanPhamThuQuaLark,
@@ -60,6 +61,8 @@ describe.skipIf(!coDb)("BB-360 (b): layTienCanThu thật trên bb-dev", () => {
   const boIds: string[] = [];
   // Giá trị cờ trước khi thử — trả lại y nguyên.
   let coCu: { co: boolean; value: unknown } = { co: false, value: null };
+  // BB-363: mốc hiệu lực của cờ — cũng trả lại y nguyên.
+  let tuCu: { co: boolean; value: unknown } = { co: false, value: null };
   let coDotMuaThem = true;
 
   async function datCo(value: boolean | null) {
@@ -73,6 +76,15 @@ describe.skipIf(!coDb)("BB-360 (b): layTienCanThu thật trên bb-dev", () => {
     if (coCu.co) {
       await pg.query(`insert into settings (key, value) values ($1, $2::jsonb)`, [KHOA_THU_SAN_PHAM_QUA_APP, JSON.stringify(coCu.value)]);
     }
+    await pg.query(`delete from settings where key = $1 and branch_id is null`, [KHOA_THU_SAN_PHAM_QUA_APP_TU]);
+    if (tuCu.co) {
+      await pg.query(`insert into settings (key, value) values ($1, $2::jsonb)`, [KHOA_THU_SAN_PHAM_QUA_APP_TU, JSON.stringify(tuCu.value)]);
+    }
+  }
+  /** BB-363: cờ không hồi tố — "bật từ 2 ngày trước" để giỏ fixture (chốt 1 giờ trước) nằm sau mốc. */
+  async function datMoc(tu: string) {
+    await pg.query(`delete from settings where key = $1 and branch_id is null`, [KHOA_THU_SAN_PHAM_QUA_APP_TU]);
+    await pg.query(`insert into settings (key, value) values ($1, $2::jsonb)`, [KHOA_THU_SAN_PHAM_QUA_APP_TU, JSON.stringify(tu)]);
   }
 
   beforeAll(async () => {
@@ -80,6 +92,8 @@ describe.skipIf(!coDb)("BB-360 (b): layTienCanThu thật trên bb-dev", () => {
     await pg.connect();
     const cu = await pg.query(`select value from settings where key = $1 and branch_id is null`, [KHOA_THU_SAN_PHAM_QUA_APP]);
     coCu = cu.rowCount ? { co: true, value: cu.rows[0].value } : { co: false, value: null };
+    const tu = await pg.query(`select value from settings where key = $1 and branch_id is null`, [KHOA_THU_SAN_PHAM_QUA_APP_TU]);
+    tuCu = tu.rowCount ? { co: true, value: tu.rows[0].value } : { co: false, value: null };
 
     id.branch = (
       await pg.query(`insert into branches (code, name) values ($1,$2) returning id`, [`FXBB360-${RUN}`, `Fixture BB-360-${RUN} Chi nhánh`])
@@ -207,6 +221,7 @@ describe.skipIf(!coDb)("BB-360 (b): layTienCanThu thật trên bb-dev", () => {
   it("cờ BẬT: sản phẩm cộng vào Phải thu như BB-359, dòng Lark = 0", async () => {
     try {
       await datCo(true);
+      await datMoc(new Date(Date.now() - 48 * 3600_000).toISOString());
       const t = await layTienCanThu(createAdminClient(), id.tron!);
       const tong = 50_000 + 40_000 + (coDotMuaThem ? 30_000 + 70_000 : 0);
       expect(t.thuSanPhamQuaApp).toBe(true);

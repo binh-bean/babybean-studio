@@ -171,3 +171,95 @@ export async function kiemDayMigrationMoi({
 
   return ketQua;
 }
+
+// ---------------------------------------------------------------------------
+// BB-363 — dãy 0086–0089 (soát C vòng 11, R4)
+// ---------------------------------------------------------------------------
+
+/** Chỉ mục mà 0086/0087 tạo. Thiếu là ĐỎ — cả hai đã áp trên bb-dev, bb-prod nhận ở bước 3. */
+export const CHI_MUC_0086_0087 = {
+  "0086": [{ ten: "uq_gallery_payments_ma_yeu_cau", bang: "gallery_payments", duyNhat: true }],
+  "0087": [
+    { ten: "idx_activity_logs_created_at", bang: "activity_logs", duyNhat: false },
+    { ten: "idx_notifications_xong_created_at", bang: "notifications", duyNhat: false },
+  ],
+};
+
+/** Cột mà 0088 thêm vào `galleries` (gồm BB-363 `mo_link_cuoi_luc`). */
+export const COT_0088 = ["trang_thai_tu", "danh_sach_thu_gon_luc", "so_anh_truoc_thu_gon", "mo_lai_anh_luc", "mo_link_cuoi_luc"];
+
+/**
+ * Bốn phép kiểm cho 0086–0089. 0086/0087 thiếu = ĐỎ. 0088/0089 là "CHỜ CẮT" (anh chốt: áp
+ * lên bb-prod ở bước 3 của docs/26, KHÔNG áp sớm lên bb-dev): CHƯA áp thì ĐẠT kèm chữ
+ * "chờ cắt"; ĐÃ áp thì phải ĐỦ (áp nửa vời — thiếu một cột, hàm mở cho anon — là ĐỎ).
+ *
+ * @param {{ client: { query(sql: string, params?: unknown[]): Promise<{ rows: any[] }> } }} opts
+ */
+export async function kiemDay0086Den0089({ client }) {
+  const ketQua = [];
+  const check = (name, pass, detail = "") => ketQua.push({ name, pass, detail });
+
+  const tatCaChiMuc = Object.values(CHI_MUC_0086_0087).flat();
+  const { rows: cm } = await client.query(
+    `select c.relname as ten, t.relname as bang, i.indisunique as duy_nhat
+       from pg_index i
+       join pg_class c on c.oid = i.indexrelid
+       join pg_class t on t.oid = i.indrelid
+       join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relname = any($1::text[])`,
+    [tatCaChiMuc.map((x) => x.ten)],
+  );
+  const coChiMuc = new Map(cm.map((r) => [r.ten, r]));
+  const { rows: cotMa } = await client.query(
+    `select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'gallery_payments' and column_name = 'ma_yeu_cau'`,
+  );
+  const sai0086 = [];
+  if (cotMa.length === 0) sai0086.push("thiếu cột gallery_payments.ma_yeu_cau");
+  for (const x of CHI_MUC_0086_0087["0086"]) {
+    const r = coChiMuc.get(x.ten);
+    if (!r || r.bang !== x.bang) sai0086.push(`thiếu chỉ mục ${x.ten}`);
+    else if (x.duyNhat && !r.duy_nhat) sai0086.push(`${x.ten} không phải UNIQUE`);
+  }
+  check(
+    "0086: ma_yeu_cau + chỉ mục duy nhất",
+    sai0086.length === 0,
+    sai0086.length ? `${sai0086.join("; ")} — sổ thu tiền không chống được ghi trùng` : "đủ",
+  );
+
+  const thieu0087 = CHI_MUC_0086_0087["0087"].filter((x) => coChiMuc.get(x.ten)?.bang !== x.bang).map((x) => x.ten);
+  check("0087: hai chỉ mục của bộ dọn", thieu0087.length === 0, thieu0087.length ? `thiếu: ${thieu0087.join(", ")}` : "đủ");
+
+  const { rows: cot88 } = await client.query(
+    `select column_name from information_schema.columns
+      where table_schema = 'public' and table_name = 'galleries' and column_name = any($1::text[])`,
+    [COT_0088],
+  );
+  const { rows: ham88 } = await client.query(
+    `select has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
+            has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'nhan_mo_lai_anh'`,
+  );
+  if (cot88.length === 0 && ham88.length === 0) {
+    check("0088: thu gọn ảnh bộ cũ", true, "CHỜ CẮT — chưa áp (đúng kế hoạch: áp lên bb-prod ở bước 3)");
+  } else {
+    const coCot = new Set(cot88.map((r) => r.column_name));
+    const sai = COT_0088.filter((c) => !coCot.has(c)).map((c) => `thiếu cột galleries.${c}`);
+    if (ham88.length === 0) sai.push("thiếu hàm nhan_mo_lai_anh");
+    else if (ham88.some((r) => r.anon || r.auth)) sai.push("nhan_mo_lai_anh MỞ cho anon/authenticated (thiếu revoke, AGENTS §5b)");
+    check("0088: thu gọn ảnh bộ cũ", sai.length === 0, sai.length ? `ÁP NỬA VỜI: ${sai.join("; ")}` : `đã áp: ${COT_0088.length} cột + hàm đã revoke`);
+  }
+
+  // 0089 chỉ REINDEX (không đổi định nghĩa) — không đo được bằng cấu trúc; đọc sổ đã áp.
+  let da0089 = false;
+  try {
+    const { rows } = await client.query(`select 1 from public.schema_migrations where ten like '0089-%'`);
+    da0089 = rows.length > 0;
+  } catch {
+    da0089 = false;
+  }
+  check("0089: dựng lại chỉ mục photos", true, da0089 ? "đã áp (schema_migrations)" : "CHỜ CẮT — chưa áp (đúng kế hoạch)");
+
+  return ketQua;
+}

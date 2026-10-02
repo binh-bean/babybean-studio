@@ -17,7 +17,7 @@
  */
 
 import pg from "pg";
-import { kiemDayMigrationMoi } from "./lib/kiem-cau-truc-day-moi.mjs";
+import { kiemDayMigrationMoi, kiemDay0086Den0089 } from "./lib/kiem-cau-truc-day-moi.mjs";
 
 const REQUIRE_SEED = process.argv.includes("--seed");
 
@@ -390,6 +390,12 @@ async function main() {
     apiUrl,
     publishableKey,
   })) {
+    check(r.name, r.pass, r.detail);
+  }
+
+  // BB-363 — dãy 0086–0089 (soát C vòng 11, R4). 0088/0089 "chờ cắt": chưa áp là ĐẠT, áp nửa
+  // vời là HỎNG. Logic ở scripts/lib/kiem-cau-truc-day-moi.mjs, phép thử bb-363-verify-db.
+  for (const r of await kiemDay0086Den0089({ client })) {
     check(r.name, r.pass, r.detail);
   }
 

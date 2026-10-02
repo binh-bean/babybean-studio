@@ -13,6 +13,8 @@
  *   · BB-360: tách TIỀN ẢNH (luôn thu qua app) khỏi TIỀN SẢN PHẨM (ảnh in / khung / album —
  *     chỉ vào "Phải thu" khi cài đặt `thanh_toan.thu_san_pham_qua_app` bật; mặc định tắt,
  *     thu qua Lark). "Edit file" (`products.kind = 'edited_photo'`) là tiền ẢNH.
+ *   · BB-363: cờ KHÔNG hồi tố — chỉ giỏ chốt từ mốc bật cờ (`thanh_toan.thu_san_pham_qua_app_tu`)
+ *     mới vào "Phải thu" (đợt 1 theo lúc chốt lượt chọn chính, đợt ≥ 2 theo lúc gửi đợt).
  *   · BB-348: dòng hạn mức do thanh toán (`han-muc-thanh-toan.ts`) — cộng lại giá trị
  *     của chúng để tăng hạn mức không làm số tiền bị trừ hai lần.
  * Chưa áp migration 0077 (không có bảng đợt) thì đợt mua thêm = 0, không hỏng.
@@ -21,9 +23,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   KHOA_THU_SAN_PHAM_QUA_APP,
+  KHOA_THU_SAN_PHAM_QUA_APP_TU,
+  docMocThuSanPhamQuaApp,
   laBatThuSanPhamQuaApp,
+  sanPhamThuTrongApp,
   tienCanThuCuaBo,
-  tienSanPhamThuQuaLark,
+  tienSanPhamTinhVaoPhaiThu,
   tienVuotHanMucConPhaiThu,
   tongPhaiThuCuaBo,
 } from "@/lib/gallery/tien-phat-sinh";
@@ -51,6 +56,8 @@ export interface TienCanThuBo {
   tienSanPham: number;
   /** BB-360 — cài đặt `thanh_toan.thu_san_pham_qua_app` (mặc định false). */
   thuSanPhamQuaApp: boolean;
+  /** BB-363 — mốc hiệu lực của cờ (ISO) — chỉ giỏ chốt từ mốc này mới thu sản phẩm qua app. */
+  thuSanPhamQuaAppTu: string | null;
   /** BB-360 — phần sản phẩm thu qua Lark, KHÔNG nằm trong tongPhaiThu (0 khi cờ bật). */
   tienSanPhamQuaLark: number;
   daGhiCo: number;
@@ -90,16 +97,25 @@ export async function layTienCanThuNhieuBo(
     admin.from("v_over_quota_unbilled").select("gallery_id, unbilled_amount, unbilled_count").in("gallery_id", ids),
     admin
       .from("selection_rounds")
-      .select("gallery_id, tien_anh, tien_san_pham, san_pham")
+      .select("gallery_id, tien_anh, tien_san_pham, san_pham, submitted_at")
       .in("gallery_id", ids)
       .eq("trang_thai", "da_xac_nhan")
       .gte("so_dot", 2),
     admin.from("galleries").select("id, extra_photo_price").in("id", ids),
     layDongThanhToanTheoBo(admin, ids),
-    admin.from("settings").select("value").eq("key", KHOA_THU_SAN_PHAM_QUA_APP).is("branch_id", null).maybeSingle(),
+    admin
+      .from("settings")
+      .select("key, value")
+      .in("key", [KHOA_THU_SAN_PHAM_QUA_APP, KHOA_THU_SAN_PHAM_QUA_APP_TU])
+      .is("branch_id", null),
   ]);
   // Đọc hụt cài đặt = tắt (mặc định): không chặn màn tiền vì một dòng cài đặt.
-  const thuSanPhamQuaApp = !caiDat.error && laBatThuSanPhamQuaApp((caiDat.data as { value?: unknown } | null)?.value);
+  const caiDatTheoKhoa = new Map(
+    (caiDat.error ? [] : ((caiDat.data ?? []) as { key: string; value: unknown }[])).map((r) => [r.key, r.value]),
+  );
+  const thuSanPhamQuaApp = laBatThuSanPhamQuaApp(caiDatTheoKhoa.get(KHOA_THU_SAN_PHAM_QUA_APP));
+  // BB-363: cờ không hồi tố — chỉ giỏ chốt từ mốc bật cờ trở đi (xem `sanPhamThuTrongApp`).
+  const coSanPham = { bat: thuSanPhamQuaApp, tu: docMocThuSanPhamQuaApp(caiDatTheoKhoa.get(KHOA_THU_SAN_PHAM_QUA_APP_TU)) };
   if (sel.error) throw sel.error;
   if (pay.error) throw pay.error;
   if (theoAnh.error) throw theoAnh.error;
@@ -122,6 +138,8 @@ export async function layTienCanThuNhieuBo(
   // BB-360 — hai túi: tiền ẢNH (luôn thu qua app) và tiền SẢN PHẨM (ảnh in / khung / album).
   const dotTheoBo = new Map<string, number>();
   const sanPhamTheoBo = new Map<string, number>();
+  /** BB-363 — phần tiền sản phẩm của các giỏ chốt TỪ mốc hiệu lực (thu qua app). */
+  const sanPhamTrongAppTheoBo = new Map<string, number>();
   const cong = (m: Map<string, number>, g: string, tien: number) => {
     if (Number.isFinite(tien) && tien > 0) m.set(g, (m.get(g) ?? 0) + tien);
   };
@@ -132,6 +150,7 @@ export async function layTienCanThuNhieuBo(
       tien_anh: number | string | null;
       tien_san_pham: number | string | null;
       san_pham: unknown;
+      submitted_at?: string | null;
     };
     const dotRows = (dot.data ?? []) as DotRow[];
     const dongSp = (r: DotRow) => (Array.isArray(r.san_pham) ? r.san_pham : []) as DongSp[];
@@ -156,6 +175,8 @@ export async function layTienCanThuNhieuBo(
       tienEdit = Number.isFinite(tienEdit) ? Math.min(Math.max(0, tienEdit), tienSp) : 0;
       cong(dotTheoBo, g, Number(r.tien_anh ?? 0) + tienEdit);
       cong(sanPhamTheoBo, g, tienSp - tienEdit);
+      // Đợt ≥ 2: lúc ĐỢT đó được gửi.
+      if (sanPhamThuTrongApp(coSanPham, r.submitted_at)) cong(sanPhamTrongAppTheoBo, g, tienSp - tienEdit);
     }
   }
   // BB-359 (vòng 8 A, Q-4: "Mua thêm 40.000 ₫" cạnh "Phải thu 0 ₫ · đã trả đủ") — sản phẩm
@@ -166,6 +187,7 @@ export async function layTienCanThuNhieuBo(
   // dòng riêng (`dot` ≥ 2) nên không đếm hai lần.
   const luotDaChot = ((sel.data ?? []) as (Luot & { id: string })[]).filter((r) => r.submitted_at);
   const boTheoLuot = new Map(luotDaChot.map((r) => [String(r.id), String(r.gallery_id)]));
+  const chotLucTheoLuot = new Map(luotDaChot.map((r) => [String(r.id), r.submitted_at]));
   if (boTheoLuot.size > 0) {
     type AddonRow = {
       selection_id: string;
@@ -192,7 +214,12 @@ export async function layTienCanThuNhieuBo(
       if (!g) continue;
       const tien = Number(r.unit_price ?? 0) * Number(r.quantity ?? 0);
       // BB-360: "Edit file" = tiền ẢNH; ảnh in / khung / album = tiền SẢN PHẨM.
-      cong(r.products?.kind === "edited_photo" ? dotTheoBo : sanPhamTheoBo, g, tien);
+      const laAnh = r.products?.kind === "edited_photo";
+      cong(laAnh ? dotTheoBo : sanPhamTheoBo, g, tien);
+      // Đợt 1: lúc lượt chọn chính chốt.
+      if (!laAnh && sanPhamThuTrongApp(coSanPham, chotLucTheoLuot.get(String(r.selection_id)))) {
+        cong(sanPhamTrongAppTheoBo, g, tien);
+      }
     }
   }
 
@@ -212,11 +239,13 @@ export async function layTienCanThuNhieuBo(
     const daGhiCo = ghiCoTheoBo.get(galleryId) ?? 0;
     const tienDotMuaThem = dotTheoBo.get(galleryId) ?? 0;
     const tienSanPham = sanPhamTheoBo.get(galleryId) ?? 0;
+    // BB-363: chỉ phần chốt từ mốc hiệu lực đi vào công thức; phần trước mốc vẫn "thu qua Lark".
+    const tienSanPhamTrongApp = Math.min(tienSanPham, sanPhamTrongAppTheoBo.get(galleryId) ?? 0);
     const giaAnhHienTai = giaTheoBo.get(galleryId) ?? 0;
     const quyDoi = tinhTienQuyDoi(dongTT.get(galleryId) ?? [], giaAnhHienTai, luot?.submitted_at);
     const soAnhLucChot = Number(luot?.snapshot_extra_count ?? 0);
     const giaMotAnh = tienLucChot > 0 && soAnhLucChot > 0 ? tienLucChot / soAnhLucChot : giaAnhHienTai;
-    const congThuc = { tienTheoAnh, tienLucChot, tienDotMuaThem, tienSanPham, thuSanPhamQuaApp, quyDoi };
+    const congThuc = { tienTheoAnh, tienLucChot, tienDotMuaThem, tienSanPham: tienSanPhamTrongApp, thuSanPhamQuaApp, quyDoi };
     const tongPhaiThu = tongPhaiThuCuaBo(congThuc);
     ketQua.set(galleryId, {
       tienCanThu: tienCanThuCuaBo({ ...congThuc, daGhiCo }),
@@ -227,7 +256,9 @@ export async function layTienCanThuNhieuBo(
       tienDotMuaThem,
       tienSanPham,
       thuSanPhamQuaApp,
-      tienSanPhamQuaLark: tienSanPhamThuQuaLark(tienSanPham, thuSanPhamQuaApp),
+      thuSanPhamQuaAppTu: coSanPham.tu,
+      // Phần KHÔNG vào "Phải thu": cờ tắt = cả tiền sản phẩm; cờ bật = phần chốt trước mốc.
+      tienSanPhamQuaLark: tienSanPham - tienSanPhamTinhVaoPhaiThu(tienSanPhamTrongApp, thuSanPhamQuaApp),
       daGhiCo,
       anhVuotChuaThu,
       soAnhQuyDoi: quyDoi.soAnh,

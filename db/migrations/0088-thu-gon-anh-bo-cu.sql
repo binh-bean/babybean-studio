@@ -1,6 +1,8 @@
 -- 0088 — BB-357: thu gọn danh sách ảnh của bộ ảnh cũ (lưu trữ / hết hạn > 6 tháng).
 --        BB-359 (sửa tại chỗ, vẫn CHƯA ÁP): thêm ĐÃ GIAO > 6 tháng; cột khoá
 --        `mo_lai_anh_luc` cho đường khách mở lại bộ đã thu gọn (POST /api/g/mo-lai-anh).
+--        BB-363 (sửa tại chỗ, vẫn CHƯA ÁP): thêm bộ CHƯA XONG không ai mở > 6 tháng;
+--        cột `mo_link_cuoi_luc` + `tang_luot_mo_link` ghi lần mở link.
 --
 -- VIẾT NHƯNG CHƯA ÁP (02/10/2026). Người áp: chủ dự án / PM, sau khi duyệt.
 -- Chưa áp thì bước "anh_bo_cu" của người dọn (src/lib/van-hanh/don-rac.ts) tự
@@ -26,10 +28,24 @@
 --     được "đã thu gọn từ N ảnh"). `photo_count` thì cập nhật về số ảnh còn lại
 --     để `verify:db` ("photo_count khớp số ảnh thật") vẫn đúng nghĩa.
 --
+--   * mo_link_cuoi_luc — BB-363 (anh chốt 02/10, sửa tại chỗ, vẫn CHƯA ÁP): lần cuối
+--     bộ ảnh được MỞ — ba mẹ hoặc gia đình mở link (mọi vai), hoặc danh sách đã thu
+--     gọn được Đồng bộ lại (mở lại danh sách). Mốc 6 tháng của bộ CHƯA XONG (ready /
+--     in_review / draft / sync_error) đo từ cột này, KHÔNG từ trang_thai_tu. Bộ chưa
+--     ai mở: lùi về `sent_at` (lúc gửi link đầu), rồi `created_at`.
+--     Ghi bởi `tang_luot_mo_link` (viết lại dưới đây; POST /api/auth/gallery gọi ở
+--     MỌI lần mở link) — tối đa một lần ghi mỗi giờ mỗi bộ, để một gia đình mở đi
+--     mở lại không làm nhích updated_at của bộ liên tục.
+--     Điền sẵn = lần mở cuối thật trong `share_links.last_viewed_at` (cột 0064 ghi).
+--     LÚC CẮT sang bb-prod: `db:nap-lai --xoa` xoá share_links → mất nguồn này trên
+--     bb-prod. Mốc được CHÉP từ bb-dev bằng `npm run db:chep-moc-mo-link` (docs/26 §7c).
+--
 -- Trigger `trg_galleries_bb357_moc`:
 --   * status đổi → trang_thai_tu = now();
 --   * last_synced_at đổi (tức "Đồng bộ lại" từ Drive vừa chạy xong,
 --     sync-gallery.ts ghi cột này) → xoá dấu thu gọn. Không cần sửa mã đồng bộ.
+--     BB-363: nếu bộ ĐANG thu gọn thì đó là một lần mở lại danh sách → mo_link_cuoi_luc
+--     = now() (không thì bộ chưa xong vừa đồng bộ lại sẽ bị thu gọn ngay đêm đó).
 --
 -- Hàm trigger không `security definer`, nhưng vẫn revoke theo AGENTS.md §5b.
 --
@@ -37,15 +53,17 @@
 --   drop trigger if exists trg_galleries_bb357_moc on galleries;
 --   drop function if exists public.galleries_bb357_moc();
 --   drop function if exists public.nhan_mo_lai_anh(uuid, interval, integer);
+--   -- tang_luot_mo_link: chạy lại khối "1" của 0064 (bản không ghi galleries) TRƯỚC khi bỏ cột.
 --   alter table galleries drop column if exists trang_thai_tu,
 --     drop column if exists danh_sach_thu_gon_luc, drop column if exists so_anh_truoc_thu_gon,
---     drop column if exists mo_lai_anh_luc;
+--     drop column if exists mo_lai_anh_luc, drop column if exists mo_link_cuoi_luc;
 -- (Ảnh đã thu gọn lấy lại bằng "Đồng bộ lại" từ Drive — ảnh gốc không bị đụng.)
 
 alter table galleries add column if not exists trang_thai_tu timestamptz;
 alter table galleries add column if not exists danh_sach_thu_gon_luc timestamptz;
 alter table galleries add column if not exists so_anh_truoc_thu_gon integer;
 alter table galleries add column if not exists mo_lai_anh_luc timestamptz;
+alter table galleries add column if not exists mo_link_cuoi_luc timestamptz;
 
 -- Điền sẵn KHÔNG làm nhích updated_at của ~500 bộ (trigger set_updated_at).
 -- BB-359: bộ ĐÃ GIAO lấy mốc thật lúc giao (`deliveries.delivered_at`, route "Đã giao"
@@ -64,6 +82,13 @@ update galleries g
            g.updated_at))
  where g.trang_thai_tu is null and g.status = 'delivered';
 update galleries set trang_thai_tu = updated_at where trang_thai_tu is null;
+-- BB-363: lần mở link cuối thật (mọi link của bộ, mọi vai).
+update galleries g
+   set mo_link_cuoi_luc = s.cuoi
+  from (select gallery_id, max(last_viewed_at) as cuoi
+          from share_links where last_viewed_at is not null group by gallery_id) s
+ where s.gallery_id = g.id
+   and (g.mo_link_cuoi_luc is null or g.mo_link_cuoi_luc < s.cuoi);
 alter table galleries enable trigger trg_galleries_updated_at;
 
 alter table galleries alter column trang_thai_tu set default now();
@@ -77,6 +102,8 @@ comment on column galleries.mo_lai_anh_luc is
   'BB-359: lúc lượt khách-mở-lại-bộ-đã-thu-gọn nhận việc Đồng bộ lại (khoá + tần suất 10 phút).';
 comment on column galleries.so_anh_truoc_thu_gon is
   'BB-357: photo_count trước khi thu gọn. NULL khi chưa thu gọn / đã đồng bộ lại.';
+comment on column galleries.mo_link_cuoi_luc is
+  'BB-363: lần cuối bộ được mở (link khách/gia đình, hoặc đồng bộ lại bộ đã thu gọn). Mốc 6 tháng thu gọn bộ chưa xong.';
 
 create or replace function public.galleries_bb357_moc()
 returns trigger
@@ -90,6 +117,10 @@ begin
   -- Đồng bộ lại từ Drive vừa ghi last_synced_at → danh sách lại đủ.
   if new.last_synced_at is distinct from old.last_synced_at
      and new.danh_sach_thu_gon_luc is not distinct from old.danh_sach_thu_gon_luc then
+    -- BB-363: bộ ĐANG thu gọn vừa được đồng bộ lại = có người mở lại danh sách.
+    if old.danh_sach_thu_gon_luc is not null then
+      new.mo_link_cuoi_luc := greatest(old.mo_link_cuoi_luc, now());
+    end if;
     new.danh_sach_thu_gon_luc := null;
     new.so_anh_truoc_thu_gon := null;
   end if;
@@ -103,18 +134,44 @@ create trigger trg_galleries_bb357_moc
   before update on galleries
   for each row execute function public.galleries_bb357_moc();
 
--- Bộ chờ thu gọn được chọn theo trạng thái + mốc; chỉ mục một phần rất nhỏ
--- (chỉ các bộ đã giao/lưu trữ/hết hạn chưa thu gọn — BB-359 thêm đã giao).
+-- BB-363: không còn chỉ mục một phần cho bộ chờ thu gọn. Từ khi phạm vi gồm cả bộ CHƯA
+-- XONG (đa số bộ) thì chỉ mục đó không lọc được gì; `galleries` chỉ vài nghìn dòng, quét
+-- tuần tự mỗi đêm một lần là đủ nhanh.
 drop index if exists idx_galleries_cho_thu_gon;
-create index idx_galleries_cho_thu_gon
-  on galleries (trang_thai_tu)
-  where status in ('delivered', 'archived', 'expired') and danh_sach_thu_gon_luc is null;
+
+-- ---------------------------------------------------------------------------
+-- BB-363 — ghi lần mở link lên bộ ảnh (mốc 6 tháng của bộ chưa xong).
+-- ---------------------------------------------------------------------------
+-- Viết lại hàm của 0064 (giữ y nguyên phần share_links), thêm một câu: đặt
+-- galleries.mo_link_cuoi_luc = now() — tối đa một lần mỗi giờ mỗi bộ (mở đi mở lại
+-- không làm nhích updated_at liên tục). Cùng một lời gọi rpc từ POST /api/auth/gallery,
+-- không đổi mã TypeScript; chưa áp 0088 thì bản 0064 vẫn chạy như cũ.
+create or replace function public.tang_luot_mo_link(p_share_link_id uuid)
+returns void
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update share_links
+     set view_count = view_count + 1,
+         last_viewed_at = now()
+   where id = p_share_link_id;
+  update galleries g
+     set mo_link_cuoi_luc = now()
+    from share_links s
+   where s.id = p_share_link_id
+     and g.id = s.gallery_id
+     and (g.mo_link_cuoi_luc is null or g.mo_link_cuoi_luc < now() - interval '1 hour');
+$$;
+-- AGENTS.md §5b: revoke ĐỨNG SAU create or replace (replace trả EXECUTE về PUBLIC).
+revoke execute on function public.tang_luot_mo_link(uuid) from public, anon, authenticated;
+grant  execute on function public.tang_luot_mo_link(uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- BB-359 — khách mở bộ đã thu gọn: NHẬN việc "Đồng bộ lại" một cách nguyên tử.
 -- ---------------------------------------------------------------------------
--- Gọi từ POST /api/g/mo-lai-anh (khoá service_role, sau khi đã kiểm phiên khách vai
--- owner của ĐÚNG bộ này). Trả một trong:
+-- Gọi từ POST /api/g/mo-lai-anh (khoá service_role, sau khi đã kiểm phiên khách của
+-- ĐÚNG bộ này — mọi vai, gồm link mời gia đình, BB-360). Trả một trong:
 --   'khong_thu_gon' — bộ không (còn) thu gọn: không làm gì;
 --   'dang_mo'       — đã có lượt nhận trong `p_khoa` vừa qua (khoá + giới hạn tần suất);
 --   'ban'           — đang có ≥ p_tran bộ khác cùng mở lại (giữ hạn mức Drive) — thử sau;

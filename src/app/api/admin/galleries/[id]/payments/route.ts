@@ -82,8 +82,11 @@ const MAX_NOTE = 500;
  * BB-351 — chống ghi trùng (bấm đúp, mạng gửi lại). Hai lớp:
  *   1. `requestId` do form sinh, một mã cho mỗi lần ghi. Có cột `gallery_payments.ma_yeu_cau`
  *      (migration 0086, chỉ mục duy nhất) thì trùng mã = không ghi thêm. Chưa áp 0086 thì bỏ qua lớp này.
- *   2. Lưới đỡ không cần migration: cùng người ghi, cùng bộ, cùng số tiền, cùng hình thức trong
- *      `CUA_SO_TRUNG_MS` = coi là bấm lặp, không ghi thêm.
+ *   2. Lưới đỡ CHỈ cho máy khách cũ (không gửi `requestId`) hoặc cơ sở dữ liệu chưa áp 0086: cùng
+ *      người ghi, cùng bộ, cùng số tiền, cùng hình thức trong `CUA_SO_TRUNG_MS` = coi là bấm lặp.
+ *      BB-363 (soát C vòng 11, d2): có `requestId` hợp lệ + cột 0086 thì `requestId` là khoá DUY
+ *      NHẤT — hai phiếu khác nhau cùng số tiền, cùng người, trong 15 giây là HAI khoản thật, lưới
+ *      đỡ cũ nuốt mất khoản sau trong im lặng.
  * Lần trùng trả 200 kèm `trung: true` và số tiền hiện tại — không báo lỗi cho một khoản đã vào sổ.
  */
 const CUA_SO_TRUNG_MS = 15_000;
@@ -229,7 +232,9 @@ export async function POST(
         throw eMa;
       }
     }
-    if (amount !== 0 || coGiamGia) {
+    // BB-363: lưới đỡ 15 giây chỉ khi KHÔNG có khoá requestId dùng được (xem CUA_SO_TRUNG_MS).
+    const dungRequestId = Boolean(maYeuCau) && coCotMaYeuCau;
+    if (!dungRequestId && (amount !== 0 || coGiamGia)) {
       const tu = new Date(Date.now() - CUA_SO_TRUNG_MS).toISOString();
       const { data: ganDay, error: eGan } = await admin
         .from("gallery_payments")
@@ -295,6 +300,21 @@ export async function POST(
         return fail("INVALID_INPUT", "Phần giảm quá nhỏ (dưới làm tròn nghìn đồng), tăng phần trăm giúp");
       }
       soTienGiam = kq.soTienGiam;
+    }
+
+    // BB-363 (soát C vòng 11, P1-3 mặt kia; BB-348): tiền sản phẩm KHÔNG thu qua app (cờ tắt,
+    // hoặc giỏ chốt trước mốc bật cờ) mà CSKH vẫn ghi vào sổ app thì sổ không phân biệt được với
+    // tiền ảnh — nó trừ vào phần vượt hạn mức và kéo hạn mức tăng cho những ảnh khách CHƯA trả.
+    // Chặn phần vượt: dòng thu (+ phần giảm) không được lớn hơn số còn phải thu, nên tổng ghi có
+    // không bao giờ vượt tiền ảnh thật → hạn mức chỉ tăng đúng số ảnh đã trả. Dòng trừ (đính
+    // chính) không chặn. Cờ bật và mọi giỏ đều thu qua app thì giữ luật cũ (thu dư ghi được).
+    const sanPhamDeuQuaApp = tienCanThu.thuSanPhamQuaApp && tienCanThu.tienSanPhamQuaLark === 0;
+    if (!sanPhamDeuQuaApp && amount > 0 && amount + soTienGiam > tienCanThu.tienCanThu) {
+      return fail(
+        "INVALID_INPUT",
+        `Số thu lớn hơn phần còn phải thu (${Math.max(0, tienCanThu.tienCanThu - soTienGiam).toLocaleString("vi-VN")} ₫). ` +
+          "Tiền sản phẩm mua thêm (ảnh in / khung / album) đang thu qua Lark — không ghi vào sổ này.",
+      );
     }
 
     const dongGhi: Record<string, unknown>[] = [];

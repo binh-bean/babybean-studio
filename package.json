@@ -30,6 +30,7 @@
     "db:nap-lai": "node --env-file-if-exists=.env.local --import tsx scripts/nap-lai-tu-lark.mjs",
     "db:so-migration": "node --env-file-if-exists=.env.local --import tsx scripts/so-sanh-migration.mjs",
     "db:chep-cau-hinh": "node --env-file-if-exists=.env.local --import tsx scripts/chep-cau-hinh.mjs",
+    "db:chep-moc-mo-link": "node --env-file-if-exists=.env.local --import tsx scripts/chep-moc-mo-link.mjs",
     "anh:don-dem-hong": "node --env-file-if-exists=.env.local --import tsx scripts/don-dem-hong.ts",
     "anh:don-dem-het-han": "node --env-file-if-exists=.env.local --import tsx scripts/don-dem-het-han.ts",
     "verify:db": "node --env-file-if-exists=.env.local scripts/verify-db.mjs",

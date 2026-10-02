@@ -273,3 +273,36 @@ export function tienSanPhamThuQuaLark(tienSanPham: number, thuSanPhamQuaApp: boo
 export function laBatThuSanPhamQuaApp(value: unknown): boolean {
   return value === true;
 }
+
+/**
+ * BB-363 — anh chốt 02/10/2026: cờ KHÔNG hồi tố. Lúc cờ được BẬT, máy chủ ghi mốc hiệu lực vào
+ * khoá này (`settings`, chuỗi ISO; route PATCH /api/admin/settings ghi, không sửa tay được).
+ * Chỉ sản phẩm của giỏ CHỐT TỪ MỐC ĐÓ trở đi mới thu qua app; bộ chốt trước vẫn "thu qua Lark"
+ * — không hiện "còn thiếu" cho khoản đã thu ngoài app.
+ */
+export const KHOA_THU_SAN_PHAM_QUA_APP_TU = "thanh_toan.thu_san_pham_qua_app_tu";
+
+/** Đọc mốc hiệu lực đã lưu: chuỗi ngày hợp lệ → ISO; mọi thứ khác → null. */
+export function docMocThuSanPhamQuaApp(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const t = Date.parse(value);
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
+/**
+ * BB-363 — CHỖ RẼ NHÁNH DUY NHẤT theo mốc hiệu lực: tiền sản phẩm của MỘT giỏ (đợt 1 = lúc lượt
+ * chọn chính chốt; đợt ≥ 2 = lúc đợt đó được gửi) có thu qua app không.
+ *   · cờ tắt                        → không (thu qua Lark);
+ *   · cờ bật nhưng thiếu mốc        → không (an toàn: không bao giờ đòi tiền hồi tố);
+ *   · giỏ chưa có lúc chốt          → không (chưa phải khoản phải thu);
+ *   · lúc chốt ≥ mốc                → CÓ; trước mốc → không.
+ */
+export function sanPhamThuTrongApp(
+  co: { bat: boolean; tu: string | null },
+  chotLuc: string | null | undefined,
+): boolean {
+  if (!co.bat || !co.tu || !chotLuc) return false;
+  const moc = Date.parse(co.tu);
+  const luc = Date.parse(chotLuc);
+  return Number.isFinite(moc) && Number.isFinite(luc) && luc >= moc;
+}

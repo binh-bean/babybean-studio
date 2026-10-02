@@ -9,7 +9,8 @@
  * (một ngoại lệ có chủ đích: bước BB-357 "anh_bo_cu" ở cuối tệp)
  * ---------------------------------------------------------------------------
  * Ngoại lệ duy nhất là bước BB-357 `anh_bo_cu` (thuGonAnhBoCu, cuối tệp): xoá
- * DÒNG `photos` của bộ đã giao/lưu trữ/hết hạn quá 6 tháng (BB-359 thêm đã giao) — ảnh gốc vẫn trên Drive,
+ * DÒNG `photos` của bộ đã giao/lưu trữ/hết hạn quá 6 tháng (BB-359 thêm đã giao), và của bộ chưa
+ * xong mà không ai mở link quá 6 tháng (BB-363) — ảnh gốc vẫn trên Drive,
  * "Đồng bộ lại" kéo về đủ. Bước đó giữ bìa, ảnh khách chọn, ảnh mua thêm/thả
  * tim và mọi ảnh có khoá ngoại trỏ tới; nó không nằm trong BUOC/BANG_DUOC_DON.
  *
@@ -298,6 +299,23 @@ export const THU_GON_ANH = {
    */
   TRANG_THAI: ["delivered", "archived", "expired"] as readonly string[],
   /**
+   * BB-363 (anh chốt 02/10/2026): bộ CHƯA XONG — khách chưa chọn xong (`ready`, `in_review`)
+   * hoặc chưa tới tay khách (`draft`, `sync_error`) — mà KHÔNG AI MỞ quá 6 tháng cũng thu gọn.
+   * Trên bb-dev 497 bộ thì chỉ 2 bộ ở TRANG_THAI ở trên: vòng đời thật đi trên Lark, `status`
+   * của app dừng ở `ready` — nên không có nhánh này thì BB-357 gần như không thu hồi gì.
+   *
+   * Mốc của nhánh này KHÔNG phải `trang_thai_tu` (bị `db:nap-lai` đặt lại lúc cắt) mà là lần
+   * mở link cuối (`galleries.mo_link_cuoi_luc`, 0088 — ba mẹ hoặc gia đình, mọi vai); chưa ai
+   * mở thì lúc gửi link đầu (`sent_at`), không có thì `created_at`. Không tính `last_synced_at`:
+   * bước nạp lúc cắt đồng bộ Drive mọi bộ → mốc sẽ bị đặt lại. Đồng bộ lại một bộ ĐANG thu gọn
+   * thì trigger 0088 ghi `mo_link_cuoi_luc` (là một lần mở lại).
+   *
+   * Không có `syncing` (đang đồng bộ dở — để yên) và các trạng thái khách đã chốt
+   * (`submitted`, `in_retouch`, `awaiting_approval`, `approved`): studio đang làm việc trên đó.
+   * Ảnh khách đã chọn luôn được giữ (SQL_ANH_XOA), nên mở lại thì chọn tiếp bình thường.
+   */
+  TRANG_THAI_CHUA_XONG: ["ready", "in_review", "draft", "sync_error"] as readonly string[],
+  /**
    * Mỗi lượt tối đa chừng này dòng ảnh — cùng trần với các bước khác, để một
    * lượt cron không nặng. Luôn làm NGUYÊN BỘ (bộ đầu tiên được nhận dù vượt
    * trần), không bao giờ thu gọn nửa bộ.
@@ -337,21 +355,35 @@ export const KHOA_NGOAI_PHOTOS_DA_BIET: readonly string[] = [
  * lại dưới khoá. Mốc = muộn hơn trong (lúc vào trạng thái, lần Đồng bộ lại cuối):
  * bộ vừa được bấm Đồng bộ lại để xem thì được để yên thêm 6 tháng.
  */
-const dieuKienBo = (pMoc: string, pTrangThai: string) => `
-       g.status::text = any(${pTrangThai}::text[])
+/**
+ * Mốc "yên" của một bộ — MỘT biểu thức, dùng để chọn, xếp hàng và kiểm lại dưới khoá:
+ *   · bộ đã xong (TRANG_THAI): muộn hơn trong (lúc vào trạng thái, lần Đồng bộ lại cuối);
+ *   · bộ chưa xong (TRANG_THAI_CHUA_XONG, BB-363): lần mở link cuối, chưa ai mở thì lúc
+ *     gửi link, không có thì lúc tạo (xem THU_GON_ANH.TRANG_THAI_CHUA_XONG).
+ */
+const mocYen = (pXong: string) => `
+       case when g.status::text = any(${pXong}::text[])
+            then greatest(g.trang_thai_tu, coalesce(g.last_synced_at, g.trang_thai_tu))
+            else coalesce(greatest(g.mo_link_cuoi_luc, g.sent_at), g.created_at) end`;
+
+const dieuKienBo = (pMoc: string, pXong: string, pChuaXong: string) => `
+       (g.status::text = any(${pXong}::text[]) or g.status::text = any(${pChuaXong}::text[]))
        and g.danh_sach_thu_gon_luc is null
-       and greatest(g.trang_thai_tu, coalesce(g.last_synced_at, g.trang_thai_tu)) < ${pMoc}::timestamptz`;
+       and ${mocYen(pXong)} < ${pMoc}::timestamptz
+       and exists (select 1 from photos p0 where p0.gallery_id = g.id)`;
+// ↑ BB-363: bộ không có dòng ảnh nào (nháp/đồng bộ lỗi — bb-dev có ~120 bộ như vậy) không có
+//   gì để thu gọn; không loại ra thì chúng chiếm hết TRAN_BO của lượt mà không giải phóng gì.
 
 const SQL_BO_CHON = `
   bo as (
-    select g.id, g.trang_thai_tu,
-           coalesce(sum(coalesce(g.photo_count, 0)) over (order by g.trang_thai_tu, g.id
+    select g.id, ${mocYen("$4")} as moc,
+           coalesce(sum(coalesce(g.photo_count, 0)) over (order by ${mocYen("$4")}, g.id
              rows between unbounded preceding and 1 preceding), 0) as truoc
       from galleries g
-     where ${dieuKienBo("$1", "$4")}
+     where ${dieuKienBo("$1", "$4", "$5")}
   ),
   bo_chon as (
-    select id from bo where truoc < $2 order by trang_thai_tu, id limit $3
+    select id from bo where truoc < $2 order by moc, id limit $3
   )`;
 
 const SQL_ANH_XOA = `
@@ -377,9 +409,9 @@ async function coCotThuGon(client: Pg): Promise<boolean> {
   const { rows } = await client.query<{ n: number }>(
     `select count(*)::int as n from information_schema.columns
       where table_schema = 'public' and table_name = 'galleries'
-        and column_name in ('trang_thai_tu', 'danh_sach_thu_gon_luc', 'so_anh_truoc_thu_gon')`,
+        and column_name in ('trang_thai_tu', 'danh_sach_thu_gon_luc', 'so_anh_truoc_thu_gon', 'mo_link_cuoi_luc')`,
   );
-  return rows[0]?.n === 3;
+  return rows[0]?.n === 4;
 }
 
 /** Khoá ngoại trỏ vào photos mà luật giữ CHƯA biết. Rỗng = an toàn. */
@@ -414,6 +446,7 @@ export async function thuGonAnhBoCu(
   const tranAnh = Math.max(1, Math.min(tuyChon.tran, THU_GON_ANH.TRAN_ANH));
   const moc = truoc(bayGio, THU_GON_ANH.SAU_NGAY);
   const trangThai = [...THU_GON_ANH.TRANG_THAI];
+  const chuaXong = [...THU_GON_ANH.TRANG_THAI_CHUA_XONG];
 
   await gd.mo(client);
   try {
@@ -439,13 +472,13 @@ export async function thuGonAnhBoCu(
     // Tổng ứng viên KHÔNG trần — để báo "còn lại, lượt sau làm tiếp".
     const { rows: tong } = await client.query<{ n: number }>(
       `with ${SQL_BO_CHON}, ${SQL_ANH_XOA} select count(*)::int as n from anh`,
-      [moc, TRAN_DEM * 1000, TRAN_DEM, trangThai],
+      [moc, TRAN_DEM * 1000, TRAN_DEM, trangThai, chuaXong],
     );
     const tongUngVien = tong[0]?.n ?? 0;
 
     const { rows: boRows } = await client.query<{ id: string }>(
       `with ${SQL_BO_CHON} select id from bo_chon`,
-      [moc, tranAnh, THU_GON_ANH.TRAN_BO, trangThai],
+      [moc, tranAnh, THU_GON_ANH.TRAN_BO, trangThai, chuaXong],
     );
     let boIds = boRows.map((r) => r.id);
 
@@ -454,7 +487,7 @@ export async function thuGonAnhBoCu(
         `with ${SQL_BO_CHON}, ${SQL_ANH_XOA}
          select (select count(*)::int from anh) as xoa,
                 (select count(*)::int from photos p join bo_chon b on b.id = p.gallery_id) as tong`,
-        [moc, tranAnh, THU_GON_ANH.TRAN_BO, trangThai],
+        [moc, tranAnh, THU_GON_ANH.TRAN_BO, trangThai, chuaXong],
       );
       await gd.huy(client);
       const xoa = dem[0]?.xoa ?? 0;
@@ -474,9 +507,9 @@ export async function thuGonAnhBoCu(
     if (boIds.length > 0) {
       const { rows: khoa } = await client.query<{ id: string }>(
         `select g.id from galleries g
-          where g.id = any($1::uuid[]) and ${dieuKienBo("$3", "$2")}
+          where g.id = any($1::uuid[]) and ${dieuKienBo("$3", "$2", "$4")}
           for update`,
-        [boIds, trangThai, moc],
+        [boIds, trangThai, moc, chuaXong],
       );
       boIds = khoa.map((r) => r.id);
     }
@@ -539,7 +572,7 @@ const CHINH_SACH_THU_GON: ChinhSachDon = {
   loai: "anh_bo_cu",
   bang: "photos",
   giuNgay: THU_GON_ANH.SAU_NGAY,
-  moTa: "Danh sách ảnh của bộ đã giao/lưu trữ/hết hạn quá 6 tháng (giữ bìa, ảnh khách chọn, ảnh mua thêm/thả tim)",
+  moTa: "Danh sách ảnh của bộ đã giao/lưu trữ/hết hạn quá 6 tháng, và bộ chưa xong không ai mở link quá 6 tháng (giữ bìa, ảnh khách chọn, ảnh mua thêm/thả tim)",
   lyDo: "Ảnh gốc vẫn trên Drive; khách mở lại thì app tự Đồng bộ lại (hoặc CSKH bấm Đồng bộ lại). Bảng photos chiếm ~60% cơ sở dữ liệu.",
 };
 

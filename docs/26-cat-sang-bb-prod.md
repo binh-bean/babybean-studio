@@ -22,6 +22,39 @@ bảng nào xoá) · **8a** (biến môi trường đầy đủ, gồm `APP_SECR
 chuỗi kết nối) · **11** (hai Automation của Lark) · **11b** (thứ tự chạy cron và
 đồng bộ sau khi cắt).
 
+**Bản 02/10/2026 (BB-363) — vá R1–R9 của soát C vòng 11 và chỗ thiếu soát B nêu**
+(`scratchpad/danh-gia/18-vong11-C-phan-bien.md` mục 3, `17-vong11-B-van-hanh.md`
+mục 2.6): **3a** (thêm 0086–0089; 0088/0089 áp ở bước 3 như mọi tệp khác) ·
+**6a** (cờ thu sản phẩm qua app: mặc định tắt, ngày hiệu lực) · **7c** (MỚI — chép
+mốc "mở link" từ bb-dev, để bước nạp lại không đặt lại đồng hồ thu gọn ảnh) ·
+**5c** (rủi ro Realtime công khai) · **8a-A2** (MỚI — lộ `APP_SECRET` thì làm gì) ·
+**11c** (ô quyết định lưới đỡ, 2 secret, kiểm mỗi thứ Hai) · **13a** (MỚI — bộ dọn
+dữ liệu: đêm đầu, xem trước trên bb-prod).
+
+### Đường đi tóm tắt — một màn hình
+
+Làm TRƯỚC ngày cắt:
+
+☐ A. Diễn tập trên bb-prod (mục 17) và tuần nhân viên thử trên bb-dev (mục 15).
+☐ B. Anh quyết: bật hay không bật lưới đỡ `sync-lark` (mục 11c).
+
+Ngày cắt, theo đúng thứ tự:
+
+☐ 1. Sao lưu bb-prod (mục 1).
+☐ 2. So khoảng lệch migration — chỉ đọc (mục 2).
+☐ 3. Áp migration, gồm cả 0086–0089 (mục 3, 3a). `verify:db` ra đủ N/N.
+☐ 4. Storage (mục 4) · Auth (mục 5) · webhook Lark thật (mục 5a) · tài khoản quản
+   trị đầu tiên (mục 5b) · Realtime (mục 5c).
+☐ 5. Chép cấu hình (mục 6), rồi kiểm cờ thu sản phẩm đang TẮT (mục 6a).
+☐ 6. Xoá rồi nạp lại từ Lark (mục 7).
+☐ 7. Soát ô "Link app" cũ trên Lark (mục 7b).
+☐ 8. Chép mốc "mở link" từ bb-dev (mục 7c). Làm NGAY sau bước 6, trước khi dọn bb-dev.
+☐ 9. Biến môi trường Vercel (mục 8, 8a).
+☐ 10. Backup secret (mục 10) · Lark Automation (mục 11, 11a, 11b).
+☐ 11. Trước link đầu tiên (mục 12) → kiểm nhanh (mục 13).
+☐ 12. Sáng hôm sau: kiểm bộ dọn đã chạy đêm đầu (mục 13a).
+☐ 13. Giữ bb-dev ít nhất 3 ngày (mục 14).
+
 ---
 
 ## 0. Trước khi bắt đầu — hai chốt an toàn
@@ -157,20 +190,36 @@ Bản cũ của runbook chỉ nhắc 0067–0075. Dãy đầy đủ từ lúc b�
 | 0083 | Tim của link mời gia đình: bảng `tim_gia_dinh`, cột mới của `yeu_cau_mua_them` |
 | ~~0084~~ | **Không tồn tại** — như 0078 |
 | 0085 | Viết lại hàm `get_gallery_photos` (6 tham số, trả mã tệp Drive) |
+| 0086 | Sổ thu tiền chống ghi trùng: cột `gallery_payments.ma_yeu_cau` + chỉ mục duy nhất (BB-351). Đã áp bb-dev |
+| 0087 | Hai chỉ mục cho bộ dọn dữ liệu (`activity_logs.created_at`, `notifications`) (BB-356). Đã áp bb-dev |
+| 0088 | Thu gọn ảnh bộ cũ: cột `trang_thai_tu`, `danh_sach_thu_gon_luc`, `so_anh_truoc_thu_gon`, `mo_lai_anh_luc`, `mo_link_cuoi_luc`; hàm `nhan_mo_lai_anh`; viết lại `tang_luot_mo_link` (BB-357/359/363). **CHƯA áp bb-dev — cố ý** |
+| 0089 | Dựng lại 4 chỉ mục bảng `photos` (REINDEX, không đổi định nghĩa) (BB-357). **CHƯA áp bb-dev — cố ý** |
 
-(Đầu tệp 0083 vẫn ghi "viết nhưng chưa áp" — câu đó đã cũ, bb-dev áp từ 01/10.)
+(Đầu tệp 0083 vẫn ghi "viết nhưng chưa áp" — câu đó đã cũ, bb-dev áp từ 01/10.
+Đầu tệp 0086/0087 cũng ghi "chưa áp" — đã cũ, bb-dev áp từ 02/10.)
 
 ☐ 1. `npm run db:so-migration -- --dich .env.prod.local` liệt kê **đủ** các số
    trên trong mục "Tệp migration đích còn thiếu" (cộng dãy 0045–0075).
 ☐ 2. Sau `--thuc-thi`, chạy lại lệnh đó: "còn thiếu" = **0**.
-☐ 3. `node --env-file=.env.prod.local scripts/verify-db.mjs` ra **23/23**, và
-   riêng bốn dòng "Bảng mới: …", "23 cột mới …", "Hàm viết lại …" đều ĐẠT.
+☐ 3. `node --env-file=.env.prod.local scripts/verify-db.mjs` ra **27/27** (từ
+   BB-363; trước đó 23), và riêng các dòng "Bảng mới: …", "23 cột mới …", "Hàm
+   viết lại …", "0086: …", "0087: …" đều ĐẠT. Trên bb-prod sau bước 3, hai dòng
+   "0088: …" và "0089: …" phải ghi **"đã áp"**. Nếu ghi "CHỜ CẮT" nghĩa là bước 3
+   chưa áp chúng: DỪNG, báo Claude. (Trên bb-dev hai dòng đó ghi "CHỜ CẮT" và
+   vẫn ĐẠT — đúng kế hoạch.) Dòng "0088" ghi "ÁP NỬA VỜI" là HỎNG: DỪNG.
 ☐ 4. Không có 0078 / 0084 trong danh sách thiếu (nếu công cụ đòi chúng: DỪNG,
    báo Claude — đó là lỗi của công cụ, không phải tệp thiếu).
-☐ 5. **0088 (mốc trạng thái + dấu thu gọn ảnh) và 0089 (reindex `photos`)** —
-   anh chốt 02/10: áp NGAY TRƯỚC khi lên bb-prod, KHÔNG áp sớm lên bb-dev. 0089
-   chỉ dựng lại 4 chỉ mục (bớt ~22 MB, khoá ghi `photos` vài giây) — chạy SAU bước
-   7 (`db:nap-lai --nap`) để chỉ mục dựng trên dữ liệu đã nạp sạch.
+☐ 5. **0088 và 0089 áp NGAY Ở BƯỚC NÀY, cùng mọi tệp khác** (BB-363 chọn cách
+   này: viết lại tài liệu cho khớp `migrate-prod`, KHÔNG thêm cờ giữ lại). Lý do:
+   - `migrate-prod` áp mọi tệp còn thiếu theo thứ tự, mỗi tệp một giao dịch.
+     Thêm cờ giữ lại là thêm một thứ người làm có thể quên gõ.
+   - 0088 không cần dữ liệu đã nạp: mốc thu gọn ảnh của bộ nạp ở bước 7 được
+     điền bằng bước **7c** (chép từ bb-dev), không phải bằng phần điền sẵn của 0088.
+   - 0089 chỉ REINDEX. Bảng `photos` của bb-prod lúc này gần như rỗng nên chạy
+     vài giây; chỉ mục sau bước 7 được dựng dần khi nạp, không phình như bb-dev
+     (bb-dev phình vì nạp/xoá nhiều lần). Không cần chạy lại sau bước 7.
+   - "Áp ngay trước khi lên bb-prod" (anh chốt 02/10) vẫn đúng: bước 3 chính là
+     ngay trước khi lên. bb-dev **không** áp 0088/0089.
 
 ### Cổng `verify:db` trên bb-prod
 
@@ -327,6 +376,12 @@ màn chỉ còn tự hỏi lại mỗi 30 giây.
    thái đang mở.
 ☐ 6. Nếu không thấy gì đổi: kiểm lại bước 3 trước tiên, rồi báo Claude đọc log
    `tuc_thi.phat_hong` trên Vercel.
+☐ 7. **Rủi ro anh chấp nhận (soát C R7):** chính "Allow public access" làm cho ai
+   cầm được tên kênh (khách của bộ đó, nhân viên đã nghỉ cầm kênh chi nhánh) nghe
+   được và phát giả được tin "có thay đổi" mãi mãi. Tin không chứa tên, SĐT hay
+   tiền. Rủi ro đáng kể hơn là kẻ xấu xả tin để ăn hạn mức Free. Tuần đầu, mỗi
+   sáng xem Supabase → **Usage → Realtime messages**: vượt ~70.000 tin/ngày (nhịp
+   chạm 2 triệu/tháng) thì báo Claude.
 
 **Đường lùi:** tắt lại **Allow public access** (app vẫn chạy, chỉ mất tính năng
 tự cập nhật tức thì).
@@ -408,6 +463,37 @@ bảng phải về 0 (idempotent — chạy hai lần không tạo trùng).
 trước khi ghi (in đường dẫn ra màn hình lúc chạy). Toàn bộ phần ghi bảng nằm
 trong MỘT giao dịch — gãy giữa chừng thì tự rollback sạch, không để lại cấu
 hình nửa vời (không cần khôi phục thủ công cho trường hợp đó).
+
+---
+
+## 6a. Cờ "thu tiền sản phẩm trong app" (BB-360/363) — phải đang TẮT
+
+**Ai làm:** Claude kiểm; anh quyết khi nào bật (không phải ngày cắt).
+
+Cờ `thanh_toan.thu_san_pham_qua_app` quyết định tiền ảnh in / khung / album khách
+mua thêm có nằm trong "Phải thu" của app không. Hôm nay studio thu khoản này qua
+Lark, nên **mặc định TẮT**. Cờ đi theo bước 6 (chép `settings`).
+
+Từ BB-363 cờ **không hồi tố**: lúc anh bật trong màn Cài đặt, máy chủ tự ghi ngày
+bật vào khoá `thanh_toan.thu_san_pham_qua_app_tu` (không sửa tay được) và ghi một
+dòng nhật ký `thanh_toan.bat_thu_san_pham_qua_app`. Chỉ giỏ khách chốt **từ ngày
+đó** mới thu sản phẩm qua app (đợt mua thêm tính theo lúc gửi đợt). Bộ chốt trước
+ngày đó vẫn hiện "thu qua Lark", không bao giờ hiện nợ ma.
+
+Khi cờ tắt, CSKH không ghi được dòng thu lớn hơn số còn phải thu (máy chủ báo
+"tiền sản phẩm thu qua Lark — không ghi vào sổ này"). Lý do: tiền sản phẩm lẫn
+vào sổ sẽ bị tính là tiền ảnh và làm hạn mức tăng cho ảnh khách chưa trả.
+
+☐ 1. Sau bước 6, trên bb-prod: khoá `thanh_toan.thu_san_pham_qua_app` = `false`
+   hoặc **không có dòng**. Có dòng `true`: DỪNG, hỏi anh.
+☐ 2. Khoá `thanh_toan.thu_san_pham_qua_app_tu` **không có dòng** (hoặc anh biết vì
+   sao có).
+☐ 3. Ghi nhớ: **không bật cờ khi chưa có kế hoạch cho bộ cũ**. Bật lên chỉ ảnh
+   hưởng giỏ chốt sau ngày bật; tắt rồi bật lại thì ngày hiệu lực là ngày bật
+   LẦN SAU.
+
+**Đường lùi:** tắt cờ trong màn Cài đặt. Tiền sản phẩm đã ghi vào sổ app giữ
+nguyên (sổ chỉ ghi thêm); màn hình hiện lại dòng "thu qua Lark".
 
 ---
 
@@ -545,6 +631,48 @@ trước khi gửi link đầu tiên cho khách mới (bước 12).
 
 ---
 
+## 7c. Chép mốc "mở link" từ bb-dev (BB-363) — để đồng hồ thu gọn ảnh không về 0
+
+**Ai làm:** Claude chạy; anh duyệt số đếm trước khi ghi.
+
+Vì sao: app thu gọn danh sách ảnh của bộ **chưa xong** (khách chưa chọn xong) mà
+**không ai mở link quá 6 tháng** (ảnh gốc vẫn trên Drive, mở lại là app tự đồng
+bộ lại). Đồng hồ 6 tháng đo từ **lần mở link cuối** (ba mẹ hoặc gia đình), chưa ai
+mở thì từ lúc gửi link, rồi lúc tạo bộ. Bước 7 xoá `share_links`, `activity_logs`
+và dựng lại `galleries` trên bb-prod, nên **cả hai nguồn của mốc đều mất**: mọi bộ
+nhận "lúc tạo" = ngày cắt, đồng hồ của mọi bộ về 0. Không dựng lại được từ dữ liệu
+còn giữ trên bb-prod. Nguồn duy nhất còn lại là bb-dev, nên bước này chép từ đó.
+
+Chép gì: lần mở link cuối, lúc gửi link đầu, lúc tạo bộ (lấy sớm hơn), khớp bộ
+theo thư mục Drive (đã băm, không in). Kèm: bộ đã giao/lưu trữ/hết hạn lấy lại
+mốc trạng thái từ ngày Lark (R3 của soát C). Không bao giờ làm mốc muộn hơn.
+
+```bash
+# 1) xem — chỉ đọc cả hai bên, in số đếm
+npm run db:chep-moc-mo-link -- --dich .env.prod.local
+
+# 2) (nên làm) lưu mốc của bb-dev ra tệp — phòng khi bb-dev bị dọn trước khi chép
+npm run db:chep-moc-mo-link -- --luu "D:/bb-prod-sao-luu/moc-mo-link.json"
+
+# 3) anh duyệt số đếm xong mới chạy:
+npm run db:chep-moc-mo-link -- --dich .env.prod.local --ghi --that-su-la-bb-prod
+# (bb-dev đã bị dọn? dùng tệp đã lưu: thêm --tu-tep "D:/bb-prod-sao-luu/moc-mo-link.json")
+```
+
+☐ 1. Làm SAU bước 7 (`--nap` xong) và TRƯỚC mục 14 (dọn bb-dev).
+☐ 2. Lượt xem in bảng số: `khop` > 0 (số bộ khớp được giữa hai bên), `khoaTrung`
+   gần 0. `khop` = 0 nghĩa là sai đích hoặc bước 7 chưa nạp: DỪNG.
+☐ 3. Sau `--ghi`: chạy lại lượt xem, `capNhat` = **0** (chạy hai lần không đổi gì thêm).
+☐ 4. Có đúng một dòng nhật ký `van_hanh.chep_moc_mo_link` trên bb-prod.
+
+Nếu bỏ bước này: không mất dữ liệu gì, chỉ là bộ ảnh cũ trên bb-prod sẽ không
+được thu gọn trước khoảng 6 tháng sau ngày cắt (DB phình lâu hơn).
+
+**Đường lùi:** không cần. Bước này chỉ đổi ba cột mốc thời gian trên `galleries`;
+khôi phục toàn bộ thì dùng tệp sao lưu của bước 7.
+
+---
+
 ## 8. Ba biến Supabase trên Vercel — Production
 
 **Ai làm:** anh (dán khoá bí mật — việc của người).
@@ -627,6 +755,40 @@ Khoá này làm bốn việc cùng lúc:
 
 `docs/11` §5 có một dòng ghi "mỗi môi trường một giá trị khác nhau". Dòng đó
 đúng cho Preview, **không áp dụng cho lúc cắt**: Production giữ giá trị đang chạy.
+
+### A2. Nếu `APP_SECRET` bị lộ — kế hoạch ứng cứu (BB-363, soát C R8)
+
+Ai cầm `APP_SECRET` thì tự ký được phiên khách cho **bất kỳ** bộ ảnh nào, tức xem
+được ảnh của mọi bé. Hôm nay app chưa có cơ chế "hai khoá" (khoá cũ chỉ để giải
+mã), nên đổi khoá là cách duy nhất, và nó làm hỏng bốn thứ trong bảng trên.
+Dấu hiệu lộ: tệp `.env*` bị gửi nhầm, ảnh chụp màn hình Vercel lộ giá trị, máy có
+`.env.prod.local` bị mất, hay nhật ký thấy phiên khách mở bộ mà không có lượt mở
+link tương ứng.
+
+Đổi khoá thì hỏng gì:
+
+| Thứ | Hỏng thế nào | Ai bị ảnh hưởng |
+|---|---|---|
+| Phiên khách (`bb_gs`) | Mọi khách đang mở bị văng ra, phải bấm lại link | Khách: chỉ cần mở lại link cũ, link vẫn sống |
+| `share_link_ma` | Link "hiện lại" ở màn quản trị thành rỗng, không khôi phục được | CSKH: muốn gửi lại link phải TẠO link mới |
+| Kênh tức thì | Màn đang mở mất tự cập nhật tới khi tải lại | Nhân viên + khách: F5 là xong |
+| Dấu ký middleware | Chậm một nhịp, tự lành | Không ai |
+
+Thứ tự làm (anh làm, Claude hỗ trợ):
+
+☐ 1. Sinh khoá mới ≥ 32 ký tự ngẫu nhiên (Claude in lệnh sinh, anh chạy trên máy anh).
+☐ 2. Vercel → Production → sửa `APP_SECRET` = khoá mới → **Redeploy**. Từ lúc này
+   phiên giả ký bằng khoá cũ hết tác dụng.
+☐ 3. Sửa cùng giá trị trong `.env.prod.local` của Claude (mục A ô 3).
+☐ 4. Báo CSKH: link khách đang dùng **vẫn mở được**; chỉ ô "hiện lại link" trong
+   màn quản trị trống. Khách nào cần gửi lại link thì tạo link mới cho khách đó.
+☐ 5. Nếu nghi kẻ lộ đã xem ảnh: soát nhật ký `gallery.auth` / lượt mở bất thường
+   theo thời gian lộ, báo anh danh sách bộ bị mở để anh quyết có báo gia đình
+   không.
+☐ 6. Ghi vào đây ngày đổi, ai đổi, lý do.
+
+Việc sau cắt (chưa làm): cơ chế hai khoá (`kid`) + script mã hoá lại
+`share_link_ma`, để lần đổi khoá sau không làm mất link "hiện lại".
 
 ### B. Địa chỉ gốc và thông báo đẩy
 
@@ -854,7 +1016,26 @@ Hobby chỉ cho 2 cron mỗi ngày một lần, và cả hai chỗ đã dùng (`
 `hau-ky`). Đề xuất bật lưới đỡ nằm ở bản bàn giao BB-352 — **anh quyết, không tự
 bật**.
 
-☐ 8. Nếu anh duyệt đề xuất đó: làm xong thì ghi vào đây ngày bật và ai bật.
+Bản đề xuất: `scratchpad/bb352/sync-lark.DE-XUAT.yml` (mỗi 15 phút, 08:00–21:45
+giờ VN). BB-363 đã sửa một lỗi của bản đề xuất: bước `flush-notifications` **bỏ
+`--retry`**, vì hàm gửi lại tin không giữ khoá — nếu lần đầu chỉ hết giờ phía
+curl, lần thử lại chạy song song có thể gửi **trùng tin Lark**. Tin còn hụt sẽ
+được lượt 15 phút sau gửi tiếp.
+
+☐ 8. **Anh quyết:** ☐ Bật ☐ Chưa bật. Ghi ngày + lý do vào đây.
+☐ 9. Nếu bật, làm đủ theo thứ tự:
+   1. Thêm `export const maxDuration = 60;` vào hai route
+      `src/app/api/cron/sync-lark/route.ts` và
+      `src/app/api/cron/flush-notifications/route.ts` (**bắt buộc**, không tuỳ
+      chọn), qua một task có mã BB.
+   2. GitHub → repo → Settings → Secrets → tạo **2 secret**: `SYNC_CRON_SECRET`
+      (cùng giá trị biến này trên Vercel Production) và `APP_URL`
+      (`https://hauky.babybeanstudio.vn`, không dấu `/` cuối). Anh dán giá trị.
+   3. Chép bản đề xuất đè lên `.github/workflows/sync-lark.yml`, qua PR.
+   4. Tab **Actions** → chạy tay một lần (Run workflow) → hai bước đều xanh.
+☐ 10. **Mỗi thứ Hai** mở tab Actions xem lượt chạy gần nhất. GitHub **tự tắt lịch**
+   của repo không có commit trong 60 ngày, và lịch thường trễ 5–30 phút. Thấy
+   dòng "This scheduled workflow is disabled" thì bấm Enable lại.
 
 ---
 
@@ -932,6 +1113,36 @@ từng dòng trước khi bước 13; mục 7b (soát Link app cũ) cũng đã x
 5. Nút "Nhắn cho studio" hiện đúng (đã chép `chat.page_url` ở bước 6).
 
 Qua cả năm ý trên mới coi là cắt xong.
+
+---
+
+## 13a. Bộ dọn dữ liệu (BB-356/357/363) — đêm đầu và tuần đầu
+
+**Ai làm:** Claude kiểm; anh xem kết quả xem trước.
+
+Bộ dọn chạy **tự động** trong cron `expire-galleries` lúc 01:00 giờ VN, mỗi đêm,
+dùng phần giờ còn lại của 60 giây. Nó xoá dữ liệu vận hành cũ (nhật ký nhiễu, tin
+Lark đã gửi quá 90 ngày…) và thu gọn danh sách ảnh của bộ cũ (bộ đã giao/lưu
+trữ/hết hạn quá 6 tháng; bộ chưa xong không ai mở link quá 6 tháng). Ảnh gốc
+không bao giờ bị đụng: chúng nằm trên Drive. Không cần ai bấm gì để nó chạy.
+
+Đêm đầu trên bb-prod gần như không có gì để dọn: dữ liệu vừa nạp, và mốc mở
+link đã chép ở 7c đều còn mới. Đo trên bb-dev ngày 02/10 (mốc theo BB-363):
+**hôm nay 0 bộ, 0 MB**; tới khoảng **03/04/2027** thì ~368 bộ / ~155.000 dòng ảnh
+(~78 MB) đủ tuổi, mỗi đêm thu gọn tối đa 5.000 dòng (~13 bộ).
+
+☐ 1. **Trước đêm đầu:** đăng nhập bb-prod bằng tài khoản Admin → Cài đặt → khối
+   dọn dữ liệu vận hành → bấm **"Xem trước sẽ dọn gì"** (KHÔNG bấm nút "Dọn dữ
+   liệu vận hành" hiện ra sau đó). Xem trước chạy
+   trong giao dịch chỉ đọc. Kết quả mong đợi: tổng sẽ xoá ≈ 0, không dòng nào
+   báo lỗi, dòng "anh_bo_cu" không ghi "chờ áp migration 0088" (nếu ghi thế
+   nghĩa là bước 3 chưa áp 0088: báo Claude).
+☐ 2. **Sáng hôm sau:** có đúng **1** dòng nhật ký `van_hanh.don_rac` actor
+   `system` của đêm qua, trong đó `hetGio` = false và không loại nào `loi` = 1.
+   Claude đọc bằng truy vấn chỉ đọc.
+☐ 3. **Tuần đầu: KHÔNG bấm "Dọn dữ liệu vận hành"** trên bb-prod. Để cron tự chạy.
+☐ 4. Mỗi thứ Hai tuần đầu: xem thanh dung lượng DB (Supabase → Database size).
+   Chạm 350 MB (70%) thì báo anh (ngưỡng chuyển gói).
 
 ---
 
