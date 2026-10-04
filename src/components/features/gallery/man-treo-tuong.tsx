@@ -635,8 +635,8 @@ export function ManTreoTuong({
             data-con-tro="mac-dinh"
             className="absolute inset-0"
             style={{
-              background:
-                "radial-gradient(70% 45% at 50% 30%, rgba(255,252,246,.9) 0%, rgba(255,252,246,0) 70%), linear-gradient(180deg, #f1e9de 0%, #ebe1d4 52%, #dccab6 52.3%, #cfbaa3 100%)",
+              // BB-364: nền kem trơn — tranh "ảnh UV trên bàn" (banana) đã có mặt bàn.
+              background: "#f7f3ea",
             }}
             onClick={() => setBanAn((v) => !v)}
           />
@@ -669,14 +669,28 @@ export function ManTreoTuong({
             data-testid="uv-anh-giay"
             className="pointer-events-none absolute inset-x-0 top-[12%] z-[5] flex justify-center px-6 md:top-[17%] md:pr-[376px]"
           >
-            {/* Tấm ảnh giấy nhỏ đứng nghiêng trên mặt bàn, bóng mềm — không tường, không khung. */}
-            <div className="pointer-events-auto flex w-full max-w-[360px] flex-col items-center gap-6">
+            {/* BB-364 (anh 04/10): tranh nhìn từ trên xuống — album gài ảnh + các tấm ảnh giấy
+                nhiều cỡ trên bàn; ảnh của bé đặt như một tấm ảnh giấy cạnh album. */}
+            <div className="pointer-events-auto relative flex w-full max-w-[420px] flex-col items-center gap-5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                data-testid="uv-tranh-tren-ban"
+                src="/san-pham/sp-uv-tren-ban-640.webp"
+                srcSet="/san-pham/sp-uv-tren-ban-320.webp 320w, /san-pham/sp-uv-tren-ban-640.webp 640w"
+                sizes="(max-width: 480px) 86vw, 420px"
+                alt=""
+                aria-hidden="true"
+                className="w-full select-none mix-blend-multiply"
+                draggable={false}
+              />
               <div
-                className="relative cursor-pointer bg-white p-[3.5%]"
+                className="absolute cursor-pointer bg-white p-[3.5%]"
                 style={{
-                  width: huongKhung === "doc" ? "min(44vw, 210px)" : "min(62vw, 300px)",
+                  width: huongKhung === "doc" ? "min(24vw, 116px)" : "min(34vw, 164px)",
                   aspectRatio: huongKhung === "doc" ? "2 / 3" : "3 / 2",
-                  transform: "rotate(-4deg)",
+                  left: "6%",
+                  top: "52%",
+                  transform: "rotate(-6deg)",
                   boxShadow: "0 22px 34px -14px rgba(46,42,39,.45), 0 3px 8px rgba(46,42,39,.12)",
                 }}
                 role="button"
