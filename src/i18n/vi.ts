@@ -379,15 +379,15 @@ export const vi = {
       // BB-339 — dòng nhỏ luôn hiện trên màn demo treo tường.
       thamKhaoDemo: "Hình demo chỉ mang tính tham khảo ạ.",
       // BB-358 (anh 02/10) — UV là ảnh giấy: không cán gỗ, không bọc khung, không treo tường.
-      uvLaAnhGiay: "UV là ảnh in trên giấy ảnh, hợp để gài album hoặc để bàn ạ.",
-      tieuDeAnhGiay: "Ảnh giấy để bàn",
+      uvLaAnhGiay: "UV in trên giấy ảnh, để gài album hoặc cất hộp ảnh gia đình ạ.",
+      tieuDeAnhGiay: "Ảnh giấy lưu giữ",
       moTaChatLieu: {
         "Gỗ": "In tràn viền, cán lên tấm gỗ — không khung, góc vuông ạ.",
         "Cavas/Kim tuyến": "In tràn viền trên chất liệu kim tuyến lấp lánh nhẹ — không khung ạ.",
         "Tráng gương": "In tràn viền, phủ bóng như gương, màu lên rực và sâu ạ.",
         "Thủy tinh": "In tràn viền sau lớp kính cường lực, bề mặt phẳng và sáng ạ.",
         "Mica HD": "In tràn viền trên tấm mica trong, nhẹ và giữ màu bền ạ.",
-        UV: "Ảnh in trên giấy ảnh, hợp để gài album hoặc để bàn ạ.",
+        UV: "In trên giấy ảnh, để gài album hoặc cất hộp ảnh gia đình ạ.",
       },
     },
   },

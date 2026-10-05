@@ -189,7 +189,7 @@ test.describe("BB-339: sản phẩm trong gói, cửa hàng, demo treo tường"
     if ((await nutUv.count()) === 0) test.skip(true, "danh mục không có UV");
     await nutUv.click();
     await expect(manTuong.getByTestId("uv-anh-giay")).toBeVisible();
-    await expect(manTuong.getByTestId("uv-loi-bean")).toHaveText("UV là ảnh in trên giấy ảnh, hợp để gài album hoặc để bàn ạ.");
+    await expect(manTuong.getByTestId("uv-loi-bean")).toHaveText("UV in trên giấy ảnh, để gài album hoặc cất hộp ảnh gia đình ạ.");
     await expect(manTuong.getByTestId("tuy-chon-boc-khung")).toHaveCount(0);
     await expect(manTuong.getByRole("checkbox")).toHaveCount(0);
     const chuUv = await manTuong.innerText();

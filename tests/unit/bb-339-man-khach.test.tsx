@@ -108,7 +108,7 @@ describe("BB-339 mục 4 — cửa hàng: Trong gói x/y ảnh, xem/đổi ảnh
   });
 
   it("UV có câu giải thích ảnh giấy (BB-358: không cán gỗ, không khung)", () => {
-    expect(html).toContain("Ảnh in trên giấy ảnh, hợp để gài album hoặc để bàn ạ.");
+    expect(html).toContain("In trên giấy ảnh, để gài album hoặc cất hộp ảnh gia đình ạ.");
     expect(html).not.toMatch(/cán (lên )?gỗ/);
   });
 });

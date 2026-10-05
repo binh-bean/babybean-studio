@@ -50,6 +50,7 @@ import {
   type CoKhungCm,
 } from "@/lib/gallery/khung-tren-tuong";
 import { MAU_KHUNG, MAU_KHUNG_MAC_DINH } from "@/lib/gallery/mau-khung";
+import { BAN_UV, tinhAnhGiayTrenBan, vungNhinTrenAnh } from "@/lib/gallery/ban-uv";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { coTheBocKhung, laChatLieuUV } from "@/lib/products/nhom-san-pham";
 
@@ -199,6 +200,24 @@ const BONG_THEO_HUONG: Record<AnhPhong["huongSang"], string> = {
   tren: "0px 14px 24px rgba(20,14,8,.4)",
 };
 
+/** BB-365 — lề trắng của tấm ảnh giấy UV (ảnh in có lề mỏng), theo cm thật. */
+const LE_ANH_GIAY_CM = 0.4;
+/** BB-365 — bảng điều khiển máy tính (`md:w-[360px]`) + khoảng hở 16px. */
+const BANG_MAY_TINH_PX = 376;
+
+/**
+ * BB-365 — bóng của tấm ảnh giấy NẰM PHẲNG trên bàn: nắng từ cửa sổ phía trên
+ * ảnh nên bóng đổ xuống dưới, ngắn và mềm (giấy sát mặt bàn), tính theo cm
+ * thật × px-màn-hình-mỗi-cm để ảnh to thì bóng to theo, không phải số cố định.
+ */
+function bongAnhGiay(pxManHinhMoiCm: number): string {
+  const s = pxManHinhMoiCm;
+  return [
+    `0 ${(0.45 * s).toFixed(1)}px ${(1.1 * s).toFixed(1)}px -${(0.15 * s).toFixed(1)}px rgba(70,45,20,.38)`,
+    `0 ${(0.08 * s).toFixed(1)}px ${(0.18 * s).toFixed(1)}px rgba(70,45,20,.30)`,
+  ].join(", ");
+}
+
 export function ManTreoTuong({
   mo,
   onDong,
@@ -250,6 +269,14 @@ export function ManTreoTuong({
   const [khungRef, setKhungRef] = useState({ w: 0, h: 0, mepTren: 0 });
   const chamBatDau = useRef<{ x: number; y: number } | null>(null);
 
+  // BB-365 — cảnh bàn UV: khung chứa ảnh bàn (trên điện thoại chừa đáy cho
+  // bảng) + câu "UV in trên giấy ảnh…" nổi phía trên (đo mép dưới để ảnh của
+  // bé không nằm dưới chữ). UV là ảnh giấy: không treo tường, không khung.
+  const laUv = laChatLieuUV(chatLieu);
+  const canhBanRef = useRef<HTMLDivElement | null>(null);
+  const loiBeanRef = useRef<HTMLParagraphElement | null>(null);
+  const [canhBanDo, setCanhBanDo] = useState({ w: 0, h: 0, cheTren: 0 });
+
   // Reset về ảnh vừa mở mỗi lần bấm "Xem trên tường" từ một tấm khác — và gấp
   // lại chi tiết/xem lớn, hiện lại bảng, để không mang trạng thái ẩn/mở của
   // lần xem trước sang lần mở mới.
@@ -287,6 +314,24 @@ export function ManTreoTuong({
     if (cumPhongRef.current) ro.observe(cumPhongRef.current);
     return () => ro.disconnect();
   }, [mo]);
+
+  useEffect(() => {
+    if (!mo || !laUv) return;
+    const el = canhBanRef.current;
+    if (!el) return;
+    const doLai = () => {
+      const loi = loiBeanRef.current;
+      const cheTren = loi
+        ? Math.max(0, loi.getBoundingClientRect().bottom - el.getBoundingClientRect().top + KHOANG_HO_DUOI_CUM_PHONG_PX)
+        : 0;
+      setCanhBanDo({ w: el.clientWidth, h: el.clientHeight, cheTren });
+    };
+    doLai();
+    const ro = new ResizeObserver(doLai);
+    ro.observe(el);
+    if (loiBeanRef.current) ro.observe(loiBeanRef.current);
+    return () => ro.disconnect();
+  }, [mo, laUv]);
 
   // Esc đóng ĐÚNG MỘT LỚP — bắt ở pha capture và chặn lan, vì màn xem lớn
   // (PhotoLightbox) nằm ngay dưới cũng nghe Esc: không chặn thì một lần bấm
@@ -452,12 +497,17 @@ export function ManTreoTuong({
       cacCoTuDanhMuc(monAnhIn.filter((m) => m.material === chatLieu).map((m) => m.size)),
     [monAnhIn, chatLieu]
   );
+  // BB-365 — UV không treo tường: cỡ nào vừa MẶT BÀN (không ra khỏi bàn, không
+  // che bình hoa/hộp ảnh) thì hiện, không xét mảng tường của phòng đang chọn.
+  const canhBan = BAN_UV[kho];
   const coVua = useMemo(
     () =>
-      coCoBan.filter(
-        (c) => tinhKhungTrenTuong(phongDeTinhKhung, c, huongKhung, coKhung, mauKhungDaChon.vienCm).vua
+      coCoBan.filter((c) =>
+        laUv
+          ? tinhAnhGiayTrenBan(canhBan, c, huongKhung).vua
+          : tinhKhungTrenTuong(phongDeTinhKhung, c, huongKhung, coKhung, mauKhungDaChon.vienCm).vua
       ),
-    [coCoBan, phongDeTinhKhung, huongKhung, coKhung, mauKhungDaChon]
+    [coCoBan, laUv, canhBan, phongDeTinhKhung, huongKhung, coKhung, mauKhungDaChon]
   );
 
   /**
@@ -505,6 +555,30 @@ export function ManTreoTuong({
     if (!ketQuaKhung.vua || khungRef.w === 0) return null;
     return quyDoiKhungHienThi(khungRef.w, khungRef.h, phong.rongAnhPx, phong.caoAnhPx, ketQuaKhung.hinh);
   }, [ketQuaKhung, khungRef, phong]);
+
+  /**
+   * BB-365 — tấm ảnh giấy UV trên bàn: cm × pxMoiCm của ảnh bàn (đo tay ở
+   * `ban-uv.ts`), quy đổi sang % khung chứa bằng CÙNG phép `object-fit: cover`
+   * của ảnh phòng. Chỉ đặt trong phần bàn ba mẹ nhìn thấy: trừ dải chữ nổi phía
+   * trên, và trên máy tính trừ cột bảng bên phải khi bảng đang mở (trên điện
+   * thoại khung chứa đã chừa đáy cho bảng).
+   */
+  const anhGiay = useMemo(() => {
+    if (!laUv || canhBanDo.w === 0) return null;
+    const vungNhin = vungNhinTrenAnh(canhBanDo.w, canhBanDo.h, canhBan.rongAnhPx, canhBan.caoAnhPx, {
+      tren: canhBanDo.cheTren,
+      phai: manRong && !banAn ? BANG_MAY_TINH_PX : 0,
+    });
+    const kq = tinhAnhGiayTrenBan(canhBan, co, huongKhung, vungNhin);
+    if (!kq.vua) return null;
+    const scale = tiLeHienThi(canhBanDo.w, canhBanDo.h, canhBan.rongAnhPx, canhBan.caoAnhPx);
+    return {
+      ...quyDoiKhungHienThi(canhBanDo.w, canhBanDo.h, canhBan.rongAnhPx, canhBan.caoAnhPx, kq.hinh),
+      gocXoayDo: kq.gocXoayDo,
+      pxManHinhMoiCm: canhBan.pxMoiCm * scale,
+      rongPx: kq.hinh.rong * scale,
+    };
+  }, [laUv, canhBanDo, canhBan, co, huongKhung, manRong, banAn]);
 
   // Bề dày viền khung mẫu QUY ĐỔI ĐÚNG TỈ LỆ hiển thị — cùng `scale` với vị trí
   // khung ở trên, không thì viền phình to/nhỏ sai khi đổi cỡ màn hình.
@@ -593,8 +667,8 @@ export function ManTreoTuong({
 
   const style = lopChatLieu(chatLieu);
   // BB-358 (anh 02/10) — UV là ảnh giấy: KHÔNG BAO GIỜ treo lên tường, không khung.
-  // Hiện như một tấm ảnh giấy nhỏ đứng nghiêng trên mặt bàn, không có bức tường trống.
-  const laUvKhongKhung = laChatLieuUV(chatLieu);
+  // BB-365: nằm trên ảnh chụp thật mặt bàn, to nhỏ theo cỡ (xem `anhGiay`).
+  const laUvKhongKhung = laUv;
 
   return (
     <div
@@ -627,19 +701,87 @@ export function ManTreoTuong({
           chamBatDau.current = null;
         }}
       >
+        {/*
+          BB-365 (anh 04/10) — UV là ẢNH GIẤY: ướm lên ảnh chụp thật "bàn gỗ cạnh
+          cửa sổ" (album gài ảnh, hộp ảnh gia đình, vài tấm ảnh rời), tấm của bé
+          nằm trên bàn như một tấm ảnh in có lề trắng, to nhỏ ĐÚNG theo cỡ UV ba
+          mẹ chọn (cm × pxMoiCm — `ban-uv.ts`), giống cách ảnh in lên tường.
+          Trên điện thoại khung ảnh bàn chừa đáy cho bảng (30vh) để thấy trọn
+          mặt bàn; ẩn bảng thì tràn màn hình như ảnh phòng.
+        */}
         {laUvKhongKhung && (
           <div
+            ref={canhBanRef}
             data-testid="nen-ban-uv"
-            aria-hidden="true"
             // Như ảnh phòng: chạm nền ẩn/hiện bảng, không hiện bàn tay (tests/unit/con-tro-ban-tay.test.ts).
             data-con-tro="mac-dinh"
-            className="absolute inset-0"
-            style={{
-              // BB-364: nền kem trơn — tranh "ảnh UV trên bàn" (banana) đã có mặt bàn.
-              background: "#f7f3ea",
-            }}
+            className="absolute inset-x-0 top-0 overflow-hidden bg-[#e9dcc8]"
+            style={{ bottom: !manRong && !banAn ? `${TY_LE_CHIEU_CAO_BANG_DIEN_THOAI * 100}vh` : 0 }}
             onClick={() => setBanAn((v) => !v)}
-          />
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              key={canhBan.tep}
+              src={`/tuong/${canhBan.tep}`}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 h-full w-full object-cover"
+              draggable={false}
+            />
+            {anhGiay && sanPhamAnh && (
+              <div
+                data-testid="uv-anh-giay"
+                data-co={co}
+                role="button"
+                tabIndex={0}
+                aria-label={vi.gallery.treoTuong.xemLonAnhBe}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setXemLon(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setXemLon(true);
+                  }
+                }}
+                className="absolute origin-center cursor-pointer bg-[#fbf9f4] transition-all duration-300 ease-out"
+                style={{
+                  left: `${anhGiay.leftPct}%`,
+                  top: `${anhGiay.topPct}%`,
+                  width: `${anhGiay.widthPct}%`,
+                  height: `${anhGiay.heightPct}%`,
+                  transform: `rotate(${anhGiay.gocXoayDo}deg)`,
+                  padding: `${Math.max(1.5, LE_ANH_GIAY_CM * anhGiay.pxManHinhMoiCm)}px`,
+                  boxShadow: bongAnhGiay(anhGiay.pxManHinhMoiCm),
+                }}
+              >
+                <div className="relative h-full w-full overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={buildLightboxImageUrl(anhDangXem.id, 1600)}
+                    alt={anhDangXem.fileName}
+                    className="h-full w-full object-cover"
+                    draggable={false}
+                  />
+                </div>
+                {/* Nắng từ cửa sổ phía trên: mép trên tấm ảnh sáng ấm hơn, mép dưới hơi tối — cả lề lẫn ảnh. */}
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    background:
+                      "linear-gradient(175deg, rgba(255,240,215,.16) 0%, rgba(255,240,215,0) 45%, rgba(70,45,20,.07) 100%)",
+                  }}
+                />
+                {anhGiay.rongPx >= 96 && (
+                  <span className="pointer-events-none absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-sm">
+                    <ZoomIn className="h-3.5 w-3.5" strokeWidth={2} />
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -659,66 +801,19 @@ export function ManTreoTuong({
         />
 
         {/*
-          BB-339 (ảnh e73e77be) — ảnh UV là ảnh in trên GIẤY ẢNH, CHƯA có
-          khung: không treo lên tường trong demo (dễ hiểu nhầm là khung treo).
-          Chưa chọn khung thì hiện như một tấm ảnh giấy đặt nghiêng trên mặt
-          phẳng, viền giấy mỏng, kèm câu giải thích ngắn.
+          BB-339/BB-358 — câu giải thích UV là ảnh giấy, nổi trên phần rèm cửa
+          (chỗ của cụm chọn phòng, vốn ẩn khi UV). Mép dưới của nó được đo để
+          tấm ảnh của bé không nằm dưới chữ (xem `canhBanDo.cheTren`).
         */}
-        {laUvKhongKhung && sanPhamAnh && (
-          <div
-            data-testid="uv-anh-giay"
-            className="pointer-events-none absolute inset-x-0 top-[12%] z-[5] flex justify-center px-6 md:top-[17%] md:pr-[376px]"
-          >
-            {/* BB-364 (anh 04/10): tranh nhìn từ trên xuống — album gài ảnh + các tấm ảnh giấy
-                nhiều cỡ trên bàn; ảnh của bé đặt như một tấm ảnh giấy cạnh album. */}
-            <div className="pointer-events-auto relative flex w-full max-w-[420px] flex-col items-center gap-5">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                data-testid="uv-tranh-tren-ban"
-                src="/san-pham/sp-uv-tren-ban-640.webp"
-                srcSet="/san-pham/sp-uv-tren-ban-320.webp 320w, /san-pham/sp-uv-tren-ban-640.webp 640w"
-                sizes="(max-width: 480px) 86vw, 420px"
-                alt=""
-                aria-hidden="true"
-                className="w-full select-none mix-blend-multiply"
-                draggable={false}
-              />
-              <div
-                className="absolute cursor-pointer bg-white p-[3.5%]"
-                style={{
-                  width: huongKhung === "doc" ? "min(24vw, 116px)" : "min(34vw, 164px)",
-                  aspectRatio: huongKhung === "doc" ? "2 / 3" : "3 / 2",
-                  left: "6%",
-                  top: "52%",
-                  transform: "rotate(-6deg)",
-                  boxShadow: "0 22px 34px -14px rgba(46,42,39,.45), 0 3px 8px rgba(46,42,39,.12)",
-                }}
-                role="button"
-                tabIndex={0}
-                aria-label={vi.gallery.treoTuong.xemLonAnhBe}
-                onClick={() => setXemLon(true)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setXemLon(true);
-                  }
-                }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={buildLightboxImageUrl(anhDangXem.id, 1600)}
-                  alt={anhDangXem.fileName}
-                  className="h-full w-full object-cover"
-                  draggable={false}
-                />
-              </div>
-              <p
-                data-testid="uv-loi-bean"
-                className="rounded-full bg-white/80 px-4 py-2 text-center text-[13px] leading-snug text-[#2e2a27] shadow-[0_2px_10px_-4px_rgba(46,42,39,.25)] backdrop-blur-sm"
-              >
-                {vi.gallery.treoTuong.uvLaAnhGiay}
-              </p>
-            </div>
+        {laUvKhongKhung && (
+          <div className="pointer-events-none absolute inset-x-0 top-16 z-20 flex justify-center px-4 md:top-4 md:pr-[376px]">
+            <p
+              ref={loiBeanRef}
+              data-testid="uv-loi-bean"
+              className="max-w-[480px] text-balance rounded-full bg-white/85 px-4 py-2 text-center text-[13px] leading-snug text-[#2e2a27] shadow-[0_2px_10px_-4px_rgba(46,42,39,.25)] backdrop-blur-sm"
+            >
+              {vi.gallery.treoTuong.uvLaAnhGiay}
+            </p>
           </div>
         )}
 
