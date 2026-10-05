@@ -26,6 +26,7 @@ import {
   type HangChoOp,
   type LoGui,
 } from "@/lib/selection/hang-cho";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 /** Định kỳ thử gửi lại trong lúc còn hàng chờ (BB-232 việc 3). */
 const KHOANG_GUI_LAI_MS = 15_000;
@@ -178,7 +179,7 @@ export function useHangChoTim(token: string, tuyChon: TuyChonHangCho = {}): UseH
 
         let res: Response;
         try {
-          res = await fetch("/api/g/selection", {
+          res = await goiApiKhach("/api/g/selection", {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ clientOpId: lo.clientOpId, ops: lo.ops }),

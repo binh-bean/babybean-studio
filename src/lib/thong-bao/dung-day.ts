@@ -11,6 +11,7 @@
  */
 
 import { nhanBietMay } from "@/lib/utils/nhan-biet-may";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 export const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -109,7 +110,7 @@ export async function xinQuyenVaDangKyPush(galleryId: string): Promise<boolean> 
       }));
     const json = sub.toJSON();
 
-    const res = await fetch("/api/g/thong-bao", {
+    const res = await goiApiKhach("/api/g/thong-bao", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),

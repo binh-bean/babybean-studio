@@ -27,6 +27,7 @@ import { formatNgayVN } from "@/lib/utils/dinh-dang";
 import { giuA } from "@/lib/utils/giu-a";
 import { ChevronRight, UserPlus } from "lucide-react";
 import { useNutBackDong } from "./use-nut-back-dong";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 interface NguoiDaMoi {
   id: string;
@@ -84,7 +85,7 @@ export function MoiNguoiThan({ kieu = "the" }: { kieu?: KieuLoiVaoMoi } = {}) {
 
   const taiLai = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/g/moi-nguoi-than", { cache: "no-store" });
+      const res = await goiApiKhach("/api/g/moi-nguoi-than", { cache: "no-store" });
       if (!res.ok) return;
       const json = (await res.json().catch(() => null)) as {
         data?: { items?: NguoiDaMoi[] };
@@ -105,7 +106,7 @@ export function MoiNguoiThan({ kieu = "the" }: { kieu?: KieuLoiVaoMoi } = {}) {
 
   /** Gọi POST tạo link; trả về link mới hoặc null (đã báo lỗi). */
   async function goiTaoLink(nhanSach: string): Promise<{ nhan: string; diaChi: string } | null> {
-    const res = await fetch("/api/g/moi-nguoi-than", {
+    const res = await goiApiKhach("/api/g/moi-nguoi-than", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ nhan: nhanSach }),
@@ -122,7 +123,7 @@ export function MoiNguoiThan({ kieu = "the" }: { kieu?: KieuLoiVaoMoi } = {}) {
   }
 
   async function goiThuHoi(id: string): Promise<boolean> {
-    const res = await fetch(`/api/g/moi-nguoi-than?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    const res = await goiApiKhach(`/api/g/moi-nguoi-than?id=${encodeURIComponent(id)}`, { method: "DELETE" });
     if (!res.ok) {
       const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
       setLoi(json?.error?.message ?? "Bean chưa thu hồi được, ba mẹ thử lại giúp Bean nhé ạ.");

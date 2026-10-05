@@ -34,6 +34,7 @@
 
 import { useEffect, useRef } from "react";
 import { TEN_SU_KIEN_TUC_THI, laLoaiHopLe, type SuKienTucThi } from "@/lib/utils/tuc-thi-su-kien";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 export type PhamViTucThi = "khach" | "nhan-vien";
 
@@ -153,7 +154,7 @@ const DUONG_TEN_KENH: Record<PhamViTucThi, string> = {
 };
 
 async function layTenKenhTuApi(phamVi: PhamViTucThi): Promise<string[]> {
-  const res = await fetch(DUONG_TEN_KENH[phamVi], { cache: "no-store" });
+  const res = await goiApiKhach(DUONG_TEN_KENH[phamVi], { cache: "no-store" });
   if (!res.ok) return [];
   const json = (await res.json().catch(() => null)) as { data?: { kenh?: unknown } } | null;
   const kenh = json?.data?.kenh;
@@ -175,12 +176,17 @@ async function moKetNoiSupabase(): Promise<KetNoiToiThieu> {
 
 const soTram = new Map<string, { tram: Tram; soNguoiDung: number; hen: ReturnType<typeof setTimeout> | null }>();
 
-function muonTram(phamVi: PhamViTucThi, khoa: string): Tram {
+function muonTram(phamVi: PhamViTucThi, khoa: string, tenKenhCoSan?: readonly string[]): Tram {
   const ma = `${phamVi}|${khoa}`;
   let o = soTram.get(ma);
   if (!o) {
+    // BB-334B — trang gia đình đã có sẵn tên kênh (trong `GET /api/k/<mã>`):
+    // nghe thẳng, không hỏi lại `/api/g/tuc-thi` (phiên gia đình không có bộ).
+    const layTenKenh = tenKenhCoSan
+      ? () => Promise.resolve([...tenKenhCoSan])
+      : () => layTenKenhTuApi(phamVi);
     o = {
-      tram: taoTram({ layTenKenh: () => layTenKenhTuApi(phamVi), taoKetNoi: moKetNoiSupabase }),
+      tram: taoTram({ layTenKenh, taoKetNoi: moKetNoiSupabase }),
       soNguoiDung: 0,
       hen: null,
     };
@@ -272,6 +278,11 @@ export interface TuyChonTucThi {
   khoa?: string;
   /** Cửa sổ gộp sự kiện dồn dập (ms). Mặc định 1.500; 0 = không gộp. */
   gopMs?: number;
+  /**
+   * BB-334B — tên kênh máy chủ ĐÃ cấp sẵn (trang gia đình: `kenhTucThi` của
+   * `GET /api/k/<mã>`, kênh của mọi bộ đang hiện). Có thì không hỏi API tên kênh.
+   */
+  tenKenh?: readonly string[];
 }
 
 export function useCapNhatTucThi(
@@ -285,10 +296,15 @@ export function useCapNhatTucThi(
   const galleryId = tuyChon.galleryId;
   const khoa = tuyChon.khoa ?? "";
   const gopMs = tuyChon.gopMs ?? GOP_MAC_DINH_MS;
+  const tenKenh = tuyChon.tenKenh;
+  // Khoá trạm gồm cả danh sách kênh: nhà có bộ mới → mở trạm mới đúng kênh.
+  const khoaKenh = tenKenh ? `${khoa}#${tenKenh.join(",")}` : khoa;
+  const tenKenhRef = useRef(tenKenh);
+  tenKenhRef.current = tenKenh;
 
   useEffect(() => {
     if (!bat || typeof window === "undefined") return;
-    const tram = muonTram(phamVi, khoa);
+    const tram = muonTram(phamVi, khoaKenh, tenKenhRef.current);
     const boGop = taoBoGop<SuKienTucThi>((sk) => goiLai.current(sk), gopMs);
     const bao = (sk: SuKienTucThi) => {
       if (galleryId && sk.galleryId && sk.galleryId !== galleryId) return;
@@ -322,7 +338,7 @@ export function useCapNhatTucThi(
       clearInterval(hoiLai);
       document.removeEventListener("visibilitychange", khiDoiHien);
       window.removeEventListener("online", taiBu);
-      traTram(phamVi, khoa);
+      traTram(phamVi, khoaKenh);
     };
-  }, [phamVi, bat, galleryId, khoa, gopMs]);
+  }, [phamVi, bat, galleryId, khoaKenh, gopMs]);
 }

@@ -390,6 +390,45 @@ export const vi = {
         UV: "In trên giấy ảnh, để gài album hoặc cất hộp ảnh gia đình ạ.",
       },
     },
+
+    /**
+     * BB-334B — trang gia đình `/k/<mã>` (bản vẽ 01/02) và bộ chuyển buổi chụp
+     * trong một bộ (bản vẽ 03/04). Nhãn trạng thái KHÔNG ở đây: lấy nguyên
+     * `trangThai.khach` của `GET /api/k/<mã>` (trangThaiKhach, BB-353).
+     */
+    giaDinh: {
+      nhanTrang: "Album của gia đình",
+      chao: "Chào ba mẹ {be}",
+      chaoChung: "Chào ba mẹ",
+      moTa: "{so} buổi chụp · link này dùng lâu dài cho mọi buổi chụp sau của gia đình ạ.",
+      cacBuoiKhac: "Các buổi chụp khác",
+      cacBuoiCuaGiaDinh: "Các buổi chụp của gia đình",
+      veTrangGiaDinh: "Về trang album gia đình",
+      albumGiaDinh: "Album gia đình",
+      doiBuoiChup: "Đổi buổi chụp",
+      dangXem: "Đang xem",
+      buocTiepTheo: "Bước tiếp theo:",
+      chup: "Chụp {ngay}",
+      soAnh: "{so} ảnh",
+      viec: {
+        chon_anh: "Ba mẹ thả tim những tấm thích nhất để Bean chỉnh ảnh ạ.",
+        duyet_anh: "Ảnh đã chỉnh xong, ba mẹ xem và duyệt giúp Bean ạ.",
+        dang_lam: "Ba mẹ không cần làm gì ạ. Bean báo ngay khi có ảnh mới ạ.",
+        da_xong: "Ảnh đã về ạ. Ba mẹ tải ảnh hoặc đặt in thêm khung, album ạ.",
+        nhan_bean: "Bộ ảnh đang tạm khoá, ba mẹ nhắn Bean để mở lại ạ.",
+      },
+      nut: {
+        chon_anh: "Tiếp tục chọn ảnh",
+        duyet_anh: "Duyệt ảnh đã chỉnh",
+        xem_anh: "Xem bộ ảnh",
+      },
+      dangMo: "Bean đang mở album của gia đình ạ…",
+      loiMo: "Bean chưa mở được album của gia đình, ba mẹ thử lại giúp Bean nhé ạ.",
+      linkHetHan: "Link này đã ngừng mở ạ. Ba mẹ nhắn Bean để nhận link mới nhé ạ.",
+      khongThayBuoi: "Bean không thấy buổi chụp này trong album của gia đình ạ.",
+      chuaCoBuoi: "Bean đang chuẩn bị ảnh cho gia đình ạ. Bean sẽ báo ba mẹ khi sẵn sàng ạ.",
+      thuLai: "Thử lại",
+    },
   },
   admin: {
     branches: {
@@ -641,6 +680,75 @@ export const vi = {
       trungSdtGiaiThich:
         "Cùng một số điện thoại đang có hồ sơ ở chi nhánh khác. Sửa một bên không đổi bên kia.",
       khongXemDuoc: "Không thuộc chi nhánh của bạn",
+    },
+    // BB-334C — khối "Link app của gia đình" ở trang khách hàng (nhân viên).
+    // Câu ngắn, nói thẳng hậu quả. Vai cao nhất hiển thị "Admin".
+    linkGiaDinh: {
+      tieuDe: "Link app của gia đình",
+      moTa: "Một link cho mọi buổi chụp. Có buổi chụp mới thì link tự hiện thêm, không cần gửi lại.",
+      dangTai: "Đang tải link gia đình…",
+      loiTai: "Không đọc được link gia đình. Thử tải lại trang.",
+      chuaCo: "Khách chưa có link gia đình.",
+      chuaCoMoTa: "Tạo link để gửi ba mẹ một lần, dùng cho mọi bộ ảnh của nhà.",
+      taoLink: "Tạo link gia đình",
+      dangTao: "Đang tạo…",
+      nhanOLink: "Link gia đình",
+      chepLink: "Chép link",
+      daChepLink: "Đã chép",
+      chiaSe: "Chia sẻ",
+      chepTinNhan: "Chép tin nhắn",
+      daChepTinNhan: "Đã chép tin nhắn",
+      tinNhanMau: "Tin nhắn mẫu",
+      khongChepDuoc: "Trình duyệt không cho chép. Bôi đen rồi bấm Ctrl+C giúp.",
+      khongDocLaiDuoc:
+        "Không đọc lại được địa chỉ link này. Bấm \"Đổi link\" để tạo link mới rồi chép ngay.",
+      luuDiaChiHong:
+        "Link đã tạo nhưng chưa lưu được địa chỉ để hiện lại sau. Chép link ngay bây giờ, đóng trang là mất.",
+      thongKe: "Tạo {ngay} · Ba mẹ mở {lan} lần{cuoi}",
+      thongKeCuoi: ", lần cuối {luc}",
+      chuaMoLan: "Ba mẹ chưa mở lần nào",
+      linkCu: "{n} link cũ theo từng bộ vẫn mở được",
+      linkCuMoTa: "Gửi trước khi có link gia đình. Ba mẹ mở link cũ vẫn vào đúng bộ đó.",
+      linkCuMotBo: "{ten} · mở {lan} lần",
+      loiMoi: "{n} link mời người thân xem cả nhà. Thu hồi riêng, không bị thu hồi kèm.",
+      doiLink: "Đổi link",
+      thuHoi: "Thu hồi",
+      chiAdminDoi: "Chỉ CSKH hoặc Admin được đổi hoặc thu hồi link.",
+      ghiLark: "Ghi link vào Lark",
+      dangGhiLark: "Đang ghi…",
+      huy: "Huỷ",
+      dangXuLy: "Đang xử lý…",
+      doi: {
+        tieuDe: "Đổi link gia đình?",
+        noiDung:
+          "Link cũ sẽ ngừng mở ngay. Ba mẹ đang giữ link cũ (kể cả đã lưu ở màn hình chính) sẽ không mở được nữa cho tới khi nhận link mới.",
+        phu: "Lượt chọn ảnh đi theo link mới. Link mới được ghi sang Lark.",
+        nutXacNhan: "Đổi link",
+        xong: "Đã đổi link. Link cũ đã ngừng mở.",
+      },
+      thuHoiHop: {
+        tieuDe: "Thu hồi link gia đình?",
+        noiDung:
+          "Link sẽ ngừng mở ngay. Ba mẹ mở link này sẽ không thấy gì nữa.",
+        phu: "Link cũ theo từng bộ và link mời người thân vẫn mở được. Cột Link app trên Lark giữ link đã chết cho tới khi tạo link mới.",
+        nutXacNhan: "Thu hồi link",
+        xong: "Đã thu hồi link gia đình.",
+      },
+      ghiLarkHop: {
+        tieuDe: "Ghi link vào Lark?",
+        noiDung:
+          "Bean sẽ ghi link này vào cột Link app của mọi dòng Hậu Kỳ của khách trên Lark. Link đang có trong cột sẽ bị thay.",
+        phu: "Việc này sửa dữ liệu bên Lark.",
+        nutXacNhan: "Ghi vào Lark",
+      },
+      vuaThuHoi: "Đã thu hồi link gia đình. Ba mẹ mở link này sẽ không thấy gì.",
+      daTao: "Đã tạo link gia đình.",
+      larkKhongCoDong: "Khách chưa có dòng Hậu Kỳ nào trên Lark để ghi.",
+      larkDuHet: "Đã ghi vào cột Link app của {n} dòng Hậu Kỳ trên Lark.",
+      larkMotPhan: "Ghi được {ghi} trên {tong} dòng Hậu Kỳ. Dòng còn lại chưa ghi được, bấm \"Ghi link vào Lark\" để thử lại.",
+      larkChayThu: "Đang ở chế độ thử, chưa ghi gì sang Lark.",
+      loiChung: "Không làm được. Thử lại giúp.",
+      matKetNoi: "Mất kết nối. Thử lại giúp.",
     },
     nhatKy: {
       title: "Nhật ký thao tác",

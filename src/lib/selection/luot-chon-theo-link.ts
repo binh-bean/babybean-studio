@@ -85,6 +85,36 @@ export async function layHoacTaoLuotChon(
     .select("id")
     .single();
 
+  if (error?.code === "23505") {
+    // BB-334B — hai lượt gọi CÙNG LÚC lần đầu mở bộ (màn khách bắn song song
+    // gallery/photos/tuc-thi/tim… mỗi lượt đều qua đây) cùng thấy "chưa có" rồi
+    // cùng chèn: lượt thua vấp `uq_selections_primary` / `(share_link_id,
+    // gallery_id)` và trả 500. Lượt thắng đã tạo đúng dòng cần có — đọc lại nó.
+    const daTao = await timLuotDaCo(admin, args);
+    if (daTao) return daTao;
+  }
   if (error || !taoMoi) throw error ?? new Error("Tạo lượt chọn không trả về gì");
   return taoMoi.id as string;
+}
+
+async function timLuotDaCo(
+  admin: SupabaseClient,
+  args: { shareLinkId: string; galleryId: string; laKhachChinh: boolean; laLinkGiaDinh?: boolean },
+): Promise<string | null> {
+  if (args.laKhachChinh && args.laLinkGiaDinh) {
+    const { data } = await admin
+      .from("selections")
+      .select("id")
+      .eq("gallery_id", args.galleryId)
+      .eq("is_primary", true)
+      .maybeSingle();
+    if (data) return data.id as string;
+  }
+  const { data } = await admin
+    .from("selections")
+    .select("id")
+    .eq("share_link_id", args.shareLinkId)
+    .eq("gallery_id", args.galleryId)
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
 }

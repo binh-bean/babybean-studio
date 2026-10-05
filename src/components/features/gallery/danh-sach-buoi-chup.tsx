@@ -30,6 +30,7 @@ import { Camera, ChevronRight, AlertCircle } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/components/ui/utils";
 import { formatSo } from "@/lib/utils/dinh-dang";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 export interface BuoiChupTomTat {
   id: string;
@@ -65,7 +66,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
     try {
       setDangTai(true);
       setLoi(null);
-      const res = await fetch("/api/g/buoi-chup", { cache: "no-store" });
+      const res = await goiApiKhach("/api/g/buoi-chup", { cache: "no-store" });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
         setLoi(json?.error?.message ?? vi.gallery.loiBean.chuaMoDuocDanhSachBuoi);
@@ -92,7 +93,7 @@ export function DanhSachBuoiChup({ onDaChonBuoi }: Props) {
     setDangMo(id);
     setLoi(null);
     try {
-      const res = await fetch("/api/g/buoi-chup", {
+      const res = await goiApiKhach("/api/g/buoi-chup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ buoiChupId: id }),

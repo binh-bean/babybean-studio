@@ -126,7 +126,8 @@ function applySecurityHeaders(response: NextResponse, pathname: string): void {
 
   // Customer galleries must never be indexed — these pages contain photos of
   // children behind a shareable URL.
-  if (pathname.startsWith("/g/")) {
+  // BB-334B — trang gia đình /k/<mã> cũng chở ảnh trẻ em sau một link chia sẻ.
+  if (pathname.startsWith("/g/") || pathname.startsWith("/k/")) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   }
 }

@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useRef } from "react";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 export const CHU_KY_HOI_MO_LAI_MS = 4_000;
 export const TRAN_CHO_MO_LAI_MS = 5 * 60_000;
@@ -31,7 +32,7 @@ export function useMoLaiAnhThuGon(p: { thuGon: boolean; coPhien: boolean; khiXon
 
     const gui = () => {
       lanGuiCuoi = Date.now();
-      void fetch("/api/g/mo-lai-anh", { method: "POST" }).catch(() => {});
+      void goiApiKhach("/api/g/mo-lai-anh", { method: "POST" }).catch(() => {});
     };
     gui();
 
@@ -42,7 +43,7 @@ export function useMoLaiAnhThuGon(p: { thuGon: boolean; coPhien: boolean; khiXon
         return;
       }
       try {
-        const res = await fetch("/api/g/mo-lai-anh", { cache: "no-store" });
+        const res = await goiApiKhach("/api/g/mo-lai-anh", { cache: "no-store" });
         const json = await res.json().catch(() => null);
         if (!huy && res.ok && json?.data?.thuGon === false) {
           window.clearInterval(hen);

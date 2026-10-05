@@ -40,7 +40,8 @@ export function PWAInstallPrompt({
   // còn nhiều hơn, còn lời mời chung vẫn cần sống nguyên cho các trang khác
   // (đầu trang chủ, quản trị) mà /g/<token> không đụng tới.
   const pathname = usePathname();
-  const trangKhach = pathname?.startsWith("/g/") ?? false;
+  // BB-334B — trang gia đình /k/<mã> cũng là màn khách: lời mời lưu app riêng của nó lo.
+  const trangKhach = (pathname?.startsWith("/g/") || pathname?.startsWith("/k/")) ?? false;
 
   React.useEffect(() => {
     if (trangKhach) return;

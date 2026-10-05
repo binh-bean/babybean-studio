@@ -56,6 +56,7 @@ import {
 } from "@/lib/thong-bao/dung-day";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 export interface ChuongThongBaoProps {
   galleryId: string;
@@ -103,7 +104,7 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
   const taiHopThu = useCallback(async () => {
     setDangTai(true);
     try {
-      const res = await fetch("/api/g/thong-bao-khach", { credentials: "same-origin" });
+      const res = await goiApiKhach("/api/g/thong-bao-khach", { credentials: "same-origin" });
       if (!res.ok) return;
       const json = (await res.json()) as PhanHoiHopThu;
       if (!json.data) return;
@@ -192,7 +193,7 @@ export function ChuongThongBao({ galleryId, status, className }: ChuongThongBaoP
       setDsThongBao((ds) => ds.map((d) => ({ ...d, daDoc: true })));
       setSoChuaDoc(0);
       try {
-        await fetch("/api/g/thong-bao-khach", {
+        await goiApiKhach("/api/g/thong-bao-khach", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",

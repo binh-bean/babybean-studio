@@ -55,6 +55,7 @@ import {
   tomTatDot,
   type DongGioDot,
 } from "./dot-chon-khach";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 /** Máy chủ nhận tối đa 20 cho mỗi dòng (`ChotDotChonSchema`). */
 const SO_LUONG_TOI_DA = 20;
@@ -217,7 +218,7 @@ export function ManChonThemDot({
     setDangGui(true);
     setLoi(null);
     try {
-      const res = await fetch("/api/g/dot-chon/chot", {
+      const res = await goiApiKhach("/api/g/dot-chon/chot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

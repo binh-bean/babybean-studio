@@ -28,6 +28,7 @@ import {
   xoaChoGui,
   TOI_DA_ANH_CHINH_SUA,
 } from "@/lib/gallery/tim-gia-dinh";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 type ChoGui = { them: string[]; bo: string[] };
 
@@ -68,7 +69,7 @@ function ghiLocal(khoa: string, gt: string): void {
 async function guiTim(body: { them?: string[]; bo?: string[] }): Promise<
   { ok: true; cuaToi: string[] | null; chuaApMigration: boolean } | { ok: false; status: number }
 > {
-  const res = await fetch("/api/g/tim-gia-dinh", {
+  const res = await goiApiKhach("/api/g/tim-gia-dinh", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -127,7 +128,7 @@ export function useTimGiaDinh(galleryId: string | undefined, laNguoiXem: boolean
 
     (async () => {
       try {
-        const res = await fetch("/api/g/tim-gia-dinh", { cache: "no-store" });
+        const res = await goiApiKhach("/api/g/tim-gia-dinh", { cache: "no-store" });
         const json = await res.json().catch(() => null);
         if (huy || !res.ok || !json?.data) return;
         if (json.data.chuaApMigration) {

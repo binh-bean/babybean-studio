@@ -19,6 +19,7 @@ import { vi } from "@/i18n";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { useManHinhRong } from "@/components/features/gallery/thanh-chon";
 import { tinhTamTinh } from "@/lib/gallery/tim-gia-dinh";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 const KHOA_NGUOI_DAT = "bb-nguoi-dat-chinh-sua";
 
@@ -77,7 +78,7 @@ export function ThanhDatChinhSua({
     if (!/^0[0-9]{9}$/.test(sdt.trim())) return setLoi("Số điện thoại gồm 10 số, bắt đầu bằng 0 ạ.");
     setDangGui(true);
     try {
-      const res = await fetch("/api/g/tim-gia-dinh/dat-chinh-sua", {
+      const res = await goiApiKhach("/api/g/tim-gia-dinh/dat-chinh-sua", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenNguoiMua: ten.trim(), sdtNguoiMua: sdt.trim(), ghiChu: ghiChu.trim() || null }),

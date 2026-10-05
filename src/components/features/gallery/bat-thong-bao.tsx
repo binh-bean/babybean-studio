@@ -39,6 +39,7 @@ import { BellRing } from "lucide-react";
 import { vi } from "@/i18n";
 import { nhanBietMay } from "@/lib/utils/nhan-biet-may";
 import { isSubmittedOrLater } from "@/lib/gallery-status";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -159,7 +160,7 @@ export function BatThongBao({ galleryId, status, onMoHuongDanLuuApp }: BatThongB
       });
       const json = sub.toJSON();
 
-      const res = await fetch("/api/g/thong-bao", {
+      const res = await goiApiKhach("/api/g/thong-bao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
@@ -181,7 +182,7 @@ export function BatThongBao({ galleryId, status, onMoHuongDanLuuApp }: BatThongB
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
-        await fetch("/api/g/thong-bao", {
+        await goiApiKhach("/api/g/thong-bao", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ endpoint: sub.endpoint }),

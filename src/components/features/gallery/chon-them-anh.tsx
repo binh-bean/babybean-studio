@@ -27,6 +27,7 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatKichThuoc } from "@/lib/utils/dinh-dang";
 import { nhanTrangThaiDotChoKhach, soDotKeTiep, type TrangThaiDot } from "@/lib/gallery/dot-chon";
 import { cumTenBe, dongDauManDot, locNhapConChonDuoc, type DongGioDot } from "./dot-chon-khach";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 // ---------------------------------------------------------------------------
 // Dữ liệu `/api/g/dot-chon` (hợp đồng của DEV-BE, `layTrangThaiDotChoKhach`)
@@ -124,7 +125,7 @@ export function useDotChon(p: {
 
   const taiLai = React.useCallback(async (): Promise<TrangThaiDotKhach | null> => {
     try {
-      const res = await fetch("/api/g/dot-chon", { cache: "no-store" });
+      const res = await goiApiKhach("/api/g/dot-chon", { cache: "no-store" });
       if (!res.ok) return null;
       const json = (await res.json().catch(() => null)) as { data?: TrangThaiDotKhach } | null;
       if (json?.data) {

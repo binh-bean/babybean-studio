@@ -51,6 +51,14 @@ const KHONG_PHAI_LOI_BEAN = new Set([
   // BB-355 — câu anh duyệt NGUYÊN VĂN 01/10/2026 (BB-338 mục 2b, giữ "ạ!" ở cuối), nay
   // dời từ JSX vào `loiBean` để bìa người được mời dùng; câu đầu không thêm "ạ" theo duyệt.
   "gallery.loiBean.nguoiThanGiaiThich",
+  // BB-334B — NHÃN/TIÊU ĐỀ theo bản vẽ đã duyệt (BB-334/ban-ve 01–04), không phải câu:
+  // dòng nhãn hoa, tiêu đề lớn, nút "Về trang album gia đình", tiêu đề tấm chuyển bộ.
+  "gallery.giaDinh.nhanTrang",
+  "gallery.giaDinh.chao",
+  "gallery.giaDinh.chaoChung",
+  "gallery.giaDinh.cacBuoiCuaGiaDinh",
+  "gallery.giaDinh.veTrangGiaDinh",
+  "gallery.giaDinh.albumGiaDinh",
 ]);
 
 function phang(obj: unknown, tien = ""): [string, string][] {

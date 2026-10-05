@@ -129,15 +129,25 @@ import { useHangChoTim } from "@/components/features/gallery/use-hang-cho-tim";
 import { useNutBackDong } from "@/components/features/gallery/use-nut-back-dong";
 import { DaiKhoaTrangThai } from "@/components/features/gallery/dai-khoa-trang-thai";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Info, MessageCircle } from "lucide-react";
+import { AlertTriangle, Info, MessageCircle, LayoutGrid, ArrowLeft, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { ChuyenBoAnh, type GiaDinhTrongBo } from "@/components/features/gallery/chuyen-bo-anh";
+import { duongDanNha, tenBoHienThi } from "@/lib/utils/trang-gia-dinh";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { Spinner } from "@/components/ui/spinner";
 import type { PhotoPublic } from "@/types/domain";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 interface GalleryAppProps {
   token: string;
+  /**
+   * BB-334B — màn chọn ảnh dựng trong trang `/k/<mã>/<n>` (link gia đình):
+   * mọi bộ của nhà + bộ đang mở, cho nút về trang gia đình và bộ chuyển buổi
+   * chụp (bản vẽ 03/04). Không có (đường `/g/<mã>`) = màn y như cũ.
+   */
+  giaDinh?: GiaDinhTrongBo;
 }
 
 interface GalleryApiResponse {
@@ -305,7 +315,7 @@ const CAU_CHUA_CO_HAN_MUC = vi.gallery.loiBean.chuaCoHanMuc;
 /** BB-319 K-D2 — thả tim lúc chưa biết hạn mức: nói rõ tim CÓ được giữ hay không (không), mỗi câu ≤ 12 chữ. */
 const CAU_TIM_CHUA_LUU = `${CAU_CHUA_CO_HAN_MUC} ${vi.gallery.loiBean.timChuaLuu}`;
 
-export function GalleryApp({ token }: GalleryAppProps) {
+export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [photosLoading, setPhotosLoading] = useState(false);
@@ -345,7 +355,9 @@ export function GalleryApp({ token }: GalleryAppProps) {
   // Máy chủ từ chối hẳn một lô gửi lại (4xx): báo và tải lại bộ ảnh cho tim
   // khớp dữ liệu thật. Ref vì loadGallery khai báo SAU và phụ thuộc hangChoTim.
   const taiLaiRef = React.useRef<() => void>(() => {});
-  const hangChoTim = useHangChoTim(token, {
+  // BB-334B — một mã gia đình mở được nhiều bộ: hàng chờ tim ngoại tuyến tách
+  // theo TỪNG bộ, không thì tim chờ gửi của bộ 1 bị gửi lên khi đang ở bộ 2.
+  const hangChoTim = useHangChoTim(giaDinh ? `${token}~${giaDinh.boHienTaiId}` : token, {
     khiBiTuChoi: (_code, message) => {
       setStatusMessage(
         message
@@ -398,6 +410,8 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const [selectedSubfolder, setSelectedSubfolder] = useState<string>("");
   // BB-213 — tấm trượt "Lưu app ra màn hình chính", mở từ nút ở đầu trang.
   const [moHuongDanLuuApp, setMoHuongDanLuuApp] = useState(false);
+  /** BB-334B — bộ chuyển buổi chụp (bản vẽ 03/04), chỉ trên trang /k/<mã>/<n>. */
+  const [moChuyenBo, setMoChuyenBo] = useState(false);
 
   const [selectionCounts, setSelectionCounts] = useState({
     selectedCount: 0,
@@ -764,7 +778,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       // máy chủ không có cách nào biết ba mẹ vừa bấm vào link nào.
       const duongGallery = `/api/g/gallery?token=${encodeURIComponent(token)}`;
 
-      let res = await fetch(duongGallery, { cache: "no-store" });
+      let res = await goiApiKhach(duongGallery, { cache: "no-store" });
 
       // BB-157: phiên CŨ trong máy không được chặn link MỚI trên thanh địa chỉ.
       //
@@ -814,13 +828,15 @@ export function GalleryApp({ token }: GalleryAppProps) {
         if (authRes.ok) {
           // Link gắn theo KHÁCH: phiên vừa ký chưa trỏ vào bộ ảnh nào, vì một
           // khách có nhiều buổi chụp (BB-130). Hỏi ba mẹ trước đã.
-          if (!authData?.data?.galleryId && authData?.data?.customerId) {
+          // BB-334B — trang /k/<mã>/<n> đã nêu bộ bằng `x-bb-bo` (goiApiKhach):
+          // không hỏi lại buổi chụp, gọi lại đúng bộ đó.
+          if (!authData?.data?.galleryId && authData?.data?.customerId && !giaDinh) {
             setPhaiChonBuoiChup(true);
             setLoading(false);
             return;
           }
           // Thử gọi lại gallery sau khi đã có cookie phiên
-          res = await fetch(duongGallery, { cache: "no-store" });
+          res = await goiApiKhach(duongGallery, { cache: "no-store" });
         } else {
           const errCode = authData?.error?.code || "NOT_FOUND";
           setError({
@@ -886,7 +902,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
           const q = new URLSearchParams({ limit: String(limit) });
           if (sau !== undefined) q.set("sau", String(sau));
           if (cursor) q.set("cursor", cursor);
-          const photosRes = await fetch(`/api/g/photos?${q}`, { cache: "no-store" });
+          const photosRes = await goiApiKhach(`/api/g/photos?${q}`, { cache: "no-store" });
           const photosJson = await photosRes.json().catch(() => null);
           if (!photosRes.ok || !Array.isArray(photosJson?.data)) return null;
           return {
@@ -957,7 +973,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
    */
   const decideReview = useCallback(
     async (decision: "approve" | "revise", note?: string) => {
-      const res = await fetch("/api/g/review", {
+      const res = await goiApiKhach("/api/g/review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ decision, note }),
@@ -1038,7 +1054,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       }
 
       try {
-        const res = await fetch("/api/g/selection", {
+        const res = await goiApiKhach("/api/g/selection", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
@@ -1117,7 +1133,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
     async (photo: PhotoPublic, ghiChu: string): Promise<boolean> => {
       if (isLocked) return false;
       try {
-        const res = await fetch("/api/g/selection", {
+        const res = await goiApiKhach("/api/g/selection", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(buildGhiChuPayload(photo.id, ghiChu, crypto.randomUUID())),
@@ -1244,7 +1260,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
 
     setSubmitting(true);
     try {
-      const res = await fetch("/api/g/submit", {
+      const res = await goiApiKhach("/api/g/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1592,7 +1608,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         });
       apDung(add);
       try {
-        const res = await fetch("/api/g/placements", {
+        const res = await goiApiKhach("/api/g/placements", {
           method: add ? "POST" : "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ photoId, galleryItemId }),
@@ -1648,7 +1664,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
     async (productId: string, soLuong: number, photoId?: string | null): Promise<boolean> => {
       setPlacing(true);
       try {
-        const res = await fetch("/api/g/addons", {
+        const res = await goiApiKhach("/api/g/addons", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ productId, quantity: soLuong, photoId: photoId ?? null }),
@@ -1684,7 +1700,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
       if (photoIds.length === 0) return false;
       setPlacing(true);
       try {
-        const res = await fetch("/api/g/addons", {
+        const res = await goiApiKhach("/api/g/addons", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ productId, quantity: soLuong, photoIds }),
@@ -1724,7 +1740,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
   const guiXinSuaLai = useCallback(async () => {
     setDangXin(true);
     try {
-      const res = await fetch("/api/g/xin-sua-lai", {
+      const res = await goiApiKhach("/api/g/xin-sua-lai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lyDo: lyDoSuaLai.trim() }),
@@ -1752,7 +1768,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
     async (photoId: string, addonId: string, dat: boolean) => {
       setPlacing(true);
       try {
-        const res = await fetch("/api/g/placements", {
+        const res = await goiApiKhach("/api/g/placements", {
           method: dat ? "POST" : "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ photoId, addonId }),
@@ -1788,7 +1804,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         // thuộc lượt chọn này". Đẩy hàng chờ lên trước (Opus soát BB-202 —
         // e2e bắt được sau khi áp 0075).
         await hangChoTim.guiNgay();
-        const res = await fetch("/api/g/album-cover", {
+        const res = await goiApiKhach("/api/g/album-cover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ galleryItemId, photoId }),
@@ -2282,7 +2298,19 @@ export function GalleryApp({ token }: GalleryAppProps) {
           ô TRÁI cho cân, bên phải còn tải + chuông. Máy tính: về cụm phải.
         */}
         <div className="flex items-center justify-self-start lg:hidden">
-          {gallery.branch.chatUrl && (
+          {/* BB-334B (anh chốt Q4 ★) — trên link gia đình, góc trái là nút về trang gia đình
+              thay biểu tượng chat; chat vẫn có ở bìa (BiaBoAnh) và đầu trang máy tính. */}
+          {giaDinh ? (
+            <Link
+              href={duongDanNha(giaDinh.ma)}
+              aria-label={vi.gallery.giaDinh.veTrangGiaDinh}
+              title={vi.gallery.giaDinh.veTrangGiaDinh}
+              data-testid="nut-ve-gia-dinh"
+              className="grid h-10 w-10 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
+            >
+              <LayoutGrid className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+            </Link>
+          ) : gallery.branch.chatUrl && (
             <a
               href={gallery.branch.chatUrl}
               target="_blank"
@@ -2295,6 +2323,16 @@ export function GalleryApp({ token }: GalleryAppProps) {
             </a>
           )}
         </div>
+        {giaDinh && (
+          <Link
+            href={duongDanNha(giaDinh.ma)}
+            data-testid="nut-ve-gia-dinh-may-tinh"
+            className="hidden items-center gap-2 text-[15px] font-medium text-foreground transition hover:opacity-80 lg:inline-flex lg:w-[200px]"
+          >
+            <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={1.5} aria-hidden="true" />
+            {vi.gallery.giaDinh.albumGiaDinh}
+          </Link>
+        )}
         {/*
           BB-306 — logo hạt đậu đứng TRƯỚC chữ, căn giữa dọc theo chữ
           (`items-center`). `data-testid="ten-thuong-hieu"` VÀ `justify-self-center`
@@ -2303,21 +2341,49 @@ export function GalleryApp({ token }: GalleryAppProps) {
           cụm thương hiệu, không phải căn giữa riêng chữ nữa (logo cố định
           gắn liền chữ là thay đổi thiết kế có chủ đích, không phải hồi quy).
         */}
-        <span
-          data-testid="ten-thuong-hieu"
-          className="inline-flex items-center gap-[8px] justify-self-center lg:gap-[7px]"
-        >
-          <img
-            data-testid="logo-hat-dau"
-            src="/brand/logo-hat-dau-64.png"
-            alt=""
-            aria-hidden="true"
-            className="h-[23px] w-[23px] shrink-0 lg:h-[21px] lg:w-[21px]"
-          />
-          <span className="font-display text-[20px] uppercase tracking-[0.14em] text-[#2e2a27] lg:text-[18px] lg:tracking-[0.12em]">
-            Baby Bean
-          </span>
-        </span>
+        {(() => {
+          const thuongHieu = (
+            <span
+              data-testid="ten-thuong-hieu"
+              className="inline-flex items-center gap-[8px] justify-self-center lg:gap-[7px]"
+            >
+              <img
+                data-testid="logo-hat-dau"
+                src="/brand/logo-hat-dau-64.png"
+                alt=""
+                aria-hidden="true"
+                className="h-[23px] w-[23px] shrink-0 lg:h-[21px] lg:w-[21px]"
+              />
+              <span className="font-display text-[20px] uppercase tracking-[0.14em] text-[#2e2a27] lg:text-[18px] lg:tracking-[0.12em]">
+                Baby Bean
+              </span>
+            </span>
+          );
+          if (!giaDinh) return thuongHieu;
+          // BB-334B (bản vẽ 03/04) — tên bộ đang mở ngay dưới logo, bấm để đổi buổi chụp.
+          const boDangMo = giaDinh.boAnh.find((b) => b.id === giaDinh.boHienTaiId);
+          return (
+            <div className="flex min-w-0 flex-col items-center justify-self-center">
+              {thuongHieu}
+              <button
+                type="button"
+                data-testid="nut-doi-buoi-chup"
+                aria-haspopup="dialog"
+                aria-expanded={moChuyenBo}
+                aria-label={vi.gallery.giaDinh.doiBuoiChup}
+                onClick={() => setMoChuyenBo((v) => !v)}
+                className="mt-1 inline-flex max-w-[220px] items-center gap-1 rounded-full px-2 py-0.5 text-[13px] font-medium text-[#2e2a27] transition hover:bg-surface-2 lg:mt-1.5 lg:max-w-[320px] lg:bg-[#f3ede6] lg:px-3 lg:py-1"
+              >
+                <span className="truncate">{boDangMo ? tenBoHienThi(boDangMo) : vi.gallery.giaDinh.doiBuoiChup}</span>
+                <ChevronDown
+                  className={cn("h-4 w-4 shrink-0 transition-transform", moChuyenBo && "rotate-180")}
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+          );
+        })()}
         <div className="flex items-center justify-self-end gap-1">
           {/*
             BB-281 — "Nhắn cho studio" thu thành biểu tượng (trước là pill có
@@ -2502,7 +2568,16 @@ export function GalleryApp({ token }: GalleryAppProps) {
             data-testid="bieu-tuong-hang-dinh-trai"
             className={cn("flex items-center justify-self-start", dauTrangConThay && "invisible")}
           >
-            {gallery.branch.chatUrl && (
+            {giaDinh ? (
+              <Link
+                href={duongDanNha(giaDinh.ma)}
+                aria-label={vi.gallery.giaDinh.veTrangGiaDinh}
+                title={vi.gallery.giaDinh.veTrangGiaDinh}
+                className="grid h-11 w-11 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
+              >
+                <LayoutGrid className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
+              </Link>
+            ) : gallery.branch.chatUrl && (
               <a
                 href={gallery.branch.chatUrl}
                 target="_blank"
@@ -2535,7 +2610,23 @@ export function GalleryApp({ token }: GalleryAppProps) {
                 Baby Bean
               </span>
             </span>
-            {tenBeHienThi && (
+            {giaDinh ? (
+              <button
+                type="button"
+                onClick={() => setMoChuyenBo(true)}
+                aria-haspopup="dialog"
+                aria-label={vi.gallery.giaDinh.doiBuoiChup}
+                className="mt-0.5 inline-flex max-w-[190px] items-center gap-0.5 text-[12px] leading-none text-muted-foreground"
+              >
+                <span className="truncate">
+                  {(() => {
+                    const b = giaDinh.boAnh.find((x) => x.id === giaDinh.boHienTaiId);
+                    return b ? tenBoHienThi(b) : tenBeHienThi;
+                  })()}
+                </span>
+                <ChevronDown className="h-3 w-3 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+              </button>
+            ) : tenBeHienThi && (
               <span
                 data-testid="ten-be-thanh-dinh"
                 className="mt-0.5 max-w-[190px] truncate text-[12px] leading-none text-muted-foreground"
@@ -4128,6 +4219,7 @@ export function GalleryApp({ token }: GalleryAppProps) {
         trên `biaRef` — không còn ở đây).
       */}
       <HuongDanThemManHinh mo={moHuongDanLuuApp} onDong={() => setMoHuongDanLuuApp(false)} laNguoiXem={laNguoiXem} />
+      {giaDinh && <ChuyenBoAnh giaDinh={giaDinh} mo={moChuyenBo} onDong={() => setMoChuyenBo(false)} />}
     </div>
   );
 }

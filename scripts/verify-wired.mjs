@@ -63,7 +63,7 @@ for (const file of files) {
   //    Debounce và animation không nằm trong hàm tên handleSubmit.
   const handlers = [...code.matchAll(/(?:function\s+|const\s+)(handle[A-Z]\w*)[^{]*\{([\s\S]{0,900}?)\n\s{2}\}/g)];
   for (const [, name, body] of handlers) {
-    if (/setTimeout\s*\(/.test(body) && !/fetch\s*\(/.test(body)) {
+    if (/setTimeout\s*\(/.test(body) && !/(?:fetch|goiApiKhach)\s*\(/.test(body)) {
       report(file, "Hàm xử lý giả vờ gọi mạng", `${name}() dùng setTimeout mà không fetch`);
     }
   }
@@ -134,7 +134,9 @@ for (const file of files) {
   const mangQuaThamSoDatTenKieu = kieuCoMang.some((ten) =>
     new RegExp("\\}\\s*:\\s*" + ten + "\\b").test(code));
 
-  const getsData = /fetch\s*\(|use[A-Z]\w*Query|props\./.test(code)
+  // BB-334B — `goiApiKhach(...)` (src/lib/utils/goi-api-khach.ts) là `fetch` của màn khách
+  // (thêm tiêu đề `x-bb-bo`), gọi mạng THẬT như fetch.
+  const getsData = /(?:fetch|goiApiKhach)\s*\(|use[A-Z]\w*Query|props\./.test(code)
     || mangTrongChuKy || mangQuaKieuDatTen || mangQuaThamSoDatTenKieu;
   if (showsList && !getsData) {
     report(file, "Hiển thị danh sách mà không có nguồn dữ liệu", "không fetch, không nhận qua props");

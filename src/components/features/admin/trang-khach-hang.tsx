@@ -15,6 +15,7 @@ import Link from "next/link";
 import { PageHeader, CARD_TITLE_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
 import { NutNhanKhach } from "./nut-nhan-khach";
+import { KhoiLinkGiaDinh } from "./khoi-link-gia-dinh";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatNgayVN, formatSdt, formatSo } from "@/lib/utils/dinh-dang";
@@ -117,6 +118,8 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-start">
         <div className="flex min-w-0 flex-col gap-6">
+          {/* BB-334C — link app chung của gia đình (bản vẽ 05/06). 403 → khối tự ẩn. */}
+          <KhoiLinkGiaDinh customerId={customerId} chatUrl={khach.chatUrl} />
           <section className={KHUNG}>
             <h2 className={CARD_TITLE_CLASS}>Thông tin khách</h2>
             <dl className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">

@@ -42,7 +42,7 @@ Ngày cắt, theo đúng thứ tự:
 
 ☐ 1. Sao lưu bb-prod (mục 1).
 ☐ 2. So khoảng lệch migration — chỉ đọc (mục 2).
-☐ 3. Áp migration, gồm cả 0086–0089 (mục 3, 3a). `verify:db` ra đủ N/N.
+☐ 3. Áp migration, gồm cả 0086–0090 (mục 3, 3a). `verify:db` ra đủ N/N.
 ☐ 4. Storage (mục 4) · Auth (mục 5) · webhook Lark thật (mục 5a) · tài khoản quản
    trị đầu tiên (mục 5b) · Realtime (mục 5c).
 ☐ 5. Chép cấu hình (mục 6), rồi kiểm cờ thu sản phẩm đang TẮT (mục 6a).
@@ -194,6 +194,7 @@ Bản cũ của runbook chỉ nhắc 0067–0075. Dãy đầy đủ từ lúc b�
 | 0087 | Hai chỉ mục cho bộ dọn dữ liệu (`activity_logs.created_at`, `notifications`) (BB-356). Đã áp bb-dev |
 | 0088 | Thu gọn ảnh bộ cũ: cột `trang_thai_tu`, `danh_sach_thu_gon_luc`, `so_anh_truoc_thu_gon`, `mo_lai_anh_luc`, `mo_link_cuoi_luc`; hàm `nhan_mo_lai_anh`; viết lại `tang_luot_mo_link` (BB-357/359/363). **CHƯA áp bb-dev — cố ý** |
 | 0089 | Dựng lại 4 chỉ mục bảng `photos` (REINDEX, không đổi định nghĩa) (BB-357). **CHƯA áp bb-dev — cố ý** |
+| 0090 | Link gia đình: chỉ mục duy nhất "một link gia đình còn sống/khách", cột `galleries.so_thu_tu_khach` + trigger `gan_so_thu_tu_khach` (BB-334A). **CHƯA áp bb-dev** — `migrate-prod` không áp riêng từng tệp, mà bb-dev không áp 0088/0089; app chạy được khi thiếu (máy chủ tự tính số thứ tự đúng cách 0090 điền ngược) |
 
 (Đầu tệp 0083 vẫn ghi "viết nhưng chưa áp" — câu đó đã cũ, bb-dev áp từ 01/10.
 Đầu tệp 0086/0087 cũng ghi "chưa áp" — đã cũ, bb-dev áp từ 02/10.)
@@ -201,15 +202,15 @@ Bản cũ của runbook chỉ nhắc 0067–0075. Dãy đầy đủ từ lúc b�
 ☐ 1. `npm run db:so-migration -- --dich .env.prod.local` liệt kê **đủ** các số
    trên trong mục "Tệp migration đích còn thiếu" (cộng dãy 0045–0075).
 ☐ 2. Sau `--thuc-thi`, chạy lại lệnh đó: "còn thiếu" = **0**.
-☐ 3. `node --env-file=.env.prod.local scripts/verify-db.mjs` ra **27/27** (từ
-   BB-363; trước đó 23), và riêng các dòng "Bảng mới: …", "23 cột mới …", "Hàm
-   viết lại …", "0086: …", "0087: …" đều ĐẠT. Trên bb-prod sau bước 3, hai dòng
-   "0088: …" và "0089: …" phải ghi **"đã áp"**. Nếu ghi "CHỜ CẮT" nghĩa là bước 3
+☐ 3. `node --env-file=.env.prod.local scripts/verify-db.mjs` ra **28/28** (từ
+   BB-334A; 27 từ BB-363; trước đó 23), và riêng các dòng "Bảng mới: …", "23 cột mới …", "Hàm
+   viết lại …", "0086: …", "0087: …" đều ĐẠT. Trên bb-prod sau bước 3, ba dòng
+   "0088: …", "0089: …" và "0090: …" phải ghi **"đã áp"**. Nếu ghi "CHỜ CẮT" nghĩa là bước 3
    chưa áp chúng: DỪNG, báo Claude. (Trên bb-dev hai dòng đó ghi "CHỜ CẮT" và
    vẫn ĐẠT — đúng kế hoạch.) Dòng "0088" ghi "ÁP NỬA VỜI" là HỎNG: DỪNG.
 ☐ 4. Không có 0078 / 0084 trong danh sách thiếu (nếu công cụ đòi chúng: DỪNG,
    báo Claude — đó là lỗi của công cụ, không phải tệp thiếu).
-☐ 5. **0088 và 0089 áp NGAY Ở BƯỚC NÀY, cùng mọi tệp khác** (BB-363 chọn cách
+☐ 5. **0088, 0089 và 0090 áp NGAY Ở BƯỚC NÀY, cùng mọi tệp khác** (BB-363 chọn cách
    này: viết lại tài liệu cho khớp `migrate-prod`, KHÔNG thêm cờ giữ lại). Lý do:
    - `migrate-prod` áp mọi tệp còn thiếu theo thứ tự, mỗi tệp một giao dịch.
      Thêm cờ giữ lại là thêm một thứ người làm có thể quên gõ.

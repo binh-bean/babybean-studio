@@ -76,6 +76,7 @@ import { duocMoiMuaLanHai } from "@/lib/gallery/moi-mua-lan-hai-rules";
 import { tranhCuaSanPham } from "@/lib/products/tranh-san-pham";
 import { formatKichThuoc, tenSanPhamChoKhach } from "@/lib/utils/dinh-dang";
 import { useNutBackDong } from "./use-nut-back-dong";
+import { goiApiKhach } from "@/lib/utils/goi-api-khach";
 
 export interface MonTrongDanhMuc {
   productId: string;
@@ -168,7 +169,7 @@ export function MoiMuaLanHai({
     let huy = false;
     void (async () => {
       try {
-        const res = await fetch("/api/g/mua-them", { cache: "no-store" });
+        const res = await goiApiKhach("/api/g/mua-them", { cache: "no-store" });
         if (!res.ok || huy) return;
         const json = (await res.json().catch(() => null)) as {
           data?: { items?: { id: string; trangThai: string }[] };
@@ -224,7 +225,7 @@ export function MoiMuaLanHai({
     setDangGui(true);
     setLoi(null);
     try {
-      const res = await fetch("/api/g/mua-them", {
+      const res = await goiApiKhach("/api/g/mua-them", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
