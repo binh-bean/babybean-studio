@@ -11,7 +11,8 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { maLarkConHieuLuc } from "@/lib/gallery-status";
 import { dangCheDoChonThem } from "@/lib/gallery/dot-chon";
@@ -19,10 +20,10 @@ import { layTrangThaiDotChoKhach } from "@/lib/gallery/dot-chon-server";
 
 export const runtime = "nodejs";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
     const admin = createAdminClient();
 
     const { data: gallery } = await admin

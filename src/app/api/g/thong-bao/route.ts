@@ -17,7 +17,8 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DangKyThongBaoSchema, HuyThongBaoSchema } from "./schema";
 
@@ -29,7 +30,7 @@ export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
 
     const jsonBody = await readJsonBody(request);
     if (!jsonBody.ok) {
@@ -82,7 +83,7 @@ export async function DELETE(request: Request): Promise<Response> {
 
   try {
     // Vẫn đòi phiên hợp lệ — huỷ đăng ký không phải thao tác công khai.
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
 
     const jsonBody = await readJsonBody(request);
     if (!jsonBody.ok) {

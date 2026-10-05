@@ -14,7 +14,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { NextResponse, after } from "next/server";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { batDauDongBo, dongBoBoAnh, ghiLoiDongBo } from "@/lib/drive/sync-gallery";
@@ -26,10 +27,10 @@ import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
     const admin = createAdminClient();
     return ok({ thuGon: await boDangThuGon(admin, session.galleryId) });
   } catch (err) {
@@ -38,10 +39,10 @@ export async function GET(): Promise<Response> {
   }
 }
 
-export async function POST(): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
-    const session = await requireGallerySession(VAI_MO_LAI_ANH);
+    const session = await requirePhienBoAnh(request, VAI_MO_LAI_ANH);
     const galleryId = session.galleryId;
     const admin = createAdminClient();
 

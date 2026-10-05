@@ -25,7 +25,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import { TOI_DA_ANH_CHINH_SUA } from "@/lib/gallery/tim-gia-dinh";
@@ -55,10 +56,10 @@ async function demAnhThuocBo(
   return dem;
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
     const admin = createAdminClient();
 
     if (session.role === "viewer") {
@@ -81,7 +82,7 @@ export async function GET(): Promise<Response> {
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
     if (session.role !== "viewer") {
       return fail("FORBIDDEN", "Ba mẹ thả tim ở danh sách chọn ảnh của mình ạ");
     }

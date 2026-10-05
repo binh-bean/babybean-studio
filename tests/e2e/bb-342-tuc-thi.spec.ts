@@ -145,7 +145,14 @@ test.describe.serial("BB-342: cập nhật tức thì khách ↔ nhân viên", (
         await pg.query("delete from staff_branches where staff_id = $1", [userId]);
         await pg.query("delete from staff_profiles where id = $1", [userId]);
       }
-      if (branchId) await pg.query("delete from branches where id = $1", [branchId]).catch(() => {});
+      if (branchId) {
+        // Chốt đợt sinh thông báo/nhật ký theo CHI NHÁNH — còn dòng thì xoá chi nhánh
+        // hỏng khoá ngoại, và chi nhánh thử rỗng đứng đầu `branches limit 1` làm
+        // bb-196 đỏ (đã gặp 05/10). Dọn trước, và KHÔNG nuốt lỗi (BB-352).
+        await pg.query("delete from notifications where branch_id = $1", [branchId]);
+        await pg.query("delete from activity_logs where branch_id = $1", [branchId]);
+        await pg.query("delete from branches where id = $1", [branchId]);
+      }
       await pg.end();
     }
     if (userId) await quanTriSupabase().auth.admin.deleteUser(userId);
@@ -185,7 +192,7 @@ test.describe.serial("BB-342: cập nhật tức thì khách ↔ nhân viên", (
       const man = khach.getByTestId("man-chon-them-anh");
       await expect(man).toBeVisible();
       await man.getByRole("button", { name: "Chọn ảnh này" }).first().evaluate((el) => (el as HTMLElement).click());
-      await expect(man.getByTestId("cau-tong-dot")).toContainText("1 ảnh mới");
+      await expect(man.getByTestId("cau-tong-dot")).toContainText("1 tấm mới"); // BB-362 đổi chữ "ảnh mới" → "tấm mới" (dot-chon-khach.ts)
       await man.getByTestId("nut-chot-dot").click();
       const hop = khach.getByTestId("hop-xac-nhan-dot");
       await expect(hop).toBeVisible();

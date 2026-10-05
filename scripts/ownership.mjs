@@ -46,6 +46,9 @@ export const PROTECTED = [
   "scripts/verify-build.mjs",
   "scripts/verify-prod.mjs",
   "scripts/verify-wired.mjs",
+  // Ruột của verify:db (danh sách bảng/cột/hàm của dãy migration mới, kiem0090) —
+  // sửa được nó là sửa được cổng chấm mình.
+  "scripts/lib/kiem-cau-truc-day-moi.mjs",
 ];
 
 export const OWNERSHIP = {
@@ -68,6 +71,12 @@ export const OWNERSHIP = {
     "src/app/api/**",
     "src/lib/selection/**",
     "src/lib/supabase/**",
+    // BB-334A — lõi link gia đình (tra mã, tạo/đổi/thu hồi, danh sách bộ của nhà)
+    // và phần cắt icon bìa dùng chung của /api/g|k/…/bia-vuong: chỉ route API gọi.
+    "src/lib/gia-dinh/**",
+    "src/lib/gallery/bia-vuong-server.ts",
+    // BB-334A — chạy thử tạo link gia đình cho khách có bộ mới (mặc định không ghi).
+    "scripts/tao-link-gia-dinh.mjs",
     "scripts/db-seed.mjs",
     "scripts/db-push.mjs",
   ],

@@ -17,7 +17,8 @@ import { vi } from "@/i18n";
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { SubmitSelectionSchema } from "./schema";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
@@ -101,7 +102,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     // 1. Xác thực phiên khách hàng
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
 
     // Chỉ khách chính (owner) mới có quyền chốt
     if (session.role !== "owner") {

@@ -67,7 +67,7 @@ describe("BB-342: khách bộ B không nghe được sự kiện của bộ A", 
   }
 
   async function kenhTraVe(): Promise<{ status: number; kenh: string[] }> {
-    const res = await layKenhKhach();
+    const res = await layKenhKhach(new Request("http://localhost/api/g/tuc-thi"));
     const json = (await res.json().catch(() => null)) as { data?: { kenh?: string[] } } | null;
     return { status: res.status, kenh: json?.data?.kenh ?? [] };
   }

@@ -296,10 +296,10 @@ describe("(d) link mời mã hoá", () => {
 
   it("viewer không xem/tạo được link mời; ba mẹ A không thấy link của B", async () => {
     phien(A, "viewer");
-    expect((await moiGet()).status).toBe(403);
+    expect((await moiGet(new Request("http://localhost/api/g/moi-nguoi-than"))).status).toBe(403);
     expect((await moiPost(post("/api/g/moi-nguoi-than", { nhan: "Ông ngoại" }))).status).toBe(403);
     phien(A, "owner");
-    const res = await moiGet();
+    const res = await moiGet(new Request("http://localhost/api/g/moi-nguoi-than"));
     expect(res.status).toBe(200);
     const items = ((await res.json()) as { data: { items: { id: string; duongDan: string | null; expiresAt: string }[] } }).data.items;
     expect(items.map((i) => i.id)).not.toContain(B.viewerLinkId);

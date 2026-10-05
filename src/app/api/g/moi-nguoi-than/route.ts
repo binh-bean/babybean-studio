@@ -59,7 +59,8 @@ import { vi } from "@/i18n";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MoiNguoiThanSchema } from "./schema";
 import { diaChiDayDu } from "@/lib/lark/ghi-link-app";
@@ -86,11 +87,27 @@ const bam = (s: string) => createHash("sha256").update(s).digest("hex");
  */
 const DUOC_MOI: readonly string[] = ["owner", "co_editor"];
 
+/**
+ * BB-334A — phạm vi lời mời. Phiên link GIA ĐÌNH (customerId) mời theo KHÁCH:
+ * ông bà thấy mọi bộ, kể cả bộ sau này (anh chốt Q6 ★); giới hạn 5 link sống /
+ * 10 lượt tạo mỗi ngày tính theo khách. Phiên link cũ theo bộ: y như trước.
+ */
+function phamVi(session: { customerId: string; galleryId: string }): {
+  theoKhach: boolean;
+  cot: "customer_id" | "gallery_id";
+  id: string;
+  tienTo: "/k/" | "/g/";
+} {
+  return session.customerId
+    ? { theoKhach: true, cot: "customer_id", id: session.customerId, tienTo: "/k/" }
+    : { theoKhach: false, cot: "gallery_id", id: session.galleryId, tienTo: "/g/" };
+}
+
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request, undefined, { khongCanBoAnh: true });
 
     if (!DUOC_MOI.includes(session.role)) {
       return fail("FORBIDDEN", "Người được mời không mời tiếp được người khác");
@@ -108,15 +125,18 @@ export async function POST(request: Request): Promise<Response> {
     const { nhan } = parsed.data;
 
     const admin = createAdminClient();
+    const pv = phamVi(session);
 
-    // 1. Bộ ảnh phải tồn tại.
-    const { data: gallery, error: galleryError } = await admin
-      .from("galleries")
-      .select("id")
-      .eq("id", session.galleryId)
-      .maybeSingle();
-    if (galleryError || !gallery) {
-      return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
+    // 1. Bộ ảnh phải tồn tại (link gia đình: mời theo KHÁCH, không cần bộ — Q6 ★).
+    if (!pv.theoKhach) {
+      const { data: gallery, error: galleryError } = await admin
+        .from("galleries")
+        .select("id")
+        .eq("id", session.galleryId)
+        .maybeSingle();
+      if (galleryError || !gallery) {
+        return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
+      }
     }
 
     // 2. Hạn dùng: chép nguyên từ link đang đăng nhập (link của ba mẹ).
@@ -133,7 +153,7 @@ export async function POST(request: Request): Promise<Response> {
     const { count: soLinkHoatDong, error: demHoatDongError } = await admin
       .from("share_links")
       .select("id", { count: "exact", head: true })
-      .eq("gallery_id", session.galleryId)
+      .eq(pv.cot, pv.id)
       .eq("role", "viewer")
       .eq("status", "active");
     if (demHoatDongError) throw demHoatDongError;
@@ -148,7 +168,7 @@ export async function POST(request: Request): Promise<Response> {
     const { count: soTaoTrongNgay, error: demNgayError } = await admin
       .from("share_links")
       .select("id", { count: "exact", head: true })
-      .eq("gallery_id", session.galleryId)
+      .eq(pv.cot, pv.id)
       .eq("role", "viewer")
       .gte("created_at", hai4GioTruoc);
     if (demNgayError) throw demNgayError;
@@ -164,7 +184,8 @@ export async function POST(request: Request): Promise<Response> {
     const { data: link, error: insertError } = await admin
       .from("share_links")
       .insert({
-        gallery_id: session.galleryId,
+        // BB-334A — link gia đình mời CẢ NHÀ (customer_id); link theo bộ mời đúng bộ đó.
+        [pv.cot]: pv.id,
         token_hash: bam(ma),
         token_prefix: ma.slice(0, 6),
         role: "viewer",
@@ -203,13 +224,13 @@ export async function POST(request: Request): Promise<Response> {
       actor_id: session.selectionId,
       actor_label: "Customer",
       action: "moi_nguoi_than.tao",
-      entity_type: "gallery",
-      entity_id: session.galleryId,
+      entity_type: pv.theoKhach ? "customer" : "gallery",
+      entity_id: pv.id,
       metadata: { shareLinkId: link.id, tokenPrefix: ma.slice(0, 6), nhan },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
-    const duongDan = `/g/${ma}`;
+    const duongDan = `${pv.tienTo}${ma}`;
 
     return NextResponse.json(
       {
@@ -233,11 +254,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request, undefined, { khongCanBoAnh: true });
 
     if (!DUOC_MOI.includes(session.role)) {
       return fail("FORBIDDEN", "Người được mời không xem được danh sách này");
@@ -247,7 +268,7 @@ export async function GET(): Promise<Response> {
     const { data, error } = await admin
       .from("share_links")
       .select("id, label, status, created_at, expires_at, revoked_at, token_hash")
-      .eq("gallery_id", session.galleryId)
+      .eq(phamVi(session).cot, phamVi(session).id)
       .eq("role", "viewer")
       .order("created_at", { ascending: false });
     if (error) throw error;
@@ -284,7 +305,7 @@ export async function GET(): Promise<Response> {
         data: {
           items: (data ?? []).map((d) => {
             const ma = maTheoLink.get(d.id);
-            const duongDan = ma ? `/g/${ma}` : null;
+            const duongDan = ma ? `${phamVi(session).tienTo}${ma}` : null;
             return {
               id: d.id,
               nhan: d.label,
@@ -313,7 +334,7 @@ export async function DELETE(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request, undefined, { khongCanBoAnh: true });
 
     if (!DUOC_MOI.includes(session.role)) {
       return fail("FORBIDDEN", "Người được mời không thu hồi được lời mời");
@@ -331,7 +352,7 @@ export async function DELETE(request: Request): Promise<Response> {
       .from("share_links")
       .select("id, status")
       .eq("id", id)
-      .eq("gallery_id", session.galleryId)
+      .eq(phamVi(session).cot, phamVi(session).id)
       .eq("role", "viewer")
       .maybeSingle();
     if (findError) throw findError;
@@ -350,8 +371,8 @@ export async function DELETE(request: Request): Promise<Response> {
       actor_id: session.selectionId,
       actor_label: "Customer",
       action: "moi_nguoi_than.thu_hoi",
-      entity_type: "gallery",
-      entity_id: session.galleryId,
+      entity_type: phamVi(session).theoKhach ? "customer" : "gallery",
+      entity_id: phamVi(session).id,
       metadata: { shareLinkId: id },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);

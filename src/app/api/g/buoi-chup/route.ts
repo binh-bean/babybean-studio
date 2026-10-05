@@ -56,6 +56,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { GalleryStatus } from "@/types/domain";
 import { ChonBuoiChupSchema } from "./schema";
+import { layHoacTaoLuotChon } from "@/lib/selection/luot-chon-theo-link";
 
 export const runtime = "nodejs";
 
@@ -226,6 +227,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       shareLinkId: session.shareLinkId,
       galleryId: buoi.id as string,
       laKhachChinh: session.role === "owner",
+      laLinkGiaDinh: true,
     });
 
     // Ghi trượt thật sự không quan trọng: chỉ là timestamp cập nhật lần xem cuối,
@@ -265,55 +267,5 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 }
 
-/**
- * Lượt chọn của cặp (link, bộ ảnh) — có thì lấy, chưa có thì tạo.
- *
- * MỘT lượt chọn cho mỗi CẶP, không phải mỗi link. Chỉ số cũ
- * `uq_selections_share_link` khoá theo link, đúng khi một link chỉ mở một bộ
- * ảnh; với link theo khách thì buổi chụp thứ hai ba mẹ bấm vào sẽ đâm vào lỗi
- * trùng khoá. Migration `0040` nới thành `(share_link_id, gallery_id)`.
- *
- * Tạo lúc ba mẹ bấm vào chứ không phải lúc tạo link: một khách có thể có mười
- * buổi chụp mà chỉ mở hai, và tám lượt chọn rỗng kia chỉ làm báo cáo đếm nhầm.
- */
-async function layHoacTaoLuotChon(
-  admin: ReturnType<typeof createAdminClient>,
-  args: { shareLinkId: string; galleryId: string; laKhachChinh: boolean },
-): Promise<string> {
-  const { data: daCo } = await admin
-    .from("selections")
-    .select("id")
-    .eq("share_link_id", args.shareLinkId)
-    .eq("gallery_id", args.galleryId)
-    .maybeSingle();
-
-  if (daCo) return daCo.id as string;
-
-  // `uq_selections_primary` chỉ cho MỘT lượt chọn chính trên mỗi bộ ảnh. Nếu
-  // bộ này đã có lượt chọn chính từ một link khác (ví dụ link kiểu cũ gửi
-  // trước đó), đặt thêm cái nữa là lỗi trùng khoá — mà lỗi đó rơi đúng vào lúc
-  // ba mẹ bấm vào xem ảnh.
-  let laChinh = args.laKhachChinh;
-  if (laChinh) {
-    const { data: chinhSan } = await admin
-      .from("selections")
-      .select("id")
-      .eq("gallery_id", args.galleryId)
-      .eq("is_primary", true)
-      .maybeSingle();
-    if (chinhSan) laChinh = false;
-  }
-
-  const { data: taoMoi, error } = await admin
-    .from("selections")
-    .insert({
-      gallery_id: args.galleryId,
-      share_link_id: args.shareLinkId,
-      is_primary: laChinh,
-    })
-    .select("id")
-    .single();
-
-  if (error || !taoMoi) throw error ?? new Error("Tạo lượt chọn không trả về gì");
-  return taoMoi.id as string;
-}
+// Lượt chọn theo cặp (link, bộ ảnh): src/lib/selection/luot-chon-theo-link.ts (BB-334A tách ra
+// để /api/g/* dùng chung một luật).

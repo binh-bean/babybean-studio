@@ -36,12 +36,56 @@ export function gopTimLanDau(input: {
   local: readonly string[];
   server: readonly string[];
   daDua: boolean;
-}): { hienThi: string[]; canDua: string[] } {
+  /**
+   * Cú chạm CHƯA được máy chủ xác nhận (hàng chờ trong trình duyệt). Thả tim rồi
+   * tải lại / đóng tab ngay thì lượt POST có thể bị huỷ giữa đường hoặc chưa
+   * ghi xong: máy chủ chưa có tấm đó, nên nếu chỉ tin máy chủ thì tim MẤT
+   * (e2e bb-338 "2c" bắt được, 05/10). Hàng chờ thắng máy chủ cho đúng những
+   * tấm này, và được gửi lại.
+   */
+  choGui?: { them: readonly string[]; bo: readonly string[] };
+}): { hienThi: string[]; canDua: string[]; canBo: string[] } {
   const server = Array.from(new Set(input.server));
-  if (input.daDua) return { hienThi: server, canDua: [] };
   const coTrenServer = new Set(server);
-  const canDua = Array.from(new Set(input.local)).filter((id) => !coTrenServer.has(id));
-  return { hienThi: [...server, ...canDua], canDua };
+  const choThem = Array.from(new Set(input.choGui?.them ?? []));
+  const choBo = new Set(input.choGui?.bo ?? []);
+
+  if (input.daDua) {
+    const canDua = choThem.filter((id) => !coTrenServer.has(id) && !choBo.has(id));
+    const canBo = [...choBo].filter((id) => coTrenServer.has(id));
+    const hienThi = [...server.filter((id) => !choBo.has(id)), ...canDua];
+    return { hienThi, canDua, canBo };
+  }
+  const canDua = Array.from(new Set([...input.local, ...choThem])).filter(
+    (id) => !coTrenServer.has(id) && !choBo.has(id),
+  );
+  const canBo = [...choBo].filter((id) => coTrenServer.has(id));
+  return { hienThi: [...server.filter((id) => !choBo.has(id)), ...canDua], canDua, canBo };
+}
+
+/** Khoá hàng chờ cú chạm tim chưa được máy chủ xác nhận (BB-334A, vá BB-345). */
+export function khoaTimChoGui(galleryId: string): string {
+  return `bb-tim-nguoi-xem-cho-gui:${galleryId}`;
+}
+
+/** Ghi một cú chạm vào hàng chờ: tấm nằm ở đúng MỘT phía (thêm hoặc bỏ). */
+export function ghiChoGui(
+  cu: { them: readonly string[]; bo: readonly string[] },
+  photoId: string,
+  them: boolean,
+): { them: string[]; bo: string[] } {
+  const t = cu.them.filter((x) => x !== photoId);
+  const b = cu.bo.filter((x) => x !== photoId);
+  return them ? { them: [...t, photoId], bo: b } : { them: t, bo: [...b, photoId] };
+}
+
+/** Máy chủ đã trả lời (nhận hoặc từ chối) cho tấm này → bỏ khỏi hàng chờ. */
+export function xoaChoGui(
+  cu: { them: readonly string[]; bo: readonly string[] },
+  photoIds: readonly string[],
+): { them: string[]; bo: string[] } {
+  const s = new Set(photoIds);
+  return { them: cu.them.filter((x) => !s.has(x)), bo: cu.bo.filter((x) => !s.has(x)) };
 }
 
 /** Tạm tính một yêu cầu chỉnh sửa. Giá thiếu/âm/không phải số → 0 (CSKH báo giá). */

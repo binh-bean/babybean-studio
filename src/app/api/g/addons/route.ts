@@ -15,7 +15,8 @@ import { isGalleryLocked } from "@/lib/gallery-status";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateAddonSchema } from "./schema";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
@@ -28,7 +29,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     // 1. Authenticate customer session
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
 
     if (session.role === "viewer") {
       return fail("FORBIDDEN", "Người xem không có quyền mua thêm sản phẩm");

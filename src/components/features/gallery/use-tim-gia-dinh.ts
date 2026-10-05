@@ -19,7 +19,33 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { gopTimLanDau, khoaDaDuaTim, khoaTimNguoiXem, TOI_DA_ANH_CHINH_SUA } from "@/lib/gallery/tim-gia-dinh";
+import {
+  gopTimLanDau,
+  khoaDaDuaTim,
+  khoaTimNguoiXem,
+  khoaTimChoGui,
+  ghiChoGui,
+  xoaChoGui,
+  TOI_DA_ANH_CHINH_SUA,
+} from "@/lib/gallery/tim-gia-dinh";
+
+type ChoGui = { them: string[]; bo: string[] };
+
+/** Hàng chờ cú chạm chưa được máy chủ xác nhận — xem `gopTimLanDau` (choGui). */
+function docChoGui(galleryId: string): ChoGui {
+  try {
+    const raw = window.localStorage.getItem(khoaTimChoGui(galleryId));
+    const v = raw ? (JSON.parse(raw) as Partial<ChoGui>) : {};
+    const loc = (a: unknown) => (Array.isArray(a) ? a.filter((x): x is string => typeof x === "string") : []);
+    return { them: loc(v.them), bo: loc(v.bo) };
+  } catch {
+    return { them: [], bo: [] };
+  }
+}
+
+function ghiChoGuiLocal(galleryId: string, v: ChoGui): void {
+  ghiLocal(khoaTimChoGui(galleryId), JSON.stringify(v));
+}
 
 function docLocal(khoa: string): string[] {
   try {
@@ -46,6 +72,8 @@ async function guiTim(body: { them?: string[]; bo?: string[] }): Promise<
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    // Thả tim rồi tải lại/đóng tab ngay: không để trình duyệt huỷ lượt ghi giữa đường.
+    keepalive: true,
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) return { ok: false, status: res.status };
@@ -121,20 +149,25 @@ export function useTimGiaDinh(galleryId: string | undefined, laNguoiXem: boolean
         } catch {
           // không đọc được cờ → coi như chưa đưa (gửi lại chỉ là upsert, không trùng)
         }
-        const { hienThi, canDua } = gopTimLanDau({ local: [...timRef.current], server, daDua });
+        const choGui = docChoGui(galleryId);
+        const { hienThi, canDua, canBo } = gopTimLanDau({ local: [...timRef.current], server, daDua, choGui });
         datTim(hienThi);
         mayChuSanSang.current = true;
 
-        if (canDua.length > 0) {
-          const kq = await guiTim({ them: canDua.slice(0, TOI_DA_ANH_CHINH_SUA) });
+        if (canDua.length > 0 || canBo.length > 0) {
+          const kq = await guiTim({
+            ...(canDua.length > 0 ? { them: canDua.slice(0, TOI_DA_ANH_CHINH_SUA) } : {}),
+            ...(canBo.length > 0 ? { bo: canBo.slice(0, TOI_DA_ANH_CHINH_SUA) } : {}),
+          });
           if (huy) return;
           if (kq.ok && kq.chuaApMigration) {
             mayChuSanSang.current = false;
             setChuaAp(true);
             return;
           }
-          if (!kq.ok) return; // lần mở sau thử lại
+          if (!kq.ok) return; // lần mở sau thử lại (hàng chờ còn nguyên)
         }
+        ghiChoGuiLocal(galleryId, { them: [], bo: [] });
         ghiLocal(khoaDaDuaTim(galleryId), "1");
       } catch {
         // Mất mạng — giữ tim trong trình duyệt như BB-338.
@@ -154,10 +187,16 @@ export function useTimGiaDinh(galleryId: string | undefined, laNguoiXem: boolean
       if (dangCo) moi.delete(photo.id);
       else moi.add(photo.id);
       datTim(moi);
+      // Vào hàng chờ TRƯỚC khi gửi (kể cả lúc lượt tải đầu chưa xong — lượt đó đọc
+      // hàng chờ khi về); chỉ rời hàng chờ khi máy chủ đã trả lời.
+      if (galleryId) ghiChoGuiLocal(galleryId, ghiChoGui(docChoGui(galleryId), photo.id, !dangCo));
       if (!mayChuSanSang.current) return; // chưa áp 0083 / chưa tải xong: chỉ ở trình duyệt
 
       void guiTim(dangCo ? { bo: [photo.id] } : { them: [photo.id] })
         .then((kq) => {
+          if (galleryId && (kq.ok || (kq.status >= 400 && kq.status < 500))) {
+            ghiChoGuiLocal(galleryId, xoaChoGui(docChoGui(galleryId), [photo.id]));
+          }
           if (kq.ok && kq.chuaApMigration) {
             mayChuSanSang.current = false;
             setChuaAp(true);
@@ -176,7 +215,7 @@ export function useTimGiaDinh(galleryId: string | undefined, laNguoiXem: boolean
           // (máy chủ là nguồn thật sau lần đưa đầu) — chấp nhận, như mọi thao tác ngoại tuyến khác.
         });
     },
-    [datTim],
+    [datTim, galleryId],
   );
 
   return { timCuaToi, doiTim, giaDinhThich, chuaApMigration };

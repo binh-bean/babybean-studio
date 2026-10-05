@@ -217,7 +217,7 @@ describe("BB-245 (2): POST /api/g/mua-them", () => {
     expect(rows[0].n).toBe(0);
 
     // GET vẫn đọc được dữ liệu cũ (ở đây rỗng) — đường đọc không bị nghỉ theo.
-    const getRes = await xemYeuCau();
+    const getRes = await xemYeuCau(new Request("http://localhost/api/g/mua-them"));
     expect(getRes.status).toBe(200);
   });
 

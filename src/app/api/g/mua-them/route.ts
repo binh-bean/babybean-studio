@@ -58,7 +58,8 @@ import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateYeuCauMuaThemSchema } from "./schema";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
@@ -136,7 +137,7 @@ export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
     // BB-254: ông bà (viewer) GỬI ĐƯỢC yêu cầu này — không còn chặn 403 cho
     // mọi viewer như trước. Điều kiện của họ kiểm ở bước 2b bên dưới.
 
@@ -404,11 +405,11 @@ export async function POST(request: Request): Promise<Response> {
   }
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
     const admin = createAdminClient();
 
     const { data, error } = await admin

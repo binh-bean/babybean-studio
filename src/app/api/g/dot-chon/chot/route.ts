@@ -28,7 +28,8 @@
 import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { ghiNhatKy } from "@/lib/nhat-ky";
@@ -47,7 +48,7 @@ const TOI_DA_DOT_CHO = 5;
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
 
     // Cùng luật với nút Chốt đợt 1: quyết định (và tiền) là của người đứng tên hợp đồng.
     if (session.role !== "owner") {

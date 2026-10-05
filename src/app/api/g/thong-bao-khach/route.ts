@@ -32,7 +32,8 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DanhDauDaDocSchema } from "./schema";
 
@@ -40,11 +41,11 @@ export const runtime = "nodejs";
 
 const SO_LUONG_MOI_NHAT = 20;
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
     const admin = createAdminClient();
 
     const { data: ds, error } = await admin
@@ -83,7 +84,7 @@ export async function PATCH(request: Request): Promise<Response> {
   const requestId = randomUUID();
 
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
 
     const jsonBody = await readJsonBody(request);
     if (!jsonBody.ok) {

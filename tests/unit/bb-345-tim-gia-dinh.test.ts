@@ -125,7 +125,7 @@ describe("BB-345 (2): route tim + đặt chỉnh sửa trên cơ sở dữ liệ
   it("chưa áp 0083: GET/POST trả chuaApMigration, đặt chỉnh sửa 409 — không 500", async (ctx) => {
     if (coBang) ctx.skip();
     phien(d.A, "viewer");
-    const g = await doc(await docTim());
+    const g = await doc(await docTim(new Request("http://localhost/api/g/tim-gia-dinh")));
     expect(g.status).toBe(200);
     expect(g.json.data.chuaApMigration).toBe(true);
     const p = await doc(await guiTim(post("/api/g/tim-gia-dinh", { them: [d.A.anh[0]!.id] })));
@@ -135,7 +135,7 @@ describe("BB-345 (2): route tim + đặt chỉnh sửa trên cơ sở dữ liệ
     expect(c.status).toBe(409);
     expect(c.json.error.details.chuaApMigration).toBe(true);
     phien(d.A, "owner");
-    const gb = await doc(await docTim());
+    const gb = await doc(await docTim(new Request("http://localhost/api/g/tim-gia-dinh")));
     expect(gb.status).toBe(200);
     expect(gb.json.data.chuaApMigration).toBe(true);
     // Hàng đợi CSKH: thiếu cột `loai` thì nguồn "đặt chỉnh sửa" rỗng, không ném lỗi làm hỏng cả tab.
@@ -166,11 +166,11 @@ describe("BB-345 (2): route tim + đặt chỉnh sửa trên cơ sở dữ liệ
     r = await doc(await guiTim(post("/api/g/tim-gia-dinh", { bo: [ba[2]!] })));
     expect(new Set(r.json.data.cuaToi)).toEqual(new Set(ba.slice(0, 2)));
 
-    const g = await doc(await docTim());
+    const g = await doc(await docTim(new Request("http://localhost/api/g/tim-gia-dinh")));
     expect(new Set(g.json.data.cuaToi)).toEqual(new Set(ba.slice(0, 2)));
 
     phien(d.A, "owner");
-    const bm = await doc(await docTim());
+    const bm = await doc(await docTim(new Request("http://localhost/api/g/tim-gia-dinh")));
     expect(bm.json.data.vai).toBe("ba_me");
     expect(new Set(bm.json.data.giaDinh.map((x: { photoId: string }) => x.photoId))).toEqual(new Set(ba.slice(0, 2)));
     // Không đụng danh sách trong gói của ba mẹ.

@@ -42,7 +42,7 @@ describe("BB-338: link mời người thân hiện lại được", () => {
   }
 
   const danhSach = async (): Promise<Muc[]> => {
-    const res = await danhSachMoi();
+    const res = await danhSachMoi(new Request("http://localhost/api/g/moi-nguoi-than"));
     expect(res.status).toBe(200);
     return (await res.json()).data.items as Muc[];
   };
@@ -138,7 +138,7 @@ describe("BB-338: link mời người thân hiện lại được", () => {
 
   it("5. viewer gọi GET → 403", async () => {
     phien("viewer");
-    const res = await danhSachMoi();
+    const res = await danhSachMoi(new Request("http://localhost/api/g/moi-nguoi-than"));
     expect(res.status).toBe(403);
   });
 });

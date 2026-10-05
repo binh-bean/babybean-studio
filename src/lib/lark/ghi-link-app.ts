@@ -309,7 +309,10 @@ export async function ghiLinkAppVeLark(opts: TuyChonGhiLink): Promise<KetQuaGhiL
       try {
         const cu2 = new URL(dia);
         const moi2 = new URL(opts.diaChi);
-        return cu2.origin === moi2.origin && cu2.pathname.startsWith("/g/");
+        // BB-334A — `/k/` là link GIA ĐÌNH của chính app: ghi link gia đình
+        // lên ô đang giữ link theo bộ `/g/`, và đổi link gia đình (ô giữ `/k/`
+        // cũ đã chết) đều phải đi qua được.
+        return cu2.origin === moi2.origin && (cu2.pathname.startsWith("/g/") || cu2.pathname.startsWith("/k/"));
       } catch {
         return false;
       }
@@ -375,7 +378,7 @@ export async function ghiLinkAppVeLark(opts: TuyChonGhiLink): Promise<KetQuaGhiL
  * vòng mở mọi bộ ảnh mà không cần đăng nhập.
  */
 export function cheMa(diaChi: string): string {
-  return diaChi.replace(/\/g\/([A-Za-z0-9_-]{6})[A-Za-z0-9_-]+/g, "/g/$1…");
+  return diaChi.replace(/\/([gk])\/([A-Za-z0-9_-]{6})[A-Za-z0-9_-]+/g, "/$1/$2…");
 }
 
 /**

@@ -11,11 +11,8 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import {
-  requireGallerySession,
-  GallerySessionError,
-  EDITING_ROLES,
-} from "@/lib/auth/gallery-session";
+import { GallerySessionError, EDITING_ROLES } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { SelectionPatchSchema } from "./schema";
 
 export const runtime = "nodejs";
@@ -34,7 +31,7 @@ export async function PATCH(request: Request): Promise<Response> {
 
     // 2. Authenticate + authorize ----------------------------------------
     // The gallery is taken from the signed cookie, never from the body.
-    const session = await requireGallerySession(EDITING_ROLES);
+    const session = await requirePhienBoAnh(request, EDITING_ROLES);
 
     // 3. Mutate -----------------------------------------------------------
     const { patchSelection } = await import("@/lib/selection/mutate");

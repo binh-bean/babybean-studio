@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { requireGallerySession, GallerySessionError, EDITING_ROLES } from "@/lib/auth/gallery-session";
+import { GallerySessionError, EDITING_ROLES } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail, readJsonBody } from "@/lib/api-response";
 import { isGalleryLocked } from "@/lib/gallery-status";
@@ -27,7 +28,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireGallerySession(EDITING_ROLES);
+    const session = await requirePhienBoAnh(request, EDITING_ROLES);
 
     const jsonBody = await readJsonBody(request);
     if (!jsonBody.ok) {

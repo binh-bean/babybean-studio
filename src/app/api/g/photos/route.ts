@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PhotosQuerySchema } from "./schema";
 import { ok, fail } from "@/lib/api-response";
@@ -7,7 +8,7 @@ import type { PhotoPublic } from "@/types/domain";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(req);
     
     const url = new URL(req.url);
     const queryResult = PhotosQuerySchema.safeParse({

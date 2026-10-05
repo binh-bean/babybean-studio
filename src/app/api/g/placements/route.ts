@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { requireGallerySession, GallerySessionError, EDITING_ROLES } from "@/lib/auth/gallery-session";
+import { GallerySessionError, EDITING_ROLES } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail, readJsonBody } from "@/lib/api-response";
 import { PlacePhotoSchema, RemovePhotoPlacementSchema } from "./schema";
@@ -30,7 +31,7 @@ import { isGalleryLocked } from "@/lib/gallery-status";
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireGallerySession(EDITING_ROLES);
+    const session = await requirePhienBoAnh(request, EDITING_ROLES);
 
     const jsonBody = await readJsonBody(request);
     if (!jsonBody.ok) {
@@ -254,7 +255,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await requireGallerySession(EDITING_ROLES);
+    const session = await requirePhienBoAnh(request, EDITING_ROLES);
 
     // 1. Parse input từ JSON body hoặc query params (đọc TRƯỚC mọi truy vấn
     //    cơ sở dữ liệu — xem lý do ở khối chặn addonId ngay dưới đây).

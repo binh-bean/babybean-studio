@@ -1,6 +1,7 @@
 import { isSubmittedOrLater, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import type { NextResponse } from "next/server";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { chotBoAnhChoPhien, boAnhYeuCau } from "@/lib/auth/phien-bo-anh";
 import { boDangThuGon } from "@/lib/gallery/mo-lai-anh-thu-gon";
 import { dangNhapBangMa, datCookiePhien } from "@/lib/auth/dang-nhap-bang-ma";
 import type { GallerySession } from "@/types/domain";
@@ -57,6 +58,15 @@ export async function GET(request: Request) {
       console.error("[GET /api/g/gallery] đổi mã lấy phiên", loi);
       return fail("INTERNAL");
     }
+  }
+  // BB-334A — bộ ảnh của lượt gọi do `x-bb-bo` nêu (link gia đình, hai tab);
+  // link cũ theo bộ chỉ được nêu lại đúng bộ của nó. Xem src/lib/auth/phien-bo-anh.ts.
+  try {
+    session = await chotBoAnhChoPhien(session, boAnhYeuCau(request));
+  } catch (error) {
+    if (error instanceof GallerySessionError) return fail(error.code);
+    console.error("[GET /api/g/gallery] chốt bộ ảnh", error);
+    return fail("INTERNAL");
   }
   const res = await traDuLieu(request, session, cookieMoi !== null);
   if (cookieMoi) datCookiePhien(res, cookieMoi);

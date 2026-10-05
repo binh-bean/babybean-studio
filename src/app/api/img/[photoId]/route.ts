@@ -103,7 +103,11 @@ export async function GET(
       try {
         const session = await requireGallerySession();
 
-        const laLinkTheoBoAnh = session.galleryId !== "";
+        // BB-334A — phân loại theo LINK, không theo bộ đang trỏ: link gia đình
+        // (có customerId) xem ảnh của mọi bộ của NHÀ MÌNH dù cookie đang trỏ bộ
+        // nào (hai tab hai bộ — thẻ <img> không gửi được x-bb-bo). Link cũ theo
+        // bộ (customerId rỗng) vẫn chỉ đúng bộ của nó.
+        const laLinkTheoBoAnh = !session.customerId;
         const duocXem = laLinkTheoBoAnh
           ? // Link gắn theo bộ ảnh: tấm ảnh phải thuộc đúng bộ đã ký trong phiên.
             session.galleryId === photo.gallery_id

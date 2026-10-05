@@ -49,7 +49,7 @@ describe.skipIf(!coDb)("BB-360: ông bà (viewer) kích được mở lại ản
     vi.resetModules();
     dungPhien(cookie);
     const { POST } = await import("@/app/api/g/mo-lai-anh/route");
-    const res = await POST();
+    const res = await POST(new Request("http://localhost/api/g/mo-lai-anh", { method: "POST" }));
     return { status: res.status, body: await res.json().catch(() => null) };
   }
 

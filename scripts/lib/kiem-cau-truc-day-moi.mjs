@@ -263,3 +263,64 @@ export async function kiemDay0086Den0089({ client }) {
 
   return ketQua;
 }
+
+// ---------------------------------------------------------------------------
+// BB-334A — 0090 link gia đình (viết, CHƯA áp). Chưa áp = ĐẠT "chờ áp"; áp nửa
+// vời (thiếu cột/chỉ mục/trigger, hàm trigger mở cho anon) = ĐỎ.
+// ---------------------------------------------------------------------------
+
+/** Chỉ mục 0090 tạo, đều UNIQUE. */
+export const CHI_MUC_0090 = [
+  { ten: "uq_share_links_gia_dinh_song", bang: "share_links" },
+  { ten: "uq_galleries_so_thu_tu_khach", bang: "galleries" },
+];
+
+/**
+ * @param {{ client: { query(sql: string, params?: unknown[]): Promise<{ rows: any[] }> } }} opts
+ */
+export async function kiem0090({ client }) {
+  const { rows: cot } = await client.query(
+    `select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'galleries' and column_name = 'so_thu_tu_khach'`,
+  );
+  const { rows: cm } = await client.query(
+    `select c.relname as ten, t.relname as bang, i.indisunique as duy_nhat
+       from pg_index i
+       join pg_class c on c.oid = i.indexrelid
+       join pg_class t on t.oid = i.indrelid
+       join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relname = any($1::text[])`,
+    [CHI_MUC_0090.map((x) => x.ten)],
+  );
+  const { rows: ham } = await client.query(
+    `select has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
+            has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and p.proname = 'gan_so_thu_tu_khach'`,
+  );
+  const { rows: trg } = await client.query(
+    `select 1 from pg_trigger where tgname = 'trg_galleries_so_thu_tu_khach' and not tgisinternal`,
+  );
+
+  if (cot.length === 0 && cm.length === 0 && ham.length === 0 && trg.length === 0) {
+    return [{ name: "0090: link gia đình", pass: true, detail: "CHỜ ÁP — chưa áp (viết ở BB-334A, app chạy được khi chưa áp)" }];
+  }
+  const sai = [];
+  if (cot.length === 0) sai.push("thiếu cột galleries.so_thu_tu_khach");
+  const coCm = new Map(cm.map((r) => [r.ten, r]));
+  for (const x of CHI_MUC_0090) {
+    const r = coCm.get(x.ten);
+    if (!r || r.bang !== x.bang) sai.push(`thiếu chỉ mục ${x.ten}`);
+    else if (!r.duy_nhat) sai.push(`${x.ten} không phải UNIQUE`);
+  }
+  if (ham.length === 0) sai.push("thiếu hàm gan_so_thu_tu_khach");
+  else if (ham.some((r) => r.anon || r.auth)) sai.push("gan_so_thu_tu_khach MỞ cho anon/authenticated (thiếu revoke, AGENTS §5b)");
+  if (trg.length === 0) sai.push("thiếu trigger trg_galleries_so_thu_tu_khach");
+  return [
+    {
+      name: "0090: link gia đình",
+      pass: sai.length === 0,
+      detail: sai.length ? `ÁP NỬA VỜI: ${sai.join("; ")}` : "đã áp: cột + 2 chỉ mục UNIQUE + trigger, hàm đã revoke",
+    },
+  ];
+}

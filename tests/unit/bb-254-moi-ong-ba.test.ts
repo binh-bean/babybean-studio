@@ -114,7 +114,7 @@ describe("BB-254: chạy thật trên cơ sở dữ liệu", () => {
 
   const goiMoi = (method: "POST" | "GET" | "DELETE", body?: unknown, qs = "") => {
     const url = `http://localhost/api/g/moi-nguoi-than${qs}`;
-    if (method === "GET") return danhSachMoi();
+    if (method === "GET") return danhSachMoi(new Request("http://localhost/api/g/moi-nguoi-than"));
     if (method === "DELETE") return thuHoiMoi(new Request(url, { method: "DELETE" }));
     return moiNguoiThan(
       new Request(url, {

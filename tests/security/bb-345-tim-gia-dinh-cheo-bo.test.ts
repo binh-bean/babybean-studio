@@ -99,18 +99,18 @@ describe("BB-345: tim gia đình không lọt sang bộ ảnh/link khác", () =>
   it("(sau 0083) phiên viewer A và ba mẹ A không đọc được tim của bộ B", async (ctx) => {
     if (!coBang) ctx.skip();
     phien(d.A, "viewer");
-    const v = await (await docTim()).json();
+    const v = await (await docTim(new Request("http://localhost/api/g/tim-gia-dinh"))).json();
     expect(v.data.cuaToi).not.toContain(d.B.anh[0]!.id);
     expect(v.data.cuaToi).toEqual([]);
 
     phien(d.A, "owner");
-    const o = await (await docTim()).json();
+    const o = await (await docTim(new Request("http://localhost/api/g/tim-gia-dinh"))).json();
     expect(o.data.giaDinh.map((x: { photoId: string }) => x.photoId)).not.toContain(d.B.anh[0]!.id);
     expect(o.data.giaDinh).toEqual([]);
 
     // Đối chứng: phiên ba mẹ B THẤY đúng tấm đó — phép thử không xanh vì route luôn trả rỗng.
     phien(d.B, "owner");
-    const ob = await (await docTim()).json();
+    const ob = await (await docTim(new Request("http://localhost/api/g/tim-gia-dinh"))).json();
     expect(ob.data.giaDinh.map((x: { photoId: string }) => x.photoId)).toEqual([d.B.anh[0]!.id]);
   });
 

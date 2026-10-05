@@ -566,7 +566,7 @@ describe("BB-261: chạy thật trên cơ sở dữ liệu (bb-dev)", () => {
       } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
 
       const { GET } = await import("@/app/api/g/thong-bao-khach/route");
-      const res = await GET();
+      const res = await GET(new Request("http://localhost/api/g/thong-bao-khach"));
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data.thongBao.some((t: { id: string }) => t.id === dong!.id)).toBe(true);

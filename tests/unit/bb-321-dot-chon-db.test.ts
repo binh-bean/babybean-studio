@@ -252,7 +252,7 @@ describe("BB-321: đợt chọn chạy thật trên cơ sở dữ liệu", () =>
   it("7. GET của khách: đợt, số ảnh, tiền và bản đồ ảnh→đợt (huy hiệu 'Đã chốt đợt N')", async () => {
     if (!coBang) return;
     phienKhach();
-    const res = await docDot();
+    const res = await docDot(new Request("http://localhost/api/g/dot-chon"));
     expect(res.status).toBe(200);
     const { data } = await res.json();
     expect(data.cheDoChonThem).toBe(true);
@@ -273,7 +273,7 @@ describe("BB-321: đợt chọn chạy thật trên cơ sở dữ liệu", () =>
     expect(await dotCuaAnh(anh[5]!)).toBeUndefined(); // dòng ảnh đã xoá — ảnh về tay khách
 
     phienKhach();
-    const { data } = await (await docDot()).json();
+    const { data } = await (await docDot(new Request("http://localhost/api/g/dot-chon"))).json();
     const dot3 = data.cacDot.find((d: { soDot: number }) => d.soDot === 3);
     expect(dot3.trangThai).toBe("tu_choi");
     expect(dot3.lyDoTuChoi).toBe("Tấm này trùng đợt trước");
@@ -452,7 +452,7 @@ describe("BB-321: đợt chọn chạy thật trên cơ sở dữ liệu", () =>
     );
     const co = await chot({ tenNguoiChot: "Mẹ Fixture", photoIds: [anh[4]!], items: [] });
     expect(co.status).toBe(200);
-    const { data } = await (await docDot()).json();
+    const { data } = await (await docDot(new Request("http://localhost/api/g/dot-chon"))).json();
     expect(data.cheDoChonThem).toBe(true);
     expect(data.cauDongY.studioChon).toBe("Tôi đồng ý với ảnh Bean chọn dùm và không đổi lại");
     expect(data.cauDongY.bietAnhInCham).toBe("Tôi biết chưa chọn ảnh in thì nhận ảnh chậm hơn");

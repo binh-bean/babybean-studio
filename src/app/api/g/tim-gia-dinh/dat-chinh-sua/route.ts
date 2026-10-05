@@ -27,7 +27,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import { cheSoDienThoai } from "@/lib/lark/notify";
@@ -62,7 +63,7 @@ function cungTap(a: readonly string[], b: readonly string[]): boolean {
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
     if (session.role !== "viewer") {
       return fail("FORBIDDEN", "Ba mẹ chọn thêm ảnh ở mục \"Chọn thêm ảnh\" giúp Bean ạ");
     }

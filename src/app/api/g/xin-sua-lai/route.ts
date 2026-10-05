@@ -29,7 +29,8 @@
 import { vi } from "@/i18n";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
+import { GallerySessionError } from "@/lib/auth/gallery-session";
+import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { khoaChonCuaKhach } from "@/lib/gallery/khoa-chon-khach";
@@ -47,7 +48,7 @@ const MAX_XIN_MOI_GIO = 3;
 export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
-    const session = await requireGallerySession();
+    const session = await requirePhienBoAnh(request);
 
     // Cùng luật với nút Chốt: quyết định cuối là của người đứng tên hợp đồng.
     if (session.role !== "owner") {
