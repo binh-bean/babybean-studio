@@ -34,6 +34,7 @@ import { POST as moLai } from "@/app/api/admin/galleries/[id]/reopen/route";
 import { GET as xuat } from "@/app/api/admin/galleries/[id]/export/route";
 import { POST as chotDot1 } from "@/app/api/g/submit/route";
 
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 const runId = Math.random().toString(36).slice(2, 10);
 const NHAN = `Fixture BB-321 ${runId}`;
 const GIA_ANH = 30000;
@@ -114,18 +115,14 @@ describe("BB-321: đợt chọn chạy thật trên cơ sở dữ liệu", () =>
       return;
     }
 
-    const { rows: br } = await client.query("select id from branches order by name limit 1");
-    branchId = br[0].id;
+    // BB-367: chi nhánh + khách "Fixture" RIÊNG (không mượn chi nhánh thật).
+    const nen = await dungNenFixture(client, "BB-321", { tenKhach: `${NHAN} Khách` });
+    branchId = nen.branchId;
+    customerId = nen.customerId;
     const { rows: st } = await client.query(
       "select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1",
     );
     staffId = st[0].id;
-
-    const { rows: kh } = await client.query(
-      `insert into customers (branch_id, full_name) values ($1,$2) returning id`,
-      [branchId, `${NHAN} Khách`],
-    );
-    customerId = kh[0].id;
 
     const { rows: g } = await client.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url,
@@ -173,15 +170,14 @@ describe("BB-321: đợt chọn chạy thật trên cơ sở dữ liệu", () =>
   });
 
   afterAll(async () => {
-    if (coBang && galleryId) {
-      await client.query("delete from activity_logs where entity_id = $1", [galleryId]);
-      await client.query("delete from notifications where payload::text like $1", [`%${galleryId}%`]);
-      await client.query("delete from selection_rounds where gallery_id = $1", [galleryId]);
-      await client.query("delete from galleries where id = $1", [galleryId]);
-      await client.query("delete from customers where id = $1", [customerId]);
+    // BB-367: dọn theo id (đợt chọn/link/lượt chọn đi theo bộ ảnh), lỗi dọn làm phép thử đỏ.
+    try {
+      if (galleryId) await client.query("delete from notifications where payload::text like $1", [`%${galleryId}%`]);
+      await donNenFixture(client, { galleryIds: [galleryId], customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await client.end();
     }
-    await client.end();
-  });
+  }, 60_000);
 
   it("1. Chưa được xác nhận đợt 1 (submitted) → chốt đợt mới bị từ chối, ba mẹ cứ sửa đợt 1", async () => {
     if (!coBang) return;
@@ -486,13 +482,10 @@ describe("BB-321: chốt ĐỢT 1 — nhờ studio chọn bổ sung (cần migra
       console.warn("[BB-321] Bỏ qua chốt đợt 1: cột selections.nho_studio_chon_them chưa có — chờ áp 0077.");
       return;
     }
-    const { rows: br } = await client.query("select id from branches order by name limit 1");
-    branchId = br[0].id;
-    const { rows: kh } = await client.query(
-      `insert into customers (branch_id, full_name) values ($1,$2) returning id`,
-      [branchId, `${NHAN} Khách D1`],
-    );
-    customerId = kh[0].id;
+    // BB-367: chi nhánh + khách "Fixture" RIÊNG.
+    const nen = await dungNenFixture(client, "BB-321", { tenKhach: `${NHAN} Khách D1` });
+    branchId = nen.branchId;
+    customerId = nen.customerId;
     const { rows: g } = await client.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url,
                               photo_count, included_quota, extra_photo_price)
@@ -529,14 +522,14 @@ describe("BB-321: chốt ĐỢT 1 — nhờ studio chọn bổ sung (cần migra
   });
 
   afterAll(async () => {
-    if (coCot && galleryId) {
-      await client.query("delete from activity_logs where entity_id = $1", [galleryId]);
-      await client.query("delete from notifications where payload::text like $1", [`%${galleryId}%`]);
-      await client.query("delete from galleries where id = $1", [galleryId]);
-      await client.query("delete from customers where id = $1", [customerId]);
+    // BB-367: dọn theo id, lỗi dọn làm phép thử đỏ.
+    try {
+      if (galleryId) await client.query("delete from notifications where payload::text like $1", [`%${galleryId}%`]);
+      await donNenFixture(client, { galleryIds: [galleryId], customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await client.end();
     }
-    await client.end();
-  });
+  }, 60_000);
 
   function phien() {
     vi.spyOn(gallerySession, "requireGallerySession").mockResolvedValue({

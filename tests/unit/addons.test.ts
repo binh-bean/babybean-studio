@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { Client } from "pg";
 import { randomUUID } from "node:crypto";
-import { donFixtureTheoId, type KhachSupabaseToiThieu } from "../fixtures/don-dep-theo-id";
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 import { POST as postAddon } from "@/app/api/g/addons/route";
 import { GET as getGallery } from "@/app/api/g/gallery/route";
 import * as galleryAuth from "@/lib/auth/gallery-session";
@@ -17,6 +18,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
 
   let branchId: string;
   let customerId: string;
+  let pg: Client;
   let galleryId: string;
   let shareLinkId: string;
   let selectionId: string;
@@ -31,14 +33,12 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
   let session: GallerySession;
 
   beforeAll(async () => {
-    // 1. Lấy chi nhánh và khách hàng mẫu
-    const { data: branch } = await supabase.from("branches").select("id").limit(1).single();
-    if (!branch) throw new Error("Cần ít nhất một chi nhánh trong database");
-    branchId = branch.id;
-
-    const { data: customer } = await supabase.from("customers").select("id").limit(1).single();
-    if (!customer) throw new Error("Cần ít nhất một khách hàng trong database");
-    customerId = customer.id;
+    // 1. BB-367: chi nhánh + khách "Fixture" RIÊNG (bản cũ lấy khách THẬT `limit 1` rồi gắn bộ thử vào).
+    pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+    await pg.connect();
+    const nen = await dungNenFixture(pg, "BB-105");
+    branchId = nen.branchId;
+    customerId = nen.customerId;
 
     // 2. Tạo sản phẩm giả
     //
@@ -135,7 +135,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       customer_id: customerId,
       drive_folder_id: "test_fld_" + randomUUID().slice(0, 8),
       drive_folder_url: "https://drive.google.com/test",
-      title: "Test BB105 Gallery " + randomUUID().slice(0, 4),
+      title: "Fixture BB-105 Gallery " + randomUUID().slice(0, 4),
       status: "ready",
       photo_count: 30,
       included_quota: 20,
@@ -157,7 +157,7 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
       id: selectionId,
       gallery_id: galleryId,
       share_link_id: shareLinkId,
-      display_name: "Test Customer BB105",
+      display_name: "Fixture BB-105 Customer",
       is_primary: true,
     });
     if (selErr) throw selErr;
@@ -202,20 +202,19 @@ describe("BB-105: API khách mua thêm sản phẩm (POST /api/g/addons)", () =>
   });
 
   afterAll(async () => {
-    // Dọn sạch dữ liệu test
-    if (selectionId) {
-      await supabase.from("selection_addons").delete().eq("selection_id", selectionId);
-      await supabase.from("selections").delete().eq("id", selectionId);
+    // BB-352 + BB-367: hàng "Mẫu kiểm thử …" nằm trong bảng giá nên MỘT DÒNG RÒ LÀ KHÁCH THẤY VÀ MUA
+    // ĐƯỢC. Xoá THEO ID (bảng con → bộ ảnh → sản phẩm → khách → chi nhánh), KHÔNG nuốt lỗi, và luôn
+    // đóng kết nối.
+    try {
+      await donNenFixture(pg, {
+        galleryIds: galleryId ? [galleryId] : [],
+        productIds: createdProductIds,
+        customerIds: [customerId],
+        branchIds: [branchId],
+      });
+    } finally {
+      await pg?.end();
     }
-    if (shareLinkId) {
-      await supabase.from("share_links").delete().eq("id", shareLinkId);
-    }
-    // BB-352: hàng "Mẫu kiểm thử …" nằm trong bảng giá nên MỘT DÒNG RÒ LÀ KHÁCH THẤY
-    // VÀ MUA ĐƯỢC. Xoá theo id và KHÔNG nuốt lỗi (bản cũ bỏ `{ error }`).
-    await donFixtureTheoId(supabase as unknown as KhachSupabaseToiThieu, {
-      galleryIds: galleryId ? [galleryId] : [],
-      productIds: createdProductIds,
-    });
   }, 60_000);
 
   it("Test 1: Mua sản phẩm đủ tin cậy -> tạo dòng, giá đúng bằng list_price", async () => {

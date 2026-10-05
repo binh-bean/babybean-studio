@@ -17,6 +17,7 @@ import { POST as authGallery } from "@/app/api/auth/gallery/route";
 import * as staffAuth from "@/lib/auth/staff";
 
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 vi.mock("server-only", () => ({}));
 
 describe("BB-188 — mở khoá link cũ không đổi địa chỉ", () => {
@@ -37,56 +38,58 @@ describe("BB-188 — mở khoá link cũ không đổi địa chỉ", () => {
       branchIds: [branchId], permissions: quyenCuaVai("cs"), } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 
+  // BB-367: khách + chi nhánh "Fixture" RIÊNG. Trước đây chi nhánh lấy `limit 1` từ bảng thật.
+  // `staffId` chỉ để giả lập phiên cs (requireStaff bị mock) — không có dòng nào được ghi gắn vào nó.
+  const galleryIds: string[] = [];
+
   beforeAll(async () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
 
-    const { rows: br } = await client.query("select id from branches order by name limit 1");
-    branchId = br[0].id;
-    const { rows: st } = await client.query("select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1");
-    staffId = st[0].id;
+    try {
+      const { rows: st } = await client.query("select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1");
+      staffId = st[0].id;
 
-    const { rows: c } = await client.query(
-      `insert into customers (branch_id, full_name) values ($1,'Fixture BB-188') returning id`,
-      [branchId],
-    );
-    customerId = c[0].id;
+      const nen = await dungNenFixture(client, "BB-188");
+      branchId = nen.branchId;
+      customerId = nen.customerId;
 
-    const themBo = async (ten: string, soAnh: number) => {
-      const { rows: g } = await client.query(
-        `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
-                                drive_folder_url, photo_count, included_quota)
-         values ($1,$2,$3,'ready',$4,'https://example.com/x',$5,20) returning id`,
-        [branchId, customerId, ten, `fixture-bb188-${ten}-${Date.now()}`, soAnh],
-      );
-      return g[0].id as string;
-    };
+      const themBo = async (ten: string, soAnh: number) => {
+        const { rows: g } = await client.query(
+          `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
+                                  drive_folder_url, photo_count, included_quota)
+           values ($1,$2,$3,'ready',$4,'https://example.com/x',$5,20) returning id`,
+          [branchId, customerId, ten, `fixture-bb188-${ten}-${Date.now()}`, soAnh],
+        );
+        galleryIds.push(g[0].id as string);
+        return g[0].id as string;
+      };
 
-    galleryId = await themBo("Fixture BB-188 Gallery", 2);
-    boTrong = await themBo("Fixture BB-188 Chua Co Link", 2);
+      galleryId = await themBo("Fixture BB-188 Gallery", 2);
+      boTrong = await themBo("Fixture BB-188 Chua Co Link", 2);
 
-    for (let i = 1; i <= 2; i++) {
-      await client.query(
-        `insert into photos (gallery_id, drive_file_id, file_name, mime_type, status)
-         values ($1,$2,$3,'image/jpeg','active')`,
-        [galleryId, `bb188_file_${i}`, `IMG_${i}.jpg`],
-      );
+      for (let i = 1; i <= 2; i++) {
+        await client.query(
+          `insert into photos (gallery_id, drive_file_id, file_name, mime_type, status)
+           values ($1,$2,$3,'image/jpeg','active')`,
+          [galleryId, `bb188_file_${i}`, `IMG_${i}.jpg`],
+        );
+      }
+    } catch (e) {
+      // beforeAll hỏng thì afterAll vẫn chạy, nhưng dọn ngay cho chắc.
+      await donNenFixture(client, { galleryIds, customerIds: [customerId], branchIds: [branchId] }).catch(() => {});
+      await client.end().catch(() => {});
+      throw e;
     }
   });
 
   afterAll(async () => {
-    for (const g of [galleryId, boTrong].filter(Boolean)) {
-      await client.query("delete from share_links where gallery_id = $1", [g]);
-      await client.query(
-        `delete from selection_items where selection_id in (select id from selections where gallery_id = $1)`,
-        [g],
-      );
-      await client.query("delete from selections where gallery_id = $1", [g]);
-      await client.query("delete from photos where gallery_id = $1", [g]);
-      await client.query("delete from galleries where id = $1", [g]);
+    try {
+      // Bảng con trước (link/lượt chọn/ảnh/thông báo/nhật ký), rồi bộ → khách → chi nhánh.
+      await donNenFixture(client, { galleryIds, customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await client.end();
     }
-    await client.query("delete from customers where id = $1", [customerId]);
-    await client.end();
   });
 
   it("link hết hạn → mở khoá giữ NGUYÊN token_hash, và mã cũ đăng nhập lại được", async () => {

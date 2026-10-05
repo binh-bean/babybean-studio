@@ -15,6 +15,8 @@
  * KHÔNG làm:
  *   - KHÔNG gửi gì cho khách (không Zalo, không tin nhắn). CSKH gửi khi có dịp.
  *   - KHÔNG ghi Lark. Màn CSKH (POST …/link-gia-dinh/ghi-lark) ghi khi cần.
+ *   - KHÔNG tạo cho dữ liệu thử (BB-367): bộ có tên bắt đầu "Fixture " và khách có tên
+ *     bắt đầu "Fixture " bị bỏ qua.
  *   - KHÔNG thu hồi link cũ theo bộ — link cũ chạy mãi (anh chốt Q2).
  *   - KHÔNG in mã link, tên khách hay số điện thoại (bb-dev là dữ liệu thật,
  *     AGENTS §6) — chỉ in id rút gọn và 6 ký tự đầu của mã.
@@ -51,6 +53,9 @@ try {
             min(g.created_at) as bo_moi_dau
        from galleries g
       where g.customer_id is not null
+        -- BB-367: dữ liệu thử không bao giờ được cấp link gia đình.
+        and g.title not like 'Fixture %'
+        and not exists (select 1 from customers cu where cu.id = g.customer_id and cu.full_name like 'Fixture %')
         and g.photo_count > 0
         and g.status not in ('draft', 'archived')
         and g.created_at >= $1::date

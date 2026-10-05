@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { Client } from "pg";
 import { randomUUID } from "node:crypto";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { GET as getAdminItems } from "@/app/api/admin/galleries/[id]/items/route";
 import * as staffAuth from "@/lib/auth/staff";
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
+
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 
 vi.mock("server-only", () => ({}));
 
@@ -16,6 +19,7 @@ describe("BB-102: Thành phần hợp đồng và hạn mức ảnh (gallery_ite
 
   let branchId: string;
   let customerId: string;
+  let pg: Client;
   const createdGalleryIds: string[] = [];
   const createdProductIds: string[] = [];
 
@@ -28,14 +32,12 @@ describe("BB-102: Thành phần hợp đồng và hạn mức ảnh (gallery_ite
   let prodWoodFrame: string;
 
   beforeAll(async () => {
-    // 1. Lấy chi nhánh và khách hàng mẫu
-    const { data: branch } = await supabase.from("branches").select("id").limit(1).single();
-    if (!branch) throw new Error("Cần ít nhất một chi nhánh trong database");
-    branchId = branch.id;
-
-    const { data: customer } = await supabase.from("customers").select("id").limit(1).single();
-    if (!customer) throw new Error("Cần ít nhất một khách hàng trong database");
-    customerId = customer.id;
+    // 1. BB-367: chi nhánh + khách "Fixture" RIÊNG (trước đây `limit 1` lấy khách THẬT rồi gắn bộ thử vào).
+    pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+    await pg.connect();
+    const nen = await dungNenFixture(pg, "BB-102");
+    branchId = nen.branchId;
+    customerId = nen.customerId;
 
     // 2. Tạo sản phẩm giả cho test
     prodPkgBaby02 = randomUUID();
@@ -46,12 +48,12 @@ describe("BB-102: Thành phần hợp đồng và hạn mức ảnh (gallery_ite
     prodWoodFrame = randomUUID();
 
     const prods = [
-      { id: prodPkgBaby02, name: "Fixture Baby 02", kind: "shoot_package", list_price: 2000000 },
-      { id: prodPkgBaby01, name: "Fixture Baby 01", kind: "shoot_package", list_price: 1500000 },
-      { id: prodPkgFam, name: "Fixture Family Classic", kind: "shoot_package", list_price: 3000000 },
-      { id: prodEditFile, name: "Fixture Edit file", kind: "edited_photo", list_price: 50000 },
-      { id: prodMakeup, name: "Fixture Makeup", kind: "service", list_price: 300000 },
-      { id: prodWoodFrame, name: "Fixture Gỗ 15x21", kind: "print", material: "Gỗ", size: "15x21", list_price: 150000 },
+      { id: prodPkgBaby02, name: "Fixture Baby 02", kind: "shoot_package", list_price: 2000000, is_active: false },
+      { id: prodPkgBaby01, name: "Fixture Baby 01", kind: "shoot_package", list_price: 1500000, is_active: false },
+      { id: prodPkgFam, name: "Fixture Family Classic", kind: "shoot_package", list_price: 3000000, is_active: false },
+      { id: prodEditFile, name: "Fixture Edit file", kind: "edited_photo", list_price: 50000, is_active: false },
+      { id: prodMakeup, name: "Fixture Makeup", kind: "service", list_price: 300000, is_active: false },
+      { id: prodWoodFrame, name: "Fixture Gỗ 15x21", kind: "print", material: "Gỗ", size: "15x21", list_price: 150000, is_active: false },
     ];
 
     for (const p of prods) {
@@ -63,14 +65,13 @@ describe("BB-102: Thành phần hợp đồng và hạn mức ảnh (gallery_ite
   });
 
   afterAll(async () => {
-    // Dọn sạch dữ liệu test
-    if (createdGalleryIds.length > 0) {
-      await supabase.from("galleries").delete().in("id", createdGalleryIds);
+    // BB-367: dọn theo id, không nuốt lỗi; lỗi dọn làm phép thử đỏ. Đóng kết nối kể cả khi dọn hỏng.
+    try {
+      await donNenFixture(pg, { galleryIds: createdGalleryIds, productIds: createdProductIds, customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await pg?.end();
     }
-    if (createdProductIds.length > 0) {
-      await supabase.from("products").delete().in("id", createdProductIds);
-    }
-  });
+  }, 60_000);
 
   // Helper tạo album giả
   async function createTestGallery(): Promise<string> {
@@ -83,7 +84,7 @@ describe("BB-102: Thành phần hợp đồng và hạn mức ảnh (gallery_ite
       customer_id: customerId,
       drive_folder_id: "test_fld_" + randomUUID().slice(0, 8),
       drive_folder_url: "https://drive.google.com/test",
-      title: "Test BB102 Album " + randomUUID().slice(0, 4),
+      title: "Fixture BB-102 Album " + randomUUID().slice(0, 4),
       status: "ready",
       photo_count: 50,
       included_quota: 20, // default fallback trong schema

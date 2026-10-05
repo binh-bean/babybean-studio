@@ -21,6 +21,7 @@ import * as staffAuth from "@/lib/auth/staff";
 import { giaiMaMaLink } from "@/lib/auth/ma-link";
 import { POST as taoLink } from "@/app/api/admin/galleries/[id]/share-link/route";
 
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 describe("BB-320: tạo link app — lưu địa chỉ và báo khi lưu hỏng", () => {
   let client: Client;
   let branchId: string;
@@ -43,17 +44,14 @@ describe("BB-320: tạo link app — lưu địa chỉ và báo khi lưu hỏng"
   beforeAll(async () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
-    const { rows: br } = await client.query("select id from branches order by name limit 1");
-    branchId = br[0].id;
+    // BB-367: chi nhánh + khách "Fixture" RIÊNG.
+    const nen = await dungNenFixture(client, "BB-320", { tenKhach: "Fixture BB-320 Khách link" });
+    branchId = nen.branchId;
+    customerId = nen.customerId;
     const { rows: st } = await client.query(
       "select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1",
     );
     staffId = st[0].id;
-    const { rows: c } = await client.query(
-      `insert into customers (branch_id, full_name) values ($1,'Fixture BB-320 Khách link') returning id`,
-      [branchId],
-    );
-    customerId = c[0].id;
     const { rows: g } = await client.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id,
                               drive_folder_url, photo_count, included_quota)
@@ -65,15 +63,13 @@ describe("BB-320: tạo link app — lưu địa chỉ và báo khi lưu hỏng"
   });
 
   afterAll(async () => {
-    await client.query(
-      "delete from share_link_ma where share_link_id in (select id from share_links where gallery_id = $1)",
-      [galleryId],
-    );
-    await client.query("delete from share_links where gallery_id = $1", [galleryId]);
-    await client.query("delete from galleries where id = $1", [galleryId]);
-    await client.query("delete from customers where id = $1", [customerId]);
-    await client.end();
-  });
+    // BB-367: dọn theo id (link + mã link nằm dưới bộ ảnh nên đi theo bộ), lỗi dọn làm phép thử đỏ.
+    try {
+      await donNenFixture(client, { galleryIds: [galleryId], customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await client.end();
+    }
+  }, 60_000);
 
   beforeEach(async () => {
     await client.query(

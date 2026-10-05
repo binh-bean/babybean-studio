@@ -664,6 +664,20 @@ export async function donDep(d: DuLieuDanhGia5): Promise<{ conFixture: number }>
     await donTheoChiNhanh(pg, d.branchId, [d.ownerId, d.qlId]);
     const { rows } = await pg.query(`select count(*)::int n from galleries g join branches b on b.id = g.branch_id where b.name like $1`, [`${NHAN_GOC}%`]);
     const conFixture = rows[0].n as number;
+    // BB-367: đọc lại ĐÚNG những gì lượt này tạo. `donTheoChiNhanh` nuốt lỗi xoá chi nhánh/khách, nên
+    // "không ném" chưa phải "đã sạch" — còn dòng nào là afterAll đỏ.
+    const { rows: con } = await pg.query(
+      `select (select count(*)::int from branches where id = $1) chi_nhanh,
+              (select count(*)::int from customers where branch_id = $1) khach,
+              (select count(*)::int from galleries where branch_id = $1) bo,
+              (select count(*)::int from staff_profiles where id = any($2::uuid[])) nhan_su,
+              (select count(*)::int from auth.users where id = any($2::uuid[])) tai_khoan`,
+      [d.branchId, [d.ownerId, d.qlId]],
+    );
+    const sot = Object.entries(con[0] as Record<string, number>).filter(([, n]) => n > 0);
+    if (sot.length) {
+      throw new Error(`Dọn fixture DANHGIA5 THẤT BẠI — còn nằm lại: ${sot.map(([k, n]) => `${k}=${n}`).join(", ")}`);
+    }
     return { conFixture };
   } finally {
     await pg.end();

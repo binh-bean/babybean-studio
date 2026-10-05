@@ -12,6 +12,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { Client } from "pg";
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 vi.mock("server-only", () => ({}));
@@ -55,14 +56,10 @@ describe("BB-121: vòng duyệt ảnh đã chỉnh", () => {
   beforeAll(async () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
-    const { rows: br } = await client.query("select id from branches order by name limit 1");
-    branchId = br[0].id;
-    const { rows: c } = await client.query(
-      `insert into customers (branch_id, full_name)
-       values ($1,'Fixture BB-121 Khách') returning id`,
-      [branchId],
-    );
-    customerId = c[0].id;
+    // BB-367: chi nhánh + khách "Fixture" RIÊNG, không mượn chi nhánh thật.
+    const nen = await dungNenFixture(client, "BB-121", { tenKhach: "Fixture BB-121 Khách" });
+    branchId = nen.branchId;
+    customerId = nen.customerId;
     const { rows: g } = await client.query(
       `insert into galleries (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url)
        values ($1,$2,'Fixture BB-121','in_retouch',$3,'https://example.com/x') returning id`,
@@ -72,10 +69,13 @@ describe("BB-121: vòng duyệt ảnh đã chỉnh", () => {
   });
 
   afterAll(async () => {
-    await client.query("delete from galleries where id = $1", [galleryId]);
-    await client.query("delete from customers where id = $1", [customerId]);
-    await client.end();
-  });
+    // BB-367: dọn theo id (gồm yêu cầu sửa/giao hàng đi theo bộ ảnh); lỗi dọn làm phép thử đỏ.
+    try {
+      await donNenFixture(client, { galleryIds: [galleryId], customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await client.end();
+    }
+  }, 60_000);
 
   beforeEach(async () => {
     await client.query("delete from revision_requests where gallery_id = $1", [galleryId]);

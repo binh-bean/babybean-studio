@@ -18,6 +18,7 @@ import * as staffAuth from "@/lib/auth/staff";
 import { POST as pay } from "@/app/api/admin/galleries/[id]/payments/route";
 import { POST as themDong, PATCH as suaDong, DELETE as xoaDong } from "@/app/api/admin/galleries/[id]/items/route";
 
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 describe("BB-320: sửa dòng hàng khi đã chốt + giảm giá %", () => {
   let client: Client;
   let branchId: string;
@@ -64,33 +65,26 @@ describe("BB-320: sửa dòng hàng khi đã chốt + giảm giá %", () => {
   beforeAll(async () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
-    const { rows: br } = await client.query("select id from branches order by name limit 1");
-    branchId = br[0].id;
+    // BB-367: chi nhánh + khách "Fixture" RIÊNG, không mượn chi nhánh thật.
+    const nen = await dungNenFixture(client, "BB-320", { tenKhach: "Fixture BB-320 Khách dong hang" });
+    branchId = nen.branchId;
+    customerId = nen.customerId;
     const { rows: st } = await client.query(
       "select id from staff_profiles where full_name not like 'Fixture%' order by created_at limit 1",
     );
     staffId = st[0].id;
     const { rows: p } = await client.query("select id from products where kind = 'edited_photo' limit 1");
     editFileProductId = p[0].id;
-    const { rows: c } = await client.query(
-      `insert into customers (branch_id, full_name) values ($1,'Fixture BB-320 Khách dong hang') returning id`,
-      [branchId],
-    );
-    customerId = c[0].id;
   });
 
   afterAll(async () => {
-    for (const id of galleryIds) {
-      await client.query("delete from gallery_payments where gallery_id = $1", [id]);
-      await client.query("delete from activity_logs where entity_id = $1", [id]).catch(() => {});
-      await client.query("delete from selections where gallery_id = $1", [id]);
-      await client.query("delete from share_links where gallery_id = $1", [id]);
-      await client.query("delete from gallery_items where gallery_id = $1", [id]);
-      await client.query("delete from galleries where id = $1", [id]);
+    // BB-367: dọn theo id; lỗi dọn làm phép thử đỏ; luôn đóng kết nối.
+    try {
+      await donNenFixture(client, { galleryIds, customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await client.end();
     }
-    await client.query("delete from customers where id = $1", [customerId]);
-    await client.end();
-  });
+  }, 60_000);
 
   beforeEach(() => asCs());
 

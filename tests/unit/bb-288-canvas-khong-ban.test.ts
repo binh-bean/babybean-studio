@@ -7,7 +7,7 @@
  * nhánh `kind === "print"` — nên canvas lọt qua. `/api/g/addons` thậm chí
  * không kiểm nhóm chút nào trước bản vá.
  *
- * Test dựng đúng một sản phẩm canvas giả (`Fixture BB-288 …`, tên rõ ràng là
+ * Test dựng đúng một sản phẩm canvas giả (`Mẫu kiểm thử BB-288 …`, tên rõ ràng là
  * giả theo AGENTS.md §6), đủ điều kiện giá (BB-105: có `list_price`,
  * `price_confidence >= 0.8`, `price_samples >= 5`) để chỉ còn ĐÚNG MỘT lý do
  * có thể chặn: luật nhóm bán hàng của BB-288.
@@ -20,11 +20,14 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { Client } from "pg";
 import { randomUUID } from "node:crypto";
 import { POST as postAddon } from "@/app/api/g/addons/route";
 import { POST as postMuaThem } from "@/app/api/g/mua-them/route";
 import * as galleryAuth from "@/lib/auth/gallery-session";
 import type { GallerySession } from "@/types/domain";
+
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 
 vi.mock("server-only", () => ({}));
 
@@ -36,6 +39,7 @@ describe("BB-288: canvas không nằm trong danh mục bán cho khách (route gh
 
   let branchId: string;
   let customerId: string;
+  let pg: Client;
   let canvasProductId: string;
 
   /**
@@ -45,33 +49,33 @@ describe("BB-288: canvas không nằm trong danh mục bán cho khách (route gh
    * lập, không dựng chung một bộ ảnh được.
    */
   let addonsGalleryId: string;
-  let addonsShareLinkId: string;
   let addonsSelectionId: string;
   let addonsPhotoId: string;
   let addonsSession: GallerySession;
 
   let muaThemGalleryId: string;
-  let muaThemShareLinkId: string;
-  let muaThemSelectionId: string;
   let muaThemPhotoId: string;
   let muaThemSession: GallerySession;
 
   beforeAll(async () => {
-    const { data: branch } = await supabase.from("branches").select("id").limit(1).single();
-    if (!branch) throw new Error("Cần ít nhất một chi nhánh trong database");
-    branchId = branch.id;
-
-    const { data: customer } = await supabase.from("customers").select("id").limit(1).single();
-    if (!customer) throw new Error("Cần ít nhất một khách hàng trong database");
-    customerId = customer.id;
+    // BB-367: chi nhánh + khách "Fixture" RIÊNG (bản cũ lấy khách THẬT bằng `limit 1` rồi gắn hai bộ thử vào).
+    pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+    await pg.connect();
+    const nen = await dungNenFixture(pg, "BB-288");
+    branchId = nen.branchId;
+    customerId = nen.customerId;
 
     canvasProductId = randomUUID();
+    // Tên "Mẫu kiểm thử …" chứ KHÔNG phải "Fixture …": `sanPhamBanChoKhach()` chặn mọi tên Fixture
+    // theo tên (BB-352), nên với tên Fixture phép thử xanh vì LÝ DO SAI — luật canvas chưa hề được
+    // chạm. Hàng này phải `is_active = true` để route đi tới luật canvas; canvas không nằm trong
+    // danh mục bán nên khách không thấy nó trên cửa hàng. Xoá theo id ở afterAll (BB-367).
     const { error: prodErr } = await supabase.from("products").insert({
       id: canvasProductId,
       // Tên rõ ràng là dữ liệu giả (AGENTS.md §6). BB-339: "Cavas/Kim tuyến"
       // trên Lark nay là ảnh in Kim Tuyến ĐANG BÁN (bảng giá anh gửi 01/10) —
       // phép thử này canh canvas THẬT, nên dùng chất liệu "Canvas".
-      name: "Fixture BB-288 Canvas 40x60",
+      name: "Mẫu kiểm thử BB-288 Canvas 40x60",
       kind: "print",
       material: "Canvas",
       size: "40x60",
@@ -158,7 +162,6 @@ describe("BB-288: canvas không nằm trong danh mục bán cho khách (route gh
     // "ready" = chưa khoá, đúng điều kiện mở của /api/g/addons.
     const boAnhAddons = await dungBoAnh("ready");
     addonsGalleryId = boAnhAddons.galleryId;
-    addonsShareLinkId = boAnhAddons.shareLinkId;
     addonsSelectionId = boAnhAddons.selectionId;
     addonsPhotoId = boAnhAddons.photoId;
     addonsSession = boAnhAddons.session;
@@ -166,26 +169,23 @@ describe("BB-288: canvas không nằm trong danh mục bán cho khách (route gh
     // "approved" + 0 vòng sửa = đúng điều kiện mở "mời mua lần hai" của ba mẹ.
     const boAnhMuaThem = await dungBoAnh("approved");
     muaThemGalleryId = boAnhMuaThem.galleryId;
-    muaThemShareLinkId = boAnhMuaThem.shareLinkId;
-    muaThemSelectionId = boAnhMuaThem.selectionId;
     muaThemPhotoId = boAnhMuaThem.photoId;
     muaThemSession = boAnhMuaThem.session;
   });
 
   afterAll(async () => {
-    for (const selectionId of [addonsSelectionId, muaThemSelectionId]) {
-      await supabase.from("selection_addons").delete().eq("selection_id", selectionId);
-      await supabase.from("selections").delete().eq("id", selectionId);
+    // BB-367: dọn theo id (bảng con → bộ ảnh → sản phẩm → khách → chi nhánh), lỗi dọn làm phép thử đỏ.
+    try {
+      await donNenFixture(pg, {
+        galleryIds: [addonsGalleryId, muaThemGalleryId],
+        productIds: [canvasProductId],
+        customerIds: [customerId],
+        branchIds: [branchId],
+      });
+    } finally {
+      await pg?.end();
     }
-    for (const shareLinkId of [addonsShareLinkId, muaThemShareLinkId]) {
-      await supabase.from("share_links").delete().eq("id", shareLinkId);
-    }
-    for (const galleryId of [addonsGalleryId, muaThemGalleryId]) {
-      await supabase.from("galleries").delete().eq("id", galleryId);
-    }
-    await supabase.from("yeu_cau_mua_them").delete().eq("product_id", canvasProductId);
-    if (canvasProductId) await supabase.from("products").delete().eq("id", canvasProductId);
-  });
+  }, 60_000);
 
   it("POST /api/g/addons với sản phẩm canvas -> từ chối, không tạo dòng mua thêm", async () => {
     vi.spyOn(galleryAuth, "requireGallerySession").mockResolvedValueOnce(addonsSession);

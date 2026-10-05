@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { Client } from "pg";
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 import { randomUUID } from "crypto";
 import { NextRequest } from "next/server";
 import { patchSelection } from "@/lib/selection/mutate";
@@ -13,6 +15,7 @@ describe("BB-144: Lưu ghi chú và nhãn từng ảnh", () => {
 
   let branchId: string;
   let customerId: string;
+  let pg: Client;
   let galleryId: string;
   let selectionId: string;
   let shareLinkId: string;
@@ -22,8 +25,12 @@ describe("BB-144: Lưu ghi chú và nhãn từng ảnh", () => {
   let session: GallerySession;
 
   beforeAll(async () => {
-    branchId = (await supabase.from("branches").select("id").limit(1).single()).data!.id;
-    customerId = (await supabase.from("customers").select("id").limit(1).single()).data!.id;
+    // BB-367: chi nhánh + khách "Fixture" RIÊNG (bản cũ lấy khách THẬT `limit 1` rồi gắn bộ thử vào).
+    pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+    await pg.connect();
+    const nen = await dungNenFixture(pg, "BB-144");
+    branchId = nen.branchId;
+    customerId = nen.customerId;
     galleryId = randomUUID();
     selectionId = randomUUID();
     photo1 = randomUUID();
@@ -36,7 +43,7 @@ describe("BB-144: Lưu ghi chú và nhãn từng ảnh", () => {
       customer_id: customerId,
       drive_folder_id: "test_bb144_" + randomUUID(),
       drive_folder_url: "https://drive.google.com/test",
-      title: "Test BB-144",
+      title: "Fixture BB-144",
       status: "ready",
       photo_count: 2,
       included_quota: 5,
@@ -60,7 +67,7 @@ describe("BB-144: Lưu ghi chú và nhãn từng ảnh", () => {
       id: selectionId,
       gallery_id: galleryId,
       share_link_id: shareLinkId,
-      display_name: "Test Selection BB-144",
+      display_name: "Fixture BB-144 Selection",
     });
     if (sErr) throw sErr;
 
@@ -101,10 +108,13 @@ describe("BB-144: Lưu ghi chú và nhãn từng ảnh", () => {
   });
 
   afterAll(async () => {
-    if (galleryId) {
-      await supabase.from("galleries").delete().eq("id", galleryId);
+    // BB-367: dọn theo id, lỗi dọn làm phép thử đỏ (bản cũ bỏ `{ error }` của supabase-js).
+    try {
+      await donNenFixture(pg, { galleryIds: [galleryId], customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await pg?.end();
     }
-  });
+  }, 60_000);
 
   it("1. Chọn ảnh kèm ghi chú và thẻ -> lưu thành công", async () => {
     const res = await patchSelection(

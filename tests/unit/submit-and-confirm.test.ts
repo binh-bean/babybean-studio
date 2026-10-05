@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { Client } from "pg";
 import { randomUUID } from "node:crypto";
-import { donFixtureTheoId, type KhachSupabaseToiThieu } from "../fixtures/don-dep-theo-id";
 import { POST as postSubmit } from "@/app/api/g/submit/route";
 import { POST as postConfirmRetouch } from "@/app/api/admin/galleries/[id]/confirm/route";
 import { GET as getGallery } from "@/app/api/g/gallery/route";
@@ -10,6 +10,8 @@ import * as galleryAuth from "@/lib/auth/gallery-session";
 import * as staffAuth from "@/lib/auth/staff";
 import type { GallerySession } from "@/types/domain";
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
+
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 
 vi.mock("server-only", () => ({}));
 
@@ -21,6 +23,7 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
 
   let branchId: string;
   let customerId: string;
+  let pg: Client;
 
   const createdProductIds: string[] = [];
   const createdGalleryIds: string[] = [];
@@ -30,14 +33,12 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
   let prodServiceMakeup: string;
 
   beforeAll(async () => {
-    // 1. Lấy chi nhánh và khách hàng mẫu
-    const { data: branch } = await supabase.from("branches").select("id").limit(1).single();
-    if (!branch) throw new Error("Cần ít nhất một chi nhánh trong database");
-    branchId = branch.id;
-
-    const { data: customer } = await supabase.from("customers").select("id").limit(1).single();
-    if (!customer) throw new Error("Cần ít nhất một khách hàng trong database");
-    customerId = customer.id;
+    // 1. BB-367: chi nhánh + khách "Fixture" RIÊNG (trước đây `limit 1` lấy khách THẬT rồi gắn bộ thử vào).
+    pg = new Client({ connectionString: process.env.SUPABASE_DB_URL });
+    await pg.connect();
+    const nen = await dungNenFixture(pg, "BB-114");
+    branchId = nen.branchId;
+    customerId = nen.customerId;
 
     // 2. Tạo sản phẩm mẫu
     prodPkgBaby01 = randomUUID();
@@ -45,9 +46,9 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
     prodServiceMakeup = randomUUID();
 
     const prods = [
-      { id: prodPkgBaby01, name: "Fixture Gói Baby 01", kind: "shoot_package", list_price: 1500000, is_active: true },
-      { id: prodEditFile, name: "Fixture Edit file", kind: "edited_photo", list_price: 50000, is_active: true },
-      { id: prodServiceMakeup, name: "Fixture Dịch vụ Makeup", kind: "service", list_price: 300000, is_active: true },
+      { id: prodPkgBaby01, name: "Fixture Gói Baby 01", kind: "shoot_package", list_price: 1500000, is_active: false },
+      { id: prodEditFile, name: "Fixture Edit file", kind: "edited_photo", list_price: 50000, is_active: false },
+      { id: prodServiceMakeup, name: "Fixture Dịch vụ Makeup", kind: "service", list_price: 300000, is_active: false },
     ];
 
     for (const p of prods) createdProductIds.push(p.id);
@@ -60,7 +61,11 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
     // supabase-js trả { error } chứ không ném, nên một lượt xoá hỏng để lại
     // "Fixture …" đang bán trên bb-dev mà phép thử vẫn xanh (01/10/2026).
     // 60 giây: hook mặc định chỉ 10 giây, không đủ cho xoá bộ ảnh kéo theo ảnh.
-    await donFixtureTheoId(supabase as unknown as KhachSupabaseToiThieu, { galleryIds: createdGalleryIds, productIds: createdProductIds });
+    try {
+      await donNenFixture(pg, { galleryIds: createdGalleryIds, productIds: createdProductIds, customerIds: [customerId], branchIds: [branchId] });
+    } finally {
+      await pg?.end();
+    }
   }, 60_000);
 
   // Helper tạo album giả và session
@@ -79,7 +84,7 @@ describe("BB-114: Chốt đơn, báo studio, CSKH xác nhận (submit & confirm)
       customer_id: customerId,
       drive_folder_id: "test_folder_" + randomUUID().slice(0, 8),
       drive_folder_url: "https://drive.google.com/test",
-      title: "Test BB114 " + randomUUID().slice(0, 4),
+      title: "Fixture BB-114 " + randomUUID().slice(0, 4),
       status: "in_review",
       photo_count: 20,
       included_quota: 20,

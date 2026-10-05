@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
 import { randomUUID } from "node:crypto";
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 
 describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_summary)", () => {
   let client: Client;
@@ -18,6 +19,8 @@ describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_
   const createdGalleryIds: string[] = [];
   const createdProductIds: string[] = [];
   const createdStaffIds: string[] = [];
+  const createdBranchIds: string[] = [];
+  const createdCustomerIds: string[] = [];
 
   beforeAll(async () => {
     client = new Client({
@@ -25,16 +28,15 @@ describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_
     });
     await client.connect();
 
-    // 1. Chi nhánh
-    const { rows: branches } = await client.query("SELECT id FROM branches ORDER BY name LIMIT 2");
-    if (branches.length < 2) throw new Error("Cần ít nhất 2 chi nhánh trong DB");
-    branchAId = branches[0].id;
-    branchBId = branches[1].id;
-
-    // 2. Khách hàng
-    const { rows: custs } = await client.query("SELECT id FROM customers LIMIT 1");
-    if (custs.length === 0) throw new Error("Cần ít nhất 1 khách hàng trong DB");
-    customerId = custs[0].id;
+    // 1+2. BB-367: HAI chi nhánh + khách "Fixture" RIÊNG. Bản cũ lấy hai chi nhánh thật và một khách
+    // THẬT (`customers limit 1`) rồi gắn album thử vào, tên album không có tiền tố Fixture.
+    const nenA = await dungNenFixture(client, "BB-106");
+    const nenB = await dungNenFixture(client, "BB-106");
+    createdBranchIds.push(nenA.branchId, nenB.branchId);
+    createdCustomerIds.push(nenA.customerId, nenB.customerId);
+    branchAId = nenA.branchId;
+    branchBId = nenB.branchId;
+    customerId = nenA.customerId;
 
     // 3. Sản phẩm
     prodEditFileId = randomUUID();
@@ -42,10 +44,10 @@ describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_
     createdProductIds.push(prodEditFileId, prodMakeupId);
 
     await client.query(`
-      INSERT INTO products (id, name, kind, list_price)
+      INSERT INTO products (id, name, kind, list_price, is_active)
       VALUES 
-        ($1, 'Fixture Edit file', 'edited_photo', 50000),
-        ($2, 'Fixture Makeup Test', 'service', 300000)
+        ($1, 'Fixture Edit file', 'edited_photo', 50000, false),
+        ($2, 'Fixture Makeup Test', 'service', 300000, false)
     `, [prodEditFileId, prodMakeupId]);
 
     // 4. Tạo nhân viên mẫu cho các vai trò
@@ -78,31 +80,24 @@ describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_
   });
 
   afterAll(async () => {
-    // Dọn dẹp galleries và các bảng liên quan
-    if (createdGalleryIds.length > 0) {
-      await client.query("DELETE FROM galleries WHERE id = ANY($1)", [createdGalleryIds]);
+    // BB-367: dọn theo id (bảng con → album → sản phẩm → khách → nhân sự + tài khoản → chi nhánh),
+    // lỗi dọn làm phép thử đỏ, và luôn đóng kết nối. Các phép thử chạy dưới vai `authenticated` đều
+    // ROLLBACK trong finally nên ở đây là vai gốc.
+    try {
+      await donNenFixture(client, {
+        galleryIds: createdGalleryIds,
+        productIds: createdProductIds,
+        customerIds: createdCustomerIds,
+        staffIds: createdStaffIds,
+        branchIds: createdBranchIds,
+      });
+      // BB-367: bỏ lệnh quét "DELETE FROM products WHERE name LIKE 'Fixture %' AND created_at < 6 giờ"
+      // (BB-296 #8). Nó xoá cả hàng KHÔNG do lượt chạy này tạo; lưới đỡ theo tuổi đã có ở
+      // `npm run db:cleanup` (người chạy, có xem trước), còn `npm run db:kiem-fixture` báo sót.
+    } finally {
+      await client.end();
     }
-    if (createdProductIds.length > 0) {
-      await client.query("DELETE FROM products WHERE id = ANY($1)", [createdProductIds]);
-    }
-    if (createdStaffIds.length > 0) {
-      await client.query("DELETE FROM staff_branches WHERE staff_id = ANY($1)", [createdStaffIds]);
-      await client.query("DELETE FROM staff_profiles WHERE id = ANY($1)", [createdStaffIds]);
-      await client.query("DELETE FROM auth.users WHERE id = ANY($1)", [createdStaffIds]);
-    }
-    /*
-      BB-296 mục #8 — báo cáo chấm độc lập lần 3: sản phẩm tên bắt đầu bằng
-      "Fixture" (vd "Fixture Edit file") lọt vào danh mục bán CHO KHÁCH THẬT
-      trên bb-dev. Dọn theo `id` ở trên chỉ dọn đúng lượt chạy này — một lượt
-      bị ngắt giữa chừng (process bị kill/timeout) để lại các dòng này VĨNH
-      VIỄN vì bảng `products` không có dòng quét rác theo tuổi. Thêm quét rác
-      cùng luật đã dùng cho các bảng khác trong repo (ngưỡng 6 giờ).
-    */
-    await client.query(
-      `DELETE FROM products WHERE name LIKE 'Fixture %' AND created_at < now() - interval '6 hours'`,
-    );
-    await client.end();
-  });
+  }, 60_000);
 
   async function createGalleryWithSelection(options: {
     branchId: string;
@@ -121,7 +116,7 @@ describe("BB-106: Báo cáo thất thoát (v_over_quota_unbilled & v_over_quota_
     await client.query(`
       INSERT INTO galleries (id, branch_id, customer_id, title, status, drive_folder_id, drive_folder_url, included_quota, extra_photo_price, editor_id)
       VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'in_review', 'fixture-' || $1::text, 'https://drive.google.com/test', $5, $6, $7)
-    `, [gid, options.branchId, customerId, options.title, options.includedQuota, options.extraPhotoPrice, options.editorId || null]);
+    `, [gid, options.branchId, customerId, `Fixture BB-106 ${options.title}`, options.includedQuota, options.extraPhotoPrice, options.editorId || null]);
 
     if (options.hasItemsWithNoQuota) {
       // Có gallery_items nhưng không có dòng nào là edited_photo -> app.gallery_quota trả về NULL

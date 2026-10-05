@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
 import { randomUUID } from "node:crypto";
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 
 describe("BB-115: Ghi nhận thanh toán phát sinh (gallery_payments)", () => {
   let client: Client;
@@ -18,6 +19,8 @@ describe("BB-115: Ghi nhận thanh toán phát sinh (gallery_payments)", () => {
 
   const createdGalleryIds: string[] = [];
   const createdStaffIds: string[] = [];
+  const createdBranchIds: string[] = [];
+  const createdCustomerIds: string[] = [];
 
   beforeAll(async () => {
     client = new Client({
@@ -25,16 +28,15 @@ describe("BB-115: Ghi nhận thanh toán phát sinh (gallery_payments)", () => {
     });
     await client.connect();
 
-    // 1. Chi nhánh
-    const { rows: branches } = await client.query("SELECT id FROM branches ORDER BY name LIMIT 2");
-    if (branches.length < 2) throw new Error("Cần ít nhất 2 chi nhánh trong DB");
-    branchAId = branches[0].id;
-    branchBId = branches[1].id;
-
-    // 2. Khách hàng
-    const { rows: custs } = await client.query("SELECT id FROM customers LIMIT 1");
-    if (custs.length === 0) throw new Error("Cần ít nhất 1 khách hàng trong DB");
-    customerId = custs[0].id;
+    // 1+2. BB-367: HAI chi nhánh + khách "Fixture" RIÊNG (bản cũ lấy hai chi nhánh thật và một khách
+    // THẬT `limit 1`, album thử mang tên "Gallery BB-115 Test" không có tiền tố Fixture).
+    const nenA = await dungNenFixture(client, "BB-115");
+    const nenB = await dungNenFixture(client, "BB-115");
+    createdBranchIds.push(nenA.branchId, nenB.branchId);
+    createdCustomerIds.push(nenA.customerId, nenB.customerId);
+    branchAId = nenA.branchId;
+    branchBId = nenB.branchId;
+    customerId = nenA.customerId;
 
     // 3. Tạo nhân viên mẫu cho từng vai trò
     async function createStaffUser(role: string, branchId?: string): Promise<string> {
@@ -69,16 +71,18 @@ describe("BB-115: Ghi nhận thanh toán phát sinh (gallery_payments)", () => {
   });
 
   afterAll(async () => {
-    if (createdGalleryIds.length > 0) {
-      await client.query("DELETE FROM galleries WHERE id = ANY($1::uuid[])", [createdGalleryIds]);
+    // BB-367: dọn theo id (album → khách → nhân sự + tài khoản → chi nhánh), lỗi dọn làm phép thử đỏ.
+    try {
+      await donNenFixture(client, {
+        galleryIds: createdGalleryIds,
+        customerIds: createdCustomerIds,
+        staffIds: createdStaffIds,
+        branchIds: createdBranchIds,
+      });
+    } finally {
+      await client.end();
     }
-    if (createdStaffIds.length > 0) {
-      await client.query("DELETE FROM staff_branches WHERE staff_id = ANY($1::uuid[])", [createdStaffIds]);
-      await client.query("DELETE FROM staff_profiles WHERE id = ANY($1::uuid[])", [createdStaffIds]);
-      await client.query("DELETE FROM auth.users WHERE id = ANY($1::uuid[])", [createdStaffIds]);
-    }
-    await client.end();
-  });
+  }, 60_000);
 
   async function createGalleryWithSubmittedSelection(options: {
     branchId: string;
@@ -89,7 +93,7 @@ describe("BB-115: Ghi nhận thanh toán phát sinh (gallery_payments)", () => {
 
     await client.query(`
       INSERT INTO galleries (id, branch_id, customer_id, title, status, drive_folder_id, drive_folder_url, included_quota, extra_photo_price)
-      VALUES ($1::uuid, $2::uuid, $3::uuid, 'Gallery BB-115 Test', 'submitted', 'fixture-' || $1::text, 'https://drive.google.com/test', 10, 50000)
+      VALUES ($1::uuid, $2::uuid, $3::uuid, 'Fixture BB-115 Gallery', 'submitted', 'fixture-' || $1::text, 'https://drive.google.com/test', 10, 50000)
     `, [gid, options.branchId, customerId]);
 
     const linkId = randomUUID();

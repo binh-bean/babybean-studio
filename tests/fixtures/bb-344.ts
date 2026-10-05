@@ -158,6 +158,16 @@ export async function donDepBB344(d: DuLieuBB344): Promise<{ conBo: number; conC
   await donTheoChiNhanh(d.pg, d.branchId, d.ownerId ? [d.ownerId] : []);
   const { rows: bo } = await d.pg.query(`select count(*)::int n from galleries where branch_id = $1`, [d.branchId]);
   const { rows: cn } = await d.pg.query(`select count(*)::int n from branches where id = $1`, [d.branchId]);
+  // BB-367: `donTheoChiNhanh` nuốt lỗi từng lệnh xoá nên phải ĐỌC LẠI cả khách, nhân sự và tài khoản
+  // đăng nhập (trước chỉ đếm bộ ảnh và chi nhánh) — còn dòng nào là afterAll đỏ.
+  const { rows: con } = await d.pg.query(
+    `select (select count(*)::int from customers where branch_id = $1) khach,
+            (select count(*)::int from staff_profiles where id = any($2::uuid[])) nhan_su,
+            (select count(*)::int from auth.users where id = any($2::uuid[])) tai_khoan`,
+    [d.branchId, d.ownerId ? [d.ownerId] : []],
+  );
   await d.pg.end();
+  const sot = Object.entries(con[0] as Record<string, number>).filter(([, n]) => n > 0);
+  if (sot.length) throw new Error(`Dọn fixture BB-344 THẤT BẠI — còn nằm lại: ${sot.map(([k, n]) => `${k}=${n}`).join(", ")}`);
   return { conBo: bo[0].n as number, conChiNhanh: cn[0].n as number };
 }

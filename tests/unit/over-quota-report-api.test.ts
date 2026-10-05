@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { quyenCuaVai } from "../fixtures/phien-nhan-su";
 import { Client } from "pg";
+import { dungNenFixture, donNenFixture } from "../fixtures/nen-fixture";
 
 vi.mock("server-only", () => ({}));
 
@@ -21,6 +22,7 @@ describe("BB-120: báo cáo ảnh vượt hạn mức", () => {
   let branchA: string;
   let branchB: string;
   const made: { galleryId: string; customerId: string }[] = [];
+  const nen: { branchId: string; customerId: string }[] = [];
 
   /** Dựng một bộ ảnh đã chọn vượt hạn mức, trả về id. */
   async function makeOverQuota(branchId: string, quota: number, selected: number, coBe = false) {
@@ -90,9 +92,12 @@ describe("BB-120: báo cáo ảnh vượt hạn mức", () => {
   beforeAll(async () => {
     client = new Client({ connectionString: process.env.SUPABASE_DB_URL });
     await client.connect();
-    const { rows } = await client.query("select id from branches order by name limit 2");
-    branchA = rows[0].id;
-    branchB = rows[1].id;
+    // BB-367: HAI chi nhánh "Fixture" RIÊNG (bản cũ lấy hai chi nhánh thật rồi dựng bộ thử vào).
+    const nenA = await dungNenFixture(client, "BB-120");
+    const nenB = await dungNenFixture(client, "BB-120");
+    nen.push(nenA, nenB);
+    branchA = nenA.branchId;
+    branchB = nenB.branchId;
 
     await makeOverQuota(branchA, 2, 5); // vượt 3 ảnh = 150.000đ
     await makeOverQuota(branchB, 1, 4); // vượt 3 ảnh = 150.000đ
@@ -100,12 +105,17 @@ describe("BB-120: báo cáo ảnh vượt hạn mức", () => {
   });
 
   afterAll(async () => {
-    for (const m of made) {
-      await client.query("delete from galleries where id = $1", [m.galleryId]);
-      await client.query("delete from customers where id = $1", [m.customerId]);
+    // BB-367: dọn theo id; lỗi dọn làm phép thử đỏ; luôn đóng kết nối.
+    try {
+      await donNenFixture(client, {
+        galleryIds: made.map((m) => m.galleryId),
+        customerIds: [...made.map((m) => m.customerId), ...nen.map((n) => n.customerId)],
+        branchIds: nen.map((n) => n.branchId),
+      });
+    } finally {
+      await client.end();
     }
-    await client.end();
-  });
+  }, 60_000);
 
   it("1. Quản lý chi nhánh A KHÔNG thấy khoản nợ của chi nhánh B", async () => {
     asStaff("branch_manager", [branchA]);
