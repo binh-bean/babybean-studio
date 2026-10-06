@@ -159,7 +159,13 @@ export function quyetDinhGhiLinkQuanLy(oDangCo: string, diaChiMoi: string): Quye
   try {
     const u1 = new URL(cu);
     const u2 = new URL(diaChiMoi);
-    const laLinkQuanLyCuaMinh = u1.origin === u2.origin && /^\/admin\/galleries\/[^/]+\/?$/.test(u1.pathname);
+    const laDuongQuanLy = /^\/admin\/galleries\/[^/]+\/?$/.test(u1.pathname);
+    // 06/10: lượt điền bù đầu tiên chạy từ máy thử nên ghi nhầm gốc
+    // `http://localhost:3000` vào 492 ô — link do CHÍNH APP ghi, mở ra không được.
+    // Link quản lý trỏ máy cục bộ không bao giờ đúng trên Lark → luôn thay bằng gốc thật.
+    const laGocCucBo = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u1.hostname) || u1.hostname.endsWith(".localhost");
+    if (laDuongQuanLy && laGocCucBo && u1.origin !== u2.origin) return { ghi: true };
+    const laLinkQuanLyCuaMinh = u1.origin === u2.origin && laDuongQuanLy;
     if (laLinkQuanLyCuaMinh) {
       return u1.pathname.replace(/\/$/, "") === u2.pathname ? { ghi: false, boQua: "da_dung" } : { ghi: true };
     }
@@ -173,9 +179,18 @@ export function quyetDinhGhiLinkQuanLy(oDangCo: string, diaChiMoi: string): Quye
   };
 }
 
-function giaTriO(viTri: ViTriCotQuanLy, diaChi: string): unknown {
-  // Nhãn của ô URL đặt bằng chính địa chỉ — không bao giờ bằng tên khách (docs/16 §7.3).
-  return viTri.fieldType === KIEU_O_URL ? { link: diaChi, text: diaChi } : diaChi;
+/** Chữ hiển thị của ô URL (phần "text"), nếu có. */
+export function nhanTrongO(o: unknown): string {
+  const first = Array.isArray(o) ? o[0] : o;
+  if (first && typeof first === "object") return String((first as { text?: string }).text ?? "").trim();
+  return "";
+}
+
+function giaTriO(viTri: ViTriCotQuanLy, diaChi: string, nhan?: string): unknown {
+  // 06/10 anh chốt: ô URL hiện TÊN KHÁCH ở phần chữ, phần link là địa chỉ — bảng
+  // Hậu Kỳ là bảng nội bộ của studio (nhân viên vốn thấy tên khách ở dòng đó).
+  // Thay cho luật cũ "nhãn = địa chỉ" (docs/16 §7.3) — chỉ áp cho cột quản lý này.
+  return viTri.fieldType === KIEU_O_URL ? { link: diaChi, text: nhan?.trim() || diaChi } : diaChi;
 }
 
 export type LyDoBoQuaQuanLy =
@@ -204,6 +219,8 @@ export interface TuyChonGhiQuanLy {
   recordId: string;
   /** Địa chỉ ĐẦY ĐỦ, ví dụ https://.../admin/galleries/<id>. */
   diaChi: string;
+  /** Chữ hiển thị của ô URL — tên khách (anh chốt 06/10). Trống thì dùng địa chỉ. */
+  nhan?: string;
   /** false = chạy thử: đọc ô, quyết định, KHÔNG gọi PUT. */
   ghiThat: boolean;
   /** Đã có sẵn (nạp một lần cho cả lô) thì khỏi xin token/tìm cột lại. */
@@ -217,7 +234,7 @@ async function docO(
   baseToken: string,
   viTri: ViTriCotQuanLy,
   recordId: string,
-): Promise<{ coDong: boolean; oDangCo: string }> {
+): Promise<{ coDong: boolean; oDangCo: string; nhanDangCo: string }> {
   const res = await fetch(`${HOST}/bitable/v1/apps/${baseToken}/tables/${viTri.tableId}/records/${recordId}`, {
     headers: { authorization: auth.authorization },
   });
@@ -225,8 +242,9 @@ async function docO(
     code: number;
     data?: { record?: { fields?: Record<string, unknown> } };
   };
-  if (json.code !== 0 || !json.data?.record) return { coDong: false, oDangCo: "" };
-  return { coDong: true, oDangCo: diaChiTrongO(json.data.record.fields?.[viTri.fieldName]) };
+  if (json.code !== 0 || !json.data?.record) return { coDong: false, oDangCo: "", nhanDangCo: "" };
+  const o = json.data.record.fields?.[viTri.fieldName];
+  return { coDong: true, oDangCo: diaChiTrongO(o), nhanDangCo: nhanTrongO(o) };
 }
 
 /** Ghi link quản lý lên Lark. KHÔNG BAO GIỜ NÉM LỖI. */
@@ -259,11 +277,16 @@ export async function ghiLinkQuanLyVeLark(opts: TuyChonGhiQuanLy): Promise<KetQu
       viTri = tim.viTri;
     }
 
-    const { coDong, oDangCo } = await docO(auth, baseToken, viTri, opts.recordId);
+    const { coDong, oDangCo, nhanDangCo } = await docO(auth, baseToken, viTri, opts.recordId);
     if (!coDong) {
       return { ghiDuoc: false, chayThu, viTri, boQua: "khong_thay_dong", lyDo: `Không tìm thấy dòng Hậu Kỳ ${opts.recordId} bên Lark.` };
     }
-    const qd = quyetDinhGhiLinkQuanLy(oDangCo, opts.diaChi);
+    let qd = quyetDinhGhiLinkQuanLy(oDangCo, opts.diaChi);
+    // Link đã đúng nhưng chữ hiển thị chưa phải tên khách → ghi lại chữ.
+    const nhanMuon = opts.nhan?.trim();
+    if (!qd.ghi && qd.boQua === "da_dung" && viTri.fieldType === KIEU_O_URL && nhanMuon && nhanDangCo !== nhanMuon) {
+      qd = { ghi: true };
+    }
     if (!qd.ghi) {
       return { ghiDuoc: false, chayThu, viTri, boQua: qd.boQua, lyDo: qd.lyDo };
     }
@@ -273,7 +296,7 @@ export async function ghiLinkQuanLyVeLark(opts: TuyChonGhiQuanLy): Promise<KetQu
       method: "PUT",
       headers: { authorization: auth.authorization, "content-type": "application/json" },
       // ĐÚNG MỘT KHOÁ: Lark giữ nguyên mọi cột không có mặt ở đây.
-      body: JSON.stringify({ fields: { [viTri.fieldName]: giaTriO(viTri, opts.diaChi) } }),
+      body: JSON.stringify({ fields: { [viTri.fieldName]: giaTriO(viTri, opts.diaChi, opts.nhan) } }),
     });
     const json = (await res.json()) as { code: number; msg?: string };
     if (json.code !== 0) {
@@ -303,7 +326,7 @@ export async function ghiLinkQuanLyChoBoAnh(
   try {
     const { data: g, error } = await admin
       .from("galleries")
-      .select("id, lark_hauky_record_id")
+      .select("id, title, lark_hauky_record_id, customer:customers(full_name)")
       .eq("id", galleryId)
       .maybeSingle();
     if (error) throw error;
@@ -315,7 +338,9 @@ export async function ghiLinkQuanLyChoBoAnh(
     if (!diaChi) {
       return { ghiDuoc: false, chayThu: false, boQua: "thieu_dia_chi_goc", lyDo: "Thiếu NEXT_PUBLIC_APP_URL." };
     }
-    const kq = await ghiLinkQuanLyVeLark({ recordId, diaChi, ghiThat: true });
+    const kh = (Array.isArray(g?.customer) ? g?.customer[0] : g?.customer) as { full_name?: string | null } | null | undefined;
+    const nhan = (kh?.full_name ?? "").trim() || String(g?.title ?? "").trim();
+    const kq = await ghiLinkQuanLyVeLark({ recordId, diaChi, ghiThat: true, nhan });
     // Chưa có cột / đang chạy phép thử là chuyện bình thường — không ồn ào.
     if (kq.boQua && kq.boQua !== "chua_co_cot" && kq.boQua !== "dang_chay_phep_thu" && kq.boQua !== "da_dung") {
       console.info(

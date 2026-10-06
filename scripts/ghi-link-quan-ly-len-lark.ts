@@ -60,16 +60,28 @@ async function main(): Promise<void> {
     console.error("Thiếu NEXT_PUBLIC_APP_URL — không dựng được địa chỉ đầy đủ.");
     process.exit(1);
   }
+  // 06/10: lượt đầu chạy từ máy thử ghi `http://localhost:3000/...` lên 492 ô Lark.
+  // Lark là nơi nhân viên thật bấm — không bao giờ ghi gốc cục bộ lên đó.
+  const goc = new URL(diaChiDayDu("/")!);
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(goc.hostname) || goc.hostname.endsWith(".localhost")) {
+    console.error(
+      `Địa chỉ gốc đang là ${goc.origin} (máy cục bộ) — DỪNG, không ghi link này lên Lark.\n` +
+        "Chạy kèm địa chỉ thật: NEXT_PUBLIC_APP_URL=https://hauky.babybeanstudio.vn npm run lark:ghi-link-quan-ly",
+    );
+    process.exit(2);
+  }
+  console.log(`Địa chỉ gốc: ${goc.origin}`);
 
   const client = new pg.Client({ connectionString: dbUrl });
   await client.connect();
-  let dsBo: { id: string; record: string }[] = [];
+  let dsBo: { id: string; record: string; nhan: string | null }[] = [];
   try {
     const { rows } = await client.query(
-      `select id, lark_hauky_record_id as record from galleries
-        where lark_hauky_record_id is not null and status <> 'archived' and lark_dong_da_xoa_luc is null`,
+      `select g.id, g.lark_hauky_record_id as record, coalesce(nullif(trim(c.full_name), ''), g.title) as nhan
+         from galleries g left join customers c on c.id = g.customer_id
+        where g.lark_hauky_record_id is not null and g.status <> 'archived' and g.lark_dong_da_xoa_luc is null`,
     );
-    dsBo = rows as { id: string; record: string }[];
+    dsBo = rows as { id: string; record: string; nhan: string | null }[];
   } finally {
     await client.end();
   }
@@ -79,6 +91,7 @@ async function main(): Promise<void> {
     const kq = await ghiLinkQuanLyVeLark({
       recordId: b.record,
       diaChi: diaChiDayDu(duongDanQuanLyBoAnh(b.id))!,
+      nhan: b.nhan ?? undefined,
       ghiThat,
       auth,
       baseToken: cauHinh.baseToken,
