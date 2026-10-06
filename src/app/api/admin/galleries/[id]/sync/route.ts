@@ -21,7 +21,6 @@ import { createServerClient } from "@/lib/supabase/server";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiLinkManConSauDongBo } from "@/lib/gia-dinh/link-gia-dinh";
-import { ghiLinkQuanLyChoBoAnh } from "@/lib/lark/ghi-link-quan-ly";
 import {
   batDauDongBo,
   dongBoBoAnh,
@@ -101,11 +100,6 @@ export async function POST(
       await ghiLinkManConSauDongBo(createAdminClient(), galleryId, { requestId, actorId: staff.staffId });
     });
 
-    // BB-373 — bộ gắn dòng Hậu Kỳ: ghi link màn quản lý vào cột "Link quản lý bộ ảnh"
-    // (ô trống hoặc đang giữ link quản lý trỏ sai bộ). Không ném; chưa có cột thì tự tắt.
-    after(async () => {
-      await ghiLinkQuanLyChoBoAnh(createAdminClient(), galleryId, { requestId });
-    });
 
     return NextResponse.json(
       { data: { jobId: requestId, status: "syncing" } },

@@ -9,7 +9,7 @@
 
 import { keoDongHopDongTuLark } from "@/lib/lark/dong-hop-dong";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
-import { NextResponse, after } from "next/server";
+import { NextResponse } from "next/server";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import {
   requireStaff,
@@ -28,7 +28,6 @@ import { docDongHauKy, LoiTraLark, duoiSoDienThoai } from "@/lib/lark/tra-hau-ky
 import { boAnhTheoDongLark, boAnhTheoThuMuc } from "@/lib/gallery/bo-anh-da-co";
 import { timHoacTaoGoiLark } from "@/lib/gallery/goi-chup-lark";
 import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
-import { ghiLinkQuanLyChoBoAnh } from "@/lib/lark/ghi-link-quan-ly";
 
 export const runtime = "nodejs";
 // BB-331: tạo bộ xong kéo luôn dòng hợp đồng từ Lark (3–9 giây, đo 30/09).
@@ -232,11 +231,6 @@ export async function POST(request: Request): Promise<Response> {
       }
     }
 
-    // BB-373 — ghi link màn quản lý bộ ảnh vào cột "Link quản lý bộ ảnh" của dòng Hậu Kỳ
-    // (sau khi trả lời, không ném, chưa có cột thì tự tắt).
-    after(async () => {
-      await ghiLinkQuanLyChoBoAnh(admin, galleryIdMoi, { requestId });
-    });
 
     // BB-331: bộ vừa neo vào hóa đơn Lark → kéo luôn dòng hợp đồng (hạn mức
     // tính từ các dòng này, `app.gallery_quota`). Hỏng thì bộ vẫn tạo xong —
