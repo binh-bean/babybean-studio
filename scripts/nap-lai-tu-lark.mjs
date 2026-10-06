@@ -201,6 +201,10 @@ export const PHAN_LOAI_BANG = {
   selection_rounds: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "đợt chọn thêm ảnh (0077)" },
   selections: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "lượt chọn của khách" },
   album_covers: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "bìa album khách chọn (0075)" },
+  anh_album_khong_chinh: {
+    nhom: NHOM_XOA_DU_LIEU_THU,
+    lyDo: "tấm khách chọn cho album, không chỉnh (0093, BB-374)",
+  },
   gallery_payments: {
     nhom: NHOM_XOA_DU_LIEU_THU,
     lyDo: "sổ ghi thu — CHỈ là dữ liệu thử trước ngày mở; sau đó là sổ tiền thật, không được xoá",
@@ -218,6 +222,7 @@ export const PHAN_LOAI_BANG = {
     lyDo: "sổ tin nhắc đã gửi (0067) — bộ ảnh mới id mới; cron kế tiếp có thể nhắc lại mốc chưa quá trễ một lần",
   },
   yeu_cau_mua_them: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "yêu cầu mua lần hai của khách (0072)" },
+  revision_request_items: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "chi tiết từng tấm của vòng sửa ảnh chỉnh (0091)" },
   revision_requests: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "vòng duyệt ảnh chỉnh" },
   deliveries: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "giao hàng" },
   activity_logs: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "nhật ký thao tác" },
@@ -243,6 +248,8 @@ export const THU_TU_XOA = [
   "selection_addon_photos",
   // 0075: tham chiếu selections, gallery_items, selection_items — đứng TRƯỚC cả ba.
   "album_covers",
+  // 0093 (BB-374): tham chiếu selections/galleries/photos — đứng TRƯỚC selections.
+  "anh_album_khong_chinh",
   "selection_addons",
   "selection_ops",
   "selection_items",
@@ -261,6 +268,8 @@ export const THU_TU_XOA = [
   "lark_nhac_da_gui",
   // 0072: product_id BẮT BUỘC, KHÔNG cascade -> phải đứng TRƯỚC products.
   "yeu_cau_mua_them",
+  // 0091: tham chiếu revision_requests và photos — đứng TRƯỚC cả hai.
+  "revision_request_items",
   "revision_requests",
   "deliveries",
   "gallery_items",

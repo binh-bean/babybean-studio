@@ -17,6 +17,10 @@ import { trangThaiKhach } from "@/lib/lark/trang-thai-app-lark";
 import { khoaChonCuaKhach } from "@/lib/gallery/khoa-chon-khach";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layDuLieuChungBoAnh } from "@/lib/gallery/du-lieu-chung-bo-anh";
+import { laThuMucChinhSua, khachThayAnhChinh } from "@/lib/anh-chinh-sua/nhan-dien";
+import { docTomTatAnhChinh } from "@/lib/anh-chinh-sua/du-lieu";
+import { soSuatAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh";
+import { docAnhAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh-server";
 
 /**
  * BB-341 — MỘT vòng cho lần đầu mở link.
@@ -200,6 +204,9 @@ async function traDuLieu(
         .not("subfolder", "is", null),
     );
 
+    // BB-371 — ảnh trong thư mục ảnh chỉnh sửa: tách khỏi lưới/chip/số ảnh gốc.
+    const pAnhChinh = chayNgay(docTomTatAnhChinh(supabase, galleryId));
+
     // Get selection summary
     const pSelection = chayNgay(
       supabase
@@ -307,6 +314,9 @@ async function traDuLieu(
     // (`gallery.id` === `session.galleryId` — truy vấn bộ ảnh lọc đúng id đó.)
     const pReopenRequest = chayNgay(layTrangThaiXinMoLai(supabase, galleryId));
 
+    // BB-374 — tấm ba mẹ đã chọn cho suất "Ảnh album không chỉnh sửa" (bảng riêng, 0093).
+    const pAlbumKhongChinh = chayNgay(docAnhAlbumKhongChinh(supabase, session.selectionId));
+
     // BB-187 — kiểm mã trên địa chỉ TRƯỚC khi đọc bất cứ kết quả nào.
     if (!(await kiemMaTrenDiaChi)) {
       return fail(
@@ -346,7 +356,12 @@ async function traDuLieu(
       chatUrl = chatSetting.value;
     }
 
-    const subfolders = Array.from(new Set(subfoldersData?.map(s => s.subfolder as string) || []));
+    // BB-371 — thư mục ảnh chỉnh sửa không phải một nhóm ảnh gốc để lọc (ảnh chủ studio
+    // 06/10: chip "anh chinh sua 15" nằm cạnh "JPG 281").
+    const subfolders = Array.from(new Set(subfoldersData?.map(s => s.subfolder as string) || [])).filter(
+      (t) => !laThuMucChinhSua(t),
+    );
+    const tomTatAnhChinh = await pAnhChinh;
 
     const { quotaKnown, includedQuota } = contractSummary;
 
@@ -485,6 +500,7 @@ async function traDuLieu(
       // không thì nút "duyệt" bắt họ đồng ý với thứ chưa xem. Chỉ đọc khi bộ ảnh
       // đã qua bước chỉnh — trước đó chưa có gì để xem.
       (async (): Promise<{
+        soAnhChinhTrongApp: number;
         finalDriveUrl: string | null;
         deliveredAt: string | null;
         rounds: Array<{ round: number; note: string; createdAt: string; resolved: boolean }>;
@@ -506,6 +522,11 @@ async function traDuLieu(
         ]);
 
         return {
+          // BB-371 — số ảnh chỉnh khách ĐƯỢC xem ngay trong app (CSKH đã gửi duyệt).
+          // > 0 thì màn khách hiện khối "Ảnh đã chỉnh" thay cho link Drive.
+          soAnhChinhTrongApp: tomTatAnhChinh.anh.filter((a) =>
+            khachThayAnhChinh(gallery.status, tomTatAnhChinh.guiLuc, a.created_at),
+          ).length,
           finalDriveUrl: delivery?.final_drive_url ?? null,
           // BB-298 — ngày giao thật cho dấu "Đã hoàn thiện" ở màn "Đã giao".
           deliveredAt: delivery?.delivered_at ?? null,
@@ -669,7 +690,8 @@ async function traDuLieu(
         zaloOa: (gallery.branch as unknown as { zalo_oa: string }[])?.[0]?.zalo_oa || (gallery.branch as unknown as { zalo_oa: string })?.zalo_oa,
         chatUrl
       },
-      photoCount: gallery.photo_count,
+      // BB-371 — số ảnh GỐC (lưới chọn): bỏ ảnh chỉnh sửa ra.
+      photoCount: Math.max(0, (gallery.photo_count ?? 0) - tomTatAnhChinh.anh.length),
       // BB-156: tổng dung lượng ảnh, để màn khách nói trước "bộ này nặng 6,7 GB"
       // chứ đừng để ba mẹ bấm tải rồi mới biết máy không đủ chỗ.
       tongDungLuongAnh: tongDungLuong,
@@ -723,6 +745,15 @@ async function traDuLieu(
       reopenRequest,
       // BB-359 — danh sách ảnh đã thu gọn: màn khách tự gọi POST /api/g/mo-lai-anh.
       thuGon: await pThuGon,
+      /**
+       * BB-374 — suất "Ảnh album không chỉnh sửa": `soSuat` = số tấm ba mẹ được chọn thêm cho
+       * album (CSKH thêm vào hợp đồng, 0 ₫, không vào hạn mức); `photoIds` = tấm đã chọn.
+       * `soSuat = 0` thì màn khách không hiện gì.
+       */
+      albumKhongChinh: {
+        soSuat: soSuatAlbumKhongChinh(contractSummary.items),
+        photoIds: (await pAlbumKhongChinh).photoIds,
+      },
     };
 
     return ok(responseData);

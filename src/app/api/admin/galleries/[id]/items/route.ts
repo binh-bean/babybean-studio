@@ -36,7 +36,10 @@ import { laDongThanhToan, layDongThanhToanTheoBo } from "@/lib/gallery/han-muc-t
 const CAU_DONG_THANH_TOAN =
   "Dòng này tự tạo khi thu tiền — không sửa hay xoá tay được. Muốn đổi, ghi một dòng đính chính ở khối Thanh toán.";
 import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
+import { docNguoiChinhSua } from "@/lib/lark/nguoi-chinh-sua-lark";
 import { docDauThuGon } from "@/lib/van-hanh/don-rac";
+import { docAnhAlbumKhongChinhCuaBo } from "@/lib/gallery/anh-album-khong-chinh-server";
+import { laSanPhamAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh";
 
 export const runtime = "nodejs";
 
@@ -164,6 +167,9 @@ export async function GET(
       .from("share_links")
       .select("id, status, expires_at, token_prefix, token_hash, created_at, view_count, revoked_at")
       .eq("gallery_id", gallery.id)
+      // BB-372: link mời người thân (viewer) do ba mẹ tạo không phải "link của bộ" — bỏ ra, nếu không
+      // link mời mới nhất bị hiện như link cần gửi (và "Mở khoá link cũ" có thể mở lại nhầm nó).
+      .neq("role", "viewer")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -321,8 +327,16 @@ export async function GET(
     >();
     for (const r of selectedRows ?? []) {
       const pid = r.photo_id as string;
-      if (selectedPhotoMap.has(pid)) continue;
+      // BB-370 — cùng một tấm có thể nằm ở nhiều lượt chọn (ba mẹ + ông bà). Đã có
+      // dòng rồi thì chỉ thay khi dòng cũ KHÔNG có ghi chú mà dòng này có — không để
+      // ghi chú của ba mẹ bị một dòng trống của lượt khác che mất.
+      const daCo = selectedPhotoMap.get(pid);
+      if (daCo && (daCo.note || !(r.retouch_note as string | null)?.trim())) continue;
       const anh = r.photos as unknown as { file_name: string | null } | null;
+      if (daCo) {
+        daCo.note = (r.retouch_note as string | null) ?? null;
+        continue;
+      }
       selectedPhotoMap.set(pid, {
         photoId: pid,
         fileName: anh?.file_name ?? "",
@@ -486,6 +500,8 @@ export async function GET(
       customerChatUrl: linkChatKhach((customer as { facebook?: unknown } | null)?.facebook),
       // BB-335 — "Photo": tên thợ chụp từ cột Lark (galleries.lark_photo); 0081 chưa áp → null.
       larkPhoto: (await docLarkPhoto(admin, [galleryId])).theoBo.get(galleryId) ?? null,
+      // BB-369 — người chỉnh sửa ("Người Photoshop" + "Photoshop CTV" bên Lark); 0094 chưa áp → null.
+      larkNguoiChinhSua: await docNguoiChinhSua(admin, galleryId),
       shootDate: shoot?.shoot_date ?? null,
       // BB-308 (vòng 4, mục #5) — "loại buổi chụp" ("Thôi nôi", "Newborn"…),
       // CÙNG TÊN PROP `sessionType` mà `BiaBoAnh` (component dùng chung với
@@ -530,6 +546,9 @@ export async function GET(
       // BB-296 mục #6 — xem chú thích ở phần truy vấn phía trên.
       selectedPhotos,
       addonPurchases,
+      // BB-374 — tấm khách chọn cho suất "Ảnh album không chỉnh sửa": thợ KHÔNG chỉnh, chỉ in
+      // vào album; 0 ₫, không nằm trong `selectedPhotos`/hạn mức. `soSuat = 0` = bộ không có suất.
+      albumKhongChinh: await docAnhAlbumKhongChinhCuaBo(admin, gallery.id),
     });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -652,6 +671,11 @@ export async function POST(
 
     const quotaBefore = await quotaOf(admin, galleryId);
 
+    // BB-374 — "Ảnh album không chỉnh sửa" luôn 0 ₫: ô đơn giá (nếu có ai gửi) không được
+    // biến suất miễn phí thành tiền trong tổng hợp đồng.
+    const { data: sanPham } = await admin.from("products").select("kind").eq("id", body.productId).maybeSingle();
+    const mienPhi = laSanPhamAlbumKhongChinh((sanPham as { kind?: string | null } | null)?.kind);
+
     const { data: inserted, error } = await admin
       .from("gallery_items")
       .insert({
@@ -661,7 +685,7 @@ export async function POST(
         // Dòng CSKH thêm tay là dòng hợp đồng (không có cha), nên được mang
         // tiền. Thành phần của gói thì không — ràng buộc chk_component_no_price
         // ở 0023 chặn việc đó.
-        unit_price: body.unitPrice ?? null,
+        unit_price: mienPhi ? 0 : (body.unitPrice ?? null),
       })
       .select("id")
       .single();

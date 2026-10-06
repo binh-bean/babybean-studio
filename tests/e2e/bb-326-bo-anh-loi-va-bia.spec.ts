@@ -152,7 +152,6 @@ test.describe("BB-326: bộ ảnh lỗi, nút tại thẻ, lưới chọn bìa",
     expect(hDoc.width / hDoc.height).toBeLessThan(0.8);
 
     await oNgang.click();
-    await hop.getByRole("button", { name: "Tối giản" }).click();
     await hop.getByRole("button", { name: "Điện thoại" }).click();
     const anhXemTruoc = page.locator(`[style*='container-type'] img[src*='${anhNgang}']`).first();
     await expect(anhXemTruoc).toBeVisible();

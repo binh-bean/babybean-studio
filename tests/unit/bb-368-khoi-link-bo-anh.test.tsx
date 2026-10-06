@@ -97,7 +97,7 @@ describe("BB-368: khối Link app ở màn bộ ảnh", () => {
 
   it("link cũ theo bộ còn mở được: một dòng 'N link cũ…' kèm phần xem link cũ (slot giữ chức năng cũ)", () => {
     const html = dung({ du: du({ soLinkCuConSong: 1 }), slotLinkCu: <span data-testid="slot-link-cu">cũ</span> });
-    expect(html).toContain("1 link cũ theo bộ này vẫn mở được");
+    expect(html).toContain("1 link cũ vẫn mở được (không cần gửi lại)"); // BB-372: đổi chữ, thu gọn
     expect(ma(html, "slot-link-cu")).toBe(true);
     expect(ma(dung(), "link-cu-bo-con-song")).toBe(false);
   });

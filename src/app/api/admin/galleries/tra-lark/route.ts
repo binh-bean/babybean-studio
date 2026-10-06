@@ -14,6 +14,7 @@ import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { traHauKy, LoiTraLark, duoiSoDienThoai } from "@/lib/lark/tra-hau-ky";
 import { boAnhTheoDongLark } from "@/lib/gallery/bo-anh-da-co";
+import { goiYTuDongLark } from "@/lib/lark/goi-y-tao-bo";
 
 export const runtime = "nodejs";
 
@@ -54,8 +55,29 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const admin = createAdminClient();
+    // BB-369 — gợi ý chi nhánh + người chụp từ chính dòng Lark (thuật sĩ tự điền).
+    // Chỉ trong các chi nhánh người đang đăng nhập được thấy — cùng luật /options.
+    const [{ data: branches }, { data: nhanSu }] = await Promise.all([
+      admin.from("branches").select("id, code, name").eq("is_active", true).in("id", staff.branchIds),
+      admin
+        .from("staff_profiles")
+        .select("id, full_name, staff_branches(branch_id)")
+        .eq("is_active", true)
+        .in("role", ["photographer", "cs", "owner", "admin", "branch_manager"]),
+    ]);
+    const nguoiChup = (nhanSu ?? [])
+      .map((p) => ({
+        id: p.id as string,
+        name: (p.full_name as string) ?? "",
+        branchIds: ((p.staff_branches as { branch_id: string }[] | null) ?? []).map((b) => b.branch_id),
+      }))
+      .filter((p) => p.branchIds.length === 0 || p.branchIds.some((b) => staff.branchIds.includes(b)));
     const ketQua = await Promise.all(
-      dong.map(async (d) => ({ ...d, boAnhDaCo: await boAnhTheoDongLark(admin, d.recordId) })),
+      dong.map(async (d) => ({
+        ...d,
+        boAnhDaCo: await boAnhTheoDongLark(admin, d.recordId),
+        goiY: goiYTuDongLark(d, branches ?? [], nguoiChup),
+      })),
     );
     return ok({ dong: ketQua });
   } catch (err) {

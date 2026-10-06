@@ -7,6 +7,7 @@
  * (`trangThaiKhach()`, BB-353).
  */
 import type { BoAnhGiaDinh } from "@/lib/gia-dinh/bo-anh-gia-dinh";
+import { tenBoThanThien } from "@/lib/utils/ten-bo-than-thien";
 
 export type { BoAnhGiaDinh };
 
@@ -41,13 +42,17 @@ export function duongDanNha(ma: string): string {
   return `/k/${encodeURIComponent(ma)}`;
 }
 
-/** "Bé Mít · Thôi nôi"; chưa gắn bé thì chỉ tên bộ. */
-export function tenBoHienThi(bo: Pick<BoAnhGiaDinh, "tenBe" | "tieuDe">): string {
-  const be = bo.tenBe?.trim();
-  const tieuDe = bo.tieuDe?.trim() || "Buổi chụp";
-  if (!be) return tieuDe;
-  if (tieuDe.toLocaleLowerCase("vi").includes(be.toLocaleLowerCase("vi"))) return tieuDe;
-  return `${be} · ${tieuDe}`;
+/**
+ * "Bé Mít · Thôi nôi"; chưa gắn bé thì chỉ tên bộ.
+ *
+ * BB-370 — `tieuDe` (galleries.title) thường là MÃ HOÁ ĐƠN đồng bộ từ Lark
+ * ("HD_20260909#5067"): không bao giờ in ra cho khách — dùng ngày chụp thay
+ * ("Bé Mít · 13/09/2026", "Buổi chụp 13/09/2026"). Luật ở `tenBoThanThien`.
+ */
+export function tenBoHienThi(
+  bo: Pick<BoAnhGiaDinh, "tenBe" | "tieuDe"> & { ngayChup?: string | null },
+): string {
+  return tenBoThanThien({ tenBe: bo.tenBe, tieuDe: bo.tieuDe, ngayChup: bo.ngayChup ?? null });
 }
 
 /** "2026-09-12" → "12.09.2026" (đúng kiểu bản vẽ). Sai dạng → null. */

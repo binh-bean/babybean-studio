@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AdminSidebar } from "./admin-sidebar";
 import { AdminHeader } from "./admin-header";
 import { TucThiNhanVien } from "./tuc-thi-nhan-vien";
@@ -31,14 +31,17 @@ export function AdminLayoutShell({
   // BB-359: MỘT kết quả đếm (`demViecCanXuLy`) cho huy hiệu, Bàn làm việc (dòng phụ
   // + thẻ "Cần xử lý ngay") và số trên các tab — chia qua `DemViecProvider`.
   const [demViec, setDemViec] = useState<KetQuaDemViec | null>(null);
+  const demViecTruoc = useRef<KetQuaDemViec | null>(null);
   const canXuLyCount = demViec ? demViec.tong : null;
 
   useEffect(() => {
     let alive = true;
 
     async function taiSoCanXuLy() {
-      const kq = await demViecCanXuLy(role);
+      // BB-369: đưa lượt trước vào — tab hỏng lượt này giữ số cũ, không rơi về 0.
+      const kq = await demViecCanXuLy(role, undefined, demViecTruoc.current);
       if (!alive || !kq) return;
+      demViecTruoc.current = kq;
       setDemViec(kq);
     }
 

@@ -43,8 +43,6 @@ export const UpdateStaffSchema = z
     branchIds: z.array(z.string().uuid()).max(20).optional(),
     isActive: z.boolean().optional(),
     phone: z.string().trim().max(20).nullable().optional(),
-    /** Present only when the owner is resetting someone's password. */
-    password: z.string().min(MIN_PASSWORD_LENGTH).max(200).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "Không có gì để đổi" });
 

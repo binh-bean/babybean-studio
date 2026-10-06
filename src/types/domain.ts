@@ -40,6 +40,9 @@ export const PRODUCT_KINDS = [
   "print",
   "addon",
   "service",
+  // BB-374 — "Ảnh album không chỉnh sửa" (giá 0 ₫, migration 0092/0093). Không bao giờ
+  // lọc giá trị này bằng SQL khi 0092 chưa áp (enum lạ → 22P02); so trong TypeScript.
+  "album_unedited",
 ] as const;
 export type ProductKind = (typeof PRODUCT_KINDS)[number];
 

@@ -156,7 +156,8 @@ function scanOnClickSites(): JsxOnClickSite[] {
                 file: relFile,
                 line: line + 1,
                 tagName,
-                hasCursorPointer: /cursor-pointer/.test(classText),
+                // BB-370 — ảnh xem lớn nhấp một lần là phóng: kính lúp (cursor-zoom-in) là con trỏ đúng nghĩa.
+                hasCursorPointer: /cursor-pointer|cursor-zoom-in/.test(classText),
                 role: roleText,
               });
             }

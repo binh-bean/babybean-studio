@@ -12,9 +12,10 @@
  * tự động hoá bên Lark được cấu hình cho sự kiện đó, app không cấu hình hộ được
  * (không ghi sang Lark). Nên:
  *   1. hook Lark bắn dòng nào → ghi ngay dòng đó (đường hook);
- *   2. GET ở đây: lượt cuối cũ hơn 5 phút thì đồng bộ luôn trước khi trả —
- *      nghĩa là khi có nhân viên đang mở Bàn làm việc, dữ liệu không cũ quá 5
- *      phút; không ai mở thì không tốn lượt gọi Lark nào;
+ *   2. GET trả danh sách NGAY (không đồng bộ, BB-369); kèm `canDongBo` khi lượt
+ *      cuối cũ hơn 5 phút → trình duyệt gọi `GET ?dongBo=1` ở nền — nghĩa là
+ *      khi có nhân viên đang mở Bàn làm việc, dữ liệu không cũ quá 5 phút;
+ *      không ai mở thì không tốn lượt gọi Lark nào;
  *   3. POST "Đồng bộ ngay" — bỏ qua mốc 5 phút, nhưng tối đa 1 lượt/30 giây;
  *   4. cron sáng 08:00 quét đủ bảng làm lưới đỡ cho phần "Lark xoá dòng".
  * Một lượt = ~4 lượt gọi Lark (token, danh sách bảng, search, batch_get).
@@ -27,9 +28,9 @@ import pg from "pg";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import type { StaffSession } from "@/types/domain";
-import { dongBoBanGhiMoi, taoNguonLark, type KetQuaBanGhiMoi } from "@/lib/lark/ban-ghi-moi";
-import { trangThaiBoAnh } from "@/lib/lark/trang-thai-app-lark";
+import { dongBoBanGhiMoi, taoNguonLark, docDanhSachBanGhiMoi, type KetQuaBanGhiMoi } from "@/lib/lark/ban-ghi-moi";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { dangChayPhepThu } from "@/lib/kiem-thu";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -65,6 +66,11 @@ async function dongBoNeuCan(
 ): Promise<{ daChay: boolean; ketQua?: KetQuaBanGhiMoi; loi?: string; luc: number }> {
   const truoc = await lanCuoi(client);
   if (Date.now() - truoc < cach) return { daChay: false, luc: truoc };
+  // BB-369: phép thử (Vitest hoặc máy chủ e2e) không đồng bộ Lark và không ghi
+  // mốc vào `settings` toàn cục của bb-dev.
+  if (dangChayPhepThu() || process.env.PHEP_THU_TRINH_DUYET === "1") {
+    return { daChay: false, luc: truoc };
+  }
   const { LARK_APP_ID, LARK_APP_SECRET, LARK_BASE_APP_TOKEN, SUPABASE_DB_URL } = process.env;
   if (!LARK_APP_ID || !LARK_APP_SECRET || !LARK_BASE_APP_TOKEN) {
     return { daChay: false, loi: "Thiếu cấu hình Lark", luc: truoc };
@@ -91,45 +97,10 @@ async function dongBoNeuCan(
   }
 }
 
-interface DongTho {
-  lark_record_id: string;
-  ten_khach: string;
-  so_dien_thoai: string | null;
-  goi_chup: string;
-  ma_hoa_don: string | null;
-  ngay_chup: string | null;
-  chi_nhanh_lark: string | null;
-  branch_id: string | null;
-  drive_url: string | null;
-  thay_luc: Date;
-}
-
 async function docDanhSach(client: pg.Client, staff: StaffSession) {
-  const toanQuyen = staff.permissions.includes("system:superuser");
-  const { rows } = await client.query<DongTho>(
-    `select lark_record_id, ten_khach, so_dien_thoai, goi_chup, ma_hoa_don, ngay_chup::text as ngay_chup,
-            chi_nhanh_lark, branch_id, drive_url, thay_luc
-       from lark_ban_ghi_moi
-      where gallery_id is null
-        and ($1::boolean or branch_id = any($2::uuid[]))
-      order by thay_luc desc
-      limit 100`,
-    [toanQuyen, staff.branchIds],
-  );
-  return rows.map((r) => {
-    const tt = trangThaiBoAnh({ status: null, coDriveLink: !!r.drive_url, coLinkApp: false });
-    return {
-      recordId: r.lark_record_id,
-      tenKhach: r.ten_khach,
-      soDienThoai: r.so_dien_thoai,
-      goiChup: r.goi_chup,
-      maHoaDon: r.ma_hoa_don,
-      ngayChup: r.ngay_chup,
-      chiNhanh: r.chi_nhanh_lark,
-      coDriveLink: !!r.drive_url,
-      thayLuc: r.thay_luc.toISOString(),
-      trangThai: { ma: tt.ma, nhan: tt.quanTri },
-    };
+  return docDanhSachBanGhiMoi(client, {
+    toanQuyen: staff.permissions.includes("system:superuser"),
+    branchIds: staff.branchIds,
   });
 }
 
@@ -171,6 +142,25 @@ async function xuLy(request: Request, bamTay: boolean): Promise<Response> {
     }
 
     try {
+      // BB-369 (chủ studio 06/10: "lúc hiện lúc không"): GET thường KHÔNG còn
+      // đồng bộ trước khi trả. Lượt đồng bộ đọc tới ~50 dòng Lark tuần tự, có
+      // lúc quá `maxDuration` → lần tải ấy hỏng/rỗng, lần sau (mốc đã ghi) lại
+      // đủ dòng. Nay danh sách trả ngay từ bảng; trình duyệt thấy `canDongBo`
+      // thì gọi riêng `?dongBo=1` ở nền, lỗi cũng không xoá danh sách đang hiện.
+      const url = new URL(request.url);
+      const tuDong = !bamTay && url.searchParams.get("dongBo") === "1";
+      if (!bamTay && !tuDong) {
+        const truoc = await lanCuoi(client);
+        const dong = await docDanhSach(client, staff);
+        return ok({
+          dong,
+          dongBoLuc: truoc ? new Date(truoc).toISOString() : null,
+          vuaDongBo: false,
+          canDongBo: Date.now() - truoc >= CACH_TU_DONG_MS,
+          ketQua: null,
+          loiDongBo: null,
+        });
+      }
       const dongBo = await dongBoNeuCan(client, bamTay ? CACH_BAM_TAY_MS : CACH_TU_DONG_MS);
       // BB-336 (luật BB-052): lượt đồng bộ không chỉ chép dữ liệu Lark vào
       // `lark_ban_ghi_moi` — Lark xoá dòng thì nó LƯU TRỮ bộ ảnh chưa gửi
@@ -197,6 +187,7 @@ async function xuLy(request: Request, bamTay: boolean): Promise<Response> {
         dong,
         dongBoLuc: dongBo.luc ? new Date(dongBo.luc).toISOString() : null,
         vuaDongBo: dongBo.daChay,
+        canDongBo: false,
         ketQua: dongBo.ketQua ?? null,
         loiDongBo: dongBo.loi ?? null,
       });

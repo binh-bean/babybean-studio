@@ -9,6 +9,9 @@ import { driveFetch } from "@/lib/drive/client";
 import { khongGhiDemPhepThu } from "@/lib/kiem-thu";
 import { kiemAnhTruocKhiGhiDem } from "@/lib/drive/kiem-tra-anh";
 import { nenDieuHuongLh3 } from "@/lib/drive/quyet-dinh-lh3";
+import { laThuMucChinhSua } from "@/lib/anh-chinh-sua/nhan-dien";
+import { quyetDinhAnhChoKhach } from "@/lib/anh-chinh-sua/cong-khach";
+import { docMocGui } from "@/lib/anh-chinh-sua/du-lieu";
 
 export const runtime = "nodejs";
 // BB-286: ghi bộ đệm chạy nền (after()) tính vào cùng thời lượng hàm như
@@ -66,7 +69,7 @@ export async function GET(
       // (`photo-lightbox.tsx`) xin đúng hai cỡ 1600/2048 cho MỌI tấm khách mở
       // xem, không riêng ảnh bìa.
       .select(
-        "drive_file_id, file_name, gallery_id, status, galleries!photos_gallery_id_fkey!inner(branch_id, customer_id, cover_photo_id)",
+        "drive_file_id, file_name, gallery_id, status, subfolder, created_at, galleries!photos_gallery_id_fkey!inner(branch_id, customer_id, cover_photo_id, status)",
       )
       .eq("id", photoId)
       .single();
@@ -77,7 +80,9 @@ export async function GET(
 
     const gallery = (
       Array.isArray(photo.galleries) ? photo.galleries[0] : photo.galleries
-    ) as unknown as { branch_id: string; customer_id: string | null; cover_photo_id: string | null } | undefined;
+    ) as unknown as
+      | { branch_id: string; customer_id: string | null; cover_photo_id: string | null; status: string }
+      | undefined;
 
     try {
       const staff = await requireStaff();
@@ -103,21 +108,24 @@ export async function GET(
       try {
         const session = await requireGallerySession();
 
-        // BB-334A — phân loại theo LINK, không theo bộ đang trỏ: link gia đình
-        // (có customerId) xem ảnh của mọi bộ của NHÀ MÌNH dù cookie đang trỏ bộ
-        // nào (hai tab hai bộ — thẻ <img> không gửi được x-bb-bo). Link cũ theo
-        // bộ (customerId rỗng) vẫn chỉ đúng bộ của nó.
-        const laLinkTheoBoAnh = !session.customerId;
-        const duocXem = laLinkTheoBoAnh
-          ? // Link gắn theo bộ ảnh: tấm ảnh phải thuộc đúng bộ đã ký trong phiên.
-            session.galleryId === photo.gallery_id
-          : // Link gắn theo khách (cổng khách, BB-130): phiên chưa trỏ vào bộ
-            // nào, nên xét theo chủ sở hữu. `customer_id` rỗng hai đầu thì
-            // KHÔNG được coi là khớp — bằng không một bộ ảnh mồ côi sẽ mở cho
-            // bất kỳ phiên cổng khách nào.
-            !!session.customerId && session.customerId === gallery?.customer_id;
-
-        if (!duocXem) return fail("FORBIDDEN", "Không có quyền truy cập ảnh");
+        // BB-334A (link theo bộ / link gia đình) + BB-371 (ảnh chỉnh chưa gửi): MỘT
+        // hàm thuần quyết định — xem src/lib/anh-chinh-sua/cong-khach.ts, có phép thử
+        // đơn vị canh (tests/unit/bb-371-cong-khach.test.ts). Mốc gửi chỉ đọc khi tấm
+        // ảnh nằm trong thư mục ảnh chỉnh sửa.
+        const subfolder = photo.subfolder as string | null;
+        const quyetDinh = quyetDinhAnhChoKhach({
+          phienGalleryId: session.galleryId,
+          phienCustomerId: session.customerId,
+          anhGalleryId: photo.gallery_id as string,
+          boCustomerId: gallery?.customer_id,
+          trangThaiBo: gallery?.status ?? "",
+          subfolder,
+          anhTaoLuc: photo.created_at as string | null,
+          guiLuc: laThuMucChinhSua(subfolder) ? await docMocGui(supabase, photo.gallery_id as string) : null,
+        });
+        if (quyetDinh === "cam") return fail("FORBIDDEN", "Không có quyền truy cập ảnh");
+        // Đúng bộ của mình mà CSKH chưa kiểm ảnh chỉnh → trả như ảnh không tồn tại.
+        if (quyetDinh === "an") return fail("NOT_FOUND", "Không tìm thấy ảnh");
       } catch (errKhach) {
         if (errKhach instanceof GallerySessionError) {
           return fail("FORBIDDEN", "Không có quyền truy cập ảnh");

@@ -12,12 +12,14 @@ import { tienDoChonAnh } from "./cac-bao-cao/tien-do-chon-anh";
 import { hauKyCanhBao } from "./cac-bao-cao/hau-ky-canh-bao";
 import { doanhThuPhatSinh } from "./cac-bao-cao/doanh-thu-phat-sinh";
 import { hieuSuatNhanVien } from "./cac-bao-cao/hieu-suat-nhan-vien";
+import { moiNguoiThan } from "./cac-bao-cao/moi-nguoi-than";
 
 export const DANH_SACH_BAO_CAO: DinhNghiaBaoCao[] = [
   tienDoChonAnh,
   hauKyCanhBao,
   doanhThuPhatSinh,
   hieuSuatNhanVien,
+  moiNguoiThan,
 ];
 
 export function layBaoCao(ma: string): DinhNghiaBaoCao | undefined {

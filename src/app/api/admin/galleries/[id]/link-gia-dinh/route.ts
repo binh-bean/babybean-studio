@@ -54,12 +54,14 @@ export async function GET(
     if (!g) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     requireBranch(staff, String(g.branch_id));
 
-    // Link cũ theo bộ của CHÍNH bộ này còn mở được (sống, chưa hết hạn).
+    // Link cũ theo bộ của CHÍNH bộ này còn mở được (sống, chưa hết hạn). BB-372: link mời người
+    // thân (`viewer`) KHÔNG phải "link cũ cần gửi" — chúng hiện ở khối "Link mời ông bà", không đếm ở đây.
     const { data: cu, error: cuErr } = await admin
       .from("share_links")
       .select("id, expires_at")
       .eq("gallery_id", galleryId)
-      .eq("status", "active");
+      .eq("status", "active")
+      .neq("role", "viewer");
     if (cuErr) throw cuErr;
     const soLinkCuConSong = (cu ?? []).filter(
       (l) => !l.expires_at || new Date(l.expires_at as string) > new Date(),

@@ -9,6 +9,7 @@
  */
 import { keoDongHopDongTuLark } from "@/lib/lark/dong-hop-dong";
 import { randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { z } from "zod";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
@@ -16,6 +17,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { docDongHauKy, LoiTraLark } from "@/lib/lark/tra-hau-ky";
 import { boAnhTheoDongLark } from "@/lib/gallery/bo-anh-da-co";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { ghiLinkQuanLyChoBoAnh } from "@/lib/lark/ghi-link-quan-ly";
 
 export const runtime = "nodejs";
 // BB-331: kéo dòng hợp đồng từ Lark ngay sau khi gắn (3–9 giây, đo 30/09).
@@ -84,6 +86,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       entityId: id,
       galleryId: id,
       metadata: { larkHaukyRecordId: dong.recordId, maHoaDon: dong.maHoaDon },
+    });
+
+    // BB-373 — gắn xong: ghi link màn quản lý vào cột "Link quản lý bộ ảnh" của dòng đó.
+    after(async () => {
+      await ghiLinkQuanLyChoBoAnh(admin, id, { requestId });
     });
 
     // BB-331: gắn xong là kéo luôn dòng hợp đồng + hạn mức từ hóa đơn Lark —

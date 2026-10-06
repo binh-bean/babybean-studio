@@ -19,6 +19,7 @@
 import { larkAuth, HOST, cellText, getField, type LarkRecord } from "@/lib/lark/sync-retouch";
 import { parseFolderName } from "@/lib/drive/parse-folder-name";
 import { dangChayPhepThu } from "@/lib/kiem-thu";
+import { COT_PHOTO_LARK, tenPhotoTuO } from "@/lib/lark/photo-hau-ky";
 
 const BANG_HAU_KY = /h[aậ]u\s*k[yỳ]/i;
 
@@ -37,6 +38,36 @@ export interface DongHauKy {
   trangThai: string;
   /** Link mở đúng dòng này bên Lark (null khi thiếu cấu hình). */
   linkLark: string | null;
+  /** BB-369 — tên chi nhánh trên Lark ("NTB", "Thảo Điền"); "" khi không biết. */
+  chiNhanh: string;
+  /** BB-369 — cột "photo" (người chụp) trên Lark; null khi Lark để trống. */
+  photo: string | null;
+}
+
+/**
+ * BB-369 — chữ ô "Chi Nhánh". API search trả TÊN ("NTB", "Thảo Điền"); API đọc
+ * một bản ghi (đường hook Lark, `readLarkRecord`) lại trả MÃ lựa chọn
+ * ("optAbc123") hoặc ô tra cứu `{type, value}`. Mã lựa chọn KHÔNG phải tên chi
+ * nhánh → coi như "không biết" (""), để lượt ghi không đè mất chi nhánh đã biết.
+ */
+export function tenChiNhanhLark(v: unknown): string {
+  const phan = (x: unknown): string[] => {
+    if (x == null) return [];
+    if (typeof x === "string") return [x];
+    if (typeof x === "number") return [String(x)];
+    if (Array.isArray(x)) return x.flatMap(phan);
+    if (typeof x === "object") {
+      const o = x as { text?: unknown; value?: unknown; name?: unknown };
+      if (typeof o.text === "string") return [o.text];
+      if (typeof o.name === "string") return [o.name];
+      if (o.value !== undefined) return phan(o.value);
+    }
+    return [];
+  };
+  return phan(v)
+    .map((t) => t.trim())
+    .filter((t) => t && !/^opt[A-Za-z0-9]{3,}$/.test(t))
+    .join(", ");
 }
 
 /** Chuẩn hoá mã hóa đơn để so: bỏ khoảng trắng, viết hoa. */
@@ -94,6 +125,8 @@ export function bocDongHauKy(record: LarkRecord, linkLark: string | null = null)
     tongFileEdit: Number.isFinite(tong) && tong > 0 ? tong : null,
     trangThai: cellText(f["Trạng Thái"]).trim(),
     linkLark,
+    chiNhanh: tenChiNhanhLark(f["Chi Nhánh"]),
+    photo: tenPhotoTuO(getField(f, COT_PHOTO_LARK)),
   };
 }
 
@@ -203,11 +236,22 @@ export async function traHauKy(maHoaDon: string, soDienThoai: string): Promise<D
   // link_record_ids, ô tra cứu thành {type, value}) — đo thật 29/09. Nên search
   // chỉ dùng để lấy record_id ứng viên (thường 1–3), rồi đọc lại từng dòng bằng
   // API bản ghi thường và so khớp CHÍNH XÁC trên hình dạng quen thuộc.
-  const ids = (json.data?.items ?? []).map((r) => r.record_id).slice(0, 10);
+  const items = (json.data?.items ?? []) as { record_id: string; fields?: Record<string, unknown> }[];
+  const ids = items.map((r) => r.record_id).slice(0, 10);
   const dayDu = await Promise.all(ids.map((id) => docBanGhi(auth, baseToken, tableId, id)));
-  return locDongKhop(dayDu.filter((r): r is LarkRecord => r !== null), ma, duoi).map((r) =>
-    bocDongHauKy(r, linkDong(baseToken, tableId, r.record_id)),
-  );
+  // BB-369: "Chi Nhánh" là ô tra cứu — API bản ghi thường trả MÃ lựa chọn
+  // (optXXX), API search trả TÊN. Lấy tên chi nhánh (và người chụp nếu bản
+  // ghi thường thiếu) từ chính lượt search đã gọi, không tốn thêm lượt nào.
+  const theoSearch = new Map(items.map((it) => [it.record_id, it.fields ?? {}]));
+  return locDongKhop(dayDu.filter((r): r is LarkRecord => r !== null), ma, duoi).map((r) => {
+    const d = bocDongHauKy(r, linkDong(baseToken, tableId, r.record_id));
+    const fs = theoSearch.get(r.record_id) ?? {};
+    return {
+      ...d,
+      chiNhanh: d.chiNhanh || tenChiNhanhLark(fs["Chi Nhánh"]),
+      photo: d.photo ?? tenPhotoTuO(getField(fs, COT_PHOTO_LARK)),
+    };
+  });
 }
 
 async function docBanGhi(

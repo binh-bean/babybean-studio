@@ -88,8 +88,18 @@ describe("hằng số", () => {
 });
 
 describe("danhSachVuotGhim (BB-242)", () => {
-  it("chỉ đánh dấu đúng 2 tấm (tối thiểu) → vuốt trong toàn bộ tấm đã thả tim", () => {
-    expect(danhSachVuotGhim(["a", "b"], ["x", "y", "z"])).toEqual(["x", "y", "z"]);
+  it("chỉ đánh dấu đúng 2 tấm (tối thiểu) → vuốt qua 2 tấm đó rồi toàn bộ tấm đã thả tim (BB-370)", () => {
+    expect(danhSachVuotGhim(["a", "b"], ["x", "y", "z"])).toEqual(["a", "b", "x", "y", "z"]);
+  });
+
+  it("BB-370: ghim tấm a, so với tấm b CHƯA thả tim → b vẫn có trong danh sách vuốt (không biến mất)", () => {
+    const ds = danhSachVuotGhim(["a", "b"], ["x", "y"], "a");
+    expect(ds[0]).toBe("b");
+    expect(ds).toEqual(["b", "x", "y"]);
+  });
+
+  it("BB-370: tấm đã thả tim trùng tấm so sánh không lặp hai lần", () => {
+    expect(danhSachVuotGhim(["a", "b"], ["b", "c", "a"], "a")).toEqual(["b", "c"]);
   });
 
   it("đánh dấu 3 tấm trở lên → vuốt đúng trong nhóm đã đánh dấu, không lẫn tấm khác", () => {

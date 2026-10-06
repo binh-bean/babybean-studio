@@ -1,0 +1,28 @@
+-- ============================================================================
+-- 0092 — BB-374 (1/2): loại sản phẩm "Ảnh album không chỉnh sửa".
+--
+-- VIẾT NHƯNG CHƯA ÁP (06/10/2026). Người áp: PM, sau khi soát. Áp 0092 TRƯỚC 0093.
+--
+-- Vì sao tách riêng một tệp: Postgres không cho DÙNG một giá trị enum vừa thêm
+-- trong cùng giao dịch (`unsafe use of new value`), mà `migrate-prod` chạy mỗi
+-- tệp trong MỘT giao dịch. 0093 chèn sản phẩm mang loại này nên phải ở tệp sau.
+--
+-- Anh chốt 06/10/2026: gói Baby 1/2 chỉ có 5/15 file chỉnh; khách làm album cần
+-- ~20 ảnh. Thêm sản phẩm "Ảnh album không chỉnh sửa", giá 0 ₫ — CSKH thêm vào
+-- thành phần hợp đồng với số lượng N, khách được chọn thêm đúng N tấm cho album,
+-- KHÔNG chỉnh, KHÔNG tính tiền, KHÔNG cộng vào hạn mức chỉnh sửa.
+--
+-- Loại riêng (không dùng 'service'/'print') vì:
+--   * `app.gallery_quota` chỉ cộng `edited_photo` → loại mới tự đứng ngoài hạn mức;
+--   * `nhomSanPham()` trả null cho loại lạ → không bao giờ lên cửa hàng của khách;
+--   * `/api/g/placements` chỉ nhận `print` → không lẫn vào luồng đặt ảnh in.
+--
+-- App chạy được khi CHƯA áp: mã KHÔNG lọc `kind = 'album_unedited'` trong SQL
+-- (giá trị enum lạ làm PostgREST trả 22P02) — chỉ so trong TypeScript. Chưa áp
+-- thì không có sản phẩm nào mang loại này → mục "ảnh cho album" tự ẩn.
+--
+-- Đảo ngược: Postgres không gỡ được giá trị enum. Muốn tắt: `update products set
+-- is_active = false where kind = 'album_unedited'` (CSKH không chọn được nữa).
+-- ============================================================================
+
+alter type product_kind add value if not exists 'album_unedited';

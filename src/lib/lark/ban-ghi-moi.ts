@@ -27,9 +27,10 @@
  */
 import type pg from "pg";
 import { HOST, larkAuth, extractChatLink, cellText, getField, type LarkAuthHeader, type LarkRecord } from "@/lib/lark/sync-retouch";
-import { bocDongHauKy } from "@/lib/lark/tra-hau-ky";
+import { bocDongHauKy, tenChiNhanhLark } from "@/lib/lark/tra-hau-ky";
 import { choPhepTenThat } from "@/lib/lark/muc-tieu-du-lieu";
 import { dangChayPhepThu } from "@/lib/kiem-thu";
+import { trangThaiBoAnh } from "@/lib/lark/trang-thai-app-lark";
 
 const BANG_HAU_KY = /h[aậ]u\s*k[yỳ]/i;
 const COT_TRANG_THAI = "Trạng Thái";
@@ -90,12 +91,13 @@ function linkDrive(v: unknown): string | null {
   return link && /^https:\/\/drive\.google\.com\//i.test(link) ? link : null;
 }
 
+/** BB-369 — chuyển sang tra-hau-ky.ts (thuật sĩ cũng dùng); giữ tên xuất cũ. */
+export { tenChiNhanhLark };
+
 export function bocBanGhiMoi(record: LarkRecord & { created_time?: number }): { banGhi: BanGhiMoi; trangThai: string } {
   const d = bocDongHauKy(record);
   const f = record.fields ?? {};
-  const chiNhanh = Array.isArray(f["Chi Nhánh"])
-    ? (f["Chi Nhánh"] as unknown[]).map((x) => (x && typeof x === "object" ? ((x as { text?: string }).text ?? "") : String(x ?? ""))).join("")
-    : typeof f["Chi Nhánh"] === "string" ? (f["Chi Nhánh"] as string) : "";
+  const chiNhanh = tenChiNhanhLark(f["Chi Nhánh"]);
   return {
     trangThai: d.trangThai,
     banGhi: {
@@ -169,9 +171,20 @@ async function larkJson<T>(auth: LarkAuthHeader, path: string, body?: unknown): 
   return json.data;
 }
 
+export interface KetQuaDocTrangThaiTrong {
+  /** Dòng đã đọc chi tiết (tối đa TRAN_DOC_MOI_LUOT, mới nhất trước). */
+  dong: (LarkRecord & { created_time?: number })[];
+  /**
+   * BB-369 — MỌI mã dòng Lark đang có Trạng Thái trống (kết quả search đủ trang,
+   * chưa cắt trần). Dòng của app không còn trong tập này = bên Lark đã điền
+   * Trạng Thái (đã xử lý) hoặc đã xoá → rời khối.
+   */
+  tatCaMa: string[];
+}
+
 export interface NguonLark {
   /** Dòng Hậu Kỳ có Trạng Thái trống (đã lọc trên Lark). */
-  docTrangThaiTrong(): Promise<(LarkRecord & { created_time?: number })[]>;
+  docTrangThaiTrong(): Promise<KetQuaDocTrangThaiTrong>;
   /** Trong các mã dòng này, dòng nào KHÔNG còn trên Lark. */
   timDongDaXoa(recordIds: string[]): Promise<Set<string>>;
 }
@@ -215,6 +228,10 @@ export async function taoNguonLark(opts: { appId: string; appSecret: string; bas
         pageToken = d.has_more ? (d.page_token ?? "") : "";
       } while (pageToken);
 
+      // BB-369: search không hứa thứ tự cố định — cắt trần 50 trên một thứ tự
+      // ngẫu nhiên thì mỗi lượt đọc một nhóm khác nhau. Xếp mới nhất trước
+      // (created_time giảm dần, hoà thì theo mã) để mọi lượt đọc CÙNG một nhóm.
+      ungVien.sort((a, b) => (b.created_time ?? 0) - (a.created_time ?? 0) || a.record_id.localeCompare(b.record_id));
       const ra: (LarkRecord & { created_time?: number })[] = [];
       for (const u of ungVien.slice(0, TRAN_DOC_MOI_LUOT)) {
         const d = await larkJson<{ record?: LarkRecord }>(auth, `${goc}/${encodeURIComponent(u.record_id)}`);
@@ -229,7 +246,7 @@ export async function taoNguonLark(opts: { appId: string; appSecret: string; bas
           });
         }
       }
-      return ra;
+      return { dong: ra, tatCaMa: ungVien.map((u) => u.record_id) };
     },
     async timDongDaXoa(recordIds) {
       const mat = new Set<string>();
@@ -253,6 +270,8 @@ export interface KetQuaBanGhiMoi {
   moi: number;
   capNhat: number;
   daThanhBoAnh: number;
+  /** BB-369 — bản ghi rời khối vì bên Lark đã điền Trạng Thái / Link app. */
+  daXuLyBenLark: number;
   xoaBanGhi: number;
   luuTruBoAnh: number;
   danhDauLarkXoa: number;
@@ -339,9 +358,17 @@ export async function ghiBanGhiMoi(
        (lark_record_id, branch_id, ten_khach, so_dien_thoai, goi_chup, ma_hoa_don, ngay_chup, chi_nhanh_lark, drive_url, lark_tao_luc, thay_luc, cap_nhat_luc)
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
      on conflict (lark_record_id) do update set
-       branch_id = excluded.branch_id, ten_khach = excluded.ten_khach, so_dien_thoai = excluded.so_dien_thoai,
-       goi_chup = excluded.goi_chup, ma_hoa_don = excluded.ma_hoa_don, ngay_chup = excluded.ngay_chup,
-       chi_nhanh_lark = excluded.chi_nhanh_lark, drive_url = excluded.drive_url, cap_nhat_luc = excluded.cap_nhat_luc
+       -- BB-369: đường hook đọc Lark bằng API bản ghi thường, không có tên chi
+       -- nhánh → excluded.branch_id null. Trước đây null ĐÈ chi nhánh đã biết:
+       -- dòng biến khỏi Bàn làm việc của nhân viên chi nhánh tới lượt đồng bộ
+       -- sau (5 phút) mới hiện lại. Không biết thì giữ cái đã biết.
+       branch_id = coalesce(excluded.branch_id, lark_ban_ghi_moi.branch_id),
+       ten_khach = excluded.ten_khach,
+       so_dien_thoai = coalesce(excluded.so_dien_thoai, lark_ban_ghi_moi.so_dien_thoai),
+       goi_chup = excluded.goi_chup, ma_hoa_don = coalesce(excluded.ma_hoa_don, lark_ban_ghi_moi.ma_hoa_don),
+       ngay_chup = coalesce(excluded.ngay_chup, lark_ban_ghi_moi.ngay_chup),
+       chi_nhanh_lark = coalesce(excluded.chi_nhanh_lark, lark_ban_ghi_moi.chi_nhanh_lark),
+       drive_url = excluded.drive_url, cap_nhat_luc = excluded.cap_nhat_luc
      returning (xmax = 0) as moi`,
     [
       b.recordId,
@@ -372,7 +399,15 @@ export async function dongBoBanGhiMoi(opts: {
 }): Promise<KetQuaBanGhiMoi> {
   const { client, nguon } = opts;
   const bayGio = opts.bayGio ?? new Date();
-  const kq: KetQuaBanGhiMoi = { moi: 0, capNhat: 0, daThanhBoAnh: 0, xoaBanGhi: 0, luuTruBoAnh: 0, danhDauLarkXoa: 0 };
+  const kq: KetQuaBanGhiMoi = {
+    moi: 0,
+    capNhat: 0,
+    daThanhBoAnh: 0,
+    daXuLyBenLark: 0,
+    xoaBanGhi: 0,
+    luuTruBoAnh: 0,
+    danhDauLarkXoa: 0,
+  };
 
   const { rows: branches } = await client.query<{ id: string; code: string; name: string }>(
     `select id, code, name from branches where is_active = true`,
@@ -380,10 +415,35 @@ export async function dongBoBanGhiMoi(opts: {
 
   // 1. Dòng mới / cập nhật.
   const tho = await nguon.docTrangThaiTrong();
-  for (const r of tho) {
+  const khongConMoi = new Set<string>();
+  for (const r of tho.dong) {
     const kqGhi = await ghiBanGhiMoi(client, r, branches, opts.dbUrl, bayGio);
     if (kqGhi === "moi") kq.moi++;
     else if (kqGhi === "cap_nhat") kq.capNhat++;
+    else khongConMoi.add(r.record_id);
+  }
+
+  // 1b. BB-369 — "việc xong thì biến mất": bản ghi chưa thành bộ ảnh mà bên
+  // Lark đã điền Trạng Thái (không còn trong tập search "Trạng Thái trống"),
+  // hoặc đọc lại thấy đã có Link app → rời khối. Trước đây dòng ấy nằm lì
+  // trong bảng mãi mãi. Dòng bị xoá hẳn trên Lark cũng rơi vào đây (bước 3 vẫn
+  // lo phần bộ ảnh neo vào nó).
+  const conTrong = new Set(tho.tatCaMa);
+  const { rows: dangCho } = await client.query<{ lark_record_id: string }>(
+    `select lark_record_id from lark_ban_ghi_moi where gallery_id is null`,
+  );
+  const roiKhoi = dangCho.map((x) => x.lark_record_id).filter((id) => !conTrong.has(id) || khongConMoi.has(id));
+  if (roiKhoi.length > 0) {
+    if (!duTinDeXoa(roiKhoi.length)) {
+      kq.boQuaXoa = `Lark báo ${roiKhoi.length} bản ghi mới đã có Trạng Thái (> ${TRAN_XOA_MOI_LUOT}) — không gỡ gì, cần người xem`;
+      console.error(JSON.stringify({ evt: "lark.ban_ghi_moi.bo_qua_go", lyDo: kq.boQuaXoa }));
+    } else {
+      const go = await client.query(
+        `delete from lark_ban_ghi_moi where gallery_id is null and lark_record_id = any($1::text[])`,
+        [roiKhoi],
+      );
+      kq.daXuLyBenLark = go.rowCount ?? 0;
+    }
   }
 
   // 2. Bản ghi đã có bộ ảnh neo vào (tạo qua thuật sĩ BB-325) → rời khối.
@@ -418,4 +478,61 @@ export async function dongBoBanGhiMoi(opts: {
     }
   }
   return kq;
+}
+
+// ---------------------------------------------------------------------------
+// Đọc danh sách cho Bàn làm việc
+// ---------------------------------------------------------------------------
+
+interface DongTho {
+  lark_record_id: string;
+  ten_khach: string;
+  so_dien_thoai: string | null;
+  goi_chup: string;
+  ma_hoa_don: string | null;
+  ngay_chup: string | null;
+  chi_nhanh_lark: string | null;
+  branch_id: string | null;
+  drive_url: string | null;
+  thay_luc: Date;
+}
+
+/**
+ * Danh sách khối "Bản ghi mới từ Lark" (BB-332, BB-369). Chỉ ĐỌC bảng — không gọi
+ * Lark — nên hai lần tải liên tiếp không có đồng bộ xen giữa luôn ra cùng danh
+ * sách, cùng thứ tự.
+ */
+export async function docDanhSachBanGhiMoi(client: Client, quyen: { toanQuyen: boolean; branchIds: string[] }) {
+  const { toanQuyen } = quyen;
+  const { rows } = await client.query<DongTho>(
+    // BB-369: dòng đã có bộ ảnh neo vào (tạo qua thuật sĩ) rời khối NGAY, không
+    // đợi lượt đồng bộ sau gắn gallery_id. Xếp có khoá phụ (mã dòng) để hai lần
+    // tải liên tiếp luôn ra cùng thứ tự.
+    `select b.lark_record_id, b.ten_khach, b.so_dien_thoai, b.goi_chup, b.ma_hoa_don, b.ngay_chup::text as ngay_chup,
+            b.chi_nhanh_lark, b.branch_id, b.drive_url, b.thay_luc
+       from lark_ban_ghi_moi b
+      where b.gallery_id is null
+        and not exists (
+          select 1 from galleries g where g.lark_hauky_record_id = b.lark_record_id and g.status <> 'archived'
+        )
+        and ($1::boolean or b.branch_id = any($2::uuid[]))
+      order by b.thay_luc desc, b.lark_record_id
+      limit 100`,
+    [toanQuyen, quyen.branchIds],
+  );
+  return rows.map((r) => {
+    const tt = trangThaiBoAnh({ status: null, coDriveLink: !!r.drive_url, coLinkApp: false });
+    return {
+      recordId: r.lark_record_id,
+      tenKhach: r.ten_khach,
+      soDienThoai: r.so_dien_thoai,
+      goiChup: r.goi_chup,
+      maHoaDon: r.ma_hoa_don,
+      ngayChup: r.ngay_chup,
+      chiNhanh: r.chi_nhanh_lark,
+      coDriveLink: !!r.drive_url,
+      thayLuc: r.thay_luc.toISOString(),
+      trangThai: { ma: tt.ma, nhan: tt.quanTri },
+    };
+  });
 }

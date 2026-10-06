@@ -281,16 +281,29 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
     };
   }, []);
 
+  // BB-369 (chủ studio 06/10: "lúc hiện lúc không"): khối "Bản ghi mới từ Lark"
+  // có nguồn RIÊNG (/api/admin/lark-moi). Trước đây khi số liệu Bàn làm việc
+  // (/api/admin/dashboard) còn tải hoặc hỏng (cơ sở dữ liệu bận, quá giờ), cả
+  // trang chỉ còn một dòng chữ — khối bản ghi mới biến mất theo dù dữ liệu của
+  // nó vẫn tải được. Nay khối luôn hiện, độc lập với số liệu.
   if (loading) {
-    return <div className="p-8 text-center text-muted-foreground">Đang tải dữ liệu...</div>;
+    return (
+      <div className="space-y-6">
+        <BanGhiMoiLark />
+        <div className="p-8 text-center text-muted-foreground">Đang tải dữ liệu...</div>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <div className="p-8">
-        <div className="rounded-lg bg-destructive/10 p-4 text-destructive border border-destructive/20">
-          <p className="font-semibold">Không thể tải Bàn làm việc</p>
-          <p className="text-sm">{error}</p>
+      <div className="space-y-6">
+        <BanGhiMoiLark />
+        <div className="p-8">
+          <div className="rounded-lg bg-destructive/10 p-4 text-destructive border border-destructive/20">
+            <p className="font-semibold">Không thể tải Bàn làm việc</p>
+            <p className="text-sm">{error}</p>
+          </div>
         </div>
       </div>
     );

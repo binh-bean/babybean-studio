@@ -25,7 +25,11 @@ import {
   type TrangThaiPhong,
 } from "@/lib/gallery/phong-anh";
 import { formatSo } from "@/lib/utils/dinh-dang";
+import { giuA } from "@/lib/utils/giu-a";
 import { MenuTaiAnh, type MenuTaiAnhProps } from "@/components/features/gallery/menu-tai-anh";
+
+/** BB-370 — chuột đi quá ngần này (px) giữa nhấn và thả thì là KÉO, không phải nhấp. */
+const NGUONG_KEO_PX = 5;
 
 export interface PhotoLightboxProps {
   /** BB-319 (Ghi nhận K4/K5) — tên bé, hiện nhỏ dưới số thứ tự: xem lớn vẫn "gọi tên bé". */
@@ -245,6 +249,10 @@ export function PhotoLightbox({
   const pinchRef = useRef<{ khoangCachDau: number; tiLeDau: number } | null>(null);
   const keoRef = useRef<{ x: number; y: number; xDau: number; yDau: number } | null>(null);
   const chuotDangKeoRef = useRef(false);
+  // BB-370 — nhấp một lần phóng/thu (xem handleImgClick).
+  const nhanXuongRef = useRef<{ x: number; y: number } | null>(null);
+  const daKeoChuotRef = useRef(false);
+  const chamGanNhatRef = useRef(0);
   const [dangPhong, setDangPhong] = useState(false);
   const [anhNet, setAnhNet] = useState(false);
 
@@ -366,6 +374,7 @@ export function PhotoLightbox({
       if (!chuotDangKeoRef.current || !keoRef.current) return;
       const dx = e.clientX - keoRef.current.x;
       const dy = e.clientY - keoRef.current.y;
+      if (Math.hypot(dx, dy) > NGUONG_KEO_PX) daKeoChuotRef.current = true;
       const khung = khungAnh();
       const { x, y } = kepBien(
         keoRef.current.xDau + dx,
@@ -389,7 +398,22 @@ export function PhotoLightbox({
     };
   }, [khungAnh, lenLichApDungPhong]);
 
+  /**
+   * BB-370 (anh 06/10, ảnh f68609f4) — máy tính: NHẤP MỘT LẦN là phóng to quanh
+   * con trỏ, nhấp lần nữa là thu về; đang phóng thì kéo để di ảnh. Trước đây
+   * phải nhấp ĐÚP — khách không biết, tưởng không phóng được.
+   *
+   * Nhấp và kéo cùng bắt đầu bằng `mousedown`: ghi điểm nhấn xuống, chuột đi
+   * quá NGUONG_KEO_PX thì coi là KÉO (thả ra không bật/tắt phóng).
+   * Điện thoại: chạm sinh ra cả `click` giả — bỏ qua `click` đến ngay sau một
+   * lượt chạm (`chamGanNhatRef`), cử chỉ chạm (chụm, chạm hai lần, vuốt) giữ
+   * nguyên ở handleTouch*.
+   */
+
   const handleImgMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    nhanXuongRef.current = { x: e.clientX, y: e.clientY };
+    daKeoChuotRef.current = false;
     if (zoomRef.current.scale <= TI_LE_NHO_NHAT + 0.01) return;
     e.preventDefault();
     e.stopPropagation();
@@ -397,8 +421,20 @@ export function PhotoLightbox({
     keoRef.current = { x: e.clientX, y: e.clientY, xDau: zoomRef.current.x, yDau: zoomRef.current.y };
   };
 
-  const handleImgDoubleClick = (e: React.MouseEvent) => {
+  const handleImgClick = (e: React.MouseEvent) => {
+    // Ngăn click vào ảnh kích hoạt backdrop close
     e.stopPropagation();
+    // Click giả của trình duyệt sau một lượt chạm — điện thoại đã xử lý ở handleTouchEnd.
+    if (Date.now() - chamGanNhatRef.current < 800) return;
+    const pt = (e.nativeEvent as PointerEvent).pointerType;
+    if (pt === "touch" || pt === "pen") return;
+    const xuong = nhanXuongRef.current;
+    nhanXuongRef.current = null;
+    if (daKeoChuotRef.current) {
+      daKeoChuotRef.current = false;
+      return;
+    }
+    if (xuong && Math.hypot(e.clientX - xuong.x, e.clientY - xuong.y) > NGUONG_KEO_PX) return;
     chamHaiLanPhong(diemTuTam(e.clientX, e.clientY));
   };
 
@@ -495,6 +531,7 @@ export function PhotoLightbox({
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    chamGanNhatRef.current = Date.now();
     if (pinchRef.current) {
       pinchRef.current = null;
       if (e.touches.length === 0) capNhatBoundaryPhong();
@@ -773,8 +810,8 @@ export function PhotoLightbox({
                 sizes={dungAnhNet ? undefined : "100vw"}
                 alt={photo.fileName || `Ảnh ${idx + 1}`}
                 decoding="async"
-                // Kính lúp thay cho bàn tay: nhấp đúp vào ảnh là PHÓNG TO
-                // (BB-210), nên con trỏ nói đúng việc đó. Đang phóng thì
+                // Kính lúp thay cho bàn tay: nhấp vào ảnh là PHÓNG TO
+                // (BB-210; BB-370 đổi nhấp đúp → nhấp một lần), nên con trỏ nói đúng việc đó. Đang phóng thì
                 // handleImgMouseDown kéo ảnh — con trỏ đổi sang "nắm".
                 // BB-289 lượt 3 — Opus chấm ảnh chụp: `w-auto h-auto` để
                 // trình duyệt tự đo theo KÍCH THƯỚC GỐC của ảnh; máy chủ ảnh
@@ -809,12 +846,9 @@ export function PhotoLightbox({
                       }
                     : undefined
                 }
-                onClick={(e) => {
-                  // Ngăn click vào ảnh kích hoạt backdrop close
-                  e.stopPropagation();
-                }}
-                onDoubleClick={isCurrent ? handleImgDoubleClick : undefined}
+                onClick={isCurrent ? handleImgClick : (e) => e.stopPropagation()}
                 onMouseDown={isCurrent ? handleImgMouseDown : undefined}
+                data-testid={isCurrent ? "anh-xem-lon" : undefined}
                 // BB-314: `srcSet` (buildLightboxSrcSet) có ứng viên 800w —
                 // cỡ đó nay bị `/api/img` điều hướng 302 sang lh3. Nếu lh3
                 // lỗi (cho BẤT KỲ ứng viên nào trình duyệt chọn, kể cả
@@ -925,6 +959,12 @@ export function PhotoLightbox({
                 >
                   Ghi chú cho thợ chỉnh ảnh
                 </label>
+                {/* BB-370 (anh 06/10, ảnh 1c8e9516) — bộ đã chốt: ô nhập bị khoá + mờ 50% nên
+                    ghi chú ba mẹ đã gửi gần như KHÔNG đọc được (chỉ thấy chữ mờ "đã chốt").
+                    Nay hiện nguyên văn ghi chú, chữ đậm rõ, chỉ đọc. */}
+                {isLocked ? (
+                  <GhiChuChiDoc ghiChu={currentPhoto.retouchNote} />
+                ) : (
                 <textarea
                   id="ghi-chu-anh-ben-phai"
                   value={ghiChu}
@@ -942,6 +982,7 @@ export function PhotoLightbox({
                   }
                   className="w-full resize-none rounded-xl border border-[#e5dcd2] bg-white px-3 py-2 text-xs text-[#2E2A27] outline-hidden placeholder:text-[#8a8078] focus:border-[#2E2A27]/40 disabled:opacity-50"
                 />
+                )}
                 <div className="mt-1 h-4 text-[11px]" aria-live="polite">
                   {/*
                     BB-293 vòng 2 mục #3 — giám đốc chốt màu "Đã lưu ghi chú"
@@ -1066,7 +1107,8 @@ export function PhotoLightbox({
         </div>
 
         <div className={cn("mx-auto max-w-md overflow-hidden px-6 transition-all duration-300 lg:hidden", tamMo === "ghi-chu" ? "max-h-[150px] pb-3 opacity-100" : "max-h-0 opacity-0")}>
-          {onLuuGhiChu && (
+          {onLuuGhiChu && isLocked && <GhiChuChiDoc ghiChu={currentPhoto.retouchNote} />}
+          {onLuuGhiChu && !isLocked && (
             <input
               id="ghi-chu-anh"
               type="text"
@@ -1226,6 +1268,29 @@ export function PhotoLightbox({
             {bangSanPham?.(currentPhoto, "sang")}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * BB-370 — ghi chú đã lưu của tấm đang xem, CHỈ ĐỌC (bộ đã chốt). Chữ mực đủ
+ * tương phản (không `opacity-50` như ô nhập bị khoá), xuống dòng đúng như ba mẹ
+ * đã gõ. Không có ghi chú thì một dòng phụ nhỏ — không để ô trống trơn.
+ */
+function GhiChuChiDoc({ ghiChu }: { ghiChu: string | null | undefined }) {
+  const chu = ghiChu?.trim();
+  return (
+    <div data-testid="ghi-chu-chi-doc">
+      {chu ? (
+        <>
+          <p className="whitespace-pre-wrap break-words rounded-xl border border-[#e5dcd2] bg-white px-3 py-2.5 text-[13px] leading-relaxed text-[#2E2A27]">
+            {chu}
+          </p>
+          <p className="mt-1.5 text-[11px] text-[#6b6057]">{giuA(vi.gallery.noteLocked)}</p>
+        </>
+      ) : (
+        <p className="text-[12px] text-[#6b6057]">{giuA(vi.gallery.noteKhongCo)}</p>
       )}
     </div>
   );

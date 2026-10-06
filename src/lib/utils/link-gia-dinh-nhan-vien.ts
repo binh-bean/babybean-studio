@@ -31,11 +31,31 @@ export interface LinkCuConSong {
   soLanMo: number;
 }
 
+/** BB-372 — một bộ ảnh đang hiện với gia đình = một "màn con" `/k/<mã>/<n>`. */
+export interface BoAnhManCon {
+  galleryId: string;
+  /** n trong /k/<mã>/<n> — số của `soThuTuCacBo`, không tính lại ở trình duyệt. */
+  soThuTu: number;
+  tieuDe: string;
+  tenBe: string | null;
+  ngayChup: string | null;
+  soAnh: number;
+  /** Nhãn của `trangThaiKhach()` — đúng câu ba mẹ đọc ở trang gia đình. */
+  trangThai: { ma: string; khach: string };
+  /** null: không giải mã được mã (thiếu bản mã hoá) → không chép được. */
+  duongDanManCon: string | null;
+  diaChiManCon: string | null;
+}
+
 export interface TrangThaiLinkGiaDinh {
   linkGiaDinh: LinkGiaDinhHienTai | null;
   linkCuConSong: LinkCuConSong[];
   loiMoiGiaDinh: Array<{ shareLinkId: string; nhan: string | null; taoLuc: string }>;
   soBoAnh: number;
+  /** BB-372 — link từng buổi chụp (Buổi 1, 2, 3…). Vắng: máy chủ cũ. */
+  boAnh?: BoAnhManCon[];
+  /** BB-372 — bộ của khách chưa hiện với gia đình nên chưa có màn con. */
+  soBoAn?: number;
   /** Vai hiện tại có được đổi / thu hồi không (máy chủ vẫn chặn lần nữa). */
   duocDoi: boolean;
 }
@@ -144,6 +164,16 @@ export function diaChiHienThi(
   return null;
 }
 
+/** BB-372 — địa chỉ đầy đủ của màn con một bộ: ưu tiên máy chủ, thiếu thì ghép với gốc trang. */
+export function diaChiManConBo(
+  b: Pick<BoAnhManCon, "diaChiManCon" | "duongDanManCon">,
+  gocTrang: string | null,
+): string | null {
+  if (b.diaChiManCon) return b.diaChiManCon;
+  if (b.duongDanManCon && gocTrang) return `${gocTrang.replace(/\/$/, "")}${b.duongDanManCon}`;
+  return null;
+}
+
 /** Đổi {khoá} trong câu bằng giá trị. */
 export function dien(mau: string, giaTri: Record<string, string | number>): string {
   return mau.replace(/\{(\w+)\}/g, (_, k: string) => String(giaTri[k] ?? ""));
@@ -211,5 +241,51 @@ export function tinNhanMauManCon(diaChi: string, opts: { linkMoi?: boolean } = {
   return (
     `Bean chào ba mẹ ạ. Ảnh buổi chụp mới của bé đã có trong app của gia đình mình rồi ạ: ${diaChi}\n` +
     `Ba mẹ bấm vào để xem và chọn ảnh giúp Bean nhé ạ.`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BB-372 — link mời ông bà / người thân (ba mẹ tạo; nhân viên CHỈ ĐỌC).
+// Máy chủ: GET /api/admin/customers/<id>/link-moi-nguoi-than và
+//          GET /api/admin/galleries/<id>/link-moi-nguoi-than.
+// Không có hàm ghi nào ở đây — nhân viên không sửa / thu hồi link của khách.
+// ---------------------------------------------------------------------------
+
+export interface LinkMoiNguoiThan {
+  shareLinkId: string;
+  nhan: string | null;
+  taoLuc: string;
+  soLanMo: number;
+  moLanCuoi: string | null;
+  soTim: number;
+  soYeuCau: number;
+  daThuHoi: boolean;
+  daHetHan: boolean;
+  phamVi: "ca_nha" | "bo";
+  tieuDeBo: string | null;
+  /** 6 ký tự đầu — máy chủ không bao giờ trả nhiều hơn. */
+  maDau: string;
+}
+
+export interface DuLieuLinkMoi {
+  links: LinkMoiNguoiThan[];
+  chuaApMigration: boolean;
+}
+
+export function docLinkMoiCuaKhach(customerId: string, loi: ChuoiLoi) {
+  return goi<DuLieuLinkMoi>(
+    `/api/admin/customers/${encodeURIComponent(customerId)}/link-moi-nguoi-than`,
+    undefined,
+    loi.matKetNoi,
+    loi.chung,
+  );
+}
+
+export function docLinkMoiCuaBo(galleryId: string, loi: ChuoiLoi) {
+  return goi<DuLieuLinkMoi>(
+    `/api/admin/galleries/${encodeURIComponent(galleryId)}/link-moi-nguoi-than`,
+    undefined,
+    loi.matKetNoi,
+    loi.chung,
   );
 }

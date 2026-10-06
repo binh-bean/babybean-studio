@@ -38,6 +38,7 @@ import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatKichThuoc, nhanTrangThaiGio } from "@/lib/utils/dinh-dang";
+import { giuA } from "@/lib/utils/giu-a";
 
 export interface SuatTrongGoi {
   galleryItemId: string;
@@ -95,6 +96,20 @@ export interface AlbumTrongGoi {
   soAnh: number;
 }
 
+/**
+ * BB-374 — suất "Ảnh album không chỉnh sửa" (CSKH thêm vào hợp đồng, 0 ₫, không vào hạn
+ * mức chỉnh sửa). Tách HẲN khỏi tim: tấm chọn ở đây không thả tim, không tính tiền.
+ */
+export interface AlbumKhongChinh {
+  /** Số tấm ba mẹ được chọn thêm cho album. 0 = bộ không có suất (không hiện gì). */
+  soSuat: number;
+  /** Đã chọn bao nhiêu tấm (cả bộ). */
+  daChon: number;
+  /** Tấm đang xem đã nằm trong suất này chưa. */
+  coAnhNay: boolean;
+  onDoi: (chon: boolean) => void;
+}
+
 export interface BangSanPhamCuaAnhProps {
   /** Suất in/khung trong gói: mỗi suất đúng MỘT tấm. */
   suatTrongGoi: SuatTrongGoi[];
@@ -110,6 +125,8 @@ export interface BangSanPhamCuaAnhProps {
   donDaGui?: boolean;
   /** Tấm đang xem đã được ba mẹ chọn chưa — chưa chọn thì chưa đặt in được. */
   anhDaChon: boolean;
+  /** BB-374 — bỏ trống hoặc `soSuat = 0` thì không hiện mục "ảnh album không chỉnh sửa". */
+  albumKhongChinh?: AlbumKhongChinh;
   khoa: boolean;
   dangLuu: boolean;
   onDatVaoGoi: (galleryItemId: string, dat: boolean) => void;
@@ -167,6 +184,7 @@ export function BangSanPhamCuaAnh({
   onXemTuong,
   onDatInTamNay,
   tong = "toi",
+  albumKhongChinh,
 }: BangSanPhamCuaAnhProps) {
   const [nhomDangMo, setNhomDangMo] = React.useState<NhomSanPham | null>(null);
   const sang = tong === "sang";
@@ -196,11 +214,57 @@ export function BangSanPhamCuaAnh({
     vienNhat: sang ? "ring-1 ring-[#e5dcd2]" : "ring-1 ring-white/10",
   };
 
+  /*
+    BB-374 — "Ảnh album không chỉnh sửa". Hiện cả khi tấm CHƯA thả tim (đúng lúc cần: tấm
+    không chỉnh thì không thả tim). Tấm đã thả tim là ảnh chỉnh sửa trong gói — không vào
+    được suất này (một tấm không thể là cả hai), nút mờ và nói rõ lý do.
+  */
+  const kc = albumKhongChinh && albumKhongChinh.soSuat > 0 ? albumKhongChinh : null;
+  const kcDu = kc ? kc.daChon >= kc.soSuat : false;
+  const khoiKhongChinh = kc ? (
+    <section data-testid="khoi-album-khong-chinh">
+      <h3 className={cn("kh-eyebrow mb-1.5", T.chuMoNhat)}>{vi.gallery.loiBean.albumKhongChinhTieuDe}</h3>
+      <p className={cn("mb-1.5 text-pretty text-xs leading-relaxed", T.chuMo)}>
+        {giuA(vi.gallery.loiBean.albumKhongChinhLoiMoi.replace("{n}", String(kc.soSuat)))}
+      </p>
+      <button
+        type="button"
+        data-testid="nut-album-khong-chinh"
+        aria-pressed={kc.coAnhNay}
+        disabled={khoa || anhDaChon || (!kc.coAnhNay && kcDu)}
+        onClick={() => kc.onDoi(!kc.coAnhNay)}
+        className={cn(
+          "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors disabled:opacity-60",
+          kc.coAnhNay ? "bg-[#7FA99B]/20 ring-1 ring-[#7FA99B]/50" : T.theNen,
+        )}
+      >
+        <span className="min-w-0">
+          <span className="block font-medium">
+            {kc.coAnhNay
+              ? vi.gallery.loiBean.albumKhongChinhNhan
+              : anhDaChon
+                ? vi.gallery.loiBean.albumKhongChinhDangLaAnhChinh
+                : kcDu
+                  ? vi.gallery.loiBean.albumKhongChinhDaDu
+                  : vi.gallery.loiBean.albumKhongChinhChonTamNay}
+          </span>
+          <span data-testid="dem-album-khong-chinh" className={cn("block tabular-nums", T.chuMo)}>
+            {kc.daChon}/{kc.soSuat} tấm · không chỉnh · 0 ₫
+          </span>
+        </span>
+        <span className="shrink-0 text-base leading-none">{kc.coAnhNay ? "✓" : anhDaChon || kcDu ? "" : "+"}</span>
+      </button>
+    </section>
+  ) : null;
+
   if (!anhDaChon) {
     return (
-      <p className={cn("text-xs leading-relaxed", T.chuMoHon)}>
-        {vi.gallery.loiBean.thaTimTruocKhiDatIn}
-      </p>
+      <div className={cn("space-y-4", T.chuChinh)}>
+        <p className={cn("text-xs leading-relaxed", T.chuMoHon)}>
+          {vi.gallery.loiBean.thaTimTruocKhiDatIn}
+        </p>
+        {khoiKhongChinh}
+      </div>
     );
   }
 
@@ -317,6 +381,8 @@ export function BangSanPhamCuaAnh({
           </ul>
         </section>
       )}
+
+      {khoiKhongChinh}
 
       {/* ---------- 2. ALBUM ---------- */}
       {(albumTrongGoi.length > 0 || albumThat.length > 0 || albumBanDuoc.length > 0) && (

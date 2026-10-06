@@ -444,69 +444,18 @@ test.describe("BB-313", () => {
         // phải" trong ảnh chụp app thật.
         const khung = await khungXemTruoc.boundingBox();
         expect(hopAnh!.width).toBeGreaterThan(khung!.width * 0.85);
-        // Chữ tiêu đề không được cao hơn quá 70% khối ảnh (đè kín ảnh) — vẫn
-        // cho phép đè MỘT PHẦN ở đáy theo đúng thiết kế tạp chí của bìa mobile.
-        expect(hopChu!.height).toBeLessThan(hopAnh!.height * 0.7);
+        // Chữ không được đè kín ảnh. BB-370: từ BB-317 K-b khối chữ là một DẢI KEM
+        // RIÊNG dưới ảnh (không đè), và khung xem trước nay có cả đầu trang + nút mời
+        // ông bà như màn khách thật — khối chữ cao hơn 70% ảnh là đúng như khách thấy.
+        // Canh đúng điều cần canh: khối chữ bắt đầu ở ĐÁY ảnh, không chồng lên ảnh.
+        expect(hopChu!.y).toBeGreaterThanOrEqual(hopAnh!.y + hopAnh!.height - 2);
       }
 
       await chup(page, `3-${ten}-trinh-thiet-ke-bia`);
     });
   }
 
-  // BB-313 (chấm lại 28/09/2026, mục 1) — "Làm luôn cho 3 bố cục còn lại
-  // (Tạp chí, Tối giản, Đè chéo): dùng cùng lớp @container, để đổi bố cục
-  // nào cũng không vỡ." Ba bố cục này không tách khối ảnh/khối chữ riêng
-  // (`data-testid`) như "Bên cạnh" — chữ đè lên ẢNH NỀN toàn khung, nên canh
-  // bằng CHÍNH `<section>` xem trước: phải PHỦ GẦN KÍN chiều cao khung mô
-  // phỏng ở cả hai khổ (không còn dải trắng, không mất nội dung).
-  const BON_BO_CUC = [
-    { id: "tap-chi", nhan: "Tạp chí" },
-    { id: "toi-gian", nhan: "Tối giản" },
-    { id: "de-cheo", nhan: "Đè chéo" },
-  ] as const;
-  for (const boCuc of BON_BO_CUC) {
-    for (const ten of ["dien-thoai", "may-tinh"] as const) {
-      test(`Mục 3 (${boCuc.id}, ${ten}): bố cục "${boCuc.nhan}" phủ kín khung mô phỏng, không dải trắng`, async ({ page }) => {
-        test.setTimeout(90_000);
-        await page.setViewportSize(MAY_TINH);
-        await dangNhapNhanVien(page, emailOwner, password);
-        await page.goto(`/admin/galleries/${galE}`, { waitUntil: "domcontentloaded" });
-        await page.getByText("Trạng thái").first().waitFor({ state: "attached", timeout: 20_000 });
-
-        await page.getByRole("button", { name: "Mở trình thiết kế bìa" }).click();
-        const hopThoai = page.getByRole("dialog", { name: "Thiết kế bìa bộ ảnh" });
-        await expect(hopThoai).toBeVisible();
-
-        await hopThoai.getByRole("button", { name: boCuc.nhan, exact: true }).click();
-        if (ten === "dien-thoai") {
-          await hopThoai.getByRole("button", { name: "Điện thoại" }).click();
-        } else {
-          await hopThoai.getByRole("button", { name: "Máy tính" }).click();
-        }
-
-        const luoi = hopThoai.locator("img[src*='/api/img/']").first();
-        await luoi.waitFor({ state: "visible", timeout: 20_000 });
-        const oAnh = hopThoai.locator("button:has(img[src*='/api/img/'])").nth(1);
-        await oAnh.click();
-
-        const khungXemTruoc = page.locator("[style*='container-type']");
-        await expect(khungXemTruoc).toBeVisible();
-        const khoiBia = khungXemTruoc.locator("section").first();
-        await expect(khoiBia).toBeVisible();
-        await luoi.evaluate((img: HTMLImageElement) =>
-          img.complete ? undefined : new Promise<void>((r) => img.addEventListener("load", () => r(), { once: true })),
-        );
-
-        const hopBia = await khoiBia.boundingBox();
-        const khung = await khungXemTruoc.boundingBox();
-        expect(hopBia).not.toBeNull();
-        // Phủ gần kín chiều cao khung (không còn dải trắng lớn) VÀ không
-        // TRÀN quá khung (mất do overflow-hidden cắt, đúng lỗi "mất chữ" cũ).
-        expect(hopBia!.height).toBeGreaterThan(khung!.height * 0.85);
-        expect(hopBia!.height).toBeLessThan(khung!.height * 1.15);
-
-        await chup(page, `3-${boCuc.id}-${ten}-trinh-thiet-ke-bia`);
-      });
-    }
-  }
+  // BB-370 — ba bố cục Tạp chí / Tối giản / Đè chéo đã RỜI trình thiết kế bìa: màn
+  // khách không đọc `cover_layout` (luôn "Bên cạnh"), nên khung xem trước chỉ còn đúng
+  // bố cục khách thấy — các ca đo ba bố cục đó ở đây không còn đường vào để thử.
 });

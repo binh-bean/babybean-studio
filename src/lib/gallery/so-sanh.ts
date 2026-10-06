@@ -78,7 +78,13 @@ export function danhSachVuotGhim(
    * khung hiện cùng một tấm (Opus soát BB-242, 25/09/2026). */
   idGhim?: string,
 ): string[] {
-  const ds = dsSoSanh.length > SO_SANH_TOI_THIEU ? [...dsSoSanh] : [...idDaThaTim];
+  // BB-370 — đánh dấu 2 tấm: vuốt qua CHÍNH 2 tấm đó TRƯỚC, rồi mọi tấm đã thả
+  // tim (không trùng). Trước đây chỉ lấy tấm đã thả tim — so 2 tấm CHƯA chọn thì
+  // tấm thứ hai biến mất khỏi khung vuốt (khung phải hiện một tấm tim khác).
+  const ds =
+    dsSoSanh.length > SO_SANH_TOI_THIEU
+      ? [...dsSoSanh]
+      : [...dsSoSanh, ...idDaThaTim.filter((id) => !dsSoSanh.includes(id))];
   return idGhim ? ds.filter((id) => id !== idGhim) : ds;
 }
 

@@ -13,6 +13,8 @@ import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-lin
 import { createHash } from "node:crypto";
 import { choPhepTenThat } from "@/lib/lark/muc-tieu-du-lieu";
 import { dangChayPhepThu } from "@/lib/kiem-thu";
+import { dienSdtKhach, sdtTuDongLark } from "@/lib/lark/sdt-khach-lark";
+import { tachMaHoaDon } from "@/lib/utils/ma-hoa-don";
 
 export const HOST = "https://open.larksuite.com/open-apis";
 
@@ -484,7 +486,7 @@ export interface SyncResult {
 /**
  * Xử lý 1 dòng bản ghi bảng Hậu Kỳ theo đúng bảng ánh xạ docs/16 §7.3:
  *   customers.full_name        "KH · HD_..." (chính mã hợp đồng)
- *   customers.phone            null
+ *   customers.phone            ô "SDT KH" (BB-369; trước đây null — sai, xem sdt-khach-lark.ts)
  *   customers.phone_normalized null (tự sinh)
  *   customers.facebook         CHỈ phần URL của ô "Chat với khách" (bỏ text)
  *   customers.zalo             null
@@ -523,7 +525,11 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
 
   // 4. Mã hợp đồng (lark_contract_code)
   const rawContract = cellText(getField(fields, /hợp\s*đồng|mã\s*hợp\s*đồng|hóa\s*đơn|contract/i)).trim();
-  const contractCode = rawContract || null;
+  // BB-369: regex trên khớp ô tra cứu "Hợp đồng chi tiết" ("HD_…#NN_<stt>",
+  // nhiều dòng nối dấu phẩy) → tên bộ "Album · HD_…_12576,HD_…_12772". Ưu tiên
+  // "HĐ Tổng"; không có thì tách mã hoá đơn (bỏ đuôi dòng chi tiết, bỏ trùng).
+  const cacMa = tachMaHoaDon(cellText(fields["HĐ Tổng"]), rawContract);
+  const contractCode = cacMa[0] ?? (rawContract || null);
 
   // 5. Ánh xạ dữ liệu cá nhân đúng docs/16 §7.3:
   const rawCustomerCode = cellText(getField(fields, /mã\s*kh|mã\s*khách\s*hàng/i)).trim();
@@ -535,11 +541,15 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
     customerFullName = rawCustomerName;
   }
 
+  // BB-369 — số điện thoại "SDT KH": cùng luật che như tên (chỉ giữ khi cơ sở
+  // dữ liệu đích được phép giữ dữ liệu thật).
+  const sdtLark = opts.dbUrl && choPhepTenThat(opts.dbUrl) ? sdtTuDongLark(fields) : "";
+
   const chatField = getField(fields, /chat\s*với\s*khách|link\s*chat|chat/i);
   const facebookChatUrl = extractChatLink(chatField);
 
   // Tiêu đề album: Album · Mã HĐ
-  const albumTitle = contractCode ? `Album · ${contractCode}` : `Album · ${record.record_id}`;
+  const albumTitle = cacMa.length > 0 ? `Album · ${cacMa.join(" + ")}` : contractCode ? `Album · ${contractCode}` : `Album · ${record.record_id}`;
 
   // Thợ ảnh, CSKH, retoucher (khớp theo nhân sự trong hệ thống nếu có)
   const rawPhotographer = cellText(getField(fields, /thợ\s*chụp|photographer/i)).toLowerCase();
@@ -591,7 +601,17 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
         [larkCustomerKey]
       );
       custRows = res.rows;
-    } else {
+    }
+    // BB-369: chưa khớp theo Mã KH → khớp theo SỐ ĐIỆN THOẠI trong chi nhánh
+    // (khoá duy nhất branch_id + phone_normalized) trước khi khớp theo tên.
+    if (custRows.length === 0 && sdtLark) {
+      const res = await client.query(
+        `select id from customers where branch_id = $1 and phone_normalized = regexp_replace($2, '\\D', '', 'g') limit 1`,
+        [branchId, sdtLark],
+      );
+      custRows = res.rows;
+    }
+    if (custRows.length === 0 && !larkCustomerKey) {
       const res = await client.query(
         `select id from customers where branch_id = $1 and full_name = $2 limit 1`,
         [branchId, customerFullName]
@@ -610,12 +630,14 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
          where id = $4`,
         [facebookChatUrl, customerFullName, larkCustomerKey, customerId]
       );
+      // BB-369: khách chưa có số → điền từ Lark; lệch → không đè, ghi nhật ký.
+      if (sdtLark) await dienSdtKhach(client, { customerId, sdtLark, larkRecordId: record.record_id, ghi: true });
     } else {
       const { rows: newCust } = await client.query(
         `insert into customers (branch_id, full_name, phone, facebook, zalo, note, source, tags, lark_customer_key)
-         values ($1, $2, null, $3, null, null, 'lark_retouch', array['lark_draft', 'bb111'], $4)
+         values ($1, $2, $5, $3, null, null, 'lark_retouch', array['lark_draft', 'bb111'], $4)
          returning id`,
-        [branchId, customerFullName, facebookChatUrl, larkCustomerKey],
+        [branchId, customerFullName, facebookChatUrl, larkCustomerKey, sdtLark || null],
       );
       customerId = newCust[0].id;
     }
@@ -637,13 +659,13 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
          title, welcome_message, status,
          drive_folder_id, drive_folder_url,
          lark_contract_code, included_quota, extra_photo_price,
-         photographer_id, cskh_id, editor_id
+         photographer_id, cskh_id, editor_id, lark_contract_codes
        ) values (
          $1, $2, $3,
          $4, $5, 'draft',
          $6, $7,
          $8, 20, 50000,
-         $9, $10, $11
+         $9, $10, $11, $12::text[]
        ) returning id`,
       [
         branchId,
@@ -657,6 +679,8 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
         photographer?.id ?? null,
         cskh?.id ?? null,
         editor?.id ?? null,
+        // BB-369: chk_contract_code_first — phần tử đầu = lark_contract_code.
+        cacMa,
       ],
     );
 

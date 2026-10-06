@@ -16,9 +16,11 @@ import { PageHeader, CARD_TITLE_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { KhoiLinkGiaDinh } from "./khoi-link-gia-dinh";
+import { KhoiLinkMoiNguoiThan } from "./khoi-link-moi-nguoi-than";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatNgayVN, formatSdt, formatSo } from "@/lib/utils/dinh-dang";
+import { tachTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 interface LichSu {
   khach: { id: string; fullName: string; phone: string | null; chatUrl: string | null; createdAt: string; tuLark: boolean };
@@ -41,11 +43,14 @@ interface LichSu {
 
 const KHUNG = "rounded-[var(--bb-radius)] border border-[var(--bb-border)] bg-[var(--bb-surface)] p-4 md:p-5";
 
-function nhanLinkApp(l: LichSu["lichSuChup"][number]["linkApp"]): { chu: string; kieu: "success" | "outline" | "danger" } {
-  if (!l) return { chu: "Chưa có link", kieu: "outline" };
-  if (l.tinhTrang === "da_thu_hoi" || l.tinhTrang === "revoked") return { chu: "Đã thu hồi", kieu: "danger" };
-  if (l.tinhTrang === "active") return { chu: `Đang dùng · ${l.maDau}…`, kieu: "success" };
-  return { chu: "Hết hạn", kieu: "outline" };
+// BB-372 — đây là nhãn của LINK CŨ THEO BỘ (`/g/…`), không phải link gia đình. Bộ chưa từng có
+// link cũ thì KHÔNG hiện nhãn "Chưa có link": khách đã có link gia đình thì bộ vẫn có link màn con
+// (xem khối "Link từng buổi chụp" bên trái), nhãn đó từng làm nhân viên tưởng bộ chưa có link.
+function nhanLinkApp(l: LichSu["lichSuChup"][number]["linkApp"]): { chu: string; kieu: "success" | "outline" | "danger" } | null {
+  if (!l) return null;
+  if (l.tinhTrang === "da_thu_hoi" || l.tinhTrang === "revoked") return { chu: "Link cũ đã thu hồi", kieu: "danger" };
+  if (l.tinhTrang === "active") return { chu: `Link cũ còn mở · ${l.maDau}…`, kieu: "success" };
+  return { chu: "Link cũ hết hạn", kieu: "outline" };
 }
 
 export function TrangKhachHang({ customerId }: { customerId: string }) {
@@ -120,6 +125,8 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
         <div className="flex min-w-0 flex-col gap-6">
           {/* BB-334C — link app chung của gia đình (bản vẽ 05/06). 403 → khối tự ẩn. */}
           <KhoiLinkGiaDinh customerId={customerId} chatUrl={khach.chatUrl} />
+          {/* BB-372 — link mời ông bà / người thân do ba mẹ tạo (chỉ đọc). 403 → khối tự ẩn. */}
+          <KhoiLinkMoiNguoiThan phamVi="khach" id={customerId} />
           <section className={KHUNG}>
             <h2 className={CARD_TITLE_CLASS}>Thông tin khách</h2>
             <dl className="mt-3 grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
@@ -144,13 +151,31 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
               <ul className="mt-3 divide-y divide-[var(--bb-border)]">
                 {lichSuChup.map((g) => {
                   const nhan = nhanLinkApp(g.linkApp);
+                  // BB-369: tên kiểu "Album · HD_…_12576,HD_…_12772" → "Album" + mỗi mã
+                  // hoá đơn một nhãn riêng, ngắt dòng được — không tràn đè nhãn trạng thái.
+                  const td = tachTieuDeBoAnh(g.title, g.maHopDong);
                   return (
                     <li key={g.id} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-3 text-sm" data-testid="dong-lich-su-chup">
                       <div className="min-w-0 flex-1 basis-56">
-                        <Link href={`/admin/galleries/${encodeURIComponent(g.id)}`} className="font-medium hover:underline">
+                        <Link
+                          href={`/admin/galleries/${encodeURIComponent(g.id)}`}
+                          className="font-medium [overflow-wrap:anywhere] hover:underline"
+                        >
                           {g.concept ? `${g.concept} · ` : ""}
-                          {g.title}
+                          {td.nhan}
                         </Link>
+                        {td.ma.length > 0 && (
+                          <ul className="mt-1 flex flex-wrap gap-1.5" data-testid="ma-hoa-don-bo-anh">
+                            {td.ma.map((m) => (
+                              <li
+                                key={m}
+                                className="max-w-full rounded-[var(--bb-radius-sm)] bg-[var(--bb-surface-2)] px-1.5 py-0.5 text-xs tabular-nums text-[var(--bb-fg-muted)] [overflow-wrap:anywhere]"
+                              >
+                                {m}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         <p className="text-xs text-[var(--bb-fg-muted)] tabular-nums">
                           {[g.ngayChup ? formatNgayVN(g.ngayChup) : "Chưa rõ ngày chụp", g.branchName, `${formatSo(g.soAnh)} ảnh`]
                             .filter(Boolean)
@@ -158,9 +183,11 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
                         </p>
                       </div>
                       <Badge variant="outline">{g.trangThai}</Badge>
-                      <Badge variant={nhan.kieu} title="Link app của bộ ảnh — chép đầy đủ ở chi tiết bộ ảnh">
-                        {nhan.chu}
-                      </Badge>
+                      {nhan && (
+                        <Badge variant={nhan.kieu} title="Link cũ theo bộ — không cần gửi lại nếu khách đã có link gia đình">
+                          {nhan.chu}
+                        </Badge>
+                      )}
                       <Link
                         href={`/admin/galleries/${encodeURIComponent(g.id)}`}
                         className="text-xs text-[var(--bb-fg-muted)] hover:text-[var(--bb-fg)]"

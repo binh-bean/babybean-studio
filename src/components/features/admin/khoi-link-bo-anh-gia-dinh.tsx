@@ -21,7 +21,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { AlertTriangle, Check, Copy, Link2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, Copy, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { vi } from "@/i18n/vi";
@@ -189,7 +189,27 @@ export function KhoiLinkBoAnhGiaDinhView(p: KhoiLinkBoAnhGiaDinhViewProps) {
         </p>
       )}
 
-      {p.du.soLinkCuConSong > 0 && (
+      {/* BB-372 — khách ĐÃ có link gia đình thì link cũ theo bộ (`/g/…`) chỉ còn là MỘT dòng thu gọn,
+          đóng sẵn. Địa chỉ link cũ nằm trong phần mở rộng (`slotLinkCu`) — không nổi bật ở đây để nhân
+          viên khỏi tưởng đó là link cần gửi. Chưa có link gia đình thì link cũ vẫn là link đang dùng
+          nên hiện như trước. */}
+      {p.du.soLinkCuConSong > 0 && link && (
+        <details
+          className="group text-xs text-[var(--bb-fg-muted)]"
+          data-testid="link-cu-bo-anh"
+          data-thu-gon="1"
+        >
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-[var(--bb-radius-sm)] px-1 py-1 hover:text-[var(--bb-fg)] [&::-webkit-details-marker]:hidden">
+            <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-90" />
+            <span data-testid="link-cu-bo-con-song">{dien(T.linkCu, { n: p.du.soLinkCuConSong })}</span>
+          </summary>
+          <div className="mt-1 rounded-[var(--bb-radius-sm)] bg-[var(--bb-bg)] p-3 text-sm text-[var(--bb-fg)]">
+            <p className="text-xs text-[var(--bb-fg-muted)]">{T.linkCuMoTa}</p>
+            {p.slotLinkCu}
+          </div>
+        </details>
+      )}
+      {p.du.soLinkCuConSong > 0 && !link && (
         <details className="rounded-[var(--bb-radius-sm)] bg-[var(--bb-bg)] p-3 text-sm" data-testid="link-cu-bo-anh">
           <summary className="cursor-pointer">
             <span className="font-medium" data-testid="link-cu-bo-con-song">

@@ -284,8 +284,38 @@ function packageQuotas(componentRows) {
  */
 export function sanPhamCanTat(sanPhamHienCo, boMaLarkDangDoc) {
   return sanPhamHienCo.filter(
-    (p) => p.is_active && (!p.lark_record_id || !boMaLarkDangDoc.has(p.lark_record_id)),
+    (p) =>
+      p.is_active &&
+      // BB-374 — "Ảnh album không chỉnh sửa" là sản phẩm CỦA APP (migration 0093), không
+      // có trên Lark: CSKH thêm nó vào hợp đồng để khách chọn thêm ảnh cho album, giá 0 ₫.
+      // Tắt nó là CSKH mất chỗ chọn — nên loại này không bao giờ là "sản phẩm lạc".
+      p.kind !== LOAI_ALBUM_KHONG_CHINH &&
+      (!p.lark_record_id || !boMaLarkDangDoc.has(p.lark_record_id)),
   );
+}
+
+/** BB-374 — loại sản phẩm do app sở hữu (enum thêm ở 0092). Cùng giá trị với `src/lib/gallery/anh-album-khong-chinh.ts`. */
+export const LOAI_ALBUM_KHONG_CHINH = "album_unedited";
+
+/**
+ * BB-374 — dựng lại sản phẩm "Ảnh album không chỉnh sửa" nếu chưa có (vd. sau `db:nap-lai`
+ * xoá sạch `products` rồi nạp lại từ Lark — Lark không có dòng này). Chưa áp 0092 (enum chưa
+ * có giá trị này) thì bỏ qua, KHÔNG làm hỏng lượt đồng bộ.
+ */
+export async function damBaoSanPhamAlbumKhongChinh(client) {
+  const { rows } = await client.query(
+    `select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+      where t.typname = 'product_kind' and e.enumlabel = $1`,
+    [LOAI_ALBUM_KHONG_CHINH],
+  );
+  if (rows.length === 0) return false;
+  await client.query(
+    `insert into products (name, kind, list_price, price_samples, is_active)
+     select 'Ảnh album không chỉnh sửa', $1::product_kind, 0, 0, true
+      where not exists (select 1 from products where kind = $1::product_kind)`,
+    [LOAI_ALBUM_KHONG_CHINH],
+  );
+  return true;
 }
 
 // --- chạy -------------------------------------------------------------------
@@ -426,7 +456,7 @@ Giá Bán khác giá quan sát (${lechGia.length}) — dùng Giá Bán:`);
     // không còn trong lượt đọc Lark vừa rồi. Đọc TRONG cùng giao dịch để thấy
     // đúng trạng thái vừa upsert ở trên, KHÔNG xoá — chỉ ngừng bán.
     const { rows: hienCo } = await client.query(
-      `select id, name, lark_record_id, is_active from products`,
+      `select id, name, lark_record_id, is_active, kind::text as kind from products`,
     );
     const canTat = sanPhamCanTat(hienCo, boMaLarkDangDoc);
     if (canTat.length) {
@@ -435,6 +465,9 @@ Giá Bán khác giá quan sát (${lechGia.length}) — dùng Giá Bán:`);
         [canTat.map((p) => p.id)],
       );
     }
+
+    // BB-374 — sản phẩm của app, không có trên Lark: dựng lại nếu thiếu (sau nạp lại).
+    await damBaoSanPhamAlbumKhongChinh(client);
 
     await client.query("commit");
     const { rows } = await client.query("select count(*)::int as n from products");

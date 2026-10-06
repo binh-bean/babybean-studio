@@ -35,7 +35,7 @@
 
 import { urlAnh, urlAnhDuPhong } from "@/lib/utils/anh-lh3";
 import React, { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Heart, Lock, Printer } from "lucide-react";
+import { Heart, Lock, PenLine, Printer } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { chonCoAnhTheoO } from "@/lib/utils/chon-co-anh";
@@ -81,6 +81,8 @@ interface TheAnhProps {
   dotKhoa: number;
   /** BB-345 — gia đình (link mời) đã thả tim tấm này. Chỉ lưới của ba mẹ truyền. */
   giaDinhThich?: boolean;
+  /** BB-374 — tấm này ba mẹ chọn cho album, KHÔNG chỉnh sửa (suất 0 ₫). */
+  khongChinh?: boolean;
   /** Vị trí trong lưới. Thiếu (nhánh dự phòng) thì thẻ tự xếp theo dòng chảy. */
   x?: number;
   y?: number;
@@ -102,6 +104,7 @@ const TheAnh = memo(function TheAnh({
   soSanhThuTu,
   dotKhoa,
   giaDinhThich = false,
+  khongChinh = false,
   x,
   y,
   w,
@@ -237,6 +240,39 @@ const TheAnh = memo(function TheAnh({
           </span>
         )}
 
+        {/* BB-370 (anh 06/10, ảnh 1c8e9516) — tấm có ghi chú cho thợ chỉnh ảnh: dấu bút
+            nhỏ GÓC TRÊN PHẢI (trái là dấu in, dưới là tim/gia đình). Bộ đã chốt vẫn hiện,
+            để ba mẹ biết tấm nào đã dặn — mở xem lớn đọc được nguyên văn. */}
+        {photo.retouchNote?.trim() && !soSanhBat && (
+          <span
+            data-testid="dau-co-ghi-chu"
+            role="img"
+            aria-label={vi.gallery.coGhiChu}
+            title={vi.gallery.coGhiChu}
+            className="pointer-events-none absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded-full bg-[#fffdf9]/90 text-[#8a4b3c] shadow-sm"
+          >
+            <PenLine className="h-3 w-3" strokeWidth={2} aria-hidden="true" />
+          </span>
+        )}
+
+        {/*
+          BB-374 — tấm "cho album · không chỉnh sửa": bên TRÁI (cùng phía dấu sản phẩm in, xếp
+          dưới nó nếu có), không đấu với tim — tấm này KHÔNG thả tim, không vào hạn mức.
+        */}
+        {khongChinh && !soSanhBat && (
+          <span
+            data-testid="dau-album-khong-chinh"
+            className={cn(
+              CHIP_NGUYEN_KHOI,
+              "pointer-events-none absolute left-2 z-10 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-[#4F5B45] shadow-sm",
+              soSanPham > 0 ? "top-9" : "top-2",
+            )}
+            title="Cho album · không chỉnh sửa"
+          >
+            Cho album · không chỉnh
+          </span>
+        )}
+
         {/* Tấm đã dùng làm sản phẩm in — màu rêu, bên TRÁI, không đấu với tim. */}
         {soSanPham > 0 && (
           <span
@@ -347,6 +383,8 @@ export interface LuoiAnhProps {
   dotKhoaTheoAnh?: Map<string, number>;
   /** BB-345 — các tấm gia đình (link mời) đã thả tim. Thiếu prop = không có dấu. */
   giaDinhThich?: Set<string>;
+  /** BB-374 — các tấm "cho album · không chỉnh sửa". Thiếu prop = không có dấu. */
+  khongChinh?: Set<string>;
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
   onToggleSoSanh: (photo: PhotoPublic) => void;
@@ -367,6 +405,7 @@ export function LuoiAnh({
   soSanhTheoAnh,
   dotKhoaTheoAnh,
   giaDinhThich,
+  khongChinh,
   onToggle,
   onOpen,
   onToggleSoSanh,
@@ -467,6 +506,7 @@ export function LuoiAnh({
               soSanhThuTu={soSanhTheoAnh.get(photo.id) ?? 0}
               dotKhoa={dotKhoaTheoAnh?.get(photo.id) ?? 0}
               giaDinhThich={giaDinhThich?.has(photo.id) ?? false}
+              khongChinh={khongChinh?.has(photo.id) ?? false}
               onToggle={onToggle}
               onOpen={onOpen}
               onToggleSoSanh={onToggleSoSanh}
@@ -491,6 +531,7 @@ export function LuoiAnh({
                 soSanhThuTu={soSanhTheoAnh.get(photo.id) ?? 0}
                 dotKhoa={dotKhoaTheoAnh?.get(photo.id) ?? 0}
               giaDinhThich={giaDinhThich?.has(photo.id) ?? false}
+              khongChinh={khongChinh?.has(photo.id) ?? false}
                 x={vt.x}
                 y={vt.y}
                 w={vt.w}

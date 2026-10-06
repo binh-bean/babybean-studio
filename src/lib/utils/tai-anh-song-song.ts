@@ -99,7 +99,9 @@ export async function taiAnhSongSong<T extends { id: string; sortIndex: number }
       while (trang) {
         cuaTrang.push(...trang.data);
         const cuoi = trang.data[trang.data.length - 1];
-        const conTiep = trang.hasMore && !!trang.cursor && !!cuoi && cuoi.sortIndex < mocSau;
+        // BB-371 — máy chủ lọc ảnh chỉnh sửa khỏi trang, nên một trang có thể RỖNG mà
+        // vẫn còn ảnh phía sau (`hasMore` + con trỏ tính trên trang thô): đi tiếp.
+        const conTiep = trang.hasMore && !!trang.cursor && (!cuoi || cuoi.sortIndex < mocSau);
         if (!conTiep) break;
         trang = await goi({ cursor: trang.cursor, limit: co });
       }

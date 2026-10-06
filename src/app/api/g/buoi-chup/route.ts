@@ -57,8 +57,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { GalleryStatus } from "@/types/domain";
 import { ChonBuoiChupSchema } from "./schema";
 import { layHoacTaoLuotChon } from "@/lib/selection/luot-chon-theo-link";
+import { tenBoThanThien } from "@/lib/utils/ten-bo-than-thien";
+import { tinhTenBiaTuDuLieu } from "@/lib/utils/dinh-dang";
 
 export const runtime = "nodejs";
+
+/** BB-370 — tên gọi bé của bộ (cùng luật bìa `tinhTenBiaTuDuLieu`). */
+function tenBeCua(raw: unknown): string | null {
+  const be = (Array.isArray(raw) ? raw[0] : raw) as { nickname?: string | null; full_name?: string | null } | null | undefined;
+  if (!be) return null;
+  return tinhTenBiaTuDuLieu(be.nickname, be.full_name) || null;
+}
 
 /**
  * Nhãn cho BA MẸ đọc, trên danh sách buổi chụp ở cổng khách (BB-130).
@@ -138,7 +147,7 @@ export async function GET(): Promise<NextResponse> {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("galleries")
-      .select("id, title, status, photo_count, cover_photo_id, created_at, shoot:shoots(shoot_date)")
+      .select("id, title, status, photo_count, cover_photo_id, created_at, shoot:shoots(shoot_date), baby:babies(nickname, full_name)")
       // ĐÂY là điều kiện giữ cho khách chỉ thấy buổi chụp CỦA CHÍNH MÌNH.
       // Bỏ dòng này đi thì mọi ba mẹ đều đọc được danh sách của mọi ba mẹ khác.
       .eq("customer_id", session.customerId)
@@ -154,7 +163,12 @@ export async function GET(): Promise<NextResponse> {
       const trangThai = row.status as GalleryStatus;
       return {
         id: row.id as string,
-        ten: (row.title as string) ?? "Buổi chụp",
+        // BB-370 — không bao giờ in mã hoá đơn (`title` từ Lark) cho khách.
+        ten: tenBoThanThien({
+          tenBe: tenBeCua(row.baby),
+          tieuDe: row.title as string | null,
+          ngayChup: ngayChupCua(row.shoot),
+        }),
         ngayChup: ngayChupCua(row.shoot),
         soAnh: (row.photo_count as number) ?? 0,
         trangThai,

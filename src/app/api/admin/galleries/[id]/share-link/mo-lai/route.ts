@@ -82,6 +82,7 @@ export async function POST(
       .from("share_links")
       .select("id, status, expires_at, token_prefix, revoked_at")
       .eq("gallery_id", galleryId)
+      .neq("role", "viewer") // BB-372: không mở lại nhầm link mời người thân của ba mẹ
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

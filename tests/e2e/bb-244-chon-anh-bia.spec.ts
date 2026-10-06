@@ -132,9 +132,9 @@ test.describe("BB-244: Chọn ảnh bìa popup full màn hình", () => {
     // Mở lại, ảnh nháp không lưu
     await nutDoiBia.click();
     await expect(dialog).toBeVisible();
-    // Chọn kiểu chữ "Tạp chí" — phải được lưu cùng ảnh.
-    await dialog.getByRole("button", { name: "Tạp chí" }).click();
-    await expect(dialog.getByRole("button", { name: "Tạp chí" })).toHaveAttribute("aria-pressed", "true");
+    // BB-370 — trình thiết kế KHÔNG còn chọn bố cục: màn khách không đọc `cover_layout`
+    // (luôn bố cục "Bên cạnh"), chọn mà khách không thấy là xem trước sai.
+    await expect(dialog.getByRole("button", { name: "Tạp chí" })).toHaveCount(0);
     
     // Bấm ảnh 3
     const anh3_lai = dialog.locator('button img').nth(2);
@@ -151,6 +151,7 @@ test.describe("BB-244: Chọn ảnh bìa popup full màn hình", () => {
     // Kiểm db
     const { rows: kq } = await client.query("select cover_photo_id, cover_layout from galleries where id = $1", [galleryId]);
     expect(kq[0].cover_photo_id).toBe(photos[2]);
-    expect(kq[0].cover_layout).toBe("tap-chi");
+    // Lưu bìa không đụng `cover_layout` (BB-370).
+    expect(kq[0].cover_layout).toBeNull();
   });
 });

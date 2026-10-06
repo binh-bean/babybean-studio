@@ -50,6 +50,8 @@ interface StaffRow {
   stale: boolean;
   branchIds: string[];
   deleteReason: string | null;
+  /** BB-373 — được phép đặt mật khẩu cho người này (chỉ Admin; chỉ owner đụng được owner). */
+  canResetPassword: boolean;
 }
 
 interface Branch {
@@ -142,14 +144,6 @@ export function StaffManager({
     void patch(row.id, { isActive: !row.isActive }, t.updated);
   }
 
-  function resetPassword(row: StaffRow) {
-    // prompt() giữ mật khẩu mới nằm ngoài state của trang: nó đi thẳng vào
-    // request và không bao giờ được lưu lại hay render lần nào.
-    const next = window.prompt(`${t.newPassword} — ${row.fullName}`);
-    if (!next) return;
-    void patch(row.id, { password: next }, t.passwordChanged);
-  }
-
   const roleSelect = (row: StaffRow, className: string) => (
     <Select
       className={className}
@@ -214,14 +208,6 @@ export function StaffManager({
         onClick={() => setEditingId(editingId === row.id ? null : row.id)}
       >
         {editingId === row.id ? t.cancel : t.edit}
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busyId === row.id}
-        onClick={() => resetPassword(row)}
-      >
-        {t.resetPassword}
       </Button>
       <Button
         variant="danger"
@@ -366,6 +352,10 @@ export function StaffManager({
                         await patch(row.id, payload, t.updated);
                         setEditingId(null);
                       }}
+                      onPasswordSet={(ten) => {
+                        setError(null);
+                        setNotice(t.passwordChangedFor.replace("{name}", ten));
+                      }}
                     />
                   </div>
                 )}
@@ -408,16 +398,138 @@ export function StaffManager({
  * rơi vào trạng thái nửa vời. Cần đổi thật thì tắt tài khoản cũ, cấp cái mới —
  * lịch sử vẫn còn nguyên vì tắt không phải xoá.
  */
+/**
+ * BB-373 — Admin tự gõ mật khẩu mới. Mật khẩu nằm trong state của MỘT ô nhập,
+ * đi thẳng vào request rồi xoá sạch; không lưu, không in ra đâu cả.
+ */
+function MatKhauMoi({
+  row,
+  onDone,
+}: {
+  row: StaffRow;
+  onDone: (tenNhanSu: string) => void;
+}) {
+  const [matKhau, setMatKhau] = useState("");
+  const [hien, setHien] = useState(false);
+  const [dangDat, setDangDat] = useState(false);
+  const [loi, setLoi] = useState<string | null>(null);
+  const [daChep, setDaChep] = useState(false);
+
+  async function chepTen() {
+    try {
+      await navigator.clipboard.writeText(row.identifier);
+      setDaChep(true);
+      setTimeout(() => setDaChep(false), 2000);
+    } catch {
+      /* Trình duyệt chặn chép: tên vẫn nằm đó để tự bôi đen. */
+    }
+  }
+
+  async function datMatKhau() {
+    if (matKhau.length < 8) {
+      setLoi(t.passwordTooShort);
+      return;
+    }
+    setDangDat(true);
+    setLoi(null);
+    try {
+      const res = await fetch(`/api/admin/staff/${row.id}/mat-khau`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: matKhau }),
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error?.message ?? "Không đặt được mật khẩu");
+      setMatKhau("");
+      setHien(false);
+      onDone(row.fullName);
+    } catch (e) {
+      setLoi(e instanceof Error ? e.message : "Không đặt được mật khẩu");
+    } finally {
+      setDangDat(false);
+    }
+  }
+
+  return (
+    <section
+      data-testid="o-mat-khau-moi"
+      aria-label={t.passwordSection}
+      className="space-y-3 border-t border-[var(--bb-border)] pt-4"
+    >
+      <h3 className="text-sm font-semibold text-[var(--bb-fg)]">{t.passwordSection}</h3>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-xs font-medium text-[var(--bb-fg-muted)]">{t.loginName}</span>
+        <code data-testid="ten-dang-nhap" className="break-all text-sm text-[var(--bb-fg)]">
+          {row.identifier}
+        </code>
+        <Button type="button" variant="outline" size="sm" onClick={() => void chepTen()}>
+          {daChep ? t.copied : t.copy}
+        </Button>
+        <span className="text-xs text-[var(--bb-fg-muted)]">{t.loginNameHint}</span>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="min-w-[14rem] flex-1">
+          <label
+            htmlFor={`mat-khau-moi-${row.id}`}
+            className="mb-1 block text-xs font-medium text-[var(--bb-fg-muted)]"
+          >
+            {t.newPassword}
+          </label>
+          <div className="flex gap-2">
+            <Input
+              id={`mat-khau-moi-${row.id}`}
+              name="mat-khau-moi"
+              type={hien ? "text" : "password"}
+              value={matKhau}
+              onChange={(e) => {
+                setMatKhau(e.target.value);
+                setLoi(null);
+              }}
+              autoComplete="new-password"
+              spellCheck={false}
+              minLength={8}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-pressed={hien}
+              onClick={() => setHien((v) => !v)}
+            >
+              {hien ? t.hidePassword : t.showPassword}
+            </Button>
+          </div>
+        </div>
+        <Button type="button" disabled={dangDat || matKhau.length === 0} onClick={() => void datMatKhau()}>
+          {dangDat ? t.settingPassword : t.setPassword}
+        </Button>
+      </div>
+
+      {loi && (
+        <p role="alert" className="text-sm text-[var(--bb-danger)]">
+          {loi}
+        </p>
+      )}
+      <p className="text-xs text-[var(--bb-fg-muted)]">{t.newPasswordHint}</p>
+      <p className="text-xs text-[var(--bb-fg-muted)]">{t.passwordNeverShown}</p>
+    </section>
+  );
+}
+
 function EditStaffRow({
   row,
   branches,
   saving,
   onSave,
+  onPasswordSet,
 }: {
   row: StaffRow;
   branches: Branch[];
   saving: boolean;
   onSave: (payload: Record<string, unknown>) => void | Promise<void>;
+  onPasswordSet: (tenNhanSu: string) => void;
 }) {
   const [fullName, setFullName] = useState(row.fullName);
   const [phone, setPhone] = useState(row.phone ?? "");
@@ -425,6 +537,7 @@ function EditStaffRow({
   const seesAllBranches = row.role === "owner" || row.role === "admin";
 
   return (
+    <div className="space-y-4">
     <form
       className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       onSubmit={(e) => {
@@ -482,6 +595,8 @@ function EditStaffRow({
         </Button>
       </div>
     </form>
+    {row.canResetPassword && <MatKhauMoi row={row} onDone={onPasswordSet} />}
+    </div>
   );
 }
 

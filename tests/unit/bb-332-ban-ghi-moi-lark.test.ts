@@ -157,6 +157,10 @@ function taoDbGia(galleries: GalleryGia[]) {
         }
         return { rows: [], rowCount: n };
       }
+      if (/select lark_record_id from lark_ban_ghi_moi where gallery_id is null/.test(sql)) {
+        const rows = [...banGhi.values()].filter((b) => !b.gallery_id);
+        return { rows, rowCount: rows.length };
+      }
       if (/select lark_record_id, gallery_id from lark_ban_ghi_moi/.test(sql)) {
         return { rows: [...banGhi.values()], rowCount: banGhi.size };
       }
@@ -179,8 +183,12 @@ function taoDbGia(galleries: GalleryGia[]) {
         return { rows: [], rowCount: g ? 1 : 0 };
       }
       if (/delete from lark_ban_ghi_moi/.test(sql)) {
+        const chiChuaBo = /gallery_id is null/.test(sql);
         let n = 0;
-        for (const id of p[0] as string[]) if (banGhi.delete(id)) n++;
+        for (const id of p[0] as string[]) {
+          if (chiChuaBo && banGhi.get(id)?.gallery_id) continue;
+          if (banGhi.delete(id)) n++;
+        }
         return { rows: [], rowCount: n };
       }
       throw new Error(`pg giả không biết câu lệnh: ${sql.slice(0, 60)}`);
@@ -194,7 +202,8 @@ function nguonGia(dongMoi: LarkRecord[], daXoa: string[] = []): NguonLark & { ho
   return {
     hoiXoa,
     async docTrangThaiTrong() {
-      return dongMoi;
+      // Dòng đọc chi tiết + mọi mã còn "Trạng Thái trống" (BB-369).
+      return { dong: dongMoi, tatCaMa: dongMoi.map((d) => d.record_id) };
     },
     async timDongDaXoa(ids) {
       hoiXoa.push(ids);
@@ -228,7 +237,8 @@ describe("BB-332: dongBoBanGhiMoi (Lark giả, pg giả)", () => {
       nguon: nguonGia([], ["recChuaTao", "recNhap", "recDaGui"]),
       dbUrl: DB_TEN_GIA,
     });
-    expect(kq).toMatchObject({ xoaBanGhi: 3, luuTruBoAnh: 1, danhDauLarkXoa: 1 });
+    // BB-369: dòng chưa thành bộ ảnh rời khối ngay ở bước "không còn Trạng Thái trống".
+    expect(kq).toMatchObject({ daXuLyBenLark: 1, xoaBanGhi: 2, luuTruBoAnh: 1, danhDauLarkXoa: 1 });
     expect(db.banGhi.size).toBe(0);
     expect(galleries[0]!.status).toBe("archived");
     // Bộ đã gửi khách: KHÔNG xoá, KHÔNG lưu trữ — chỉ đánh dấu cho Việc cần xử lý.

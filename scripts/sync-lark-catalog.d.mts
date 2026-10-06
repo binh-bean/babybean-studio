@@ -7,7 +7,11 @@ export interface SanPhamHienCo {
   name: string;
   lark_record_id: string | null;
   is_active: boolean;
+  /** BB-374 — loại sản phẩm (text); `album_unedited` không bao giờ bị tắt. */
+  kind?: string | null;
 }
+
+export const LOAI_ALBUM_KHONG_CHINH: "album_unedited";
 
 export function sanPhamCanTat(
   sanPhamHienCo: SanPhamHienCo[],

@@ -37,6 +37,7 @@ import { OverQuotaReport } from "./over-quota-report";
 import { YeuCauMoLaiReport } from "./yeu-cau-mo-lai-report";
 import { KhachGuiAnhChonReport } from "./khach-gui-anh-chon-report";
 import { QuenMatKhauReport } from "./quen-mat-khau-report";
+import { AnhChinhSuaReport } from "./anh-chinh-sua-report";
 import { formatSo } from "@/lib/utils/dinh-dang";
 import { TABS_VIEC_CAN_XU_LY, tabsChoVai as locTabTheoVai, type TabViecCanXuLy } from "@/lib/utils/viec-can-xu-ly-tabs";
 
@@ -78,7 +79,7 @@ export function ViecCanXuLy({ role }: { role?: string }) {
     <div className="space-y-6">
       <PageHeader
         title="Việc cần xử lý"
-        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại, khách gửi ảnh chọn chờ xác nhận, nhân viên quên mật khẩu."
+        description="Những việc CSKH cần xử lý trước khi khách gặp vấn đề — bộ ảnh chưa tải được, link sắp hết hạn, ảnh vượt hạn mức, yêu cầu mở lại, khách gửi ảnh chọn chờ xác nhận, ảnh chỉnh sửa chờ gửi khách, nhân viên quên mật khẩu."
       />
       <Tabs value={active} onValueChange={onChange}>
         {/* BB-318: hàng tab xuống dòng thay vì tràn ngang — trên 390px bốn tab không vừa một hàng, và bấm tab từng làm CẢ TRANG trượt sang bên.
@@ -133,6 +134,11 @@ export function ViecCanXuLy({ role }: { role?: string }) {
         {tabsChoVai.some((t) => t.value === "lark-da-xoa") && (
           <TabsContent value="lark-da-xoa">
             <LarkDaXoaReport />
+          </TabsContent>
+        )}
+        {tabsChoVai.some((t) => t.value === "anh-chinh-sua") && (
+          <TabsContent value="anh-chinh-sua" className="mt-6">
+            <AnhChinhSuaReport />
           </TabsContent>
         )}
         {tabsChoVai.some((t) => t.value === "quen-mat-khau") && (

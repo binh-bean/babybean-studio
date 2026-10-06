@@ -78,6 +78,9 @@ describe("BB-325: bocDongHauKy — thông tin điền sẵn lấy từ Lark, kh�
       tongFileEdit: 15,
       trangThai: "Chờ khách chọn",
       linkLark: "https://lark.example/base/x?record=rec9",
+      // BB-369: chi nhánh + người chụp — dòng này không có hai ô đó.
+      chiNhanh: "",
+      photo: null,
     });
   });
 

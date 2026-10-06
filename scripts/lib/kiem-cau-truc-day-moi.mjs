@@ -324,3 +324,53 @@ export async function kiem0090({ client }) {
     },
   ];
 }
+
+/**
+ * BB-374 — 0092 (giá trị enum `album_unedited`) + 0093 (bảng `anh_album_khong_chinh`, sản phẩm
+ * "Ảnh album không chỉnh sửa", `app.gallery_quota` bỏ qua dòng loại này khi hỏi "có dòng hợp
+ * đồng nào không"). Chưa áp cả hai là ĐẠT "chờ áp"; áp nửa vời / thiếu revoke là HỎNG.
+ */
+export async function kiem0092_0093({ client }) {
+  const { rows: en } = await client.query(
+    `select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+      where t.typname = 'product_kind' and e.enumlabel = 'album_unedited'`,
+  );
+  const { rows: bang } = await client.query(
+    `select c.relrowsecurity as rls,
+            has_table_privilege('anon', c.oid, 'SELECT') as anon,
+            has_table_privilege('authenticated', c.oid, 'SELECT') as auth
+       from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relname = 'anh_album_khong_chinh'`,
+  );
+  if (en.length === 0 && bang.length === 0) {
+    return [{ name: "0092/0093: ảnh album không chỉnh sửa", pass: true, detail: "CHỜ ÁP — chưa áp (viết ở BB-374, app chạy được khi chưa áp)" }];
+  }
+  const sai = [];
+  if (en.length === 0) sai.push("thiếu giá trị enum product_kind 'album_unedited' (0092)");
+  if (bang.length === 0) sai.push("thiếu bảng anh_album_khong_chinh (0093)");
+  else {
+    if (!bang[0].rls) sai.push("anh_album_khong_chinh chưa bật RLS");
+    if (bang[0].anon || bang[0].auth) sai.push("anh_album_khong_chinh MỞ cho anon/authenticated (thiếu revoke)");
+  }
+  if (en.length > 0) {
+    const { rows: sp } = await client.query(`select count(*)::int n from products where kind::text = 'album_unedited' and is_active`);
+    if (sp[0].n === 0) sai.push("chưa có sản phẩm 'Ảnh album không chỉnh sửa' đang dùng");
+  }
+  const { rows: ham } = await client.query(
+    `select pg_get_functiondef(p.oid) as def, has_function_privilege('anon', p.oid, 'EXECUTE') as anon
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'app' and p.proname = 'gallery_quota'`,
+  );
+  if (ham.length === 0) sai.push("thiếu hàm app.gallery_quota");
+  else {
+    if (!String(ham[0].def).includes("album_unedited")) sai.push("app.gallery_quota chưa bỏ qua dòng album_unedited (0093 mục 3)");
+    if (ham[0].anon) sai.push("app.gallery_quota MỞ cho anon (thiếu revoke, AGENTS §5b)");
+  }
+  return [
+    {
+      name: "0092/0093: ảnh album không chỉnh sửa",
+      pass: sai.length === 0,
+      detail: sai.length ? `ÁP NỬA VỜI: ${sai.join("; ")}` : "đã áp: enum + bảng (RLS, revoke) + sản phẩm + hạn mức bỏ qua dòng album",
+    },
+  ];
+}

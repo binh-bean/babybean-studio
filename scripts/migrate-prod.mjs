@@ -66,6 +66,13 @@ const boQuaSaoLuu = process.argv.includes("--bo-qua-sao-luu");
  */
 const epAp = process.argv.includes("--ep-ap");
 
+/** `--chi 0090,0091` — chỉ áp các tệp có số đầu này (xem chỗ dùng bên dưới). */
+const viTriChi = process.argv.indexOf("--chi");
+const chiCacTep =
+  viTriChi >= 0 && process.argv[viTriChi + 1]
+    ? process.argv[viTriChi + 1].split(",").map((s) => s.trim()).filter(Boolean)
+    : null;
+
 /**
  * Mốc bắt đầu của dãy migrate-prod biết áp: `0045` là tệp NGAY SAU baseline mà
  * `setup-prod.mjs` (schema + 0001..0044) đã dựng lên bb-prod ngày 16/09/2026 —
@@ -356,7 +363,15 @@ async function main() {
   // không dựa vào chín mốc — chín mốc chỉ canh 0045–0050, và trước đây khiến
   // script thoát "không có gì phải vá" ngay cả khi 0051–0075 chưa hề chạy.
   const daAp = await layTenDaAp(client);
-  const dayThatSu = epAp ? DAY : tepConThieu(DAY, daAp);
+  const dayDayDu = epAp ? DAY : tepConThieu(DAY, daAp);
+  // `--chi 0090,0091`: chỉ áp những tệp CÒN THIẾU có số đầu khớp — để bật tính
+  // năng mới trên bb-dev mà KHÔNG kéo theo tệp cố ý giữ tới ngày cắt (0088/0089,
+  // docs/26 bước 3). Không có cờ thì giữ nguyên hành vi cũ: áp cả dãy còn thiếu.
+  const dayThatSu = chiCacTep ? dayDayDu.filter((t) => chiCacTep.some((so) => t.startsWith(so))) : dayDayDu;
+  if (chiCacTep) {
+    const khongThay = chiCacTep.filter((so) => !dayDayDu.some((t) => t.startsWith(so)));
+    if (khongThay.length) console.log(`\n--chi: không thấy tệp còn thiếu nào bắt đầu bằng ${khongThay.join(", ")} (đã áp hoặc gõ sai).`);
+  }
 
   if (dayThatSu.length === 0) {
     console.log(`\nKhông có gì phải vá — cả ${DAY.length} tệp trong dãy (${TU_TEP} trở lên) đã có trong bảng theo dõi.`);

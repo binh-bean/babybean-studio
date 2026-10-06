@@ -35,6 +35,7 @@ import { vi } from "@/i18n/vi";
 import { formatNgayGioVN, formatNgayVN } from "@/lib/utils/dinh-dang";
 import {
   diaChiHienThi,
+  diaChiManConBo,
   dien,
   docLinkGiaDinh,
   doiLinkGiaDinh,
@@ -71,6 +72,11 @@ export interface KhoiLinkGiaDinhViewProps {
   daChep: "link" | "tin" | null;
   coTheChiaSe: boolean;
   chatUrl?: string | null;
+  /** BB-372 — gốc trang (để ghép địa chỉ màn con khi máy chủ chỉ trả đường dẫn). */
+  goc?: string | null;
+  /** BB-372 — bộ ảnh vừa được chép (id), hiện "Đã chép" ở dòng đó. */
+  daChepBo?: string | null;
+  onChepBo?: (galleryId: string, diaChi: string) => void;
   onTao: () => void;
   onMoHop: (h: Exclude<HopXacNhan, null>) => void;
   onDongHop: () => void;
@@ -266,6 +272,75 @@ export function KhoiLinkGiaDinhView(props: KhoiLinkGiaDinhViewProps) {
         </div>
       )}
 
+      {/* BB-372 — link màn con của TỪNG bộ ảnh: Buổi 1, 2, 3… (số của `soThuTuCacBo`). */}
+      {link && du?.boAnh && (
+        <div className="mt-4 border-t border-[var(--bb-border)] pt-4" data-testid="link-man-con-cac-bo">
+          <h3 className="text-sm font-medium">{T.manCon.tieuDe}</h3>
+          <p className="mt-0.5 text-xs text-[var(--bb-fg-muted)]">{T.manCon.moTa}</p>
+          {du.boAnh.length === 0 ? (
+            <p className="mt-2 text-sm text-[var(--bb-fg-muted)]" data-testid="link-man-con-trong">
+              {T.manCon.khongCoBo}
+            </p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-2">
+              {du.boAnh.map((b) => {
+                const diaChiBo = diaChiManConBo(b, p.goc ?? null);
+                const daChepBo = p.daChepBo === b.galleryId;
+                return (
+                  <li
+                    key={b.galleryId}
+                    className="flex flex-col gap-1.5 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-[var(--bb-bg)] p-3"
+                    data-testid="dong-man-con"
+                    data-so-thu-tu={b.soThuTu}
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                      <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]" data-testid="man-con-ten">
+                        {dien(T.manCon.buoi, { n: b.soThuTu })} · {b.tieuDe}
+                        {b.tenBe ? ` · ${b.tenBe}` : ""}
+                        {` · ${b.ngayChup ? formatNgayVN(b.ngayChup) : T.manCon.chuaRoNgay}`}
+                      </p>
+                      <span className="shrink-0 text-xs tabular-nums text-[var(--bb-fg-muted)]" data-testid="man-con-so-anh">
+                        {dien(T.manCon.soAnh, { n: b.soAnh })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--bb-fg-muted)]" data-testid="man-con-trang-thai">
+                      {b.trangThai.khach}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        readOnly
+                        aria-label={dien(T.manCon.buoi, { n: b.soThuTu })}
+                        data-testid="o-link-man-con-bo"
+                        value={diaChiBo ?? ""}
+                        placeholder={diaChiBo ? undefined : T.manCon.khongDocLai}
+                        onFocus={(e) => e.currentTarget.select()}
+                        className="h-9 min-w-0 flex-1 basis-48 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-[var(--bb-surface)] px-2.5 font-mono text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => diaChiBo && p.onChepBo?.(b.galleryId, diaChiBo)}
+                        disabled={!diaChiBo}
+                        data-testid="nut-chep-man-con-bo"
+                      >
+                        {daChepBo ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                        {daChepBo ? T.manCon.daChep : T.manCon.chep}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {(du.soBoAn ?? 0) > 0 && (
+            <p className="mt-2 text-xs text-[var(--bb-fg-muted)]" data-testid="link-man-con-bo-an">
+              {dien(T.manCon.boAn, { n: du.soBoAn ?? 0 })}
+            </p>
+          )}
+        </div>
+      )}
+
       {du && (soLinkCu > 0 || soLoiMoi > 0) && (
         <div className="mt-4 flex flex-col gap-2 rounded-[var(--bb-radius-sm)] bg-[var(--bb-bg)] p-3 text-sm" data-testid="link-gia-dinh-link-cu">
           {soLinkCu > 0 && (
@@ -338,6 +413,7 @@ export function KhoiLinkGiaDinh({ customerId, chatUrl }: { customerId: string; c
   const [vuaThuHoi, setVuaThuHoi] = React.useState(false);
   const [duongDanTam, setDuongDanTam] = React.useState<string | null>(null);
   const [daChep, setDaChep] = React.useState<"link" | "tin" | null>(null);
+  const [daChepBo, setDaChepBo] = React.useState<string | null>(null);
   const [coTheChiaSe, setCoTheChiaSe] = React.useState(false);
   const [goc, setGoc] = React.useState<string | null>(null);
   const loiChuoi = React.useMemo(() => ({ matKetNoi: T.matKetNoi, chung: T.loiChung }), []);
@@ -374,6 +450,16 @@ export function KhoiLinkGiaDinh({ customerId, chatUrl }: { customerId: string; c
     } catch {
       setThongBao({ loai: "canh-bao", chu: T.khongChepDuoc });
       document.querySelector<HTMLInputElement>('[data-testid="o-link-gia-dinh"]')?.select();
+    }
+  }
+
+  async function chepBo(galleryId: string, chu: string) {
+    try {
+      await navigator.clipboard.writeText(chu);
+      setDaChepBo(galleryId);
+      window.setTimeout(() => setDaChepBo(null), 2000);
+    } catch {
+      setThongBao({ loai: "canh-bao", chu: T.khongChepDuoc });
     }
   }
 
@@ -446,6 +532,9 @@ export function KhoiLinkGiaDinh({ customerId, chatUrl }: { customerId: string; c
       daChep={daChep}
       coTheChiaSe={coTheChiaSe}
       chatUrl={chatUrl}
+      goc={goc}
+      daChepBo={daChepBo}
+      onChepBo={(id, diaChiBo) => void chepBo(id, diaChiBo)}
       onTao={() => void tao()}
       onMoHop={(h) => {
         setThongBao(null);

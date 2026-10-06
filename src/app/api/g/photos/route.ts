@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { PhotosQuerySchema } from "./schema";
 import { ok, fail } from "@/lib/api-response";
 import type { PhotoPublic } from "@/types/domain";
+import { locLuoiAnhGoc } from "@/lib/anh-chinh-sua/cong-khach";
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,11 +51,19 @@ export async function GET(req: NextRequest) {
     if (error) throw error;
 
     const hasMore = rawPhotos && rawPhotos.length > limit;
-    const photosToReturn = hasMore ? rawPhotos.slice(0, limit) : (rawPhotos || []);
+    const trangTho = hasMore ? rawPhotos.slice(0, limit) : (rawPhotos || []);
 
-    const nextCursor = photosToReturn.length > 0 
-      ? Buffer.from(JSON.stringify({ s: photosToReturn[photosToReturn.length - 1].sort_index })).toString('base64url')
+    // Con trỏ tính trên trang THÔ (trước khi lọc ảnh chỉnh) — lọc bớt mà tính con trỏ
+    // trên phần còn lại thì trang sau xin lại đúng những tấm vừa bị lọc.
+    const nextCursor = trangTho.length > 0
+      ? Buffer.from(JSON.stringify({ s: trangTho[trangTho.length - 1].sort_index })).toString('base64url')
       : null;
+
+    // BB-371 — ảnh trong thư mục ảnh chỉnh sửa ("anh chinh sua"…) KHÔNG nằm trong
+    // lưới chọn ảnh gốc: khách xem chúng ở khối "Ảnh đã chỉnh" (/api/g/anh-chinh-sua),
+    // và chỉ sau khi CSKH bấm "Gửi khách duyệt". Lọc ở máy chủ — lọc ở màn khách là
+    // đã gửi ảnh chưa kiểm xuống trình duyệt rồi.
+    const photosToReturn = locLuoiAnhGoc(trangTho as { subfolder: string | null }[]) as typeof trangTho;
 
     // BB-341 — mã tệp Drive của từng ảnh, để màn khách dựng thẳng URL lh3
     // (xem src/lib/utils/anh-lh3.ts) thay vì đi vòng 302 qua `/api/img`.

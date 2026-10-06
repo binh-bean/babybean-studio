@@ -75,6 +75,13 @@ interface DongHauKy {
   tongFileEdit: number | null;
   linkLark: string | null;
   boAnhDaCo: BoAnhDaCo | null;
+  /** BB-369 — gợi ý từ chính dòng Lark (ô "Chi Nhánh", cột "photo"). */
+  goiY?: {
+    branchId: string | null;
+    photographerId: string | null;
+    chiNhanhLark: string;
+    photoLark: string | null;
+  };
 }
 
 /** Lỗi Drive kèm hướng dẫn từng bước, không phải lỗi kỹ thuật. */
@@ -180,6 +187,19 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
   useEffect(() => {
     if (dongChon?.tongFileEdit) setQuota(dongChon.tongFileEdit);
   }, [dongChon]);
+
+  // BB-369 (chủ studio 06/10): đã tra được dòng Lark thì chi nhánh + người chụp
+  // lấy từ dòng đó, không bắt chọn tay. Lark trống / không khớp thì GIỮ lựa
+  // chọn tay (không xoá), và thuật sĩ nói rõ vì sao.
+  const goiY = dongChon?.goiY ?? null;
+  const branchTuLark = !!goiY?.branchId && (options?.branches ?? []).some((b) => b.id === goiY.branchId);
+  useEffect(() => {
+    if (!goiY) return;
+    if (goiY.branchId && (options?.branches ?? []).some((b) => b.id === goiY.branchId)) setBranchId(goiY.branchId);
+    if (goiY.photographerId && (options?.photographers ?? []).some((p) => p.id === goiY.photographerId)) {
+      setPhotographerId(goiY.photographerId);
+    }
+  }, [goiY, options]);
 
   async function traLark(ma = maHoaDon, sdt = sdtTra) {
     setDangTra(true);
@@ -471,7 +491,12 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={w.branch} required>
-                <OChonTim value={branchId} onChange={(e) => setBranchId(e.target.value)}>
+                <OChonTim
+                  name="branchId"
+                  aria-label={w.branch}
+                  value={branchId}
+                  onChange={(e) => setBranchId(e.target.value)}
+                >
                   <option value="">{w.choose}</option>
                   {(options?.branches ?? []).map((b) => (
                     <option key={b.id} value={b.id}>
@@ -479,10 +504,21 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
                     </option>
                   ))}
                 </OChonTim>
+                {goiY && (
+                  <p className="mt-1 text-xs text-[var(--bb-fg-muted)]" data-testid="goi-y-chi-nhanh">
+                    {branchTuLark && branchId === goiY.branchId
+                      ? w.tuLark
+                      : goiY.chiNhanhLark
+                        ? w.chiNhanhLarkKhongKhop.replace("{ten}", goiY.chiNhanhLark)
+                        : w.chiNhanhLarkTrong}
+                  </p>
+                )}
               </Field>
 
               <Field label={w.photographer}>
                 <OChonTim
+                  name="photographerId"
+                  aria-label={w.photographer}
                   value={photographerId}
                   onChange={(e) => setPhotographerId(e.target.value)}
                   disabled={branchId === ""}
@@ -494,6 +530,18 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
                     </option>
                   ))}
                 </OChonTim>
+                {goiY && (
+                  <p
+                    className={`mt-1 text-xs ${goiY.photoLark ? "text-[var(--bb-fg-muted)]" : "text-[var(--bb-urgent)]"}`}
+                    data-testid="goi-y-nguoi-chup"
+                  >
+                    {goiY.photographerId && photographerId === goiY.photographerId
+                      ? w.tuLark
+                      : goiY.photoLark
+                        ? w.photoLarkKhongKhop.replace("{ten}", goiY.photoLark)
+                        : w.photoLarkTrong}
+                  </p>
+                )}
               </Field>
             </div>
 
@@ -567,7 +615,9 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
                     <OLark nhan={w.invoiceCode} giaTri={dongChon.maHoaDon} />
                     <OLark nhan={w.packageSelect} giaTri={dongChon.goiChup} />
                     <OLark nhan={w.shootDate} giaTri={dongChon.ngayChup ? formatNgayVN(dongChon.ngayChup) : null} />
+                    <OLark nhan={w.photographer} giaTri={dongChon.goiY?.photoLark ?? null} />
                   </dl>
+                  <p className="text-xs text-[var(--bb-fg-muted)]">{w.thanhPhanTuLark}</p>
                   {dongChon.linkLark && (
                     <a
                       href={dongChon.linkLark}

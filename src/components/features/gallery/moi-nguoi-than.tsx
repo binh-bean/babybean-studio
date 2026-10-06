@@ -70,6 +70,24 @@ export function diaChiTuyetDoi(diaChiDayDu: string | undefined, duongDan: string
  */
 export type KieuLoiVaoMoi = "the" | "nut-bia" | "hang";
 
+/**
+ * Nút viền "Mời ông bà cùng xem" trên bìa. Tách riêng (BB-370) để khung xem
+ * trước bìa ở quản trị vẽ ĐÚNG nút này mà không dựng cả màn mời (gọi API khách).
+ */
+export function NutMoiOngBaBia({ onClick }: { onClick?: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid="nut-moi-ong-ba-bia"
+      onClick={onClick}
+      className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#e5dcd2] bg-white px-6 text-[14px] font-medium text-[#2e2a27] transition hover:bg-[#2e2a27]/5 @[64rem]:h-[52px] @[64rem]:w-auto"
+    >
+      <UserPlus className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
+      Mời ông bà cùng xem
+    </button>
+  );
+}
+
 export function MoiNguoiThan({ kieu = "the" }: { kieu?: KieuLoiVaoMoi } = {}) {
   const [ds, setDs] = React.useState<NguoiDaMoi[] | null>(null);
   const [mo, setMo] = React.useState(false);
@@ -227,15 +245,7 @@ export function MoiNguoiThan({ kieu = "the" }: { kieu?: KieuLoiVaoMoi } = {}) {
 
   const loiVao =
     kieu === "nut-bia" ? (
-      <button
-        type="button"
-        data-testid="nut-moi-ong-ba-bia"
-        onClick={moMan}
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#e5dcd2] bg-white px-6 text-[14px] font-medium text-[#2e2a27] transition hover:bg-[#2e2a27]/5 @[64rem]:h-[52px] @[64rem]:w-auto"
-      >
-        <UserPlus className="h-[18px] w-[18px]" strokeWidth={1.8} aria-hidden="true" />
-        Mời ông bà cùng xem
-      </button>
+      <NutMoiOngBaBia onClick={moMan} />
     ) : kieu === "hang" ? (
       <button
         type="button"

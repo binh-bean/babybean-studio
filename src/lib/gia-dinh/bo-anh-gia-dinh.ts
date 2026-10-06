@@ -18,6 +18,7 @@ import { tinhTenBiaTuDuLieu } from "@/lib/utils/dinh-dang";
 import { laLoiThieuCot } from "@/lib/gallery/dot-chon-server";
 import { TRANG_THAI_AN_VOI_GIA_DINH } from "@/lib/auth/phien-bo-anh";
 import { tenNha, type BeTrongNha } from "@/lib/gia-dinh/ten-nha";
+import { tieuDeChoKhach } from "@/lib/utils/ten-bo-than-thien";
 
 export type MaBuocTiepTheo = "chon_anh" | "duyet_anh" | "xem_anh" | "nhan_bean";
 
@@ -150,7 +151,9 @@ export async function danhSachBoAnhGiaDinh(
       return {
         id: dong.id,
         soThuTu: so,
-        tieuDe: dong.title ?? "Buổi chụp",
+        // BB-370 — `title` từ Lark là MÃ HOÁ ĐƠN ("HD_20260909#5067"): không
+        // gửi ra trình duyệt khách. Rỗng thì màn khách dựng tên từ bé + ngày chụp.
+        tieuDe: tieuDeChoKhach(dong.title) ?? "",
         tenBe,
         ngayChup: shoot?.shoot_date ?? null,
         soAnh: dong.photo_count ?? 0,

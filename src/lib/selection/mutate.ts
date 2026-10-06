@@ -2,6 +2,7 @@ import { vi } from "@/i18n";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isGalleryLocked, maLarkConHieuLuc } from "@/lib/gallery-status";
 import { canSelectMore, type QuotaRules } from "@/lib/selection/quota";
+import { goKhoiAlbumKhongChinhKhiThaTim } from "@/lib/gallery/anh-album-khong-chinh-server";
 import type { GallerySession, SelectionPatchRequest, SelectionPatchResponse, ErrorCode } from "@/types/domain";
 
 export async function patchSelection(
@@ -169,6 +170,19 @@ export async function patchSelection(
     if (rpcError.message === "FORBIDDEN_PHOTO") return { error: { code: "FORBIDDEN", message: "Ảnh này không thuộc bộ ảnh đang mở" } };
     if (rpcError.message === "QUOTA_EXCEEDED") return { error: { code: "QUOTA_EXCEEDED" } };
     throw rpcError;
+  }
+
+  // BB-374 — tấm vừa THẢ TIM (thành ảnh chỉnh sửa, trong hạn mức) rời suất "Ảnh album không
+  // chỉnh sửa": một tấm không thể vừa chỉnh vừa không chỉnh. Chỉ tấm RPC đã nhận (không nằm
+  // trong `rejected`) và chỉ khi thật sự thành `selected` (người gợi ý ra `suggested`, không gỡ).
+  if (session.role !== "suggester") {
+    const biTuChoi = new Set(
+      ((result?.rejected ?? []) as { photoId: string }[]).map((r) => r.photoId),
+    );
+    const thaTim = request.ops
+      .filter((op) => op.mark === "selected" && !biTuChoi.has(op.photoId))
+      .map((op) => op.photoId);
+    await goKhoiAlbumKhongChinhKhiThaTim(supabase, session.selectionId, thaTim);
   }
 
   // BB-144: Cập nhật ghi chú chỉnh sửa (retouch_note) và danh sách nhãn (note_tags).

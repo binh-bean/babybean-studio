@@ -21,7 +21,8 @@ export type TabViecCanXuLy =
   | "yeu-cau-mo-lai"
   | "khach-mua-them"
   | "quen-mat-khau"
-  | "lark-da-xoa";
+  | "lark-da-xoa"
+  | "anh-chinh-sua";
 
 export interface DinhNghiaTabViec {
   value: TabViecCanXuLy;
@@ -82,6 +83,15 @@ export const TABS_VIEC_CAN_XU_LY: DinhNghiaTabViec[] = [
       if (Array.isArray(d?.boAnh)) return d.boAnh.length;
       return (d?.items?.length ?? 0) + (d?.viecDot1?.length ?? 0);
     },
+  },
+  {
+    // BB-371 — ảnh chỉnh mới về chờ CSKH kiểm rồi "Gửi khách duyệt", và ba mẹ vừa
+    // xin sửa (vòng đang mở). Mỗi BỘ ẢNH một dòng.
+    value: "anh-chinh-sua",
+    label: "Ảnh chỉnh sửa",
+    api: "/api/admin/reports/anh-chinh-sua",
+    hiddenForRoles: ["photoshop_ctv"],
+    demSo: demItems,
   },
   {
     // BB-327 — nhân viên báo quên mật khẩu. Route tự trả rỗng cho vai không
@@ -174,24 +184,39 @@ export function ketQuaDemViec(
 export async function demViecCanXuLy(
   role?: string,
   goi: (url: string, init?: RequestInit) => Promise<Response> = (u, i) => fetch(u, i),
+  /**
+   * BB-369 — kết quả lượt đếm trước. Một tab tải hỏng lượt này (route chậm, quá
+   * giờ) thì GIỮ số cũ của tab đó thay vì coi là 0. Trước đây tab hỏng rơi khỏi
+   * thẻ "Cần xử lý ngay" rồi lượt sau hiện lại — việc chưa xử lý "lúc hiện lúc
+   * không" (chủ studio 06/10/2026).
+   */
+  truoc: KetQuaDemViec | null = null,
 ): Promise<KetQuaDemViec | null> {
   const demSo: Partial<Record<TabViecCanXuLy, number>> = {};
   let coNguonNaoOk = false;
-  let khongCoQuyenQuenMk = false;
+  let khongCoQuyenQuenMk = truoc?.khongCoQuyenQuenMk ?? false;
+  const motLan = async (tab: DinhNghiaTabViec): Promise<boolean> => {
+    try {
+      const res = await goi(tab.api, { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.data) return false;
+      coNguonNaoOk = true;
+      if (tab.value === "quen-mat-khau") khongCoQuyenQuenMk = json.data.coQuyen === false;
+      demSo[tab.value] = tab.demSo(json.data);
+      return true;
+    } catch {
+      return false;
+    }
+  };
   await Promise.all(
     tabsChoVai(role).map(async (tab) => {
-      try {
-        const res = await goi(tab.api, { cache: "no-store" });
-        const json = await res.json().catch(() => null);
-        if (!res.ok || !json?.data) return;
-        coNguonNaoOk = true;
-        if (tab.value === "quen-mat-khau" && json.data.coQuyen === false) khongCoQuyenQuenMk = true;
-        demSo[tab.value] = tab.demSo(json.data);
-      } catch {
-        // Một tab hỏng thì coi là 0 — huy hiệu là phụ.
-      }
+      // Hỏng thì thử lại MỘT lần; vẫn hỏng thì giữ số lượt trước (nếu có).
+      if (await motLan(tab)) return;
+      if (await motLan(tab)) return;
+      const cu = truoc?.theoTab[tab.value];
+      if (typeof cu === "number") demSo[tab.value] = cu;
     }),
   );
-  if (!coNguonNaoOk) return null;
+  if (!coNguonNaoOk) return truoc;
   return ketQuaDemViec(demSo, role, khongCoQuyenQuenMk);
 }

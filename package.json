@@ -29,6 +29,7 @@
     "db:kiem-fixture": "node --env-file-if-exists=.env.local scripts/kiem-fixture-sot.mjs",
     "db:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-test-galleries.mjs",
     "db:nap-lai": "node --env-file-if-exists=.env.local --import tsx scripts/nap-lai-tu-lark.mjs",
+    "db:dien-bu-sdt": "node --env-file-if-exists=.env.local --import tsx scripts/dien-bu-sdt-khach.mjs",
     "db:so-migration": "node --env-file-if-exists=.env.local --import tsx scripts/so-sanh-migration.mjs",
     "db:chep-cau-hinh": "node --env-file-if-exists=.env.local --import tsx scripts/chep-cau-hinh.mjs",
     "db:chep-moc-mo-link": "node --env-file-if-exists=.env.local --import tsx scripts/chep-moc-mo-link.mjs",
@@ -45,6 +46,7 @@
     "sync:contracts": "node --env-file-if-exists=.env.local scripts/sync-lark-contracts.mjs",
     "sync:hauky": "node --env-file-if-exists=.env.local --import tsx scripts/sync-lark-hauky.mjs",
     "lark:ghi-link": "node --env-file-if-exists=.env.local --conditions=react-server --import tsx scripts/ghi-link-app-len-lark.ts",
+    "lark:ghi-link-quan-ly": "node --env-file-if-exists=.env.local --conditions=react-server --import tsx scripts/ghi-link-quan-ly-len-lark.ts",
     "lark:soat-link-cu": "node --env-file-if-exists=.env.local --conditions=react-server --import tsx scripts/soat-link-app-cu.mjs",
     "suggest:names": "node --env-file-if-exists=.env.local --import tsx scripts/suggest-names.mjs",
     "soat:quyen": "node --env-file-if-exists=.env.local scripts/soat-quyen-doc.mjs"

@@ -208,6 +208,10 @@ export function sanPhamBanChoKhach(sp: SanPhamXetBan): boolean {
   // đường ghi (addons, mua-them, dot-chon), không chỉ ở danh mục hiển thị. Trước
   // đây chỉ /api/g/gallery lọc (BB-339): đoán được id là mua được.
   if (laSanPhamThu(sp.name)) return false;
+  // BB-374 — "Ảnh album không chỉnh sửa" (0 ₫) chỉ CSKH thêm vào hợp đồng; khách tự "mua" nó
+  // qua cửa hàng/addons/mua-them là tự cấp cho mình suất ảnh album. Chặn tên rõ ở đây, kể cả khi
+  // ai đó đặt chất liệu chứa chữ "album" (khi đó `nhomSanPham` sẽ xếp nó vào nhóm album đang bán).
+  if (sp.kind === "album_unedited") return false;
   if (!sanPhamThuocNhomBan(sp)) return false;
   if (sp.kind === "print" && !coTrongBangGia(sp.material, sp.size)) return false;
   return true;

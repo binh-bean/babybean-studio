@@ -1,5 +1,5 @@
 /**
- * PATCH /api/admin/staff/:id — đổi vai trò, chi nhánh, bật/tắt, đặt lại mật khẩu
+ * PATCH /api/admin/staff/:id — đổi vai trò, chi nhánh, bật/tắt (mật khẩu: xem `mat-khau/route.ts`)
  *
  * OWNER: DEV-BE. Task BB-063.
  * Spec: docs/13-quyet-dinh-van-hanh.md §8
@@ -12,7 +12,6 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { passwordProblem } from "@/lib/auth/username";
 import { UpdateStaffSchema } from "../schema";
 import type { StaffRole } from "@/types/domain";
 
@@ -82,17 +81,6 @@ export async function PATCH(
       }
     }
 
-    if (input.password !== undefined) {
-      const problem = passwordProblem(input.password);
-      if (problem) return fail("INVALID_INPUT", problem);
-
-      const { error } = await admin.auth.admin.updateUserById(id, { password: input.password });
-      if (error) {
-        console.error(JSON.stringify({ evt: "reset_password_failed", requestId, reason: error.message }));
-        return fail("INTERNAL", "Không đặt lại được mật khẩu");
-      }
-    }
-
     const profilePatch: Record<string, unknown> = {};
     if (input.fullName !== undefined) profilePatch.full_name = input.fullName;
     if (input.role !== undefined) profilePatch.role = input.role;
@@ -143,11 +131,10 @@ export async function PATCH(
       action: "staff.update",
       entity_type: "staff_profile",
       entity_id: id,
-      // Ghi ĐÃ đổi mật khẩu hay chưa, không bao giờ ghi mật khẩu.
+      // Đặt mật khẩu đi đường riêng `/mat-khau` (BB-373) — PATCH không nhận mật khẩu nữa.
       metadata: {
         target: target.full_name,
-        fields: Object.keys(input).filter((k) => k !== "password"),
-        passwordReset: input.password !== undefined,
+        fields: Object.keys(input),
       },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);

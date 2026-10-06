@@ -100,6 +100,7 @@ export async function GET(
       .from("share_links")
       .select("id, token_hash, revoked_at")
       .eq("gallery_id", galleryId)
+      .neq("role", "viewer") // BB-372: link mời người thân không phải link để nhân viên chép gửi khách
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

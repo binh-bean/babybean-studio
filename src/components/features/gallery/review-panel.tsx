@@ -45,6 +45,11 @@ export interface ReviewRound {
 }
 
 export interface ReviewData {
+  /**
+   * BB-371 — số ảnh chỉnh ba mẹ xem được NGAY TRONG APP (CSKH đã "Gửi khách
+   * duyệt"). > 0 thì màn khách vẽ khối `AnhChinhSuaKhach` thay cho khung này.
+   */
+  soAnhChinhTrongApp?: number;
   finalDriveUrl: string | null;
   rounds: ReviewRound[];
   /**
@@ -165,12 +170,19 @@ export function ReviewPanel({
                   ? "Ảnh đã hoàn thiện"
                   : "Ba mẹ đã duyệt bộ ảnh này"}
           </p>
-          {status === "in_retouch" && review.rounds.some((r) => !r.resolved) && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {vi.gallery.loiBean.dangSuaTheoYeuCau}
-            </p>
-          )}
         </div>
+      )}
+
+      {/* BB-371 — "Bean đã nhận yêu cầu sửa lần N": hiện CẢ khi thẻ hành trình đã nói
+          trạng thái (anCauTrangThai) — ba mẹ cần biết chắc lời mình đã tới nơi. */}
+      {status === "in_retouch" && review.rounds.some((r) => !r.resolved) && (
+        <p className="text-sm" data-testid="da-nhan-yeu-cau-sua">
+          {vi.gallery.anhChinh.daNhan.replace(
+            "{n}",
+            String(Math.max(...review.rounds.filter((r) => !r.resolved).map((r) => r.round))),
+          )}{" "}
+          <span className="text-muted-foreground">{vi.gallery.anhChinh.daNhanPhu}</span>
+        </p>
       )}
 
       {review.finalDriveUrl && (

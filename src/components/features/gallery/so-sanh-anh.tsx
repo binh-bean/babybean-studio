@@ -63,6 +63,12 @@ export interface SoSanhAnhProps {
    * nguồn vuốt khi chỉ đánh dấu đúng 2 tấm so sánh (xem `danhSachVuotGhim`).
    */
   anhDaThaTim?: PhotoPublic[];
+  /**
+   * BB-370 — mọi tấm của bộ (đã tải), để khung vuốt vẫn vẽ được một tấm VỪA BỎ
+   * TIM ngay tại chỗ (tấm đó rơi khỏi `anhDaThaTim` nhưng vẫn ở trong danh sách
+   * vuốt đã chốt lúc bật "Ghim để vuốt" — bỏ nhầm thì thả tim lại được).
+   */
+  tatCaAnh?: PhotoPublic[];
 }
 
 export function SoSanhAnh({
@@ -76,6 +82,7 @@ export function SoSanhAnh({
   daChon,
   hanMuc,
   anhDaThaTim = [],
+  tatCaAnh = [],
 }: SoSanhAnhProps) {
   // Hướng màn đo bằng bề ngang/cao thật của cửa sổ — cùng cách LuoiAnh đo,
   // không dùng CSS orientation vì codebase này chọn cột theo bề ngang
@@ -115,31 +122,38 @@ export function SoSanhAnh({
 
   const dsSoSanhIds = useMemo(() => photos.map((p) => p.id), [photos]);
   const idDaThaTim = useMemo(() => anhDaThaTim.map((p) => p.id), [anhDaThaTim]);
+  /**
+   * BB-370 — danh sách tấm đã thả tim CHỐT LẠI lúc bật "Ghim để vuốt". Anh muốn
+   * "giữ tấm nào thì tim/bỏ tim tấm đó ngay tại chỗ (để bỏ bớt khi chọn quá
+   * nhiều)": nếu danh sách vuốt đọc thẳng `anhDaThaTim`, bỏ tim tấm đang xem là
+   * nó biến mất, khung nhảy sang tấm khác — không kịp thả tim lại khi bấm nhầm.
+   */
+  const [timDongBang, setTimDongBang] = useState<string[] | null>(null);
   const dsVuot = useMemo(
-    () => danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idGhim),
-    [dsSoSanhIds, idDaThaTim, idGhim],
+    () => danhSachVuotGhim(dsSoSanhIds, timDongBang ?? idDaThaTim, idGhim),
+    [dsSoSanhIds, timDongBang, idDaThaTim, idGhim],
   );
   const banDoAnh = useMemo(() => {
     const m = new Map<string, PhotoPublic>();
+    for (const p of tatCaAnh) m.set(p.id, p);
     for (const p of anhDaThaTim) m.set(p.id, p);
     for (const p of photos) m.set(p.id, p); // photos đang so sánh ưu tiên (mới nhất)
     return m;
-  }, [photos, anhDaThaTim]);
+  }, [photos, anhDaThaTim, tatCaAnh]);
 
-  const dsSoSanhKey = dsSoSanhIds.join("|");
-  // Chỉ đặt lại vị trí ghim/vuốt khi BẬT chế độ hoặc đổi hẳn bộ tấm đang so
-  // sánh — không chạy lại mỗi lần ba mẹ tự vuốt/ghim trong lúc đang xem.
-  useEffect(() => {
-    if (!cheDoGhim) return;
-    const idGhimMoi = dsSoSanhIds[0] ?? "";
+  /**
+   * Bật "Ghim để vuốt" với tấm `idGhimMoi` đứng yên (nút đầu màn: tấm đầu
+   * danh sách; nút ghim trên một tấm ở lưới: chính tấm đó). Khung vuốt đứng
+   * ngay ở tấm so sánh còn lại.
+   */
+  const batCheDoGhim = (idGhimMoi: string) => {
+    const chot = idDaThaTim;
+    setTimDongBang(chot);
     setIdGhim(idGhimMoi);
-    const idKhac = dsSoSanhIds[1] ?? "";
-    setChiSoVuot(chiSoBanDauVuot(danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idGhimMoi), idKhac));
-    // Chỉ tính lại khi BẬT chế độ hoặc đổi hẳn bộ tấm so sánh (dsSoSanhKey) —
-    // dsSoSanhIds/idDaThaTim đã nằm trong dsSoSanhKey/idDaThaTim gốc, cố tình
-    // không liệt kê lại để không chạy mỗi lần mảng props đổi tham chiếu.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cheDoGhim, dsSoSanhKey]);
+    const idKhac = dsSoSanhIds.find((id) => id !== idGhimMoi) ?? "";
+    setChiSoVuot(chiSoBanDauVuot(danhSachVuotGhim(dsSoSanhIds, chot, idGhimMoi), idKhac));
+    setCheDoGhim(true);
+  };
 
   useEffect(() => {
     if (!cheDoGhim) return;
@@ -160,7 +174,7 @@ export function SoSanhAnh({
     setIdGhim(idMoi);
     // Danh sách vuốt tính lại khi đổi tấm ghim (loại tấm ghim mới ra) — tìm
     // vị trí tấm ghim CŨ trong danh sách MỚI, không phải danh sách hiện tại.
-    const viTriCu = danhSachVuotGhim(dsSoSanhIds, idDaThaTim, idMoi).indexOf(idCu);
+    const viTriCu = danhSachVuotGhim(dsSoSanhIds, timDongBang ?? idDaThaTim, idMoi).indexOf(idCu);
     setChiSoVuot(viTriCu >= 0 ? viTriCu : 0);
   };
 
@@ -216,7 +230,7 @@ export function SoSanhAnh({
         </span>
         <button
           type="button"
-          onClick={() => setCheDoGhim((v) => !v)}
+          onClick={() => (cheDoGhim ? setCheDoGhim(false) : batCheDoGhim(dsSoSanhIds[0] ?? ""))}
           aria-pressed={cheDoGhim}
           className={cn(
             "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition active:scale-95",
@@ -257,6 +271,7 @@ export function SoSanhAnh({
             onGhim={() => troGhim(ghimPhoto.id)}
           />
           <div
+            data-testid="khung-vuot-so-sanh"
             className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden bg-[#F3EDE5]"
             onTouchStart={(e) => {
               const t = e.touches[0];
@@ -335,6 +350,7 @@ export function SoSanhAnh({
               onToggleHeart={onToggleHeart}
               onBoKhoi={onBoKhoi}
               onPhongTo={onPhongTo}
+              onGhim={() => batCheDoGhim(photo.id)}
             />
           ))}
         </div>
@@ -414,7 +430,7 @@ function OTamGhimVuot({ photo, ghim, dangGui, khoa, onToggleHeart, onPhongTo, on
             "absolute bottom-3 right-3 z-10 grid h-14 w-14 place-items-center rounded-full transition-all active:scale-90 touch-manipulation focus:outline-hidden disabled:opacity-40",
             daChon
               ? "bg-[#c4645a] text-white shadow-[0_10px_26px_-6px_rgba(196,100,90,.65)]"
-              : "bg-white/10 text-white ring-1 ring-white/25 hover:bg-white/15",
+              : "bg-black/45 text-white ring-1 ring-white/50 backdrop-blur-sm hover:bg-black/60",
           )}
         >
           <Heart className="h-6 w-6" fill={daChon ? "currentColor" : "none"} strokeWidth={1.8} />
@@ -434,6 +450,8 @@ interface OTamSoSanhProps {
   onToggleHeart: (photo: PhotoPublic) => void;
   onBoKhoi: (photo: PhotoPublic) => void;
   onPhongTo: (photo: PhotoPublic) => void;
+  /** BB-370 — ghim CHÍNH tấm này rồi vuốt tấm còn lại qua các tấm khác. */
+  onGhim: () => void;
 }
 
 /**
@@ -449,7 +467,7 @@ interface OTamSoSanhProps {
  * đứng riêng đầu dải (trùng chức năng) đã bỏ. "Bỏ khỏi so sánh" (×, phải)
  * vẫn là việc KHÁC — gỡ tấm khỏi màn so sánh, không đụng trạng thái chọn.
  */
-function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPhongTo }: OTamSoSanhProps) {
+function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPhongTo, onGhim }: OTamSoSanhProps) {
   /** Chạm hai lần trong 300ms — cùng ngưỡng với photo-lightbox.tsx. */
   const chamTruocRef = useRef(0);
   const daChon = photo.mark === "selected";
@@ -472,8 +490,19 @@ function OTamSoSanh({ photo, thuTu, dangGui, khoa, onToggleHeart, onBoKhoi, onPh
         riêng NGOÀI khung ảnh (giống dải điều khiển bên dưới) — luôn đọc
         được trọn vẹn, không phụ thuộc nội dung ảnh bên dưới nó.
       */}
-      <div className="flex h-6 shrink-0 items-center bg-[#e5dcd2] px-3 text-[11px] uppercase tracking-[0.1em] text-[#6b6057]">
-        Tấm {thuTu}
+      <div className="flex h-8 shrink-0 items-center justify-between bg-[#e5dcd2] pl-3 pr-1 text-[11px] uppercase tracking-[0.1em] text-[#6b6057]">
+        <span>Tấm {thuTu}</span>
+        {/* BB-370 — ghim tấm này (đứng yên bên trái/trên), tấm còn lại vuốt qua các tấm khác. */}
+        <button
+          type="button"
+          onClick={onGhim}
+          aria-label={vi.gallery.soSanh.ghimTam}
+          title={vi.gallery.soSanh.ghimTam}
+          className="flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium normal-case tracking-normal text-[#2E2A27] transition hover:bg-black/5 active:scale-95"
+        >
+          <Pin className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
+          {vi.gallery.soSanh.ghimTam}
+        </button>
       </div>
       <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-[#F3EDE5] p-2">
         {/* eslint-disable-next-line @next/next/no-img-element */}

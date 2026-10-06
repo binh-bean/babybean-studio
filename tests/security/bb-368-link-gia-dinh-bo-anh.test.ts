@@ -99,10 +99,12 @@ describe("BB-368: link gia đình ở màn bộ ảnh — chốt máy chủ", ()
       `Fixture BB-368 Khách khác ${nen.runId}`,
     ]);
     khachKhac = rows[0].id;
-    // Tạo bộ 2 TRƯỚC bộ 1 trong thời gian thực, nhưng created_at của bộ 1 cũ hơn:
-    // số thứ tự phải theo created_at (cách trang gia đình đánh số), không theo lượt chèn.
-    bo.b2 = await taoBo(nen.customerId, "B2", "2026-09-20T00:00:00Z", 2);
+    // Chèn theo đúng thứ tự thời gian như ngoài đời (app không bao giờ đặt lùi created_at).
+    // Từ khi 0090 áp (06/10), số thứ tự do trigger gán lúc chèn và KHÔNG BAO GIỜ đổi —
+    // link /k/<mã>/<n> ba mẹ đã lưu giữ nghĩa mãi; khi cột chưa có thì máy chủ tính theo
+    // created_at. Chèn đúng thứ tự thì cả hai đường cho cùng số: B1 = 1, B2 = 2.
     bo.b1 = await taoBo(nen.customerId, "B1", "2026-09-01T00:00:00Z", 2);
+    bo.b2 = await taoBo(nen.customerId, "B2", "2026-09-20T00:00:00Z", 2);
     bo.b3 = await taoBo(nen.customerId, "B3", "2026-10-01T00:00:00Z", 0);
     bo.k1 = await taoBo(khachKhac, "K1", "2026-09-05T00:00:00Z", 2);
   }, 60_000);
@@ -138,7 +140,7 @@ describe("BB-368: link gia đình ở màn bộ ảnh — chốt máy chủ", ()
     expect(goiLark).toHaveLength(1);
   });
 
-  it("GET màn bộ ảnh khi chưa có link gia đình: soThuTu đúng theo created_at, linkGiaDinh null", async () => {
+  it("GET màn bộ ảnh khi chưa có link gia đình: soThuTu đúng (thứ tự bộ trong nhà), linkGiaDinh null", async () => {
     laNhanVien();
     const r = await docLinkCuaBo(new Request("http://localhost/x"), ctx(bo.b2));
     expect(r.status).toBe(200);

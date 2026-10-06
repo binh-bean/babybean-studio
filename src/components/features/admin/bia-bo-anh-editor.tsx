@@ -4,10 +4,14 @@ import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 import React, { useState, useEffect, useRef } from "react";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
 import { MAU_CHU_BIA, dienMau } from "@/lib/gallery/mau-chu-bia";
-import { X } from "lucide-react";
+import { ArrowLeft, Bell, ChevronDown, LayoutGrid, MessageCircle, X } from "lucide-react";
 import { CARD_TITLE_CLASS } from "./page-header";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { tinhTenBiaTuDuLieu } from "@/lib/utils/dinh-dang";
+import { isGalleryLocked } from "@/lib/gallery-status";
+import { tenBoThanThien } from "@/lib/utils/ten-bo-than-thien";
+import { NutMoiOngBaBia } from "@/components/features/gallery/moi-nguoi-than";
+import { ThuongHieuBoAnh } from "@/components/features/gallery/thuong-hieu-bo-anh";
 
 interface AnhLuoi {
   id: string;
@@ -60,6 +64,9 @@ export function BiaBoAnhEditor({
      * (`tinhBiaMacDinh`, bia-bo-anh.tsx).
      */
     sessionType?: string | null;
+    /** BB-370 — tên bộ (thường là mã hoá đơn) + trạng thái, để khung xem trước nói đúng như màn khách. */
+    title?: string | null;
+    status?: string | null;
     photoCount: number;
     includedQuota: number | null;
     selectedCount: number;
@@ -87,7 +94,6 @@ export function BiaBoAnhEditor({
   const [anhBiaNhap, setAnhBiaNhap] = useState(detail.coverPhotoId);
   const [tieuDe, setTieuDe] = useState(detail.coverHeadline ?? "");
   const [loi, setLoi] = useState(detail.welcomeMessage ?? "");
-  const [layout, setLayout] = useState(detail.coverLayout ?? "ben-canh");
 
   /** BB-290 (#38): nút đổi khung xem trước máy tính / điện thoại. */
   const [thietBiXemTruoc, setThietBiXemTruoc] = useState<"may-tinh" | "dien-thoai">("may-tinh");
@@ -101,8 +107,7 @@ export function BiaBoAnhEditor({
     setAnhBiaNhap(detail.coverPhotoId);
     setTieuDe(detail.coverHeadline ?? "");
     setLoi(detail.welcomeMessage ?? "");
-    setLayout(detail.coverLayout ?? "ben-canh");
-  }, [galleryId, detail.coverPhotoId, detail.coverHeadline, detail.welcomeMessage, detail.coverLayout]);
+  }, [galleryId, detail.coverPhotoId, detail.coverHeadline, detail.welcomeMessage]);
 
   async function taiLuoi(tuDau: boolean) {
     setDangTaiLuoi(true);
@@ -142,8 +147,22 @@ export function BiaBoAnhEditor({
   const doiGi =
     anhBiaNhap !== detail.coverPhotoId ||
     tieuDe.trim() !== (detail.coverHeadline ?? "") ||
-    loi.trim() !== (detail.welcomeMessage ?? "") ||
-    layout !== (detail.coverLayout ?? "ben-canh");
+    loi.trim() !== (detail.welcomeMessage ?? "");
+
+  // BB-370 — khung xem trước dựng ĐÚNG như màn khách (gallery-app.tsx): cùng
+  // component bìa, cùng bố cục (màn khách luôn dùng bố cục mặc định "Bên cạnh" —
+  // `coverLayout` KHÔNG được màn khách đọc, nên trình thiết kế không còn cho chọn
+  // bố cục: chọn mà khách không thấy là xem trước sai), cùng trạng thái khoá,
+  // cùng dải 4 tấm đầu, cùng nút mời ông bà, cùng đầu trang thương hiệu + tên bộ.
+  const trangThai = detail.status ?? "ready";
+  const khoaXemTruoc = isGalleryLocked(trangThai);
+  const tenBoXemTruoc = tenBoThanThien({
+    tenBe: tenBeHienThi,
+    tieuDe: detail.title ?? null,
+    loaiBuoi: detail.sessionType ?? null,
+    ngayChup: detail.shootDate ?? null,
+  });
+  const laMayTinh = thietBiXemTruoc === "may-tinh";
 
   return (
     <section className="rounded-lg border border-[var(--bb-border)] p-4">
@@ -226,6 +245,9 @@ export function BiaBoAnhEditor({
                 của Drive), xếp kiểu masonry bằng cột CSS. Trước đây mọi ô ép
                 khung dọc 2:3 nên ảnh ngang bị cắt mất hai bên, chọn bìa như
                 chọn mò. Thiếu kích thước thì lùi về 2:3. */}
+            {/* BB-370 mục 5c — lưới tự cuộn trong một vùng cao ~nửa màn (máy tính): mở ra là thấy
+                cả lưới, phần Nội dung và nút Lưu, không phải kéo cả cột xuống dưới. */}
+            <div className="md:max-h-[50vh] md:overflow-y-auto md:pr-1" data-testid="vung-luoi-chon-bia">
             <div className="columns-3 gap-2 sm:columns-4" data-testid="luoi-chon-bia">
               {dangTaiLuoi && luoi.length === 0
                 ? Array.from({ length: 8 }).map((_, i) => (
@@ -269,28 +291,9 @@ export function BiaBoAnhEditor({
                 {dangTaiLuoi ? "Đang tải..." : "Tải thêm"}
               </button>
             )}
-
-            <h3 className="mb-2 mt-6 text-md font-semibold">2. Bố cục</h3>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: "tap-chi", label: "Tạp chí" },
-                { id: "toi-gian", label: "Tối giản" },
-                { id: "ben-canh", label: "Bên cạnh" },
-                { id: "de-cheo", label: "Đè chéo" }
-              ].map((l) => (
-                <button
-                  key={l.id}
-                  type="button"
-                  aria-pressed={layout === l.id}
-                  onClick={() => setLayout(l.id)}
-                  className={`rounded border px-3 py-1.5 text-sm ${layout === l.id ? "border-[var(--bb-accent)] bg-[var(--bb-accent)]/10" : "border-[var(--bb-border)]"}`}
-                >
-                  {l.label}
-                </button>
-              ))}
             </div>
 
-            <h3 className="mb-2 mt-6 text-md font-semibold">3. Nội dung</h3>
+            <h3 className="mb-2 mt-6 text-md font-semibold">2. Nội dung</h3>
             <label className="flex flex-col gap-1 text-sm">
               Tiêu đề bìa
               <input
@@ -332,7 +335,7 @@ export function BiaBoAnhEditor({
               })}
             </div>
             
-            <div className="mt-8 flex gap-3 pb-8">
+            <div className="sticky bottom-0 -mx-4 mt-6 flex gap-3 border-t border-[var(--bb-border)] bg-background px-4 py-3">
               {/* BB-308 (vòng 4, mục #5 báo cáo chấm 28/09/2026) — "Lưu bìa"
                   vẫn dùng `--bb-accent` (sage/bạc hà nhạt), màu BB-301 đã bỏ
                   cho nút chính ("Nhất quán: bạc hà là một màu lạ nằm ngoài
@@ -346,7 +349,6 @@ export function BiaBoAnhEditor({
                     coverPhotoId: anhBiaNhap,
                     coverHeadline: tieuDe,
                     welcomeMessage: loi,
-                    coverLayout: layout,
                   });
                   setMoEditor(false);
                 }}
@@ -357,20 +359,19 @@ export function BiaBoAnhEditor({
             </div>
           </div>
 
-          {/* Xem trước (phải / dưới) — BB-290 (#38): thu nhỏ TRỌN khung theo
-              tỉ lệ thật của thiết bị, có nút đổi máy tính / điện thoại. Trước
-              đây `zoom: 0.7` lồng với một lớp `scale-[1.428]` bên trong —
-              nghịch đảo gần đúng nhau nên ảnh xem trước bị cắt ngang thay vì
-              thu gọn. Cách mới: khung ngoài cố định theo TỈ LỆ thiết bị, bên
-              trong render `BiaBoAnh` ở kích thước THẬT của thiết bị (1440×900
-              hoặc 390×844 — trùng khổ chụp ảnh của phép thử BB-290) rồi
-              `scale()` toàn bộ khung đó vừa khít chiều ngang của khung xem
-              trước bằng đơn vị container-query (`cqw`), nên không còn phép
-              tính tay dễ lệch. */}
-          {/* BB-294 (#9) — nền khung xem trước trước đây `bg-gray-100`
-              (#F3F4F6, xám lạnh Tailwind mặc định) lệch hẳn tông kem của
-              thương hiệu (#fdfbf9 / `--bb-bg`, xem LUAT-DOT-8.md). */}
-          <div className="relative shrink-0 bg-[var(--bb-bg)] dark:bg-gray-900 md:w-1/2 md:flex-1 flex flex-col items-center justify-center gap-3 overflow-hidden p-4">
+          {/* Xem trước (phải / dưới) — BB-290 (#38): render `BiaBoAnh` ở kích thước
+              THẬT của thiết bị (1440×900 hoặc 390×844) rồi `scale()` vừa khung
+              bằng `cqw` (chú thích dài ở các bản trước: BB-296/308/313).
+
+              BB-370 (anh 06/10, ảnh 417e5a51 so với 3b8e6719) — khung xem trước
+              "lệch hẳn" màn khách thật vì: (1) trình thiết kế cho chọn bố cục
+              (Tối giản…) mà màn khách KHÔNG đọc `coverLayout` (luôn "Bên cạnh");
+              (2) thiếu trạng thái khoá, dải 4 tấm, nút mời ông bà, đầu trang tên
+              bộ; (3) máy tính ép bìa cao 900px trong khi màn khách cao theo nội
+              dung. Nay đưa ĐÚNG các prop màn khách truyền, thêm đầu trang dùng
+              chung cụm thương hiệu, và khung đứng ở ĐẦU cột (không căn giữa dọc
+              — mở ra là thấy, không phải cuộn). */}
+          <div className="relative flex shrink-0 flex-col items-center justify-start gap-3 overflow-hidden bg-[var(--bb-bg)] p-4 dark:bg-gray-900 md:w-1/2 md:flex-1 md:overflow-y-auto md:pt-6">
             <div className="flex items-center gap-1 rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] bg-white/70 backdrop-blur p-0.5 text-xs">
               <button
                 type="button"
@@ -391,80 +392,45 @@ export function BiaBoAnhEditor({
             </div>
 
             <div
-              className="relative overflow-hidden rounded-md border border-[var(--bb-border)] bg-white shadow-sm"
+              data-testid="khung-xem-truoc-bia"
+              data-kho={thietBiXemTruoc}
+              className="relative overflow-hidden rounded-md border border-[var(--bb-border)] bg-[#fdfbf9] shadow-sm"
               style={{
                 containerType: "size",
-                width: thietBiXemTruoc === "may-tinh" ? "100%" : "min(100%, 260px)",
-                // BB-308 (vòng 4, mục #5 báo cáo chấm 28/09/2026) — "dải
-                // trắng thừa bên phải" ĐÃ BẮT ĐƯỢC gốc từ BB-296 mục #2
-                // (chú thích cũ): `container-type: size` + `100cqw` làm tròn
-                // độ phóng xuống một phần rất nhỏ dưới tỉ lệ thật ở một số bề
-                // rộng cửa sổ — nội dung 1440px co hụt vài phần trăm pixel so
-                // với khung 640px, để lộ đúng nền TRẮNG của khung (`bg-white`
-                // ở div này) thành một sợi/dải mỏng bên phải, nơi
-                // `overflow-hidden` không có gì để cắt vì nội dung đã HỤT chứ
-                // không TRÀN. Sửa tại gốc: phóng dư một phần rất nhỏ
-                // (`+ 0.002`, dưới 1 phần nghìn — không thấy được bằng mắt)
-                // để mọi sai số làm tròn luôn rơi về phía TRÀN thay vì HỤT —
-                // phần tràn đó mới bị `overflow-hidden` cắt sạch, không còn
-                // lộ nền trắng. Không đổi maxWidth (vẫn 640px, an toàn như
-                // BB-296 đã chốt).
-                maxWidth: thietBiXemTruoc === "may-tinh" ? "640px" : "260px",
-                aspectRatio: thietBiXemTruoc === "may-tinh" ? "16 / 10" : "9 / 19.5",
+                width: laMayTinh ? "100%" : "min(100%, 300px)",
+                maxWidth: laMayTinh ? "760px" : "300px",
+                aspectRatio: laMayTinh ? "1440 / 900" : "390 / 844",
               }}
             >
               <div
-                className="pointer-events-none absolute left-0 top-0 origin-top-left"
+                className="pointer-events-none absolute left-0 top-0 origin-top-left overflow-hidden bg-[#fdfbf9]"
                 style={
-                  thietBiXemTruoc === "may-tinh"
+                  laMayTinh
                     ? {
                         width: "1440px",
                         height: "900px",
-                        // BB-313 mục 3 — `100cqw / 1440` chia MỘT CHIỀU DÀI cho
-                        // MỘT SỐ THUẦN (không đơn vị): kết quả vẫn là MỘT CHIỀU
-                        // DÀI. `scale()` đòi một SỐ THUẦN, và CSS không cho
-                        // cộng chiều dài với số thuần (`+ 0.002` phía sau) —
-                        // toàn bộ `calc()` này KHÔNG HỢP LỆ, trình duyệt bỏ
-                        // qua cả khai báo `transform`, khung xem trước render
-                        // ĐÚNG KÍCH THƯỚC THẬT (1440×900/390×844) rồi bị
-                        // `overflow-hidden` của khung ngoài cắt cụt — chỉ còn
-                        // thấy đúng góc trên-trái, đúng lỗi "chữ đè kín ảnh,
-                        // ảnh bị đẩy sang mép phải/chữ mất hẳn" trong ảnh chụp
-                        // app thật (Đợt 9). Bám dữ liệu, không đoán: kiểm bằng
-                        // `getComputedStyle(...).transform` trong phép thử e2e
-                        // (`tests/e2e/bb-313-chi-tiet-va-bia.spec.ts`) đo được
-                        // đúng `"none"` trước khi sửa dòng này. Sửa: chia cho
-                        // MỘT CHIỀU DÀI (`1440px`, không phải số thuần `1440`)
-                        // — chiều dài chia chiều dài ra ĐÚNG một số thuần, để
-                        // cộng `+ 0.002` hợp lệ.
+                        // Chia cho CHIỀU DÀI `1440px` (không phải số thuần) — xem BB-313.
                         transform: "scale(calc(100cqw / 1440px + 0.002))",
-                        // Xem chú thích dài ở bia-bo-anh.tsx
-                        // (`--bb-bia-khung-cao`): dùng CHO CẢ khối ảnh máy
-                        // tính (chặn dải trắng thừa, chấm lại 28/09/2026 —
-                        // bìa trước đó chỉ cao ~40% khung) lẫn khối ảnh điện
-                        // thoại (chặn mất chữ) — đặt biến này để ghim đúng
-                        // 900px, đúng khung đang vẽ.
-                        ["--bb-bia-khung-cao" as string]: "900px",
+                        // Bìa phủ kín phần khung DƯỚI đầu trang (BB-313 P0: không để
+                        // dải trắng lớn) — trước đây ghim 900px nên bìa tràn qua đáy
+                        // khung khi đã có đầu trang phía trên.
+                        ["--bb-bia-khung-cao" as string]: `${900 - CAO_DAU_TRANG_MAY_TINH}px`,
                       }
                     : {
                         width: "390px",
                         height: "844px",
-                        // Cùng lỗi/cùng sửa như nhánh máy tính ở trên — chia
-                        // cho `390px` (chiều dài), không phải `390` (số thuần).
                         transform: "scale(calc(100cqw / 390px + 0.002))",
                         ["--bb-bia-khung-cao" as string]: "844px",
+                        // Màn khách trừ đúng chiều cao đầu trang khỏi bìa (gallery-app đo thật).
+                        ["--bb-phan-tren-bia" as string]: `${CAO_DAU_TRANG_DIEN_THOAI}px`,
                       }
                 }
               >
+                <DauTrangXemTruoc kho={thietBiXemTruoc} tenBo={tenBoXemTruoc} />
                 <BiaBoAnh
                   anhBia={anhBiaNhap ? { id: anhBiaNhap } : null}
                   coverHeadline={tieuDe}
-                  coverLayout={layout}
                   tenBe={tenBeHienThi}
-                  // BB-308 (vòng 4, mục #5) — `detail.createdAt` không tồn
-                  // tại trên `Detail` thật (gallery-detail.tsx) nên luôn
-                  // `undefined`: ngày chụp trên khung xem trước luôn trống.
-                  // `shootDate` là ngày chụp THẬT, đúng trường màn khách dùng.
                   ngayChup={detail.shootDate ?? null}
                   sessionType={detail.sessionType ?? null}
                   chiNhanh={detail.branchName ?? "BabyBean"}
@@ -473,12 +439,18 @@ export function BiaBoAnhEditor({
                   hanMuc={detail.includedQuota}
                   daChon={detail.selectedCount}
                   hanChot={null}
-                  khoa={false}
+                  khoa={khoaXemTruoc}
+                  trangThai={trangThai}
+                  anhXemTruoc={luoi.slice(0, 4)}
+                  nutMoiOngBa={!khoaXemTruoc && trangThai !== "delivered" ? <NutMoiOngBaBia /> : undefined}
                   onBatDau={() => {}}
                   placeholderChuaCoAnh="Chọn một tấm bên trái"
                 />
               </div>
             </div>
+            <p className="max-w-[760px] text-center text-[11px] text-[var(--bb-fg-muted)]">
+              Đúng như ba mẹ thấy khi mở bộ ảnh.
+            </p>
           </div>
         </div>
       )}
@@ -486,8 +458,51 @@ export function BiaBoAnhEditor({
   );
 }
 
+/** Chiều cao đầu trang màn khách trên điện thoại (thương hiệu + tên bộ), px. */
+const CAO_DAU_TRANG_DIEN_THOAI = 86;
+/** Chiều cao đầu trang màn khách trên máy tính, px. */
+const CAO_DAU_TRANG_MAY_TINH = 86;
 
-
-
-
-
+/**
+ * BB-370 — đầu trang màn khách trong khung xem trước: cụm thương hiệu DÙNG
+ * CHUNG (`ThuongHieuBoAnh`) + tên bộ thân thiện đúng như ô chuyển bộ của khách
+ * (`tenBoThanThien` — không bao giờ là mã hoá đơn). Biểu tượng hai bên chỉ để
+ * giữ đúng bố cục, không bấm được (khung xem trước `pointer-events-none`).
+ */
+function DauTrangXemTruoc({ kho, tenBo }: { kho: "may-tinh" | "dien-thoai"; tenBo: string }) {
+  const mt = kho === "may-tinh";
+  return (
+    <div
+      data-testid="dau-trang-xem-truoc"
+      className={`grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-[#e5dcd2] bg-[#fdfbf9] ${
+        mt ? "px-10" : "px-3.5"
+      }`}
+      style={{ height: `${mt ? CAO_DAU_TRANG_MAY_TINH : CAO_DAU_TRANG_DIEN_THOAI}px` }}
+    >
+      {mt ? (
+        <span className="inline-flex items-center gap-2 text-[15px] font-medium text-[#2e2a27]" aria-hidden="true">
+          <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={1.5} />
+          Album gia đình
+        </span>
+      ) : (
+        <LayoutGrid className="h-5 w-5 text-[#2e2a27]" strokeWidth={1.5} aria-hidden="true" />
+      )}
+      <div className="flex min-w-0 flex-col items-center">
+        <ThuongHieuBoAnh kho={kho} />
+        <span
+          data-testid="ten-bo-xem-truoc"
+          className={`inline-flex max-w-[220px] items-center gap-1 truncate rounded-full text-[13px] font-medium text-[#2e2a27] ${
+            mt ? "mt-1.5 max-w-[320px] bg-[#f3ede6] px-3 py-1" : "mt-1 px-2 py-0.5"
+          }`}
+        >
+          <span className="truncate">{tenBo}</span>
+          <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+        </span>
+      </div>
+      <div className="flex items-center justify-end gap-4 text-[#2e2a27]" aria-hidden="true">
+        {mt && <MessageCircle className="h-5 w-5" strokeWidth={1.5} />}
+        <Bell className="h-5 w-5" strokeWidth={1.5} />
+      </div>
+    </div>
+  );
+}

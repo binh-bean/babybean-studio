@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { isGalleryLocked } from "@/lib/gallery-status";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import { TheHanhTrinh } from "@/components/features/gallery/the-hanh-trinh";
+import { AnhChinhSuaKhach } from "@/components/features/gallery/anh-chinh-sua-khach";
 import { tranhHanhTrinh, anhHanhTrinh } from "@/components/features/gallery/hanh-trinh";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
@@ -133,6 +134,7 @@ import { AlertTriangle, Info, MessageCircle, LayoutGrid, ArrowLeft, ChevronDown 
 import Link from "next/link";
 import { ChuyenBoAnh, type GiaDinhTrongBo } from "@/components/features/gallery/chuyen-bo-anh";
 import { duongDanNha, tenBoHienThi } from "@/lib/utils/trang-gia-dinh";
+import { ThuongHieuBoAnh } from "@/components/features/gallery/thuong-hieu-bo-anh";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -252,6 +254,11 @@ interface GalleryApiResponse {
   placements?: Array<{ photoId: string; galleryItemId: string }>;
   /** Ảnh nào nằm trong album mua thêm nào (migration 0062). */
   albumPlacements?: Array<{ addonId: string; photoId: string }>;
+  /**
+   * BB-374 — suất "Ảnh album không chỉnh sửa" (CSKH thêm vào hợp đồng, 0 ₫, không vào hạn
+   * mức): `soSuat` tấm ba mẹ được chọn thêm cho album; `photoIds` tấm đã chọn.
+   */
+  albumKhongChinh?: { soSuat: number; photoIds: string[] };
   /** BB-202 — bìa của mỗi album TRONG GÓI. Rỗng = gói không có album nào. */
   albumBia?: Array<{
     galleryItemId: string;
@@ -506,6 +513,8 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
     if (!showSubmitModal) setHopChotDaCuon(false);
   }, [showSubmitModal]);
   const [placements, setPlacements] = useState<{ photoId: string; galleryItemId: string }[]>([]);
+  /** BB-374 — tấm ba mẹ chọn cho album, KHÔNG chỉnh (tách hẳn khỏi tim/hạn mức). */
+  const [anhKhongChinh, setAnhKhongChinh] = useState<string[]>([]);
   const [placing, setPlacing] = useState(false);
   /** BB-339 mục 3 — món trong gói đang mở lưới chọn ảnh (galleryItemId), hoặc null. */
   const [monDangChonAnh, setMonDangChonAnh] = useState<string | null>(null);
@@ -872,6 +881,7 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
       const gData = chuanHoaKyHieuKichThuocTrongGallery(json.data as GalleryApiResponse);
       setGallery(gData);
       setPlacements(gData.placements ?? []);
+      setAnhKhongChinh(gData.albumKhongChinh?.photoIds ?? []);
       setSelectionCounts({
         selectedCount: gData.selection?.selectedCount ?? 0,
         extraCount: gData.selection?.extraCount ?? 0,
@@ -1024,6 +1034,11 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
       setPhotos((prev) =>
         prev.map((p) => (p.id === photo.id ? { ...p, mark: nextMark } : p))
       );
+      // BB-374 — thả tim = ảnh CHỈNH SỬA: tấm rời suất "cho album · không chỉnh" (máy chủ gỡ
+      // cùng lúc trong /api/g/selection). Một tấm không thể là cả hai.
+      if (nextMark === "selected" && gallery?.myRole !== "suggester") {
+        setAnhKhongChinh((prev) => prev.filter((id) => id !== photo.id));
+      }
       // BB-232 — bộ đếm ở ThanhChon (`dem-da-chon`) đọc từ selectionCounts,
       // không đọc trực tiếp mảng photos. Lúc mất mạng không còn phản hồi máy
       // chủ để lấy con số chuẩn, nên tự cộng/trừ optimistic — sai lệch (phụ
@@ -1120,7 +1135,7 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
     // Cùng lý do ở loadGallery: phụ thuộc vào hàm ổn định `xepHangTim`, không
     // phụ thuộc cả object `hangChoTim`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isLocked, gallery?.quotaKnown, gallery?.maxSelection, hangChoTim.xepHangTim],
+    [isLocked, gallery?.quotaKnown, gallery?.maxSelection, gallery?.myRole, hangChoTim.xepHangTim],
   );
 
   /**
@@ -1630,6 +1645,49 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
     },
     [],
   );
+
+  /**
+   * BB-374 — chọn / bỏ một tấm cho suất "Ảnh album không chỉnh sửa". Lạc quan, rồi lấy
+   * danh sách CHUẨN từ máy chủ (máy chủ giữ luật: không vượt số suất, không nhận tấm
+   * đang thả tim). Không đụng tim, hạn mức hay tiền.
+   */
+  const albumKhongChinhDangGuiRef = useRef<Set<string>>(new Set());
+  const doiAnhKhongChinh = useCallback(
+    async (photoId: string, chon: boolean): Promise<boolean> => {
+      if (albumKhongChinhDangGuiRef.current.has(photoId)) return false;
+      albumKhongChinhDangGuiRef.current.add(photoId);
+      const apDung = (them: boolean) =>
+        setAnhKhongChinh((prev) => {
+          const bo = prev.filter((id) => id !== photoId);
+          return them ? [...bo, photoId] : bo;
+        });
+      apDung(chon);
+      try {
+        const res = await goiApiKhach("/api/g/album-khong-chinh", {
+          method: chon ? "POST" : "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ photoId }),
+        });
+        const json = await res.json().catch(() => null);
+        if (!res.ok) {
+          apDung(!chon);
+          setStatusMessage(json?.error?.message ?? vi.gallery.loiBean.khongLuuDuoc);
+          return false;
+        }
+        if (Array.isArray(json?.data?.photoIds)) setAnhKhongChinh(json.data.photoIds as string[]);
+        return true;
+      } catch {
+        apDung(!chon);
+        setStatusMessage("Mất kết nối, ba mẹ thử lại giúp Bean nhé ạ.");
+        return false;
+      } finally {
+        albumKhongChinhDangGuiRef.current.delete(photoId);
+      }
+    },
+    [],
+  );
+  const soSuatKhongChinh = gallery?.albumKhongChinh?.soSuat ?? 0;
+  const tapAnhKhongChinh = useMemo(() => new Set(anhKhongChinh), [anhKhongChinh]);
 
   /**
    * BB-339 mục 3/4 — "Xong" trong lưới chọn ảnh của một món trong gói: so với
@@ -2342,23 +2400,8 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
           gắn liền chữ là thay đổi thiết kế có chủ đích, không phải hồi quy).
         */}
         {(() => {
-          const thuongHieu = (
-            <span
-              data-testid="ten-thuong-hieu"
-              className="inline-flex items-center gap-[8px] justify-self-center lg:gap-[7px]"
-            >
-              <img
-                data-testid="logo-hat-dau"
-                src="/brand/logo-hat-dau-64.png"
-                alt=""
-                aria-hidden="true"
-                className="h-[23px] w-[23px] shrink-0 lg:h-[21px] lg:w-[21px]"
-              />
-              <span className="font-display text-[20px] uppercase tracking-[0.14em] text-[#2e2a27] lg:text-[18px] lg:tracking-[0.12em]">
-                Baby Bean
-              </span>
-            </span>
-          );
+          // BB-370 — cụm thương hiệu dùng chung với khung xem trước bìa (quản trị).
+          const thuongHieu = <ThuongHieuBoAnh />;
           if (!giaDinh) return thuongHieu;
           // BB-334B (bản vẽ 03/04) — tên bộ đang mở ngay dưới logo, bấm để đổi buổi chụp.
           const boDangMo = giaDinh.boAnh.find((b) => b.id === giaDinh.boHienTaiId);
@@ -2865,7 +2908,21 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
         !duocChon ||
         (gallery.reopenRequest && gallery.reopenRequest.trangThai !== "khong_co")) && (
         <div className="mx-auto max-w-3xl space-y-3 px-6 pt-5 empty:hidden">
-          {gallery.review && (
+          {/* BB-371 — CSKH đã gửi ảnh chỉnh trong app: ba mẹ xem, so trước/sau, duyệt
+              hoặc xin sửa chi tiết NGAY TẠI ĐÂY (không mở Drive). */}
+          {gallery.review && (gallery.review.soAnhChinhTrongApp ?? 0) > 0 && (
+            <AnhChinhSuaKhach
+              onDaQuyet={async ({ quyetDinh, lan }) => {
+                setStatusMessage(
+                  quyetDinh === "approve"
+                    ? vi.gallery.loiBean.duyetChuyenIn
+                    : vi.gallery.anhChinh.daNhan.replace("{n}", String(lan ?? 1)),
+                );
+                await loadGallery();
+              }}
+            />
+          )}
+          {gallery.review && !((gallery.review.soAnhChinhTrongApp ?? 0) > 0) && (
             <ReviewPanel
               status={gallery.status}
               nhanTienDo={gallery.nhanTienDo}
@@ -2986,6 +3043,7 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
             }}
             onToggleSoSanh={onToggleSoSanh}
             giaDinhThich={laNguoiXem ? undefined : giaDinhThich}
+            khongChinh={laNguoiXem ? undefined : tapAnhKhongChinh}
           />
         )}
       </section>
@@ -3051,6 +3109,29 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
         hai đều không sửa thẳng được nữa, các nút bên trong vốn đã `disabled`
         khi khoá, ẩn nguyên khối gọn hơn là để một khối xám không bấm được).
       */}
+      {/*
+        BB-374 — suất "Ảnh album không chỉnh sửa": nói rõ ngay trên trang (giọng Bean) và đếm
+        "x / N" RIÊNG, tách khỏi bộ đếm ảnh chỉnh sửa. Chọn tấm ở màn xem lớn (mục cùng tên).
+      */}
+      {soSuatKhongChinh > 0 && !laNguoiXem && gallery.myRole !== "suggester" && (
+        <div className="mx-auto mt-4 w-full max-w-[1600px] px-4 sm:px-6">
+          <div
+            data-testid="the-album-khong-chinh"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#4F5B45]/[0.07] px-4 py-3 ring-1 ring-[#4F5B45]/20"
+          >
+            <p className="min-w-0 flex-1 text-pretty text-sm text-[#2E2A27]">
+              {giuA(vi.gallery.loiBean.albumKhongChinhLoiMoi.replace("{n}", String(soSuatKhongChinh)))}
+              <span className="block text-xs text-[#6b6057]">{vi.gallery.loiBean.albumKhongChinhHuongDan}</span>
+            </p>
+            <span
+              data-testid="dem-the-album-khong-chinh"
+              className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold tabular-nums text-[#4F5B45] ring-1 ring-[#4F5B45]/25"
+            >
+              {anhKhongChinh.length}/{soSuatKhongChinh} tấm cho album
+            </span>
+          </div>
+        </div>
+      )}
       {albumTrongGoi.length > 0 && !isLocked && (
         <div className="mx-auto mt-14 max-w-[1600px] px-6 lg:px-10">
           <ChonBiaAlbum
@@ -3069,7 +3150,11 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
         </div>
       )}
 
-      {(hanMuc != null || hangInTrongGoi.length > 0) && (
+      {/* BB-370 mục 5b (anh 06/10) — khối "Trong gói của ba mẹ" ở chân trang không còn
+          việc gì để làm khi bộ đã chốt (chỉ đọc, ba mẹ không đổi được) hoặc gói không có
+          sản phẩm in (chỉ còn một câu hạn mức — đã có ở bìa "N tấm trong gói"): bỏ hẳn.
+          Còn giữ khi bộ đang mở VÀ có sản phẩm in — đó là chỗ ba mẹ xếp ảnh vào album. */}
+      {!isLocked && hangInTrongGoi.length > 0 && (
         <div id="trong-goi-cua-ba-me" className="mx-auto mt-14 max-w-[1600px] space-y-5 px-6 lg:px-10">
           <h2 className="kh-h2">Trong gói của ba mẹ</h2>
           {hanMuc != null && (
@@ -3283,7 +3368,9 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
           <h2 className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
             {vi.gallery.studioInfo}
           </h2>
-          <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          {/* BB-370 mục 5b — máy tính: khối chi nhánh + nút nhắn GỌN trong một dải ~760px
+              (trước đây tên chi nhánh sát trái, nút trôi tận mép phải 1600px). */}
+          <div className="mt-3 flex flex-col gap-4 sm:max-w-[760px] sm:flex-row sm:items-center sm:justify-between sm:gap-10">
             <div className="space-y-1">
               {/* BB-305 — tên chi nhánh trong "Thông tin studio" là nội
                   dung, không phải H1/H2 của màn: bỏ font-display, dùng Be
@@ -4051,6 +4138,17 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
             <BangSanPhamCuaAnh
               tong={tong}
               anhDaChon={anh.mark === "selected"}
+              // BB-374 — người thân gợi ý (suggester) không quyết ảnh in vào album (route chặn).
+              albumKhongChinh={
+                soSuatKhongChinh > 0 && gallery.myRole !== "suggester"
+                  ? {
+                      soSuat: soSuatKhongChinh,
+                      daChon: anhKhongChinh.length,
+                      coAnhNay: tapAnhKhongChinh.has(anh.id),
+                      onDoi: (chon) => void doiAnhKhongChinh(anh.id, chon),
+                    }
+                  : undefined
+              }
               khoa={isLocked}
               dangLuu={placing}
               suatTrongGoi={suatInTrongGoi.map((sp) => ({
@@ -4164,6 +4262,8 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
           // BB-242: chế độ "Ghim & vuốt" vuốt qua toàn bộ tấm đã thả tim khi
           // chỉ đánh dấu đúng 2 tấm so sánh — cần danh sách này để vẽ đúng.
           anhDaThaTim={anhDaChonHopThoai}
+          // BB-370 — khung vuốt vẽ được cả tấm vừa bỏ tim ngay tại chỗ.
+          tatCaAnh={photos}
         />
       )}
 

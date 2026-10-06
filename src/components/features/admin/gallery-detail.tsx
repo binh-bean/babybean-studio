@@ -22,6 +22,8 @@
  */
 
 "use client";
+import { KhoiAnhChinhSuaAdmin } from "./khoi-anh-chinh-sua-admin";
+import { hienKhoiVongDuyetCu } from "@/lib/anh-chinh-sua/quan-tri";
 import { BiaBoAnhEditor } from "./bia-bo-anh-editor";
 import { DongThoiGianHoatDong } from "./dong-thoi-gian";
 import { YeuCauMuaThemBlock } from "./yeu-cau-mua-them";
@@ -51,12 +53,14 @@ import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./
 import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { KhoiLinkBoAnhGiaDinh } from "./khoi-link-bo-anh-gia-dinh";
+import { KhoiLinkMoiNguoiThan } from "./khoi-link-moi-nguoi-than";
 import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
 import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import { nhomSanPham } from "@/lib/products/nhom-san-pham";
 import { GanDongLark } from "./gan-dong-lark";
+import { nhanNguoiChinhSua } from "@/lib/lark/nguoi-chinh-sua-ten";
 import {
   formatGioVN,
   formatKichThuoc,
@@ -254,6 +258,8 @@ interface Detail {
   customerChatUrl?: string | null;
   /** BB-335 — "Photo": tên thợ chụp đọc từ cột "photo" bên Lark; null khi trống / chưa áp 0081. */
   larkPhoto?: string | null;
+  /** BB-369 — người chỉnh sửa đọc từ Lark ("Người Photoshop", "Photoshop CTV"). */
+  larkNguoiChinhSua?: { nguoiPhotoshop: string | null; photoshopCtv: string | null } | null;
   shootDate: string | null;
   /**
    * BB-308 (vòng 4, mục #5) — "loại buổi chụp" thật ("Thôi nôi", "Newborn"…,
@@ -291,6 +297,8 @@ interface Detail {
    * (route `items/route.ts`), không đổi schema.
    */
   selectedPhotos?: Array<{ photoId: string; fileName: string; note: string | null }>;
+  /** BB-374 — suất "Ảnh album không chỉnh sửa": tấm khách chọn cho album, thợ KHÔNG chỉnh. */
+  albumKhongChinh?: { coBang: boolean; soSuat: number; anh: Array<{ photoId: string; fileName: string }> };
   addonPurchases?: Array<{
     id: string;
     productId: string;
@@ -827,6 +835,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
     detail.branchName,
     detail.shootDate ? formatNgayVN(detail.shootDate) : null,
     detail.larkPhoto ? `Photo: ${detail.larkPhoto}` : null,
+    detail.larkNguoiChinhSua ? nhanNguoiChinhSua(detail.larkNguoiChinhSua) : null,
   ].filter((v): v is string => !!v);
 
   return (
@@ -1225,6 +1234,10 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                 link đã thu hồi) — chỉ đổi chỗ đặt nút bấm. */}
           </section>
 
+          {/* BB-372 (P0 chủ studio 06/10) — link mời ông bà / người thân do ba mẹ tạo: CHỈ ĐỌC
+              (nhãn, ngày tạo, lượt mở, tim, thu hồi, yêu cầu mua thêm). Vai không có quyền → tự ẩn. */}
+          <KhoiLinkMoiNguoiThan phamVi="bo" id={galleryId} />
+
           {/* BB-290 lượt 2 (#36): "Xuất danh sách" chuyển từ cột trái sang
               đây — lưới 3 cột, nhãn MỘT DÒNG ("Lightroom"/"Excel"/"Văn bản"),
               ghi chú đầy đủ chuyển vào `title`/dòng nhỏ bên dưới thay vì
@@ -1315,6 +1328,8 @@ function KhoiChinh({
   dangMoLai: boolean;
   dongMoLai: () => void;
 }) {
+  // BB-371 — khối "Ảnh chỉnh sửa" báo bộ này có ảnh chỉnh trong app hay không.
+  const [coAnhChinhTrongApp, setCoAnhChinhTrongApp] = React.useState<boolean | null>(null);
   // BB-313 mục 2 — "Quyền: vai có quyền sửa bộ ảnh". `canEditItems` do route
   // GET tính từ `staff.permissions.includes("galleries:write")` (cùng quyền
   // route PATCH/POST/DELETE đòi) — màn hình chỉ ẩn nút cho gọn, route API mới
@@ -1426,14 +1441,56 @@ function KhoiChinh({
                     </span>
                   )}
                 </div>
+                {/* BB-370 — ghi chú hiện ĐỦ (tối đa 4 dòng, rê chuột xem trọn), không cắt một dòng "…". */}
                 {p.note && (
-                  <p className="truncate px-1.5 py-1 text-[10px] text-[var(--bb-fg-muted)]">
+                  <p
+                    data-testid="ghi-chu-anh-quan-tri"
+                    className="line-clamp-4 whitespace-pre-wrap break-words px-1.5 py-1 text-[11px] leading-snug text-[var(--bb-fg)]"
+                  >
                     ✎ {p.note}
                   </p>
                 )}
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {/*
+        BB-374 — "Ảnh album không chỉnh sửa": TÁCH HẲN khỏi "Ảnh khách đã chọn" ở trên (đó là ảnh
+        CHỈNH SỬA, trong hạn mức). Thợ không chỉnh những tấm này, chỉ in vào album; 0 ₫.
+      */}
+      {(detail.albumKhongChinh?.soSuat ?? 0) > 0 && (
+        <section data-testid="khoi-quan-tri-album-khong-chinh" className="rounded-lg border border-[var(--bb-border)] p-4">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-base font-medium">Ảnh album không chỉnh sửa</h2>
+            <span data-testid="dem-quan-tri-album-khong-chinh" className="text-xs tabular-nums text-[var(--bb-fg-muted)]">
+              {formatSo(detail.albumKhongChinh!.anh.length)}/{formatSo(detail.albumKhongChinh!.soSuat)} tấm · KHÔNG chỉnh · 0 ₫
+            </span>
+          </div>
+          {!detail.albumKhongChinh!.coBang ? (
+            <p className="mt-2 text-xs text-[var(--bb-fg-muted)]">Chưa bật xong tính năng này (chờ cập nhật cơ sở dữ liệu).</p>
+          ) : detail.albumKhongChinh!.anh.length === 0 ? (
+            <p className="mt-2 text-xs text-[var(--bb-fg-muted)]">Khách chưa chọn tấm nào cho album.</p>
+          ) : (
+            <ul className="mt-3 grid grid-cols-4 gap-2.5 sm:grid-cols-6">
+              {detail.albumKhongChinh!.anh.map((p) => (
+                <li key={p.photoId} className="overflow-hidden rounded-md border border-[var(--bb-border)]" title={p.fileName}>
+                  <div className="relative aspect-[4/5] bg-[var(--bb-surface-2)]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/img/${p.photoId}?w=200`} alt="" loading="lazy" className="h-full w-full object-cover" />
+                    <span
+                      className="absolute left-1 top-1 max-w-[calc(100%-0.5rem)] truncate rounded bg-black/60 px-1 py-0.5 text-[10px] font-medium text-white"
+                      data-testid="nhan-anh-khong-chinh"
+                    >
+                      {p.fileName}
+                    </span>
+                  </div>
+                  <p className="truncate px-1.5 py-1 text-[10px] font-medium text-[#4F5B45]">Không chỉnh</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 
@@ -1687,9 +1744,22 @@ function KhoiChinh({
         )}
       </section>
 
-      {(detail.status === "in_retouch" ||
-        detail.status === "awaiting_approval" ||
-        detail.revisions.length > 0) && (
+      {/* BB-371 — ảnh trong thư mục ảnh chỉnh sửa của link Drive: CSKH kiểm rồi "Gửi
+          khách duyệt"; khách xin sửa thì thấy từng tấm, ghi chú, vùng khoanh, ảnh mẫu.
+          Khối tự ẩn khi bộ không có ảnh chỉnh. */}
+      <KhoiAnhChinhSuaAdmin
+        galleryId={galleryId}
+        canWrite
+        onDaGui={onDelivered}
+        onBietCoAnhChinh={setCoAnhChinhTrongApp}
+      />
+
+      {/* BB-371 — khối cũ (gửi link Drive) chỉ cho bộ KHÔNG có ảnh chỉnh trong app. */}
+      {hienKhoiVongDuyetCu({
+        status: detail.status,
+        soVongSua: detail.revisions.length,
+        coAnhChinhTrongApp,
+      }) && (
         <section className="rounded-lg border border-[var(--bb-border)] p-4">
           <h2 className="text-base font-medium">Vòng duyệt ảnh đã chỉnh</h2>
 
@@ -2168,6 +2238,8 @@ const KIND_LABEL: Record<string, string> = {
   print: "Sản phẩm in ấn",
   addon: "Mua thêm",
   service: "Dịch vụ",
+  // BB-374 — khách chọn thêm N tấm cho album, thợ không chỉnh, 0 ₫, không vào hạn mức.
+  album_unedited: "Ảnh album không chỉnh sửa (0 ₫)",
 };
 
 /**
@@ -2374,14 +2446,15 @@ function TinhTrangLink({
 
   return (
     <div className="mt-2 space-y-1 text-sm">
-      <p>
+      {/* BB-375 — `div`, không `p`: Badge dựng `<div>`, nằm trong `<p>` là HTML sai → lỗi hydration. */}
+      <div>
         <Badge variant={nhan.variant} className="mr-2">
           {nhan.chu}
         </Badge>
         <span className="text-[var(--bb-fg-muted)]">
           mã <span className="tabular-nums">{link.tokenPrefix ?? "—"}…</span>
         </span>
-      </p>
+      </div>
       {/* BB-201 — link hiện lại được như link Drive (chủ studio 25/09/2026). */}
       {link.diaChi || linkDuPhong ? (
         <DongLinkApp diaChi={(link.diaChi ?? linkDuPhong)!} />

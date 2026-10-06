@@ -47,6 +47,9 @@ comment on column galleries.so_thu_tu_khach is
 
 -- Điền ngược: thứ tự tạo trong từng khách, hoà thì theo id — khớp đúng cách
 -- `src/lib/gia-dinh/bo-anh-gia-dinh.ts` tính khi cột chưa có.
+-- Điền sẵn KHÔNG làm nhích updated_at của ~500 bộ (trigger set_updated_at) —
+-- cùng cách 0088 (06/10, Claude soát trước khi áp).
+alter table galleries disable trigger trg_galleries_updated_at;
 with xep as (
   select id,
          row_number() over (partition by customer_id order by created_at, id) as n
@@ -58,6 +61,7 @@ update galleries g
   from xep
  where g.id = xep.id
    and g.so_thu_tu_khach is null;
+alter table galleries enable trigger trg_galleries_updated_at;
 
 create unique index if not exists uq_galleries_so_thu_tu_khach
   on galleries (customer_id, so_thu_tu_khach)

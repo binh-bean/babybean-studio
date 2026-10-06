@@ -14,6 +14,7 @@ import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { laNhanSuThat } from "@/lib/utils/nhan-su-cong-khai";
+import { laVaiAdmin } from "@/lib/nhan-su/dat-mat-khau";
 import {
   isValidUsername,
   normalizeUsername,
@@ -111,6 +112,8 @@ export async function GET(): Promise<Response> {
           new Date(p.last_login_at).getTime() < staleBefore,
         branchIds: byStaff.get(p.id) ?? [],
         deleteReason: deleteReasonByStaff.get(p.id) ?? null,
+        // BB-373: ô "Mật khẩu mới" chỉ hiện khi người xem được phép đặt cho đúng người này.
+        canResetPassword: laVaiAdmin(staff.role) && (p.role !== "owner" || staff.role === "owner"),
       })),
       branches: branches ?? [],
       assignableRoles: assignableBy(staff.role),

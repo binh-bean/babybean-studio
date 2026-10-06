@@ -23,6 +23,12 @@ import { HOST, larkAuth, type LarkAuthHeader } from "@/lib/lark/sync-retouch";
 import { dangChayPhepThu } from "@/lib/kiem-thu";
 import { MA_NEO_COT_CANH_BAO, MA_NEO_COT_TRANG_THAI, giaiDoanCua } from "@/lib/lark/trang-thai-hau-ky";
 import { COT_PHOTO_LARK, coCotLarkPhoto, tenPhotoTuO } from "@/lib/lark/photo-hau-ky";
+import {
+  COT_NGUOI_PHOTOSHOP,
+  COT_PHOTOSHOP_CTV,
+  ghiNguoiChinhSuaVaoGalleries,
+  tenNguoiChinhSua,
+} from "@/lib/lark/nguoi-chinh-sua-lark";
 
 /** Cột ngày của Lark ứng với lúc VÀO giai đoạn — dùng khi mới thấy bộ ảnh lần đầu. */
 const COT_NGAY_THEO_GIAI_DOAN: Record<number, RegExp> = {
@@ -53,6 +59,9 @@ export interface BangMa {
   cotNgay: Map<number, string>;
   /** BB-335 — tên cột "photo" (thợ chụp); null khi bảng chưa có cột đó. */
   cotPhoto?: string | null;
+  /** BB-369 — cột "Người Photoshop" / "Photoshop CTV"; null khi bảng chưa có. */
+  cotNguoiPhotoshop?: string | null;
+  cotPhotoshopCtv?: string | null;
 }
 
 /** Từ danh sách cột của bảng, dựng bảng đổi tên → mã. Không thấy cột trạng thái thì ném. */
@@ -74,6 +83,8 @@ export function dungBangMa(cot: CotLark[]): BangMa {
     maCanhBao: map(cb),
     cotNgay,
     cotPhoto: cot.find((c) => COT_PHOTO_LARK.test(c.field_name))?.field_name ?? null,
+    cotNguoiPhotoshop: cot.find((c) => COT_NGUOI_PHOTOSHOP.test(c.field_name))?.field_name ?? null,
+    cotPhotoshopCtv: cot.find((c) => COT_PHOTOSHOP_CTV.test(c.field_name))?.field_name ?? null,
   };
 }
 
@@ -89,6 +100,9 @@ export interface TrangThaiDoc {
    * này không đọc cột đó (bảng chưa có cột) → KHÔNG đụng galleries.lark_photo.
    */
   photo?: string | null;
+  /** BB-369 — người chỉnh sửa; undefined = lượt này không đọc cột đó. */
+  nguoiPhotoshop?: string | null;
+  photoshopCtv?: string | null;
 }
 
 function oChonMot(v: unknown): string | null {
@@ -120,6 +134,8 @@ export function dichBanGhi(
     ngayVaoGiaiDoan,
     suaLuc: typeof lastModified === "number" && lastModified > 0 ? new Date(lastModified) : null,
     ...(bang.cotPhoto ? { photo: tenPhotoTuO(fields[bang.cotPhoto]) } : {}),
+    ...(bang.cotNguoiPhotoshop ? { nguoiPhotoshop: tenNguoiChinhSua(fields[bang.cotNguoiPhotoshop]) } : {}),
+    ...(bang.cotPhotoshopCtv ? { photoshopCtv: tenNguoiChinhSua(fields[bang.cotPhotoshopCtv]) } : {}),
   };
 }
 
@@ -341,6 +357,12 @@ export async function ghiTrangThaiVaoGalleries(
     }
   }
   await ghiPhotoVaoGalleries(client, doc);
+  // BB-369 — người chỉnh sửa; 0094 chưa áp hay lỗi thì bỏ qua, không hỏng lượt trạng thái.
+  try {
+    await ghiNguoiChinhSuaVaoGalleries(client, doc);
+  } catch (err) {
+    console.error(JSON.stringify({ evt: "lark_nguoi_chinh_sua_ghi_loi", loi: String((err as Error)?.message ?? err) }));
+  }
   return { doc: soDoc, doi: soDoi, sangHinhDaVe, doiTrangThai };
 }
 

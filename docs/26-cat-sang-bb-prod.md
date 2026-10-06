@@ -194,7 +194,7 @@ Bản cũ của runbook chỉ nhắc 0067–0075. Dãy đầy đủ từ lúc b�
 | 0087 | Hai chỉ mục cho bộ dọn dữ liệu (`activity_logs.created_at`, `notifications`) (BB-356). Đã áp bb-dev |
 | 0088 | Thu gọn ảnh bộ cũ: cột `trang_thai_tu`, `danh_sach_thu_gon_luc`, `so_anh_truoc_thu_gon`, `mo_lai_anh_luc`, `mo_link_cuoi_luc`; hàm `nhan_mo_lai_anh`; viết lại `tang_luot_mo_link` (BB-357/359/363). **CHƯA áp bb-dev — cố ý** |
 | 0089 | Dựng lại 4 chỉ mục bảng `photos` (REINDEX, không đổi định nghĩa) (BB-357). **CHƯA áp bb-dev — cố ý** |
-| 0090 | Link gia đình: chỉ mục duy nhất "một link gia đình còn sống/khách", cột `galleries.so_thu_tu_khach` + trigger `gan_so_thu_tu_khach` (BB-334A). **CHƯA áp bb-dev** — `migrate-prod` không áp riêng từng tệp, mà bb-dev không áp 0088/0089; app chạy được khi thiếu (máy chủ tự tính số thứ tự đúng cách 0090 điền ngược) |
+| 0090 | Link gia đình: chỉ mục duy nhất "một link gia đình còn sống/khách", cột `galleries.so_thu_tu_khach` + trigger `gan_so_thu_tu_khach` (BB-334A). **Đã áp bb-dev 06/10** bằng `migrate-prod --chi 0090` (cờ mới, áp riêng từng tệp, không kéo 0088/0089) |
 
 (Đầu tệp 0083 vẫn ghi "viết nhưng chưa áp" — câu đó đã cũ, bb-dev áp từ 01/10.
 Đầu tệp 0086/0087 cũng ghi "chưa áp" — đã cũ, bb-dev áp từ 02/10.)

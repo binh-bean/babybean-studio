@@ -17,7 +17,7 @@
  */
 
 import pg from "pg";
-import { kiemDayMigrationMoi, kiemDay0086Den0089, kiem0090 } from "./lib/kiem-cau-truc-day-moi.mjs";
+import { kiemDayMigrationMoi, kiemDay0086Den0089, kiem0090, kiem0092_0093 } from "./lib/kiem-cau-truc-day-moi.mjs";
 
 const REQUIRE_SEED = process.argv.includes("--seed");
 
@@ -401,6 +401,11 @@ async function main() {
 
   // BB-334A — 0090 link gia đình: chưa áp là ĐẠT "chờ áp", áp nửa vời là HỎNG.
   for (const r of await kiem0090({ client })) {
+    check(r.name, r.pass, r.detail);
+  }
+
+  // BB-374 — 0092/0093 ảnh album không chỉnh sửa: chưa áp là ĐẠT "chờ áp", áp nửa vời là HỎNG.
+  for (const r of await kiem0092_0093({ client })) {
     check(r.name, r.pass, r.detail);
   }
 

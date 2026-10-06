@@ -37,6 +37,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { laLoiThieuCot, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
 import { dongAnhChiTiet, nhanBiaAlbum } from "@/lib/gallery/xuat-danh-sach";
+import { NHAN_KHONG_CHINH, tachAnhChinhVaKhongChinh } from "@/lib/gallery/anh-album-khong-chinh";
+import { docAnhAlbumKhongChinhCuaBo } from "@/lib/gallery/anh-album-khong-chinh-server";
+
+/** BB-374 — tấm "cho album · không chỉnh sửa" đưa vào tệp xuất (đã loại tấm trùng ảnh chỉnh). */
+interface AnhKhongChinhXuat {
+  fileName: string;
+}
 
 export const runtime = "nodejs";
 
@@ -103,9 +110,11 @@ async function xuatChiTiet(
     dot: number | null;
     /** BB-202 — tên (các) album mà mỗi ảnh (theo photo_id) đang làm bìa. */
     tenAlbumBiaTheoAnh: Map<string, string[]>;
+    /** BB-374 — tấm "không chỉnh — cho album" (rỗng khi bộ không có suất / lọc theo đợt ≥ 2). */
+    khongChinh: { soSuat: number; anh: AnhKhongChinhXuat[] };
   },
 ): Promise<string> {
-  const { gallery, luotChon, dong, tenAlbumBiaTheoAnh, dot } = ctx;
+  const { gallery, luotChon, dong, tenAlbumBiaTheoAnh, dot, khongChinh } = ctx;
   const itemIds = dong.map((d) => d.selection_item_id).filter((v): v is string => Boolean(v));
   const photoIds = dong.map((d) => d.photo_id).filter((v): v is string => Boolean(v));
 
@@ -196,6 +205,12 @@ async function xuatChiTiet(
     );
   }
   dongViet.push(`Số ảnh đã chọn: ${dong.length}`);
+  // BB-374 — thợ phải biết ngay từ đầu tệp: có những tấm KHÔNG chỉnh, chỉ in vào album.
+  if (khongChinh.soSuat > 0) {
+    dongViet.push(
+      `Ảnh album không chỉnh sửa: ${khongChinh.anh.length}/${khongChinh.soSuat} tấm (KHÔNG chỉnh — chỉ in vào album, 0 ₫)`,
+    );
+  }
   dongViet.push("");
   dongViet.push("=".repeat(60));
   dongViet.push("");
@@ -210,6 +225,15 @@ async function xuatChiTiet(
       ...(d.photo_id ? tenSanPhamTheoAnh.get(d.photo_id) ?? [] : []),
     ];
     dongViet.push(dongAnhChiTiet({ tenFile: d.file_name, dungCho, ghiChu: d.retouch_note }));
+  }
+
+  // BB-374 — mỗi tấm "không chỉnh" một dòng, đánh dấu rõ, đứng SAU ảnh chỉnh sửa.
+  if (khongChinh.anh.length > 0) {
+    dongViet.push("");
+    dongViet.push(`ẢNH ALBUM KHÔNG CHỈNH SỬA (${khongChinh.anh.length} tấm) — thợ KHÔNG chỉnh:`);
+    for (const a of khongChinh.anh) {
+      dongViet.push(dongAnhChiTiet({ tenFile: a.fileName, dungCho: [NHAN_KHONG_CHINH], ghiChu: null }));
+    }
   }
 
   return dongViet.join("\r\n");
@@ -351,15 +375,38 @@ export async function GET(
           a.file_name.localeCompare(b.file_name, "vi", { numeric: true }),
       );
 
+    /*
+      BB-374 — tấm khách chọn cho suất "Ảnh album không chỉnh sửa" (bảng riêng 0093, KHÔNG
+      nằm trong `selection_items`). Chỉ đưa vào tệp khi xuất cả bộ hoặc đợt 1 — suất này nằm
+      trong hợp đồng, không phải ảnh mua thêm ở đợt ≥ 2. Tấm trùng ảnh chỉnh (đua mạng) thì
+      ảnh chỉnh thắng: không ghi một tấm hai lần. Dạng "txt" (chỉ tên file, cho thợ lọc
+      bộ ảnh cần CHỈNH) KHÔNG nhận các tấm này — đưa vào là thợ chỉnh thừa.
+    */
+    const khongChinh: { soSuat: number; anh: AnhKhongChinhXuat[] } = { soSuat: 0, anh: [] };
+    if (dot === null || dot === 1) {
+      const kc = await docAnhAlbumKhongChinhCuaBo(admin, galleryId);
+      const { khongChinh: ids } = tachAnhChinhVaKhongChinh(
+        dong.map((d) => ({ photoId: String(d.photo_id ?? "") })),
+        kc.anh.map((a) => a.photoId),
+      );
+      const conLai = new Set(ids);
+      khongChinh.soSuat = kc.soSuat;
+      khongChinh.anh = kc.anh
+        .filter((a) => conLai.has(a.photoId) && a.fileName !== "")
+        .map((a) => ({ fileName: a.fileName }));
+    }
+
     let than: string;
 
     if (dinhDang === "chi-tiet") {
-      than = await xuatChiTiet(admin, { gallery, luotChon, dong, tenAlbumBiaTheoAnh, dot });
+      than = await xuatChiTiet(admin, { gallery, luotChon, dong, tenAlbumBiaTheoAnh, dot, khongChinh });
     } else if (dinhDang === "csv") {
       than = [
         // BB-202: cột "bia_album" — tên (các) album mà ảnh này đang làm bìa,
         // rỗng nếu ảnh không phải bìa của album nào.
-        ["ten_file", "thu_muc_con", "ghi_chu_chinh_sua", "yeu_thich", "bia_album"].join(","),
+        // BB-374: cột cuối "khong_chinh" — "Không chỉnh — cho album" cho tấm thuộc suất ảnh
+        // album không chỉnh sửa (đứng sau ảnh chỉnh), rỗng cho ảnh chỉnh sửa.
+        ["ten_file", "thu_muc_con", "ghi_chu_chinh_sua", "yeu_thich", "bia_album", "khong_chinh"].join(","),
         ...dong.map((d) =>
           [
             oCsv(d.file_name),
@@ -367,7 +414,11 @@ export async function GET(
             oCsv(d.retouch_note),
             oCsv(d.is_favorite ? "x" : ""),
             oCsv((d.photo_id && tenAlbumBiaTheoAnh.get(d.photo_id)?.join(" + ")) || ""),
+            oCsv(""),
           ].join(","),
+        ),
+        ...khongChinh.anh.map((a) =>
+          [oCsv(a.fileName), oCsv(""), oCsv(""), oCsv(""), oCsv(""), oCsv(NHAN_KHONG_CHINH)].join(","),
         ),
         // Ghi chú chung của khách đi kèm, nếu có: nó là lời dặn cho CẢ bộ,
         // mất nó thì thợ chỉnh ảnh không biết gia đình muốn tông màu nào.
@@ -391,7 +442,12 @@ export async function GET(
       entityType: "gallery",
       entityId: galleryId,
       galleryId,
-      metadata: { dinhDang, soAnh: dong.length, ...(dot !== null ? { dot } : {}) },
+      metadata: {
+        dinhDang,
+        soAnh: dong.length,
+        ...(khongChinh.anh.length > 0 ? { soAnhKhongChinh: khongChinh.anh.length } : {}),
+        ...(dot !== null ? { dot } : {}),
+      },
     });
 
     /**

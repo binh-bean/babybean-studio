@@ -206,6 +206,24 @@ Trả `lark` như 3.2. `404` khi chưa có link hoặc không giải mã đượ
 - `POST /api/admin/galleries/<id>/share-link`: khách của bộ đã có link gia đình sống → `409 CONFLICT` kèm `details.linkGiaDinh` (`duongDan`, `duongDanManCon`, `soThuTu`); không tạo link, không thu hồi, không ghi Lark.
 - Sau khi **đồng bộ ảnh** thành công (bộ có ảnh) và khách có link gia đình: ghi link màn con vào ô "Link app" của dòng Hậu Kỳ của bộ **chỉ khi ô đang trống** (`ghiLinkAppVeLark({ chiKhiTrong: true })`). Gọi ở route `POST …/sync` và `kiemTraLaiMotBo` (nút "Kiểm tra lại" + cron hậu kỳ 08:00). Nhật ký `share_link.gia_dinh_ghi_lark_sau_dong_bo` (6 ký tự đầu của mã). Không gửi gì cho khách.
 
+### 3.6 BB-372 — link từng buổi chụp, link cũ thu gọn, link mời người thân (P0 chủ studio 06/10)
+
+- `GET /api/admin/customers/<id>/link-gia-dinh` thêm `boAnh: [{ galleryId, soThuTu, tieuDe, tenBe, ngayChup, soAnh, trangThai: { ma, khach }, duongDanManCon, diaChiManCon }]`
+  (bộ đang hiện với gia đình, xếp Buổi 1, 2, 3…; `soThuTu` = số của `soThuTuCacBo`, đúng cái `GET /api/k/<mã>` trả; nhãn `trangThai.khach` = `trangThaiKhach()`)
+  và `soBoAn` (bộ chưa có màn con). `linkCuConSong` không còn đếm link `viewer` (link mời người thân).
+- Trang khách hàng: danh sách "Link từng buổi chụp" — mỗi dòng "Buổi n · tên bộ · bé · ngày chụp", trạng thái, số ảnh, ô địa chỉ `/k/<mã>/<n>` + nút Chép.
+  Nhãn "Chưa có link" cũ ở "Lịch sử chụp" bỏ (đó là nhãn link cũ theo bộ).
+- Màn bộ ảnh: khách đã có link gia đình thì link cũ `/g/…` chỉ là một dòng thu gọn "N link cũ vẫn mở được (không cần gửi lại)", đóng sẵn.
+  **Gốc lỗi "link /g/ nổi bật"**: `GET /api/admin/galleries/<id>/items`, `…/share-link/mo-lai`, `…/link-khach` lấy link MỚI NHẤT của bộ mà không lọc vai —
+  link mời người thân (`viewer`) do ba mẹ tạo thành "link của bộ" (và "Mở khoá link cũ" có thể mở lại nhầm). Cả ba nay `.neq("role", "viewer")`.
+- Link mời ông bà / người thân (CHỈ ĐỌC; quyền `galleries:read` + đúng chi nhánh; không có POST/DELETE):
+  `GET /api/admin/customers/<id>/link-moi-nguoi-than` (cả nhà) và `GET /api/admin/galleries/<id>/link-moi-nguoi-than` (tim và yêu cầu chỉ đếm trong bộ đó) →
+  `{ links: [{ shareLinkId, nhan, taoLuc, soLanMo, moLanCuoi, soTim, soYeuCau, daThuHoi, daHetHan, phamVi: "ca_nha"|"bo", tieuDeBo, maDau }], chuaApMigration }`.
+  `maDau` = 6 ký tự đầu của mã, không bao giờ nhiều hơn; không trả mã đầy đủ, `token_hash`, bản mã hoá, tên / số điện thoại người mua.
+  Nguồn: `share_links` (role `viewer`), `tim_gia_dinh` (0083), `yeu_cau_mua_them.share_link_id` (0073).
+- Báo cáo điều hành: báo cáo "Mời người thân" (`/admin/bao-cao?ma=moi-nguoi-than`, `reports:operations`) — nhà có mời, người được mời đã mở,
+  yêu cầu mua thêm đến từ người được mời; tính theo kỳ, loại Fixture/lưu trữ (xem `src/lib/bao-cao/cac-bao-cao/moi-nguoi-than.ts`).
+
 ## 4. Bảo đảm an ninh (phép thử: `tests/security/bb-334a-*.test.ts`)
 
 | Phép thử phủ định | Canh |

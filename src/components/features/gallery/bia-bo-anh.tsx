@@ -160,7 +160,7 @@ export interface BiaMacDinh {
   eyebrow: string;
   /** Chữ lớn Playfair — tên bé, loại buổi chụp, hoặc ngày chụp. */
   title: string;
-  /** Dòng nghiêng dưới tên — loại buổi chụp, "của con", hoặc "của gia đình mình". `null` = không có dòng này. */
+  /** Dòng nghiêng dưới tên — loại buổi chụp hoặc "của con". `null` = không có dòng này. */
   phuDe: string | null;
 }
 
@@ -169,7 +169,9 @@ export interface BiaMacDinh {
  * admin duyệt 28/09/2026 mục 2):
  *   1. Có tên bé → "Bộ ảnh của" / Tên bé / loại buổi chụp (nghiêng).
  *   2. Không tên bé, CÓ loại buổi chụp → "Bộ ảnh" / Loại buổi chụp / "của con".
- *   3. Không có cả hai → "Bộ ảnh" / "Ngày {d} tháng {m}" / "của gia đình mình".
+ *   3. Không có cả hai → "Bộ ảnh" / "Ngày {d} tháng {m}" (không dòng phụ).
+ *      BB-370 — anh khoanh dòng "của gia đình mình" (ảnh 3b8e6719): câu chung
+ *      chung, không nói gì về buổi chụp. Bỏ hẳn; ngày/chi nhánh đã có ở dòng meta.
  * Hàm THUẦN (không đọc DOM/props ngoài tham số) để phép thử đơn vị canh đúng
  * luật rẽ nhánh, không canh chuỗi HTML render ra (AGENTS.md §5a).
  */
@@ -186,7 +188,7 @@ export function tinhBiaMacDinh(
   if (loai) {
     return { eyebrow: "Bộ ảnh", title: loai, phuDe: "của con" };
   }
-  return { eyebrow: "Bộ ảnh", title: ngayThangDep(ngayChup) || "Khoảnh khắc", phuDe: "của gia đình mình" };
+  return { eyebrow: "Bộ ảnh", title: ngayThangDep(ngayChup) || "Khoảnh khắc", phuDe: null };
 }
 
 export function BiaBoAnh(props: BiaBoAnhProps) {
@@ -641,6 +643,10 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
           // lại chứ nút chính không bị đẩy xuống dưới mép màn. Máy tính: một hàng, hai cột.
           "relative isolate flex min-h-[calc(var(--bb-bia-khung-cao,100svh)-var(--bb-phan-tren-bia,0px))] w-full flex-col overflow-hidden bg-[#fdfbf9] text-[#2e2a27]",
           "@[64rem]:grid @[64rem]:min-h-0 @[64rem]:grid-cols-[minmax(0,1fr)_42%] @[64rem]:grid-rows-1 @[64rem]:items-stretch",
+          // BB-370 mục 5a — màn rộng (≥1536px, ảnh chụp anh 1880px): cột chữ 58% rộng gần 1100px
+          // mà khối chữ chỉ ~670px, để một khoảng trống lớn lệch giữa chữ và ảnh. Ảnh lên 50%
+          // cho hai nửa cân; lề trái 40px giữ nguyên (BB-319).
+          "@[96rem]:grid-cols-[minmax(0,1fr)_50%]",
           className,
         )}
       >
@@ -694,7 +700,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
             <img
               src={`/api/img/${anhBia.id}?w=1600`}
               srcSet={`/api/img/${anhBia.id}?w=1600 1600w, /api/img/${anhBia.id}?w=2048 2048w`}
-              sizes="(min-width: 1024px) 42vw, 100vw"
+              sizes="(min-width: 1536px) 50vw, (min-width: 1024px) 42vw, 100vw"
               alt=""
               fetchPriority="high"
               decoding="async"

@@ -29,6 +29,7 @@ import {
   taoLinkGiaDinh,
   ghiLinkGiaDinhVeLark,
   duongDanGiaDinh,
+  duongDanManCon,
   duocDoiLinkGiaDinh,
 } from "@/lib/gia-dinh/link-gia-dinh";
 import { danhSachBoAnhGiaDinh } from "@/lib/gia-dinh/bo-anh-gia-dinh";
@@ -74,8 +75,10 @@ export async function GET(
     const admin = createAdminClient();
     const song = await linkGiaDinhSong(admin, id);
     let linkGiaDinh = null;
+    let maGiaDinh: string | null = null;
     if (song) {
       const ma = await giaiMaLink(admin, song);
+      maGiaDinh = ma;
       const duongDan = ma ? duongDanGiaDinh(ma) : null;
       linkGiaDinh = {
         shareLinkId: song.id,
@@ -100,6 +103,7 @@ export async function GET(
         .select("id, gallery_id, role, token_prefix, created_at, view_count, expires_at")
         .in("gallery_id", idsBo)
         .eq("status", "active")
+        .neq("role", "viewer") // BB-372: link mời người thân hiện ở khối riêng, không phải "link cũ"
         .order("created_at", { ascending: false });
       if (cuErr) throw cuErr;
       linkCuConSong = (cu ?? [])
@@ -126,11 +130,34 @@ export async function GET(
 
     const ds = await danhSachBoAnhGiaDinh(admin, id);
 
+    // BB-372 — link màn con `/k/<mã>/<n>` của TỪNG bộ ảnh đang hiện với gia đình. Số thứ tự
+    // `soThuTu` và nhãn trạng thái lấy thẳng từ `danhSachBoAnhGiaDinh` (cùng nguồn với
+    // `GET /api/k/<mã>`), không tính kiểu khác. Xếp Buổi 1, 2, 3… (cũ trước) cho nhân viên.
+    const boAnh = [...ds]
+      .sort((a, b) => a.soThuTu - b.soThuTu)
+      .map((b) => {
+        const duongDanBo = maGiaDinh ? duongDanManCon(maGiaDinh, b.soThuTu) : null;
+        return {
+          galleryId: b.id,
+          soThuTu: b.soThuTu,
+          tieuDe: b.tieuDe,
+          tenBe: b.tenBe,
+          ngayChup: b.ngayChup,
+          soAnh: b.soAnh,
+          trangThai: { ma: b.trangThai.ma, khach: b.trangThai.khach },
+          duongDanManCon: duongDanBo,
+          diaChiManCon: duongDanBo ? diaChiDayDu(duongDanBo) : null,
+        };
+      });
+
     return ok({
       linkGiaDinh,
       linkCuConSong,
       loiMoiGiaDinh: (moi ?? []).map((m) => ({ shareLinkId: m.id, nhan: m.label, taoLuc: m.created_at })),
       soBoAnh: ds.length,
+      boAnh,
+      // Bộ của khách chưa hiện với gia đình (chưa có ảnh / nháp / lưu trữ) — không có màn con.
+      soBoAn: Math.max(0, idsBo.length - ds.length),
       duocDoi: duocDoiLinkGiaDinh(staff),
     });
   } catch (err) {
