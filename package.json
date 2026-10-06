@@ -29,6 +29,7 @@
     "db:kiem-fixture": "node --env-file-if-exists=.env.local scripts/kiem-fixture-sot.mjs",
     "db:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-test-galleries.mjs",
     "db:nap-lai": "node --env-file-if-exists=.env.local --import tsx scripts/nap-lai-tu-lark.mjs",
+    "db:neo-dong-hau-ky": "node --env-file-if-exists=.env.local --import tsx scripts/neo-dong-hau-ky.mjs",
     "db:dien-bu-sdt": "node --env-file-if-exists=.env.local --import tsx scripts/dien-bu-sdt-khach.mjs",
     "db:so-migration": "node --env-file-if-exists=.env.local --import tsx scripts/so-sanh-migration.mjs",
     "db:chep-cau-hinh": "node --env-file-if-exists=.env.local --import tsx scripts/chep-cau-hinh.mjs",

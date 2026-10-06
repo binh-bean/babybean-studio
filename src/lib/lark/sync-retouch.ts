@@ -15,6 +15,7 @@ import { choPhepTenThat } from "@/lib/lark/muc-tieu-du-lieu";
 import { dangChayPhepThu } from "@/lib/kiem-thu";
 import { dienSdtKhach, sdtTuDongLark } from "@/lib/lark/sdt-khach-lark";
 import { tachMaHoaDon } from "@/lib/utils/ma-hoa-don";
+import { neoBoAnhVaoDongHauKy } from "@/lib/lark/neo-dong-hau-ky";
 
 export const HOST = "https://open.larksuite.com/open-apis";
 
@@ -510,6 +511,9 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
     [trigger.driveFolderId],
   );
   if (existingGals.length > 0) {
+    // BB-376: bộ đã có (đường cũ không neo dòng) → neo vào dòng này nếu còn trống;
+    // đã neo dòng khác thì không đổi, ghi nhật ký. Không làm hỏng lượt đồng bộ.
+    if (write) await neoBoAnhVaoDongHauKy(client, { galleryId: existingGals[0].id, recordId: record.record_id });
     return {
       action: "already_exists",
       galleryId: existingGals[0].id,
@@ -659,13 +663,15 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
          title, welcome_message, status,
          drive_folder_id, drive_folder_url,
          lark_contract_code, included_quota, extra_photo_price,
-         photographer_id, cskh_id, editor_id, lark_contract_codes
+         photographer_id, cskh_id, editor_id, lark_contract_codes,
+         lark_hauky_record_id
        ) values (
          $1, $2, $3,
          $4, $5, 'draft',
          $6, $7,
          $8, 20, 50000,
-         $9, $10, $11, $12::text[]
+         $9, $10, $11, $12::text[],
+         $13
        ) returning id`,
       [
         branchId,
@@ -681,6 +687,8 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
         editor?.id ?? null,
         // BB-369: chk_contract_code_first — phần tử đầu = lark_contract_code.
         cacMa,
+        // BB-376: neo dòng Hậu Kỳ ngay khi tạo bộ.
+        record.record_id,
       ],
     );
 
