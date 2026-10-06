@@ -148,3 +148,68 @@ export function diaChiHienThi(
 export function dien(mau: string, giaTri: Record<string, string | number>): string {
   return mau.replace(/\{(\w+)\}/g, (_, k: string) => String(giaTri[k] ?? ""));
 }
+
+// ---------------------------------------------------------------------------
+// BB-368 — link gia đình nhìn từ MỘT bộ ảnh (màn chi tiết bộ ảnh).
+// Máy chủ: GET /api/admin/galleries/<id>/link-gia-dinh. Tạo link: dùng lại
+// `taoLinkGiaDinh(customerId)` ở trên (cùng API, cùng quyền BB-334A).
+// ---------------------------------------------------------------------------
+
+export interface LinkGiaDinhCuaBo {
+  customerId: string | null;
+  /** n trong /k/<mã>/<n>; null khi bộ không gắn khách. */
+  soThuTu: number | null;
+  coAnh: boolean;
+  /** Bộ đang hiện trên trang gia đình (có ảnh, không nháp/lưu trữ). */
+  hienVoiGiaDinh: boolean;
+  linkGiaDinh: {
+    shareLinkId: string;
+    tokenPrefix: string | null;
+    duongDan: string | null;
+    /** /k/<mã>/<n> — null khi không đọc lại được mã (thiếu bản mã hoá). */
+    duongDanManCon: string | null;
+    diaChiManCon: string | null;
+    soLanMo: number;
+  } | null;
+  /** Số link cũ theo bộ của CHÍNH bộ này còn mở được. */
+  soLinkCuConSong: number;
+  duocDoi: boolean;
+}
+
+export function docLinkGiaDinhCuaBo(galleryId: string, loi: ChuoiLoi) {
+  return goi<LinkGiaDinhCuaBo>(
+    `/api/admin/galleries/${encodeURIComponent(galleryId)}/link-gia-dinh`,
+    undefined,
+    loi.matKetNoi,
+    loi.chung,
+  );
+}
+
+/** Địa chỉ đầy đủ của màn con: ưu tiên máy chủ; thiếu thì ghép với gốc trang. */
+export function diaChiManConHienThi(
+  link: LinkGiaDinhCuaBo["linkGiaDinh"],
+  gocTrang: string | null,
+): string | null {
+  if (!link) return null;
+  if (link.diaChiManCon) return link.diaChiManCon;
+  if (link.duongDanManCon && gocTrang) return `${gocTrang.replace(/\/$/, "")}${link.duongDanManCon}`;
+  return null;
+}
+
+/**
+ * Tin nhắn mẫu cho MỘT buổi chụp trong link gia đình — giọng Bean, câu kết "ạ".
+ * `linkMoi`: khách vừa có link gia đình lần đầu → thêm một câu giới thiệu link
+ * dùng lâu dài.
+ */
+export function tinNhanMauManCon(diaChi: string, opts: { linkMoi?: boolean } = {}): string {
+  if (opts.linkMoi) {
+    return (
+      `Bean chào ba mẹ ạ. Ảnh buổi chụp của bé đã có trên app Baby Bean rồi ạ: ${diaChi}\n` +
+      `Đây cũng là link của cả gia đình mình, có buổi chụp mới Bean tự thêm vào, ba mẹ lưu vào màn hình chính để mở lại nhanh nhé ạ.`
+    );
+  }
+  return (
+    `Bean chào ba mẹ ạ. Ảnh buổi chụp mới của bé đã có trong app của gia đình mình rồi ạ: ${diaChi}\n` +
+    `Ba mẹ bấm vào để xem và chọn ảnh giúp Bean nhé ạ.`
+  );
+}

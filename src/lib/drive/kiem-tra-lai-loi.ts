@@ -29,6 +29,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { assertFolderReadable } from "./list-files";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiLinkManConSauDongBo } from "@/lib/gia-dinh/link-gia-dinh";
 import {
   batDauDongBo,
   dongBoBoAnh,
@@ -81,6 +83,11 @@ export async function kiemTraLaiMotBo(
   const thongTin = await batDauDongBo(db, galleryId);
   try {
     const kq = await dongBoBoAnh(db, galleryId, thongTin, requestId);
+    // BB-368 — bộ vừa có ảnh + khách đã có link gia đình: ghi link màn con vào ô
+    // "Link app" của dòng Hậu Kỳ CHỈ KHI Ô TRỐNG. Không ném, không gửi khách.
+    if (kq.photoCount > 0) {
+      await ghiLinkManConSauDongBo(createAdminClient(), galleryId, { requestId });
+    }
     return { galleryId, hetLoi: true, soAnh: kq.photoCount };
   } catch (err) {
     await ghiLoiDongBo(db, galleryId, thongTin.giaiDoanDau, err);

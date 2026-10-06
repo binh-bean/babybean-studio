@@ -81,7 +81,7 @@ describe("BB-334A: route nhân viên link gia đình", () => {
     expect(rows[0].status).toBe("active");
   });
 
-  it("CSKH đổi link (có xác nhận): link cũ chết ngay, lượt chọn đi theo, Lark nhận CÙNG một /k/<mã> cho mọi dòng", async () => {
+  it("CSKH đổi link (có xác nhận): link cũ chết ngay, lượt chọn đi theo, Lark nhận /k/<mã>/<n> đúng từng bộ", async () => {
     laNhanVien("cs");
     goiLark.length = 0;
     const r = await POST(goi({ doiLink: true, xacNhan: true }), ctx());
@@ -101,7 +101,10 @@ describe("BB-334A: route nhân viên link gia đình", () => {
 
     expect(data.lark).toMatchObject({ tong: 2, ghiDuoc: 2 });
     expect(goiLark).toHaveLength(2);
-    expect(new Set(goiLark.map((g) => g.diaChi))).toEqual(new Set([`https://fixture-bb334a.test/k/${ma}`]));
+    // BB-368 (anh chốt 06/10): mỗi dòng nhận link MÀN CON của đúng bộ đó (A1 = bộ 1, A2 = bộ 2).
+    expect(new Set(goiLark.map((g) => g.diaChi))).toEqual(
+      new Set([`https://fixture-bb334a.test/k/${ma}/1`, `https://fixture-bb334a.test/k/${ma}/2`]),
+    );
     expect(goiLark.every((g) => g.recordId.startsWith("recFX334A"))).toBe(true);
 
     // GET hiện lại đúng địa chỉ (giải bản mã hoá BB-201), kèm link cũ theo bộ còn sống.

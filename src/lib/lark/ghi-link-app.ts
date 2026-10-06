@@ -235,6 +235,12 @@ export interface TuyChonGhiLink {
   ghiThat: boolean;
   /** true = ghi đè cả khi ô đã có nội dung do nhân viên dán tay. */
   ghiDe?: boolean;
+  /**
+   * BB-368 — true = CHỈ ghi khi ô đang TRỐNG; ô đã có bất cứ thứ gì (kể cả link
+   * app cũ của chính app) thì để nguyên. Dùng cho lượt ghi tự động sau khi đồng
+   * bộ ảnh: máy không được thay thứ CSKH vừa dán / vừa chọn. Thắng `ghiDe`.
+   */
+  chiKhiTrong?: boolean;
 }
 
 /**
@@ -288,6 +294,18 @@ export async function ghiLinkAppVeLark(opts: TuyChonGhiLink): Promise<KetQuaGhiL
         lyDo: `Không tìm thấy dòng Hậu Kỳ ${opts.recordId} bên Lark.`,
       };
     }
+    // BB-368: lượt ghi tự động sau đồng bộ ảnh — ô đã có gì là thôi, kể cả
+    // link app của chính app (CSKH có thể đã cố ý dán link khác vào dòng này).
+    if (opts.chiKhiTrong && oDangCo) {
+      return {
+        ghiDuoc: false,
+        chayThu,
+        viTri,
+        recordId: opts.recordId,
+        lyDo: `Ô "${viTri.fieldName}" đã có nội dung — lượt ghi tự động không ghi đè.`,
+      };
+    }
+
     // BB-155: link CŨ CỦA CHÍNH APP thì được ghi đè; thứ gì khác thì không.
     //
     // Chốt ban đầu chặn mọi giá trị khác — đúng ý "máy không lẳng lặng thay thứ

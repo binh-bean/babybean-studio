@@ -19,6 +19,8 @@ import { fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createServerClient } from "@/lib/supabase/server";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiLinkManConSauDongBo } from "@/lib/gia-dinh/link-gia-dinh";
 import {
   batDauDongBo,
   dongBoBoAnh,
@@ -89,7 +91,13 @@ export async function POST(
         await dongBoBoAnh(supabase, galleryId, thongTin, requestId);
       } catch (err) {
         await ghiLoiDongBo(supabase, galleryId, thongTin.giaiDoanDau, err);
+        return;
       }
+      // BB-368 — bộ đã có ảnh + khách đã có link gia đình: ghi link màn con
+      // `/k/<mã>/<n>` vào ô "Link app" của dòng Hậu Kỳ, CHỈ KHI Ô ĐANG TRỐNG.
+      // Không bao giờ ném; không gửi gì cho khách. Cùng hàm với lượt kiểm lại
+      // tự động (`kiemTraLaiMotBo` — cron hậu kỳ 08:00 + nút "Kiểm tra lại").
+      await ghiLinkManConSauDongBo(createAdminClient(), galleryId, { requestId, actorId: staff.staffId });
     });
 
     return NextResponse.json(

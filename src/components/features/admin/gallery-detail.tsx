@@ -50,6 +50,7 @@ import { cauBaoSauDoiHanMuc, tinhPhatSinhTheoHanMuc } from "@/lib/gallery/tien-p
 import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./form-thanh-toan";
 import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
+import { KhoiLinkBoAnhGiaDinh } from "./khoi-link-bo-anh-gia-dinh";
 import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
 import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
@@ -245,6 +246,8 @@ interface Detail {
   branchName: string | null;
   /** BB-303 (quan-tri-chi-tiet.png) — tiêu đề "Loại buổi · Bé …" + dòng phụ. */
   packageName: string | null;
+  /** BB-368 — khách của bộ; có thì khối Link app dùng link gia đình (màn con /k/<mã>/<n>). */
+  customerId?: string | null;
   customerName: string | null;
   customerPhone: string | null;
   /** BB-331: link chat với khách từ Lark (đã lọc http/https). */
@@ -1161,43 +1164,58 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             {/* BB-325 ("đi về đâu") — bộ chưa gắn dòng Hậu Kỳ: nói lý do, cho gắn trước. */}
             {detail.coDongLark === false && <GanDongLark galleryId={galleryId} onDone={load} />}
 
-            {/* Kết quả ghi sang Lark của lần tạo link VỪA RỒI (chỉ hiện sau khi bấm tạo). */}
-            {linkMoi && (
-              <div className="mt-3 space-y-2">
-                {/* BB-132: nói rõ CSKH còn phải làm gì — máy đã dán hộ thì đừng bắt dán tay. */}
-                {daGhiLark ? (
-                  <p className="rounded-md border border-[var(--bb-success)] p-3 text-sm">
-                    <strong>Đã ghi sang Lark.</strong> Link nằm sẵn ở cột <em>Link app</em> đúng
-                    dòng Hậu Kỳ của khách này — <strong>không cần dán tay</strong>.
-                  </p>
-                ) : (
-                  <p className="rounded-md border border-[var(--bb-danger)] p-3 text-sm">
-                    <strong>Chưa ghi được sang Lark — dán tay giúp.</strong> Chép link dưới đây
-                    dán vào cột <em>Link app</em> đúng dòng Hậu Kỳ của khách này.
-                    {lyDoKhongGhiLark ? (
-                      <>
-                        <br />
-                        <span className="text-[var(--bb-fg-muted)]">Lý do: {lyDoKhongGhiLark}</span>
-                      </>
-                    ) : null}
-                  </p>
-                )}
-                {/* BB-320 (2a): app KHÔNG lưu được địa chỉ thì tải lại trang là mất link — cảnh báo, không im lặng. */}
-                {luuDiaChiDuoc === false && (
-                  <p role="alert" data-testid="canh-bao-khong-luu-link" className="rounded-md border border-[var(--bb-danger)] p-3 text-sm">
-                    <strong>App chưa lưu được địa chỉ link này.</strong> Chép link ngay bây giờ —
-                    tải lại trang sẽ không còn thấy nó, và phải bấm <em>Tạo link mới</em> để có link khác.
-                  </p>
-                )}
-              </div>
-            )}
+            {/* BB-368 (anh chốt 06/10) — bộ CÓ khách: link gia đình, bộ này là màn con
+                /k/<mã>/<n>; không còn nút tạo link theo bộ. Bộ KHÔNG có khách (hiếm) hoặc
+                vai không có quyền gửi link: luồng link theo bộ y như cũ. */}
+            <KhoiLinkBoAnhGiaDinh
+              galleryId={galleryId}
+              photoCount={detail.photoCount}
+              chatUrl={detail.customerChatUrl}
+              slotLinkCu={
+                detail.shareLink ? <TinhTrangLink detail={detail} linkDuPhong={null} busy={busy} /> : null
+              }
+              luongCu={() => (
+                <>
+                  {/* Kết quả ghi sang Lark của lần tạo link VỪA RỒI (chỉ hiện sau khi bấm tạo). */}
+                  {linkMoi && (
+                    <div className="mt-3 space-y-2">
+                      {/* BB-132: nói rõ CSKH còn phải làm gì — máy đã dán hộ thì đừng bắt dán tay. */}
+                      {daGhiLark ? (
+                        <p className="rounded-md border border-[var(--bb-success)] p-3 text-sm">
+                          <strong>Đã ghi sang Lark.</strong> Link nằm sẵn ở cột <em>Link app</em> đúng
+                          dòng Hậu Kỳ của khách này — <strong>không cần dán tay</strong>.
+                        </p>
+                      ) : (
+                        <p className="rounded-md border border-[var(--bb-danger)] p-3 text-sm">
+                          <strong>Chưa ghi được sang Lark — dán tay giúp.</strong> Chép link dưới đây
+                          dán vào cột <em>Link app</em> đúng dòng Hậu Kỳ của khách này.
+                          {lyDoKhongGhiLark ? (
+                            <>
+                              <br />
+                              <span className="text-[var(--bb-fg-muted)]">Lý do: {lyDoKhongGhiLark}</span>
+                            </>
+                          ) : null}
+                        </p>
+                      )}
+                      {/* BB-320 (2a): app KHÔNG lưu được địa chỉ thì tải lại trang là mất link — cảnh báo, không im lặng. */}
+                      {luuDiaChiDuoc === false && (
+                        <p role="alert" data-testid="canh-bao-khong-luu-link" className="rounded-md border border-[var(--bb-danger)] p-3 text-sm">
+                          <strong>App chưa lưu được địa chỉ link này.</strong> Chép link ngay bây giờ —
+                          tải lại trang sẽ không còn thấy nó, và phải bấm <em>Tạo link mới</em> để có link khác.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-            {/* BB-320 (2a): link LUÔN hiện ở đây kèm nút "Chép link" — cả ngay sau khi tạo lẫn mỗi lần mở lại bộ ảnh. */}
-            <TinhTrangLink
-              detail={detail}
-              linkDuPhong={linkMoi}
-              busy={busy}
-              onTaoLink={() => void taoLink()}
+                  {/* BB-320 (2a): link LUÔN hiện ở đây kèm nút "Chép link" — cả ngay sau khi tạo lẫn mỗi lần mở lại bộ ảnh. */}
+                  <TinhTrangLink
+                    detail={detail}
+                    linkDuPhong={linkMoi}
+                    busy={busy}
+                    onTaoLink={() => void taoLink()}
+                  />
+                </>
+              )}
             />
 
             {/* BB-308 (bản vẽ BB-301 admin duyệt) — "Mở khoá link cũ / Gia
@@ -1916,15 +1934,18 @@ function MenuThaoTacPhu({
               Mở lại cho khách chọn
             </MenuMuc>
           )}
-          <MenuMuc
-            disabled={busy || detail.photoCount === 0}
-            onClick={() => {
-              setOpen(false);
-              onTaoLink();
-            }}
-          >
-            {detail.shareLink ? "Tạo link mới (ĐỔI địa chỉ)" : "Tạo link app"}
-          </MenuMuc>
+          {/* BB-368 — bộ có khách dùng link gia đình: không còn tạo link theo bộ. */}
+          {!detail.customerId && (
+            <MenuMuc
+              disabled={busy || detail.photoCount === 0}
+              onClick={() => {
+                setOpen(false);
+                onTaoLink();
+              }}
+            >
+              {detail.shareLink ? "Tạo link mới (ĐỔI địa chỉ)" : "Tạo link app"}
+            </MenuMuc>
+          )}
           {coTheGiaHan && (
             <MenuMuc
               disabled={busy}
@@ -2304,7 +2325,8 @@ function TinhTrangLink({
   /** Địa chỉ trả về lúc tạo link, dùng khi màn chi tiết chưa đọc lại được bản đã lưu (lưu hỏng). */
   linkDuPhong: string | null;
   busy: boolean;
-  onTaoLink: () => void;
+  /** BB-368: vắng = không cho tạo link theo bộ (bộ có khách — dùng link gia đình). */
+  onTaoLink?: () => void;
 }) {
   const link = detail.shareLink;
 
@@ -2319,7 +2341,7 @@ function TinhTrangLink({
             ? "Chưa có ảnh nào. Bấm đồng bộ ở thẻ Thư mục ảnh gốc phía trên, xong rồi tạo link."
             : "Chưa có link nào cho bộ ảnh này."}
         </p>
-        {detail.photoCount > 0 && (
+        {detail.photoCount > 0 && onTaoLink && (
           <button
             type="button"
             data-testid="nut-tao-link-app"
@@ -2363,7 +2385,7 @@ function TinhTrangLink({
       {/* BB-201 — link hiện lại được như link Drive (chủ studio 25/09/2026). */}
       {link.diaChi || linkDuPhong ? (
         <DongLinkApp diaChi={(link.diaChi ?? linkDuPhong)!} />
-      ) : !link.revokedAt && link.coQuyenGuiLink ? (
+      ) : !link.revokedAt && link.coQuyenGuiLink && onTaoLink ? (
         // BB-320 (2b): link cũ mà app không giữ được địa chỉ — một câu ngắn và nút ngay tại đây.
         <div data-testid="link-cu-khong-khoi-phuc" className="rounded-md border border-[var(--bb-border)] p-3">
           <p>

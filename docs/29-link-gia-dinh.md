@@ -173,7 +173,7 @@ Thân: `{ "doiLink"?: boolean, "xacNhan"?: boolean, "ghiLark"?: boolean }` (`ghi
 - Chưa có link gia đình → tạo. `doiLink` bỏ qua.
 - Đã có, `doiLink` không phải `true` → `409 CONFLICT` kèm `{ shareLinkId }`.
 - `doiLink: true` → cần vai CSKH/Admin + `xacNhan: true`; thu hồi link cũ **ngay**, tạo link mới, lượt chọn của link cũ **chuyển theo** link mới (luật BB-148).
-- Sau khi lưu: ghi **cùng một địa chỉ** `/k/<mã>` vào cột "Link app" của **mọi dòng Hậu Kỳ** của khách (mọi bộ có `lark_hauky_record_id`) qua `ghiLinkAppVeLark`. Lark hỏng không chặn: link vẫn trả về.
+- Sau khi lưu: ghi vào cột "Link app" của **mọi dòng Hậu Kỳ** của khách (mọi bộ có `lark_hauky_record_id`) qua `ghiLinkAppVeLark` — **BB-368: mỗi dòng nhận link màn con của đúng bộ đó** `/k/<mã>/<n>` (trước là `/k/<mã>` chung). Lark hỏng không chặn: link vẫn trả về.
 
 ```jsonc
 { "data": {
@@ -196,6 +196,15 @@ Thân `{ "xacNhan": true }`. Vai CSKH/Admin. Thu hồi link gia đình đang s�
 
 Ghi lại link gia đình đang sống lên mọi dòng Hậu Kỳ (vd. có bộ mới về từ Lark).
 Trả `lark` như 3.2. `404` khi chưa có link hoặc không giải mã được mã.
+
+### 3.5 BB-368 — link gia đình ở màn chi tiết bộ ảnh (anh chốt 06/10)
+
+- `GET /api/admin/galleries/<id>/link-gia-dinh` (quyền `galleries:share` + chi nhánh của bộ) →
+  `{ customerId, soThuTu, coAnh, hienVoiGiaDinh, linkGiaDinh: null | { shareLinkId, tokenPrefix, duongDan, duongDanManCon, diaChiManCon, soLanMo }, soLinkCuConSong, duocDoi }`.
+  `soThuTu` tính bằng `soThuTuCacBo` (cùng cách đánh số với `GET /api/k/<mã>`, không cần 0090).
+- Màn bộ ảnh: bộ có khách → khách chưa có link thì nút "Tạo link gia đình" gọi 3.2; đã có thì hiện link màn con `/k/<mã>/<n>`. Không còn nút tạo link theo bộ. Bộ không có khách → luồng link theo bộ cũ.
+- `POST /api/admin/galleries/<id>/share-link`: khách của bộ đã có link gia đình sống → `409 CONFLICT` kèm `details.linkGiaDinh` (`duongDan`, `duongDanManCon`, `soThuTu`); không tạo link, không thu hồi, không ghi Lark.
+- Sau khi **đồng bộ ảnh** thành công (bộ có ảnh) và khách có link gia đình: ghi link màn con vào ô "Link app" của dòng Hậu Kỳ của bộ **chỉ khi ô đang trống** (`ghiLinkAppVeLark({ chiKhiTrong: true })`). Gọi ở route `POST …/sync` và `kiemTraLaiMotBo` (nút "Kiểm tra lại" + cron hậu kỳ 08:00). Nhật ký `share_link.gia_dinh_ghi_lark_sau_dong_bo` (6 ký tự đầu của mã). Không gửi gì cho khách.
 
 ## 4. Bảo đảm an ninh (phép thử: `tests/security/bb-334a-*.test.ts`)
 

@@ -15,6 +15,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
 import { giaiMaMaLink, maHoaMaLink } from "@/lib/auth/ma-link";
 import { ghiLinkAppVeLark, diaChiDayDu } from "@/lib/lark/ghi-link-app";
+import { soThuTuCacBo } from "@/lib/gia-dinh/bo-anh-gia-dinh";
 
 export interface DongLink {
   id: string;
@@ -161,15 +162,20 @@ export async function taoLinkGiaDinh(
 export interface KetQuaGhiLarkGiaDinh {
   tong: number;
   ghiDuoc: number;
-  dong: { galleryId: string; recordId: string; ghiDuoc: boolean; lyDo: string | null }[];
+  dong: { galleryId: string; recordId: string; soThuTu: number | null; ghiDuoc: boolean; lyDo: string | null }[];
   lyDo?: string | null;
 }
 
+/** BB-368 — đường dẫn "màn con" của bộ thứ `n` trong trang gia đình. */
+export const duongDanManCon = (ma: string, soThuTu: number) => `/k/${ma}/${soThuTu}`;
+
 /**
- * Ghi CÙNG MỘT địa chỉ `/k/<mã>` vào cột "Link app" của MỌI dòng Hậu Kỳ của
- * khách (mỗi bộ có `lark_hauky_record_id`). Dùng lại `ghiLinkAppVeLark` — hàm
- * đó không bao giờ ném, tự tắt khi chạy phép thử (`khongGuiRaLarkThat`). Tuần
- * tự từng dòng: Lark giới hạn tần suất theo app, và một nhà chỉ có vài bộ.
+ * Ghi vào cột "Link app" của MỌI dòng Hậu Kỳ của khách (mỗi bộ có
+ * `lark_hauky_record_id`). BB-368 (anh chốt 06/10): mỗi dòng nhận link MÀN CON
+ * của ĐÚNG bộ đó `/k/<mã>/<n>` — không phải `/k/<mã>` chung — để CSKH bấm từ
+ * dòng Lark là vào thẳng buổi chụp đó. Dùng lại `ghiLinkAppVeLark` — hàm đó
+ * không bao giờ ném, tự tắt khi chạy phép thử (`khongGuiRaLarkThat`). Tuần tự
+ * từng dòng: Lark giới hạn tần suất theo app, và một nhà chỉ có vài bộ.
  */
 export async function ghiLinkGiaDinhVeLark(
   admin: SupabaseClient,
@@ -186,8 +192,7 @@ export async function ghiLinkGiaDinhVeLark(
     (g) => !!g.lark_hauky_record_id,
   );
 
-  const diaChi = diaChiDayDu(duongDanGiaDinh(ma));
-  if (!diaChi) {
+  if (!diaChiDayDu(duongDanGiaDinh(ma))) {
     return {
       tong: dsDong.length,
       ghiDuoc: 0,
@@ -196,12 +201,111 @@ export async function ghiLinkGiaDinhVeLark(
     };
   }
 
+  const soThuTu = dsDong.length > 0 ? await soThuTuCacBo(admin, customerId) : new Map<string, number>();
+
   const dong: KetQuaGhiLarkGiaDinh["dong"] = [];
   for (const g of dsDong) {
+    const so = soThuTu.get(g.id) ?? null;
+    if (so === null) {
+      // Không thể xảy ra (bộ vừa đọc theo đúng khách này) — nhưng ghi `/k/<mã>`
+      // chung thay vào là ghi sai bộ, nên thà báo không ghi.
+      dong.push({ galleryId: g.id, recordId: g.lark_hauky_record_id!, soThuTu: null, ghiDuoc: false, lyDo: "Không tính được số thứ tự bộ." });
+      continue;
+    }
+    const diaChi = diaChiDayDu(duongDanManCon(ma, so))!;
     const kq = await ghiLinkAppVeLark({ recordId: g.lark_hauky_record_id!, diaChi, ghiThat: true }).catch(
       (err: unknown) => ({ ghiDuoc: false, lyDo: err instanceof Error ? err.message : String(err) }),
     );
-    dong.push({ galleryId: g.id, recordId: g.lark_hauky_record_id!, ghiDuoc: kq.ghiDuoc, lyDo: kq.lyDo ?? null });
+    dong.push({ galleryId: g.id, recordId: g.lark_hauky_record_id!, soThuTu: so, ghiDuoc: kq.ghiDuoc, lyDo: kq.lyDo ?? null });
   }
   return { tong: dsDong.length, ghiDuoc: dong.filter((d) => d.ghiDuoc).length, dong };
+}
+
+export interface KetQuaGhiSauDongBo {
+  /** Đã thử ghi lên Lark chưa (false: không đủ điều kiện — xem `boQua`). */
+  daThu: boolean;
+  ghiDuoc: boolean;
+  boQua?: "khong_co_khach" | "khong_co_dong_lark" | "bo_chua_co_anh" | "chua_co_link_gia_dinh" | "khong_doc_lai_duoc_ma" | "thieu_dia_chi_goc";
+  lyDo?: string | null;
+  duongDan?: string;
+}
+
+/**
+ * BB-368 — sau khi ĐỒNG BỘ ẢNH xong (bộ đã có ảnh) mà khách ĐÃ có link gia đình:
+ * ghi link màn con `/k/<mã>/<n>` của bộ này vào cột "Link app" của dòng Hậu Kỳ
+ * của bộ — CHỈ KHI Ô ĐANG TRỐNG (`chiKhiTrong`). Không gửi gì cho khách.
+ *
+ * Không bao giờ ném: đồng bộ ảnh đã xong, lỗi ở đây chỉ được làm mất một lượt
+ * ghi tiện tay, không được biến lượt đồng bộ thành lỗi.
+ */
+export async function ghiLinkManConSauDongBo(
+  admin: SupabaseClient,
+  galleryId: string,
+  ngucanh: { requestId: string; actorId?: string | null },
+): Promise<KetQuaGhiSauDongBo> {
+  try {
+    const { data: g, error } = await admin
+      .from("galleries")
+      .select("id, branch_id, customer_id, photo_count, lark_hauky_record_id")
+      .eq("id", galleryId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!g?.customer_id) return { daThu: false, ghiDuoc: false, boQua: "khong_co_khach" };
+    if (!g.lark_hauky_record_id) return { daThu: false, ghiDuoc: false, boQua: "khong_co_dong_lark" };
+    if (!((g.photo_count as number | null) ?? 0)) return { daThu: false, ghiDuoc: false, boQua: "bo_chua_co_anh" };
+
+    const song = await linkGiaDinhSong(admin, g.customer_id as string);
+    if (!song) return { daThu: false, ghiDuoc: false, boQua: "chua_co_link_gia_dinh" };
+    const ma = await giaiMaLink(admin, song);
+    if (!ma) return { daThu: false, ghiDuoc: false, boQua: "khong_doc_lai_duoc_ma" };
+    const so = (await soThuTuCacBo(admin, g.customer_id as string)).get(galleryId);
+    if (!so) return { daThu: false, ghiDuoc: false, boQua: "khong_co_khach" };
+
+    const duongDan = duongDanManCon(ma, so);
+    const diaChi = diaChiDayDu(duongDan);
+    if (!diaChi) return { daThu: false, ghiDuoc: false, boQua: "thieu_dia_chi_goc" };
+
+    const kq = await ghiLinkAppVeLark({
+      recordId: g.lark_hauky_record_id as string,
+      diaChi,
+      ghiThat: true,
+      chiKhiTrong: true,
+    }).catch((err: unknown) => ({ ghiDuoc: false, lyDo: err instanceof Error ? err.message : String(err) }));
+
+    const { error: logErr } = await admin.from("activity_logs").insert({
+      actor_type: ngucanh.actorId ? "staff" : "system",
+      actor_id: ngucanh.actorId ?? null,
+      branch_id: g.branch_id ?? null,
+      action: "share_link.gia_dinh_ghi_lark_sau_dong_bo",
+      entity_type: "gallery",
+      entity_id: galleryId,
+      gallery_id: galleryId,
+      // SÁU ký tự đầu — không bao giờ cả mã (AGENTS §5).
+      metadata: { shareLinkId: song.id, tokenPrefix: ma.slice(0, 6), soThuTu: so, ghiDuoc: kq.ghiDuoc, lyDo: kq.lyDo ?? null },
+    });
+    if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
+
+    console.info(
+      JSON.stringify({
+        evt: "share_link.gia_dinh_lark_sau_dong_bo",
+        requestId: ngucanh.requestId,
+        galleryId,
+        tokenPrefix: ma.slice(0, 6),
+        soThuTu: so,
+        ghiDuoc: kq.ghiDuoc,
+        lyDo: kq.lyDo ?? null,
+      }),
+    );
+    return { daThu: true, ghiDuoc: kq.ghiDuoc, lyDo: kq.lyDo ?? null, duongDan };
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        evt: "share_link.gia_dinh_lark_sau_dong_bo_loi",
+        requestId: ngucanh.requestId,
+        galleryId,
+        lyDo: err instanceof Error ? err.message : String(err),
+      }),
+    );
+    return { daThu: false, ghiDuoc: false, lyDo: err instanceof Error ? err.message : String(err) };
+  }
 }

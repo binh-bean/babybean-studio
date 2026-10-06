@@ -478,6 +478,8 @@ export async function GET(
       branchName: branch?.name ?? null,
       // BB-303 — xem chú thích ở phần truy vấn phía trên.
       packageName: goiChup?.name ?? null,
+      // BB-368 — bộ có khách thì khối Link app dùng link gia đình (không tạo link theo bộ).
+      customerId: (gallery.customer_id as string | null) ?? null,
       customerName: customer?.full_name ?? null,
       customerPhone: customer?.phone ?? null,
       // BB-331: link "Chat với khách" (ô Lark Hậu Kỳ → customers.facebook) cho nút "Nhắn khách".

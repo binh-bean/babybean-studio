@@ -119,6 +119,17 @@ async function docMoiBo(admin: SupabaseClient, customerId: string): Promise<{ do
   }));
 }
 
+/**
+ * BB-368 — số thứ tự `n` (trong `/k/<mã>/<n>`) của MỌI bộ của khách, kể cả bộ
+ * đang ẩn (chưa có ảnh). Cùng cách đánh số với trang gia đình (`docMoiBo`), nên
+ * link màn con nhân viên chép / ghi Lark luôn mở đúng bộ mà `GET /api/k/<mã>`
+ * trả về. Không phụ thuộc cột `so_thu_tu_khach` (0090 chưa áp).
+ */
+export async function soThuTuCacBo(admin: SupabaseClient, customerId: string): Promise<Map<string, number>> {
+  const tatCa = await docMoiBo(admin, customerId);
+  return new Map(tatCa.map(({ dong, so }) => [dong.id, so]));
+}
+
 export async function danhSachBoAnhGiaDinh(
   admin: SupabaseClient,
   customerId: string,

@@ -80,6 +80,8 @@ import { maHoaMaLink } from "@/lib/auth/ma-link";
 import { soNgayHanChot, hanChotTuHomNay } from "@/lib/gallery/han-chot";
 import { lamNongAnhBia } from "@/lib/drive/lam-nong-cache";
 import { qua60NgayFileGoc } from "@/lib/lark/trang-thai-hau-ky";
+import { linkGiaDinhSong, giaiMaLink, duongDanGiaDinh, duongDanManCon } from "@/lib/gia-dinh/link-gia-dinh";
+import { soThuTuCacBo } from "@/lib/gia-dinh/bo-anh-gia-dinh";
 
 export const runtime = "nodejs";
 // GIẢ ĐỊNH HẠ TẦNG: gói Hobby — 60 giây là mức TỐI ĐA Hobby cho phép (mặc
@@ -148,6 +150,32 @@ export async function POST(
 
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     requireBranch(staff, gallery.branch_id);
+
+    // BB-368 (anh chốt 06/10) — khách đã có LINK GIA ĐÌNH còn sống thì bộ này là
+    // một "màn con" `/k/<mã>/<n>` của trang gia đình: KHÔNG tạo link theo bộ,
+    // KHÔNG thu hồi gì, KHÔNG ghi Lark. Đây là chốt máy chủ để không còn đường
+    // nào ghi đè ô "Link app" (đang giữ link màn con) bằng một link `/g/` mới.
+    if (gallery.customer_id) {
+      const song = await linkGiaDinhSong(admin, gallery.customer_id as string);
+      if (song) {
+        const ma = await giaiMaLink(admin, song);
+        const so = ma ? (await soThuTuCacBo(admin, gallery.customer_id as string)).get(galleryId) : undefined;
+        const duongDanManConBo = ma && so ? duongDanManCon(ma, so) : null;
+        return fail(
+          "CONFLICT",
+          "Khách đã có link gia đình — bộ này nằm sẵn trong link đó. Không tạo link riêng cho bộ nữa.",
+          {
+            linkGiaDinh: {
+              shareLinkId: song.id,
+              tokenPrefix: song.token_prefix,
+              duongDan: ma ? duongDanGiaDinh(ma) : null,
+              duongDanManCon: duongDanManConBo,
+              soThuTu: so ?? null,
+            },
+          },
+        );
+      }
+    }
 
     // Gửi link cho khách khi bộ ảnh chưa có tấm nào là để khách mở ra thấy
     // trang trắng rồi gọi điện. Chặn ở đây rẻ hơn một cuộc gọi.
