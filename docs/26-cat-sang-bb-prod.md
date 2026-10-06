@@ -50,6 +50,10 @@ Ngày cắt, theo đúng thứ tự:
 ☐ 7. Soát ô "Link app" cũ trên Lark (mục 7b).
 ☐ 8. Chép mốc "mở link" từ bb-dev (mục 7c). Làm NGAY sau bước 6, trước khi dọn bb-dev.
 ☐ 9. Biến môi trường Vercel (mục 8, 8a).
+☐ 9b. **Link quản lý bộ ảnh lên Lark** (anh chốt 06/10: chỉ làm khi sang prod):
+   - đặt `LARK_GHI_LINK_QUAN_LY=1` trên Vercel để app tự ghi cho bộ mới;
+   - rồi điền bù bằng `NEXT_PUBLIC_APP_URL=https://hauky.babybeanstudio.vn npm run lark:ghi-link-quan-ly`: chạy thử trước, xem dòng "Địa chỉ gốc", rồi mới thêm `-- --write`.
+   - Ô hiện tên khách, link là `…/admin/galleries/<id>`. Script tự thay 492 ô `http://localhost:3000/…` lỡ ghi ngày 06/10.
 ☐ 10. Backup secret (mục 10) · Lark Automation (mục 11, 11a, 11b).
 ☐ 11. Trước link đầu tiên (mục 12) → kiểm nhanh (mục 13).
 ☐ 12. Sáng hôm sau: kiểm bộ dọn đã chạy đêm đầu (mục 13a).

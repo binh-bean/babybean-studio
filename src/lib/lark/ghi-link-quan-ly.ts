@@ -323,6 +323,11 @@ export async function ghiLinkQuanLyChoBoAnh(
   galleryId: string,
   ngucanh: { requestId?: string } = {},
 ): Promise<KetQuaGhiQuanLy> {
+  // 06/10 anh chốt: CHƯA ghi link quản lý sang Lark cho tới ngày cắt sang bb-prod.
+  // Bật bằng biến môi trường LARK_GHI_LINK_QUAN_LY=1 trên Vercel (docs/26, bước cắt).
+  if (process.env.LARK_GHI_LINK_QUAN_LY !== "1") {
+    return { ghiDuoc: false, chayThu: false, boQua: "chua_co_cot", lyDo: "Tắt tới ngày cắt sang bb-prod (LARK_GHI_LINK_QUAN_LY chưa bật)." };
+  }
   try {
     const { data: g, error } = await admin
       .from("galleries")

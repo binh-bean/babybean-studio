@@ -185,7 +185,22 @@ describe("BB-373: lượt ghi lên Lark (fetch giả)", () => {
     expect(kq.boQua).toBe("loi");
   });
 
+  it("ghiLinkQuanLyChoBoAnh: CÔNG TẮC TẮT (mặc định, anh chốt 06/10 — chờ ngày cắt bb-prod) → không gọi Lark", async () => {
+    delete process.env.LARK_GHI_LINK_QUAN_LY;
+    const adminGia = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({ maybeSingle: async () => ({ data: { id: BO, lark_hauky_record_id: "rec1" }, error: null }) }),
+        }),
+      }),
+    } as never;
+    const kq = await ghiLinkQuanLyChoBoAnh(adminGia, BO);
+    expect(kq.ghiDuoc).toBe(false);
+    expect(cacLuot).toHaveLength(0);
+  });
+
   it("ghiLinkQuanLyChoBoAnh: dựng địa chỉ từ NEXT_PUBLIC_APP_URL + id bộ, ghi vào đúng dòng của bộ", async () => {
+    process.env.LARK_GHI_LINK_QUAN_LY = "1";
     const adminGia = {
       from: () => ({
         select: () => ({
@@ -200,6 +215,7 @@ describe("BB-373: lượt ghi lên Lark (fetch giả)", () => {
   });
 
   it("ghiLinkQuanLyChoBoAnh: bộ chưa gắn dòng Hậu Kỳ thì không gọi Lark; thiếu NEXT_PUBLIC_APP_URL thì không đoán", async () => {
+    process.env.LARK_GHI_LINK_QUAN_LY = "1";
     const adminGia = (record: string | null) =>
       ({
         from: () => ({
@@ -212,5 +228,6 @@ describe("BB-373: lượt ghi lên Lark (fetch giả)", () => {
     delete process.env.NEXT_PUBLIC_APP_URL;
     expect((await ghiLinkQuanLyChoBoAnh(adminGia("rec1"), BO)).boQua).toBe("thieu_dia_chi_goc");
     expect(cacLuot).toHaveLength(0);
+    delete process.env.LARK_GHI_LINK_QUAN_LY;
   });
 });
