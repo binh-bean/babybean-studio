@@ -22,6 +22,8 @@
  */
 import { giaiDoanCua } from "@/lib/lark/trang-thai-hau-ky";
 import { maLarkConHieuLuc } from "@/lib/gallery-status";
+import { vi } from "@/i18n/vi";
+import type { KhoiVungDuyet } from "@/lib/anh-chinh-sua/vong-duyet";
 
 export type MaTrangThaiBoAnh =
   | "moi_nhap"
@@ -257,9 +259,14 @@ export function cauBiaKhach(
   status: string,
   giaiDoan: number | null,
   tenBe?: string | null,
-  tuyChon: { khoa?: boolean } = {},
+  tuyChon: { khoa?: boolean; khoiDuyet?: KhoiVungDuyet } = {},
 ): string {
-  return trangThaiKhach(status, giaiDoan, tuyChon).bia.replace("{be}", tenBe?.trim() || "bé");
+  const tt = trangThaiKhach(status, giaiDoan, tuyChon);
+  // BB-387 — bước "Duyệt ảnh" mà app CHƯA có ảnh chỉnh (`khoiVungDuyet` = "dang_chuan_bi",
+  // BB-384): bìa nói CÙNG lời Bean với vùng duyệt và thẻ hành trình (BB-386), không
+  // "đã chỉnh xong, mời ba mẹ duyệt". Luật nằm ở `khoiVungDuyet`; đây chỉ chọn chữ.
+  const bia = tt.ma === "cho_khach_duyet" && tuyChon.khoiDuyet === "dang_chuan_bi" ? vi.gallery.anhChinh.chuanBiBia : tt.bia;
+  return bia.replace("{be}", tenBe?.trim() || "bé");
 }
 
 /**

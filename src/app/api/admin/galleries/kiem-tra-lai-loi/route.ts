@@ -12,7 +12,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, requireMotTrongCacQuyen, requireBranch, AuthError } from "@/lib/auth/staff";
+import { CAC_QUYEN_DONG_BO } from "@/lib/auth/quyen-xem-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { kiemTraLaiMotBo, kiemTraLaiCacBoLoi } from "@/lib/drive/kiem-tra-lai-loi";
@@ -36,10 +37,14 @@ export async function POST(request: Request): Promise<Response> {
     if (!parsed.success) return fail("INVALID_INPUT", "Dữ liệu không hợp lệ");
 
     const staff = await requireStaff();
-    requirePermission(staff, "galleries:write");
+    const { galleryId } = parsed.data;
+    // BB-383 — "Kiểm tra lại" MỘT bộ là nút đồng bộ của bộ đang lỗi: cùng cửa với
+    // route `[id]/sync` (`galleries:sync` HOẶC `galleries:write`). Quét cả hệ
+    // thống (không gửi galleryId) vẫn chỉ cho `galleries:write`.
+    if (galleryId) requireMotTrongCacQuyen(staff, CAC_QUYEN_DONG_BO);
+    else requirePermission(staff, "galleries:write");
     const admin = createAdminClient();
 
-    const { galleryId } = parsed.data;
     if (galleryId) {
       const { data: g } = await admin
         .from("galleries")

@@ -53,6 +53,7 @@ import { MAU_KHUNG, MAU_KHUNG_MAC_DINH } from "@/lib/gallery/mau-khung";
 import { BAN_UV, tinhAnhGiayTrenBan, vungNhinTrenAnh } from "@/lib/gallery/ban-uv";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { coTheBocKhung, laChatLieuUV } from "@/lib/products/nhom-san-pham";
+import { XemLonCanh } from "@/components/features/gallery/xem-lon-canh";
 
 export interface AnhTreoTuong {
   id: string;
@@ -256,6 +257,10 @@ export function ManTreoTuong({
   const [banAn, setBanAn] = useState(false);
   const [chiTietMo, setChiTietMo] = useState(false);
   const [xemLon, setXemLon] = useState(false);
+  // BB-378 — bảng điện thoại: thấp (mặc định, ≤30vh) / cao (kéo lên); `keoBang` = độ lệch khi đang kéo.
+  const [bangCao, setBangCao] = useState(false);
+  const [keoBang, setKeoBang] = useState<number | null>(null);
+  const keoBatDau = useRef<number | null>(null);
 
   const mauKhungDaChon = useMemo(
     () => MAU_KHUNG.find((m) => m.ma === maMauKhung) ?? MAU_KHUNG_MAC_DINH,
@@ -286,6 +291,7 @@ export function ManTreoTuong({
       setBanAn(false);
       setChiTietMo(false);
       setXemLon(false);
+      setBangCao(false);
     }
   }, [mo, chiSoBanDau]);
 
@@ -575,6 +581,8 @@ export function ManTreoTuong({
     return {
       ...quyDoiKhungHienThi(canhBanDo.w, canhBanDo.h, canhBan.rongAnhPx, canhBan.caoAnhPx, kq.hinh),
       gocXoayDo: kq.gocXoayDo,
+      /** BB-378 — vị trí trên ảnh bàn GỐC (px), cho cảnh xem lớn. */
+      hinhGoc: kq.hinh,
       pxManHinhMoiCm: canhBan.pxMoiCm * scale,
       rongPx: kq.hinh.rong * scale,
     };
@@ -665,10 +673,25 @@ export function ManTreoTuong({
 
   if (!mo || !anhDangXem) return null;
 
-  const style = lopChatLieu(chatLieu);
   // BB-358 (anh 02/10) — UV là ảnh giấy: KHÔNG BAO GIỜ treo lên tường, không khung.
   // BB-365: nằm trên ảnh chụp thật mặt bàn, to nhỏ theo cỡ (xem `anhGiay`).
   const laUvKhongKhung = laUv;
+  const tenChatLieu = sanPhamAnh ? (TEN_CHAT_LIEU[sanPhamAnh.material ?? ""] ?? sanPhamAnh.material) : null;
+  const dongTomTat = [tenChatLieu, sanPhamAnh?.size ? `${formatKichThuoc(sanPhamAnh.size)} cm` : null, coKhung && sanPhamKhung ? "Khung HQ" : null]
+    .filter(Boolean)
+    .join(" · ");
+  const caHaiTrongGoi = !!suatAnhVua && (!coKhung || !!suatKhungVua);
+
+  /** BB-378 — kéo tay cầm của bảng (điện thoại): lên = mở cao, xuống = thu thấp / ẩn. */
+  const keoXong = (dy: number) => {
+    if (dy < -36) setBangCao(true);
+    else if (dy > 36) {
+      if (bangCao) setBangCao(false);
+      else setBanAn(true);
+    } else if (Math.abs(dy) < 6) setBangCao((v) => !v);
+    setKeoBang(null);
+    keoBatDau.current = null;
+  };
 
   return (
     <div
@@ -745,35 +768,16 @@ export function ManTreoTuong({
                     setXemLon(true);
                   }
                 }}
-                className="absolute origin-center cursor-pointer bg-[#fbf9f4] transition-all duration-300 ease-out"
+                className="absolute origin-center cursor-pointer transition-all duration-300 ease-out"
                 style={{
                   left: `${anhGiay.leftPct}%`,
                   top: `${anhGiay.topPct}%`,
                   width: `${anhGiay.widthPct}%`,
                   height: `${anhGiay.heightPct}%`,
                   transform: `rotate(${anhGiay.gocXoayDo}deg)`,
-                  padding: `${Math.max(1.5, LE_ANH_GIAY_CM * anhGiay.pxManHinhMoiCm)}px`,
-                  boxShadow: bongAnhGiay(anhGiay.pxManHinhMoiCm),
                 }}
               >
-                <div className="relative h-full w-full overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={buildLightboxImageUrl(anhDangXem.id, 1600)}
-                    alt={anhDangXem.fileName}
-                    className="h-full w-full object-cover"
-                    draggable={false}
-                  />
-                </div>
-                {/* Nắng từ cửa sổ phía trên: mép trên tấm ảnh sáng ấm hơn, mép dưới hơi tối — cả lề lẫn ảnh. */}
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0"
-                  style={{
-                    background:
-                      "linear-gradient(175deg, rgba(255,240,215,.16) 0%, rgba(255,240,215,0) 45%, rgba(70,45,20,.07) 100%)",
-                  }}
-                />
+                <AnhGiayUv anh={anhDangXem} pxManHinhMoiCm={anhGiay.pxManHinhMoiCm} />
                 {anhGiay.rongPx >= 96 && (
                   <span className="pointer-events-none absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 text-white/90 backdrop-blur-sm">
                     <ZoomIn className="h-3.5 w-3.5" strokeWidth={2} />
@@ -810,7 +814,7 @@ export function ManTreoTuong({
             <p
               ref={loiBeanRef}
               data-testid="uv-loi-bean"
-              className="max-w-[480px] text-balance rounded-full bg-white/85 px-4 py-2 text-center text-[13px] leading-snug text-[#2e2a27] shadow-[0_2px_10px_-4px_rgba(46,42,39,.25)] backdrop-blur-sm"
+              className="max-w-[480px] text-balance rounded-full bg-white/70 px-4 py-2 text-center text-[13px] leading-snug text-[#2e2a27] shadow-[0_2px_10px_-4px_rgba(46,42,39,.25)] backdrop-blur-md"
             >
               {vi.gallery.treoTuong.uvLaAnhGiay}
             </p>
@@ -822,6 +826,7 @@ export function ManTreoTuong({
             role="button"
             tabIndex={0}
             aria-label={vi.gallery.treoTuong.xemLonAnhBe}
+            data-testid="khung-tren-tuong"
             onClick={() => setXemLon(true)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
@@ -838,71 +843,28 @@ export function ManTreoTuong({
               boxShadow: BONG_THEO_HUONG[phong.huongSang],
             }}
           >
-            {/*
-              Khung HQ = viền vẽ bằng border-image theo mẫu khung ba mẹ chọn
-              (BB-222, chỉ để tham khảo). border-image-slice lấy từ số đo
-              pixel trong chính ảnh mẫu (`mau-khung.ts`); border width (viền
-              dày bao nhiêu TRÊN MÀN HÌNH) quy đổi từ cm thật theo đúng tỉ lệ
-              hiển thị `object-fit: cover` — không phải một số cố định.
-            */}
-            <div
-              className="h-full w-full"
-              style={
-                coKhung
-                  ? {
-                      borderStyle: "solid",
-                      borderWidth: `${vienKhungPx}px`,
-                      borderImageSource: `url(${mauKhungDaChon.anh})`,
-                      borderImageSlice: mauKhungDaChon.slicePx,
-                      borderImageRepeat: "stretch",
-                      boxSizing: "border-box",
-                    }
-                  : undefined
-              }
-            >
-              <div
-                className={`relative h-full w-full ${style.className}`}
-                style={{
-                  padding: style.padding,
-                  background: style.background,
-                  boxShadow: style.boxShadow,
-                  // BB-339 — tràn viền, góc vuông (không bo) cho mọi chất liệu.
-                  borderRadius: 0,
-                }}
-              >
-                <div className="relative h-full w-full overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={buildLightboxImageUrl(anhDangXem.id, 1600)}
-                    alt={anhDangXem.fileName}
-                    className="h-full w-full object-cover"
-                    draggable={false}
-                  />
-                  {chatLieu === "Cavas/Kim tuyến" && (
-                    <div
-                      className="pointer-events-none absolute inset-0 mix-blend-screen"
-                      style={{ backgroundImage: ANH_KIM_TUYEN, backgroundSize: "9px 9px" }}
-                    />
-                  )}
-                  {(chatLieu === "Tráng gương" || chatLieu === "Thủy tinh" || chatLieu === "Mica HD") && (
-                    <div
-                      className="pointer-events-none absolute inset-0"
-                      style={{
-                        background:
-                          "linear-gradient(115deg, rgba(255,255,255,.32) 0%, rgba(255,255,255,0) 22%, rgba(255,255,255,0) 78%, rgba(255,255,255,.18) 100%)",
-                      }}
-                    />
-                  )}
-                </div>
-                {/* Gợi ý bấm được — khung ảnh của bé chiếm phần lớn màn hình,
-                    icon nhỏ này báo cho ba mẹ biết chạm vào để xem lớn. */}
-                <span className="pointer-events-none absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur-sm">
-                  <ZoomIn className="h-3.5 w-3.5" strokeWidth={2} />
-                </span>
-              </div>
-            </div>
+            <KhungAnhBe
+              anh={anhDangXem}
+              chatLieu={chatLieu}
+              coKhung={coKhung}
+              mauKhung={mauKhungDaChon}
+              vienPx={vienKhungPx}
+              coIconPhong
+            />
           </div>
         )}
+
+        {/*
+          BB-339 — dòng nhỏ luôn hiện. BB-378: rời khỏi bảng (bảng chỉ còn chất
+          liệu · cỡ · giá), nằm mờ ở góc cảnh, ngay trên mép bảng.
+        */}
+        <p
+          data-testid="tham-khao-demo"
+          className="pointer-events-none absolute left-3 z-[5] rounded-full bg-black/30 px-2.5 py-1 text-[11px] text-white/90 backdrop-blur-sm md:bottom-3"
+          style={{ bottom: manRong ? undefined : banAn ? 12 : `calc(${TY_LE_CHIEU_CAO_BANG_DIEN_THOAI * 100}vh + 8px)` }}
+        >
+          {vi.gallery.treoTuong.thamKhaoDemo}
+        </p>
 
         {/*
           Mũi tên lướt, nút đóng/ẩn bảng, thẻ chọn phòng — TẤT CẢ đều z-20,
@@ -931,10 +893,7 @@ export function ManTreoTuong({
               disabled={chiSo === anh.length - 1}
               className={cn(
                 "absolute right-3 top-1/2 z-20 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm transition hover:bg-black/50 disabled:opacity-0 md:flex",
-                // BB-293 mục #10 — báo cáo chấm độc lập: nút › đứng cố định ở
-                // right-3 (từ mép màn hình) đè lên mép trái của bảng 360px
-                // trên máy tính. Bảng đang mở (chưa ẩn) thì lùi nút ra khỏi
-                // vùng bảng; bảng ẩn thì trả về right-3 như cũ.
+                // BB-293 mục #10 — bảng đang mở (chưa ẩn) thì lùi nút ra khỏi vùng bảng.
                 !banAn && "md:right-[376px]",
               )}
             >
@@ -966,13 +925,8 @@ export function ManTreoTuong({
         </div>
 
         {/*
-          4 phòng — thẻ nhỏ chọn ảnh nền.
-
-          BB-293 mục #4 — báo cáo chấm độc lập: trên điện thoại (390px), cụm
-          phòng căn giữa (~180px) và nút "Ẩn bảng" + "Đóng" bên phải (từ
-          right-4, ~158px) CHỒNG NHAU ở top-4 — 390 không đủ chỗ cho cả hai ở
-          cùng một hàng. Máy tính đủ rộng nên giữ nguyên top-4; điện thoại đẩy
-          cụm phòng xuống một hàng riêng (top-16), dưới hàng "Ẩn bảng"/"Đóng".
+          4 phòng — thẻ nhỏ chọn ảnh nền. BB-293 mục #4: điện thoại đẩy cụm
+          phòng xuống một hàng riêng (top-16), dưới hàng "Ẩn bảng"/"Đóng".
         */}
         <div
           ref={cumPhongRef}
@@ -1005,238 +959,428 @@ export function ManTreoTuong({
       </div>
 
       {/*
-        BẢNG ĐIỀU KHIỂN (BB-243) — một thanh gọn ĐÈ LÊN ảnh phòng, không còn
-        chiếm riêng một cột đẩy ảnh hẹp lại. Nền mờ (backdrop-blur) để vẫn đọc
-        được chữ trên mọi ảnh phòng. Chỉ hiện nhãn ngắn (chip chất liệu/cỡ đã
-        sẵn ngắn); mô tả dài + câu "chỉ để tham khảo" gấp sau nút "i".
-        Ẩn hẳn được bằng nút "Ẩn bảng" hoặc chạm vào ảnh phòng.
+        BẢNG ĐIỀU KHIỂN — BB-243 (đè lên ảnh, ẩn được) → BB-378 (anh: "text quá
+        nhiều. Text gọn và làm hiệu ứng mờ đi, hãy nhìn từ góc khách hàng"):
+         · Chỉ còn chất liệu · cỡ · giá + nút chính. Mô tả chất liệu, câu tham
+           khảo khung, tách giá ảnh/khung gấp sau "Chi tiết".
+         · Nền KÍNH MỜ (trong hơn, blur mạnh) — thấy cảnh phía sau.
+         · Điện thoại: bảng KÉO LÊN/XUỐNG bằng tay cầm, mặc định THẤP (≤30vh —
+           khung trên tường đã được tính để nằm trên mép này); kéo xuống khi
+           đang thấp là ẩn hẳn. Máy tính: thẻ nổi bên phải, cùng bề ngang cũ.
       */}
       <div
+        data-testid="bang-treo-tuong"
+        data-muc={bangCao ? "cao" : "thap"}
         className={cn(
-          "giao-dien-khach absolute z-10 flex flex-col gap-3 overflow-y-auto rounded-t-3xl bg-bb-bg/80 p-4 backdrop-blur-md transition-transform duration-300 ease-out",
-          // BB-293 mục #4 — báo cáo chấm độc lập: 52vh chiếm hơn nửa màn hình
-          // điện thoại, đè gần hết ảnh tường. LUAT-DOT-8: bảng thu gọn ≤30%
-          // chiều cao trên điện thoại — nội dung vẫn cuộn được bên trong.
-          "inset-x-0 bottom-0 max-h-[30vh]",
-          // md:pt-16: cột phải trên máy tính chừa chỗ cho nút "Ẩn bảng"/"Đóng"
-          // (z-20, top-4 right-4 của ảnh phòng) — thiếu khoảng này, hàng đầu
-          // của bảng (tiêu đề + nút "Chi tiết") nằm ĐÚNG dưới hai nút đó, và
-          // vì hai nút kia z CAO HƠN nên chặn mất cú bấm vào "Chi tiết" (tự bắt
-          // bằng Playwright: click "Chi tiết" bị nút "Đóng" chặn pointer-events).
-          // BB-293 mục #10 — báo cáo chấm độc lập: 300px ép tiêu đề "Treo lên
-          // tường nhà mình" + nút "Chi tiết" gãy hai dòng. Rộng ra 360px —
-          // đủ một dòng, đúng LUAT-DOT-8 ("bảng 360px tiêu đề một dòng").
-          "md:inset-y-0 md:right-0 md:left-auto md:bottom-auto md:max-h-none md:w-[360px] md:rounded-none md:pt-16",
-          // "invisible" (không chỉ translate ra ngoài khung nhìn) để Playwright
-          // và trình đọc màn hình đều coi đây là ĐÃ ẨN thật, không phải một
-          // khối vẫn "nhìn thấy được" nhưng trôi ra ngoài rìa màn hình.
-          banAn && "invisible translate-y-full md:translate-x-full md:translate-y-0",
+          "giao-dien-khach absolute z-10 flex flex-col overflow-hidden border border-white/55 text-bb-fg",
+          "shadow-[0_-8px_30px_rgba(0,0,0,.18)] backdrop-blur-xl backdrop-saturate-150",
+          keoBang === null && "transition-[transform,max-height] duration-300 ease-out",
+          "inset-x-0 bottom-0 rounded-t-3xl border-b-0",
+          bangCao ? "max-h-[72vh] min-h-[52vh]" : "max-h-[30vh]",
+          // md:top-[72px]: chừa chỗ cho nút "Ẩn bảng"/"Đóng" (z-20, top-4 right-4)
+          // — thiếu khoảng này, hàng đầu của bảng nằm ĐÚNG dưới hai nút đó.
+          // Rộng 344 + lề 16 = 360 (khớp BANG_MAY_TINH_PX 376 = 360 + 16 khe).
+          "md:bottom-auto md:left-auto md:right-4 md:top-[72px] md:max-h-[calc(100dvh-88px)] md:w-[344px] md:rounded-3xl md:border-b",
+          // "invisible" (không chỉ translate) để Playwright và trình đọc màn hình
+          // đều coi đây là ĐÃ ẨN thật.
+          banAn && "invisible translate-y-full md:translate-x-[calc(100%+16px)] md:translate-y-0",
         )}
-        style={{ boxShadow: "0 -8px 30px rgba(0,0,0,.25)" }}
+        style={{
+          // Nền kính TRONG: đặt inline — luật `.giao-dien-khach { background }` (tokens.css,
+          // ngoài @layer) đè mọi lớp bg-* của Tailwind, bảng cũ vì thế đặc kín, không mờ.
+          backgroundColor: "rgba(251,247,242,0.66)",
+          ...(keoBang === null
+            ? {}
+            : keoBang > 0
+              ? { transform: `translateY(${keoBang}px)` }
+              : { maxHeight: `calc(${bangCao ? 72 : 30}vh + ${-keoBang}px)` }),
+        }}
         aria-hidden={banAn}
       >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            {/*
-              BB-275 kiểm ngược — trên máy tính (`md:w-[300px]`) cột chữ chỉ còn
-              ~184px cạnh nút "Chi tiết", và `truncate` cắt tiêu đề còn "Treo
-              lên tư…". Bỏ `truncate`, cho xuống dòng: cột có chiều cao tự do
-              (`md:max-h-none`, cuộn được), không như thanh ngang hẹp cần cắt
-              một dòng.
-            */}
-            <h2 className="kh-h3 text-bb-fg">
+        {/* Tay cầm kéo — chỉ điện thoại. */}
+        <button
+          type="button"
+          data-testid="tay-cam-bang"
+          aria-label={bangCao ? vi.gallery.treoTuong.thuBang : vi.gallery.treoTuong.keoBang}
+          aria-expanded={bangCao}
+          className="flex h-6 w-full shrink-0 touch-none items-center justify-center md:hidden"
+          onPointerDown={(e) => {
+            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+            keoBatDau.current = e.clientY;
+            setKeoBang(0);
+          }}
+          onPointerMove={(e) => {
+            if (keoBatDau.current === null) return;
+            setKeoBang(e.clientY - keoBatDau.current);
+          }}
+          onPointerUp={(e) => {
+            if (keoBatDau.current === null) return;
+            keoXong(e.clientY - keoBatDau.current);
+          }}
+          onPointerCancel={() => {
+            setKeoBang(null);
+            keoBatDau.current = null;
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setBangCao((v) => !v);
+            }
+          }}
+        >
+          <span className="h-1 w-10 rounded-full bg-bb-fg/25" />
+        </button>
+
+        <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain px-4 pb-3 md:px-5 md:pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="min-w-0 text-[14px] font-medium leading-tight text-bb-fg">
               {laUvKhongKhung ? vi.gallery.treoTuong.tieuDeAnhGiay : "Treo lên tường nhà mình"}
             </h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => setChiTietMo((v) => !v)}
-            aria-pressed={chiTietMo}
-            aria-label={chiTietMo ? vi.gallery.treoTuong.anChiTiet : vi.gallery.treoTuong.chiTiet}
-            className={cn(
-              "flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition",
-              chiTietMo ? "bg-bb-fg text-bb-bg" : "bg-bb-surface-2 text-bb-fg-muted hover:bg-bb-border",
-            )}
-          >
-            <Info className="h-3 w-3" strokeWidth={2} />
-            {vi.gallery.treoTuong.chiTiet}
-          </button>
-        </div>
-
-        {dsChatLieu.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {dsChatLieu.map((cl) => (
-              <button
-                key={cl}
-                type="button"
-                onClick={() => setChatLieu(cl)}
-                className={[
-                  "rounded-full px-3 py-1.5 text-xs font-medium transition",
-                  cl === chatLieu
-                    ? "bg-bb-fg text-bb-bg"
-                    : "bg-bb-surface-2 text-bb-fg hover:bg-bb-border",
-                ].join(" ")}
-              >
-                {TEN_CHAT_LIEU[cl] ?? cl}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {coVua.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {coVua.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCo(c)}
-                className={[
-                  "rounded-full px-3 py-1.5 text-xs font-medium transition",
-                  c === co ? "bg-bb-fg text-bb-bg" : "bg-bb-surface-2 text-bb-fg hover:bg-bb-border",
-                ].join(" ")}
-              >
-                {formatKichThuoc(c)} cm
-              </button>
-            ))}
-          </div>
-        )}
-
-        {coVua.length === 0 && (
-          <p className="text-xs text-bb-fg-muted">
-            {vi.gallery.loiBean.phongChuaVuaTuong}
-          </p>
-        )}
-
-        {/* BB-358 — Khung Hàn Quốc chỉ bọc chất liệu đã cán (Gỗ, Tráng gương…); UV là ảnh giấy, không có khung. */}
-        {monKhung.length > 0 && coTheBocKhung(chatLieu) && (
-          <div className="space-y-2">
-            <label
-              data-testid="tuy-chon-boc-khung"
-              className="flex cursor-pointer items-center justify-between rounded-2xl bg-bb-surface-2 px-3.5 py-2"
+            <button
+              type="button"
+              onClick={() => {
+                setChiTietMo((v) => !v);
+                if (!chiTietMo) setBangCao(true);
+              }}
+              aria-pressed={chiTietMo}
+              aria-label={chiTietMo ? vi.gallery.treoTuong.anChiTiet : vi.gallery.treoTuong.chiTiet}
+              className={cn(
+                "flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium transition",
+                chiTietMo ? "bg-bb-fg text-bb-bg" : "bg-white/55 text-bb-fg-muted hover:bg-white/80",
+              )}
             >
-              <span className="text-xs font-medium text-bb-fg">Bọc khung HQ</span>
-              <input
-                type="checkbox"
-                checked={coKhung}
-                onChange={(e) => setCoKhung(e.target.checked)}
-                className="h-4 w-4 accent-bb-fg"
-              />
-            </label>
-
-            {coKhung && (
-              <div className="flex flex-wrap gap-2">
-                {MAU_KHUNG.map((m) => (
-                  <button
-                    key={m.ma}
-                    type="button"
-                    aria-pressed={m.ma === maMauKhung}
-                    onClick={() => setMaMauKhung(m.ma)}
-                    className={[
-                      "flex flex-col items-center gap-1 rounded-xl p-1 transition",
-                      m.ma === maMauKhung
-                        ? "bg-bb-fg/10 ring-2 ring-bb-fg"
-                        : "ring-1 ring-transparent hover:bg-bb-surface-2",
-                    ].join(" ")}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={m.anh}
-                      alt=""
-                      className="h-8 w-8 rounded-md object-cover"
-                      draggable={false}
-                    />
-                    <span className="text-[11px] font-medium text-bb-fg">{m.ten}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+              <Info className="h-3 w-3" strokeWidth={2} />
+              {vi.gallery.treoTuong.chiTiet}
+            </button>
           </div>
-        )}
 
-        {/* Chi tiết gấp lại (BB-243): mô tả chất liệu + câu "chỉ để tham khảo"
-            của khung — chỉ hiện khi bấm nút "i" ở trên, không choán chỗ mặc định. */}
-        {chiTietMo && (
-          <div className="space-y-1.5 rounded-2xl bg-bb-surface-2/70 p-3 text-[11px] leading-relaxed text-bb-fg-muted">
-            {chatLieu && MO_TA_CHAT_LIEU[chatLieu] && <p>{MO_TA_CHAT_LIEU[chatLieu]}</p>}
-            {coKhung && <p>{vi.gallery.treoTuong.thamKhaoKhung}</p>}
-          </div>
-        )}
-
-        <div className="mt-auto space-y-1 border-t border-bb-border pt-2.5">
-          <div className="flex items-baseline justify-between text-sm">
-            <span className="text-bb-fg-muted">
-              {sanPhamAnh ? (TEN_CHAT_LIEU[sanPhamAnh.material ?? ""] ?? sanPhamAnh.material) : "—"}
-              {sanPhamAnh?.size ? ` · ${formatKichThuoc(sanPhamAnh.size)}` : ""}
-            </span>
-            <span className="font-medium text-bb-fg">
-              {suatAnhVua ? "Trong gói · 0 ₫" : formatCurrencyVND(giaAnh)}
-            </span>
-          </div>
-          {coKhung && sanPhamKhung && (
-            <div className="flex items-baseline justify-between text-sm">
-              <span className="text-bb-fg-muted">Khung HQ</span>
-              <span className="font-medium text-bb-fg">
-                {suatKhungVua ? "Trong gói · 0 ₫" : formatCurrencyVND(giaKhung)}
-              </span>
+          {dsChatLieu.length > 0 && (
+            <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+              {dsChatLieu.map((cl) => (
+                <button
+                  key={cl}
+                  type="button"
+                  onClick={() => setChatLieu(cl)}
+                  className={cn(
+                    "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition",
+                    cl === chatLieu ? "bg-bb-fg text-bb-bg" : "bg-white/55 text-bb-fg hover:bg-white/85",
+                  )}
+                >
+                  {TEN_CHAT_LIEU[cl] ?? cl}
+                </button>
+              ))}
             </div>
           )}
-          <div className="flex items-baseline justify-between pt-1.5 text-base">
-            <span className="font-medium text-bb-fg">Tổng cộng</span>
-            {/* BB-305 — giá tiền: bỏ font-display, thêm tabular-nums. */}
-            <span className="text-xl font-medium tabular-nums text-bb-fg">
-              {formatCurrencyVND(tongGia)}
-            </span>
-          </div>
+
+          {coVua.length > 0 && (
+            <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+              {coVua.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCo(c)}
+                  className={cn(
+                    "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium tabular-nums transition",
+                    c === co ? "bg-bb-fg text-bb-bg" : "bg-white/55 text-bb-fg hover:bg-white/85",
+                  )}
+                >
+                  {formatKichThuoc(c)} cm
+                </button>
+              ))}
+            </div>
+          )}
+
+          {coVua.length === 0 && <p className="text-xs text-bb-fg-muted">{vi.gallery.loiBean.phongChuaVuaTuong}</p>}
+
+          {/* BB-358 — Khung Hàn Quốc chỉ bọc chất liệu đã cán (Gỗ, Tráng gương…); UV là ảnh giấy, không có khung. */}
+          {monKhung.length > 0 && coTheBocKhung(chatLieu) && (
+            <div className="space-y-2">
+              <label
+                data-testid="tuy-chon-boc-khung"
+                className="flex cursor-pointer items-center justify-between rounded-2xl bg-white/55 px-3.5 py-2"
+              >
+                <span className="text-xs font-medium text-bb-fg">Bọc khung HQ</span>
+                <input
+                  type="checkbox"
+                  checked={coKhung}
+                  onChange={(e) => setCoKhung(e.target.checked)}
+                  className="h-4 w-4 accent-bb-fg"
+                />
+              </label>
+
+              {coKhung && (
+                <div className="flex flex-wrap gap-2">
+                  {MAU_KHUNG.map((m) => (
+                    <button
+                      key={m.ma}
+                      type="button"
+                      aria-pressed={m.ma === maMauKhung}
+                      onClick={() => setMaMauKhung(m.ma)}
+                      className={[
+                        "flex flex-col items-center gap-1 rounded-xl p-1 transition",
+                        m.ma === maMauKhung ? "bg-bb-fg/10 ring-2 ring-bb-fg" : "ring-1 ring-transparent hover:bg-white/55",
+                      ].join(" ")}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={m.anh} alt="" className="h-8 w-8 rounded-md object-cover" draggable={false} />
+                      <span className="text-[11px] font-medium text-bb-fg">{m.ten}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Chi tiết gấp lại: mô tả chất liệu, câu tham khảo khung, giá tách ảnh/khung. */}
+          {chiTietMo && (
+            <div data-testid="chi-tiet-treo-tuong" className="space-y-1.5 rounded-2xl bg-white/50 p-3 text-[11.5px] leading-relaxed text-bb-fg-muted">
+              {chatLieu && MO_TA_CHAT_LIEU[chatLieu] && <p>{MO_TA_CHAT_LIEU[chatLieu]}</p>}
+              {coKhung && <p>{vi.gallery.treoTuong.thamKhaoKhung}</p>}
+              {sanPhamAnh && (
+                <p className="flex justify-between gap-2 pt-1 text-bb-fg">
+                  <span>{tenChatLieu}{sanPhamAnh.size ? ` · ${formatKichThuoc(sanPhamAnh.size)}` : ""}</span>
+                  <span className="tabular-nums">{suatAnhVua ? vi.gallery.treoTuong.trongGoi : formatCurrencyVND(giaAnh)}</span>
+                </p>
+              )}
+              {coKhung && sanPhamKhung && (
+                <p className="flex justify-between gap-2 text-bb-fg">
+                  <span>Khung HQ</span>
+                  <span className="tabular-nums">{suatKhungVua ? vi.gallery.treoTuong.trongGoi : formatCurrencyVND(giaKhung)}</span>
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* BB-339 — dòng nhỏ luôn hiện (chủ studio 01/10/2026). */}
-        <p data-testid="tham-khao-demo" className="text-[11px] text-bb-fg-muted">
-          {vi.gallery.treoTuong.thamKhaoDemo}
-        </p>
-
-        {!xemDuocThoi && (
-          <button
-            type="button"
-            disabled={!sanPhamAnh || dangLuu}
-            onClick={themVaoDon}
-            className="h-12 shrink-0 rounded-full bg-bb-fg text-sm font-medium text-bb-bg transition hover:opacity-90 disabled:opacity-40"
-          >
-            {dangLuu ? "Đang lưu…" : "Thêm vào giỏ"}
-          </button>
-        )}
-        {xemDuocThoi && (
-          <p className="text-center text-xs text-bb-fg-muted">{vi.gallery.loiBean.dangChiXemChuaDat}</p>
-        )}
+        {/* Chân bảng — luôn thấy: chất liệu · cỡ · giá + nút chính. */}
+        <div className="flex shrink-0 items-center gap-3 border-t border-white/60 px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] md:px-5 md:pb-4">
+          <div className="min-w-0 flex-1">
+            <p data-testid="tom-tat-treo-tuong" className="truncate text-[12px] text-bb-fg-muted">
+              {dongTomTat || "—"}
+            </p>
+            {/* BB-305 — giá tiền: không font-display, có tabular-nums. */}
+            <p className="text-[18px] font-medium leading-tight tabular-nums text-bb-fg">
+              {caHaiTrongGoi ? vi.gallery.treoTuong.trongGoi : formatCurrencyVND(tongGia)}
+            </p>
+          </div>
+          {!xemDuocThoi ? (
+            <button
+              type="button"
+              disabled={!sanPhamAnh || dangLuu}
+              onClick={themVaoDon}
+              className="h-11 shrink-0 rounded-full bg-bb-fg px-5 text-sm font-medium text-bb-bg transition hover:opacity-90 disabled:opacity-40"
+            >
+              {dangLuu ? "Đang lưu…" : "Thêm vào giỏ"}
+            </button>
+          ) : (
+            <p className="max-w-[55%] text-right text-[11.5px] leading-snug text-bb-fg-muted">
+              {vi.gallery.loiBean.dangChiXemChuaDat}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* BB-243 — mở lớn tấm của bé: toàn màn, nền tối, đè trên cả màn tường. */}
+      {/*
+        BB-378 — chạm khung/tấm giấy → xem lớn CẢ CẢNH (ảnh nền đầy đủ + ảnh của
+        bé đúng chỗ, đúng cỡ), phóng/kéo được. Toạ độ khung lấy thẳng từ phép
+        tính trên ảnh GỐC (`ketQuaKhung.hinh` / `anhGiay.hinhGoc`), nên khớp
+        đúng vị trí ba mẹ vừa thấy, chỉ không bị cắt `cover`.
+      */}
       {xemLon && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={vi.gallery.treoTuong.xemLonAnhBe}
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95"
-          onClick={() => setXemLon(false)}
-          data-con-tro="mac-dinh"
+        <XemLonCanh
+          rong={laUvKhongKhung ? canhBan.rongAnhPx : phong.rongAnhPx}
+          cao={laUvKhongKhung ? canhBan.caoAnhPx : phong.caoAnhPx}
+          onDong={() => setXemLon(false)}
         >
+          {(rongSanKhau) => {
+            if (laUvKhongKhung) {
+              const tl = rongSanKhau / canhBan.rongAnhPx;
+              const h = anhGiay?.hinhGoc;
+              return (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`/tuong/${canhBan.tep}`} alt="" className="absolute inset-0 h-full w-full" draggable={false} />
+                  {h && (
+                    <div
+                      data-testid="xem-lon-canh-anh-be"
+                      className="absolute"
+                      style={{
+                        left: `${(h.x / canhBan.rongAnhPx) * 100}%`,
+                        top: `${(h.y / canhBan.caoAnhPx) * 100}%`,
+                        width: `${(h.rong / canhBan.rongAnhPx) * 100}%`,
+                        height: `${(h.cao / canhBan.caoAnhPx) * 100}%`,
+                        transform: `rotate(${anhGiay?.gocXoayDo ?? 0}deg)`,
+                      }}
+                    >
+                      <AnhGiayUv anh={anhDangXem} pxManHinhMoiCm={canhBan.pxMoiCm * tl} doPhanGiai={2048} />
+                    </div>
+                  )}
+                </>
+              );
+            }
+            const tl = rongSanKhau / phong.rongAnhPx;
+            const h = ketQuaKhung.vua ? ketQuaKhung.hinh : null;
+            return (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/tuong/${phong.tep}`} alt="" className="absolute inset-0 h-full w-full" draggable={false} />
+                {h && (
+                  <div
+                    data-testid="xem-lon-canh-anh-be"
+                    className="absolute"
+                    style={{
+                      left: `${(h.x / phong.rongAnhPx) * 100}%`,
+                      top: `${(h.y / phong.caoAnhPx) * 100}%`,
+                      width: `${(h.rong / phong.rongAnhPx) * 100}%`,
+                      height: `${(h.cao / phong.caoAnhPx) * 100}%`,
+                      boxShadow: BONG_THEO_HUONG[phong.huongSang],
+                    }}
+                  >
+                    <KhungAnhBe
+                      anh={anhDangXem}
+                      chatLieu={chatLieu}
+                      coKhung={coKhung}
+                      mauKhung={mauKhungDaChon}
+                      vienPx={mauKhungDaChon.vienCm * phong.pxMoiCm * tl}
+                      doPhanGiai={2048}
+                    />
+                  </div>
+                )}
+              </>
+            );
+          }}
+        </XemLonCanh>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Tấm ảnh của bé trên tường: (khung HQ nếu chọn) → chất liệu tràn viền → ảnh.
+ * Dùng chung cho cảnh ướm và cảnh xem lớn (BB-378) — cùng một cách vẽ, chỉ khác
+ * bề dày viền (px màn hình) theo tỉ lệ hiển thị.
+ */
+function KhungAnhBe({
+  anh,
+  chatLieu,
+  coKhung,
+  mauKhung,
+  vienPx,
+  coIconPhong = false,
+  doPhanGiai = 1600,
+}: {
+  anh: AnhTreoTuong;
+  chatLieu: string | null;
+  coKhung: boolean;
+  mauKhung: (typeof MAU_KHUNG)[number];
+  vienPx: number;
+  coIconPhong?: boolean;
+  doPhanGiai?: 1600 | 2048;
+}) {
+  const style = lopChatLieu(chatLieu);
+  return (
+    /*
+      Khung HQ = viền vẽ bằng border-image theo mẫu khung ba mẹ chọn (BB-222, chỉ
+      để tham khảo). border-image-slice lấy từ số đo pixel trong chính ảnh mẫu
+      (`mau-khung.ts`); bề dày viền trên màn hình quy đổi từ cm thật theo đúng tỉ
+      lệ hiển thị — không phải một số cố định.
+    */
+    <div
+      className="h-full w-full"
+      style={
+        coKhung
+          ? {
+              borderStyle: "solid",
+              borderWidth: `${vienPx}px`,
+              borderImageSource: `url(${mauKhung.anh})`,
+              borderImageSlice: mauKhung.slicePx,
+              borderImageRepeat: "stretch",
+              boxSizing: "border-box",
+            }
+          : undefined
+      }
+    >
+      <div
+        className={`relative h-full w-full ${style.className}`}
+        style={{
+          padding: style.padding,
+          background: style.background,
+          boxShadow: style.boxShadow,
+          // BB-339 — tràn viền, góc vuông (không bo) cho mọi chất liệu.
+          borderRadius: 0,
+        }}
+      >
+        <div className="relative h-full w-full overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={buildLightboxImageUrl(anhDangXem.id, 2048)}
-            alt={anhDangXem.fileName}
-            className="max-h-[92vh] max-w-[92vw] object-contain"
+            src={buildLightboxImageUrl(anh.id, doPhanGiai)}
+            alt={anh.fileName}
+            className="h-full w-full object-cover"
             draggable={false}
-            onClick={(e) => e.stopPropagation()}
           />
-          <button
-            type="button"
-            onClick={() => setXemLon(false)}
-            aria-label={vi.gallery.treoTuong.dongXemLon}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/55"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {chatLieu === "Cavas/Kim tuyến" && (
+            <div
+              className="pointer-events-none absolute inset-0 mix-blend-screen"
+              style={{ backgroundImage: ANH_KIM_TUYEN, backgroundSize: "9px 9px" }}
+            />
+          )}
+          {(chatLieu === "Tráng gương" || chatLieu === "Thủy tinh" || chatLieu === "Mica HD") && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(115deg, rgba(255,255,255,.32) 0%, rgba(255,255,255,0) 22%, rgba(255,255,255,0) 78%, rgba(255,255,255,.18) 100%)",
+              }}
+            />
+          )}
         </div>
-      )}
+        {/* Gợi ý bấm được — chạm vào để xem lớn cả cảnh. */}
+        {coIconPhong && (
+          <span className="pointer-events-none absolute bottom-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur-sm">
+            <ZoomIn className="h-3.5 w-3.5" strokeWidth={2} />
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** BB-365 — tấm ảnh giấy UV nằm trên bàn: lề trắng + bóng theo cm thật + nắng từ cửa sổ. */
+function AnhGiayUv({
+  anh,
+  pxManHinhMoiCm,
+  doPhanGiai = 1600,
+}: {
+  anh: AnhTreoTuong;
+  pxManHinhMoiCm: number;
+  doPhanGiai?: 1600 | 2048;
+}) {
+  return (
+    <div
+      className="relative h-full w-full bg-[#fbf9f4]"
+      style={{
+        padding: `${Math.max(1.5, LE_ANH_GIAY_CM * pxManHinhMoiCm)}px`,
+        boxShadow: bongAnhGiay(pxManHinhMoiCm),
+      }}
+    >
+      <div className="relative h-full w-full overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={buildLightboxImageUrl(anh.id, doPhanGiai)}
+          alt={anh.fileName}
+          className="h-full w-full object-cover"
+          draggable={false}
+        />
+      </div>
+      {/* Nắng từ cửa sổ phía trên: mép trên tấm ảnh sáng ấm hơn, mép dưới hơi tối — cả lề lẫn ảnh. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(175deg, rgba(255,240,215,.16) 0%, rgba(255,240,215,0) 45%, rgba(70,45,20,.07) 100%)",
+        }}
+      />
     </div>
   );
 }

@@ -4,7 +4,7 @@
  *
  * Voice: address the customer as "ba mẹ". Short, warm, no technical words.
  *
- * BB-353 — giọng Bean cho mọi chuỗi KHÁCH thấy (`gallery`, `api`, `landing`,
+ * BB-353 — giọng Bean cho mọi chuỗi KHÁCH thấy (`gallery`, `landing`,
  * `errorPages`, `common.offline`): studio tự xưng "Bean" (không "studio",
  * "bên mình", "em" — trừ tên thương hiệu "Baby Bean Studio"), gọi khách là
  * "ba mẹ"/"gia đình", và câu nào cũng kết bằng "ạ". Phép thử
@@ -21,7 +21,6 @@ export const vi = {
     close: "Đóng",
     loading: "Đang tải…",
     saving: "Đang lưu…",
-    saved: "Đã lưu",
     unsaved: "Chưa lưu",
     offline: "Mất kết nối ạ. Ảnh ba mẹ chọn sẽ tự lưu khi có mạng ạ.",
     error: "Đã xảy ra lỗi",
@@ -42,31 +41,13 @@ export const vi = {
     download: "Tải xuống",
   },
   ui: {
-    dataTable: {
-      emptyMessage: "Không có dữ liệu",
-      rowsPerPage: "Số dòng mỗi trang",
-      pageOf: "Trang {page} / {total}",
-      totalRows: "Tổng cộng {count} dòng",
-      sortAsc: "Sắp xếp tăng dần",
-      sortDesc: "Sắp xếp giảm dần",
-    },
-    errorState: {
-      defaultTitle: "Đã xảy ra lỗi",
-      defaultDescription: "Không thể tải dữ liệu, vui lòng thử lại.",
-      defaultRetryLabel: "Thử lại",
-    },
     emptyState: {
       defaultTitle: "Chưa có dữ liệu",
-      defaultDescription: "Chưa có mục nào để hiển thị ở đây.",
-      clearFilter: "Xoá bộ lọc",
     },
     pagination: {
       ariaLabel: "Phân trang",
       previous: "Trước",
       next: "Sau",
-      previousPage: "Trang trước",
-      nextPage: "Trang tiếp theo",
-      morePages: "Thêm trang",
       page: "Trang {page}",
     },
     spinner: {
@@ -94,63 +75,23 @@ export const vi = {
       totalLabel: "Tổng cộng",
       emptyMessage: "Chưa có thông tin gói chụp hoặc sản phẩm.",
     },
-    addonSelector: {
-      title: "Chọn sản phẩm mua thêm",
-      description: "Chọn thêm sản phẩm in ấn, khung ảnh hoặc file chỉnh sửa theo nhu cầu.",
-      priceQuotePending: "CSKH sẽ báo giá",
-      priceQuotePendingHint: "Sản phẩm này cần CSKH tư vấn và báo giá cụ thể",
-      subtotalLabel: "Tổng tạm tính",
-      itemsSelected: "{count} sản phẩm đã chọn",
-      emptyMessage: "Hiện chưa có sản phẩm mua thêm nào khả dụng.",
-    },
   },
   gallery: {
     /** BB-359 — bộ cũ đã thu gọn danh sách ảnh, app đang Đồng bộ lại từ Drive. */
     dangMoLaiAnh: "Bean đang mở lại toàn bộ ảnh của bé, ba mẹ chờ chút ạ",
     /** BB-360 — cùng câu cho người thân (link mời gia đình, không phải ba mẹ). */
     dangMoLaiAnhGiaDinh: "Bean đang mở lại toàn bộ ảnh của bé, gia đình chờ chút ạ",
-    pinTitle: "Ba mẹ nhập 4 số cuối số điện thoại đã đăng ký ạ",
-    pinSubmit: "Xem bộ ảnh",
-    pinWrong: "Mã PIN chưa đúng, ba mẹ còn {n} lần thử ạ",
-    pinLocked: "Ba mẹ đã nhập sai quá nhiều lần, ba mẹ thử lại sau {m} phút giúp Bean ạ",
-    pinHelp: "Ba mẹ quên mã ạ? Ba mẹ gọi {hotline} giúp Bean nhé ạ",
-    pinPlaceholder: "••••",
 
     filterAll: "Tất cả",
     filterSelected: "Đã chọn",
-    filterFavorite: "Yêu thích",
-    filterNoted: "Có ghi chú",
     filterUnselected: "Chưa chọn",
-    filterSubfolder: "Thư mục",
-
-    quotaSummary: "Đã chọn {selected}/{quota}",
-    quotaExtra: "thêm {count} tấm = {amount}",
-    quotaWarningTitle: "Ảnh này vượt gói của ba mẹ ạ",
-    quotaWarningBody: "Mỗi ảnh thêm phụ thu {price} ạ. Ba mẹ vẫn chọn ảnh này chứ ạ?",
     quotaWarningDontAsk: "Không hỏi lại trong lần chọn này",
     quotaHardLimit: "Ba mẹ đã chọn tối đa {max} tấm cho bộ ảnh này ạ",
 
     select: "Chọn ảnh này",
     deselect: "Bỏ chọn",
     favorite: "Yêu thích",
-    unfavorite: "Bỏ yêu thích",
-    addNote: "Thêm ghi chú chỉnh sửa",
-    editNote: "Sửa ghi chú",
-    removeNote: "Xoá ghi chú",
     notePlaceholder: "Ví dụ: làm sáng da bé, xoá vật thể phía sau…",
-    noteTags: {
-      xoa_mun: "Xoá mụn sữa",
-      lam_sang_da: "Làm sáng da",
-      xoa_vat_the: "Xoá vật thể lạ",
-      cat_cup: "Cắt cúp lại",
-      doi_nen: "Đổi nền",
-      ghep_mat: "Ghép mắt mở",
-    },
-
-    reviewCta: "Xem lại và xác nhận",
-    reviewTitle: "Ba mẹ kiểm tra lại giúp Bean nhé ạ",
-    reviewSubtitle: "{count} tấm đã chọn · {quota} trong gói · {extra} tấm thêm",
-    reviewUnusedQuota: "Ba mẹ còn {n} tấm miễn phí chưa dùng ạ. Ba mẹ chốt luôn ạ?",
     submitCta: "Chốt danh sách",
     submitConfirmTitle: "Xác nhận chốt danh sách",
     // Sửa 24/09/2026: câu cũ "sau khi chốt không đổi được nữa" sai từ quyết định
@@ -160,22 +101,10 @@ export const vi = {
     submitAgree: "Tôi xác nhận các thông tin trên là đúng",
     parentName: "Tên ba/mẹ xác nhận",
     parentNamePlaceholder: "Nhập tên ba hoặc mẹ",
-
-    doneTitle: "Cảm ơn ba mẹ ạ!",
-    doneBody: "Bean đã nhận danh sách của ba mẹ và sẽ xác nhận sớm ạ.",
-    doneEstimate: "Bean dự kiến hoàn thành vào {date} ạ",
-    saveSummary: "Lưu ảnh tóm tắt",
-    viewAgain: "Xem lại bộ ảnh",
-
-    lockedBanner: "Ba mẹ đã chốt ngày {date} ạ. Bộ ảnh đang ở chế độ chỉ xem ạ.",
-    expiredTitle: "Link đã hết hạn",
-    expiredBody: "Ba mẹ nhắn Bean để được gửi lại link nhé ạ.",
     notFoundTitle: "Không tìm thấy bộ ảnh",
     notFoundBody: "Link không tồn tại hoặc đã được thu hồi ạ.",
     photoMissing: "Ảnh này không còn xem được, ba mẹ nhắn Bean giúp nhé ạ",
     emptyFilter: "Chưa có ảnh nào trong mục này ạ",
-    preparing: "Bean đang chuẩn bị bộ ảnh ạ. Bean sẽ báo ba mẹ khi sẵn sàng ạ.",
-    offlineBanner: "Mất kết nối ạ. Ảnh ba mẹ chọn sẽ tự lưu khi có mạng ạ.",
 
     /**
      * BB-353 — MỘT chỗ cho lời Bean nói với ba mẹ trên màn khách và trong lỗi
@@ -260,7 +189,6 @@ export const vi = {
       chuaCoHanMuc: "Bean đang cập nhật gói của ba mẹ ạ.",
       matMangChuaLuu: "Vài ảnh chọn lúc mất mạng chưa lưu được ạ. Bean đã tải lại danh sách ạ.",
       duyetChuyenIn: "Cảm ơn ba mẹ ạ. Bean chuyển bộ ảnh sang in ạ.",
-      daNhanYeuCauSua: "Bean đã nhận yêu cầu sửa của ba mẹ ạ.",
       daChotDanhSach: "Ba mẹ đã chốt danh sách ảnh ạ. Bean đã nhận được thông tin ạ.",
       guiChoBean: "Gửi cho Bean",
       chotChuaDuoc: "Chốt chưa được, ba mẹ thử lại giúp Bean nhé ạ",
@@ -275,7 +203,6 @@ export const vi = {
       muaThemMoTa: "Ba mẹ chọn sản phẩm, Bean sẽ gọi xác nhận ạ. Chưa tính tiền lúc này ạ.",
       guiYeuCau: "Gửi yêu cầu cho Bean",
       dangChinhAnh: "Bean đang chỉnh ảnh ạ",
-      dangSuaTheoYeuCau: "Bean đang sửa theo yêu cầu của ba mẹ ạ. Xong Bean sẽ gửi lại để ba mẹ xem ạ.",
       goiChoBean: "Gọi cho Bean",
       sePhanHoiSom: "Bean sẽ phản hồi sớm ạ, ba mẹ chưa cần gửi lại ạ.",
       daMoLai: "Bean đã mở lại, ba mẹ chọn tiếp nhé ạ",
@@ -320,10 +247,6 @@ export const vi = {
 
     lightbox: {
       closeAria: "Đóng xem ảnh lớn",
-      prevPhoto: "Ảnh trước",
-      nextPhoto: "Ảnh tiếp theo",
-      zoomIn: "Phóng to",
-      zoomOut: "Thu nhỏ",
       counter: "{current} / {total}",
     },
     subfolderAll: "Tất cả",
@@ -335,12 +258,9 @@ export const vi = {
     noteSaved: "Đã lưu ghi chú",
     noteSaveFailed: "Chưa lưu được ghi chú, ba mẹ thử lại giúp Bean nhé ạ",
     noteLocked: "Bộ ảnh đã chốt nên không sửa ghi chú được nữa ạ",
-    /** BB-370 — ghi chú đã lưu, hiện CHỈ ĐỌC khi bộ đã chốt. */
-    noteDaLuuChiDoc: "Ghi chú ba mẹ đã gửi",
     noteKhongCo: "Tấm này không có ghi chú ạ",
-    coGhiChu: "Có ghi chú cho thợ chỉnh ảnh",
+    coGhiChu: "Tấm này có ghi chú cho thợ chỉnh ảnh ạ",
     downloadThis: "Tải ảnh này về máy",
-    quotaInline: "đã chọn",
     // BB-319 — MỘT nhãn cho việc nhắn tin (bìa, chân trang, thông báo hạn mức, dải xin mở lại).
     messageStudio: "Nhắn Bean",
     /**
@@ -353,15 +273,76 @@ export const vi = {
     /** BB-241 — lời gợi ý "Lưu app", thay cho nút biểu tượng khó hiểu. */
     saveAppPrompt: {
       message: "Ba mẹ lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm ạ",
-      // BB-278/BB-281 — nhãn ngắn cho chip một dòng ở đầu trang (thay bản thẻ
-      // nổi ở đáy cũ); "message" (câu đầy đủ) vẫn dùng cho `aria-label`.
-      // BB-330 — chủ studio (mục cũ "lưu app ra màn hình chính"): câu phải nói
-      // NÓ ĐỂ LÀM GÌ, không chỉ tên thao tác.
-      shortLabel: "Lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn ạ",
-      // BB-358 (anh 02/10) — người được mời (link "Mời gia đình"): lời Bean nói với gia đình.
-      shortLabelGiaDinh: "Lưu vào màn hình chính để gia đình mở lại ảnh của bé nhanh hơn ạ",
-      howTo: "Xem cách lưu",
       later: "Để sau",
+    },
+
+    /**
+     * BB-378 (anh, Bản yêu cầu P1) — "nếu không phải người thiết kế thì không biết
+     * nó để làm gì — cần nó giống như gợi ý cho khách biết". Nói LỢI ÍCH trước,
+     * rồi mới chỉ cách theo đúng máy; mỗi bước có hình nhỏ.
+     */
+    luuApp: {
+      tieuDe: "Mở ảnh của bé chỉ bằng một chạm",
+      loiIch: "Lưu ảnh của bé ra màn hình chính, lần sau ba mẹ không phải tìm lại tin nhắn ạ.",
+      loiIchGiaDinh: "Lưu ảnh của bé ra màn hình chính, lần sau gia đình không phải tìm lại tin nhắn ạ.",
+      xemCach: "Xem cách lưu",
+      luuNgay: "Lưu ngay",
+      deSau: "Để sau",
+      anGoiY: "Ẩn gợi ý lưu app",
+      daHieu: "Đã hiểu",
+      cachLuuTren: "Cách lưu trên",
+      may: {
+        iphone: "iPhone",
+        android: "Android",
+        mayTinh: "Máy tính",
+      },
+      moTrinhDuyet: "{app} không cho lưu ra màn hình chính ạ. Ba mẹ mở link này bằng Safari hoặc Chrome trước nhé ạ.",
+      buoc: {
+        iphoneChiaSe: "Chạm nút Chia sẻ ở thanh dưới màn hình ạ",
+        iphoneChiaSeKhac: "Chạm nút Chia sẻ (ô vuông có mũi tên lên) ạ",
+        iphoneThem: "Kéo xuống, chọn “Thêm vào MH chính” ạ",
+        iphoneXong: "Chạm “Thêm” — biểu tượng ảnh của bé hiện trên màn hình ạ",
+        androidMenu: "Chạm dấu ba chấm ⋮ ở góc trên bên phải ạ",
+        androidThem: "Chọn “Cài đặt ứng dụng” hoặc “Thêm vào MH chính” ạ",
+        androidXong: "Chạm “Cài đặt” — biểu tượng ảnh của bé hiện trên màn hình ạ",
+        samsungMenu: "Chạm biểu tượng ≡ ở góc dưới màn hình ạ",
+        samsungThem: "Chọn “Thêm trang vào” → “Màn hình chờ” ạ",
+        trongAppMenu: "Chạm dấu ⋯ ở góc trên màn hình ạ",
+        trongAppMo: "Chọn “Mở bằng trình duyệt” ạ",
+        trongAppTiep: "Trong Safari hoặc Chrome, làm theo các bước lưu ạ",
+        mayTinhCai: "Bấm biểu tượng cài đặt ở cuối thanh địa chỉ ạ",
+        mayTinhXong: "Chọn “Cài đặt” — lần sau mở từ màn hình máy ạ",
+      },
+    },
+
+    /**
+     * BB-378 (P2) — màn link hết hạn / không tìm thấy / đã thu hồi: cùng ngôn ngữ
+     * màn khách hiện nay (nền kem, Playfair + Be Vietnam Pro), luôn có nút Nhắn Bean.
+     */
+    manLoi: {
+      hetHanTieuDe: "Link này đã hết hạn",
+      hetHanMoTa: "Ảnh của bé vẫn được Bean giữ cẩn thận ạ. Ba mẹ nhắn Bean để nhận link mới nhé ạ.",
+      khongThayTieuDe: "Không tìm thấy bộ ảnh",
+      khongThayMoTa: "Link có thể đã được thay bằng link mới ạ. Ba mẹ nhắn Bean để nhận đúng link nhé ạ.",
+      loiTieuDe: "Bean chưa mở được bộ ảnh",
+      loiMoTa: "Có thể mạng đang chậm ạ. Ba mẹ thử lại, hoặc nhắn Bean giúp nhé ạ.",
+      nhanBean: "Nhắn Bean",
+      xemChiNhanh: "Liên hệ Bean",
+      thuLai: "Thử lại",
+    },
+
+    /** BB-378 (P2) — màn chọn buổi chụp của link cũ `/g/` nhiều buổi. */
+    chonBuoi: {
+      nhan: "Bộ ảnh của bé",
+      tieuDe: "Ba mẹ muốn xem buổi nào ạ?",
+      moTa: "Link này là của riêng gia đình mình, không hết hạn, ba mẹ lưu lại để xem nhé ạ.",
+      dangMo: "Bean đang mở các buổi chụp của gia đình ạ…",
+      chup: "Chụp {ngay}",
+      chuaGhiNgay: "Chưa ghi ngày chụp",
+      soAnh: "{so} ảnh",
+      dangXem: "Đang xem",
+      dangChuanBiTieuDe: "Bean đang chuẩn bị ảnh",
+      taiLai: "Tải lại",
     },
 
     // BB-242 — chế độ "Ghim & vuốt" trong màn so sánh nhiều tấm.
@@ -387,6 +368,13 @@ export const vi = {
       anChiTiet: "Ẩn chi tiết",
       xemLonAnhBe: "Xem lớn ảnh của bé",
       dongXemLon: "Đóng xem lớn",
+      // BB-378 — xem lớn CẢ CẢNH (phòng + ảnh của bé), phóng/kéo được; bảng kéo lên/xuống.
+      phongTo: "Phóng to",
+      thuNho: "Thu nhỏ",
+      goiYPhongTo: "Chụm hai ngón hoặc chạm hai lần để phóng to ạ.",
+      keoBang: "Kéo lên xem thêm lựa chọn",
+      thuBang: "Thu gọn bảng",
+      trongGoi: "Trong gói",
       thamKhaoKhung: "Mẫu khung chỉ để tham khảo ạ. Bean tư vấn mẫu thật khi chốt đơn ạ.",
       // BB-339 — dòng nhỏ luôn hiện trên màn demo treo tường.
       thamKhaoDemo: "Hình demo chỉ mang tính tham khảo ạ.",
@@ -435,8 +423,6 @@ export const vi = {
         xem_anh: "Xem bộ ảnh",
       },
       dangMo: "Bean đang mở album của gia đình ạ…",
-      loiMo: "Bean chưa mở được album của gia đình, ba mẹ thử lại giúp Bean nhé ạ.",
-      linkHetHan: "Link này đã ngừng mở ạ. Ba mẹ nhắn Bean để nhận link mới nhé ạ.",
       khongThayBuoi: "Bean không thấy buổi chụp này trong album của gia đình ạ.",
       chuaCoBuoi: "Bean đang chuẩn bị ảnh cho gia đình ạ. Bean sẽ báo ba mẹ khi sẵn sàng ạ.",
       thuLai: "Thử lại",
@@ -462,9 +448,8 @@ export const vi = {
       truocDo: "Tấm trước",
       tiepTheo: "Tấm sau",
       suaMoDau:
-        "Bean xin lỗi vì còn tấm chưa đúng ý ba mẹ ạ. Ba mẹ chạm vào từng tấm cần sửa và ghi giúp Bean mong muốn, Bean sẽ sửa thật kỹ ạ.",
+        "Bean thành thật xin lỗi vì chưa làm hài lòng ba mẹ trong lần chỉnh sửa ảnh này ạ. Ba mẹ chạm vào từng tấm cần sửa và ghi giúp Bean mong muốn ạ.",
       canSuaTamNay: "Cần sửa tấm này",
-      boChonSua: "Bỏ chọn",
       soTamCanSua: "{n} tấm cần sửa",
       ghiChuTam: "Ba mẹ muốn Bean sửa gì ở tấm này ạ?",
       ghiChuTamGoiY: "Ví dụ: da bé sáng hơn một chút ạ",
@@ -482,14 +467,79 @@ export const vi = {
       quayLai: "Quay lại",
       canChonTam: "Ba mẹ chọn giúp Bean ít nhất một tấm, hoặc ghi vài dòng mong muốn ạ.",
       daNhan: "Bean đã nhận yêu cầu sửa lần {n} của ba mẹ ạ.",
-      daNhanPhu: "Bean sẽ sửa thật kỹ và gửi lại để ba mẹ xem ngay trong app ạ.",
       lanTruoc: "Lần {n} · ba mẹ nhắn",
       dangTai: "Bean đang mở ảnh đã chỉnh ạ…",
       loiTai: "Bean chưa mở được ảnh đã chỉnh, ba mẹ thử lại giúp Bean nhé ạ.",
       chiNguoiChinh: "Ba mẹ (người nhận link chính) sẽ duyệt hoặc nhắn Bean sửa ạ.",
+      // BB-377 — ảnh mua thêm chia khối theo đợt.
+      trongGoi: "Trong gói",
+      soTam: "{n} tấm",
+      duyetMuaThem: "Duyệt các tấm này",
+      daDuyetDot: "Ba mẹ đã duyệt ạ",
+      // BB-384 — vòng duyệt luôn trong app.
+      chuanBiTieuDe: "Bean đang chuẩn bị ảnh để ba mẹ duyệt ạ…",
+      chuanBiBia: "Bean đang chuẩn bị ảnh của {be} để ba mẹ duyệt ạ.",
+      chuanBiMoTa:
+        "Ảnh chỉnh của bé sắp có ngay trong app ạ. Bean sẽ báo ba mẹ khi ảnh sẵn sàng để xem từng tấm, so với ảnh gốc và nhắn Bean sửa chi tiết ạ.",
+      lanSua: "Lần {n}",
+      beanDaSua: "Bean đã sửa",
+      beanDangSua: "Bean đang sửa",
+      lichSuTam: "Các lần ba mẹ nhắn sửa tấm này ạ",
+      lichSuTieuDe: "Các lần ba mẹ nhắn Bean sửa ạ",
+      kemAnhMau: "kèm {n} ảnh mẫu",
+      daKhoanh: "khoanh {n} vùng",
+      canSuaChung: "ghi chú chung",
+      // Hạ hoả (BB-387, anh chốt 07/10) — Bean nhận phần chưa đúng về mình, KHÔNG nêu tên
+      // thợ chỉnh; thời gian là khoảng ước tính, không hứa cứng ({n} từ Cài đặt, mặc định 3).
+      suaLoiBean:
+        "Bean thành thật xin lỗi vì chưa làm hài lòng ba mẹ trong lần chỉnh sửa ảnh này ạ. Yêu cầu của ba mẹ đã được ghi nhận và chuyển đến bộ phận hậu kỳ ạ.",
+      hanSua: "Bean sẽ gửi lại ảnh đã sửa trong khoảng {n} ngày ạ.",
+      daNhanTieuDe: "Bean đã nhận yêu cầu sửa lần {n} ạ",
+      daNhanSoTam: "{n} tấm cần sửa:",
+      daNhanGhiChuChung: "Ba mẹ nhắn thêm cho Bean ạ",
+      // bh-04 — mời in thêm đúng lúc ba mẹ duyệt cho in (không còn tấm xin sửa).
+      moiInTieuDe: "Ba mẹ đã duyệt cho in, Bean cảm ơn ba mẹ ạ",
+      moiInMoTa: "Những tấm đẹp này in thêm để tặng ông bà hay treo trong nhà thì xinh lắm ạ.",
+      moiInNut: "Chọn ảnh in thêm",
+      moiInGia: "từ {gia}",
     },
   },
   admin: {
+    // BB-385 — màn "Gói chụp" (BB-062).
+    goiChup: {
+      title: "Gói chụp",
+      subtitle:
+        "Tên, giá gói, số ảnh chỉnh và sản phẩm đi kèm lấy từ Lark. App chỉ làm chủ giá ảnh chọn thêm.",
+      tuLark: "lấy từ Lark",
+      giaChungTitle: "Giá chung một ảnh chọn thêm",
+      giaChungMoTa: "Áp cho mọi gói chưa có giá riêng. Cùng ô với Cài đặt.",
+      khongHoiTo:
+        "Đổi giá chỉ áp cho bộ ảnh TẠO SAU lúc đổi. Bộ đang chọn và bộ đã chốt giữ nguyên giá khách đã thấy.",
+      chuaApMigration: "Chưa áp migration 0100: chưa đặt được giá riêng theo gói. Mọi gói đang dùng giá chung.",
+      colTen: "Gói",
+      colGiaGoi: "Giá gói",
+      colSoAnh: "Ảnh chỉnh",
+      colDiKem: "Sản phẩm đi kèm",
+      colSoBo: "Bộ ảnh",
+      colGiaAnhThem: "Giá ảnh chọn thêm",
+      chuaBan: "Chưa có giá",
+      khongCoHopDong: "Chưa có hợp đồng",
+      hopDongKhac: "{n} hợp đồng khác thành phần",
+      ngungBan: "Ngừng bán",
+      ngoaiDanhMuc: "Ngoài danh mục Lark",
+      dungGiaChung: "Giá chung",
+      giaRieng: "Giá riêng",
+      sua: "Sửa giá",
+      luu: "Lưu",
+      huy: "Huỷ",
+      boGiaRieng: "Về giá chung",
+      daLuu: "Đã lưu giá. Áp cho bộ ảnh tạo từ bây giờ.",
+      giaKhongHopLe: "Giá phải từ 0 đến 10.000.000 ₫.",
+      chiXem: "Chỉ Admin sửa được giá.",
+      trong: "Chưa có gói chụp nào",
+      trongMoTa: "Danh mục gói đến từ Lark. Chạy đồng bộ danh mục rồi mở lại.",
+      timGoi: "Tìm gói",
+    },
     branches: {
       title: "Chi nhánh",
       subtitle: "Tên, địa chỉ và hotline hiển thị cho khách. Sửa ở đây, không sửa trong code.",
@@ -529,7 +579,6 @@ export const vi = {
       subtitle: "Cấp tài khoản, gán vai trò và chi nhánh cho nhân viên",
       addButton: "Thêm nhân viên",
       colName: "Họ tên",
-      colAccount: "Tài khoản",
       colRole: "Vai trò",
       colBranches: "Chi nhánh",
       colLastLogin: "Đăng nhập lần cuối",
@@ -553,7 +602,6 @@ export const vi = {
       cancel: "Huỷ",
       edit: "Sửa",
       usernameLocked: "Tên tài khoản không đổi được. Cần đổi thì tắt tài khoản cũ và cấp cái mới — lịch sử vẫn giữ nguyên.",
-      resetPassword: "Đặt lại mật khẩu",
       newPassword: "Mật khẩu mới",
       // BB-373 — Admin tự gõ mật khẩu mới ở form Sửa.
       loginName: "Tên đăng nhập",
@@ -573,7 +621,6 @@ export const vi = {
       confirmDeactivate: "Tắt tài khoản của {name}? Họ sẽ không đăng nhập được nữa, nhưng lịch sử thao tác vẫn giữ nguyên.",
       created: "Đã tạo tài khoản {name}",
       updated: "Đã cập nhật",
-      passwordChanged: "Đã đổi mật khẩu",
       passwordChangedFor: "Đã đặt mật khẩu mới cho {name}. Báo mật khẩu này cho nhân viên.",
       emptyTitle: "Chưa có nhân viên nào",
       emptyBody: "Bấm Thêm nhân viên để cấp tài khoản đầu tiên.",
@@ -638,6 +685,7 @@ export const vi = {
         "gallery.reminder_days": "Nhắc CSKH gọi khách vào ngày thứ",
         "gallery.link_ttl_days": "Link sống được (ngày)",
         "gallery.invite_default": "Cho mời người thân",
+        "gallery.revision_days_estimate": "Số ngày Bean hẹn gửi lại ảnh sửa",
         "gallery.watermark_default": "Đóng dấu mờ",
         "gallery.allow_download_default": "Cho khách tải ảnh",
         "photo.expected_long_edge_px": "Cạnh dài ảnh xem trước (px)",
@@ -655,6 +703,8 @@ export const vi = {
           "Tính từ ngày gửi link. App KHÔNG nhắn thẳng cho khách — nó báo vào nhóm Lark của chi nhánh để CSKH gọi. Nhập cách nhau dấu phẩy, ví dụ 3, 6. Tối đa 5 mốc, để trống là tắt hẳn.",
         "gallery.link_ttl_days": "Quá hạn này link tự hết hiệu lực. Mặc định 60 ngày.",
         "gallery.invite_default": "Ba mẹ có được chia sẻ link cho người thân cùng xem không.",
+        "gallery.revision_days_estimate":
+          "Khi ba mẹ xin sửa ảnh, Bean nói \"sẽ gửi lại trong khoảng N ngày\" — là ước tính, không phải cam kết. Từ 1 tới 30. Chưa đặt thì dùng 3.",
         "gallery.watermark_default": "Ảnh xem trước có đóng dấu mờ hay không.",
         "gallery.allow_download_default": "Khách có tải được ảnh xem trước về máy không.",
         "photo.expected_long_edge_px": "Ảnh xem trước dài bao nhiêu điểm ảnh ở cạnh lớn nhất.",
@@ -737,9 +787,7 @@ export const vi = {
       dsBe: "Bé",
       themBe: "Thêm bé",
       tenBe: "Tên bé",
-      biDanh: "Tên gọi ở nhà",
       ngaySinh: "Ngày sinh",
-      gioiTinh: "Giới tính",
       gioi: { male: "Bé trai", female: "Bé gái", other: "Khác" },
       chuaCoNgaySinh: "Chưa có ngày sinh",
       chuaCoBe: "Chưa ghi bé nào trong hồ sơ này.",
@@ -833,7 +881,6 @@ export const vi = {
       larkKhongCoDong: "Khách chưa có dòng Hậu Kỳ nào trên Lark để ghi.",
       larkDuHet: "Đã ghi vào cột Link app của {n} dòng Hậu Kỳ trên Lark.",
       larkMotPhan: "Ghi được {ghi} trên {tong} dòng Hậu Kỳ. Dòng còn lại chưa ghi được, bấm \"Ghi link vào Lark\" để thử lại.",
-      larkChayThu: "Đang ở chế độ thử, chưa ghi gì sang Lark.",
       loiChung: "Không làm được. Thử lại giúp.",
       matKetNoi: "Mất kết nối. Thử lại giúp.",
     },
@@ -863,7 +910,6 @@ export const vi = {
       linkCu: "{n} link cũ vẫn mở được (không cần gửi lại)",
       linkCuMoTa: "Gửi trước khi có link gia đình. Ba mẹ mở link cũ vẫn vào đúng bộ này, nhân viên không cần gửi lại.",
       xemLinkCu: "Bấm để xem",
-      khongTaoLinkTheoBo: "Khách đã có link gia đình nên không tạo link riêng cho từng bộ nữa.",
       loiChung: "Không làm được. Thử lại giúp.",
       matKetNoi: "Mất kết nối. Thử lại giúp.",
     },
@@ -930,20 +976,12 @@ export const vi = {
     },
     dashboard: {
       title: "Bàn làm việc",
-      pendingSelection: "Chờ khách chọn",
       expiringSoon: "Sắp hết hạn",
       overdue: "Quá hạn",
-      pendingRetouch: "Chờ chỉnh ảnh",
       deliveredThisMonth: "Đã giao tháng này",
-      urgentListTitle: "Cần xử lý ngay",
-      childName: "Tên bé",
       customerName: "Khách hàng",
       branchName: "Chi nhánh",
-      statusName: "Trạng thái",
-      daysRemaining: "Thời hạn",
       progress: "Tiến độ",
-      quickAction: "Xử lý",
-      recentChartTitle: "Lượng bộ ảnh 14 ngày gần nhất",
     },
     galleries: {
       // BB-290 lượt 2: "Bộ ảnh" theo H1 của quan-tri-bo-anh-bang.png — "Danh
@@ -957,15 +995,9 @@ export const vi = {
       filterToggle: "Bộ lọc",
       filterBranch: "Chi nhánh",
       filterStatus: "Trạng thái",
-      filterUrgency: "Mức khẩn",
       filterPhotographer: "Photo",
-      filterDate: "Khoảng ngày",
-      menuView: "Xem bộ ảnh",
-      menuCopyLink: "Sao chép link",
-      menuRemind: "Nhắc khách",
-      menuExport: "Xuất danh sách",
-      menuExtend: "Gia hạn",
-      menuReopen: "Mở lại",
+      // BB-379 — bộ lọc nhanh cho CSKH điền tên bé.
+      filterChuaTenBe: "Chưa có tên bé",
       createGalleryCta: "Tạo bộ ảnh mới",
     },
     wizard: {
@@ -987,28 +1019,18 @@ export const vi = {
       stepRules: "Luật chọn",
       driveLinkTitle: "Dán link thư mục Google Drive",
       driveLinkDesc: "Thư mục Drive cần chia sẻ ở chế độ công khai (bất kỳ ai có link đều xem được).",
-      driveLinkPlaceholder: "https://drive.google.com/drive/folders/...",
       checkDriveLink: "Kiểm tra thư mục",
       checkingDrive: "Đang kiểm tra Drive…",
-      drivePreviewTitle: "Xem trước ảnh trong thư mục ({count} ảnh)",
-      customerTitle: "Thông tin khách hàng & buổi chụp",
-      searchCustomer: "Tìm khách hàng cũ",
-      createCustomer: "Thêm khách hàng mới",
       babyName: "Tên bé",
       shootDate: "Ngày chụp",
       photographer: "Photo",
       packageSelect: "Gói chụp",
-      rulesTitle: "Thiết lập luật chọn ảnh",
       quota: "Số ảnh trong gói (quota)",
       extraPrice: "Giá ảnh thêm (VNĐ)",
       deadline: "Hạn chốt (ngày)",
       allowDownload: "Cho phép ba mẹ tải ảnh về",
-      allowInvite: "Cho phép chia sẻ link mời người thân",
       successTitle: "Tạo bộ ảnh thành công!",
-      linkReady: "Link chọn ảnh của bé đã sẵn sàng để gửi cho ba mẹ.",
       copyLinkCta: "Sao chép link app",
-      copyMessageCta: "Sao chép tin nhắn mẫu",
-      sampleMessage: "BabyBean Studio xin chào ba mẹ bé {babyName}! Dạ em gửi link chọn ảnh buổi chụp của bé ạ: {link}. Mã PIN là 4 số cuối SĐT ba mẹ nhé. Hạn chốt ảnh là ngày {deadline}. Ba mẹ cần hỗ trợ gì cứ nhắn em nha!",
       // BB-325 — tạo bộ ảnh neo vào dòng Hậu Kỳ bên Lark.
       larkTitle: "Tra dòng Hậu Kỳ bên Lark",
       larkDesc: "Nhập mã hóa đơn và số điện thoại khách. Thông tin bộ ảnh lấy từ Lark, không gõ tay.",
@@ -1035,29 +1057,9 @@ export const vi = {
       linkedLarkRow: "Bộ ảnh đã gắn với dòng Hậu Kỳ {code} bên Lark. Link app sẽ ghi về đúng dòng này khi tạo/gửi link ở trang bộ ảnh.",
       emptyValue: "(Lark để trống)",
     },
-    detail: {
-      tabOverview: "Tổng quan",
-      tabPhotos: "Ảnh",
-      tabSelection: "Kết quả chọn",
-      tabShareLinks: "Link chia sẻ",
-      tabLogs: "Nhật ký",
-      infoBranch: "Chi nhánh",
-      infoPhotographer: "Photo",
-      infoDate: "Ngày chụp",
-      infoPackage: "Gói chụp",
-      infoDeadline: "Hạn chốt",
-      infoStatus: "Trạng thái",
-    },
     export: {
       title: "Xuất danh sách ảnh đã chọn",
       description: "Chọn định dạng phù hợp để chuyển cho Người Photoshop.",
-      formatLightroom: "Lightroom (.txt / danh sách tên file)",
-      formatCsv: "Bảng tính Excel / CSV kèm ghi chú",
-      formatChiTiet: "Văn bản chi tiết cho CSKH (.txt)",
-      formatJson: "Dữ liệu JSON đầy đủ",
-      copyClipboard: "Sao chép vào clipboard",
-      copiedNotice: "Đã sao chép danh sách vào bộ nhớ tạm",
-      previewTitle: "Xem trước nội dung xuất",
     },
     login: {
       title: "Đăng nhập nội bộ",
@@ -1068,20 +1070,6 @@ export const vi = {
       loggingIn: "Đang đăng nhập…",
       errorInvalid: "Email hoặc mật khẩu không chính xác.",
     },
-  },
-  api: {
-    invalidInput: "Dữ liệu không hợp lệ",
-    unauthenticated: "Ba mẹ mở lại link bộ ảnh giúp Bean ạ",
-    forbidden: "Ba mẹ chưa thực hiện được thao tác này ạ",
-    notFound: "Không tìm thấy nội dung",
-    linkExpired: "Link đã hết hạn hoặc đã được thu hồi ạ",
-    galleryLocked: "Bộ ảnh đã được chốt nên không thay đổi được nữa ạ",
-    quotaExceeded: "Ba mẹ đã chọn quá số ảnh tối đa ạ",
-    conflict: "Thao tác bị trùng, ba mẹ thử lại giúp Bean ạ",
-    rateLimited: "Ba mẹ thao tác hơi nhanh, ba mẹ chờ một lát giúp Bean ạ",
-    driveAccessDenied: "Thư mục ảnh chưa mở được, Bean đang kiểm tra lại ạ",
-    driveUnavailable: "Chưa tải được ảnh, ba mẹ thử lại giúp Bean ạ",
-    internal: "Có lỗi nhỏ, ba mẹ thử lại giúp Bean ạ",
   },
   landing: {
     studioName: "BabyBean Studio",

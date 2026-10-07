@@ -12,6 +12,8 @@ export interface GalleryFilterState {
   status: string;
   /** BB-335 — tên thợ chụp đọc từ cột "photo" bên Lark (galleries.lark_photo). */
   photo: string;
+  /** BB-379 — chỉ bộ ảnh chưa có tên bé (CSKH điền nhanh). */
+  chuaTenBe: boolean;
   dateFrom: string;
   dateTo: string;
   search: string;
@@ -87,6 +89,7 @@ export function GalleryFilters({
     values.branchId,
     values.status,
     values.photo,
+    values.chuaTenBe,
     values.dateFrom,
     values.dateTo,
   ].filter(Boolean).length;
@@ -291,6 +294,19 @@ export function GalleryFilters({
             </OChonTim>
           </div>
 
+          {/* BB-379 — nút bật/tắt "Chưa có tên bé": CSKH lọc ra các bộ cần điền tên bé. */}
+          <Button
+            type="button"
+            variant={values.chuaTenBe ? "default" : "outline"}
+            size="sm"
+            className="h-9 px-3 text-xs"
+            aria-pressed={values.chuaTenBe}
+            data-testid="loc-chua-ten-be"
+            onClick={() => onChange({ chuaTenBe: !values.chuaTenBe })}
+          >
+            {vi.admin.galleries.filterChuaTenBe}
+          </Button>
+
           {/* Lọc khoảng ngày chụp — BB-290 (#34): `<input type="date">` gõ
               tay số vẫn theo mm/dd/yyyy của Chromium bất kể `lang` (đã thử ở
               lượt 1, chụp màn hình thật vẫn ra mm/dd/yyyy — Chromium chỉ đổi
@@ -323,7 +339,7 @@ export function GalleryFilters({
               size="sm"
               className="h-9 px-2 text-xs text-[var(--bb-fg-muted)]"
               onClick={() =>
-                onChange({ branchId: "", status: "", photo: "", dateFrom: "", dateTo: "" })
+                onChange({ branchId: "", status: "", photo: "", chuaTenBe: false, dateFrom: "", dateTo: "" })
               }
             >
               <X className="h-3.5 w-3.5 mr-1" /> Xoá lọc

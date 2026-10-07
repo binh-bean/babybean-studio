@@ -36,26 +36,6 @@ export function hardLimitOf(rules: QuotaRules): number | null {
   return rules.maxSelection;
 }
 
-export function computeQuota(
-  selectedCount: number,
-  favoriteCount: number,
-  rules: QuotaRules,
-): QuotaState {
-  const extraCount = Math.max(0, selectedCount - rules.includedQuota);
-  const hardLimit = hardLimitOf(rules);
-
-  return {
-    selectedCount,
-    favoriteCount,
-    extraCount,
-    extraAmount: extraCount * rules.extraPhotoPrice,
-    includedQuota: rules.includedQuota,
-    remainingFree: Math.max(0, rules.includedQuota - selectedCount),
-    hardLimit,
-    atHardLimit: hardLimit !== null && selectedCount >= hardLimit,
-  };
-}
-
 export type SelectDecision =
   | { allowed: true; willBecomeExtra: boolean; extraPrice: number }
   | { allowed: false; reason: "QUOTA_EXCEEDED"; hardLimit: number };

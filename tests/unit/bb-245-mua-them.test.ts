@@ -5,7 +5,7 @@
  *
  *   1. Luật thuần `duocMoiMuaLanHai` — cùng hàm mà màn khách VÀ route dùng
  *      (xem @/lib/gallery/moi-mua-lan-hai-rules), không phải một bản chép
- *      lại. Dự án chưa có thư viện dựng DOM (xem review-rules.ts), nên đây là
+ *      lại. Dự án chưa có thư viện dựng DOM, nên đây là
  *      cách canh "điều kiện hiện thẻ" mà không cần kết xuất component.
  *   2. `POST /api/g/mua-them` — Zod từ chối body hỏng, và sản phẩm gắn ảnh mà
  *      thiếu `photoId` bị chặn TRƯỚC khi chạm bảng `yeu_cau_mua_them`

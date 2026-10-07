@@ -87,12 +87,20 @@ describe("BB-284: /api/g/review gọi đúng sự kiện Lark theo nhánh", () =
       [branchId, customerId, `fixture-bb284-${Date.now()}`],
     );
     galleryId = g[0].id;
+    // BB-384 — gửi khách duyệt đi qua ảnh chỉnh TRONG APP: bộ cần ảnh trong thư mục con
+    // "ảnh chỉnh sửa" (route cũ retouch-done làm đúng việc "Gửi khách duyệt").
+    await client.query(
+      `insert into photos (gallery_id, drive_file_id, file_name, mime_type, sort_index, status, subfolder, created_at)
+       values ($1, $2, 'IMG_0284-Edit.jpg', 'image/jpeg', 1, 'active', 'anh chinh sua', now() - interval '1 hour')`,
+      [galleryId, `fixture-bb284-chinh-${Date.now()}`],
+    );
   });
 
   afterAll(async () => {
     await client.query("delete from notifications where payload->>'galleryId' = $1", [galleryId]);
     await client.query("delete from revision_requests where gallery_id = $1", [galleryId]);
     await client.query("delete from deliveries where gallery_id = $1", [galleryId]);
+    await client.query("delete from photos where gallery_id = $1", [galleryId]);
     await client.query("delete from galleries where id = $1", [galleryId]);
     await client.query("delete from customers where id = $1", [customerId]);
     await client.end();

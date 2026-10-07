@@ -1,6 +1,6 @@
 import React from "react";
-import { tranhHanhTrinh, buocHanhTrinh, anhHanhTrinh } from "./hanh-trinh";
-import { trangThaiKhach } from "@/lib/lark/trang-thai-app-lark";
+import { tranhHanhTrinh, buocHanhTrinh, anhHanhTrinh, nhanTheHanhTrinh } from "./hanh-trinh";
+import type { KhoiVungDuyet } from "@/lib/anh-chinh-sua/vong-duyet";
 import { cn } from "@/components/ui/utils";
 
 interface TheHanhTrinhProps {
@@ -9,6 +9,8 @@ interface TheHanhTrinhProps {
   /** Không còn dùng làm tiêu đề (BB-353): tiêu đề lấy từ `trangThaiKhach()`, chung nguồn với bìa. */
   nhanTienDo?: string | null;
   photoCount: number;
+  /** BB-386 — kết quả `khoiVungDuyet(...)` của màn khách; "dang_chuan_bi" đổi tiêu đề sang lời Bean đang chuẩn bị. */
+  khoiDuyet?: KhoiVungDuyet;
   /**
    * BB-355 — bản vẽ "Màn khách v8" (b): đã gửi, chờ Bean xác nhận. Thẻ GỘP thay
    * bốn khối cũ (thẻ tiến độ có tranh, thẻ khoá, thẻ đợt chọn, khối mời): tiêu đề
@@ -101,7 +103,7 @@ function TheGop({
   );
 }
 
-export function TheHanhTrinh({ status, giaiDoan, photoCount, gop }: TheHanhTrinhProps) {
+export function TheHanhTrinh({ status, giaiDoan, photoCount, khoiDuyet, gop }: TheHanhTrinhProps) {
   // Chỉ hiện khi status từ submitted trở đi (hoặc awaiting_approval, in_retouch).
   // Tuy nhiên, logic này sẽ được quyết định bên gallery-app, nhưng ta cũng kiểm tra ở đây để chắc chắn.
   // `approved` (ba mẹ đã duyệt, chờ in/giao) từng bị bỏ sót ở đây — đúng lúc
@@ -124,7 +126,7 @@ export function TheHanhTrinh({ status, giaiDoan, photoCount, gop }: TheHanhTrinh
   // nói "đã nhận"/"đã chốt" như thể bộ ảnh đã vào hàng chỉnh.
   // BB-353 (P0) — tiêu đề thẻ và câu trạng thái trên bìa (`cauBiaKhach`) đọc
   // CÙNG một dòng của `TRANG_THAI_BO_ANH` qua `trangThaiKhach()`.
-  const nhanText = trangThaiKhach(status, giaiDoan).khach;
+  const nhanText = nhanTheHanhTrinh(status, giaiDoan, khoiDuyet);
   if (gop) {
     return <TheGop tieuDe={nhanText} buoc={buoc} hienTai={hienTai} dongPhu={gop.dongPhu} moiOngBa={gop.moiOngBa} />;
   }

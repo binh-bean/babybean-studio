@@ -20,13 +20,17 @@ interface DongViec {
   title: string;
   soAnh: number;
   lan?: number;
+  /** BB-377 — đợt mua thêm của dòng việc. */
+  nhanDot?: string;
+  khoa?: string;
   luc: string;
 }
 
-export function moTaViec(v: Pick<DongViec, "loai" | "soAnh" | "lan">): string {
-  if (v.loai === "cho_gui") return `Có ${formatSo(v.soAnh)} ảnh chỉnh sửa — kiểm rồi gửi khách`;
+export function moTaViec(v: Pick<DongViec, "loai" | "soAnh" | "lan" | "nhanDot">): string {
+  const dot = v.nhanDot ? ` (${v.nhanDot})` : "";
+  if (v.loai === "cho_gui") return `Có ${formatSo(v.soAnh)} ảnh chỉnh sửa${dot} — kiểm rồi gửi khách`;
   const tam = v.soAnh > 0 ? ` · ${formatSo(v.soAnh)} tấm` : "";
-  return `Khách yêu cầu sửa lần ${v.lan ?? 1}${tam}`;
+  return `Khách yêu cầu sửa lần ${v.lan ?? 1}${dot}${tam}`;
 }
 
 export function AnhChinhSuaReport() {
@@ -70,7 +74,7 @@ export function AnhChinhSuaReport() {
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--bb-border)] rounded-lg border border-[var(--bb-border)]">
           {items.map((v) => (
-            <li key={`${v.loai}-${v.galleryId}`} data-testid="dong-anh-chinh-sua" data-loai={v.loai}>
+            <li key={`${v.loai}-${v.galleryId}-${v.khoa ?? ""}`} data-testid="dong-anh-chinh-sua" data-loai={v.loai} data-khoa={v.khoa ?? "goc"}>
               <Link
                 href={`/admin/galleries/${encodeURIComponent(v.galleryId)}#anh-chinh-sua`}
                 className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-sm hover:bg-[var(--bb-surface-2)]"

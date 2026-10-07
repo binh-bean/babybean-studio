@@ -13,6 +13,11 @@ import { hauKyCanhBao } from "./cac-bao-cao/hau-ky-canh-bao";
 import { doanhThuPhatSinh } from "./cac-bao-cao/doanh-thu-phat-sinh";
 import { hieuSuatNhanVien } from "./cac-bao-cao/hieu-suat-nhan-vien";
 import { moiNguoiThan } from "./cac-bao-cao/moi-nguoi-than";
+import { sauConSo } from "./cac-bao-cao/sau-con-so";
+import { pheuKhach } from "./cac-bao-cao/pheu-khach";
+import { doanhThuMuaThem } from "./cac-bao-cao/doanh-thu-mua-them";
+import { salesMuaThem } from "./cac-bao-cao/sales-mua-them";
+import { vanHanhChinhSua } from "./cac-bao-cao/van-hanh-chinh-sua";
 
 export const DANH_SACH_BAO_CAO: DinhNghiaBaoCao[] = [
   tienDoChonAnh,
@@ -20,6 +25,12 @@ export const DANH_SACH_BAO_CAO: DinhNghiaBaoCao[] = [
   doanhThuPhatSinh,
   hieuSuatNhanVien,
   moiNguoiThan,
+  // BB-380 — bộ báo cáo điều hành + sales.
+  sauConSo,
+  pheuKhach,
+  doanhThuMuaThem,
+  salesMuaThem,
+  vanHanhChinhSua,
 ];
 
 export function layBaoCao(ma: string): DinhNghiaBaoCao | undefined {

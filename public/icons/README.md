@@ -51,10 +51,9 @@ tự vẽ — KHÔNG phải logo studio. Nếu bạn thấy hình khác với `l
 | `public/favicon.ico` | chứa 16×16 và 32×32, nền trắng | trình duyệt tự tìm ở gốc site; cũng khai tường minh trong `src/app/layout.tsx` |
 | `public/icons/logo-goc.jpg` | 1875×1875, KHÔNG dùng trực tiếp | bản gốc chủ studio gửi, giữ lại làm nguồn cho lần thu nhỏ sau |
 
-`public/manifest.json` không được dùng — Next.js sinh `/manifest.webmanifest`
-từ `src/app/manifest.ts` lúc build, không đọc tệp JSON tĩnh này. Giữ nó khớp
-nội dung để không gây hiểu lầm nếu ai đó mở nhầm, nhưng sửa THẬT thì sửa
-`src/app/manifest.ts`.
+Next.js sinh `/manifest.webmanifest` từ `src/app/manifest.ts` lúc build. Tệp
+tĩnh `public/manifest.json` cũ không ai đọc nên đã gỡ (BB-389, 07/10/2026) —
+sửa manifest thì sửa `src/app/manifest.ts`.
 
 ## Vì sao nền TRẮNG cho icon thường, nền KEM chỉ cho maskable
 

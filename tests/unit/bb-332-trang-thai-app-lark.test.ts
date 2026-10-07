@@ -99,14 +99,3 @@ describe("BB-332: trangThaiBoAnh", () => {
     }
   });
 });
-
-import { trangThaiThanhToan } from "@/lib/gallery/thanh-toan-mua-them";
-
-describe("BB-332 mục 3b: số dư = 0 là đã thanh toán", () => {
-  it("còn thiếu → chưa đủ; trả đủ hoặc giảm giá bù đủ → đã thanh toán; không mua thêm → không phát sinh", () => {
-    expect(trangThaiThanhToan(2_400_000, 1_000_000)).toBe("con_thieu");
-    expect(trangThaiThanhToan(2_400_000, 2_400_000)).toBe("da_thanh_toan");
-    expect(trangThaiThanhToan(2_400_000, 2_500_000)).toBe("da_thanh_toan");
-    expect(trangThaiThanhToan(0, 0)).toBe("khong_phat_sinh");
-  });
-});

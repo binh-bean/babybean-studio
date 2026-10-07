@@ -67,7 +67,3 @@ export function isDriveFolderLink(input: string): boolean {
     return false;
   }
 }
-
-export function buildDriveFolderUrl(folderId: string): string {
-  return `https://drive.google.com/drive/folders/${folderId}`;
-}

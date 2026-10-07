@@ -86,7 +86,14 @@ const NUT_THEO_TRANG_THAI: Record<
  * 404/500 từ route GET thì im lặng ẩn khối này, không phải hỏng cả màn chi
  * tiết (giữ nguyên hành vi BB-245).
  */
-export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
+export function YeuCauMuaThemBlock({
+  galleryId,
+  choSua = true,
+}: {
+  galleryId: string;
+  /** BB-382 — vai không có `galleries:write` chỉ xem yêu cầu, không có nút đổi trạng thái. */
+  choSua?: boolean;
+}) {
   const [items, setItems] = React.useState<Dong[] | null>(null);
   const [dangXuLy, setDangXuLy] = React.useState<string | null>(null);
   const [loi, setLoi] = React.useState<Record<string, string>>({});
@@ -194,7 +201,7 @@ export function YeuCauMuaThemBlock({ galleryId }: { galleryId: string }) {
                 </p>
               )}
 
-              {nuts.length > 0 && (
+              {choSua && nuts.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {nuts.map((nut) => (
                     <button

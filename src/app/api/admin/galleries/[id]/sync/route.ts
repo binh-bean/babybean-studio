@@ -16,7 +16,8 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { after } from "next/server";
 import { fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requireMotTrongCacQuyen, requireBranch, AuthError } from "@/lib/auth/staff";
+import { CAC_QUYEN_DONG_BO } from "@/lib/auth/quyen-xem-bo-anh";
 import { createServerClient } from "@/lib/supabase/server";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -40,7 +41,8 @@ export async function POST(
   try {
     const { id: galleryId } = await context.params;
     const staff = await requireStaff();
-    requirePermission(staff, "galleries:write");
+    // BB-383 — thợ chụp bấm được: `galleries:sync` HOẶC `galleries:write`.
+    requireMotTrongCacQuyen(staff, CAC_QUYEN_DONG_BO);
 
     const supabase = await createServerClient();
 

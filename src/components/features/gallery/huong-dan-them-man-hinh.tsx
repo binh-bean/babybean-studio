@@ -1,42 +1,35 @@
 "use client";
 
 /**
- * Tấm trượt "Lưu app ra màn hình chính" — hướng dẫn ĐÚNG theo máy khách đang
- * dùng, mở từ nút "Lưu app" ở đầu trang khách (gallery-app.tsx).
+ * Tấm trượt "Lưu ra màn hình chính" — mở từ lời mời ở trang bộ ảnh / trang
+ * gia đình / màn người được mời.
  *
- * OWNER: Sonnet (BB-213). Chủ studio 24/09/2026: "hướng dẫn khách dán app ra
- * màn hình chính của các loại máy khách đang dùng để thao tác."
+ * OWNER: DEV-FE. BB-213 (hướng dẫn theo máy) → BB-378 (anh, Bản yêu cầu P1):
+ * "nếu không phải người thiết kế thì không biết nó để làm gì — cần nó giống như
+ * gợi ý cho khách biết". Nay đọc theo thứ tự ba mẹ nghĩ:
+ *   1. LỢI ÍCH: "Mở ảnh của bé chỉ bằng một chạm" + vì sao (không phải tìm lại
+ *      tin nhắn).
+ *   2. Trình duyệt cho cài một chạm (`beforeinstallprompt`) → MỘT nút "Lưu ngay".
+ *   3. Không thì các bước ĐÚNG MÁY, mỗi bước một hình nhỏ khoanh chỗ cần chạm
+ *      (`minh-hoa-luu-app.tsx`, SVG — không ảnh chụp thật). Máy đoán sai thì
+ *      đổi được iPhone ↔ Android ngay trên tấm.
  *
- * Phần nhận biết máy tách riêng, hàm thuần: src/lib/utils/nhan-biet-may.ts.
- *
- * TRƯỜNG HỢP GẶP NHIỀU NHẤT: khách mở link từ tin nhắn Zalo, tức là đang ở
- * TRÌNH DUYỆT TRONG APP Zalo (và tương tự với Facebook) — hai nơi này không
- * có API "Thêm vào màn hình chính" (WebView không có), làm đúng theo các bước
- * cài đặt thông thường sẽ không ra kết quả gì. Hướng dẫn riêng cho ca này là
- * "mở bằng Safari/Chrome trước", không phải các bước cài thường.
- *
- * Không hiện khi đã chạy dạng app chuẩn — hai cách nhận biết cùng lúc
- * (display-mode: standalone cho Android/Chrome, navigator.standalone cho
- * iOS) vì mỗi hệ chỉ hỗ trợ đúng một cách.
+ * Zalo/Facebook (trình duyệt trong app) không có "Thêm vào MH chính": bước đầu
+ * là "Mở bằng trình duyệt". Nhận biết máy: `src/lib/utils/nhan-biet-may.ts`.
+ * Không hiện khi đã chạy dạng app (`dangChayNhuApp`).
  */
 
 import React, { useEffect, useState } from "react";
-import { X, Share2, MoreVertical, ExternalLink, SquarePlus } from "lucide-react";
+import { X } from "lucide-react";
 import { nhanBietMay, type LoaiThietBi } from "@/lib/utils/nhan-biet-may";
+import { dangChayNhuApp } from "@/lib/utils/luu-app-dung-luc";
 import { vi } from "@/i18n";
-import { giuA } from "@/lib/utils/giu-a";
+import { giuA, giuCuoi } from "@/lib/utils/giu-a";
+import { cn } from "@/components/ui/utils";
+import { MinhHoaLuuApp, type LoaiMinhHoa } from "@/components/features/gallery/minh-hoa-luu-app";
+import { useCaiApp } from "@/components/features/gallery/use-cai-app";
 
-/**
- * BB-361 (người chấm vòng 9, mục 10) — MỘT tiêu đề cho cùng một việc trên mọi
- * điện thoại (iPhone, Android, Samsung): trước đây iPhone "Thêm vào màn hình
- * chính" còn Android "Lưu app ra màn hình chính". Lấy đúng chữ của iOS/Android.
- */
-const TIEU_DE_DIEN_THOAI = "Thêm vào màn hình chính";
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+const L = vi.gallery.luuApp;
 
 export interface HuongDanThemManHinhProps {
   mo: boolean;
@@ -45,153 +38,94 @@ export interface HuongDanThemManHinhProps {
   laNguoiXem?: boolean;
 }
 
-function dangChayNhuApp(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as unknown as { standalone?: boolean }).standalone === true
-  );
-}
-
-interface Buoc {
-  bieuTuong: React.ReactNode;
+export interface BuocLuuApp {
+  hinh: LoaiMinhHoa;
   chu: string;
 }
 
-interface NoiDungHuongDan {
-  tieuDe: string;
-  moTa: string;
-  buoc: Buoc[];
-  nutCaiTrucTiep: boolean;
-}
+/** Nhóm cách lưu — mỗi nhóm một bộ bước; "iphone"/"android" đổi qua lại được. */
+export type NhomMay = "iphone" | "iphone-khac" | "android" | "samsung" | "trong-app" | "may-tinh";
 
-function noiDungTheoLoai(loai: LoaiThietBi): NoiDungHuongDan {
-  const buocChiaSe: Buoc = {
-    bieuTuong: <Share2 className="h-4 w-4 shrink-0" aria-hidden="true" />,
-    chu: "Chạm biểu tượng Chia sẻ ở thanh dưới màn hình",
-  };
-  const buocThemMH: Buoc = {
-    bieuTuong: <SquarePlus className="h-4 w-4 shrink-0" aria-hidden="true" />,
-    chu: 'Chọn "Thêm vào MH chính"',
-  };
-
+export function nhomTheoLoai(loai: LoaiThietBi): NhomMay {
   switch (loai) {
+    case "ios-safari":
+      return "iphone";
+    case "ios-khac":
+      return "iphone-khac";
+    case "android-chrome":
+      return "android";
+    case "samsung-internet":
+      return "samsung";
     case "zalo-app":
     case "facebook-app":
-      return {
-        tieuDe: "Mở bằng trình duyệt để lưu app",
-        moTa: vi.gallery.loiBean.luuAppMoTrinhDuyet.replace("{app}", loai === "zalo-app" ? "Zalo" : "Facebook"),
-        buoc: [
-          {
-            bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: "Chạm dấu ba chấm (⋮) hoặc nút chia sẻ ở góc",
-          },
-          {
-            bieuTuong: <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: "Chọn \"Mở bằng trình duyệt\" (Safari hoặc Chrome)",
-          },
-          {
-            bieuTuong: <SquarePlus className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: "Mở link trong Safari/Chrome rồi lưu app như hướng dẫn",
-          },
-        ],
-        nutCaiTrucTiep: false,
-      };
-    case "ios-safari":
-      // BB-330 — iPhone Safari: "Thêm vào màn hình chính", câu nói rõ để làm gì,
-      // hai bước ngắn có hình (Chia sẻ → Thêm vào MH chính).
-      return {
-        tieuDe: TIEU_DE_DIEN_THOAI,
-        moTa: vi.gallery.loiBean.luuAppMoNhanhAnhBe,
-        buoc: [buocChiaSe, buocThemMH],
-        nutCaiTrucTiep: false,
-      };
-    case "ios-khac":
-      return {
-        tieuDe: TIEU_DE_DIEN_THOAI,
-        moTa: vi.gallery.loiBean.luuAppIphone,
-        buoc: [buocChiaSe, buocThemMH],
-        nutCaiTrucTiep: false,
-      };
-    case "samsung-internet":
-      return {
-        tieuDe: TIEU_DE_DIEN_THOAI,
-        moTa: vi.gallery.loiBean.luuAppNhuAppRieng,
-        buoc: [
-          {
-            bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: "Chạm dấu ba chấm (⋮) ở góc dưới màn hình",
-          },
-          {
-            bieuTuong: <SquarePlus className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: 'Chọn "Thêm trang vào" → "Màn hình Home"',
-          },
-        ],
-        nutCaiTrucTiep: false,
-      };
-    case "android-chrome":
-      return {
-        tieuDe: TIEU_DE_DIEN_THOAI,
-        moTa: vi.gallery.loiBean.luuAppNhuAppRieng,
-        buoc: [
-          {
-            bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: "Chạm dấu ba chấm (⋮) ở góc trên bên phải",
-          },
-          {
-            bieuTuong: <SquarePlus className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: 'Chọn "Thêm vào màn hình chính"',
-          },
-        ],
-        // Có sự kiện beforeinstallprompt thì thay khối các bước bằng một nút
-        // bấm thẳng — xem HuongDanThemManHinh bên dưới.
-        nutCaiTrucTiep: true,
-      };
+      return "trong-app";
     case "may-tinh":
-      return {
-        tieuDe: "Lưu app ra máy tính",
-        moTa: vi.gallery.loiBean.luuAppMayTinh,
-        buoc: [
-          {
-            bieuTuong: <MoreVertical className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: "Chạm biểu tượng cài đặt (⊕) ở cuối thanh địa chỉ",
-          },
-          {
-            bieuTuong: <SquarePlus className="h-4 w-4 shrink-0" aria-hidden="true" />,
-            chu: 'Chọn "Cài đặt"',
-          },
-        ],
-        nutCaiTrucTiep: false,
-      };
+      return "may-tinh";
     default:
-      return {
-        tieuDe: TIEU_DE_DIEN_THOAI,
-        moTa: vi.gallery.loiBean.luuAppCanSafari,
-        buoc: [],
-        nutCaiTrucTiep: false,
-      };
+      // Không nhận ra máy: đa số khách Việt dùng iPhone; đổi sang Android ngay trên tấm.
+      return "iphone";
   }
 }
 
-/** BB-358 — người được mời: lời hướng dẫn nói với "gia đình" thay vì "ba mẹ". */
+export function buocTheoNhom(nhom: NhomMay): BuocLuuApp[] {
+  const B = L.buoc;
+  switch (nhom) {
+    case "iphone":
+      return [
+        { hinh: "safari-chia-se", chu: B.iphoneChiaSe },
+        { hinh: "bang-chia-se", chu: B.iphoneThem },
+        { hinh: "man-hinh-chinh", chu: B.iphoneXong },
+      ];
+    case "iphone-khac":
+      return [
+        { hinh: "safari-chia-se", chu: B.iphoneChiaSeKhac },
+        { hinh: "bang-chia-se", chu: B.iphoneThem },
+        { hinh: "man-hinh-chinh", chu: B.iphoneXong },
+      ];
+    case "android":
+      return [
+        { hinh: "chrome-menu", chu: B.androidMenu },
+        { hinh: "menu-them", chu: B.androidThem },
+        { hinh: "man-hinh-chinh", chu: B.androidXong },
+      ];
+    case "samsung":
+      return [
+        { hinh: "samsung-menu", chu: B.samsungMenu },
+        { hinh: "menu-them", chu: B.samsungThem },
+        { hinh: "man-hinh-chinh", chu: B.androidXong },
+      ];
+    case "trong-app":
+      return [
+        { hinh: "trong-app-menu", chu: B.trongAppMenu },
+        { hinh: "mo-trinh-duyet", chu: B.trongAppMo },
+        { hinh: "man-hinh-chinh", chu: B.trongAppTiep },
+      ];
+    case "may-tinh":
+      return [
+        { hinh: "may-tinh-cai", chu: B.mayTinhCai },
+        { hinh: "man-hinh-chinh", chu: B.mayTinhXong },
+      ];
+  }
+}
+
+/** BB-358 — người được mời: lời nói với "gia đình" thay vì "ba mẹ". */
 function choGiaDinh(chu: string): string {
   return chu.replace(/Ba mẹ/g, "Gia đình").replace(/ba mẹ/g, "gia đình");
 }
 
 export function HuongDanThemManHinh({ mo, onDong, laNguoiXem = false }: HuongDanThemManHinhProps) {
   const [loai, setLoai] = useState<LoaiThietBi>("khac");
-  const [promptCai, setPromptCai] = useState<BeforeInstallPromptEvent | null>(null);
+  const [nhomChon, setNhomChon] = useState<NhomMay | null>(null);
+  const { coTheCaiNgay, caiNgay } = useCaiApp();
 
   useEffect(() => {
     setLoai(nhanBietMay(window.navigator.userAgent).loai);
-
-    const bat = (e: Event) => {
-      e.preventDefault();
-      setPromptCai(e as BeforeInstallPromptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", bat);
-    return () => window.removeEventListener("beforeinstallprompt", bat);
   }, []);
+
+  // Mỗi lần mở lại: về đúng máy đang dùng.
+  useEffect(() => {
+    if (mo) setNhomChon(null);
+  }, [mo]);
 
   // Esc để đóng, như mọi tấm trượt khác trong màn khách.
   useEffect(() => {
@@ -203,23 +137,24 @@ export function HuongDanThemManHinh({ mo, onDong, laNguoiXem = false }: HuongDan
 
   if (!mo || dangChayNhuApp()) return null;
 
-  const noiDungGoc = noiDungTheoLoai(loai);
+  const nhom = nhomChon ?? nhomTheoLoai(loai);
   const doiLoi = (chu: string) => giuA(laNguoiXem ? choGiaDinh(chu) : chu);
-  // BB-361 (vòng 9, mục 2) — mọi câu của tấm hướng dẫn đi qua `giuA`: Android từng để
-  // "…như một app riêng" / "ạ." rơi một chữ xuống dòng riêng.
-  const noiDung = {
-    ...noiDungGoc,
-    tieuDe: giuA(noiDungGoc.tieuDe),
-    moTa: noiDungGoc.moTa ? doiLoi(noiDungGoc.moTa) : noiDungGoc.moTa,
-    buoc: noiDungGoc.buoc.map((b) => ({ ...b, chu: doiLoi(b.chu) })),
-  };
+  const trongApp = nhom === "trong-app";
+  const moTa = trongApp
+    ? doiLoi(L.moTrinhDuyet.replace("{app}", loai === "facebook-app" ? "Facebook" : "Zalo"))
+    : giuA(laNguoiXem ? L.loiIchGiaDinh : L.loiIch);
+  const buoc = buocTheoNhom(nhom).map((b) => ({ ...b, chu: doiLoi(b.chu) }));
+  // Đổi máy chỉ có nghĩa giữa hai điện thoại phổ biến; Zalo/máy tính có bước riêng.
+  const doiDuoc = nhom === "iphone" || nhom === "iphone-khac" || nhom === "android" || nhom === "samsung";
+  const nhomDoi: Array<{ ma: NhomMay; nhan: string }> = [
+    { ma: loai === "ios-khac" ? "iphone-khac" : "iphone", nhan: L.may.iphone },
+    { ma: loai === "samsung-internet" ? "samsung" : "android", nhan: L.may.android },
+  ];
+  const laIphone = nhom === "iphone" || nhom === "iphone-khac";
 
-  const caiTrucTiep = async () => {
-    if (!promptCai) return;
-    await promptCai.prompt();
-    await promptCai.userChoice;
-    setPromptCai(null);
-    onDong();
+  const luuNgay = async () => {
+    const xong = await caiNgay();
+    if (xong) onDong();
   };
 
   return (
@@ -229,69 +164,90 @@ export function HuongDanThemManHinh({ mo, onDong, laNguoiXem = false }: HuongDan
       aria-modal="true"
       aria-label="Lưu app ra màn hình chính"
     >
-      <button
-        type="button"
-        aria-label="Đóng"
-        onClick={onDong}
-        className="absolute inset-0 cursor-default"
-      />
+      <button type="button" aria-label="Đóng" onClick={onDong} className="absolute inset-0 cursor-default" />
 
-      <div className="relative w-full max-w-md overflow-hidden rounded-t-3xl bg-surface p-5 pb-[max(20px,env(safe-area-inset-bottom))] text-foreground shadow-2xl animate-in slide-in-from-bottom-6 sm:mb-6 sm:rounded-3xl">
+      <div
+        data-testid="huong-dan-luu-app"
+        data-nhom={nhom}
+        className="giao-dien-khach relative max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-[#fbf7f2] p-5 pb-[max(20px,env(safe-area-inset-bottom))] text-[#2e2a27] shadow-2xl animate-in slide-in-from-bottom-6 sm:mb-6 sm:rounded-3xl"
+      >
         <button
           type="button"
           onClick={onDong}
           aria-label="Đóng"
-          className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground transition hover:bg-surface-2"
+          className="absolute right-4 top-4 rounded-full p-1.5 text-[#6f665f] transition hover:bg-[#f3ede6]"
         >
           <X className="h-4 w-4" />
         </button>
 
-        <h3 className="pr-8 font-display text-xl">{noiDung.tieuDe}</h3>
-        {noiDung.moTa && (
-          <p data-testid="huong-dan-luu-app-mo-ta" className="mt-1.5 text-pretty text-sm text-muted-foreground">{noiDung.moTa}</p>
-        )}
+        {/* 1 — LỢI ÍCH trước. */}
+        <h3 className="pr-8 font-display text-[22px] font-normal not-italic leading-tight">{giuCuoi(L.tieuDe)}</h3>
+        <p data-testid="huong-dan-luu-app-mo-ta" className="mt-1.5 text-pretty text-[14px] leading-relaxed text-[#6f665f]">
+          {moTa}
+        </p>
 
-        {noiDung.buoc.length > 0 && (
-          <ol className="mt-4 space-y-3">
-            {noiDung.buoc.map((buoc, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm">
-                <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-medium">
-                  {i + 1}
-                </span>
-                <span className="flex items-center gap-2 leading-relaxed">
-                  {buoc.bieuTuong}
-                  {buoc.chu}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-
-        {noiDung.nutCaiTrucTiep && promptCai && (
+        {/* 2 — cài một chạm khi trình duyệt cho phép. */}
+        {coTheCaiNgay && !trongApp && (
           <button
             type="button"
-            onClick={caiTrucTiep}
-            className="mt-5 h-11 w-full rounded-full bg-foreground text-sm font-medium text-background transition active:scale-[0.98]"
+            data-testid="nut-luu-ngay"
+            onClick={() => void luuNgay()}
+            className="mt-4 h-12 w-full rounded-full bg-[#2e2a27] text-[15px] font-medium text-[#fbf7f2] transition active:scale-[0.98]"
           >
-            Thêm vào màn hình chính
+            {L.luuNgay}
           </button>
         )}
 
-        {/*
-          BB-281 — dựng đúng `babybean-assets/BB-281/goi-y-luu-app.png`: nút
-          chữ "Đã hiểu" gạch chân, không phải một nút nền đặc — cùng hành
-          động đóng như nút × ở góc, chỉ thêm một lối đóng THEO ĐÚNG bản vẽ
-          cho ca không có `beforeinstallprompt` (đa số — Zalo/Facebook/iOS
-          Safari không có sự kiện này).
-        */}
+        {/* 3 — các bước đúng máy, mỗi bước một hình. */}
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#6f665f]">
+            {L.cachLuuTren}{" "}
+            {trongApp ? (loai === "facebook-app" ? "Facebook" : "Zalo") : nhom === "may-tinh" ? L.may.mayTinh : laIphone ? L.may.iphone : L.may.android}
+          </p>
+          {doiDuoc && (
+            <div role="group" aria-label="Chọn loại máy" className="flex rounded-full bg-[#f3ede6] p-0.5 text-[12px]">
+              {nhomDoi.map((n) => {
+                const dangChon = n.ma === "iphone" || n.ma === "iphone-khac" ? laIphone : !laIphone;
+                return (
+                  <button
+                    key={n.ma}
+                    type="button"
+                    aria-pressed={dangChon}
+                    onClick={() => setNhomChon(n.ma)}
+                    className={cn(
+                      "h-7 rounded-full px-3 font-medium transition",
+                      dangChon ? "bg-white text-[#2e2a27] shadow-sm" : "text-[#6f665f]",
+                    )}
+                  >
+                    {n.nhan}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <ol className="mt-3 space-y-2.5" data-testid="buoc-luu-app">
+          {buoc.map((b, i) => (
+            <li key={i} className="flex items-center gap-3 rounded-2xl border border-[#e5dcd2] bg-white p-2.5 pr-3">
+              <MinhHoaLuuApp loai={b.hinh} className="h-[52px] w-[74px] shrink-0" />
+              <span className="flex min-w-0 items-start gap-2 text-[14px] leading-snug">
+                <span className="mt-px grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#2e2a27] text-[11px] font-medium text-[#fbf7f2]">
+                  {i + 1}
+                </span>
+                <span className="text-pretty">{b.chu}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+
         <div className="mt-5 flex justify-center">
-          {/* BB-305 — nút là nội dung, không phải tiêu đề: bỏ font-display. */}
           <button
             type="button"
             onClick={onDong}
-            className="text-sm text-foreground underline underline-offset-4 transition hover:opacity-70"
+            className="text-sm text-[#2e2a27] underline underline-offset-4 transition hover:opacity-70"
           >
-            Đã hiểu
+            {L.daHieu}
           </button>
         </div>
       </div>

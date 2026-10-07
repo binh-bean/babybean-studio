@@ -39,6 +39,7 @@
  * Ảnh chụp: `test-results/bb-278/` (đã gitignore) — tự xem, không phải bằng
  * chứng nộp kèm.
  */
+import { daMoLanTruoc } from "./helpers/luu-app";
 import { test as ownIpTest, expect as ownIpExpect } from "./helpers/ip-rieng-moi-ca";
 import type { Locator } from "@playwright/test";
 import { Client } from "pg";
@@ -299,6 +300,8 @@ ownIpTest.describe("BB-278: đầu trang thương hiệu + bìa máy tính + tha
   // -------------------------------------------------------------------------
   ownIpTest("Chip gợi ý Lưu app không giao thanh nổi chọn/chốt — dien-thoai", async ({ page }) => {
     await page.setViewportSize(DIEN_THOAI);
+    // BB-378 — lời mời hiện đúng lúc: ba mẹ mở lại lần thứ 2.
+    await daMoLanTruoc(page);
     await page.goto(`/g/${maLink}`);
     const anhBia = page.locator('img[fetchpriority="high"]');
     await anhBia.first().waitFor({ state: "visible", timeout: 30000 });

@@ -40,6 +40,7 @@ import { GetCanXuLyQuerySchema } from "./schema";
 import { CANH_BAO_LARK } from "@/lib/lark/trang-thai-hau-ky";
 import { layDanhSachChoXuLyMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layKhachGuiAnhChon } from "@/lib/gallery/khach-gui-anh-chon";
+import { idDonHauKy } from "@/lib/gallery/bo-anh-rong";
 
 export const runtime = "nodejs";
 
@@ -66,6 +67,7 @@ interface HangGalleryTho {
   drive_folder_url: string | null;
   sync_error: string | null;
   last_synced_at: string | null;
+  photo_count?: number | null;
   branches: { name: string } | { name: string }[] | null;
 }
 
@@ -124,7 +126,7 @@ export async function GET(request: Request): Promise<Response> {
 
     const admin = createAdminClient();
     const CAC_COT =
-      "id, title, branch_id, drive_folder_url, sync_error, last_synced_at, branches(name)";
+      "id, title, branch_id, drive_folder_url, sync_error, last_synced_at, photo_count, branches(name)";
 
     // 4a. Thư mục Drive chưa chia sẻ công khai ---------------------------
     let qDrive = admin
@@ -210,8 +212,17 @@ export async function GET(request: Request): Promise<Response> {
     if (resHanMuc.error) return failUnexpected(resHanMuc.error, requestId);
     if (resCanhBao.error) return failUnexpected(resCanhBao.error, requestId);
 
-    const driveChuaChiaSe = ((resDrive.data ?? []) as unknown as HangGalleryTho[]).map(chuyenHang);
-    const chuaCoAnh = ((resRong.data ?? []) as unknown as HangGalleryTho[]).map(chuyenHang);
+    // BB-381 — bộ 0 ảnh mà hoá đơn KHÔNG có dịch vụ chụp là đơn hậu kỳ mua thêm (in thêm,
+    // chỉnh thêm file…) của khách cũ, không phải "bộ chưa có ảnh" cần xử lý: nó có hàng riêng
+    // "Đơn hậu kỳ mua thêm" ở Việc cần xử lý. Loại khỏi hai nhóm cũ.
+    const driveTho = (resDrive.data ?? []) as unknown as HangGalleryTho[];
+    const rongTho = (resRong.data ?? []) as unknown as HangGalleryTho[];
+    const hauKy = await idDonHauKy(admin, [
+      ...rongTho.map((g) => g.id),
+      ...driveTho.filter((g) => (g.photo_count ?? 0) === 0).map((g) => g.id),
+    ]);
+    const driveChuaChiaSe = driveTho.filter((g) => !hauKy.has(g.id)).map(chuyenHang);
+    const chuaCoAnh = rongTho.filter((g) => !hauKy.has(g.id)).map(chuyenHang);
 
     const ungVienHanMuc = (resHanMuc.data ?? []) as unknown as HangGalleryTho[];
     let chuaCoHanMuc = ungVienHanMuc;

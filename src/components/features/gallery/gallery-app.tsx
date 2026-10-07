@@ -6,8 +6,10 @@ import { isGalleryLocked } from "@/lib/gallery-status";
 import { ReviewPanel, type ReviewData } from "@/components/features/gallery/review-panel";
 import { TheHanhTrinh } from "@/components/features/gallery/the-hanh-trinh";
 import { AnhChinhSuaKhach } from "@/components/features/gallery/anh-chinh-sua-khach";
-import { tranhHanhTrinh, anhHanhTrinh } from "@/components/features/gallery/hanh-trinh";
+import { khoiVungDuyet, thanhDayBuocDuyet } from "@/lib/anh-chinh-sua/vong-duyet";
+import { tranhHanhTrinh } from "@/components/features/gallery/hanh-trinh";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
+import { ManLoiLink, loaiLoiTuMa } from "@/components/features/gallery/man-loi-link";
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
@@ -150,6 +152,11 @@ interface GalleryAppProps {
    * chụp (bản vẽ 03/04). Không có (đường `/g/<mã>`) = màn y như cũ.
    */
   giaDinh?: GiaDinhTrongBo;
+  /**
+   * BB-378 — địa chỉ "Nhắn Bean" (`settings.chat.page_url`) đọc ở máy chủ: màn
+   * link hết hạn/không tìm thấy chưa có `gallery.branch.chatUrl` để dùng.
+   */
+  chatUrlDuPhong?: string | null;
 }
 
 interface GalleryApiResponse {
@@ -322,7 +329,7 @@ const CAU_CHUA_CO_HAN_MUC = vi.gallery.loiBean.chuaCoHanMuc;
 /** BB-319 K-D2 — thả tim lúc chưa biết hạn mức: nói rõ tim CÓ được giữ hay không (không), mỗi câu ≤ 12 chữ. */
 const CAU_TIM_CHUA_LUU = `${CAU_CHUA_CO_HAN_MUC} ${vi.gallery.loiBean.timChuaLuu}`;
 
-export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
+export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryAppProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [photosLoading, setPhotosLoading] = useState(false);
@@ -521,6 +528,11 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
   /** BB-339 — cặp (ảnh, món) đang chờ máy chủ: bấm lặp lại trong lúc chờ thì bỏ qua. */
   const placementDangGuiRef = useRef<Set<string>>(new Set());
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  /** BB-378 — số lượt xem lớn trong phiên (mỗi tấm mở/lướt tới) — tín hiệu "đã xem vài tấm" cho lời mời lưu app. */
+  const [soLanXemLon, setSoLanXemLon] = useState(0);
+  useEffect(() => {
+    if (lightboxIndex !== null) setSoLanXemLon((n) => n + 1);
+  }, [lightboxIndex]);
   /**
    * BB-218 — màn xem lớn thường xem trong danh sách đã LỌC (`filteredPhotos`).
    * Mở từ "So sánh với tấm khác" thì tấm đó có thể không nằm trong bộ lọc
@@ -977,31 +989,8 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
     khiXong: () => void loadGallery({ silent: true }),
   });
 
-  /**
-   * Khách duyệt hoặc yêu cầu sửa. Tải lại cả bộ ảnh sau đó — quyết định này
-   * đổi trạng thái, mà trạng thái chi phối gần như mọi thứ trên màn hình.
-   */
-  const decideReview = useCallback(
-    async (decision: "approve" | "revise", note?: string) => {
-      const res = await goiApiKhach("/api/g/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision, note }),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        setStatusMessage(json?.error?.message ?? vi.gallery.loiBean.khongGuiDuoc);
-        return;
-      }
-      setStatusMessage(
-        decision === "approve"
-          ? vi.gallery.loiBean.duyetChuyenIn
-          : vi.gallery.loiBean.daNhanYeuCauSua,
-      );
-      await loadGallery();
-    },
-    [loadGallery],
-  );
+  // BB-384 — `decideReview` (duyệt cả bộ bằng một ô chữ chung, theo link Drive) đã gỡ:
+  // vòng duyệt luôn đi trong app (`AnhChinhSuaKhach` gọi `/api/g/review` với từng tấm).
 
   useEffect(() => {
     void loadGallery();
@@ -1956,51 +1945,19 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
   // lỗi bên dưới, vì lúc này `gallery` còn rỗng — rơi xuống đó là ba mẹ nhận
   // "không tìm thấy album" đúng vào lúc album của họ vẫn còn nguyên.
   if (phaiChonBuoiChup) {
-    return <DanhSachBuoiChup onDaChonBuoi={() => void loadGallery()} />;
+    return <DanhSachBuoiChup onDaChonBuoi={() => void loadGallery()} chatUrl={chatUrlDuPhong} />;
   }
 
-  // BB-212 — màn lỗi / link hết hạn / không tìm thấy, cùng ngôn ngữ mới.
+  // BB-212 → BB-378 — màn lỗi / link hết hạn / không tìm thấy (gồm đã thu hồi):
+  // cùng ngôn ngữ màn khách hiện nay, luôn có nút "Nhắn Bean" (man-loi-link.tsx).
   if (error || !gallery) {
-    // BB-258 — chủ studio 26/09/2026: link KHÔNG TỒN TẠI (khác LINK_EXPIRED)
-    // trước dùng tạm tranh "chua-co-anh" (hành trình xử lý ảnh — sai ngữ
-    // cảnh, gallery còn chưa từng tồn tại thì không có "hành trình" nào cả).
-    // Nay có tranh riêng "khung ảnh trống" (`public/minh-hoa/khong-tim-thay`,
-    // ngang 16:9) đúng nghĩa hơn. LINK_EXPIRED giữ nguyên tranh đồng hồ cát
-    // "link-het-han" — nay cũng đã có bản ngang trong `CO_BAN_NGANG`.
-    const laHetHan = error?.code === "LINK_EXPIRED";
-    const anhLoi = laHetHan
-      ? anhHanhTrinh("link-het-han")
-      : { src: "/minh-hoa/khong-tim-thay-1280.webp", srcSet: "/minh-hoa/khong-tim-thay-640.webp 640w, /minh-hoa/khong-tim-thay-1280.webp 1280w" };
+    const loaiLoi = loaiLoiTuMa(error?.code ?? "NOT_FOUND");
     return (
-      <div className="mx-auto flex min-h-[80dvh] max-w-md flex-col items-center justify-center bg-background p-6 text-center text-foreground">
-        <div className="relative mb-6 h-[120px] w-full max-w-[280px] overflow-hidden rounded-[16px] bg-[#fdfbf9] md:h-[150px]">
-          {/* Đồng hồ cát chỉ cho link HẾT HẠN; link không có thật thì nói
-              "hết hạn" bằng hình là sai (Opus soát BB-225). */}
-          <img
-            src={anhLoi.src}
-            srcSet={anhLoi.srcSet}
-            sizes="280px"
-            alt=""
-            loading="lazy"
-            width={1280}
-            height={720}
-            className="absolute inset-0 h-full w-full object-cover object-center animate-in fade-in duration-300 motion-reduce:animate-none"
-          />
-        </div>
-        <h1 className="font-display text-2xl font-light">
-          {error?.code === "LINK_EXPIRED" ? vi.gallery.expiredTitle : vi.gallery.notFoundTitle}
-        </h1>
-        <p className="mb-6 mt-2 text-sm text-muted-foreground">
-          {error?.message || vi.gallery.notFoundBody}
-        </p>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          className="h-11 rounded-full border border-border px-6 text-sm font-medium transition hover:bg-surface-2"
-        >
-          {vi.common.retry}
-        </button>
-      </div>
+      <ManLoiLink
+        loai={loaiLoi}
+        chatUrl={chatUrlDuPhong}
+        onThuLai={() => window.location.reload()}
+      />
     );
   }
 
@@ -2088,6 +2045,22 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
     !laNguoiXem &&
     ["submitted", "in_retouch", "awaiting_approval", "approved", "delivered"].includes(gallery.status) &&
     tranhHanhTrinh(gallery.status, gallery.giaiDoanTienDo ?? null, gallery.photoCount) != null;
+
+  /*
+    BB-384 — vùng duyệt + thanh đáy ở BƯỚC DUYỆT đọc cùng một luật thuần
+    (`@/lib/anh-chinh-sua/vong-duyet`): có ảnh chỉnh trong app → khối duyệt từng tấm;
+    bước duyệt mà chưa có ảnh → lời Bean "đang chuẩn bị", không nút duyệt mù.
+  */
+  const soAnhChinhTrongApp = gallery.review?.soAnhChinhTrongApp ?? 0;
+  const khoiDuyet = gallery.review
+    ? khoiVungDuyet({
+        status: gallery.status,
+        soAnhChinhTrongApp,
+        giaiDoan: gallery.giaiDoanTienDo ?? null,
+        coVongSuaMo: gallery.review.rounds.some((r) => !r.resolved),
+      })
+    : null;
+  const thanhDuyet = duocChon ? thanhDayBuocDuyet({ status: gallery.status, soAnhChinhTrongApp }) : null;
 
   /*
     BB-321 — màn "Chọn thêm ảnh · Đợt N" THAY cả trang (không phải lớp phủ): lưới
@@ -2507,6 +2480,7 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
           ngayGiao={gallery.review?.deliveredAt ?? null}
           trangThai={gallery.status}
           giaiDoanTienDo={gallery.giaiDoanTienDo ?? null}
+          khoiDuyet={khoiDuyet}
           laNguoiXem={laNguoiXem}
           nutMoiOngBa={nutMoiTrenBia}
           onBatDau={cuonToiLuoi}
@@ -2522,7 +2496,8 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
       {!dangGiao && (
         <div className="flex justify-center bg-[#fdfbf9] px-6 pb-4 empty:hidden lg:hidden">
           <LoiGoiYLuuApp
-            daChon={selectionCounts.selectedCount}
+            daChon={laNguoiXem ? timNguoiXem.size : selectionCounts.selectedCount}
+            daXem={soLanXemLon}
             onXemCachLuu={() => setMoHuongDanLuuApp(true)}
             laNguoiXem={laNguoiXem}
           />
@@ -2881,6 +2856,7 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
             giaiDoan={gallery.giaiDoanTienDo ?? null}
             nhanTienDo={gallery.nhanTienDo}
             photoCount={gallery.photoCount}
+            khoiDuyet={khoiDuyet}
             gop={
               theGop
                 ? {
@@ -2895,10 +2871,10 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
 
       {/*
         BB-258 — chủ studio 26/09/2026: bỏ dòng "Bật thông báo để biết ngay
-        khi ảnh chỉnh xong" đang lơ lửng mép trái. CHỈ gỡ chỗ GẮN ở đây — một
-        Sonnet khác đang làm chuông thông báo góc phải thay thế, Opus sẽ gắn
-        lúc gộp. Component `bat-thong-bao.tsx` và `src/lib/thong-bao/**`,
-        `public/sw.js`, `src/app/api/g/thong-bao/**` GIỮ NGUYÊN, không đụng.
+        khi ảnh chỉnh xong" đang lơ lửng mép trái; chuông góc phải (BB-261)
+        thay thế. BB-389 (07/10) gỡ hẳn component cũ `bat-thong-bao.tsx`;
+        `src/lib/thong-bao/**`, `public/sw.js`, `src/app/api/g/thong-bao/**`
+        vẫn dùng cho chuông.
       */}
 
       {/* Thông báo trạng thái bộ ảnh — chỉ hiện khi có điều cần nói. */}
@@ -2910,7 +2886,10 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
         <div className="mx-auto max-w-3xl space-y-3 px-6 pt-5 empty:hidden">
           {/* BB-371 — CSKH đã gửi ảnh chỉnh trong app: ba mẹ xem, so trước/sau, duyệt
               hoặc xin sửa chi tiết NGAY TẠI ĐÂY (không mở Drive). */}
-          {gallery.review && (gallery.review.soAnhChinhTrongApp ?? 0) > 0 && (
+          {/* BB-384 — vòng duyệt LUÔN trong app (`khoiVungDuyet`): không còn khung link
+              Drive + ô chữ chung. Bộ ở bước duyệt mà app chưa có ảnh chỉnh → lời Bean
+              "đang chuẩn bị", không nút duyệt mù. */}
+          {khoiDuyet === "anh_trong_app" && (
             <AnhChinhSuaKhach
               onDaQuyet={async ({ quyetDinh, lan }) => {
                 setStatusMessage(
@@ -2920,16 +2899,20 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
                 );
                 await loadGallery();
               }}
+              moiInThem={{
+                danhMuc: gallery.addons?.catalogue ?? [],
+                onChonInThem:
+                  dotChon.tt?.cheDoChonThem && dotChon.tt.coTheChot ? () => setMoManDot(true) : null,
+              }}
             />
           )}
-          {gallery.review && !((gallery.review.soAnhChinhTrongApp ?? 0) > 0) && (
+          {gallery.review && (khoiDuyet === "dang_chuan_bi" || khoiDuyet === "thong_tin") && (
             <ReviewPanel
               status={gallery.status}
               nhanTienDo={gallery.nhanTienDo}
               coTheHanhTrinh={theHanhTrinhDangHien}
               review={gallery.review}
-              hotline={gallery.branch.hotline}
-              onDecide={decideReview}
+              dangChuanBi={khoiDuyet === "dang_chuan_bi"}
             />
           )}
 
@@ -3290,6 +3273,34 @@ export function GalleryApp({ token, giaDinh }: GalleryAppProps) {
             >
               <XIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
             </button>
+          </div>
+        </div>
+      ) : thanhDuyet ? (
+        /*
+          BB-384 — BƯỚC DUYỆT: "5 / 5 tấm · Đủ trong gói · Yêu cầu sửa lại" là thanh của
+          luồng chọn ảnh / xin mở lại danh sách — sai ngữ cảnh khi ba mẹ đang duyệt ảnh
+          chỉnh. Ở bước này thanh đáy nói đúng việc và nút chính dẫn vào khối duyệt.
+        */
+        <div
+          data-testid="thanh-duyet"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-6 pb-[max(12px,env(safe-area-inset-bottom))]"
+        >
+          <div className="pointer-events-auto mx-auto flex h-[60px] max-w-xl items-center gap-2 rounded-full bg-[#2a2420] pl-5 pr-2 text-[#fffdf9] shadow-[0_14px_32px_-10px_rgba(27,23,20,.55)]">
+            <p className="min-w-0 flex-1 truncate text-[14px] font-medium" data-testid="thanh-duyet-dong">
+              {thanhDuyet.dong}
+            </p>
+            {thanhDuyet.nut && (
+              <button
+                type="button"
+                data-testid="nut-xem-duyet-anh-chinh"
+                onClick={() =>
+                  document.getElementById("anh-da-chinh")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
+                className="h-11 shrink-0 rounded-full bg-[#fffdf9] px-4 text-[13px] font-semibold text-[#2a2420] transition hover:opacity-90"
+              >
+                {thanhDuyet.nut}
+              </button>
+            )}
           </div>
         </div>
       ) : (

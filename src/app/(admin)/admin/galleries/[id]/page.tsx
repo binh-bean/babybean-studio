@@ -10,44 +10,68 @@
 import { redirect } from "next/navigation";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { GalleryDetail } from "@/components/features/admin/gallery-detail";
+import { ManChanBoAnh } from "@/components/features/admin/man-chan-bo-anh";
+import {
+  duongDanSauDangNhap,
+  quyenThaoTacBoAnh,
+  xetQuyenXemBoAnh,
+} from "@/lib/auth/quyen-xem-bo-anh";
 
 export const dynamic = "force-dynamic";
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default async function GalleryDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
+
+  let staff;
   try {
-    await requireStaff();
+    staff = await requireStaff();
   } catch (err) {
-    if (err instanceof AuthError) redirect("/login?next=%2Fadmin%2Fgalleries");
+    // BB-382 — link "Quản lý bộ ảnh" bấm từ Lark: đăng nhập xong phải quay về
+    // ĐÚNG bộ này (trước đây `next=/admin/galleries` — mất id, nhân viên rơi
+    // vào danh sách và không biết mình vừa bấm bộ nào).
+    if (err instanceof AuthError) redirect(duongDanSauDangNhap(id));
     throw err;
   }
 
-  const { id } = await params;
-  let galleryId = id;
-
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  
-  if (!UUID_REGEX.test(id)) {
-    const { createAdminClient } = await import("@/lib/supabase/admin");
-    const admin = createAdminClient();
-    const decodedId = decodeURIComponent(id);
-    
-    // Tìm bộ ảnh chứa mã hợp đồng này (trùng mã thì lấy mới nhất)
-    const { data } = await admin
-      .from("galleries")
-      .select("id")
-      .contains("lark_contract_codes", [decodedId])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (data) {
-      galleryId = data.id;
-    }
+  // BB-382 — vai không có quyền xem bộ ảnh thì dừng TRƯỚC khi tra bộ: không
+  // để lộ cả chuyện bộ có tồn tại hay không.
+  if (!staff.permissions.includes("galleries:read")) {
+    return <ManChanBoAnh lyDo="chua-co-quyen-xem" />;
   }
+
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
+  // Link cũ dạng `/admin/galleries/<mã hoá đơn>` vẫn mở được (trùng mã thì lấy
+  // bộ mới nhất).
+  let maHoaDon = id;
+  try {
+    maHoaDon = decodeURIComponent(id);
+  } catch {
+    // Chuỗi % hỏng — tra nguyên văn.
+  }
+  const { data: bo } = UUID_REGEX.test(id)
+    ? await admin.from("galleries").select("id, branch_id, editor_id").eq("id", id).maybeSingle()
+    : await admin
+        .from("galleries")
+        .select("id, branch_id, editor_id")
+        .contains("lark_contract_codes", [maHoaDon])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+  if (!bo) return <ManChanBoAnh lyDo="khong-tim-thay" />;
+
+  const lyDo = xetQuyenXemBoAnh(staff, bo as { branch_id: string; editor_id: string | null });
+  if (lyDo) return <ManChanBoAnh lyDo={lyDo} />;
+
+  const galleryId = bo.id as string;
 
   return (
     // BB-255: bản vẽ quan-tri-chi-tiet.webp dùng bố cục hai cột (nội dung
@@ -70,7 +94,7 @@ export default async function GalleryDetailPage({
 
           Khoá theo `galleryId` đã tra xong, không theo `id` trên địa chỉ: hai địa
           chỉ khác nhau trỏ về cùng một bộ ảnh thì không cần dựng lại màn. Đừng gỡ. */}
-      <GalleryDetail key={galleryId} galleryId={galleryId} />
+      <GalleryDetail key={galleryId} galleryId={galleryId} quyen={quyenThaoTacBoAnh(staff.permissions)} />
     </main>
   );
 }

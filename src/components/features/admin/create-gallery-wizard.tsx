@@ -22,6 +22,7 @@ import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
 import { formatNgayVN, formatSdt } from "@/lib/utils/dinh-dang";
 import { dinhDangNghin, docSoNghin } from "@/lib/utils/so-tien-nhap";
+import { giaAnhThemChoBoMoi, giaRiengTheoTenGoi } from "@/lib/gallery/gia-goi-chup";
 
 const w = vi.admin.wizard;
 
@@ -47,6 +48,8 @@ interface Options {
   macDinhHanChotNgay?: number;
   /** Giá một ảnh chọn thêm mặc định, do chủ studio đặt trong màn Cài đặt. */
   macDinhGiaAnhChonThem?: number;
+  /** BB-385 — giá riêng theo gói (mã LARK-<TÊN> → giá), đặt ở màn Gói chụp. */
+  giaAnhThemTheoGoi?: Record<string, number>;
 }
 
 interface ResultData {
@@ -187,6 +190,18 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
   useEffect(() => {
     if (dongChon?.tongFileEdit) setQuota(dongChon.tongFileEdit);
   }, [dongChon]);
+
+  // BB-385 — giá ảnh chọn thêm theo GÓI của dòng Lark (giá riêng Admin đặt ở
+  // màn Gói chụp; gói chưa có giá riêng → giá chung). CSKH vẫn sửa tay được.
+  useEffect(() => {
+    if (!dongChon || !options) return;
+    setExtraPrice(
+      giaAnhThemChoBoMoi({
+        giaRiengCuaGoi: giaRiengTheoTenGoi(options.giaAnhThemTheoGoi, dongChon.goiChup),
+        giaChung: options.macDinhGiaAnhChonThem,
+      }),
+    );
+  }, [dongChon, options]);
 
   // BB-369 (chủ studio 06/10): đã tra được dòng Lark thì chi nhánh + người chụp
   // lấy từ dòng đó, không bắt chọn tay. Lark trống / không khớp thì GIỮ lựa

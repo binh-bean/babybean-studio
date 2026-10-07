@@ -50,6 +50,13 @@ describe("BB-121: vòng duyệt ảnh đã chỉnh", () => {
     } as unknown as Awaited<ReturnType<typeof gallerySession.requireGallerySession>>);
   }
 
+  const themAnhChinh = () =>
+    client.query(
+      `insert into photos (gallery_id, drive_file_id, file_name, mime_type, sort_index, status, subfolder, created_at)
+       values ($1, $2, 'IMG_0121-Edit.jpg', 'image/jpeg', 1, 'active', 'anh chinh sua', now() - interval '1 hour')`,
+      [galleryId, `fixture-bb121-chinh-${Date.now()}`],
+    );
+
   const setStatus = (s: string) =>
     client.query("update galleries set status = $1 where id = $2", [s, galleryId]);
 
@@ -66,6 +73,9 @@ describe("BB-121: vòng duyệt ảnh đã chỉnh", () => {
       [branchId, customerId, `fixture-bb121-${Date.now()}`],
     );
     galleryId = g[0].id;
+    // BB-384 — gửi khách duyệt đi qua ảnh chỉnh TRONG APP (route cũ retouch-done làm
+    // đúng việc "Gửi khách duyệt"): bộ cần ảnh trong thư mục con "ảnh chỉnh sửa".
+    await themAnhChinh();
   });
 
   afterAll(async () => {
@@ -95,13 +105,19 @@ describe("BB-121: vòng duyệt ảnh đã chỉnh", () => {
     expect(rows[0].status).toBe("awaiting_approval");
   });
 
-  it("2. Gửi mà KHÔNG có link thì từ chối — khách mở ra sẽ thấy trang trống", async () => {
-    asCs();
-    const res = await retouchDone(body({ finalDriveUrl: "  " }), params());
-    expect(res.status).toBe(400);
+  it("2. BB-384: KHÔNG có ảnh chỉnh trong app thì từ chối (link Drive không còn đủ) — khách mở ra sẽ thấy trang trống", async () => {
+    await client.query("delete from photos where gallery_id = $1 and subfolder = 'anh chinh sua'", [galleryId]);
+    try {
+      asCs();
+      const res = await retouchDone(body({ finalDriveUrl: "https://drive.google.com/drive/folders/abc123" }), params());
+      expect(res.status).toBe(400);
+      expect((await res.json()).error.message).toContain("Đồng bộ ảnh");
 
-    const { rows } = await client.query("select status from galleries where id = $1", [galleryId]);
-    expect(rows[0].status).toBe("in_retouch");
+      const { rows } = await client.query("select status from galleries where id = $1", [galleryId]);
+      expect(rows[0].status).toBe("in_retouch");
+    } finally {
+      await themAnhChinh();
+    }
   });
 
   it("3. Khách duyệt -> approved", async () => {
@@ -135,7 +151,8 @@ describe("BB-121: vòng duyệt ảnh đã chỉnh", () => {
     expect(r).toHaveLength(1);
     expect(r[0].note).toBe("Ảnh số 3 sáng quá");
     // Giữ link bản khách đang xem lúc chê — vòng sau file khác rồi.
-    expect(r[0].reviewed_url).toContain("v1");
+    // BB-384 — không còn link Drive ảnh chỉnh: bản khách chê là ảnh trong app.
+    expect(r[0].reviewed_url).toBeNull();
   });
 
   it("5. Vòng lặp LẶP LẠI ĐƯỢC, và vòng trước KHÔNG bị ghi đè", async () => {

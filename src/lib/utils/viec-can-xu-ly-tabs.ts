@@ -22,7 +22,9 @@ export type TabViecCanXuLy =
   | "khach-mua-them"
   | "quen-mat-khau"
   | "lark-da-xoa"
-  | "anh-chinh-sua";
+  | "anh-chinh-sua"
+  | "goi-chua-co-anh"
+  | "don-hau-ky";
 
 export interface DinhNghiaTabViec {
   value: TabViecCanXuLy;
@@ -48,6 +50,30 @@ export const TABS_VIEC_CAN_XU_LY: DinhNghiaTabViec[] = [
     demSo: (data) => {
       const d = data as { summary?: { galleryCount?: number } } | null;
       return d?.summary?.galleryCount ?? 0;
+    },
+  },
+  {
+    // BB-381 — bộ có gói chụp (hoặc chưa rõ gói) mà 0 ảnh, CHƯA nằm ở "Bộ ảnh lỗi tải"
+    // (bộ đang lỗi Drive chỉ đếm theo lý do ở chân tab — không đếm hai lần trên huy hiệu).
+    value: "goi-chua-co-anh",
+    label: "Gói chụp chưa có ảnh",
+    api: "/api/admin/reports/bo-anh-rong",
+    hiddenForRoles: ["photoshop_ctv"],
+    demSo: (data) => {
+      const d = data as { goiChuaCoAnh?: unknown[] } | null;
+      return d?.goiChuaCoAnh?.length ?? 0;
+    },
+  },
+  {
+    // BB-381 — hoá đơn không có dịch vụ chụp (in thêm, chỉnh thêm file…) của khách cũ:
+    // theo dõi tới khi Lark "Đã giao". Không gửi link cho khách.
+    value: "don-hau-ky",
+    label: "Đơn hậu kỳ mua thêm",
+    api: "/api/admin/reports/bo-anh-rong",
+    hiddenForRoles: ["photoshop_ctv"],
+    demSo: (data) => {
+      const d = data as { donHauKy?: unknown[] } | null;
+      return d?.donHauKy?.length ?? 0;
     },
   },
   {

@@ -98,6 +98,8 @@ export async function GET(
       den,
       kyTruoc,
       nhom: query.nhom,
+      // BB-380: báo cáo vận hành có số tiền tự ẩn tiền khi thiếu reports:financial.
+      quyen: staff.permissions,
     });
 
     if (query.dinhDang === "csv") {

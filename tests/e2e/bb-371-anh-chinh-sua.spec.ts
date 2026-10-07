@@ -18,7 +18,10 @@
  *
  * Chạy: PW_PORT=3371 npx playwright test tests/e2e/bb-371-anh-chinh-sua.spec.ts --workers=1
  */
-import { test, expect, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+// BB-388 — mỗi ca một IP riêng: mở link khách bị giới hạn 10 lần/IP/15 phút (helper ghi rõ vì
+// sao). Từ `::1` chung, ca 3 đỏ 429 "Bean chưa mở được bộ ảnh" khi cùng server vừa chạy spec khác.
+import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { createClient } from "@supabase/supabase-js";
 import { Client } from "pg";
 import path from "node:path";
@@ -217,9 +220,13 @@ test.describe("BB-371: ảnh chỉnh sửa — CSKH gửi duyệt, khách xem/so
     await khoi.getByLabel("Ba mẹ muốn nhắn thêm gì cho Bean không ạ?").fill("Fixture BB-371 cảm ơn Bean");
     await khoi.getByRole("button", { name: "Gửi yêu cầu sửa" }).click();
 
-    await expect(page.getByTestId("da-nhan-yeu-cau-sua")).toContainText("Bean đã nhận yêu cầu sửa lần 1 của ba mẹ ạ.", {
-      timeout: 30_000,
-    });
+    // BB-388 — BB-384 (anh 06/10) thay khung "đã nhận" bằng khung xác nhận rõ: tiêu đề
+    // `anhChinh.daNhanTieuDe` ("… lần N ạ") + danh sách tấm cần sửa + lời xin lỗi (BB-387).
+    // Câu cũ "… lần N của ba mẹ ạ." nay chỉ là dòng báo trạng thái, không nằm trong khung này.
+    const daNhan = page.getByTestId("da-nhan-yeu-cau-sua");
+    await expect(daNhan).toContainText("Bean đã nhận yêu cầu sửa lần 1 ạ", { timeout: 30_000 });
+    await expect(daNhan.getByTestId("da-nhan-cac-tam")).toContainText("1 tấm cần sửa");
+    await expect(daNhan.getByTestId("da-nhan-cac-tam")).toContainText("IMG_0001-Edit.jpg");
     await expect(page.getByTestId("khoi-anh-chinh")).toHaveCount(0);
     await page.getByTestId("da-nhan-yeu-cau-sua").scrollIntoViewIfNeeded();
     await chup(page, "6-khach-da-nhan-yeu-cau-390.png");

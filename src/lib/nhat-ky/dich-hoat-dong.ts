@@ -116,6 +116,8 @@ const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
   "share_link.reopened": { nhom: "nhan_vien", cau: () => "Nhân viên mở khoá lại link cũ" },
   "gallery.retouch_sent": { nhom: "nhan_vien", cau: () => "Nhân viên gửi ảnh đã chỉnh cho khách" },
   "gallery.confirm_retouch": { nhom: "nhan_vien", cau: () => "Nhân viên bắt đầu hậu kỳ ảnh" },
+  // BB-379 — CSKH điền tên bé cho bộ chưa có. Không ghép tên bé vào câu (dữ liệu định danh trẻ em).
+  "gallery.set_baby": { nhom: "nhan_vien", cau: () => "Nhân viên điền tên bé cho bộ ảnh" },
   "gallery.review_approved": { nhom: "khach", cau: () => "Ba mẹ duyệt ảnh đã chỉnh" },
   "gallery.review_revise": { nhom: "khach", cau: () => "Ba mẹ yêu cầu chỉnh sửa lại" },
   "gallery.reopen": {

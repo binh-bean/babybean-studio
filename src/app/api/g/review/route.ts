@@ -40,9 +40,7 @@ import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 import { after } from "next/server";
 import {
   chuanHoaVung,
-  ghepAnhChinhVoiGoc,
   ghepGhiChu,
-  khachThayAnhChinh,
   TOI_DA_ANH_MAU,
   TOI_DA_ANH_SUA,
   TOI_DA_GHI_CHU,
@@ -50,12 +48,22 @@ import {
 } from "@/lib/anh-chinh-sua/nhan-dien";
 import {
   coBangChiTiet,
-  docAnhChinh,
-  docAnhGoc,
-  docMocGui,
+  coBangTheoDot,
+  docBoiCanhAnhChinh,
+  docVongSua,
+  khachThayTrongBoiCanh,
   laDuongDanAnhMau,
 } from "@/lib/anh-chinh-sua/du-lieu";
+import {
+  KHOA_TRONG_GOI,
+  duocQuyetAnhChinh,
+  laKhoaMuaThem,
+  lanSuaKeTiep,
+  nhanCuaKhoa,
+  trangThaiDuyetDot,
+} from "@/lib/anh-chinh-sua/theo-dot";
 import { ghiTrangThaiSuaLenLark } from "@/lib/lark/ghi-trang-thai-sua";
+import { kiemQuyetTrongGoi } from "@/lib/anh-chinh-sua/vong-duyet";
 
 export const runtime = "nodejs";
 
@@ -66,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const session = await requirePhienBoAnh(request);
-    if (session.role !== "owner") {
+    if (!duocQuyetAnhChinh(session.role)) {
       return fail("FORBIDDEN", "Chỉ người nhận link chính mới duyệt được ảnh");
     }
 
@@ -76,6 +84,8 @@ export async function POST(request: Request): Promise<Response> {
       note?: string;
       /** BB-371 — yêu cầu sửa CHI TIẾT trên ảnh chỉnh trong app. */
       items?: unknown;
+      /** BB-377 — đợt đang duyệt: thiếu/"goc" = trong gói (vòng cũ), "dot:N"/"mt:<id>" = mua thêm. */
+      khoa?: unknown;
     } | null;
 
     const decision = body?.decision;
@@ -109,13 +119,36 @@ export async function POST(request: Request): Promise<Response> {
     // Chỉ duyệt được khi đang chờ duyệt. Bấm hai lần, hoặc mở lại link cũ sau
     // khi đã duyệt, đều rơi vào đây — và câu trả lời phải nói rõ đang ở đâu
     // chứ không phải "có lỗi xảy ra".
-    if (gallery.status !== "awaiting_approval") {
-      return fail(
-        "INVALID_INPUT",
-        gallery.status === "approved"
-          ? vi.gallery.loiBean.daDuyetDangIn
-          : "Bộ ảnh chưa tới bước duyệt ảnh đã chỉnh.",
-      );
+    // BB-377 — đợt MUA THÊM: vòng duyệt riêng, không đụng trạng thái bộ ảnh.
+    const khoaYeuCau = body?.khoa;
+    if (khoaYeuCau !== undefined && khoaYeuCau !== null && khoaYeuCau !== KHOA_TRONG_GOI) {
+      if (!laKhoaMuaThem(khoaYeuCau)) return fail("INVALID_INPUT", "Đợt ảnh không hợp lệ ạ.");
+      return await quyetDotMuaThem({
+        requestId,
+        gallery: gallery as GalleryDuyet,
+        khoa: khoaYeuCau,
+        decision,
+        note,
+        items: coMucChiTiet ? (body!.items as unknown[]) : [],
+      });
+    }
+
+    // BB-384 — bỏ HẲN đường "duyệt mù" theo link Drive (BB-121): vòng trong gói chỉ nhận
+    // quyết định khi ba mẹ ĐANG thấy ảnh chỉnh trong app (CSKH đã "Gửi khách duyệt").
+    // Vòng TRONG GÓI chỉ tính tấm trong gói (đã áp 0095); tấm mua thêm duyệt ở vòng của đợt.
+    const bc = await docBoiCanhAnhChinh(admin, gallery.id);
+    const duocXemTrongGoi = new Map(
+      bc.anhChinh
+        .filter(
+          (a) =>
+            khachThayTrongBoiCanh(bc, gallery.status, a) &&
+            (bc.mocDot === null || !laKhoaMuaThem(bc.khoaCua.get(a.id))),
+        )
+        .map((a) => [a.id, a] as const),
+    );
+    const kiem = kiemQuyetTrongGoi({ status: gallery.status, soAnhKhachThay: duocXemTrongGoi.size });
+    if (!kiem.ok) {
+      return fail("INVALID_INPUT", gallery.status === "approved" ? vi.gallery.loiBean.daDuyetDangIn : kiem.loi);
     }
 
     const now = new Date().toISOString();
@@ -142,11 +175,14 @@ export async function POST(request: Request): Promise<Response> {
         .eq("id", gallery.id);
       if (error) throw error;
 
-      const { error: resErr } = await admin
+      let qDong = admin
         .from("revision_requests")
         .update({ resolved_at: now })
         .eq("gallery_id", gallery.id)
         .is("resolved_at", null);
+      // BB-377 — duyệt ảnh trong gói không đóng vòng sửa đang mở của đợt mua thêm.
+      if (await coBangTheoDot(admin)) qDong = qDong.is("dot_khoa", null);
+      const { error: resErr } = await qDong;
       if (resErr) throw resErr;
 
       // BB-052: đây là một QUYẾT ĐỊNH của khách, ngang với lúc chốt chọn ảnh.
@@ -189,18 +225,15 @@ export async function POST(request: Request): Promise<Response> {
       .limit(1)
       .maybeSingle();
 
-    const round = (last?.round ?? 0) + 1;
+    const round = lanSuaKeTiep(last ? [last] : []);
 
     // BB-371 — từng tấm ba mẹ xin sửa. Ảnh phải là ảnh CHỈNH của CHÍNH bộ này mà
     // ba mẹ ĐƯỢC xem (CSKH đã gửi) — id lạ/bộ khác/chưa gửi thì từ chối cả lượt.
-    let cacMuc: (MucSua & { gocId: string | null })[] = [];
+    let cacMuc: (MucSua & { gocId: string | null; nhanDot?: string })[] = [];
     if (coMucChiTiet) {
-      const [anhChinh, guiLuc] = await Promise.all([docAnhChinh(admin, gallery.id), docMocGui(admin, gallery.id)]);
-      const duocXem = new Map(
-        anhChinh
-          .filter((a) => khachThayAnhChinh(gallery.status, guiLuc, a.created_at))
-          .map((a) => [a.id, a] as const),
-      );
+      // BB-377 — vòng TRONG GÓI chỉ nhận tấm trong gói (khi đã áp 0095 và bộ có đợt mua
+      // thêm); tấm mua thêm xin sửa ở vòng của đợt nó. (Tập đã tính ở cổng BB-384 phía trên.)
+      const duocXem = duocXemTrongGoi;
       const daGap = new Set<string>();
       for (const raw of body!.items as unknown[]) {
         const m = (raw ?? {}) as { photoId?: unknown; note?: unknown; marks?: unknown; anhMau?: unknown };
@@ -224,12 +257,14 @@ export async function POST(request: Request): Promise<Response> {
           gocId: null,
         });
       }
-      const goc = await docAnhGoc(admin, gallery.id);
-      const ghep = ghepAnhChinhVoiGoc(
-        cacMuc.map((c) => ({ id: c.photoId, fileName: c.tenAnh })),
-        goc.map((g) => ({ id: g.id, fileName: g.file_name })),
-      );
-      cacMuc = cacMuc.map((c) => ({ ...c, gocId: ghep.get(c.photoId) ?? null }));
+      cacMuc = cacMuc.map((c) => ({ ...c, gocId: bc.gocCua.get(c.photoId) ?? null }));
+      // Chưa áp 0095: mọi tấm chung một vòng — ghi rõ đợt cho thợ chỉnh.
+      if (bc.mocDot === null) {
+        cacMuc = cacMuc.map((c) => {
+          const k = bc.khoaCua.get(c.photoId);
+          return laKhoaMuaThem(k) ? { ...c, nhanDot: nhanCuaKhoa(k, bc.nhom) } : c;
+        });
+      }
     }
     const noiDungVong = ghepGhiChu(note, cacMuc);
 
@@ -305,7 +340,7 @@ export async function POST(request: Request): Promise<Response> {
         // BB-371 — thẻ Lark liệt kê từng tấm (mẫu `cacTam` đã có ở notify.ts) + nút
         // "Mở bộ ảnh" dẫn thẳng tới màn quản trị bộ này.
         cacTam: cacMuc.map((c) => ({
-          ten: c.tenAnh,
+          ten: c.nhanDot ? `${c.tenAnh} · ${c.nhanDot}` : c.tenAnh,
           ghiChu: [
             c.ghiChu,
             c.vung.length ? `khoanh ${c.vung.length} vùng` : "",
@@ -340,4 +375,190 @@ export async function POST(request: Request): Promise<Response> {
     if (err instanceof GallerySessionError) return fail(err.code);
     return failUnexpected(err, requestId);
   }
+}
+
+// ---------------------------------------------------------------------------
+// BB-377 — duyệt / xin sửa ảnh chỉnh của một ĐỢT MUA THÊM
+// ---------------------------------------------------------------------------
+//
+// Ảnh mua thêm (đợt chọn BB-321, hay yêu cầu của người thân BB-345) về sau khi
+// bộ đã duyệt/đã giao là chuyện thường — kéo cả bộ về "chờ duyệt" là làm hỏng
+// trạng thái in/giao của ảnh trong gói. Nên đợt mua thêm có vòng RIÊNG (bảng
+// `anh_chinh_dot`, 0095): duyệt ghi `duyet_luc` của đợt; xin sửa ghi một vòng
+// `revision_requests` gắn `dot_khoa`. Lần sửa vẫn đếm theo BỘ (Lark chỉ có một
+// cột Trạng Thái cho dòng Hậu Kỳ của bộ — đợt mua thêm không có dòng riêng).
+
+interface GalleryDuyet {
+  id: string;
+  branch_id: string;
+  status: string;
+  title: string;
+  customer_id: string | null;
+  lark_hauky_record_id?: string | null;
+}
+
+async function quyetDotMuaThem(p: {
+  requestId: string;
+  gallery: GalleryDuyet;
+  khoa: string;
+  decision: "approve" | "revise";
+  note: string;
+  items: unknown[];
+}): Promise<Response> {
+  const { gallery, khoa, decision, note, requestId } = p;
+  const admin = createAdminClient();
+  const bc = await docBoiCanhAnhChinh(admin, gallery.id);
+  if (bc.mocDot === null) {
+    // Chưa áp 0095: ảnh mua thêm đi chung vòng của bộ (gửi không kèm `khoa`).
+    return fail("INVALID_INPUT", "Bộ ảnh chưa tới bước duyệt ảnh đã chỉnh.");
+  }
+  const nhan = nhanCuaKhoa(khoa, bc.nhom);
+  const cuaDot = bc.anhChinh.filter((a) => bc.khoaCua.get(a.id) === khoa && khachThayTrongBoiCanh(bc, gallery.status, a));
+  if (!bc.nhom.some((n) => n.khoa === khoa) || cuaDot.length === 0) {
+    return fail("NOT_FOUND", "Không tìm thấy ảnh cần sửa ạ.");
+  }
+  const vong = await docVongSua(admin, gallery.id, false);
+  const trangThai = trangThaiDuyetDot(
+    bc.mocDot.get(khoa),
+    vong.some((v) => v.resolved_at === null && v.dot_khoa === khoa),
+  );
+  if (trangThai !== "cho_duyet") {
+    return fail(
+      "INVALID_INPUT",
+      trangThai === "da_duyet" ? "Ba mẹ đã duyệt các ảnh này rồi ạ." : "Ảnh này chưa tới bước duyệt ạ.",
+    );
+  }
+
+  const now = new Date().toISOString();
+  let soKhach: string | null = null;
+  if (gallery.customer_id) {
+    const { data: khach } = await admin.from("customers").select("phone").eq("id", gallery.customer_id).maybeSingle();
+    soKhach = (khach?.phone as string | undefined) ?? null;
+  }
+  const tieuDe = `${gallery.title} · ${nhan}`;
+
+  if (decision === "approve") {
+    const { error } = await admin
+      .from("anh_chinh_dot")
+      .update({ duyet_luc: now, updated_at: now })
+      .eq("gallery_id", gallery.id)
+      .eq("khoa", khoa);
+    if (error) throw error;
+    await ghiNhatKy({
+      actorType: "customer",
+      actorLabel: "khách",
+      branchId: gallery.branch_id,
+      action: "gallery.review_approved",
+      entityType: "gallery",
+      entityId: gallery.id,
+      galleryId: gallery.id,
+      metadata: { khoa, nhan, soAnh: cuaDot.length },
+    });
+    await phatSuKienBoAnh({ galleryId: gallery.id, branchId: gallery.branch_id, loai: LOAI_TUC_THI.khachDuyetAnh });
+    await enqueueLarkNotification({
+      branchId: gallery.branch_id,
+      event: "review.approved",
+      payload: { galleryId: gallery.id, galleryTitle: tieuDe, customerPhone: cheSoDienThoai(soKhach) },
+    });
+    return ok({ status: gallery.status, khoa, daDuyet: true });
+  }
+
+  // Xin sửa: BẮT BUỘC chọn tấm — vòng của đợt mua thêm phải chỉ được đúng tấm nào.
+  if (p.items.length === 0) return fail("INVALID_INPUT", "Ba mẹ chọn giúp Bean tấm cần sửa ạ.");
+  const duocXem = new Map(cuaDot.map((a) => [a.id, a] as const));
+  const daGap = new Set<string>();
+  const cacMuc: (MucSua & { gocId: string | null })[] = [];
+  for (const raw of p.items) {
+    const m = (raw ?? {}) as { photoId?: unknown; note?: unknown; marks?: unknown; anhMau?: unknown };
+    const anh = typeof m.photoId === "string" ? duocXem.get(m.photoId) : undefined;
+    if (!anh || daGap.has(anh.id)) return fail("NOT_FOUND", "Không tìm thấy ảnh cần sửa ạ.");
+    daGap.add(anh.id);
+    const ghiChu = typeof m.note === "string" ? m.note.trim() : "";
+    if (ghiChu.length > TOI_DA_GHI_CHU) return fail("INVALID_INPUT", `Ghi chú mỗi tấm tối đa ${TOI_DA_GHI_CHU} ký tự ạ.`);
+    const anhMau = Array.isArray(m.anhMau) ? m.anhMau : [];
+    if (anhMau.length > TOI_DA_ANH_MAU || !anhMau.every((d) => laDuongDanAnhMau(d, gallery.id))) {
+      return fail("INVALID_INPUT", "Ảnh mẫu không hợp lệ ạ.");
+    }
+    cacMuc.push({
+      photoId: anh.id,
+      tenAnh: anh.file_name,
+      ghiChu,
+      vung: chuanHoaVung(m.marks),
+      anhMau: anhMau as string[],
+      gocId: bc.gocCua.get(anh.id) ?? null,
+    });
+  }
+
+  // Lần sửa đếm theo BỘ ẢNH (mọi đợt) — đúng một cột Trạng Thái bên Lark.
+  const round = lanSuaKeTiep(vong);
+  const noiDung = `[${nhan}]\n${ghepGhiChu(note, cacMuc)}`;
+  const { data: delivery } = await admin.from("deliveries").select("final_drive_url").eq("gallery_id", gallery.id).maybeSingle();
+  const { data: vongMoi, error: insErr } = await admin
+    .from("revision_requests")
+    .insert({ gallery_id: gallery.id, round, note: noiDung, reviewed_url: delivery?.final_drive_url ?? null, dot_khoa: khoa })
+    .select("id")
+    .single();
+  if (insErr) throw insErr;
+
+  let daLuuChiTiet = false;
+  if (vongMoi && (await coBangChiTiet(admin))) {
+    const { error: ctErr } = await admin.from("revision_request_items").insert(
+      cacMuc.map((c) => ({
+        revision_request_id: vongMoi.id,
+        gallery_id: gallery.id,
+        photo_id: c.photoId,
+        original_photo_id: c.gocId,
+        note: c.ghiChu,
+        marks: c.vung,
+        reference_paths: c.anhMau,
+      })),
+    );
+    if (ctErr) console.error(JSON.stringify({ evt: "bb377.chi_tiet_ghi_hut", requestId, code: ctErr.code }));
+    else daLuuChiTiet = true;
+  }
+
+  await ghiNhatKy({
+    actorType: "customer",
+    actorLabel: "khách",
+    branchId: gallery.branch_id,
+    action: "gallery.review_revise",
+    entityType: "gallery",
+    entityId: gallery.id,
+    galleryId: gallery.id,
+    metadata: { round, soTam: cacMuc.length, daLuuChiTiet, khoa, nhan },
+  });
+  await phatSuKienBoAnh({ galleryId: gallery.id, branchId: gallery.branch_id, loai: LOAI_TUC_THI.khachDuyetAnh });
+  await enqueueLarkNotification({
+    branchId: gallery.branch_id,
+    event: "review.changes_requested",
+    payload: {
+      galleryId: gallery.id,
+      galleryTitle: tieuDe,
+      round,
+      ghiChu: note || noiDung,
+      cacTam: cacMuc.map((c) => ({
+        ten: c.tenAnh,
+        ghiChu:
+          [c.ghiChu, c.vung.length ? `khoanh ${c.vung.length} vùng` : "", c.anhMau.length ? `${c.anhMau.length} ảnh mẫu` : ""]
+            .filter(Boolean)
+            .join(" · ") || "cần sửa",
+      })),
+      customerPhone: cheSoDienThoai(soKhach),
+    },
+  });
+
+  // Dòng Hậu Kỳ CỦA BỘ (đợt mua thêm không có dòng riêng): "Sửa" / "Sửa lần N".
+  const ghiLark = async () => {
+    const kq = await ghiTrangThaiSuaLenLark({ recordId: gallery.lark_hauky_record_id ?? null, lanSua: round });
+    if (!kq.ghiDuoc && !kq.chayThu) {
+      console.error(JSON.stringify({ evt: "bb377.lark_trang_thai_hut", galleryId: gallery.id, lyDo: kq.lyDo }));
+    }
+  };
+  try {
+    after(ghiLark);
+  } catch {
+    await ghiLark();
+  }
+
+  return ok({ status: gallery.status, khoa, round, soTam: cacMuc.length });
 }

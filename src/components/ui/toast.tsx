@@ -170,5 +170,3 @@ function ToastSingle({
     </div>
   );
 }
-
-export { ToastSingle as Toast };

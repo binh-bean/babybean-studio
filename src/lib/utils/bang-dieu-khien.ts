@@ -158,20 +158,3 @@ export function xepViecHomNay<T extends ViecHomNayThoLuoc>(
   ket.ngayMai.sort(tangDan);
   return ket;
 }
-
-/**
- * Câu "Chép lời nhắc" dùng chung cho danh sách Bộ ảnh và khối "Việc hôm nay"
- * của Bảng điều khiển (BB-303) — MỘT câu chữ, không phải mỗi nơi viết một
- * kiểu. KHÔNG kèm link gửi khách thật: link đó chỉ khôi phục được qua route
- * chi tiết bộ ảnh (giải mã + có thể cần đọc lại Lark), tốn một lượt gọi riêng
- * — không hợp để dựng SẴN cho hàng loạt dòng trên một trang danh sách/bảng
- * điều khiển. Nhân viên mở bộ ảnh để lấy link thật nếu cần gửi kèm.
- */
-export function loiNhacKhach(input: { customerName: string; babyName?: string | null; title: string }): string {
-  const veBe = input.babyName ? ` của bé ${input.babyName}` : "";
-  return (
-    `Chào ${input.customerName}, ảnh${veBe} đã sẵn sàng để chọn ạ. ` +
-    `Ba/mẹ giúp em chọn ảnh trước hạn nhé ạ. ` +
-    `(Mở bộ ảnh "${input.title}" trong app để lấy lại link gửi khách nếu cần ạ.)`
-  );
-}

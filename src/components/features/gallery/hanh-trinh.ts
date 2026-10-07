@@ -1,4 +1,6 @@
-import { TRANG_THAI_BO_ANH } from "@/lib/lark/trang-thai-app-lark";
+import { trangThaiKhach } from "@/lib/lark/trang-thai-app-lark";
+import type { KhoiVungDuyet } from "@/lib/anh-chinh-sua/vong-duyet";
+import { vi } from "@/i18n/vi";
 
 export type TenTranh =
   | "tien-do-chon-anh"
@@ -119,12 +121,6 @@ export interface HanhTrinhInfo {
  */
 export const BUOC_HANH_TRINH = ["Chờ xác nhận", "Chờ chỉnh", "Đang chỉnh", "Duyệt ảnh", "In/nhận ảnh"] as const;
 
-/**
- * Tiêu đề thẻ khi bộ ảnh vừa chốt, CSKH chưa xác nhận. BB-353: lấy từ bảng
- * chung `TRANG_THAI_BO_ANH` (không tự viết chuỗi riêng nữa).
- */
-export const NHAN_CHO_XAC_NHAN = TRANG_THAI_BO_ANH.cho_studio_xac_nhan.khach;
-
 export function buocHanhTrinh(status: string, giaiDoan: number | null): HanhTrinhInfo {
   const buoc = [...BUOC_HANH_TRINH];
   let hienTai = 0;
@@ -150,4 +146,15 @@ export function buocHanhTrinh(status: string, giaiDoan: number | null): HanhTrin
   }
 
   return { buoc, hienTai };
+}
+
+/**
+ * BB-386 — tiêu đề thẻ hành trình. Bước "Duyệt ảnh" mà app CHƯA có ảnh chỉnh
+ * (`khoiVungDuyet` = "dang_chuan_bi", BB-384) thì thẻ nói CÙNG lời Bean với vùng
+ * duyệt ("Bean đang chuẩn bị ảnh…"), không "Ảnh đã chỉnh xong, mời ba mẹ duyệt".
+ * Luật quyết định nằm ở `khoiVungDuyet`; đây chỉ chọn chữ theo kết quả của nó.
+ */
+export function nhanTheHanhTrinh(status: string, giaiDoan: number | null, khoiDuyet?: KhoiVungDuyet): string {
+  if (khoiDuyet === "dang_chuan_bi") return vi.gallery.anhChinh.chuanBiTieuDe;
+  return trangThaiKhach(status, giaiDoan).khach;
 }

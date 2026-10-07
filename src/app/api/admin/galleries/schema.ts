@@ -90,6 +90,10 @@ export const GetGalleriesQuerySchema = z.object({
       z.enum(["true", "false", "1", "0"]).transform((v) => v === "true" || v === "1"),
     ])
     .optional(),
+  /** BB-379 — chỉ bộ ảnh CHƯA có tên bé (CSKH điền nhanh). */
+  chuaTenBe: z
+    .union([z.boolean(), z.enum(["true", "false", "1", "0"]).transform((v) => v === "true" || v === "1")])
+    .optional(),
   q: z.string().trim().optional(),
   search: z.string().trim().optional(),
   sortBy: z

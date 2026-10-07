@@ -20,12 +20,13 @@ import { datBoAnhKhach } from "@/lib/utils/goi-api-khach";
 import { duongDanNha, traBoTheoSoThuTu } from "@/lib/utils/trang-gia-dinh";
 import { useNhaGiaDinh } from "@/components/features/gallery/use-nha-gia-dinh";
 import { GalleryApp } from "@/components/features/gallery/gallery-app";
+import { ManLoiLink, loaiLoiTuMa } from "@/components/features/gallery/man-loi-link";
 
 const G = vi.gallery.giaDinh;
 
 let henBoBo: ReturnType<typeof setTimeout> | null = null;
 
-export function BoAnhTrongNha({ ma, n }: { ma: string; n: string }) {
+export function BoAnhTrongNha({ ma, n, chatUrl = null }: { ma: string; n: string; chatUrl?: string | null }) {
   const { trangThai, taiLai } = useNhaGiaDinh(ma);
   const nha = trangThai.loai === "xong" ? trangThai.nha : null;
   const bo = nha ? traBoTheoSoThuTu(nha.boAnh, n) : null;
@@ -55,37 +56,31 @@ export function BoAnhTrongNha({ ma, n }: { ma: string; n: string }) {
     );
   }
 
-  if (trangThai.loai === "loi" || !bo || !nha) {
-    const cau =
-      trangThai.loai === "loi"
-        ? trangThai.ma === "NOT_FOUND" || trangThai.ma === "LINK_EXPIRED"
-          ? G.linkHetHan
-          : G.loiMo
-        : G.khongThayBuoi;
+  // BB-378 — link hết hạn / không tìm thấy / lỗi mở: cùng màn với `/g/`, có "Nhắn Bean".
+  if (trangThai.loai === "loi") {
+    return (
+      <div data-testid="loi-bo-trong-nha">
+        <ManLoiLink loai={loaiLoiTuMa(trangThai.ma)} chatUrl={chatUrl} onThuLai={() => void taiLai()} />
+      </div>
+    );
+  }
+
+  if (!bo || !nha) {
+    const cau = G.khongThayBuoi;
     return (
       <div className="flex min-h-[80dvh] flex-col items-center justify-center gap-4 px-6 text-center text-foreground">
         <p data-testid="loi-bo-trong-nha" className="max-w-sm text-[15px] leading-relaxed">
           {giuA(cau)}
         </p>
-        {trangThai.loai === "loi" ? (
-          <button
-            type="button"
-            onClick={() => void taiLai()}
-            className="h-11 rounded-full border border-border px-6 text-sm font-medium transition hover:bg-surface-2"
-          >
-            {G.thuLai}
-          </button>
-        ) : (
-          <Link
-            href={duongDanNha(ma)}
-            className="inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-medium transition hover:bg-surface-2"
-          >
-            {G.veTrangGiaDinh}
-          </Link>
-        )}
+        <Link
+          href={duongDanNha(ma)}
+          className="inline-flex h-11 items-center rounded-full border border-border px-6 text-sm font-medium transition hover:bg-surface-2"
+        >
+          {G.veTrangGiaDinh}
+        </Link>
       </div>
     );
   }
 
-  return <GalleryApp key={bo.id} token={ma} giaDinh={{ ma, boAnh: nha.boAnh, boHienTaiId: bo.id }} />;
+  return <GalleryApp key={bo.id} token={ma} giaDinh={{ ma, boAnh: nha.boAnh, boHienTaiId: bo.id }} chatUrlDuPhong={chatUrl} />;
 }

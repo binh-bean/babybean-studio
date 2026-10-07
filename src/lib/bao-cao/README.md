@@ -84,3 +84,14 @@ Xem `loai.ts`: `DinhNghiaBaoCao`, `NguCanhBaoCao`, `KetQuaBaoCao`,
 `kyTuMaDungSan`, `kyTruocCungDoDai`, `chenhLechPhanTram`, `chiaMoc` (chia một
 khoảng thành các mốc ngày/tuần/tháng cho biểu đồ), `trungVi`. Tất cả tính theo
 giờ Việt Nam (UTC+7 cố định, không có giờ mùa hè).
+
+## BB-380 — thêm vào khung (tuỳ chọn, báo cáo cũ không đổi)
+
+- `KetQuaBaoCao.bangPhu` (bảng phụ có tiêu đề, CSV vẫn chỉ xuất `bang`), `lienKet`
+  (nút sang báo cáo liên quan — đừng đếm lại số của báo cáo khác).
+- `TheSoBaoCao.tangLaTot` / `maChiTiet` / `giaiThich` — dải "Sáu con số" ở Bàn làm
+  việc đọc báo cáo `sau-con-so` qua chính API khung và dùng các trường này.
+- `NguCanhBaoCao.quyen` — route truyền `staff.permissions`; báo cáo vận hành có số
+  tiền thì ẩn tiền khi thiếu `reports:financial` (`dieu-hanh/chung.ts`).
+- Công thức điều hành ở `dieu-hanh/cong-thuc.ts` (thuần, có phép thử), đọc dữ liệu ở
+  `dieu-hanh/nguyen-lieu.ts`; tiền luôn qua `layTienCanThuNhieuBo`.

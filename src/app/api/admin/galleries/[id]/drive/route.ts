@@ -28,7 +28,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requireMotTrongCacQuyen, requireBranch, AuthError } from "@/lib/auth/staff";
+import { CAC_QUYEN_SUA_THONG_TIN } from "@/lib/auth/quyen-xem-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { parseDriveFolderId, InvalidDriveLinkError } from "@/lib/drive/parse-link";
 
@@ -82,7 +83,9 @@ export async function PATCH(
     // được link, nếu không nhân viên gặp link sai lại không có đường đi tiếp.
     // Kế toán, thợ chỉnh ảnh và cộng tác viên photoshop KHÔNG đổi nguồn ảnh của
     // khách.
-    requirePermission(staff, "galleries:write");
+    // BB-383b: thợ chụp đổi được thư mục bằng `galleries:edit_info` (sửa thông
+    // tin bộ, không tiền) — không cần `galleries:write`.
+    requireMotTrongCacQuyen(staff, CAC_QUYEN_SUA_THONG_TIN);
 
     const admin = await createAdminClient();
 

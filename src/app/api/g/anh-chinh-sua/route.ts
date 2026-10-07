@@ -16,15 +16,25 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { GallerySessionError } from "@/lib/auth/gallery-session";
 import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ghepAnhChinhVoiGoc, khachThayAnhChinh, chuanHoaVung } from "@/lib/anh-chinh-sua/nhan-dien";
+import { chuanHoaVung } from "@/lib/anh-chinh-sua/nhan-dien";
+import { docSoNgaySuaDuKien } from "@/lib/anh-chinh-sua/han-sua";
 import {
-  docAnhChinh,
-  docAnhGoc,
-  docMocGui,
+  docBoiCanhAnhChinh,
   docChiTietVong,
+  docVongSua,
   coBangChiTiet,
   coBucketAnhMau,
+  khachThayTrongBoiCanh,
 } from "@/lib/anh-chinh-sua/du-lieu";
+import {
+  KHOA_TRONG_GOI,
+  duocQuyetAnhChinh,
+  gomTheoDot,
+  laKhoaMuaThem,
+  nhanCuaKhoa,
+  trangThaiDuyetDot,
+  trangThaiDuyetTrongGoi,
+} from "@/lib/anh-chinh-sua/theo-dot";
 
 export const runtime = "nodejs";
 
@@ -41,66 +51,92 @@ export async function GET(request: Request): Promise<Response> {
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
 
-    const [tatCa, guiLuc] = await Promise.all([docAnhChinh(admin, gallery.id), docMocGui(admin, gallery.id)]);
-    const duocXem = tatCa.filter((a) => khachThayAnhChinh(gallery.status, guiLuc, a.created_at));
-
-    const [{ data: vong }, chiTiet, coBang, coBucket] = await Promise.all([
-      admin
-        .from("revision_requests")
-        .select("id, round, note, created_at, resolved_at")
-        .eq("gallery_id", gallery.id)
-        .order("round", { ascending: true }),
+    const [bc, vong, chiTiet, coBang, coBucket, soNgaySua] = await Promise.all([
+      docBoiCanhAnhChinh(admin, gallery.id),
+      docVongSua(admin, gallery.id, true),
       docChiTietVong(admin, gallery.id),
       coBangChiTiet(admin),
       coBucketAnhMau(admin),
+      // BB-387 — "trong khoảng {n} ngày" cho lời Bean khi ba mẹ xin sửa (chưa có dòng → 3).
+      // KHÔNG trả tên thợ chỉnh ra màn khách.
+      docSoNgaySuaDuKien(admin),
     ]);
+    // BB-377 — mỗi tấm theo mốc gửi của ĐÚNG đợt nó (trong gói / mua thêm đợt N).
+    const duocXem = bc.anhChinh.filter((a) => khachThayTrongBoiCanh(bc, gallery.status, a));
+    const theoDot = bc.mocDot !== null;
+    const laChu = duocQuyetAnhChinh(session.role);
 
-    let anh: unknown[] = [];
-    if (duocXem.length > 0) {
-      const goc = await docAnhGoc(admin, gallery.id);
-      const ghep = ghepAnhChinhVoiGoc(
-        duocXem.map((a) => ({ id: a.id, fileName: a.file_name })),
-        goc.map((g) => ({ id: g.id, fileName: g.file_name })),
-      );
-      const gocTheoId = new Map(goc.map((g) => [g.id, g]));
-      anh = duocXem.map((a) => {
-        const g = gocTheoId.get(ghep.get(a.id) ?? "");
-        return {
-          id: a.id,
-          fileName: a.file_name,
-          width: a.width,
-          height: a.height,
-          maTepDrive: a.drive_file_id,
-          goc: g
-            ? { id: g.id, fileName: g.file_name, width: g.width, height: g.height, maTepDrive: g.drive_file_id }
-            : null,
-        };
-      });
-    }
+    const gocTheoId = new Map(bc.goc.map((g) => [g.id, g]));
+    const anh = duocXem.map((a) => {
+      const g = gocTheoId.get(bc.gocCua.get(a.id) ?? "");
+      return {
+        id: a.id,
+        fileName: a.file_name,
+        width: a.width,
+        height: a.height,
+        maTepDrive: a.drive_file_id,
+        khoa: bc.khoaCua.get(a.id) ?? KHOA_TRONG_GOI,
+        goc: g
+          ? { id: g.id, fileName: g.file_name, width: g.width, height: g.height, maTepDrive: g.drive_file_id }
+          : null,
+      };
+    });
+
+    // Đợt của một vòng sửa: cột `dot_khoa` (0095); chưa áp thì suy từ tấm đầu tiên.
+    const khoaCuaVong = (v: { id: string; dot_khoa: string | null }) => {
+      if (v.dot_khoa) return v.dot_khoa;
+      const muc = chiTiet.find((c) => c.revision_request_id === v.id);
+      return (muc && bc.khoaCua.get(muc.photo_id)) || KHOA_TRONG_GOI;
+    };
+
+    const nhom = gomTheoDot(anh, bc.nhom).map((g) => {
+      const vongMo = vong.some((v) => v.resolved_at === null && khoaCuaVong(v) === g.khoa);
+      const trangThai =
+        theoDot && laKhoaMuaThem(g.khoa)
+          ? trangThaiDuyetDot(bc.mocDot!.get(g.khoa), vongMo)
+          : trangThaiDuyetTrongGoi(gallery.status, vongMo);
+      return {
+        khoa: g.khoa,
+        nhan: g.nhan,
+        soAnh: g.anh.length,
+        trangThai,
+        // Chỉ người nhận link CHÍNH quyết duyệt/xin sửa (cùng luật /api/g/review).
+        duocQuyet: laChu && trangThai === "cho_duyet",
+      };
+    });
 
     const idDuocXem = new Set(duocXem.map((a) => a.id));
-    const vongSua = (vong ?? []).map((v) => ({
-      round: v.round as number,
-      note: v.note as string,
-      createdAt: v.created_at as string,
-      resolved: v.resolved_at !== null,
-      items: chiTiet
-        .filter((c) => c.revision_request_id === v.id && idDuocXem.has(c.photo_id))
-        .map((c) => ({
-          photoId: c.photo_id,
-          note: c.note,
-          marks: chuanHoaVung(c.marks),
-          soAnhMau: c.reference_paths?.length ?? 0,
-        })),
-    }));
+    const vongSua = vong.map((v) => {
+      const khoa = khoaCuaVong(v);
+      return {
+        round: v.round,
+        note: v.note,
+        createdAt: v.created_at,
+        resolved: v.resolved_at !== null,
+        khoa,
+        nhan: nhanCuaKhoa(khoa, bc.nhom),
+        items: chiTiet
+          .filter((c) => c.revision_request_id === v.id && idDuocXem.has(c.photo_id))
+          .map((c) => ({
+            photoId: c.photo_id,
+            note: c.note,
+            marks: chuanHoaVung(c.marks),
+            soAnhMau: c.reference_paths?.length ?? 0,
+          })),
+      };
+    });
 
     return ok({
       trangThai: gallery.status,
-      // Chỉ người nhận link CHÍNH quyết duyệt/xin sửa (cùng luật /api/g/review).
-      duocQuyet: gallery.status === "awaiting_approval" && session.role === "owner" && duocXem.length > 0,
+      // Vòng duyệt cũ (một quyết định cho cả bộ): ảnh trong gói, hoặc mọi tấm khi chưa áp 0095.
+      duocQuyet: gallery.status === "awaiting_approval" && laChu && duocXem.length > 0,
+      theoDot,
       anh,
+      nhom,
       vongSua,
       tinhNang: { vungKhoanh: coBang, anhMau: coBang && coBucket },
+      laChu,
+      soNgaySua,
     });
   } catch (err) {
     if (err instanceof GallerySessionError) return fail(err.code);

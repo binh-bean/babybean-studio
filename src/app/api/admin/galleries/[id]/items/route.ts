@@ -11,6 +11,7 @@ import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { HINH_THUC_GIAM_GIA } from "@/lib/gallery/tien-phat-sinh";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { giaiMaMaLink, maHoaMaLink } from "@/lib/auth/ma-link";
+import { xetQuyenXemBoAnh, CAU_CHAN_BO_ANH } from "@/lib/auth/quyen-xem-bo-anh";
 import { docMaLinkAppTuLark } from "@/lib/lark/khoi-phuc-link-app";
 
 /** Link đã thử khôi phục từ Lark trong đời tiến trình này — không gọi Lark mỗi lần mở trang. */
@@ -81,7 +82,7 @@ export async function GET(
       // Bé …" + dòng phụ "khách · SĐT · chi nhánh · ngày chụp"
       // (quan-tri-chi-tiet.png). Cùng luật viết liền một dòng (BB-150,
       // BB-215, BB-200) — Supabase suy kiểu từ chuỗi literal, nối chuỗi mất kiểu.
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc, submitted_at, customer_id, shoot_id, package_id")
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc, submitted_at, customer_id, shoot_id, package_id, editor_id")
       .eq("id", galleryId)
       .single();
 
@@ -89,7 +90,11 @@ export async function GET(
       return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
 
-    requireBranch(staff, gallery.branch_id);
+    // BB-382 — cùng luật với màn chi tiết và RLS `galleries_select` (0056):
+    // có quyền xem, đúng chi nhánh, và (thấy mọi bộ trong chi nhánh HOẶC được
+    // giao bộ này). Trước đây chỉ xét chi nhánh — CTV chỉnh ảnh đọc được mọi bộ.
+    const lyDoChan = xetQuyenXemBoAnh(staff, gallery as { branch_id: string; editor_id: string | null });
+    if (lyDoChan) return fail("FORBIDDEN", CAU_CHAN_BO_ANH[lyDoChan].tieuDe);
 
     // 4. Retrieve 2-tier contract components and quota
     const summary = await getGalleryContractSummary(gallery.id, admin);
@@ -258,7 +263,7 @@ export async function GET(
     const [{ data: primarySel }, { data: payRows }] = await Promise.all([
       admin
         .from("selections")
-        .select("id, snapshot_extra_amount")
+        .select("id, snapshot_extra_amount, submitted_by_name")
         .eq("gallery_id", gallery.id)
         .eq("is_primary", true)
         .maybeSingle(),
@@ -379,6 +384,11 @@ export async function GET(
     const { data: baby } = gallery.baby_id
       ? await admin.from("babies").select("full_name, nickname").eq("id", gallery.baby_id).maybeSingle()
       : { data: null };
+    // BB-379 — bộ chưa có tên bé: CSKH điền ngay ở màn chi tiết; gợi ý các bé đã có của khách
+    // (một nhà nhiều bộ — chọn bé có sẵn thay vì gõ lại, tránh tạo trùng).
+    const { data: beKhach } = !gallery.baby_id && gallery.customer_id
+      ? await admin.from("babies").select("id, full_name").eq("customer_id", gallery.customer_id).order("created_at")
+      : { data: null };
     const { data: branch } = await admin
       .from("branches")
       .select("name")
@@ -489,6 +499,9 @@ export async function GET(
       // hợp — đúng lỗi đã sửa ở mục 1 (họ tên đầy đủ bị ăn nhầm "Bé ").
       babyNickname: baby?.nickname ?? null,
       babyFullName: baby?.full_name ?? null,
+      beCuaKhach: (beKhach ?? []).map((b) => ({ id: String(b.id), ten: String(b.full_name) })),
+      // BB-379 — người ba mẹ ghi lúc chốt ("Tên ba/mẹ xác nhận"); thời điểm chốt là `submittedAt`.
+      nguoiXacNhan: ((primarySel as { submitted_by_name?: string | null } | null)?.submitted_by_name ?? "").trim() || null,
       branchName: branch?.name ?? null,
       // BB-303 — xem chú thích ở phần truy vấn phía trên.
       packageName: goiChup?.name ?? null,

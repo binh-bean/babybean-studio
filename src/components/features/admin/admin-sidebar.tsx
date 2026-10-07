@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   History,
-  BarChart3
+  BarChart3,
+  Package
 } from "lucide-react";
 import { demSoCanXuLy } from "@/lib/utils/can-xu-ly";
 import { formatSo } from "@/lib/utils/dinh-dang";
@@ -119,6 +120,15 @@ export const navGroups: NavGroup[] = [
     label: "Hệ thống",
     items: [
       { name: "Chi nhánh", href: "/admin/branches", icon: Store, ready: true },
+      {
+        // BB-385 (BB-062): gói chụp (dữ liệu Lark) + giá ảnh chọn thêm. CSKH
+        // xem, chỉ Admin sửa giá (route kiểm `settings:system`).
+        name: "Gói chụp",
+        href: "/admin/goi-chup",
+        icon: Package,
+        ready: true,
+        hiddenForRoles: ["photoshop_ctv"],
+      },
       {
         // BB-280: gộp "Nhân sự" và "Vai trò" thành một trang hai tab.
         name: "Nhân sự & vai trò",

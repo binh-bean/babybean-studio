@@ -73,6 +73,7 @@
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { after } from "next/server";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
+import { idDonHauKy } from "@/lib/gallery/bo-anh-rong";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiLinkAppVeLark, diaChiDayDu } from "@/lib/lark/ghi-link-app";
@@ -180,6 +181,13 @@ export async function POST(
     // Gửi link cho khách khi bộ ảnh chưa có tấm nào là để khách mở ra thấy
     // trang trắng rồi gọi điện. Chặn ở đây rẻ hơn một cuộc gọi.
     if (gallery.photo_count === 0) {
+      // BB-381 — đơn hậu kỳ mua thêm (hoá đơn không có dịch vụ chụp) không bao giờ có link khách.
+      if ((await idDonHauKy(admin, [galleryId])).has(galleryId)) {
+        return fail(
+          "INVALID_INPUT",
+          "Đây là đơn hậu kỳ mua thêm (không có dịch vụ chụp) — không gửi link cho khách. Làm theo bộ gốc của khách.",
+        );
+      }
       return fail(
         "INVALID_INPUT",
         "Bộ ảnh chưa có tấm nào. Đồng bộ ảnh từ Drive xong rồi hãy tạo link.",

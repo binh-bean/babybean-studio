@@ -316,10 +316,12 @@ from share_links;
 -- selections / selection_items
 -- ---------------------------------------------------------------------------
 
+-- 0099 (BB-383): thêm vế "được giao" — CTV có `selections:read` chỉ thấy bộ mình.
 create policy selections_select on selections for select to authenticated
   using (app.has_permission('selections:read') and exists (
     select 1 from galleries g
-    where g.id = selections.gallery_id and app.can_see_branch(g.branch_id)));
+    where g.id = selections.gallery_id and app.can_see_branch(g.branch_id)
+    and (app.has_permission('galleries:all_in_branch') or g.editor_id = auth.uid())));
 
 -- Tách khỏi `for all` ở migration 0057: chính sách `for all` góp mệnh đề
 -- `using` vào cả lượt SELECT, nên ai ghi được thì đọc được — kể cả khi cửa

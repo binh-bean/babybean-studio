@@ -9,7 +9,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
+import { xetQuyenXemBoAnh, CAU_CHAN_BO_ANH } from "@/lib/auth/quyen-xem-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { docLinkMoiNguoiThan } from "@/lib/gia-dinh/link-moi-nguoi-than";
 
@@ -29,10 +30,12 @@ export async function GET(
     if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
 
     const admin = createAdminClient();
-    const { data: g, error } = await admin.from("galleries").select("id, branch_id, customer_id").eq("id", galleryId).maybeSingle();
+    const { data: g, error } = await admin.from("galleries").select("id, branch_id, customer_id, editor_id").eq("id", galleryId).maybeSingle();
     if (error) throw error;
     if (!g) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
-    requireBranch(staff, String(g.branch_id));
+    // BB-383 — cùng luật với màn chi tiết (BB-382): xem được màn thì API trả được, và ngược lại.
+    const lyDoChan = xetQuyenXemBoAnh(staff, g as { branch_id: string; editor_id: string | null });
+    if (lyDoChan) return fail("FORBIDDEN", CAU_CHAN_BO_ANH[lyDoChan].tieuDe);
 
     return ok(await docLinkMoiNguoiThan(admin, { customerId: (g.customer_id as string | null) ?? null, galleryId }));
   } catch (err) {

@@ -27,6 +27,7 @@
  * mỗi lượt (`soGia`) để không va `uq_customers_phone_branch` khi nhiều
  * worktree chạy song song.
  */
+import { daMoLanTruoc } from "./helpers/luu-app";
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { Client } from "pg";
 import { createHash, randomBytes } from "node:crypto";
@@ -161,7 +162,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
    * ảnh `mx-auto` canh theo bề rộng KHÔNG có thanh cuộn → chữ bìa lệch ~8px.
    * Ca 1440 không bắt được (dưới 1600px phần dư bằng 0). Nay dùng `100cqw`.
    */
-  test("1920×1080 (có thanh cuộn): khối ảnh bìa vẫn ≈42% bề rộng, h1 vẫn trong cột trái", async ({ page }) => {
+  test("1920×1080 (có thanh cuộn): khối ảnh bìa ≈50% bề rộng (màn rộng, BB-370 5a), h1 vẫn trong cột trái", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`/g/${maLink}`);
     const tieuDeBia = page.locator("section[aria-label='Ảnh bìa'] h1");
@@ -182,8 +183,14 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     //
     // BB-298 (điều hành) — ĐẢO NGƯỢC cột: ảnh nay CỘT PHẢI, h1 vẫn ở CỘT
     // TRÁI (trước khối ảnh) — đảo chiều bất đẳng thức so với bản trước.
+    //
+    // BB-388 — BB-370 mục 5a (anh 06/10, ảnh chụp màn 1880px): từ khung ≥96rem (1536px) cột
+    // chữ 58% để trống lớn giữa chữ và ảnh, nên ảnh lên 50% cho hai nửa cân
+    // (`@[96rem]:grid-cols-[minmax(0,1fr)_50%]` trong `bia-bo-anh.tsx`). 1920px (trừ thanh
+    // cuộn vẫn > 1536px) thuộc bậc đó → ≈50%, không còn 42%. Ca 1440×900 ở trên vẫn canh 42%.
+    // Vẫn chia theo bề rộng KHÔNG gồm thanh cuộn: lệch thanh cuộn (100vw) vẫn làm đỏ ca này.
     const tiLeKhoiAnh = rKhoiAnh.width / (1920 - thanhCuon);
-    expect(Math.abs(tiLeKhoiAnh - 0.42)).toBeLessThanOrEqual(0.02);
+    expect(Math.abs(tiLeKhoiAnh - 0.5)).toBeLessThanOrEqual(0.02);
     expect(xBia).toBeLessThan(rKhoiAnh.x);
   });
 
@@ -196,7 +203,14 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await expect(page.getByText("Tổng cộng")).toHaveCount(0);
 
     // Hạn mức vẫn hiện, đúng điều ba mẹ dùng được (2-3: giữ lại).
-    await expect(page.getByText(/Gói của ba mẹ gồm 10 ảnh chỉnh/)).toBeVisible();
+    // BB-388 — BB-370 mục 5b (anh 06/10): gói KHÔNG có sản phẩm in thì bỏ hẳn khối "Trong gói
+    // của ba mẹ" ở chân trang (câu "Gói của ba mẹ gồm N tấm ảnh chỉnh ạ") vì hạn mức đã nằm ở
+    // bìa: bộ ba thông tin máy tính "Trong gói · N tấm". Bộ Fixture không có sản phẩm in → canh
+    // hạn mức ở bìa, đúng con số 10 của bộ.
+    const bia = page.getByRole("region", { name: "Ảnh bìa" });
+    const oTrongGoi = bia.getByText("Trong gói", { exact: true }).locator("..");
+    await expect(oTrongGoi).toBeVisible();
+    await expect(oTrongGoi).toContainText(/^Trong gói\s*10 tấm/);
   });
 
   test("chân trang: chi nhánh + nút nhắn tin cùng hàng ở máy tính, xếp dọc ở 375px", async ({ page }) => {
@@ -262,9 +276,12 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // đúng chỗ ở ĐIỆN THOẠI (không đổi), nên phần còn lại của ca thử này
     // chuyển hẳn sang bề rộng điện thoại để tiếp tục canh đúng hành vi chip.
     await expect(
-      page.getByRole("status", { name: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm" }),
+      page.getByRole("status", { name: "Mở ảnh của bé chỉ bằng một chạm" }),
     ).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 844 });
+    // BB-378 — lời mời hiện đúng lúc: ba mẹ mở lại lần thứ 2 (phiên mới).
+    await daMoLanTruoc(page);
+    await page.evaluate(() => sessionStorage.clear());
     await page.reload();
 
     const tamDau = page.getByTestId("the-anh").first();
@@ -283,7 +300,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
       .toBe(1);
 
     const goiY = page.getByRole("status", {
-      name: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
+      name: "Mở ảnh của bé chỉ bằng một chạm",
     });
     await expect(goiY).toBeVisible();
     // BB-278/BB-281 (27/09/2026) — gợi ý không còn là thẻ `fixed` gần đáy: nó
@@ -314,7 +331,7 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await expect(page.getByTestId("the-anh").first()).toBeVisible();
     await page.waitForTimeout(500);
     await expect(
-      page.getByRole("status", { name: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm" }),
+      page.getByRole("status", { name: "Mở ảnh của bé chỉ bằng một chạm" }),
     ).toHaveCount(0);
   });
 
@@ -332,6 +349,8 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     // xem ca thử phía trên); ca này canh việc bấm chip nên chuyển sang bề
     // rộng điện thoại, nơi chip còn tồn tại.
     await page.setViewportSize({ width: 390, height: 844 });
+    // BB-378 — lời mời hiện đúng lúc: ba mẹ mở lại lần thứ 2.
+    await daMoLanTruoc(page);
     await page.goto(`/g/${maLink}`);
 
     const tamDau = page.getByTestId("the-anh").first();
@@ -339,13 +358,13 @@ test.describe("BB-240 + BB-241: màn khách máy tính — lưới, chân trang,
     await tamDau.getByRole("button", { name: "Chọn ảnh này" }).click();
 
     const goiY = page.getByRole("status", {
-      name: "Lưu bộ ảnh ra màn hình điện thoại để mở lại chỉ bằng một chạm",
+      name: "Mở ảnh của bé chỉ bằng một chạm",
     });
     await expect(goiY).toBeVisible();
     // BB-278/BB-281 — chip chỉ còn MỘT nhãn bấm được (nhãn ngắn), thay cho
     // nút "Xem cách lưu" riêng của thẻ cũ; bấm vào nhãn mở đúng tấm hướng dẫn
     // như trước.
-    await goiY.getByRole("button", { name: "Lưu vào màn hình chính để mở lại ảnh của bé nhanh hơn" }).click();
+    await goiY.getByTestId("goi-y-xem-cach-luu").click();
 
     await expect(page.getByRole("dialog", { name: "Lưu app ra màn hình chính" })).toBeVisible();
   });

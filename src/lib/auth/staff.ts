@@ -138,6 +138,16 @@ export function requirePermission(staff: StaffSession, quyen: string): void {
 }
 
 /**
+ * BB-383 — như `requirePermission` nhưng nhận MỘT TRONG nhiều quyền (vd. đồng
+ * bộ ảnh: `galleries:sync` hoặc `galleries:write`). Vẫn hỏi quyền, không hỏi vai.
+ */
+export function requireMotTrongCacQuyen(staff: StaffSession, cacQuyen: readonly string[]): void {
+  if (!cacQuyen.some((q) => staff.permissions.includes(q))) {
+    throw new AuthError("FORBIDDEN");
+  }
+}
+
+/**
  * Ensures the staff member has one of the allowed roles.
  * Throws AuthError('FORBIDDEN') if not.
  */

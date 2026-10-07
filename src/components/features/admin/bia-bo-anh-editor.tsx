@@ -32,8 +32,11 @@ export function BiaBoAnhEditor({
   detail,
   busy,
   onSave,
+  choSua = true,
 }: {
   galleryId: string;
+  /** BB-382 — vai không có `galleries:write`: chỉ xem bìa, không có nút mở trình thiết kế. */
+  choSua?: boolean;
   detail: {
     coverPhotoId?: string | null;
     coverHeadline?: string | null;
@@ -194,6 +197,7 @@ export function BiaBoAnhEditor({
         </>
       )}
 
+      {choSua && (
       <div className="mt-3 flex gap-2">
         <button
           type="button"
@@ -204,8 +208,9 @@ export function BiaBoAnhEditor({
           {detail.coverPhotoId ? "Đổi bìa" : "Mở trình thiết kế bìa"}
         </button>
       </div>
+      )}
 
-      {moEditor && (
+      {moEditor && choSua && (
         <div
           ref={dialogRef}
           role="dialog"

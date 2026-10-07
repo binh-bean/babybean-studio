@@ -22,16 +22,3 @@ export async function getContractCodesForGalleries(galleryIds: string[]) {
   });
   return map;
 }
-
-export async function getShareLinkInfo(galleryId: string) {
-  await requireStaff();
-  const admin = createAdminClient();
-  const { data } = await admin
-    .from("share_links")
-    .select("id, status, created_at, expires_at, view_count, token_prefix")
-    .eq("gallery_id", galleryId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return data;
-}

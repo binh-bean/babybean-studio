@@ -7,7 +7,8 @@
  *   - `/api/img/[photoId]` (byte ảnh)    → `quyetDinhAnhChoKhach`
  */
 
-import { laThuMucChinhSua, khachThayAnhChinh } from "./nhan-dien";
+import { laThuMucChinhSua } from "./nhan-dien";
+import { KHOA_TRONG_GOI, khachThayAnhChinhTheoDot, type MocDot } from "./theo-dot";
 
 /**
  * Lưới chọn ảnh gốc: bỏ MỌI ảnh trong thư mục ảnh chỉnh sửa — đã gửi hay chưa.
@@ -29,11 +30,16 @@ export interface DauVaoAnhKhach {
   anhTaoLuc: string | null | undefined;
   /** Mốc CSKH "Gửi khách duyệt" (chỉ cần khi tấm là ảnh chỉnh). */
   guiLuc: string | null | undefined;
+  /** BB-377 — đợt của tấm ảnh chỉnh ("goc" | "dot:N" | "mt:<id>"); thiếu = trong gói. */
+  khoa?: string;
+  /** BB-377 — mốc từng đợt mua thêm; thiếu/null = chưa áp 0095 (luật cũ). */
+  mocDot?: ReadonlyMap<string, MocDot> | null;
 }
 
 /**
  * - `cam`  (403): tấm ảnh không thuộc bộ/nhà của phiên này.
- * - `an`   (404): đúng bộ của mình, nhưng là ảnh chỉnh CSKH chưa gửi (hoặc về sau lần gửi).
+ * - `an`   (404): đúng bộ của mình, nhưng là ảnh chỉnh CSKH chưa gửi (hoặc về sau lần gửi;
+ *               BB-377: ảnh mua thêm theo mốc gửi của ĐÚNG đợt nó).
  * - `cho_xem`.
  */
 export function quyetDinhAnhChoKhach(v: DauVaoAnhKhach): "cho_xem" | "cam" | "an" {
@@ -44,6 +50,16 @@ export function quyetDinhAnhChoKhach(v: DauVaoAnhKhach): "cho_xem" | "cam" | "an
     ? !!v.phienGalleryId && v.phienGalleryId === v.anhGalleryId
     : !!v.phienCustomerId && v.phienCustomerId === v.boCustomerId;
   if (!dungChu) return "cam";
-  if (laThuMucChinhSua(v.subfolder) && !khachThayAnhChinh(v.trangThaiBo, v.guiLuc, v.anhTaoLuc)) return "an";
+  if (
+    laThuMucChinhSua(v.subfolder) &&
+    !khachThayAnhChinhTheoDot({
+      trangThaiBo: v.trangThaiBo,
+      khoa: v.khoa ?? KHOA_TRONG_GOI,
+      mocChung: v.guiLuc,
+      mocDot: v.mocDot ?? null,
+      anhTaoLuc: v.anhTaoLuc,
+    })
+  )
+    return "an";
   return "cho_xem";
 }

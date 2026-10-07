@@ -2,6 +2,7 @@ import { Metadata } from "next";
 import { GalleryApp } from "@/components/features/gallery/gallery-app";
 import { xacThucTokenBoAnh } from "@/lib/auth/xac-thuc-token-bo-anh";
 import { TEN_NGAN_MAC_DINH } from "@/lib/utils/dinh-dang";
+import { layChatUrlCoDem } from "@/app/(customer)/chat-url-co-dem";
 
 interface PageProps {
   params: Promise<{ token: string }>;
@@ -63,10 +64,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function GalleryPage({ params }: PageProps) {
   const { token } = await params;
+  // BB-378 — "Nhắn Bean" cho màn link hết hạn/không tìm thấy (chưa có bộ ảnh để đọc chi nhánh).
+  const chatUrl = await layChatUrlCoDem();
 
   return (
     <main className="min-h-[100dvh] bg-background">
-      <GalleryApp token={token} />
+      <GalleryApp token={token} chatUrlDuPhong={chatUrl} />
     </main>
   );
 }

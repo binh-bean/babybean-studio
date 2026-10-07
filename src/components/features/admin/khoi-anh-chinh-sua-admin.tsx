@@ -29,28 +29,69 @@ interface DuLieu {
     width: number | null;
     height: number | null;
     chuaGui: boolean;
+    khoa: string;
     goc: { id: string; fileName: string } | null;
   }[];
   soChuaGui: number;
   coTheGui: boolean;
+  theoDot: boolean;
+  nhom: NhomDot[];
   vongSua: {
     round: number;
     note: string;
     createdAt: string;
     resolved: boolean;
-    items: { photoId: string; fileName: string; gocId: string | null; note: string; marks: VungKhoanh[]; anhMau: string[] }[];
+    khoa: string;
+    nhan: string;
+    deXuatBoi: string | null;
+    items: {
+      photoId: string;
+      fileName: string;
+      gocId: string | null;
+      nhan: string;
+      deXuatBoi: string | null;
+      note: string;
+      marks: VungKhoanh[];
+      anhMau: string[];
+    }[];
   }[];
-  tinhNang: { chiTiet: boolean };
+  tinhNang: { chiTiet: boolean; theoDot: boolean };
+  /** BB-384 — số ảnh chỉnh trong gói khách đang thấy trong app. */
+  soAnhKhachThay?: number;
+  /** BB-384 — "Khách chưa xem được ảnh chỉnh — …" khi bộ ở bước duyệt mà khách không thấy tấm nào. */
+  canhBao?: string | null;
 }
+
+interface NhomDot {
+  khoa: string;
+  nhan: string;
+  deXuatBoi: string | null;
+  soAnh: number;
+  soChuaGui: number;
+  trangThai: "chua_gui" | "cho_duyet" | "dang_sua" | "da_duyet";
+  guiLuc: string | null;
+  duyetLuc: string | null;
+  coTheGui: boolean | null;
+}
+
+const CHU_TRANG_THAI_DOT: Record<NhomDot["trangThai"], string> = {
+  chua_gui: "Chưa gửi khách",
+  cho_duyet: "Chờ khách duyệt",
+  dang_sua: "Khách yêu cầu sửa",
+  da_duyet: "Khách đã duyệt",
+};
 
 export function KhoiAnhChinhSuaAdmin({
   galleryId,
   canWrite,
   onDaGui,
   onBietCoAnhChinh,
+  onDongBo,
 }: {
   galleryId: string;
   canWrite: boolean;
+  /** BB-384 — kéo ảnh từ Drive (cả thư mục con "ảnh chỉnh sửa") — nút trong cảnh báo. */
+  onDongBo?: () => void | Promise<void>;
   onDaGui?: () => void | Promise<void>;
   /** Báo cho trang chi tiết: bộ có ảnh chỉnh trong app không (để ẩn khối link Drive cũ). */
   onBietCoAnhChinh?: (co: boolean | null) => void;
@@ -60,6 +101,8 @@ export function KhoiAnhChinhSuaAdmin({
   const [ban, setBan] = React.useState(false);
   const [thongBao, setThongBao] = React.useState<string | null>(null);
   const [hoiLai, setHoiLai] = React.useState(false);
+  /** BB-377 — đợt mua thêm CSKH đang định gửi (hộp hỏi lại). */
+  const [hoiDot, setHoiDot] = React.useState<NhomDot | null>(null);
 
   const tai = React.useCallback(async () => {
     try {
@@ -82,18 +125,26 @@ export function KhoiAnhChinhSuaAdmin({
     void tai();
   }, [tai]);
 
-  async function guiKhach() {
+  async function guiKhach(dot?: NhomDot) {
     setHoiLai(false);
+    setHoiDot(null);
     setBan(true);
     setThongBao(null);
     try {
-      const res = await fetch(`/api/admin/galleries/${galleryId}/anh-chinh-sua/gui-khach`, { method: "POST" });
+      const res = await fetch(`/api/admin/galleries/${galleryId}/anh-chinh-sua/gui-khach`, {
+        method: "POST",
+        ...(dot ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ khoa: dot.khoa }) } : {}),
+      });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
         setThongBao(json?.error?.message ?? "Gửi chưa được, thử lại giúp.");
         return;
       }
-      setThongBao(`Đã gửi ${formatSo(json.data.soAnh)} ảnh cho khách duyệt. Khách nhận thông báo trên app.`);
+      setThongBao(
+        dot
+          ? `Đã gửi ${formatSo(json.data.soAnh)} ảnh ${dot.nhan} cho khách duyệt. Khách nhận thông báo trên app.`
+          : `Đã gửi ${formatSo(json.data.soAnh)} ảnh cho khách duyệt. Khách nhận thông báo trên app.`,
+      );
       window.dispatchEvent(new Event(SU_KIEN_VIEC_DOI));
       await tai();
       await onDaGui?.();
@@ -105,9 +156,38 @@ export function KhoiAnhChinhSuaAdmin({
   if (loi) return <p className="text-sm text-[var(--bb-danger)]">{loi}</p>;
   if (!d) return null;
   const coChiTiet = d.vongSua.some((v) => v.items.length > 0);
-  if (d.anh.length === 0 && !coChiTiet) return null;
+  // BB-384 — bộ ở bước khách duyệt mà khách không thấy ảnh chỉnh nào trong app.
+  const canhBao = d.canhBao ? (
+    <div
+      role="alert"
+      data-testid="canh-bao-khach-chua-xem-anh-chinh"
+      className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-[var(--bb-danger)] p-3 text-sm"
+    >
+      <p className="min-w-0 flex-1 font-medium text-[var(--bb-danger)]">{d.canhBao}</p>
+      {canWrite && onDongBo && (
+        <button
+          type="button"
+          disabled={ban}
+          onClick={() => void onDongBo()}
+          data-testid="nut-dong-bo-tu-canh-bao"
+          className="h-8 rounded-md border border-[var(--bb-border)] px-3 text-xs font-medium disabled:opacity-40"
+        >
+          Đồng bộ ảnh
+        </button>
+      )}
+    </div>
+  ) : null;
+  if (d.anh.length === 0 && !coChiTiet) {
+    return canhBao ? (
+      <section id="anh-chinh-sua" data-testid="khoi-anh-chinh-admin" className="rounded-lg border border-[var(--bb-border)] p-4">
+        <h2 className="text-base font-medium">Ảnh chỉnh sửa (0 tấm)</h2>
+        {canhBao}
+      </section>
+    ) : null;
+  }
 
   const tenAnh = new Map(d.anh.map((a) => [a.id, a]));
+  const coMuaThem = d.nhom.some((n) => n.khoa !== "goc") || d.vongSua.some((v) => v.khoa !== "goc");
 
   return (
     <section id="anh-chinh-sua" data-testid="khoi-anh-chinh-admin" className="rounded-lg border border-[var(--bb-border)] p-4">
@@ -134,8 +214,9 @@ export function KhoiAnhChinhSuaAdmin({
           </button>
         )}
       </div>
+      {canhBao}
       {hoiLai && (() => {
-        const cau = cauHoiGuiKhach(d.trangThai, d.anh.length);
+        const cau = cauHoiGuiKhach(d.trangThai, d.theoDot ? d.anh.filter((a) => a.khoa === "goc").length : d.anh.length);
         return (
           <div
             role="alertdialog"
@@ -175,9 +256,70 @@ export function KhoiAnhChinhSuaAdmin({
       })()}
       {thongBao && <p className="mt-2 text-sm">{thongBao}</p>}
 
-      {d.anh.length > 0 && (
-        <ul className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
-          {d.anh.map((a) => (
+      {coMuaThem && !d.theoDot && (
+        <p className="mt-2 text-xs text-[var(--bb-fg-muted)]" data-testid="goi-y-0095">
+          Gửi riêng từng đợt mua thêm cần áp migration 0095 — hiện nút “Gửi khách duyệt” gửi chung cả bộ.
+        </p>
+      )}
+      {hoiDot && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="hoi-gui-dot-tieu-de"
+          data-testid="hop-hoi-gui-dot"
+          className="mt-3 rounded-md border border-[var(--bb-fg)] bg-[var(--bb-surface)] p-4 text-sm"
+        >
+          <p id="hoi-gui-dot-tieu-de" className="font-medium">Gửi ảnh {hoiDot.nhan} cho khách duyệt?</p>
+          <p className="mt-1">
+            Khách sẽ thấy {formatSo(hoiDot.soAnh)} ảnh chỉnh của {hoiDot.nhan} ngay trong app và nhận thông báo. Trạng
+            thái bộ ảnh giữ nguyên.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void guiKhach(hoiDot)}
+              data-testid="dong-y-gui-dot"
+              className="h-9 rounded-md bg-[var(--bb-fg)] px-4 font-medium text-[var(--bb-bg)]"
+            >
+              Đồng ý, gửi khách
+            </button>
+            <button type="button" onClick={() => setHoiDot(null)} className="h-9 rounded-md border border-[var(--bb-border)] px-4">
+              Huỷ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {d.nhom.map((n) => (
+        <div key={n.khoa} className="mt-3" data-testid="nhom-anh-chinh-admin" data-khoa={n.khoa}>
+          {coMuaThem && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-medium">
+                {n.nhan} ({formatSo(n.soAnh)} tấm)
+                {n.deXuatBoi && (
+                  <span className="ml-2 text-xs font-normal text-[var(--bb-fg-muted)]">đề xuất bởi {n.deXuatBoi}</span>
+                )}
+                {(d.theoDot || n.khoa === "goc") && (
+                  <span className="ml-2 text-xs font-normal text-[var(--bb-fg-muted)]" data-testid="trang-thai-nhom">
+                    {n.soChuaGui > 0 ? `${formatSo(n.soChuaGui)} tấm mới chưa gửi` : CHU_TRANG_THAI_DOT[n.trangThai]}
+                  </span>
+                )}
+              </p>
+              {canWrite && d.theoDot && n.coTheGui && (
+                <button
+                  type="button"
+                  disabled={ban}
+                  onClick={() => setHoiDot(n)}
+                  data-testid="nut-gui-dot"
+                  className="h-8 rounded-md bg-[var(--bb-fg)] px-3 text-xs font-medium text-[var(--bb-bg)] disabled:opacity-40"
+                >
+                  Gửi khách duyệt {n.nhan}
+                </button>
+              )}
+            </div>
+          )}
+        <ul className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {d.anh.filter((a) => a.khoa === n.khoa).map((a) => (
             <li key={a.id} className="text-[11px] text-[var(--bb-fg-muted)]">
               <div className="relative aspect-square overflow-hidden rounded-md bg-[var(--bb-surface-2)]">
                 {/* eslint-disable-next-line @next/next/no-img-element -- ảnh Drive qua /api/img */}
@@ -195,7 +337,8 @@ export function KhoiAnhChinhSuaAdmin({
             </li>
           ))}
         </ul>
-      )}
+        </div>
+      ))}
 
       {d.vongSua.length > 0 && (
         <div className="mt-4 flex flex-col gap-3">
@@ -208,6 +351,12 @@ export function KhoiAnhChinhSuaAdmin({
               <p className="font-medium">
                 Khách yêu cầu sửa lần {v.round} · {formatNgayVN(v.createdAt)} ·{" "}
                 {v.resolved ? "đã xử lý" : "đang chờ"}
+                {coMuaThem && (
+                  <span className="ml-2 text-xs font-normal" data-testid="dot-vong-sua">
+                    · {v.nhan}
+                    {v.deXuatBoi ? ` · đề xuất bởi ${v.deXuatBoi}` : ""}
+                  </span>
+                )}
                 <span className="ml-2 text-xs font-normal text-[var(--bb-fg-muted)]">
                   Lark: {trangThaiLarkTheoLanSua(v.round).nhan}
                 </span>
@@ -238,6 +387,12 @@ export function KhoiAnhChinhSuaAdmin({
                           vung={it.marks}
                         />
                         <p className="mt-1 text-xs font-medium">{it.fileName}</p>
+                        {coMuaThem && (
+                          <p className="text-xs text-[var(--bb-fg-muted)]" data-testid="dot-muc-sua">
+                            {it.nhan}
+                            {it.deXuatBoi ? ` · đề xuất bởi ${it.deXuatBoi}` : ""}
+                          </p>
+                        )}
                         {it.note && <p className="text-sm" data-testid="ghi-chu-muc-sua">{it.note}</p>}
                         {it.marks.length > 0 && (
                           <p className="text-xs text-[var(--bb-fg-muted)]">{formatSo(it.marks.length)} vùng khoanh</p>

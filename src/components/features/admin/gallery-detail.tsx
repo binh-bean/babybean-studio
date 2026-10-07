@@ -38,6 +38,8 @@ import { YeuCauMoLaiBanner, type ReopenRequestChiTiet } from "./yeu-cau-mo-lai-b
 import { DotChonQuanTri, GhiChuChotDot1, type ChotDot1View, type DotQuanTriView } from "./dot-chon-admin";
 import { PageHeader, PAGE_TITLE_FALLBACK_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
+import type { QuyenThaoTacBoAnh } from "@/lib/auth/quyen-xem-bo-anh";
+import { KhoiTenBe } from "./khoi-ten-be";
 
 import React from "react";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
@@ -55,6 +57,7 @@ import { NutNhanKhach } from "./nut-nhan-khach";
 import { KhoiLinkBoAnhGiaDinh } from "./khoi-link-bo-anh-gia-dinh";
 import { KhoiLinkMoiNguoiThan } from "./khoi-link-moi-nguoi-than";
 import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
+import { KhoiHauKyBoAnh } from "./khoi-hau-ky-bo-anh";
 import { vi } from "@/i18n/vi";
 import { canhBaoUi } from "@/lib/lark/mau-canh-bao-ui";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
@@ -247,6 +250,10 @@ interface Detail {
    */
   babyNickname: string | null;
   babyFullName: string | null;
+  /** BB-379 — bé đã có của khách (chỉ có khi bộ CHƯA gắn bé), để CSKH bấm chọn thay vì gõ lại. */
+  beCuaKhach?: Array<{ id: string; ten: string }>;
+  /** BB-379 — tên người ba mẹ ghi lúc chốt ("Tên ba/mẹ xác nhận"); null = chưa chốt / không có. */
+  nguoiXacNhan?: string | null;
   branchName: string | null;
   /** BB-303 (quan-tri-chi-tiet.png) — tiêu đề "Loại buổi · Bé …" + dòng phụ. */
   packageName: string | null;
@@ -313,7 +320,12 @@ interface Detail {
   }>;
 }
 
-export function GalleryDetail({ galleryId }: { galleryId: string }) {
+/**
+ * BB-382 — `quyen`: nút nào được bày ra, tính ở máy chủ (page.tsx) từ bộ quyền
+ * của người đang xem. Vai chỉ xem (thợ chụp, CTV…) vẫn thấy đủ sản phẩm, thành
+ * phần hợp đồng, ảnh chọn, ghi chú — chỉ không thấy nút sẽ bị route từ chối.
+ */
+export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: QuyenThaoTacBoAnh }) {
   const [detail, setDetail] = React.useState<Detail | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
@@ -353,7 +365,8 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       // Máy chủ có thể trả mã trần ("FORBIDDEN") làm message — nhân viên mở bộ
       // của chi nhánh khác từng thấy đúng chữ đó (BB-230 E-10). Chặn/không có
       // thì nói bằng câu người đọc được.
-      if (res.status === 403) setError("Bạn không có quyền xem bộ ảnh này (bộ thuộc chi nhánh khác).");
+      // BB-382: máy chủ nói đúng lý do (khác chi nhánh / chưa được giao / chưa có quyền).
+      if (res.status === 403) setError(json?.error?.message ?? "Bạn không có quyền xem bộ ảnh này.");
       else if (res.status === 404) setError("Không tìm thấy bộ ảnh này.");
       else setError(json?.error?.message ?? "Không tải được bộ ảnh");
       return;
@@ -545,28 +558,6 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       } else {
         setNotice(`Vẫn chưa đọc được thư mục: ${json?.data?.loi ?? "không rõ lý do"}.`);
       }
-      await load();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /** CSKH chuyển thư mục ảnh đã chỉnh cho khách: in_retouch → chờ khách duyệt. */
-  async function sendRetouched(url: string) {
-    setBusy(true);
-    setNotice(null);
-    try {
-      const res = await fetch(`/api/admin/galleries/${galleryId}/retouch-done`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ finalDriveUrl: url }),
-      });
-      const json = await res.json().catch(() => null);
-      setNotice(
-        res.ok
-          ? "Đã gửi. Bộ ảnh chuyển sang chờ khách duyệt — nhắn cho khách vào link xem."
-          : (json?.error?.message ?? "Không gửi được"),
-      );
       await load();
     } finally {
       setBusy(false);
@@ -851,13 +842,21 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
         onDone={load}
       />
 
+      {/* BB-381 — đơn hậu kỳ mua thêm (bộ 0 ảnh, không có dịch vụ chụp) ↔ bộ gốc của khách. */}
+      <KhoiHauKyBoAnh galleryId={galleryId} />
+
       {/* BB-321 — đợt mua thêm khách vừa chốt (Xác nhận / Từ chối) + ảnh theo
           từng đợt. Tự ẩn khi chưa có đợt nào từ 2 trở đi. */}
       <GhiChuChotDot1 chotDot1={detail.chotDot1} />
+      {/* BB-379 — bộ chưa có tên bé: CSKH điền ngay tại đây (tự ẩn khi đã có bé hoặc không có quyền sửa).
+          BB-383b — theo `quyen.suaThongTin` (route `ten-be` nhận `galleries:edit_info` HOẶC `galleries:write`). */}
+      {!detail.babyFullName && !detail.babyNickname && detail.customerId && quyen.suaThongTin && (
+        <KhoiTenBe galleryId={galleryId} goiY={detail.beCuaKhach ?? []} onDone={load} />
+      )}
       <DotChonQuanTri
         galleryId={galleryId}
         dotChon={detail.dotChon}
-        canConfirm={detail.canEditItems !== false}
+        canConfirm={quyen.ghi}
         onDone={load}
       />
 
@@ -921,7 +920,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                 thoại (khối đó nằm cột phải, rơi khỏi màn hình đầu). BB-320 (Q4):
                 từ `lg` khối "Xuất danh sách ảnh đã chọn" đã thấy ngay ở cột phải,
                 nên lối tắt này chỉ còn dưới `lg` — không có hai nút cùng tên. */}
-            {detail.selectedCount > 0 && (
+            {detail.selectedCount > 0 && quyen.xuat && (
               <a
                 href="#xuat-danh-sach"
                 className="shrink-0 rounded-full border border-[var(--bb-border)] px-3 py-1.5 text-xs text-[var(--bb-fg-muted)] hover:bg-[var(--bb-surface-2)] hover:text-[var(--bb-fg)] lg:hidden"
@@ -934,6 +933,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             {/* BB-308: menu ⋯ gom các thao tác phụ; hành vi/API từng thao tác giữ nguyên. */}
             <MenuThaoTacPhu
               detail={detail}
+              quyen={quyen}
               busy={busy}
               dangLamNong={dangLamNong}
               onDongBoLai={() => void dongBoLai()}
@@ -949,7 +949,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             {/* BB-290 lượt 2 (#36): MỘT nút chính màu mực ở đầu trang. Chỉ trạng
                 thái "submitted" có hành động một-bấm-là-xong ở đây; trên điện
                 thoại nút chuyển xuống thanh ghim đáy (BB-303), không lặp hai nút. */}
-            {detail.status === "submitted" && (
+            {detail.status === "submitted" && quyen.ghi && (
               <div className="hidden shrink-0 flex-col items-end gap-2 lg:flex">
                 {detail.outstanding > 0 && (
                   <p className="max-w-xs text-right text-xs text-[var(--bb-danger)]">
@@ -1015,7 +1015,13 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           // Giờ:phút vẫn ở `phu`.
           label="Chốt lúc"
           value={detail.submittedAt ? formatNgayVN(detail.submittedAt) || "—" : "—"}
-          phu={detail.submittedAt ? formatGioVN(detail.submittedAt) || undefined : undefined}
+          // BB-379 — "tên người xác nhận" ba mẹ ghi lúc chốt đứng cạnh giờ chốt.
+          phu={
+            detail.submittedAt
+              ? [formatGioVN(detail.submittedAt), detail.nguoiXacNhan].filter(Boolean).join(" · ") || undefined
+              : undefined
+          }
+          testId="the-chot-luc"
           chuNho
         />
       </section>
@@ -1034,12 +1040,13 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             changeItem={changeItem}
             addItem={addItem}
             recordPayment={recordPayment}
-            sendRetouched={sendRetouched}
+            dongBoAnh={dongBoLai}
             reopen={reopen}
             dangMoLai={dangMoLai}
             dongMoLai={() => setDangMoLai(false)}
             onDelivered={load}
             galleryId={galleryId}
+            quyen={quyen}
           />
         </div>
         <div className="flex flex-col gap-5 lg:order-2">
@@ -1047,6 +1054,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             galleryId={galleryId}
             detail={detail}
             busy={busy}
+            choSua={quyen.suaThongTin}
             onSave={(thayDoi) => void saveCover(thayDoi)}
           />
 
@@ -1094,7 +1102,10 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                 menu ⋯ nên bộ 0 ảnh trông như "không làm gì được". Nút nằm
                 ngay tại thẻ; bộ đang lỗi thì nút đọc là "Kiểm tra lại". Menu ⋯
                 vẫn giữ các mục cũ. */}
-            {!dangSuaThuMuc && (
+            {/* BB-383 — nút đồng bộ theo `quyen.dongBo` (thợ chụp có `galleries:sync`);
+                "Đổi thư mục" theo `quyen.suaThongTin` (BB-383b: route `drive` nhận
+                `galleries:edit_info` HOẶC `galleries:write`). */}
+            {!dangSuaThuMuc && quyen.dongBo && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -1113,17 +1124,19 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                       ? "Đồng bộ ảnh từ Drive"
                       : "Đồng bộ lại"}
                 </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => {
-                    setThuMucMoi(detail.driveFolderUrl ?? "");
-                    setDangSuaThuMuc(true);
-                  }}
-                  className="text-xs text-[var(--bb-fg-muted)] underline disabled:opacity-40"
-                >
-                  {detail.driveFolderUrl ? "Đổi thư mục" : "Gắn thư mục"}
-                </button>
+                {quyen.suaThongTin && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setThuMucMoi(detail.driveFolderUrl ?? "");
+                      setDangSuaThuMuc(true);
+                    }}
+                    className="text-xs text-[var(--bb-fg-muted)] underline disabled:opacity-40"
+                  >
+                    {detail.driveFolderUrl ? "Đổi thư mục" : "Gắn thư mục"}
+                  </button>
+                )}
               </div>
             )}
 
@@ -1131,7 +1144,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                 thư mục" chuyển vào menu ⋯ ở đầu trang; thẻ này giờ CHỈ còn
                 thông tin (mã thư mục, số ảnh, lần đồng bộ). Form đổi thư mục
                 dưới đây vẫn dùng chung hàm `doiThuMuc`, chỉ đổi cách mở. */}
-            {dangSuaThuMuc && (
+            {dangSuaThuMuc && quyen.suaThongTin && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <input
                   type="url"
@@ -1171,7 +1184,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
             <h2 className="text-base font-medium">Link app</h2>
 
             {/* BB-325 ("đi về đâu") — bộ chưa gắn dòng Hậu Kỳ: nói lý do, cho gắn trước. */}
-            {detail.coDongLark === false && <GanDongLark galleryId={galleryId} onDone={load} />}
+            {detail.coDongLark === false && quyen.ghi && <GanDongLark galleryId={galleryId} onDone={load} />}
 
             {/* BB-368 (anh chốt 06/10) — bộ CÓ khách: link gia đình, bộ này là màn con
                 /k/<mã>/<n>; không còn nút tạo link theo bộ. Bộ KHÔNG có khách (hiếm) hoặc
@@ -1221,7 +1234,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
                     detail={detail}
                     linkDuPhong={linkMoi}
                     busy={busy}
-                    onTaoLink={() => void taoLink()}
+                    onTaoLink={quyen.guiLink ? () => void taoLink() : undefined}
                   />
                 </>
               )}
@@ -1242,7 +1255,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
               đây — lưới 3 cột, nhãn MỘT DÒNG ("Lightroom"/"Excel"/"Văn bản"),
               ghi chú đầy đủ chuyển vào `title`/dòng nhỏ bên dưới thay vì
               chiếm chỗ ngang hàng như trước (từng dài tới 5 dòng ở 390px). */}
-          {detail.selectedCount > 0 && (
+          {detail.selectedCount > 0 && quyen.xuat && (
             <section id="xuat-danh-sach" className="scroll-mt-6 rounded-lg border border-[var(--bb-border)] p-4">
               <h2 className="text-base font-medium">{vi.admin.export.title}</h2>
               {/* BB-327 (chủ studio 29/09): hiện CHỮ ngay trong app + nút Chép, chỉ
@@ -1268,7 +1281,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
           vào layout cha (`admin-layout-shell.tsx`, đã có `p-4 sm:p-6`) — thay
           vào đó thanh này tự mang nền + viền trên để không đè lên chữ cuối
           trang, và `scroll-mb` không cần vì trang chỉ dài thêm một chút. */}
-      {detail.status === "submitted" && (
+      {detail.status === "submitted" && quyen.ghi && (
         <div className="fixed inset-x-0 bottom-0 z-30 flex flex-col gap-1.5 border-t border-[var(--bb-border)] bg-[var(--bb-bg)]/95 p-3 backdrop-blur-sm lg:hidden">
           {detail.outstanding > 0 && (
             <p className="text-center text-xs text-[var(--bb-danger)]">
@@ -1288,7 +1301,7 @@ export function GalleryDetail({ galleryId }: { galleryId: string }) {
       )}
       {/* Đệm dưới cùng bằng chiều cao thanh ghim, để nội dung cuối trang
           (Dòng thời gian hoạt động) không bị thanh che mất trên điện thoại. */}
-      {detail.status === "submitted" && <div className="h-24 lg:hidden" aria-hidden="true" />}
+      {detail.status === "submitted" && quyen.ghi && <div className="h-24 lg:hidden" aria-hidden="true" />}
     </div>
   );
 }
@@ -1305,20 +1318,24 @@ function KhoiChinh({
   changeItem,
   addItem,
   recordPayment,
-  sendRetouched,
+  dongBoAnh,
   reopen,
   onDelivered,
   galleryId,
   dangMoLai,
   dongMoLai,
+  quyen,
 }: {
   detail: Detail;
   busy: boolean;
   locked: boolean;
+  /** BB-382 — nút nào được bày ra (xem `GalleryDetail`). */
+  quyen: QuyenThaoTacBoAnh;
   changeItem: (method: "PATCH" | "DELETE", body: Record<string, unknown>) => Promise<void>;
   addItem: (productId: string, quantity: number) => Promise<void>;
   recordPayment: (amount: number, method: string, note: string, discountPercent: number | null, xacNhan?: TuyChonXacNhan) => Promise<void>;
-  sendRetouched: (url: string) => Promise<void>;
+  /** BB-384 — kéo ảnh từ Drive (cả thư mục con "ảnh chỉnh sửa"); thay đường dán link Drive cũ. */
+  dongBoAnh: () => Promise<void>;
   reopen: (reason: string, dot?: number) => Promise<void>;
   /** BB-311 — tải lại dữ liệu sau khi đánh dấu đã giao ảnh thành công. */
   onDelivered: () => Promise<void>;
@@ -1336,7 +1353,8 @@ function KhoiChinh({
   // là ranh giới an ninh thật (đã có sẵn, xem loadEditableGallery()).
   // `undefined` (API cũ chưa trả field này) coi như CÓ quyền — giữ hành vi cũ
   // để không đột ngột ẩn nút với ai đó chưa kịp tải lại.
-  const canSuaDong = detail.canEditItems !== false;
+  // BB-382: lấy từ `quyen.ghi` (máy chủ tính từ CÙNG quyền `galleries:write`).
+  const canSuaDong = quyen.ghi;
 
   /**
    * BB-313 mục 2 — "Có xác nhận khi xoá". Trước bản vá, nút "bỏ" gọi thẳng
@@ -1602,6 +1620,7 @@ function KhoiChinh({
             Tiền thu ngoài app. Đây chỉ là chỗ đánh dấu đã thu. Ghi sai thì ghi thêm
             một dòng trừ kèm lý do — dòng cũ không sửa được.
           </p>
+          {quyen.ghi ? (
           <PaymentForm
             disabled={busy}
             conThieu={detail.amountToCollect}
@@ -1610,6 +1629,11 @@ function KhoiChinh({
             sanPhamQuaLark={detail.sanPhamQuaLark ?? 0}
             onSubmit={(a, m, n, pt, xn) => recordPayment(a, m, n, pt, xn)}
           />
+          ) : (
+            <p data-testid="thanh-toan-chi-xem" className="mt-2 text-xs text-[var(--bb-fg-muted)]">
+              Vai của bạn chỉ xem — ghi thu do CSKH hoặc Admin.
+            </p>
+          )}
         </section>
       )}
 
@@ -1749,9 +1773,10 @@ function KhoiChinh({
           Khối tự ẩn khi bộ không có ảnh chỉnh. */}
       <KhoiAnhChinhSuaAdmin
         galleryId={galleryId}
-        canWrite
+        canWrite={quyen.guiAnhChinh}
         onDaGui={onDelivered}
         onBietCoAnhChinh={setCoAnhChinhTrongApp}
+        onDongBo={dongBoAnh}
       />
 
       {/* BB-371 — khối cũ (gửi link Drive) chỉ cho bộ KHÔNG có ảnh chỉnh trong app. */}
@@ -1776,12 +1801,24 @@ function KhoiChinh({
               </p>
             ))}
 
-          {detail.status === "in_retouch" && (
-            <RetouchSender
-              defaultUrl={detail.finalDriveUrl ?? ""}
-              disabled={busy}
-              onSubmit={(u) => void sendRetouched(u)}
-            />
+          {/* BB-384 — không còn dán link Drive ảnh chỉnh cho khách: khách duyệt từng tấm
+              NGAY TRONG APP. Ảnh chỉnh phải về app trước (thư mục con "ảnh chỉnh sửa"). */}
+          {(detail.status === "in_retouch" || detail.status === "awaiting_approval") && quyen.ghi && (
+            <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="huong-dan-gui-duyet-trong-app">
+              <p className="min-w-0 flex-1 text-sm text-[var(--bb-fg-muted)]">
+                Gửi khách duyệt đi qua ảnh chỉnh trong app: thợ chỉnh bỏ ảnh vào thư mục con “ảnh chỉnh sửa” trên
+                Drive → bấm Đồng bộ ảnh → khối “Ảnh chỉnh sửa” hiện ra → bấm Gửi khách duyệt.
+              </p>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void dongBoAnh()}
+                data-testid="nut-dong-bo-anh-chinh"
+                className="rounded-md bg-[var(--bb-fg)] px-3 py-2 text-sm text-[var(--bb-bg)] disabled:opacity-40"
+              >
+                Đồng bộ ảnh
+              </button>
+            </div>
           )}
 
           {detail.status === "awaiting_approval" && (
@@ -1837,7 +1874,7 @@ function KhoiChinh({
       {/* BB-345 — tấm gia đình (link mời) thả tim; ẩn khi chưa có tim / chưa áp 0083. */}
       <TimGiaDinhBlock galleryId={galleryId} />
 
-      <YeuCauMuaThemBlock galleryId={galleryId} />
+      <YeuCauMuaThemBlock galleryId={galleryId} choSua={quyen.ghi} />
 
       {/*
         BB-200 (3/3) — form chỉ hiện khi nhân viên CÓ quyền `galleries:reopen`.
@@ -1906,6 +1943,7 @@ function KhoiChinh({
  */
 function MenuThaoTacPhu({
   detail,
+  quyen,
   busy,
   dangLamNong,
   onDongBoLai,
@@ -1916,6 +1954,8 @@ function MenuThaoTacPhu({
   onGiaHan,
 }: {
   detail: Detail;
+  /** BB-382 — chỉ bày mục mà vai này dùng được; không còn mục nào thì ẩn luôn nút ⋯. */
+  quyen: QuyenThaoTacBoAnh;
   busy: boolean;
   dangLamNong: boolean;
   onDongBoLai: () => void;
@@ -1946,7 +1986,9 @@ function MenuThaoTacPhu({
 
   const coTheMoLai =
     luaChonMoLai(detail.status, cacDotTomTat(detail)).duoc && detail.canReopen === true;
-  const coTheGiaHan = !!detail.shareLink && detail.shareLink.status !== "active";
+  const coTheGiaHan = quyen.guiLink && !!detail.shareLink && detail.shareLink.status !== "active";
+  const coTheTaoLink = quyen.guiLink && !detail.customerId;
+  if (!quyen.suaThongTin && !quyen.dongBo && !quyen.guiLink && !coTheMoLai) return null;
 
   return (
     <div ref={hopRef} className="relative shrink-0">
@@ -1966,33 +2008,41 @@ function MenuThaoTacPhu({
           aria-label="Thao tác khác"
           className="absolute right-0 z-20 mt-2 w-64 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-surface)] p-1.5 shadow-lg"
         >
-          <MenuMuc
-            disabled={busy || !detail.driveFolderUrl}
-            onClick={() => {
-              setOpen(false);
-              onDongBoLai();
-            }}
-          >
-            Đồng bộ lại
-          </MenuMuc>
-          <MenuMuc
-            disabled={busy}
-            onClick={() => {
-              setOpen(false);
-              onMoDoiThuMuc();
-            }}
-          >
-            Đổi thư mục
-          </MenuMuc>
-          <MenuMuc
-            disabled={dangLamNong}
-            onClick={() => {
-              setOpen(false);
-              onLamNongAnh();
-            }}
-          >
-            {dangLamNong ? "Đang chuẩn bị…" : "Chuẩn bị ảnh bìa"}
-          </MenuMuc>
+          {quyen.dongBo && (
+            <MenuMuc
+              disabled={busy || !detail.driveFolderUrl}
+              onClick={() => {
+                setOpen(false);
+                onDongBoLai();
+              }}
+            >
+              Đồng bộ lại
+            </MenuMuc>
+          )}
+          {quyen.suaThongTin && (
+            <>
+              <MenuMuc
+                disabled={busy}
+                onClick={() => {
+                  setOpen(false);
+                  onMoDoiThuMuc();
+                }}
+              >
+                Đổi thư mục
+              </MenuMuc>
+            </>
+          )}
+          {quyen.guiLink && (
+            <MenuMuc
+              disabled={dangLamNong}
+              onClick={() => {
+                setOpen(false);
+                onLamNongAnh();
+              }}
+            >
+              {dangLamNong ? "Đang chuẩn bị…" : "Chuẩn bị ảnh bìa"}
+            </MenuMuc>
+          )}
           {coTheMoLai && (
             <MenuMuc
               disabled={busy}
@@ -2005,7 +2055,7 @@ function MenuThaoTacPhu({
             </MenuMuc>
           )}
           {/* BB-368 — bộ có khách dùng link gia đình: không còn tạo link theo bộ. */}
-          {!detail.customerId && (
+          {coTheTaoLink && (
             <MenuMuc
               disabled={busy || detail.photoCount === 0}
               onClick={() => {
@@ -2105,50 +2155,6 @@ function QuantityEditor({
   );
 }
 
-/**
- * Ô nhập link thư mục ảnh đã chỉnh.
- *
- * Nút gửi TẮT khi ô trống. Route API cũng chặn, nhưng để bấm được rồi mới báo
- * lỗi thì nhân viên đã kịp nghĩ là mình gửi xong.
- */
-function RetouchSender({
-  defaultUrl,
-  disabled,
-  onSubmit,
-}: {
-  defaultUrl: string;
-  disabled?: boolean;
-  onSubmit: (url: string) => void;
-}) {
-  const [url, setUrl] = React.useState(defaultUrl);
-  // Chỉ là để bật/tắt nút. Route API mới kiểm thật — màn hình không phải
-  // ranh giới an ninh.
-  const trimmed = url.trim();
-  const valid = trimmed.startsWith("http") && trimmed.length > 12 && !trimmed.includes(" ");
-
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <input
-        type="url"
-        name="finalDriveUrl"
-        value={url}
-        disabled={disabled}
-        onChange={(e) => setUrl(e.target.value)}
-        placeholder="Link thư mục ảnh đã chỉnh"
-        aria-label="Link thư mục ảnh đã chỉnh"
-        className="min-w-64 flex-1 rounded border border-[var(--bb-border)] px-2 py-2 text-sm"
-      />
-      <button
-        type="button"
-        disabled={disabled || !valid}
-        onClick={() => onSubmit(trimmed)}
-        className="rounded-md bg-[var(--bb-fg)] px-3 py-2 text-sm text-[var(--bb-bg)] disabled:opacity-40"
-      >
-        Gửi file đã chỉnh cho khách
-      </button>
-    </div>
-  );
-}
 
 /**
  * Ô ghi lý do mở lại.

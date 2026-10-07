@@ -48,11 +48,6 @@ interface DuLieu {
  */
 let banCuoi: DuLieu | null = null;
 
-/** Chỉ cho phép thử: xoá bản nhớ giữa các ca. */
-export function __xoaBanCuoiBanGhiMoi() {
-  banCuoi = null;
-}
-
 function gioPhut(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Ho_Chi_Minh" });

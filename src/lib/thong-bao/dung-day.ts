@@ -79,14 +79,6 @@ export async function dangKyServiceWorker(galleryId: string): Promise<ServiceWor
   return reg;
 }
 
-/** Đăng ký đang có sẵn cho trang này, nếu có. */
-export async function docDangKyHienCo(): Promise<PushSubscription | null> {
-  if (!hoTroPush()) return null;
-  const reg = await navigator.serviceWorker.getRegistration("/");
-  if (!reg) return null;
-  return reg.pushManager.getSubscription();
-}
-
 /**
  * Xin quyền thông báo rồi đăng ký Web Push cho `galleryId`. Trả `true` khi
  * đăng ký thành công (quyền `granted` + gửi lên `/api/g/thong-bao` thành

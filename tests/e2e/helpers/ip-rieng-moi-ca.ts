@@ -26,6 +26,15 @@ import { test as goc, expect } from "@playwright/test";
 const daiIp = `10.${((process.pid ?? 1) % 200) + 1}.${Math.floor(Math.random() * 250) + 1}`;
 let dem = 0;
 
+/**
+ * BB-388 — một IP riêng nữa cho trang/ngữ cảnh ca thử tự mở bằng `browser.newPage()` (ngữ
+ * cảnh mới KHÔNG mang `extraHTTPHeaders` của fixture bên dưới, nên lại đi từ `::1` chung túi).
+ */
+export function ipMoi(): string {
+  dem += 1;
+  return `${daiIp}.${dem}`;
+}
+
 export const test = goc.extend({
   // Ghi đè tuỳ chọn `extraHTTPHeaders` bằng một fixture, không dùng
   // `browser.newContext()` tự tạo: làm thế là mất sạch tuỳ chọn trong
@@ -35,8 +44,7 @@ export const test = goc.extend({
   // react-hooks nhìn `use(...)` là hook React gọi sai chỗ và báo lỗi. Playwright
   // truyền theo vị trí, không theo tên.
   extraHTTPHeaders: async ({ extraHTTPHeaders }, dung) => {
-    dem += 1;
-    await dung({ ...extraHTTPHeaders, "x-forwarded-for": `${daiIp}.${dem}` });
+    await dung({ ...extraHTTPHeaders, "x-forwarded-for": ipMoi() });
   },
 });
 

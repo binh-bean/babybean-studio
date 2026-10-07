@@ -16,6 +16,7 @@ import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { soNgayHanChot } from "@/lib/gallery/han-chot";
 import { giaAnhChonThemMacDinh } from "@/lib/gallery/gia-anh-chon-them";
+import { docBangGiaRieng } from "@/lib/gallery/gia-goi-chup-server";
 import { danhSachPhoto } from "@/lib/lark/photo-hau-ky";
 
 export const runtime = "nodejs";
@@ -76,6 +77,14 @@ export async function GET(): Promise<Response> {
        * giá trị TRƯỚC khi chọn gói / khi gói không có giá riêng.
        */
       macDinhGiaAnhChonThem: await giaAnhChonThemMacDinh(admin),
+      /**
+       * BB-385 — giá ảnh chọn thêm RIÊNG theo gói (mã `LARK-<TÊN>` → giá), Admin
+       * đặt ở màn Gói chụp. Thuật sĩ tra theo gói của dòng Lark đã chọn; gói
+       * không có trong đây dùng `macDinhGiaAnhChonThem`. Migration 0100 chưa
+       * áp → `{}` (mọi gói dùng giá chung).
+       */
+      // Đọc hụt vì lý do khác cũng không được làm hỏng thuật sĩ: rơi về giá chung.
+      giaAnhThemTheoGoi: (await docBangGiaRieng(admin).catch(() => ({ bang: {} as Record<string, number> }))).bang,
       branches: branches ?? [],
       packages: (packages ?? []).map((p) => ({
         id: p.id,

@@ -9,6 +9,8 @@
  * Chạy:  npm run sync:hauky            xem trước, không ghi gì
  *        npm run sync:hauky -- --write ghi thật
  *        npm run sync:hauky -- --limit 20   chỉ lấy 20 bộ đầu, để thử
+ *        npm run sync:hauky -- --dien-ten-be           BB-379: đếm bộ ảnh chưa có tên bé mà Lark có tên (không ghi)
+ *        npm run sync:hauky -- --dien-ten-be --write   điền tên bé cho các bộ đó (CHỈ khi bộ còn trống)
  *
  * ---------------------------------------------------------------------------
  * Album neo vào BẢN GHI HẬU KỲ, không neo vào mã hợp đồng
@@ -42,6 +44,7 @@
 import { createHash } from "node:crypto";
 import { choPhepTenThat } from "../src/lib/lark/muc-tieu-du-lieu.ts";
 import { parseFolderName } from "../src/lib/drive/parse-folder-name.ts";
+import { taoBoTraCuuTenBe } from "../src/lib/lark/ten-be-tu-lark.ts";
 import pg from "pg";
 
 const HOST = "https://open.larksuite.com/open-apis";
@@ -264,6 +267,96 @@ async function main() {
   // rồi chỉ UPDATE tên / số điện thoại / ghi chú cho khách ĐÃ CÓ. Không chèn
   // khách mới, không dựng album, không đụng buổi chụp — nên chạy lại bao nhiêu
   // lần cũng ra cùng một kết quả.
+  // --- BB-379: điền TÊN BÉ cho bộ ảnh đã có mà chưa gắn bé ----------------------------
+  //
+  // Bảng Hậu Kỳ không có cột tên bé; tên nằm ở "Lịch Chụp" (từng buổi) và "Khách Hàng"
+  // (Tên Bé 1 / Tên bé 2). Luật chọn ở src/lib/lark/ten-be-tu-lark.ts: không mơ hồ mới điền.
+  // CHỈ điền bộ đang trống (`baby_id is null`) — không đè bé CSKH đã gắn tay. Mặc định chỉ ĐẾM.
+  if (process.argv.includes("--dien-ten-be")) {
+    const khachHang = await readTable(auth, baseToken, /Khách Hàng/i);
+    const lichChup = await readTable(auth, baseToken, /Lịch Chụp/i);
+    const bo = taoBoTraCuuTenBe({ khachHang, lichChup });
+    console.log(
+      `Lark: ${khachHang.length} khách (${bo.soMaKhachCoTenBe} có tên bé), ${lichChup.length} buổi chụp (${bo.soHopDongCoTenBe} hợp đồng có tên bé).`,
+    );
+    const haukyTheoId = new Map();
+    for (const r of hauky) {
+      haukyTheoId.set(cellText(r.fields["record ID"]).trim() || r.record_id, r);
+      haukyTheoId.set(r.record_id, r);
+    }
+
+    const client = new pg.Client({ connectionString: dbUrl });
+    await client.connect();
+    try {
+      const { rows: bo0 } = await client.query(
+        `select g.id, g.customer_id, g.shoot_id, g.lark_hauky_record_id rid
+           from galleries g left join babies b on b.id = g.baby_id
+          where g.baby_id is null
+             or (btrim(coalesce(b.full_name, '')) = '' and btrim(coalesce(b.nickname, '')) = '')`,
+      );
+      const dem = { chuaCoTenBe: bo0.length, khongCoDongHauKy: 0, dienDuoc: 0, moHo: 0, khongCoTenTrenLark: 0, theoNguon: {} };
+      const sePhep = [];
+      for (const g of bo0) {
+        const r = g.rid ? haukyTheoId.get(g.rid) : null;
+        if (!r) {
+          dem.khongCoDongHauKy++;
+          continue;
+        }
+        const kq = bo.tra(r.fields, null);
+        if (kq.ten) {
+          dem.dienDuoc++;
+          dem.theoNguon[kq.nguon] = (dem.theoNguon[kq.nguon] ?? 0) + 1;
+          sePhep.push({ g, ten: kq.ten });
+        } else if (kq.moHo) dem.moHo++;
+        else dem.khongCoTenTrenLark++;
+      }
+      console.log("Bộ ảnh chưa có tên bé:", JSON.stringify(dem));
+
+      if (!write) {
+        console.log(`Xem trước, chưa ghi gì: có thể tự điền ${dem.dienDuoc}/${dem.chuaCoTenBe} bộ. Thêm -- --write để ghi thật.`);
+        return;
+      }
+      if (!choPhepTenThat(dbUrl)) {
+        console.error("Đích này không được phép nhận tên thật — không ghi tên bé.");
+        process.exit(1);
+      }
+      let daGhi = 0;
+      for (const { g, ten } of sePhep) {
+        await client.query("begin");
+        try {
+          const { rows: cu } = await client.query(
+            `select id from babies where customer_id = $1 and lower(btrim(full_name)) = lower($2) limit 1`,
+            [g.customer_id, ten],
+          );
+          let babyId = cu[0]?.id;
+          if (!babyId) {
+            const { rows: moi } = await client.query(
+              `insert into babies (customer_id, full_name) values ($1, $2) returning id`,
+              [g.customer_id, ten],
+            );
+            babyId = moi[0].id;
+          }
+          const { rowCount } = await client.query(
+            `update galleries set baby_id = $2, updated_at = now() where id = $1 and baby_id is null`,
+            [g.id, babyId],
+          );
+          if (rowCount) {
+            daGhi++;
+            if (g.shoot_id) await client.query(`update shoots set baby_id = $2 where id = $1 and baby_id is null`, [g.shoot_id, babyId]);
+          }
+          await client.query("commit");
+        } catch (err) {
+          await client.query("rollback");
+          throw err;
+        }
+      }
+      console.log(`Đã điền tên bé cho ${daGhi} bộ ảnh.`);
+    } finally {
+      await client.end();
+    }
+    return;
+  }
+
   if (process.argv.includes("--lam-moi-ten")) {
     if (!choPhepTenThat(dbUrl)) {
       console.error("Đích này không được phép nhận tên thật — không có gì để làm mới.");
@@ -428,12 +521,22 @@ async function main() {
         shootDate,
         larkStatus: cellText(f["Trạng Thái"]).trim(),
 
+        // BB-379: các ô của bản ghi đầu tiên — tra tên bé từ Lịch Chụp / Khách Hàng khi thư mục không có.
+        haukyFields: f,
         rawCustomerName: cellText(f["Tên KH"]).trim(),
         rawPhone: cellText(f["SDT KH"]).trim(),
         rawNote: cellText(f["Ghi Chú"]).trim(),
         driveFolderText: cellText(f["Link ảnh gửi khách"]).trim(),
       });
     }
+
+    // BB-379: tên bé dự phòng từ Lark (chỉ khi đích nhận tên thật — cùng chốt với tên khách).
+    const boTenBe = fullMapping
+      ? taoBoTraCuuTenBe({
+          khachHang: await readTable(auth, baseToken, /Khách Hàng/i),
+          lichChup: await readTable(auth, baseToken, /Lịch Chụp/i),
+        })
+      : null;
 
     const plan = [...byFolder.values()].map((g) => {
       let customerName = `KH · ${g.customerKey ?? g.contractCodes[0]}`;
@@ -456,6 +559,8 @@ async function main() {
           const bocTen = parseFolderName(g.driveFolderText);
           babyName = bocTen.babyName || null;
         }
+        // Thư mục không có tên bé trong ngoặc → tra Lịch Chụp / Khách Hàng (chỉ khi KHÔNG mơ hồ).
+        if (!babyName && boTenBe) babyName = boTenBe.tra(g.haukyFields, null).ten;
       }
 
       return {

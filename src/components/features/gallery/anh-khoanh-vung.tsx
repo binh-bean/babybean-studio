@@ -53,7 +53,7 @@ export function AnhKhoanhVung({
 
   return (
     <div
-      className={`relative select-none ${dangKhoanh ? "cursor-crosshair" : ""} ${className ?? ""}`}
+      className={`relative select-none ${dangKhoanh ? "cursor-crosshair" : "cursor-pointer"} ${className ?? ""}`}
       style={{ aspectRatio: `1 / ${r}` }}
       onClick={cham}
       data-testid="anh-khoanh"
@@ -89,6 +89,7 @@ export function AnhKhoanhVung({
             stroke="#e0566b"
             strokeWidth={6}
             strokeDasharray="18 10"
+            className="cursor-pointer"
             data-testid="vung-khoanh"
             style={{ pointerEvents: dangKhoanh && onBo ? "auto" : "none", cursor: "pointer" }}
             onClick={(e) => {

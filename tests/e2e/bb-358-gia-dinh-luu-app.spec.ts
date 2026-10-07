@@ -11,6 +11,7 @@
  * Dữ liệu: "Fixture BB-358-…" (fixture bb-345 với tiền tố riêng), dọn theo id.
  * Chạy: PW_PORT=3241 npx playwright test tests/e2e/bb-358-gia-dinh-luu-app.spec.ts --workers=1
  */
+import { daMoLanTruoc } from "./helpers/luu-app";
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import { taoBb345, donBb345, type DuLieuBb345 } from "../fixtures/bb-345";
 
@@ -34,14 +35,16 @@ test.afterAll(async () => {
 test("gia đình thấy chip lưu app (lời cho gia đình) và mở được hướng dẫn — 390", async ({ page }) => {
   const du = d!;
   await page.setViewportSize({ width: 390, height: 844 });
-  // Luật tần suất 7 ngày đọc localStorage: trình duyệt mới thì chưa từng ẩn.
+  // BB-378 — lời mời hiện đúng lúc: gia đình mở lại lần thứ 2.
+  await daMoLanTruoc(page);
   await page.goto(`/g/${du.A.maGiaDinh}`);
   await expect(page.getByTestId("the-anh").first()).toBeVisible({ timeout: 30_000 });
 
   const chip = page.getByTestId("goi-y-luu-app");
   await chip.scrollIntoViewIfNeeded();
   await expect(chip).toBeVisible();
-  await expect(chip).toContainText("Lưu vào màn hình chính để gia đình mở lại ảnh của bé nhanh hơn ạ");
+  await expect(chip).toContainText("Mở ảnh của bé chỉ bằng một chạm");
+  await expect(chip).toContainText("lần sau gia đình không phải tìm lại tin nhắn");
 
   // Chip nằm trong dòng chảy trang: không phải lớp `fixed` đè lên thanh đáy.
   const viTri = await chip.evaluate((el) => {
@@ -54,7 +57,7 @@ test("gia đình thấy chip lưu app (lời cho gia đình) và mở được h
   });
   expect(viTri).toBe("dong-chay");
 
-  await chip.getByRole("button", { name: /gia đình mở lại ảnh/ }).click();
+  await chip.getByTestId("goi-y-xem-cach-luu").click();
   const huongDan = page.getByRole("dialog");
   await expect(huongDan).toBeVisible();
   await expect(huongDan).not.toContainText(/ba mẹ/i);

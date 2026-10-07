@@ -25,7 +25,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requireMotTrongCacQuyen, requireBranch, AuthError } from "@/lib/auth/staff";
+import { CAC_QUYEN_SUA_THONG_TIN } from "@/lib/auth/quyen-xem-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 
@@ -66,7 +67,9 @@ export async function PATCH(
     const staff = await requireStaff();
     // Cùng bộ vai với sửa các trường khác của bộ ảnh (drive, items): kế toán,
     // thợ chỉnh ảnh, cộng tác viên photoshop KHÔNG đổi bìa gửi khách.
-    requirePermission(staff, "galleries:write");
+    // BB-383b: bìa (ảnh, tiêu đề, lời chào) là thông tin bộ — thợ chụp sửa được
+    // bằng `galleries:edit_info`; route không có trường tiền/trạng thái nào.
+    requireMotTrongCacQuyen(staff, CAC_QUYEN_SUA_THONG_TIN);
 
     const admin = createAdminClient();
 

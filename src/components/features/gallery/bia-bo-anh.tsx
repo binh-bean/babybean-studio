@@ -8,6 +8,7 @@ import { tinhDoSang, chonMauChu } from "@/lib/utils/do-sang";
 import { coChuTieuDeBia, dongChiNhanh, formatSo } from "@/lib/utils/dinh-dang";
 import { vi } from "@/i18n";
 import { cauBiaKhach } from "@/lib/lark/trang-thai-app-lark";
+import type { KhoiVungDuyet } from "@/lib/anh-chinh-sua/vong-duyet";
 import { giuA } from "@/lib/utils/giu-a";
 
 
@@ -82,6 +83,12 @@ export interface BiaBoAnhProps {
    * "đang chỉnh" khi thẻ còn "chờ xác nhận".
    */
   giaiDoanTienDo?: number | null;
+  /**
+   * BB-387 — kết quả `khoiVungDuyet(...)` của màn khách. "dang_chuan_bi" (bước Duyệt ảnh mà
+   * app chưa có ảnh chỉnh) → câu trạng thái của bìa là lời Bean đang chuẩn bị, KHÔNG
+   * "đã chỉnh xong, mời ba mẹ duyệt" — cùng ý với thẻ hành trình (BB-386).
+   */
+  khoiDuyet?: KhoiVungDuyet;
   /**
    * BB-353 mục 5 — người thân được mời (link gia đình, vai xem): không chọn ảnh
    * vào gói, chỉ thả tim rồi "Đặt chỉnh sửa"/đặt in. Bìa nói đúng việc đó và
@@ -214,6 +221,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     ngayGiao,
     trangThai,
     giaiDoanTienDo = null,
+    khoiDuyet,
     laNguoiXem = false,
     nutMoiOngBa,
     onBatDau,
@@ -278,7 +286,7 @@ export function BiaBoAnh(props: BiaBoAnhProps) {
     laNguoiXem && !khoa
       ? vi.gallery.loiBean.nguoiThanThaTim
       : trangThai === "delivered" || khoa
-        ? cauBiaKhach(trangThai ?? "ready", giaiDoanTienDo, tenBe, { khoa })
+        ? cauBiaKhach(trangThai ?? "ready", giaiDoanTienDo, tenBe, { khoa, khoiDuyet })
         : vi.gallery.loiBean.sanSangChon.replace("{n}", formatSo(soAnh));
   // BB-353 — khi đã khoá (sau chốt) hoặc với người thân được mời, câu trạng
   // thái/hướng dẫn thắng lời chào studio tự soạn (lời chào viết cho lúc mời

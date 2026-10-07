@@ -15,6 +15,7 @@
  * `reminder_days` bỗng là chuỗi thay vì mảng số.
  */
 import { z } from "zod";
+import { KHOA_SO_NGAY_SUA, SO_NGAY_SUA_TOI_DA } from "@/lib/anh-chinh-sua/han-sua";
 
 /** Nhóm để màn hình xếp ô, không ảnh hưởng gì tới dữ liệu. */
 export type NhomCaiDat = "album" | "anh" | "quang-cao" | "lien-lac" | "thanh-toan";
@@ -67,6 +68,8 @@ export const CAI_DAT_SUA_DUOC: DinhNghiaCaiDat[] = [
   },
   { key: "gallery.link_ttl_days", nhom: "album", schema: soNgay(1, 365) },
   { key: "gallery.invite_default", nhom: "album", schema: z.boolean() },
+  // BB-387 — "Bean sẽ gửi lại ảnh đã sửa trong khoảng {n} ngày": ước tính, không hứa cứng.
+  { key: KHOA_SO_NGAY_SUA, nhom: "album", schema: soNgay(1, SO_NGAY_SUA_TOI_DA) },
 
   // --- Ảnh -----------------------------------------------------------------
   { key: "gallery.watermark_default", nhom: "anh", schema: z.boolean() },

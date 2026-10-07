@@ -9,18 +9,32 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, AuthError } from "@/lib/auth/staff";
+import { xetQuyenXemBoAnh, CAU_CHAN_BO_ANH } from "@/lib/auth/quyen-xem-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ghepAnhChinhVoiGoc, laAnhChuaGui, chuanHoaVung, TRANG_THAI_GUI_DUOC } from "@/lib/anh-chinh-sua/nhan-dien";
+import { laAnhChuaGui, chuanHoaVung, TRANG_THAI_GUI_DUOC } from "@/lib/anh-chinh-sua/nhan-dien";
+import { canhBaoKhachChuaXem } from "@/lib/anh-chinh-sua/vong-duyet";
+import { maLarkConHieuLuc } from "@/lib/gallery-status";
+import { giaiDoanCua } from "@/lib/lark/trang-thai-hau-ky";
 import {
   BUCKET_ANH_MAU,
   HAN_URL_KY_GIAY,
   coBangChiTiet,
-  docAnhChinh,
-  docAnhGoc,
+  docBoiCanhAnhChinh,
   docChiTietVong,
-  docMocGui,
+  docVongSua,
+  khachThayTrongBoiCanh,
 } from "@/lib/anh-chinh-sua/du-lieu";
+import {
+  KHOA_TRONG_GOI,
+  gomTheoDot,
+  guiDuocDotMuaThem,
+  laKhoaMuaThem,
+  mocGuiCuaKhoa,
+  nhanCuaKhoa,
+  trangThaiDuyetDot,
+  trangThaiDuyetTrongGoi,
+} from "@/lib/anh-chinh-sua/theo-dot";
 
 export const runtime = "nodejs";
 
@@ -39,36 +53,26 @@ export async function GET(
     const admin = createAdminClient();
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, branch_id, status, editor_id")
+      .select("id, branch_id, status, editor_id, lark_trang_thai, lark_trang_thai_tu, reopened_at")
       .eq("id", galleryId)
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
-    requireBranch(staff, gallery.branch_id);
-    if (staff.role === "photoshop_ctv" && gallery.editor_id !== staff.staffId) {
-      return fail("FORBIDDEN", "Bộ ảnh này không giao cho bạn");
-    }
+    // BB-383 — cùng luật với màn chi tiết (BB-382): xem được màn thì API trả được, và ngược lại.
+    const lyDoChan = xetQuyenXemBoAnh(staff, gallery as { branch_id: string; editor_id: string | null });
+    if (lyDoChan) return fail("FORBIDDEN", CAU_CHAN_BO_ANH[lyDoChan].tieuDe);
 
-    const [anhChinh, guiLuc, { data: vong }, chiTiet, coBang] = await Promise.all([
-      docAnhChinh(admin, galleryId),
-      docMocGui(admin, galleryId),
-      admin
-        .from("revision_requests")
-        .select("id, round, note, created_at, resolved_at")
-        .eq("gallery_id", galleryId)
-        .order("round", { ascending: false }),
+    const [bc, vong, chiTiet, coBang] = await Promise.all([
+      docBoiCanhAnhChinh(admin, galleryId),
+      docVongSua(admin, galleryId, false),
       docChiTietVong(admin, galleryId),
       coBangChiTiet(admin),
     ]);
-
-    const goc = anhChinh.length > 0 ? await docAnhGoc(admin, galleryId) : [];
-    const ghep = ghepAnhChinhVoiGoc(
-      anhChinh.map((a) => ({ id: a.id, fileName: a.file_name })),
-      goc.map((g) => ({ id: g.id, fileName: g.file_name })),
-    );
-    const gocTheoId = new Map(goc.map((g) => [g.id, g]));
+    const theoDot = bc.mocDot !== null;
+    const guiLuc = bc.mocChung;
+    const gocTheoId = new Map(bc.goc.map((g) => [g.id, g]));
     const tenTheoId = new Map<string, string>([
-      ...anhChinh.map((a) => [a.id, a.file_name] as [string, string]),
-      ...goc.map((g) => [g.id, g.file_name] as [string, string]),
+      ...bc.anhChinh.map((a) => [a.id, a.file_name] as [string, string]),
+      ...bc.goc.map((g) => [g.id, g.file_name] as [string, string]),
     ]);
 
     // URL ký cho mọi ảnh mẫu trong một lượt.
@@ -79,46 +83,108 @@ export async function GET(
       for (const k of ky ?? []) if (k.path && k.signedUrl) urlKy.set(k.path, k.signedUrl);
     }
 
-    const anh = anhChinh.map((a) => {
-      const g = gocTheoId.get(ghep.get(a.id) ?? "");
+    const anh = bc.anhChinh.map((a) => {
+      const g = gocTheoId.get(bc.gocCua.get(a.id) ?? "");
+      const khoa = bc.khoaCua.get(a.id) ?? KHOA_TRONG_GOI;
       return {
         id: a.id,
         fileName: a.file_name,
         width: a.width,
         height: a.height,
         taoLuc: a.created_at,
-        chuaGui: laAnhChuaGui(guiLuc, a.created_at),
+        khoa,
+        // BB-377 — ảnh mua thêm theo mốc gửi của ĐÚNG đợt nó (đã áp 0095).
+        chuaGui: laAnhChuaGui(mocGuiCuaKhoa(khoa, guiLuc, bc.mocDot), a.created_at),
         goc: g ? { id: g.id, fileName: g.file_name } : null,
       };
     });
-    const soChuaGui = anh.filter((a) => a.chuaGui).length;
+
+    // Đợt của một vòng sửa: `dot_khoa` (0095); chưa áp thì suy từ tấm đầu tiên.
+    const khoaCuaVong = (v: { id: string; dot_khoa: string | null }) => {
+      if (v.dot_khoa) return v.dot_khoa;
+      const muc = chiTiet.find((c) => c.revision_request_id === v.id);
+      return (muc && bc.khoaCua.get(muc.photo_id)) || KHOA_TRONG_GOI;
+    };
+
+    const coTheGuiTrongGoi = (soAnh: number, soChuaGui: number) =>
+      soAnh > 0 &&
+      (TRANG_THAI_GUI_DUOC as readonly string[]).includes(gallery.status) &&
+      (gallery.status !== "awaiting_approval" || soChuaGui > 0);
+
+    const nhom = gomTheoDot(anh, bc.nhom).map((g) => {
+      const soChuaGui = g.anh.filter((a) => a.chuaGui).length;
+      const vongMo = vong.some((v) => v.resolved_at === null && khoaCuaVong(v) === g.khoa);
+      const laMuaThem = theoDot && laKhoaMuaThem(g.khoa);
+      const trangThai = laMuaThem
+        ? trangThaiDuyetDot(bc.mocDot!.get(g.khoa), vongMo)
+        : trangThaiDuyetTrongGoi(gallery.status, vongMo);
+      return {
+        khoa: g.khoa,
+        nhan: g.nhan,
+        deXuatBoi: g.deXuatBoi,
+        soAnh: g.anh.length,
+        soChuaGui,
+        trangThai,
+        guiLuc: laMuaThem ? (bc.mocDot!.get(g.khoa)?.guiLuc ?? null) : guiLuc,
+        duyetLuc: laMuaThem ? (bc.mocDot!.get(g.khoa)?.duyetLuc ?? null) : null,
+        coTheGui: laMuaThem
+          ? guiDuocDotMuaThem({ trangThaiBo: gallery.status, soAnh: g.anh.length, soChuaGui, trangThai })
+          : null,
+      };
+    });
+    // Vòng TRONG GÓI (nút gửi cũ): tấm trong gói khi đã áp 0095, mọi tấm khi chưa.
+    const anhVongChung = theoDot ? anh.filter((a) => !laKhoaMuaThem(a.khoa)) : anh;
+    const soChuaGui = anhVongChung.filter((a) => a.chuaGui).length;
+    // BB-384 — bộ ở bước khách duyệt (app, hoặc Lark "Đã gửi duyệt") mà khách KHÔNG thấy
+    // tấm ảnh chỉnh trong gói nào: màn quản trị cảnh báo (khách đang thấy "Bean đang chuẩn bị").
+    const idChung = new Set(anhVongChung.map((a) => a.id));
+    const soAnhKhachThay = bc.anhChinh.filter(
+      (a) => idChung.has(a.id) && khachThayTrongBoiCanh(bc, gallery.status, a),
+    ).length;
+    const canhBao = canhBaoKhachChuaXem({
+      status: gallery.status,
+      giaiDoan: giaiDoanCua(maLarkConHieuLuc(gallery)),
+      soAnhKhachThay,
+    });
 
     return ok({
       trangThai: gallery.status,
       guiLuc,
       anh,
       soChuaGui,
-      coTheGui:
-        anh.length > 0 &&
-        (TRANG_THAI_GUI_DUOC as readonly string[]).includes(gallery.status) &&
-        (gallery.status !== "awaiting_approval" || soChuaGui > 0),
-      vongSua: (vong ?? []).map((v) => ({
-        round: v.round as number,
-        note: v.note as string,
-        createdAt: v.created_at as string,
-        resolved: v.resolved_at !== null,
-        items: chiTiet
-          .filter((c) => c.revision_request_id === v.id)
-          .map((c) => ({
-            photoId: c.photo_id,
-            fileName: tenTheoId.get(c.photo_id) ?? "",
-            gocId: c.original_photo_id,
-            note: c.note,
-            marks: chuanHoaVung(c.marks),
-            anhMau: (c.reference_paths ?? []).map((p) => urlKy.get(p)).filter((u): u is string => !!u),
-          })),
-      })),
-      tinhNang: { chiTiet: coBang },
+      coTheGui: coTheGuiTrongGoi(anhVongChung.length, soChuaGui),
+      theoDot,
+      nhom,
+      vongSua: vong.map((v) => {
+        const khoa = khoaCuaVong(v);
+        return {
+          round: v.round,
+          note: v.note,
+          createdAt: v.created_at,
+          resolved: v.resolved_at !== null,
+          khoa,
+          nhan: nhanCuaKhoa(khoa, bc.nhom),
+          deXuatBoi: bc.nhom.find((n) => n.khoa === khoa)?.deXuatBoi ?? null,
+          items: chiTiet
+            .filter((c) => c.revision_request_id === v.id)
+            .map((c) => {
+              const khoaTam = bc.khoaCua.get(c.photo_id) ?? KHOA_TRONG_GOI;
+              return {
+                photoId: c.photo_id,
+                fileName: tenTheoId.get(c.photo_id) ?? "",
+                gocId: c.original_photo_id,
+                nhan: nhanCuaKhoa(khoaTam, bc.nhom),
+                deXuatBoi: bc.nhom.find((n) => n.khoa === khoaTam)?.deXuatBoi ?? null,
+                note: c.note,
+                marks: chuanHoaVung(c.marks),
+                anhMau: (c.reference_paths ?? []).map((p) => urlKy.get(p)).filter((u): u is string => !!u),
+              };
+            }),
+        };
+      }),
+      tinhNang: { chiTiet: coBang, theoDot },
+      soAnhKhachThay,
+      canhBao,
     });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);

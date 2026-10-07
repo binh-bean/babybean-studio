@@ -24,11 +24,3 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number]["value"];
 export function isPaymentMethod(v: string): v is PaymentMethod {
   return PAYMENT_METHODS.some((m) => m.value === v);
 }
-
-/** Nhãn tiếng Việt để hiện lại trên báo cáo. */
-export function paymentMethodLabel(v: string): string {
-  // BB-320: "giam_gia" KHÔNG phải hình thức thu — là loại dòng sổ ghi phần giảm giá
-  // (xem lib/gallery/tien-phat-sinh.ts), nên không nằm trong PAYMENT_METHODS (không chọn được ở ô "Hình thức").
-  if (v === "giam_gia") return "Giảm giá";
-  return PAYMENT_METHODS.find((m) => m.value === v)?.label ?? v;
-}

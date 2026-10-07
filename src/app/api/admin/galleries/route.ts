@@ -27,7 +27,11 @@ import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
 import { docDongHauKy, LoiTraLark, duoiSoDienThoai } from "@/lib/lark/tra-hau-ky";
 import { boAnhTheoDongLark, boAnhTheoThuMuc } from "@/lib/gallery/bo-anh-da-co";
 import { timHoacTaoGoiLark } from "@/lib/gallery/goi-chup-lark";
+import { giaAnhThemChoBoMoi, giaRiengTheoTenGoi } from "@/lib/gallery/gia-goi-chup";
+import { docBangGiaRieng } from "@/lib/gallery/gia-goi-chup-server";
+import { giaAnhChonThemMacDinh } from "@/lib/gallery/gia-anh-chon-them";
 import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
+import { chuaCoTenBe, catTrang, demTheoTrangThai } from "@/lib/gallery/loc-chua-ten-be";
 
 export const runtime = "nodejs";
 // BB-331: tạo bộ xong kéo luôn dòng hợp đồng từ Lark (3–9 giây, đo 30/09).
@@ -144,6 +148,20 @@ export async function POST(request: Request): Promise<Response> {
     const goiChinh = dong.goiChup.split(",")[0]?.trim() || dong.goiChup;
     const packageId = await timHoacTaoGoiLark(admin, goiChinh, dong.tongFileEdit);
 
+    // BB-385 — giá ảnh chọn thêm của bộ MỚI: số CSKH gửi lên (thuật sĩ đã điền
+    // sẵn theo gói) → giá riêng của gói → giá chung → 50.000. Chép vào bộ đúng
+    // một lần ở đây; đổi giá sau này không đụng bộ đã tạo.
+    const giaAnhThem =
+      input.extraPhotoPrice !== undefined
+        ? input.extraPhotoPrice
+        : giaAnhThemChoBoMoi({
+            giaRiengCuaGoi: giaRiengTheoTenGoi(
+              (await docBangGiaRieng(admin).catch(() => ({ bang: {} as Record<string, number> }))).bang,
+              goiChinh,
+            ),
+            giaChung: await giaAnhChonThemMacDinh(admin),
+          });
+
     // 4. Mutate & Log (in a single database transaction) -------------------
     // Generate 22-character Base62 token. Only store sha256 hash in database.
     const token = generateBase62Token(22);
@@ -171,7 +189,7 @@ export async function POST(request: Request): Promise<Response> {
       p_drive_folder_url: input.driveUrl,
       p_drive_folder_name: null,
       p_included_quota: input.includedQuota ?? null,
-      p_extra_photo_price: input.extraPhotoPrice ?? null,
+      p_extra_photo_price: giaAnhThem,
       p_max_selection: input.maxSelection ?? null,
       p_due_at: input.dueAt ?? null,
       p_welcome_message: input.welcomeMessage || null,
@@ -358,9 +376,9 @@ export async function GET(request: Request): Promise<Response> {
     const limit = Math.min(query.limit, 200);
     const admin = createAdminClient();
 
-    const { data: result, error: rpcError } = await admin.rpc("get_admin_galleries", {
+    const goiRpc = (pOffset: number, pLimit: number, pStatus: string[] | null) => admin.rpc("get_admin_galleries", {
       p_branch_ids: targetBranchIds,
-      p_status: query.status && query.status.length > 0 ? query.status : null,
+      p_status: pStatus,
       p_photographer_id: query.photographerId || null,
       p_editor_id: query.editorId || null,
       p_cskh_id: query.cskhId || null,
@@ -370,11 +388,42 @@ export async function GET(request: Request): Promise<Response> {
       p_search: query.q || query.search || null,
       p_sort_by: query.sortBy,
       p_sort_order: query.sortOrder,
-      p_offset: offset,
-      p_limit: limit,
+      p_offset: pOffset,
+      p_limit: pLimit,
       // BB-335: CHỈ gửi khi đang lọc Photo — bản RPC trước 0081 không có tham số này.
       ...(query.photo ? { p_lark_photo: query.photo } : {}),
     });
+
+    const trangThaiLoc = query.status && query.status.length > 0 ? query.status : null;
+    // BB-379 — "Chưa có tên bé": RPC không có tham số này, nên đọc hết các trang (kho ~500 bộ,
+    // 200/trang) KHÔNG lọc trạng thái, lọc ở đây rồi tự cắt trang + tự đếm theo trạng thái.
+    // Lọc trạng thái cũng làm ở đây để các số đếm theo trạng thái vẫn đủ.
+    let result: unknown;
+    let rpcError: { code?: string; message?: string } | null;
+    if (query.chuaTenBe) {
+      const daLoc: Array<Record<string, unknown>> = [];
+      let off = 0;
+      let heTrang = false;
+      rpcError = null;
+      for (let vong = 0; vong < 10 && !heTrang; vong++) {
+        const { data: trang, error: loiTrang } = await goiRpc(off, 200, null);
+        if (loiTrang) {
+          rpcError = loiTrang;
+          break;
+        }
+        const t = (trang ?? {}) as { items?: Array<Record<string, unknown>>; hasMore?: boolean };
+        for (const it of t.items ?? []) if (chuaCoTenBe(it)) daLoc.push(it);
+        heTrang = !t.hasMore || (t.items ?? []).length === 0;
+        off += (t.items ?? []).length;
+      }
+      const theoTrangThai = trangThaiLoc ? daLoc.filter((r) => trangThaiLoc.includes(String(r.status) as never)) : daLoc;
+      const { items: trangNay, hasMore: conNua } = catTrang(theoTrangThai, offset, limit);
+      result = { items: trangNay, counts: demTheoTrangThai(daLoc), hasMore: conNua, limit, offset };
+    } else {
+      const kq = await goiRpc(offset, limit, trangThaiLoc);
+      result = kq.data;
+      rpcError = kq.error;
+    }
 
     if (rpcError) {
       // BB-335: lọc Photo khi 0081 chưa áp (PostgREST không thấy hàm có p_lark_photo)

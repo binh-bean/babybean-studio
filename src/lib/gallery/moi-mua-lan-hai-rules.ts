@@ -5,7 +5,7 @@
  *
  *     "Mời mua lần hai khi khách duyệt không yêu cầu chỉnh lại."
  *
- * Dự án chưa có thư viện dựng DOM để thử (xem @/lib/selection/review-rules),
+ * Dự án chưa có thư viện dựng DOM để thử,
  * nên luật quan trọng tách ra hàm thuần — phép thử gọi đúng hàm mà cả màn
  * hình (`moi-mua-lan-hai.tsx`) lẫn route (`/api/g/mua-them`) cùng dùng.
  */

@@ -11,7 +11,8 @@ import { kiemAnhTruocKhiGhiDem } from "@/lib/drive/kiem-tra-anh";
 import { nenDieuHuongLh3 } from "@/lib/drive/quyet-dinh-lh3";
 import { laThuMucChinhSua } from "@/lib/anh-chinh-sua/nhan-dien";
 import { quyetDinhAnhChoKhach } from "@/lib/anh-chinh-sua/cong-khach";
-import { docMocGui } from "@/lib/anh-chinh-sua/du-lieu";
+import { docCongAnhChinh } from "@/lib/anh-chinh-sua/du-lieu";
+import { ghiLuotTaiAnh, nenGhiLuotTai } from "@/lib/bao-cao/dieu-hanh/ghi-luot-tai";
 
 export const runtime = "nodejs";
 // BB-286: ghi bộ đệm chạy nền (after()) tính vào cùng thời lượng hàm như
@@ -113,6 +114,10 @@ export async function GET(
         // đơn vị canh (tests/unit/bb-371-cong-khach.test.ts). Mốc gửi chỉ đọc khi tấm
         // ảnh nằm trong thư mục ảnh chỉnh sửa.
         const subfolder = photo.subfolder as string | null;
+        // BB-377 — ảnh chỉnh: mốc gửi chung + mốc ĐÚNG đợt của tấm (mua thêm).
+        const cong = laThuMucChinhSua(subfolder)
+          ? await docCongAnhChinh(supabase, photo.gallery_id as string, photoId)
+          : null;
         const quyetDinh = quyetDinhAnhChoKhach({
           phienGalleryId: session.galleryId,
           phienCustomerId: session.customerId,
@@ -121,11 +126,29 @@ export async function GET(
           trangThaiBo: gallery?.status ?? "",
           subfolder,
           anhTaoLuc: photo.created_at as string | null,
-          guiLuc: laThuMucChinhSua(subfolder) ? await docMocGui(supabase, photo.gallery_id as string) : null,
+          guiLuc: cong?.guiLuc ?? null,
+          khoa: cong?.khoa,
+          mocDot: cong?.mocDot ?? null,
         });
         if (quyetDinh === "cam") return fail("FORBIDDEN", "Không có quyền truy cập ảnh");
         // Đúng bộ của mình mà CSKH chưa kiểm ảnh chỉnh → trả như ảnh không tồn tại.
         if (quyetDinh === "an") return fail("NOT_FOUND", "Không tìm thấy ảnh");
+
+        // BB-380: KHÁCH tải ảnh gốc → ghi lượt tải (một dòng / bộ / link / 30 phút) cho số
+        // "% tải ảnh trước khi chốt". Chạy nền sau phản hồi; hỏng không ảnh hưởng lượt tải.
+        if (new URL(request.url).searchParams.get("tai") === "1" && nenGhiLuotTai()) {
+          const ghi = () =>
+            ghiLuotTaiAnh(supabase, {
+              galleryId: photo.gallery_id as string,
+              branchId: gallery?.branch_id ?? null,
+              shareLinkId: session.shareLinkId || null,
+            });
+          try {
+            after(ghi);
+          } catch {
+            void ghi();
+          }
+        }
       } catch (errKhach) {
         if (errKhach instanceof GallerySessionError) {
           return fail("FORBIDDEN", "Không có quyền truy cập ảnh");

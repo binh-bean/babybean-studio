@@ -59,7 +59,11 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
   { ma: "selections:read", ten: "Xem khách đã chọn ảnh nào", nhom: "Album", dangCoHieuLuc: true },
   { ma: "galleries:create", ten: "Tạo album mới", nhom: "Album", dangCoHieuLuc: true },
   { ma: "galleries:write", ten: "Sửa cấu hình album", nhom: "Album", dangCoHieuLuc: true },
-  { ma: "galleries:sync", ten: "Đồng bộ ảnh từ Drive", nhom: "Album" },
+  // BB-383b (migration 0099) — route `[id]/drive`, `[id]/ten-be`, `[id]/bia` nhận
+  // quyền này HOẶC `galleries:write`. Không mở tiền, xác nhận, dòng hàng, gửi khách.
+  { ma: "galleries:edit_info", ten: "Sửa thông tin bộ ảnh", nhom: "Album", dangCoHieuLuc: true },
+  // BB-383 — route `[id]/sync` nhận quyền này (hoặc `galleries:write`) từ 07/10.
+  { ma: "galleries:sync", ten: "Đồng bộ ảnh từ Drive", nhom: "Album", dangCoHieuLuc: true },
   { ma: "galleries:share", ten: "Gửi và thu hồi link chia sẻ", nhom: "Album" },
   { ma: "galleries:reopen", ten: "Mở lại album đã chốt", nhom: "Album" },
   { ma: "galleries:delete", ten: "Xoá hoặc lưu trữ album", nhom: "Album" },
@@ -93,6 +97,14 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
 
   { ma: "retouch:read", ten: "Xem danh sách chờ chỉnh ảnh", nhom: "Hậu kỳ" },
   { ma: "retouch:write", ten: "Cập nhật trạng thái chỉnh ảnh", nhom: "Hậu kỳ" },
+  // BB-383 (migration 0099) — route `[id]/anh-chinh-sua/gui-khach` nhận quyền này
+  // HOẶC `galleries:write`: thợ chỉnh tự gửi được mà không cần quyền sửa bộ ảnh.
+  {
+    ma: "anh_chinh:gui_khach",
+    ten: "Gửi ảnh chỉnh sửa cho khách duyệt",
+    nhom: "Hậu kỳ",
+    dangCoHieuLuc: true,
+  },
   { ma: "deliveries:read", ten: "Xem lịch sử giao ảnh", nhom: "Hậu kỳ" },
   { ma: "deliveries:write", ten: "Cập nhật tiến độ giao ảnh", nhom: "Hậu kỳ", dangCoHieuLuc: true },
   { ma: "deliveries:delete", ten: "Xoá dữ liệu giao ảnh", nhom: "Hậu kỳ" },

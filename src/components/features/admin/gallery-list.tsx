@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
+import { taoBoDemYeuCau } from "@/lib/utils/yeu-cau-moi-nhat";
 import Link from "next/link";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -328,9 +329,12 @@ function KanbanColumn({
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // BB-388 — phản hồi về không theo thứ tự: chỉ đổ phản hồi của lần tải mới nhất.
+  const boDemRef = React.useRef(taoBoDemYeuCau());
 
   const fetchItems = useCallback(
     async (isLoadMore = false, cursorToUse?: string | null) => {
+      const soLan = boDemRef.current.batDau();
       if (isLoadMore) setLoadingMore(true);
       else setLoading(true);
 
@@ -339,6 +343,7 @@ function KanbanColumn({
         if (filters.branchId) queryParams.set("branchId", filters.branchId);
         queryParams.set("status", colKey);
         if (filters.photo) queryParams.set("photo", filters.photo);
+        if (filters.chuaTenBe) queryParams.set("chuaTenBe", "1");
         if (filters.dateFrom) queryParams.set("dateFrom", filters.dateFrom);
         if (filters.dateTo) queryParams.set("dateTo", filters.dateTo);
         if (filters.search) queryParams.set("q", filters.search);
@@ -355,6 +360,7 @@ function KanbanColumn({
 
         if (!res.ok) throw new Error("Không thể tải danh sách bộ ảnh");
         const body = await res.json();
+        if (!boDemRef.current.laMoiNhat(soLan)) return;
         const fetchedItems: GalleryItem[] = body?.data?.items ?? [];
 
         if (isLoadMore) {
@@ -368,8 +374,10 @@ function KanbanColumn({
       } catch (err) {
         console.error("Lỗi khi fetch kanban column:", err);
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (boDemRef.current.laMoiNhat(soLan)) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [filters, colKey]
@@ -528,6 +536,7 @@ export function GalleryList() {
     branchId: "",
     status: "",
     photo: "",
+    chuaTenBe: false,
     dateFrom: "",
     dateTo: "",
     search: "",
@@ -573,8 +582,13 @@ export function GalleryList() {
   }, []);
 
   // Tải danh sách bộ ảnh từ API
+  // BB-388 — mở trang, gõ ô tìm, bấm "Chưa có tên bé" bắn ba lần tải gần như cùng lúc và phản
+  // hồi về KHÔNG theo thứ tự: lần tải cũ (không lọc) về muộn từng ghi đè kết quả lọc mới nhất.
+  // Chỉ đổ phản hồi của lần tải mới nhất (xem `yeu-cau-moi-nhat.ts`).
+  const boDemRef = React.useRef(taoBoDemYeuCau());
   const fetchGalleries = useCallback(
     async (isLoadMore = false, cursorToUse?: string | null, im = false) => {
+      const soLan = boDemRef.current.batDau();
       if (isLoadMore) {
         setLoadingMore(true);
       } else if (!im) {
@@ -586,6 +600,7 @@ export function GalleryList() {
         if (filters.branchId) queryParams.set("branchId", filters.branchId);
         if (filters.status) queryParams.set("status", filters.status);
         if (filters.photo) queryParams.set("photo", filters.photo);
+        if (filters.chuaTenBe) queryParams.set("chuaTenBe", "1");
         if (filters.dateFrom) queryParams.set("dateFrom", filters.dateFrom);
         if (filters.dateTo) queryParams.set("dateTo", filters.dateTo);
         if (filters.search) queryParams.set("q", filters.search);
@@ -605,6 +620,7 @@ export function GalleryList() {
         }
 
         const body = await res.json();
+        if (!boDemRef.current.laMoiNhat(soLan)) return;
         const fetchedItems: GalleryItem[] = body?.data?.items ?? [];
         const fetchedCounts: GalleryCounts | null = body?.data?.counts ?? null;
         const more: boolean = Boolean(body?.data?.hasMore);
@@ -627,8 +643,10 @@ export function GalleryList() {
       } catch (err) {
         console.error("Lỗi khi fetch galleries:", err);
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        if (boDemRef.current.laMoiNhat(soLan)) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [filters]

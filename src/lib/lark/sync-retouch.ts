@@ -69,10 +69,6 @@ export function cellText(value: unknown): string {
   return String(value);
 }
 
-export function cellNumber(value: unknown): number {
-  return Number(String(cellText(value)).replace(/[^\d]/g, "")) || 0;
-}
-
 export function cellBoolean(value: unknown): boolean {
   if (value === true || value === 1) return true;
   if (typeof value === "string") {
@@ -80,14 +76,6 @@ export function cellBoolean(value: unknown): boolean {
     return s === "true" || s === "1" || s === "yes" || s === "checked";
   }
   return false;
-}
-
-/** Mã bản ghi mà một ô liên kết trỏ tới. */
-export function linkedRecordIds(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((v) =>
-    v && typeof v === "object" ? ((v as { record_ids?: string[] }).record_ids ?? []) : [],
-  );
 }
 
 /**
@@ -669,7 +657,13 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
          $1, $2, $3,
          $4, $5, 'draft',
          $6, $7,
-         $8, 20, 50000,
+         $8, 20,
+         -- BB-385: giá chung trong Cài đặt (0065), không chôn 50000. Thiếu dòng /
+         -- giá lạ → 50000 như cũ. Chép vào bộ lúc tạo, đổi giá sau không hồi tố.
+         coalesce((select case when jsonb_typeof(s.value) = 'number' then (s.value)::text::numeric end
+                     from settings s
+                    where s.key = 'gallery.extra_photo_price_default' and s.branch_id is null
+                    limit 1), 50000),
          $9, $10, $11, $12::text[],
          $13
        ) returning id`,

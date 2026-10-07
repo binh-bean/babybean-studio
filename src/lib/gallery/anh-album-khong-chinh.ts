@@ -18,14 +18,8 @@
 /** Loại sản phẩm (enum `product_kind`, thêm ở 0092). */
 export const LOAI_ALBUM_KHONG_CHINH = "album_unedited" as const;
 
-/** Tên sản phẩm trong danh mục (0093). Chỉ để hiển thị/tra cứu — nhận diện bằng `kind`. */
-export const TEN_SAN_PHAM_ALBUM_KHONG_CHINH = "Ảnh album không chỉnh sửa";
-
 /** Nhãn cho thợ/CSKH ở danh sách xuất, màn chi tiết, file "Thông tin chi tiết". */
 export const NHAN_KHONG_CHINH = "Không chỉnh — cho album";
-
-/** Nhãn ngắn trên ô ảnh của khách. */
-export const NHAN_KHACH_KHONG_CHINH = "Cho album · không chỉnh sửa";
 
 export function laSanPhamAlbumKhongChinh(kind: string | null | undefined): boolean {
   return kind === LOAI_ALBUM_KHONG_CHINH;

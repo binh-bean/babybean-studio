@@ -23,6 +23,16 @@ import { giuA } from "@/lib/utils/giu-a";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
 import { TOI_DA_ANH_MAU, TOI_DA_BYTE_ANH_MAU, type VungKhoanh } from "@/lib/anh-chinh-sua/nhan-dien";
 import { AnhKhoanhVung } from "./anh-khoanh-vung";
+import { KHOA_TRONG_GOI } from "@/lib/anh-chinh-sua/theo-dot";
+import { cauHanSua } from "@/lib/anh-chinh-sua/han-sua";
+import {
+  chonAnhMoiIn,
+  chonSanPhamGoiY,
+  hienLoiMoiInThem,
+  type SanPhamGoiY,
+  tomTatVongSua,
+} from "@/lib/anh-chinh-sua/vong-duyet";
+import { formatTien } from "@/lib/utils/dinh-dang";
 
 const t = vi.gallery.anhChinh;
 const dien = (s: string, n: number) => s.replace("{n}", String(n));
@@ -36,13 +46,44 @@ interface AnhNho {
 }
 interface AnhChinh extends AnhNho {
   goc: AnhNho | null;
+  /** BB-377 — đợt: "goc" (trong gói) | "dot:N" | "mt:<id>" (mua thêm). */
+  khoa: string;
+}
+interface NhomDot {
+  khoa: string;
+  nhan: string;
+  soAnh: number;
+  trangThai: "chua_gui" | "cho_duyet" | "dang_sua" | "da_duyet";
+  duocQuyet: boolean;
 }
 interface DuLieu {
   trangThai: string;
   duocQuyet: boolean;
+  /** BB-377 — đã áp 0095: mỗi đợt mua thêm duyệt riêng. */
+  theoDot?: boolean;
   anh: AnhChinh[];
-  vongSua: { round: number; note: string; createdAt: string; resolved: boolean }[];
+  nhom?: NhomDot[];
+  vongSua: {
+    round: number;
+    note: string;
+    createdAt: string;
+    resolved: boolean;
+    khoa?: string;
+    nhan?: string;
+    /** Từng tấm ba mẹ đã xin sửa trong vòng (0091; chưa áp → rỗng). */
+    items?: { photoId: string; note: string; marks: VungKhoanh[]; soAnhMau: number }[];
+  }[];
   tinhNang: { vungKhoanh: boolean; anhMau: boolean };
+  /** BB-384 — có phải người nhận link chính (được duyệt / xin sửa / mời in thêm). */
+  laChu?: boolean;
+  /** BB-387 — số ngày Bean ước tính gửi lại ảnh sửa (Cài đặt `gallery.revision_days_estimate`). */
+  soNgaySua?: number;
+}
+/** BB-384 — Bean xác nhận rõ đã nhận gì sau khi ba mẹ gửi yêu cầu sửa. */
+interface DaGuiSua {
+  lan: number;
+  tam: { ten: string; ghiChu: string }[];
+  ghiChuChung: string;
 }
 interface MucDangSua {
   ghiChu: string;
@@ -54,9 +95,15 @@ const tiLeCua = (a: AnhNho) => (a.width && a.height ? a.height / a.width : null)
 
 export function AnhChinhSuaKhach({
   onDaQuyet,
+  moiInThem,
 }: {
   /** Sau khi ba mẹ duyệt / gửi yêu cầu sửa — màn cha tải lại bộ ảnh. */
   onDaQuyet: (ketQua: { quyetDinh: "approve" | "revise"; lan?: number }) => void | Promise<void>;
+  /**
+   * BB-384 / bh-04 — lời mời in thêm ĐÚNG LÚC ba mẹ duyệt cho in (không còn tấm xin
+   * sửa): danh mục sản phẩm (giá từ dữ liệu) và lối vào màn chọn thêm (null = chưa mở).
+   */
+  moiInThem?: { danhMuc: readonly SanPhamGoiY[]; onChonInThem: (() => void) | null };
 }) {
   const [duLieu, setDuLieu] = React.useState<DuLieu | null>(null);
   const [loi, setLoi] = React.useState<string | null>(null);
@@ -64,33 +111,38 @@ export function AnhChinhSuaKhach({
   const [soSanh, setSoSanh] = React.useState(false);
   const [viTri, setViTri] = React.useState(50);
   const [cheDo, setCheDo] = React.useState<"xem" | "sua">("xem");
+  /** BB-377 — vòng duyệt đang xin sửa (đợt). */
+  const [khoaSua, setKhoaSua] = React.useState<string>(KHOA_TRONG_GOI);
   const [chon, setChon] = React.useState<Record<string, MucDangSua>>({});
   const [dangKhoanh, setDangKhoanh] = React.useState(false);
   const [ghiChuChung, setGhiChuChung] = React.useState("");
   const [ban, setBan] = React.useState(false);
   const [loiGui, setLoiGui] = React.useState<string | null>(null);
   const [dangTaiAnhMau, setDangTaiAnhMau] = React.useState(false);
+  const [daGui, setDaGui] = React.useState<DaGuiSua | null>(null);
 
-  React.useEffect(() => {
-    let song = true;
-    (async () => {
-      try {
-        const res = await goiApiKhach("/api/g/anh-chinh-sua", { cache: "no-store" });
-        const json = await res.json().catch(() => null);
-        if (!song) return;
-        if (!res.ok || !json?.data) {
-          setLoi(json?.error?.message ?? t.loiTai);
-          return;
-        }
-        setDuLieu(json.data as DuLieu);
-      } catch {
-        if (song) setLoi(t.loiTai);
+  const songRef = React.useRef(true);
+  const tai = React.useCallback(async () => {
+    try {
+      const res = await goiApiKhach("/api/g/anh-chinh-sua", { cache: "no-store" });
+      const json = await res.json().catch(() => null);
+      if (!songRef.current) return;
+      if (!res.ok || !json?.data) {
+        setLoi(json?.error?.message ?? t.loiTai);
+        return;
       }
-    })();
-    return () => {
-      song = false;
-    };
+      setDuLieu(json.data as DuLieu);
+    } catch {
+      if (songRef.current) setLoi(t.loiTai);
+    }
   }, []);
+  React.useEffect(() => {
+    songRef.current = true;
+    void tai();
+    return () => {
+      songRef.current = false;
+    };
+  }, [tai]);
 
   const anh = duLieu?.anh ?? [];
   const dangMo = mo !== null ? anh[mo] : undefined;
@@ -133,7 +185,7 @@ export function AnhChinhSuaKhach({
     }
   }
 
-  async function quyet(quyetDinh: "approve" | "revise") {
+  async function quyet(quyetDinh: "approve" | "revise", khoa: string = KHOA_TRONG_GOI) {
     if (quyetDinh === "revise" && soChon === 0 && !ghiChuChung.trim()) {
       setLoiGui(t.canChonTam);
       return;
@@ -141,11 +193,14 @@ export function AnhChinhSuaKhach({
     setBan(true);
     setLoiGui(null);
     try {
+      // Trong gói giữ đúng thân cũ (không kèm `khoa`); đợt mua thêm kèm `khoa`.
+      const theoKhoa = khoa === KHOA_TRONG_GOI ? {} : { khoa };
       const body =
         quyetDinh === "approve"
-          ? { decision: "approve" }
+          ? { decision: "approve", ...theoKhoa }
           : {
               decision: "revise",
+              ...theoKhoa,
               note: ghiChuChung.trim(),
               items: Object.entries(chon).map(([photoId, m]) => ({
                 photoId,
@@ -164,8 +219,34 @@ export function AnhChinhSuaKhach({
         setLoiGui(json?.error?.message ?? vi.gallery.loiBean.guiChuaDuoc);
         return;
       }
+      if (quyetDinh === "revise") {
+        const tenCua = new Map(anh.map((a) => [a.id, a.fileName]));
+        setDaGui({
+          lan: Number(json?.data?.round) || 1,
+          tam: Object.entries(chon).map(([id, m]) => ({
+            ten: tenCua.get(id) ?? id,
+            ghiChu:
+              [
+                m.ghiChu.trim(),
+                m.vung.length ? dien(t.daKhoanh, m.vung.length) : "",
+                m.anhMau.length ? dien(t.kemAnhMau, m.anhMau.length) : "",
+              ]
+                .filter(Boolean)
+                .join(" · ") || t.canSuaTamNay,
+          })),
+          ghiChuChung: ghiChuChung.trim(),
+        });
+      } else {
+        setDaGui(null);
+      }
       setMo(null);
+      // BB-377 — đợt mua thêm không đổi trạng thái bộ ảnh nên khối này vẫn hiện: về
+      // chế độ xem và tải lại (đợt vừa duyệt/xin sửa không còn nút quyết).
+      setCheDo("xem");
+      setChon({});
+      setGhiChuChung("");
       await onDaQuyet({ quyetDinh, lan: json?.data?.round });
+      await tai();
     } catch {
       setLoiGui(vi.gallery.loiBean.guiChuaDuoc);
     } finally {
@@ -173,11 +254,151 @@ export function AnhChinhSuaKhach({
     }
   }
 
-  if (loi) return <p className="rounded-2xl border border-border bg-surface p-5 text-sm text-heart">{loi}</p>;
-  if (!duLieu) return <p className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted-foreground">{t.dangTai}</p>;
+  // BB-388 — thanh đáy "Xem & duyệt N ảnh chỉnh" hiện NGAY khi bộ ảnh tải xong (số ảnh chỉnh có
+  // sẵn trong dữ liệu bộ), còn khối này tự tải ảnh chỉnh thêm ~1–2 giây. Nút cuộn tới
+  // `#anh-da-chinh`: nếu chỉ khối đã tải mới mang id thì bấm sớm là KHÔNG có gì xảy ra (e2e
+  // bb-384 ca 3). Ô "đang tải"/lỗi giữ cùng id để nút luôn đưa ba mẹ tới đúng chỗ.
+  if (loi)
+    return (
+      <p id="anh-da-chinh" className="rounded-2xl border border-border bg-surface p-5 text-sm text-heart">
+        {loi}
+      </p>
+    );
+  if (!duLieu)
+    return (
+      <p id="anh-da-chinh" className="rounded-2xl border border-border bg-surface p-5 text-sm text-muted-foreground">
+        {t.dangTai}
+      </p>
+    );
   if (anh.length === 0) return null;
 
   const mucMo = dangMo ? chon[dangMo.id] : undefined;
+  // BB-377 — có ảnh mua thêm thì chia khối theo đợt ("Trong gói" / "Mua thêm đợt 2"…).
+  const nhom = duLieu.nhom ?? [];
+  const coMuaThem = nhom.some((n) => n.khoa !== KHOA_TRONG_GOI);
+  const nhanDot = (khoa: string) => nhom.find((n) => n.khoa === khoa)?.nhan ?? t.trongGoi;
+  // Đã áp 0095: mỗi đợt một vòng duyệt riêng. Chưa áp: một quyết định cho cả bộ.
+  const quyetTheoDot = duLieu.theoDot && coMuaThem;
+  const dangSuaTam = (a: AnhChinh) => cheDo === "sua" && (!quyetTheoDot || a.khoa === khoaSua);
+
+  const luoi = (ds: AnhChinh[]) => (
+    <ul className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
+      {ds.map((a) => {
+        const daChon = !!chon[a.id];
+        const i = anh.indexOf(a);
+        return (
+          <li key={a.id} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setMo(i);
+                setSoSanh(false);
+                setDangKhoanh(false);
+              }}
+              data-testid="o-anh-chinh"
+              data-khoa={a.khoa}
+              aria-label={a.fileName}
+              className={cn(
+                "block aspect-square w-full overflow-hidden rounded-lg bg-surface-2",
+                daChon && "ring-2 ring-heart ring-offset-2",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- ảnh Drive, không qua next/image */}
+              <img
+                src={urlAnh(a, 400)}
+                alt={a.fileName}
+                loading="lazy"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  const du = urlAnhDuPhong(a.id, 400);
+                  if (!e.currentTarget.src.endsWith(du)) e.currentTarget.src = du;
+                }}
+              />
+            </button>
+            {daChon && (
+              <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full bg-heart px-2 py-0.5 text-[11px] font-medium text-white">
+                {t.canSuaTamNay}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  /** Thanh Duyệt / Yêu cầu sửa của một vòng duyệt (`khoa` = đợt; trong gói khi chưa áp 0095). */
+  const thanhQuyet = (khoa: string, duocQuyet: boolean, choDuyet: boolean) => {
+    if (!duocQuyet) {
+      return choDuyet ? <p className="text-xs text-muted-foreground">{giuA(t.chiNguoiChinh)}</p> : null;
+    }
+    if (cheDo === "xem" || khoaSua !== khoa) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={ban}
+            onClick={() => void quyet("approve", khoa)}
+            className="h-10 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+          >
+            {khoa === KHOA_TRONG_GOI ? t.duyet : t.duyetMuaThem}
+          </button>
+          <button
+            type="button"
+            disabled={ban}
+            onClick={() => {
+              setChon({});
+              setKhoaSua(khoa);
+              setCheDo("sua");
+            }}
+            className="h-10 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-40"
+          >
+            {t.yeuCauSua}
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-3 border-t border-border pt-3">
+        <p className="text-sm font-medium" data-testid="so-tam-can-sua">
+          {dien(t.soTamCanSua, soChon)}
+        </p>
+        <label htmlFor={`ghi-chu-chung-sua-${khoa}`} className="block text-xs text-muted-foreground">
+          {t.ghiChuChung}
+        </label>
+        <textarea
+          id={`ghi-chu-chung-sua-${khoa}`}
+          name="ghiChuChung"
+          rows={3}
+          maxLength={1000}
+          value={ghiChuChung}
+          onChange={(e) => setGhiChuChung(e.target.value)}
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
+        />
+        {loiGui && <p className="text-xs text-heart">{loiGui}</p>}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={ban || dangTaiAnhMau}
+            onClick={() => void quyet("revise", khoa)}
+            className="h-10 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+          >
+            {t.guiYeuCau}
+          </button>
+          <button
+            type="button"
+            disabled={ban}
+            onClick={() => {
+              setCheDo("xem");
+              setLoiGui(null);
+            }}
+            className="h-10 rounded-full px-5 text-sm font-medium text-muted-foreground transition hover:bg-surface-2 disabled:opacity-40"
+          >
+            {t.quayLai}
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <section
@@ -190,127 +411,153 @@ export function AnhChinhSuaKhach({
         <p className="mt-1 text-sm text-muted-foreground">
           {giuA(cheDo === "sua" ? t.suaMoDau : `${dien(t.moDau, anh.length)} ${t.goiY}`)}
         </p>
+        {/* BB-387 — hạ hoả: khoảng thời gian Bean gửi lại (ước tính, không hứa cứng); KHÔNG nêu tên thợ chỉnh. */}
+        {cheDo === "sua" && (
+          <p className="mt-1 text-sm text-muted-foreground" data-testid="ai-se-sua">
+            {giuA(cauHanSua(duLieu.soNgaySua))}
+          </p>
+        )}
       </div>
 
-      <ul className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
-        {anh.map((a, i) => {
-          const daChon = !!chon[a.id];
-          return (
-            <li key={a.id} className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setMo(i);
-                  setSoSanh(false);
-                  setDangKhoanh(false);
-                }}
-                data-testid="o-anh-chinh"
-                aria-label={a.fileName}
-                className={cn(
-                  "block aspect-square w-full overflow-hidden rounded-lg bg-surface-2",
-                  daChon && "ring-2 ring-heart ring-offset-2",
-                )}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element -- ảnh Drive, không qua next/image */}
-                <img
-                  src={urlAnh(a, 400)}
-                  alt={a.fileName}
-                  loading="lazy"
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    const du = urlAnhDuPhong(a.id, 400);
-                    if (!e.currentTarget.src.endsWith(du)) e.currentTarget.src = du;
-                  }}
-                />
-              </button>
-              {daChon && (
-                <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full bg-heart px-2 py-0.5 text-[11px] font-medium text-white">
-                  {t.canSuaTamNay}
-                </span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+      {daGui && cheDo === "xem" && (
+        <div className="space-y-1.5 rounded-xl bg-surface-2 p-4 text-sm" data-testid="xac-nhan-da-gui-sua" role="status">
+          <p className="font-medium">{giuA(dien(t.daNhanTieuDe, daGui.lan))}</p>
+          {daGui.tam.length > 0 && (
+            <>
+              <p className="text-muted-foreground">{dien(t.daNhanSoTam, daGui.tam.length)}</p>
+              <ul className="list-disc pl-5">
+                {daGui.tam.map((x) => (
+                  <li key={x.ten}>
+                    <span className="font-medium">{x.ten}</span> — {x.ghiChu}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {daGui.ghiChuChung && (
+            <p>
+              <span className="text-muted-foreground">{t.daNhanGhiChuChung}</span>{" "}
+              <span className="whitespace-pre-line">{daGui.ghiChuChung}</span>
+            </p>
+          )}
+          <p className="text-muted-foreground">{giuA(t.suaLoiBean)}</p>
+          <p className="text-muted-foreground">{giuA(cauHanSua(duLieu.soNgaySua))}</p>
+        </div>
+      )}
 
+      {coMuaThem
+        ? nhom.map((n) => {
+            const ds = anh.filter((a) => a.khoa === n.khoa);
+            if (ds.length === 0) return null;
+            return (
+              <div key={n.khoa} className="space-y-2" data-testid="nhom-anh-chinh" data-khoa={n.khoa}>
+                <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                  <span
+                    className={cn(
+                      "rounded-full px-2.5 py-0.5 text-xs",
+                      n.khoa === KHOA_TRONG_GOI ? "bg-surface-2 text-foreground" : "bg-primary/10 text-primary",
+                    )}
+                    data-testid="nhan-dot"
+                  >
+                    {n.khoa === KHOA_TRONG_GOI ? t.trongGoi : n.nhan}
+                  </span>
+                  <span className="text-xs font-normal text-muted-foreground">{dien(t.soTam, ds.length)}</span>
+                  {quyetTheoDot && n.trangThai === "da_duyet" && (
+                    <span className="text-xs font-normal text-muted-foreground">· {t.daDuyetDot}</span>
+                  )}
+                </h3>
+                {luoi(ds)}
+                {quyetTheoDot && thanhQuyet(n.khoa, n.duocQuyet, n.trangThai === "cho_duyet")}
+              </div>
+            );
+          })
+        : luoi(anh)}
+
+      {/* BB-384 — lịch sử các lần sửa THEO TỪNG TẤM: lần, ghi chú, vùng khoanh, ảnh mẫu,
+          trạng thái Bean đã sửa / đang sửa. Vòng không có chi tiết (chưa áp 0091 / bản cũ)
+          hiện nguyên chữ ba mẹ đã viết. */}
       {duLieu.vongSua.length > 0 && (
-        <ul className="space-y-1 border-t border-border pt-3">
-          {duLieu.vongSua.map((v) => (
-            <li key={v.round} className="text-xs">
-              <span className="text-muted-foreground">
-                {dien(t.lanTruoc, v.round)} · {formatNgayVN(v.createdAt)}
-              </span>
-              <br />
-              <span className="whitespace-pre-line">{v.note}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-3 border-t border-border pt-3" data-testid="lich-su-sua-theo-tam">
+          <p className="text-xs font-medium">{t.lichSuTieuDe}</p>
+          <ul className="space-y-3">
+            {duLieu.vongSua.map((v) => {
+              const items = v.items ?? [];
+              const chung = tomTatVongSua(v.note).ghiChuChung;
+              return (
+                <li key={v.round} className="text-xs" data-testid="vong-sua-khach" data-lan={v.round}>
+                  <span className="text-muted-foreground">
+                    {dien(t.lanSua, v.round)} · {formatNgayVN(v.createdAt)} ·{" "}
+                    <span className={v.resolved ? "" : "font-medium text-foreground"}>
+                      {v.resolved ? t.beanDaSua : t.beanDangSua}
+                    </span>
+                    {coMuaThem && v.khoa && v.khoa !== KHOA_TRONG_GOI ? ` · ${v.nhan}` : ""}
+                  </span>
+                  {items.length > 0 ? (
+                    <ul className="mt-1.5 space-y-1.5">
+                      {items.map((it) => {
+                        const a = anh.find((x) => x.id === it.photoId);
+                        return (
+                          <li key={it.photoId} className="flex items-start gap-2" data-testid="muc-sua-khach">
+                            {a && (
+                              <button
+                                type="button"
+                                onClick={() => setMo(anh.indexOf(a))}
+                                className="h-11 w-11 shrink-0 overflow-hidden rounded-md bg-surface-2"
+                                aria-label={a.fileName}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element -- ảnh Drive */}
+                                <img src={urlAnh(a, 200)} alt="" className="h-full w-full object-cover" />
+                              </button>
+                            )}
+                            <span className="min-w-0">
+                              <span className="font-medium">{a?.fileName ?? ""}</span>
+                              {it.note ? <span className="block whitespace-pre-line">{it.note}</span> : null}
+                              <span className="block text-muted-foreground">
+                                {[
+                                  it.marks.length ? dien(t.daKhoanh, it.marks.length) : "",
+                                  it.soAnhMau ? dien(t.kemAnhMau, it.soAnhMau) : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                      {chung && (
+                        <li className="whitespace-pre-line text-muted-foreground">
+                          {t.canSuaChung}: {chung}
+                        </li>
+                      )}
+                    </ul>
+                  ) : (
+                    <span className="mt-0.5 block whitespace-pre-line">{v.note}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
-      {!duLieu.duocQuyet ? (
-        duLieu.trangThai === "awaiting_approval" ? (
-          <p className="text-xs text-muted-foreground">{giuA(t.chiNguoiChinh)}</p>
-        ) : null
-      ) : cheDo === "xem" ? (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={ban}
-            onClick={() => void quyet("approve")}
-            className="h-10 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
-          >
-            {t.duyet}
-          </button>
-          <button
-            type="button"
-            disabled={ban}
-            onClick={() => setCheDo("sua")}
-            className="h-10 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-40"
-          >
-            {t.yeuCauSua}
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3 border-t border-border pt-3">
-          <p className="text-sm font-medium" data-testid="so-tam-can-sua">
-            {dien(t.soTamCanSua, soChon)}
-          </p>
-          <label htmlFor="ghi-chu-chung-sua" className="block text-xs text-muted-foreground">
-            {t.ghiChuChung}
-          </label>
-          <textarea
-            id="ghi-chu-chung-sua"
-            name="ghiChuChung"
-            rows={3}
-            maxLength={1000}
-            value={ghiChuChung}
-            onChange={(e) => setGhiChuChung(e.target.value)}
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
+      {/* bh-04 — mời in thêm ĐÚNG LÚC ba mẹ vừa duyệt cho in và không còn tấm xin sửa. */}
+      {moiInThem &&
+        hienLoiMoiInThem({
+          status: duLieu.trangThai,
+          coVongSuaMo: duLieu.vongSua.some((v) => !v.resolved),
+          laChu: duLieu.laChu ?? false,
+        }) && (
+          <LoiMoiInThem
+            anh={chonAnhMoiIn(
+              anh.filter((a) => a.khoa === KHOA_TRONG_GOI),
+              new Set(duLieu.vongSua.flatMap((v) => (v.items ?? []).map((it) => it.photoId))),
+            )}
+            sanPham={chonSanPhamGoiY(moiInThem.danhMuc)}
+            onChon={moiInThem.onChonInThem}
           />
-          {loiGui && <p className="text-xs text-heart">{loiGui}</p>}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={ban || dangTaiAnhMau}
-              onClick={() => void quyet("revise")}
-              className="h-10 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
-            >
-              {t.guiYeuCau}
-            </button>
-            <button
-              type="button"
-              disabled={ban}
-              onClick={() => {
-                setCheDo("xem");
-                setLoiGui(null);
-              }}
-              className="h-10 rounded-full px-5 text-sm font-medium text-muted-foreground transition hover:bg-surface-2 disabled:opacity-40"
-            >
-              {t.quayLai}
-            </button>
-          </div>
-        </div>
-      )}
+        )}
+
+      {!quyetTheoDot && thanhQuyet(KHOA_TRONG_GOI, duLieu.duocQuyet, duLieu.trangThai === "awaiting_approval")}
       {cheDo === "xem" && loiGui && <p className="text-xs text-heart">{loiGui}</p>}
 
       {dangMo && (
@@ -325,6 +572,11 @@ export function AnhChinhSuaKhach({
           <div className="flex items-center justify-between gap-2 px-4 py-3 text-sm">
             <span className="truncate opacity-80">
               {mo! + 1}/{anh.length} · {dangMo.fileName}
+              {coMuaThem && (
+                <span className="ml-2 rounded-full bg-white/15 px-2 py-0.5 text-[11px]" data-testid="nhan-dot-xem-lon">
+                  {dangMo.khoa === KHOA_TRONG_GOI ? t.trongGoi : nhanDot(dangMo.khoa)}
+                </span>
+              )}
             </span>
             <button type="button" onClick={() => setMo(null)} className="rounded-full px-3 py-1.5 hover:bg-white/10">
               {t.dong}
@@ -387,7 +639,30 @@ export function AnhChinhSuaKhach({
               </button>
             </div>
 
-            {duLieu.duocQuyet && cheDo === "sua" && (
+            {(() => {
+              const cuaTam = duLieu.vongSua.flatMap((v) =>
+                (v.items ?? []).filter((it) => it.photoId === dangMo.id).map((it) => ({ v, it })),
+              );
+              if (cuaTam.length === 0) return null;
+              return (
+                <div className="mx-auto max-w-3xl rounded-2xl bg-white/10 p-3 text-xs" data-testid="lich-su-tam-xem-lon">
+                  <p className="mb-1 font-medium">{t.lichSuTam}</p>
+                  <ul className="space-y-1">
+                    {cuaTam.map(({ v, it }) => (
+                      <li key={v.round}>
+                        <span className="opacity-70">
+                          {dien(t.lanSua, v.round)} · {v.resolved ? t.beanDaSua : t.beanDangSua}
+                        </span>
+                        {it.note ? ` — ${it.note}` : ""}
+                        {it.soAnhMau ? ` · ${dien(t.kemAnhMau, it.soAnhMau)}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
+
+            {dangSuaTam(dangMo) && (
               <div className="mx-auto max-w-3xl space-y-2 rounded-2xl bg-white p-3 text-sm text-black" data-testid="bang-sua-tam">
                 <button
                   type="button"
@@ -527,6 +802,59 @@ function TruocSau({
         className="absolute inset-0 h-full w-full cursor-ew-resize opacity-0"
         data-testid="thanh-truot-so-sanh"
       />
+    </div>
+  );
+}
+
+/** bh-04 — lời mời in thêm sau khi ba mẹ duyệt cho in: 3 tấm đã chỉnh + sản phẩm in có giá trong danh mục. */
+function LoiMoiInThem({
+  anh,
+  sanPham,
+  onChon,
+}: {
+  anh: AnhNho[];
+  sanPham: SanPhamGoiY[];
+  onChon: (() => void) | null;
+}) {
+  const t = vi.gallery.anhChinh;
+  if (anh.length === 0) return null;
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-background p-4" data-testid="loi-moi-in-them">
+      <div>
+        <p className="kh-h3">{giuA(t.moiInTieuDe)}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{giuA(t.moiInMoTa)}</p>
+      </div>
+      <ul className="grid grid-cols-3 gap-1.5">
+        {anh.map((a) => (
+          <li key={a.id} className="aspect-square overflow-hidden rounded-lg bg-surface-2" data-testid="anh-moi-in">
+            {/* eslint-disable-next-line @next/next/no-img-element -- ảnh Drive */}
+            <img src={urlAnh(a, 400)} alt={a.fileName} loading="lazy" className="h-full w-full object-cover" />
+          </li>
+        ))}
+      </ul>
+      {sanPham.length > 0 && (
+        <ul className="space-y-1 text-sm" data-testid="san-pham-moi-in">
+          {sanPham.map((sp) => (
+            <li key={sp.productId} className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate">
+                {sp.name}
+                {sp.size ? ` · ${sp.size}` : ""}
+              </span>
+              <span className="shrink-0 text-muted-foreground">{t.moiInGia.replace("{gia}", formatTien(sp.unitPrice))}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {onChon && (
+        <button
+          type="button"
+          onClick={onChon}
+          data-testid="nut-moi-in-them"
+          className="h-10 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+        >
+          {t.moiInNut}
+        </button>
+      )}
     </div>
   );
 }

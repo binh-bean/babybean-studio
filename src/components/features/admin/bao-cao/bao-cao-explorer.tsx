@@ -449,6 +449,26 @@ function NoiDungBaoCao({
 
           {ketQua.bang && <BangSapXep bang={ketQua.bang} />}
 
+          {/* BB-380: bảng phụ (theo đợt, theo nhóm sản phẩm, bộ đang kẹt…). CSV vẫn xuất bảng chính. */}
+          {ketQua.bangPhu?.map((bp) => (
+            <section key={bp.tieuDe} className="flex flex-col gap-2" data-testid="bang-phu-bao-cao">
+              <h3 className="text-sm font-medium text-[var(--bb-fg)]">{bp.tieuDe}</h3>
+              <BangSapXep bang={bp.bang} />
+            </section>
+          ))}
+
+          {/* BB-380: báo cáo liên quan — bấm sang, giữ nguyên kỳ và chi nhánh đang lọc. */}
+          {ketQua.lienKet && ketQua.lienKet.length > 0 && (
+            <nav aria-label="Báo cáo liên quan" className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-[var(--bb-fg-muted)]">Xem thêm:</span>
+              {ketQua.lienKet.map((lk) => (
+                <Button key={lk.ma} type="button" variant="outline" size="sm" onClick={() => onDoiFilter({ ma: lk.ma })}>
+                  {lk.nhan}
+                </Button>
+              ))}
+            </nav>
+          )}
+
           {ketQua.ghiChu && ketQua.ghiChu.length > 0 && (
             <div className="flex flex-col gap-1 rounded-md border border-[var(--bb-border)] p-3 text-xs text-[var(--bb-fg-muted)]">
               {ketQua.ghiChu.map((g, i) => (
@@ -487,7 +507,8 @@ function TheSoCard({ theSo }: { theSo: KetQuaBaoCao["theSo"][number] }) {
     <TheSoLieu
       testId="the-so-bao-cao"
       label={nhan}
-      title={theSo.nhan}
+      title={theSo.giaiThich ? `${theSo.nhan} — ${theSo.giaiThich}` : theSo.nhan}
+      chuNho={theSo.donVi === "đ"}
       // BB-324: số có dấu chấm hàng nghìn ("12.500.000"), tiền đi với "₫".
       value={typeof theSo.giaTri === "number" ? formatSo(theSo.giaTri, 1) : String(theSo.giaTri)}
       phu={theSo.donVi === "đ" ? "₫" : (theSo.donVi ?? undefined)}

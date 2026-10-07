@@ -17,7 +17,3 @@ const collator = new Intl.Collator("vi", {
 export function naturalCompare(a: string, b: string): number {
   return collator.compare(a, b);
 }
-
-export function naturalSort<T>(items: T[], key: (item: T) => string): T[] {
-  return [...items].sort((x, y) => naturalCompare(key(x), key(y)));
-}

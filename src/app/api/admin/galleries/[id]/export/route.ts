@@ -32,7 +32,8 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
+import { xetQuyenXemBoAnh, CAU_CHAN_BO_ANH } from "@/lib/auth/quyen-xem-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { laLoiThieuCot, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
@@ -273,11 +274,13 @@ export async function GET(
 
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, branch_id, title, status, customer_id, baby_id")
+      .select("id, branch_id, title, status, customer_id, baby_id, editor_id")
       .eq("id", galleryId)
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
-    requireBranch(staff, String(gallery.branch_id));
+    // BB-383 — cùng luật với màn chi tiết (BB-382): xem được màn thì API trả được, và ngược lại.
+    const lyDoChan = xetQuyenXemBoAnh(staff, gallery as { branch_id: string; editor_id: string | null });
+    if (lyDoChan) return fail("FORBIDDEN", CAU_CHAN_BO_ANH[lyDoChan].tieuDe);
 
     const { data: luotChon } = await admin
       .from("selections")

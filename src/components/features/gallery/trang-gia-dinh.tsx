@@ -37,6 +37,7 @@ import {
 import { useNhaGiaDinh } from "@/components/features/gallery/use-nha-gia-dinh";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
 import { MoiNguoiThan } from "@/components/features/gallery/moi-nguoi-than";
+import { ManLoiLink, loaiLoiTuMa } from "@/components/features/gallery/man-loi-link";
 
 const HuongDanThemManHinh = dynamic(
   () => import("@/components/features/gallery/huong-dan-them-man-hinh").then((m) => m.HuongDanThemManHinh),
@@ -266,7 +267,7 @@ function ManTrangThai({ children }: { children: ReactNode }) {
   );
 }
 
-export function TrangGiaDinh({ ma }: { ma: string }) {
+export function TrangGiaDinh({ ma, chatUrl = null }: { ma: string; chatUrl?: string | null }) {
   const { trangThai, taiLai } = useNhaGiaDinh(ma);
   const [moHuongDan, setMoHuongDan] = useState(false);
   const nha = trangThai.loai === "xong" ? trangThai.nha : null;
@@ -286,20 +287,11 @@ export function TrangGiaDinh({ ma }: { ma: string }) {
     );
   }
   if (trangThai.loai === "loi") {
-    const cau = trangThai.ma === "NOT_FOUND" || trangThai.ma === "LINK_EXPIRED" ? G.linkHetHan : G.loiMo;
+    // BB-378 — cùng màn với `/g/`: hết hạn / không tìm thấy (gồm thu hồi) / lỗi mở, có "Nhắn Bean".
     return (
-      <ManTrangThai>
-        <p data-testid="loi-trang-gia-dinh" className="max-w-sm text-[15px] leading-relaxed">
-          {giuA(trangThai.message && trangThai.ma === "LINK_EXPIRED" ? trangThai.message : cau)}
-        </p>
-        <button
-          type="button"
-          onClick={() => void taiLai()}
-          className="h-11 rounded-full border border-[#e5dcd2] px-6 text-sm font-medium transition hover:bg-[#f3ede6]"
-        >
-          {G.thuLai}
-        </button>
-      </ManTrangThai>
+      <div data-testid="loi-trang-gia-dinh">
+        <ManLoiLink loai={loaiLoiTuMa(trangThai.ma)} chatUrl={chatUrl} onThuLai={() => void taiLai()} />
+      </div>
     );
   }
 

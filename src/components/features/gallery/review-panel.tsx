@@ -24,9 +24,16 @@
  * Đến vòng thứ ba, câu hỏi của cả hai bên đều là "lần trước đã nói gì rồi".
  * Giấu đi thì khách viết lại yêu cầu cũ, và người chỉnh ảnh sửa lại thứ đã sửa.
  *
+ * BB-384 (07/10/2026) — anh: "vòng khách duyệt anh muốn như yêu cầu của anh ở bản
+ * yêu cầu". Bỏ HẲN đường khách duyệt bằng link Drive + ô chữ chung: khung này chỉ
+ * còn thông tin (đang chỉnh / đã nhận yêu cầu sửa / đã duyệt / lịch sử) và lời Bean
+ * "đang chuẩn bị ảnh" khi bộ ở bước duyệt mà app chưa có ảnh chỉnh. Duyệt / xin sửa
+ * từng tấm nằm ở `anh-chinh-sua-khach.tsx`. Các đoạn chú thích BB-121 ở trên là
+ * lịch sử.
+ *
  * BB-212 — đổi sang ngôn ngữ "cuốn album kỷ niệm" (font-display, nút viên
  * tròn màu mực, viền mảnh cho nút phụ). Hành vi và luật quyết định
- * (`lib/selection/review-rules`) giữ nguyên. BB-305 (28/09/2026): font-display
+ * giữ nguyên. BB-305 (28/09/2026): font-display
  * chuyển từ Fraunces sang Playfair Display (LUẬT PHÔNG mới).
  */
 
@@ -34,8 +41,10 @@
 
 import { vi } from "@/i18n";
 import React from "react";
-import { canApprove, canRequestRevision } from "@/lib/selection/review-rules";
 import { formatNgayVN } from "@/lib/utils/dinh-dang";
+import { giuA } from "@/lib/utils/giu-a";
+import { tomTatVongSua } from "@/lib/anh-chinh-sua/vong-duyet";
+import { cauHanSua } from "@/lib/anh-chinh-sua/han-sua";
 
 export interface ReviewRound {
   round: number;
@@ -59,6 +68,11 @@ export interface ReviewData {
    * ngày, không bịa.
    */
   deliveredAt?: string | null;
+  /**
+   * BB-387 — số ngày Bean ước tính gửi lại ảnh sửa (Cài đặt `gallery.revision_days_estimate`,
+   * mặc định 3). Màn khách KHÔNG nêu tên thợ chỉnh nên không còn trường người chỉnh.
+   */
+  soNgaySua?: number;
 }
 
 /**
@@ -86,197 +100,100 @@ export function ReviewPanel({
   nhanTienDo,
   coTheHanhTrinh = false,
   review,
-  hotline,
-  onDecide,
+  dangChuanBi = false,
 }: {
   status: string;
   /**
    * BB-200 (3/3) — chuỗi tiến độ tính từ mã Lark (`nhanHienThi().khach`,
-   * docs/21 "Luồng hiển thị"). CSKH xác nhận xong mà Lark còn "Đã chọn hình"
-   * (bộ ảnh XẾP HÀNG, chưa ai chỉnh) thì khách phải thấy "Bộ ảnh đã được ghi
-   * nhận yêu cầu", KHÔNG phải "Studio đang chỉnh ảnh" — nói đang làm trong
-   * khi chưa ai đụng vào là hứa sai. `null`/`undefined` = giữ câu cũ theo
-   * `status` (chưa đọc được Lark, hoặc bộ đã ở giai đoạn không cần Lark).
+   * docs/21 "Luồng hiển thị"). `null`/`undefined` = giữ câu cũ theo `status`.
    */
   nhanTienDo?: string | null;
   /**
-   * BB-258 — chủ studio 26/09/2026: câu trạng thái ("Bộ ảnh đã được ghi nhận
-   * yêu cầu") hiện HAI LẦN liền nhau — tiêu đề thẻ hành trình
-   * (`the-hanh-trinh.tsx`) và khung này, cả hai cùng đọc `nhanTienDo`. Khi thẻ
-   * hành trình đang hiện (gallery-app tính, truyền vào đây) thì khung này BỎ
-   * câu trạng thái của riêng nó cho trường hợp `in_retouch` — đúng cái đã lặp
-   * — nhưng GIỮ nguyên lịch sử sửa và nút duyệt/xin sửa bên dưới.
+   * BB-258 — thẻ hành trình đang hiện thì khung này BỎ câu trạng thái `in_retouch`
+   * (đã lặp nguyên văn), giữ lịch sử sửa bên dưới.
    */
   coTheHanhTrinh?: boolean;
   review: ReviewData;
-  hotline: string;
-  onDecide: (decision: "approve" | "revise", note?: string) => Promise<void>;
+  /**
+   * BB-384 — bộ ở bước duyệt (app `awaiting_approval` hoặc Lark "Đã gửi duyệt") mà
+   * app CHƯA có ảnh chỉnh để ba mẹ xem: chỉ lời Bean, không nút (`khoiVungDuyet`).
+   */
+  dangChuanBi?: boolean;
 }) {
-  const [writing, setWriting] = React.useState(false);
-  const [note, setNote] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
-
-  // Luật nằm ở @/lib/selection/review-rules — có phép thử gọi thẳng vào đó.
-  const state = { status, finalDriveUrl: review.finalDriveUrl };
-  const canDecide = status === "awaiting_approval";
-  const showDecide = canApprove(state);
-
-  async function send(decision: "approve" | "revise") {
-    setBusy(true);
-    try {
-      await onDecide(decision, decision === "revise" ? note.trim() : undefined);
-      setNote("");
-      setWriting(false);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // BB-258 — chỉ bỏ câu trạng thái ở NHÁNH `in_retouch`: đó là nhánh đọc
-  // cùng `nhanTienDo` với tiêu đề thẻ hành trình nên mới thật sự lặp lại
-  // nguyên văn. Nhánh `awaiting_approval`/đã duyệt dùng câu RIÊNG của khung
-  // này (không đọc `nhanTienDo`), không lặp, nên vẫn hiện như cũ.
-  //
-  // BB-310 mục 3 — báo cáo chấm độc lập vòng 4: màn "Đã giao" có tới 4 thẻ
-  // đứng trước lưới ảnh (bản vẽ `babybean-assets/BB-297/da-giao-*.png` chỉ
-  // vẽ bìa rồi thẳng xuống lưới), trong đó khung này góp một thẻ "Ảnh đã
-  // hoàn thiện" TRÙNG với huy hiệu + tiêu đề bìa (`bia-bo-anh.tsx`, nhánh
-  // `trangThai === "delivered"`) vừa hiện ngay phía trên. Gộp `delivered`
-  // vào cùng cơ chế "câu đã có nơi khác nói rồi" — khung này chỉ còn hiện
-  // khi CÒN THÔNG TIN THẬT SỰ MỚI (link Drive, lịch sử vòng sửa), không tự
-  // vẽ lại tiêu đề/nút tải đã có ở bìa.
+  const t = vi.gallery.anhChinh;
+  // BB-384 — khung này KHÔNG còn nút duyệt / ô chữ chung / link Drive: vòng duyệt luôn
+  // đi trong app (`AnhChinhSuaKhach`). Ở đây chỉ còn thông tin.
   const anCauTrangThai = (coTheHanhTrinh && status === "in_retouch") || status === "delivered";
+  const vongMo = review.rounds.filter((r) => !r.resolved);
 
-  // BB-295 mục #14 — không vẽ thẻ khi không có nội dung (xem hàm thuần
-  // `coNoiDungDeVe` ở trên và phép thử `tests/unit/bb-295-review-panel.test.ts`).
-  if (!coNoiDungDeVe(anCauTrangThai, review.finalDriveUrl, showDecide, review.rounds.length)) {
+  if (!dangChuanBi && !coNoiDungDeVe(anCauTrangThai, null, false, review.rounds.length)) {
     return null;
   }
 
   return (
-    <div className="space-y-3.5 rounded-2xl border border-border bg-surface p-5">
-      {!anCauTrangThai && (
-        <div>
+    <div className="space-y-3.5 rounded-2xl border border-border bg-surface p-5" data-testid="khung-vong-duyet">
+      {dangChuanBi ? (
+        <div data-testid="bean-dang-chuan-bi-duyet">
+          <p className="kh-h3">{t.chuanBiTieuDe}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{giuA(t.chuanBiMoTa)}</p>
+        </div>
+      ) : (
+        !anCauTrangThai && (
           <p className="kh-h3">
             {status === "in_retouch"
               ? (nhanTienDo ?? vi.gallery.loiBean.dangChinhAnh)
-              : status === "awaiting_approval"
-                ? "Ảnh đã chỉnh xong, mời ba mẹ xem"
-                : // BB-295 mục #15 — báo cáo chấm: "đã giao" (khách đã nhận đủ ảnh
-                  // hoàn thiện) trước đây dùng chung câu "Ba mẹ đã duyệt bộ ảnh
-                  // này" với "approved" (đã duyệt nhưng chưa chắc đã giao) — gộp
-                  // thành khối riêng "Ảnh đã hoàn thiện" cho đúng trạng thái.
-                  status === "delivered"
-                  ? "Ảnh đã hoàn thiện"
-                  : "Ba mẹ đã duyệt bộ ảnh này"}
+              : status === "delivered"
+                ? "Ảnh đã hoàn thiện"
+                : "Ba mẹ đã duyệt bộ ảnh này"}
           </p>
-        </div>
+        )
       )}
 
-      {/* BB-371 — "Bean đã nhận yêu cầu sửa lần N": hiện CẢ khi thẻ hành trình đã nói
-          trạng thái (anCauTrangThai) — ba mẹ cần biết chắc lời mình đã tới nơi. */}
-      {status === "in_retouch" && review.rounds.some((r) => !r.resolved) && (
-        <p className="text-sm" data-testid="da-nhan-yeu-cau-sua">
-          {vi.gallery.anhChinh.daNhan.replace(
-            "{n}",
-            String(Math.max(...review.rounds.filter((r) => !r.resolved).map((r) => r.round))),
-          )}{" "}
-          <span className="text-muted-foreground">{vi.gallery.anhChinh.daNhanPhu}</span>
-        </p>
-      )}
-
-      {review.finalDriveUrl && (
-        <a
-          href={review.finalDriveUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block text-sm font-medium text-primary underline underline-offset-2"
-        >
-          Mở thư mục ảnh đã chỉnh
-        </a>
-      )}
-
-      {/*
-        BB-310 mục 3 — báo cáo chấm độc lập vòng 4: "Tải cả bộ" hiện HAI LẦN
-        trên màn Đã giao (đây, và nút chính hero của bìa —
-        `bia-bo-anh.tsx` nhánh `trangThai === "delivered"`, dùng đúng cùng
-        `choPhepTai`/`onTaiCaBo`). Bìa luôn đứng TRƯỚC khung này trên trang
-        nên nó luôn là bản trùng — bỏ hẳn, chỉ còn MỘT nút duy nhất ở bìa.
-      */}
-
-      {canDecide && !review.finalDriveUrl && (
-        <p className="text-xs text-heart">
-          Chưa có link ảnh đã chỉnh. Ba mẹ gọi giúp hotline{" "}
-          <span className="font-semibold">{hotline}</span> để Bean gửi lại ạ.
-        </p>
-      )}
-
-      {showDecide && !writing && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void send("approve")}
-            className="h-10 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
-          >
-            Duyệt, cho in
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setWriting(true)}
-            className="h-10 rounded-full border border-border px-5 text-sm font-medium transition hover:bg-surface-2 disabled:opacity-40"
-          >
-            Yêu cầu sửa
-          </button>
-        </div>
-      )}
-
-      {showDecide && writing && (
-        <div className="space-y-2">
-          <label htmlFor="revision-note" className="block text-xs text-muted-foreground">
-            Ba mẹ ghi cần sửa gì, càng rõ càng nhanh. Ví dụ: ảnh số 3 sáng quá.
-          </label>
-          <textarea
-            id="revision-note"
-            name="note"
-            rows={3}
-            maxLength={1000}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-hidden focus:ring-1 focus:ring-primary"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy || !canRequestRevision(state, note)}
-              onClick={() => void send("revise")}
-              className="h-10 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
-            >
-              Gửi yêu cầu sửa
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setWriting(false)}
-              className="h-10 rounded-full px-5 text-sm font-medium text-muted-foreground transition hover:bg-surface-2 disabled:opacity-40"
-            >
-              Quay lại
-            </button>
+      {/* BB-371/384 — "Bean đã nhận yêu cầu sửa lần N": xác nhận RÕ đã nhận gì (số tấm,
+          từng tấm, ghi chú chung), ai sửa và khi nào báo lại — ba mẹ đang không vui cần
+          biết chắc lời mình đã tới nơi. */}
+      {status === "in_retouch" && vongMo.length > 0 && (() => {
+        const moi = vongMo.reduce((a, b) => (b.round > a.round ? b : a));
+        const tt = tomTatVongSua(moi.note);
+        return (
+          <div className="space-y-1.5 text-sm" data-testid="da-nhan-yeu-cau-sua">
+            <p className="font-medium">{giuA(t.daNhanTieuDe.replace("{n}", String(moi.round)))}</p>
+            {tt.soTam > 0 && (
+              <div data-testid="da-nhan-cac-tam">
+                <p className="text-muted-foreground">{t.daNhanSoTam.replace("{n}", String(tt.soTam))}</p>
+                <ul className="mt-0.5 list-disc pl-5">
+                  {tt.tam.map((x) => (
+                    <li key={x.ten}>
+                      <span className="font-medium">{x.ten}</span> — {x.ghiChu}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {tt.ghiChuChung && (
+              <p data-testid="da-nhan-ghi-chu-chung">
+                <span className="text-muted-foreground">{t.daNhanGhiChuChung}</span>{" "}
+                <span className="whitespace-pre-line">{tt.ghiChuChung}</span>
+              </p>
+            )}
+            <p className="text-muted-foreground">{giuA(t.suaLoiBean)}</p>
+            <p className="text-muted-foreground" data-testid="ai-dang-sua">
+              {giuA(cauHanSua(review.soNgaySua))}
+            </p>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {review.rounds.length > 0 && (
-        <ul className="space-y-1 border-t border-border pt-3">
+        <ul className="space-y-1 border-t border-border pt-3" data-testid="lich-su-vong-sua">
           {review.rounds.map((r) => (
             <li key={r.round} className="text-xs">
               <span className="text-muted-foreground">
-                Lần {r.round} · {formatNgayVN(r.createdAt)}
-                {r.resolved ? " · Bean đã sửa" : " · Bean đang sửa"}
+                {t.lanSua.replace("{n}", String(r.round))} · {formatNgayVN(r.createdAt)} ·{" "}
+                {r.resolved ? t.beanDaSua : t.beanDangSua}
               </span>
               <br />
-              {r.note}
+              <span className="whitespace-pre-line">{r.note}</span>
             </li>
           ))}
         </ul>

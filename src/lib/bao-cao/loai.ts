@@ -43,6 +43,12 @@ export interface NguCanhBaoCao {
   den: Date;
   kyTruoc?: KhoangThoiGian;
   nhom: DonViGomNhom;
+  /**
+   * BB-380 — bộ quyền của nhân viên đang xem (route truyền `staff.permissions`).
+   * Báo cáo vận hành có con số tiền dùng nó để ẩn tiền với người không có
+   * `reports:financial`. Bỏ trống (gọi nội bộ/phép thử) = không ẩn.
+   */
+  quyen?: readonly string[];
 }
 
 export interface TheSoBaoCao {
@@ -53,6 +59,12 @@ export interface TheSoBaoCao {
   kyTruoc?: number | string;
   /** % chênh lệch so kỳ trước; `null` khi không tính được (vd kỳ trước = 0). */
   chenhLechPhanTram?: number | null;
+  /** BB-380 — tăng là tốt (doanh thu, tỉ lệ chốt) hay xấu (thời gian chờ). Mặc định: tốt. */
+  tangLaTot?: boolean;
+  /** BB-380 — mã báo cáo chi tiết để bấm vào (vd dải 6 con số ở Bàn làm việc). */
+  maChiTiet?: string;
+  /** BB-380 — một câu giải thích cách đo, hiện khi rê chuột. */
+  giaiThich?: string;
 }
 
 export interface BangBaoCao {
@@ -72,6 +84,10 @@ export interface KetQuaBaoCao {
   bieuDo?: BieuDoBaoCao;
   /** Ghi chú hiển thị dưới báo cáo — vd loại trừ Fixture/archived, con số là sàn... */
   ghiChu?: string[];
+  /** BB-380 — bảng phụ (vd theo đợt, theo loại sản phẩm). CSV vẫn chỉ xuất `bang` chính. */
+  bangPhu?: { tieuDe: string; bang: BangBaoCao }[];
+  /** BB-380 — báo cáo liên quan để bấm sang (không làm trùng số của báo cáo khác). */
+  lienKet?: { ma: string; nhan: string }[];
 }
 
 export interface BoLocBaoCao {

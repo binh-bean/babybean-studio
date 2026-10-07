@@ -48,6 +48,7 @@ import {
 } from "@/lib/utils/dinh-dang";
 import { CARD_TITLE_CLASS, PageHeader } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
+import { DaiSauConSo } from "./bao-cao/dai-sau-con-so";
 
 /** Màu dải cơ cấu Mua thêm theo ĐÚNG bản vẽ: Ảnh in (mực) · Khung (rêu) · Album (hồng). */
 const MAU_CO_CAU_MUA_THEM: Record<string, string> = {
@@ -547,6 +548,8 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
             biến mất khiến trang trông như hỏng. Không bịa số: đây vẫn là
             `data.stats` thật từ API, chỉ là toàn 0 vì `totalGalleries === 0`. */}
         {hangTheSo}
+        {/* BB-380: Sáu con số điều hành — theo chi nhánh đang chọn, có so kỳ trước. */}
+        <DaiSauConSo branchId={branchId} />
         <div className="flex flex-col items-center rounded-xl border border-dashed bg-muted/20 p-8 text-center">
           <img
             src="/minh-hoa/ngang-quan-tri-trong-1280.webp"
@@ -595,6 +598,10 @@ export function Dashboard({ hoTen }: { hoTen?: string | null } = {}) {
           kỳ") thì không hiện chip — xem định nghĩa ở route.ts.
           BB-294 (mục cũ #32): `hangTheSo` dùng chung với nhánh trống ở trên. */}
       {hangTheSo}
+
+      {/* BB-380 (Bản yêu cầu P1): Sáu con số điều hành — theo chi nhánh đang chọn + kỳ,
+          so kỳ trước, bấm vào ra báo cáo chi tiết. */}
+      <DaiSauConSo branchId={branchId} />
 
       {/* BB-303 (bản vẽ BB-301) — "Việc hôm nay" (trái) + "Mua thêm · 7 ngày
           qua" và "Theo chi nhánh" (phải).

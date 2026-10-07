@@ -6,6 +6,7 @@ import { boDangThuGon } from "@/lib/gallery/mo-lai-anh-thu-gon";
 import { dangNhapBangMa, datCookiePhien } from "@/lib/auth/dang-nhap-bang-ma";
 import type { GallerySession } from "@/types/domain";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { docSoNgaySuaDuKien } from "@/lib/anh-chinh-sua/han-sua";
 import { ok, fail } from "@/lib/api-response";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
@@ -17,7 +18,7 @@ import { trangThaiKhach } from "@/lib/lark/trang-thai-app-lark";
 import { khoaChonCuaKhach } from "@/lib/gallery/khoa-chon-khach";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layDuLieuChungBoAnh } from "@/lib/gallery/du-lieu-chung-bo-anh";
-import { laThuMucChinhSua, khachThayAnhChinh } from "@/lib/anh-chinh-sua/nhan-dien";
+import { laThuMucChinhSua } from "@/lib/anh-chinh-sua/nhan-dien";
 import { docTomTatAnhChinh } from "@/lib/anh-chinh-sua/du-lieu";
 import { soSuatAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh";
 import { docAnhAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh-server";
@@ -504,11 +505,12 @@ async function traDuLieu(
         finalDriveUrl: string | null;
         deliveredAt: string | null;
         rounds: Array<{ round: number; note: string; createdAt: string; resolved: boolean }>;
+        soNgaySua: number;
       } | null> => {
         if (!["in_retouch", "awaiting_approval", "approved", "delivered"].includes(gallery.status)) {
           return null;
         }
-        const [{ data: delivery }, { data: rounds }] = await Promise.all([
+        const [{ data: delivery }, { data: rounds }, soNgaySua] = await Promise.all([
           supabase
             .from("deliveries")
             .select("final_drive_url, delivered_at")
@@ -519,14 +521,15 @@ async function traDuLieu(
             .select("round, note, created_at, resolved_at")
             .eq("gallery_id", gallery.id)
             .order("round", { ascending: true }),
+          // BB-387 — "trong khoảng {n} ngày" cho lời Bean khi ba mẹ xin sửa (chưa có dòng → 3).
+          // KHÔNG trả tên thợ chỉnh ra màn khách.
+          docSoNgaySuaDuKien(supabase),
         ]);
 
         return {
           // BB-371 — số ảnh chỉnh khách ĐƯỢC xem ngay trong app (CSKH đã gửi duyệt).
           // > 0 thì màn khách hiện khối "Ảnh đã chỉnh" thay cho link Drive.
-          soAnhChinhTrongApp: tomTatAnhChinh.anh.filter((a) =>
-            khachThayAnhChinh(gallery.status, tomTatAnhChinh.guiLuc, a.created_at),
-          ).length,
+          soAnhChinhTrongApp: tomTatAnhChinh.anh.filter((a) => tomTatAnhChinh.laThay(gallery.status, a)).length,
           finalDriveUrl: delivery?.final_drive_url ?? null,
           // BB-298 — ngày giao thật cho dấu "Đã hoàn thiện" ở màn "Đã giao".
           deliveredAt: delivery?.delivered_at ?? null,
@@ -536,6 +539,7 @@ async function traDuLieu(
             createdAt: r.created_at as string,
             resolved: r.resolved_at !== null,
           })),
+          soNgaySua,
         };
       })(),
     ]);

@@ -78,17 +78,3 @@ export function AdminBreadcrumb() {
     </nav>
   );
 }
-
-/**
- * Tên của màn đang xem, một chữ duy nhất — dùng cho thanh đầu trang trên điện
- * thoại, nơi không đủ chỗ cho cả đường dẫn.
- *
- * Dùng chung `getBreadcrumbName` với đường dẫn đầy đủ: hai bảng tên cho cùng
- * một màn là hai bảng sẽ trôi khỏi nhau.
- */
-export function TenManHinh() {
-  const pathname = usePathname();
-  const paths = pathname.split("/").filter(Boolean);
-  const cuoi = paths[paths.length - 1] ?? "admin";
-  return <>{getBreadcrumbName(cuoi, paths[paths.length - 2])}</>;
-}

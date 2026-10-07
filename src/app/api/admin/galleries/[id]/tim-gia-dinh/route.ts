@@ -12,7 +12,8 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
-import { requireStaff, requireBranch, AuthError } from "@/lib/auth/staff";
+import { requireStaff, AuthError } from "@/lib/auth/staff";
+import { xetQuyenXemBoAnh, CAU_CHAN_BO_ANH } from "@/lib/auth/quyen-xem-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { demTimGiaDinh } from "@/lib/gallery/tim-gia-dinh-server";
 
@@ -33,11 +34,13 @@ export async function GET(
     const admin = createAdminClient();
     const { data: gallery, error: gErr } = await admin
       .from("galleries")
-      .select("id, branch_id, title")
+      .select("id, branch_id, title, editor_id")
       .eq("id", galleryId)
       .maybeSingle();
     if (gErr || !gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
-    requireBranch(staff, gallery.branch_id as string);
+    // BB-383 — cùng luật với màn chi tiết (BB-382): xem được màn thì API trả được, và ngược lại.
+    const lyDoChan = xetQuyenXemBoAnh(staff, gallery as { branch_id: string; editor_id: string | null });
+    if (lyDoChan) return fail("FORBIDDEN", CAU_CHAN_BO_ANH[lyDoChan].tieuDe);
 
     const { theoAnh, chuaApMigration } = await demTimGiaDinh(admin, galleryId);
     const ids = Array.from(theoAnh.keys());

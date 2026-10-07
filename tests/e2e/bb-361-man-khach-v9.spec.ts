@@ -17,6 +17,7 @@
  * bảo vệ, Safari cũ không có `text-pretty` nên `giuA` mới là lớp chính); bỏ `invisible` ở hàng
  * dính → ca 3 ĐỎ (2 nút chat thấy được).
  */
+import { daMoLanTruoc } from "./helpers/luu-app";
 import { test, expect } from "./helpers/ip-rieng-moi-ca";
 import type { Page } from "@playwright/test";
 import { duLieuDanhGia5, donDep, cheTrongDom, type DuLieuDanhGia5 } from "../fixtures/danh-gia";
@@ -40,6 +41,8 @@ test.afterAll(async () => {
 async function vao(page: Page, w: number, h: number, token: string) {
   await page.setViewportSize({ width: w, height: h });
   await chanLh3TrenTrinhDuyet(page);
+  // BB-378 — lời mời lưu app hiện đúng lúc: ba mẹ mở lại lần thứ 2.
+  await daMoLanTruoc(page);
   await page.goto(`/g/${token}`);
   await page.locator("#dau-luoi-anh").first().waitFor({ state: "attached", timeout: 45_000 });
   await page.waitForTimeout(1000);
@@ -84,10 +87,10 @@ async function moHuongDan(page: Page): Promise<{ tieuDe: string; aMoCoi: string[
   await vao(page, 390, 844, d.chinh.token);
   const chip = page.getByTestId("goi-y-luu-app").first();
   await chip.scrollIntoViewIfNeeded();
-  await chip.getByRole("button").first().click();
+  await chip.getByTestId("goi-y-xem-cach-luu").click();
   const hd = page.getByRole("dialog").first();
   await hd.waitFor({ state: "visible" });
-  const tieuDe = (await hd.locator("h3").first().innerText()).trim();
+  const tieuDe = (await hd.locator("h3").first().innerText()).replace(/\s+/gu, " ").trim(); // BB-378: tiêu đề giữ hai chữ cuối bằng khoảng trắng không ngắt
   // Đổi bề rộng tấm trượt từng 2px (260→448): ở MỌI bề rộng, "ạ" phải cùng dòng với chữ đứng trước.
   const aMoCoi = await hd.getByTestId("huong-dan-luu-app-mo-ta").evaluate((p) => {
     const loi: string[] = [];
@@ -119,7 +122,7 @@ test.describe("2 — hướng dẫn lưu app, Android", () => {
   test("Android: 'ạ' không đứng một mình; tiêu đề chung", async ({ page }) => {
     const { tieuDe, aMoCoi } = await moHuongDan(page);
     expect(aMoCoi, `"ạ" rơi xuống dòng riêng ở bề rộng: ${aMoCoi.join(", ")}`).toEqual([]);
-    expect(tieuDe).toBe("Thêm vào màn hình chính");
+    expect(tieuDe).toBe("Mở ảnh của bé chỉ bằng một chạm");
   });
 });
 
@@ -127,7 +130,7 @@ test.describe("2 — hướng dẫn lưu app, iPhone", () => {
   test.use({ userAgent: UA.iphone, isMobile: true, hasTouch: true });
   test("iPhone: cùng tiêu đề với Android", async ({ page }) => {
     const { tieuDe } = await moHuongDan(page);
-    expect(tieuDe).toBe("Thêm vào màn hình chính");
+    expect(tieuDe).toBe("Mở ảnh của bé chỉ bằng một chạm");
   });
 });
 

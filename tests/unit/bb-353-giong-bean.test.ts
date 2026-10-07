@@ -22,7 +22,6 @@ import { NOI_DUNG_MOC } from "@/lib/thong-bao/moc-khach";
 /** Phần `vi` khách thấy. `admin`/`ui` là màn nhân viên — không thuộc luật này. */
 const PHAN_KHACH = {
   gallery: vi.gallery,
-  api: vi.api,
   landing: vi.landing,
   errorPages: vi.errorPages,
   "common.offline": vi.common.offline,
@@ -59,6 +58,8 @@ const KHONG_PHAI_LOI_BEAN = new Set([
   "gallery.giaDinh.cacBuoiCuaGiaDinh",
   "gallery.giaDinh.veTrangGiaDinh",
   "gallery.giaDinh.albumGiaDinh",
+  // BB-378 — TIÊU ĐỀ lời mời lưu app (nói lợi ích), không phải câu; câu đi kèm (`luuApp.loiIch`) kết "ạ".
+  "gallery.luuApp.tieuDe",
 ]);
 
 function phang(obj: unknown, tien = ""): [string, string][] {
