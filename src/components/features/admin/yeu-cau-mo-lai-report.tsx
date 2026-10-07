@@ -25,6 +25,8 @@ import type { DotTomTat } from "@/lib/gallery/dot-chon";
 import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { tenMeThat } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface DongYeuCau {
   galleryId: string;
@@ -44,6 +46,7 @@ export function YeuCauMoLaiReport() {
   const [error, setError] = React.useState<string | null>(null);
   const [items, setItems] = React.useState<DongYeuCau[]>([]);
   const [canReopen, setCanReopen] = React.useState(false);
+  const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
 
   const tai = React.useCallback(async (alive: () => boolean = () => true) => {
     try {
@@ -57,6 +60,7 @@ export function YeuCauMoLaiReport() {
       setError(null);
       setItems(json.data.items ?? []);
       setCanReopen(json.data.canReopen === true);
+      setNha(json.data.nha ?? {});
     } catch {
       if (alive()) setError("Mất kết nối, thử lại giúp.");
     } finally {
@@ -106,6 +110,7 @@ export function YeuCauMoLaiReport() {
                   {[tenMeThat(it.customerName) ? hienTieuDeBoAnh(it.title) : null, it.branchName].filter(Boolean).join(" · ")}
                 </span>
               </div>
+              <NhanNhaBoAnh nha={nha[it.galleryId]} />
               <YeuCauMoLaiBanner
                 galleryId={it.galleryId}
                 status={it.status}

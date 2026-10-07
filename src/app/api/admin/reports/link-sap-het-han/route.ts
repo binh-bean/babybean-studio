@@ -40,6 +40,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
 
 export const runtime = "nodejs";
 
@@ -149,7 +150,9 @@ export async function GET(request: Request): Promise<Response> {
       chuaAiMo: items.filter((i) => i.viewCount === 0).length,
     };
 
-    return ok({ soNgay, tong, items });
+    // BB-394 — nhãn nhà (khách có ≥ 2 bộ); lỗi đọc thì bỏ nhãn, danh sách vẫn đủ.
+    const nha = await docNhaCuaCacBoKhongLoi(admin, items.map((i) => i.galleryId));
+    return ok({ soNgay, tong, items, nha });
   } catch (err) {
     return failUnexpected(err, requestId);
   }

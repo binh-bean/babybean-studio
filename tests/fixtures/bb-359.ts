@@ -4,10 +4,14 @@
  *
  * Bàn làm việc (mục 1) — nhân sự vai `branch_manager` CHỈ thấy chi nhánh này, nên số trên
  * màn là số của fixture, không lẫn bộ thật:
- *   · guiAnh : `submitted`, đợt 1 chờ xác nhận            → tab "Khách gửi ảnh chọn" 1
+ *   · guiAnh : `submitted`, 2 ảnh, đợt 1 chờ xác nhận     → tab "Khách gửi ảnh chọn" 1
+ *              (có ảnh như bộ thật khách đã chọn; trước BB-395 bộ này 0 ảnh nên từ BB-381
+ *              nó bị đếm THÊM ở "Gói chụp chưa có ảnh" — phép thử đỏ 4 ≠ 2)
  *   · vuot   : `in_retouch`, chốt 3/1 ảnh, 100.000 chưa thu → tab "Ảnh vượt hạn mức" 1
- *   · nhap   : `draft`, 0 ảnh — KHÔNG có tab nào; bản cũ (BB-283) cộng nó vào thẻ
- *              "Cần xử lý ngay" ("Bộ ảnh chưa có ảnh") nên thẻ lệch huy hiệu (kiểm ngược).
+ *   · nhap   : `draft`, 0 ảnh, chưa có dòng hoá đơn         → tab "Gói chụp chưa có ảnh" 1
+ *              (luật BB-381, Đợt 18: bộ có gói/chưa rõ gói mà 0 ảnh là MỘT việc có tab riêng;
+ *              trước BB-381 bộ này không có tab nào — bản cũ BB-283 cộng nó vào thẻ
+ *              "Cần xử lý ngay" bằng công thức riêng nên thẻ lệch huy hiệu).
  *
  * Bộ đã thu gọn (mục 2b) — `daGiao`: `delivered`, CHỈ còn 2 dòng ảnh (bìa + ảnh đã chọn),
  * link vai owner. Phép thử thêm 4 dòng ảnh khi "Drive đồng bộ xong" (giả).
@@ -99,6 +103,8 @@ export async function duLieuBB359(): Promise<DuLieuBB359> {
 
     const guiAnh = await taoBo("gui-anh", "submitted", 10);
     await linkVaLuot(guiAnh, { soAnh: 0, tien: 0 });
+    // BB-395 — bộ khách đã gửi ảnh chọn thì có ảnh; 0 ảnh là rơi vào "Gói chụp chưa có ảnh" (BB-381).
+    await themAnh(guiAnh, 1, 2);
 
     const vuot = await taoBo("vuot", "in_retouch", 1);
     const lv = await linkVaLuot(vuot, { soAnh: 3, tien: 100000 });

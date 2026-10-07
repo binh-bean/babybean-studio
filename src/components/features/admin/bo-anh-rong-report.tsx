@@ -20,9 +20,11 @@ import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
 import type { KetQuaBoAnhRong } from "@/lib/gallery/bo-anh-rong";
 import { NHAN_LY_DO, type LyDoChuaCoAnh } from "@/lib/gallery/phan-loai-hoa-don";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 function useBoAnhRong() {
-  const [data, setData] = React.useState<KetQuaBoAnhRong | null>(null);
+  const [data, setData] = React.useState<(KetQuaBoAnhRong & { nha?: Record<string, NhaCuaBo> }) | null>(null);
   const [loi, setLoi] = React.useState<string | null>(null);
   const tai = React.useCallback(async () => {
     try {
@@ -33,7 +35,7 @@ function useBoAnhRong() {
         return;
       }
       setLoi(null);
-      setData(json.data as KetQuaBoAnhRong);
+      setData(json.data as KetQuaBoAnhRong & { nha?: Record<string, NhaCuaBo> });
     } catch {
       setLoi("Mất kết nối, thử lại giúp.");
     }
@@ -106,6 +108,7 @@ export function GoiChuaCoAnhReport() {
                 <p className="text-xs text-[var(--bb-fg-muted)] [overflow-wrap:anywhere]">
                   {[it.maHoaDon, it.branchName, `tạo ${ngay(it.createdAt)}`].filter(Boolean).join(" · ")}
                 </p>
+                <NhanNhaBoAnh nha={data?.nha?.[it.galleryId]} className="mt-1" />
                 <p className="mt-1 text-xs text-[var(--bb-fg)]" data-testid="huong-dan-goi-chua-co-anh">
                   {it.huongDan}
                 </p>
@@ -186,6 +189,7 @@ export function DonHauKyReport() {
                 <p className="text-xs text-[var(--bb-fg-muted)] [overflow-wrap:anywhere]">
                   {[it.maHoaDon, it.branchName, `tạo ${ngay(it.createdAt)}`].filter(Boolean).join(" · ")}
                 </p>
+                <NhanNhaBoAnh nha={data?.nha?.[it.galleryId]} className="mt-1" />
                 <p className="mt-1 text-xs text-[var(--bb-fg)] [overflow-wrap:anywhere]" data-testid="thanh-phan-don-hau-ky">
                   {it.thanhPhan || "Chưa có dòng hàng"}
                 </p>

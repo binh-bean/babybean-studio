@@ -17,6 +17,7 @@ import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { layDanhSachChoXuLyMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layCacDot } from "@/lib/gallery/dot-chon-server";
+import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
 
 export const runtime = "nodejs";
 
@@ -60,7 +61,9 @@ export async function GET(request: Request): Promise<Response> {
       })),
     );
 
-    return ok({ items, canReopen: staff.permissions.includes("galleries:reopen") });
+    // BB-394 — nhãn nhà (khách có ≥ 2 bộ); lỗi đọc thì bỏ nhãn, danh sách vẫn đủ.
+    const nha = await docNhaCuaCacBoKhongLoi(admin, items.map((i) => i.galleryId));
+    return ok({ items, nha, canReopen: staff.permissions.includes("galleries:reopen") });
   } catch (err) {
     return failUnexpected(err, requestId);
   }

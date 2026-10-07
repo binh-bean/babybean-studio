@@ -53,6 +53,8 @@ interface ThongTinThu {
 }
 import { NutNhacKhach } from "./nut-nhac-khach";
 import { NutNhanKhach } from "./nut-nhan-khach";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface ReportItem {
   galleryId: string;
@@ -89,6 +91,7 @@ export function OverQuotaReport() {
   const [error, setError] = React.useState<string | null>(null);
   const [summary, setSummary] = React.useState<ReportSummary | null>(null);
   const [items, setItems] = React.useState<ReportItem[]>([]);
+  const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
   // BB-331: dòng đang mở form "Xác nhận thanh toán" + câu báo sau khi ghi.
   const [moThanhToan, setMoThanhToan] = React.useState<string | null>(null);
   const [dangGhi, setDangGhi] = React.useState(false);
@@ -123,6 +126,7 @@ export function OverQuotaReport() {
       }
       setSummary(json.data.summary);
       setItems(json.data.items);
+      setNha(json.data.nha ?? {});
     } catch {
       if (alive.current) setError("Mất kết nối, thử lại giúp.");
     } finally {
@@ -298,7 +302,7 @@ export function OverQuotaReport() {
                 key={it.galleryId}
                 className="rounded-lg border border-[var(--bb-border)] p-3 text-sm"
               >
-                <BoAnhCell it={it} />
+                <BoAnhCell it={it} nha={nha[it.galleryId]} />
                 <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2">
                   <span className="select-all text-xs tabular-nums">{it.contractCode ?? "—"}</span>
                   <span className="text-xs text-[var(--bb-fg-muted)]">
@@ -350,7 +354,7 @@ export function OverQuotaReport() {
                 <React.Fragment key={it.galleryId}>
                 <tr>
                   <td className="py-2 pr-3">
-                    <BoAnhCell it={it} />
+                    <BoAnhCell it={it} nha={nha[it.galleryId]} />
                   </td>
                   {/* select-all để CSKH bôi đen một phát rồi dán vào ô tìm kiếm bên Lark */}
                   <td className="select-all whitespace-nowrap py-2 pr-3 text-xs tabular-nums">
@@ -392,7 +396,7 @@ export function OverQuotaReport() {
  * tên khách, là liên kết mở thẳng chi tiết bộ. Không có cả hai thì rơi về tên
  * bộ ảnh thô (mã hợp đồng), không bịa tên.
  */
-function BoAnhCell({ it }: { it: ReportItem }) {
+function BoAnhCell({ it, nha }: { it: ReportItem; nha?: NhaCuaBo }) {
   // BB-325 ("tên hiển thị" 29/09/2026) — dòng chính là TÊN MẸ, tên bé xuống dòng phụ.
   const tenBe = tinhTenBiaTuDuLieu(it.babyNickname, it.babyFullName);
   const { tieuDe: chinh } = tinhTieuDeBoAnhQuanTri({
@@ -412,6 +416,7 @@ function BoAnhCell({ it }: { it: ReportItem }) {
         {chinh}
       </Link>
       {phu && <div className="truncate text-xs text-[var(--bb-fg-muted)]">{phu}</div>}
+      <NhanNhaBoAnh nha={nha} className="mt-1" />
     </div>
   );
 }

@@ -34,6 +34,8 @@ import { TheSoLieu } from "./the-so-lieu";
 import { Badge } from "@/components/ui/badge";
 import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface Item {
   shareLinkId: string;
@@ -66,6 +68,7 @@ export function LinkSapHetHanReport() {
   const [error, setError] = React.useState<string | null>(null);
   const [tong, setTong] = React.useState<Tong | null>(null);
   const [items, setItems] = React.useState<Item[]>([]);
+  const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
 
   React.useEffect(() => {
     let alive = true;
@@ -82,6 +85,7 @@ export function LinkSapHetHanReport() {
         setError(null);
         setTong(json.data.tong);
         setItems(json.data.items);
+        setNha(json.data.nha ?? {});
       } catch {
         if (alive) setError("Mất kết nối, thử lại giúp.");
       } finally {
@@ -192,6 +196,7 @@ export function LinkSapHetHanReport() {
                 <div className="mt-1 text-xs text-[var(--bb-fg-muted)]">
                   {hienTieuDeBoAnh(it.galleryTitle)} · {it.branchName ?? "—"}
                 </div>
+                <NhanNhaBoAnh nha={nha[it.galleryId]} className="mt-1" />
                 <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-xs text-[var(--bb-fg-muted)]">
                   <span className="select-all font-mono">{it.contractCode ?? "—"}</span>
                   <span>
@@ -247,7 +252,12 @@ export function LinkSapHetHanReport() {
                       "—"
                     )}
                   </td>
-                  <td className="py-2 pr-3">{hienTieuDeBoAnh(it.galleryTitle)}</td>
+                  <td className="py-2 pr-3">
+                    {hienTieuDeBoAnh(it.galleryTitle)}
+                    <div className="mt-1">
+                      <NhanNhaBoAnh nha={nha[it.galleryId]} />
+                    </div>
+                  </td>
                   <td className="py-2 pr-3">{it.branchName ?? "—"}</td>
                   <td className="select-all py-2 pr-3 font-mono text-xs">
                     {it.contractCode ?? "—"}

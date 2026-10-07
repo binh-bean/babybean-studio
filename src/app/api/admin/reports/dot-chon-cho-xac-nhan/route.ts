@@ -15,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { layDanhSachChoXacNhanDot, layDanhSachViecDot1 } from "@/lib/gallery/dot-chon-server";
 import { gomTheoBoAnh, layDot1ChoXacNhan } from "@/lib/gallery/khach-gui-anh-chon";
 import { layDatChinhSuaChoXuLy } from "@/lib/gallery/tim-gia-dinh-server";
+import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
 
 export const runtime = "nodejs";
 
@@ -53,7 +54,12 @@ export async function GET(request: Request): Promise<Response> {
       layDatChinhSuaChoXuLy(admin, branchIds),
     ]);
 
+    const boAnh = gomTheoBoAnh(dot1, items, viecDot1, datChinhSua);
+    // BB-394 — nhãn nhà (khách có ≥ 2 bộ): một lần đọc cho cả tab; lỗi thì bỏ nhãn.
+    const nha = await docNhaCuaCacBoKhongLoi(admin, boAnh.map((d) => d.galleryId));
+
     return ok({
+      nha,
       // Không trả anh_ids (danh sách id ảnh) — hàng đợi chỉ cần số liệu; ảnh xem ở trang bộ ảnh.
       items: items.map((d) => ({
         galleryId: d.galleryId,
@@ -73,7 +79,7 @@ export async function GET(request: Request): Promise<Response> {
       // Đợt 1: khách nhờ studio chọn thêm ảnh / chốt khi còn sản phẩm in chưa chọn ảnh.
       viecDot1,
       // BB-337 — tab "Khách gửi ảnh chọn": MỖI BỘ ẢNH MỘT DÒNG (đợt 1 + mua thêm + nhờ chọn giúp).
-      boAnh: gomTheoBoAnh(dot1, items, viecDot1, datChinhSua),
+      boAnh,
       canConfirm: staff.permissions.includes("galleries:write"),
     });
   } catch (err) {

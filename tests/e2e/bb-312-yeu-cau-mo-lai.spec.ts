@@ -181,6 +181,9 @@ ownIpTest.describe("BB-312: khách xin mở lại — phản hồi cả hai phí
     if (client) {
       if (galleryId) {
         await client.query("delete from thong_bao_khach where gallery_id = $1", [galleryId]);
+        // BB-395 — chuông NHÂN VIÊN (khách xin mở lại) cũng mang tên bộ Fixture; trước đây
+        // mỗi lượt chạy để sót 1–2 dòng `notifications` (db:kiem-fixture báo).
+        await client.query("delete from notifications where payload->>'galleryTitle' like $1", [`${NHAN}%`]);
         await client.query("delete from push_dang_ky where gallery_id = $1", [galleryId]);
         await client.query("delete from activity_logs where entity_id = $1", [galleryId]);
         await client.query("delete from selections where gallery_id = $1", [galleryId]);

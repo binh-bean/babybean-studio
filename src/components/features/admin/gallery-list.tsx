@@ -22,6 +22,8 @@ import {
   formatSo,
 } from "@/lib/utils/dinh-dang";
 import { NutNhacKhach } from "./nut-nhac-khach";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
   Calendar,
@@ -170,6 +172,8 @@ export interface GalleryItem {
   maHoaDon?: string | null;
   /** BB-335 — "Photo": tên thợ chụp từ cột Lark; null khi trống / chưa áp 0081. */
   larkPhoto?: string | null;
+  /** BB-394 — nhãn nhà (khách có ≥ 2 bộ): "Nhà <tên> · Buổi N/M". */
+  nha?: NhaCuaBo | null;
 }
 
 /**
@@ -457,6 +461,7 @@ function KanbanColumn({
                           {tieuDeBoAnh(item)}
                         </div>
                         {tenBeCot && <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>}
+                        <NhanNhaBoAnh nha={item.nha} chiNhan className="mt-1" />
                       </div>
                     </div>
                     <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
@@ -845,6 +850,7 @@ export function GalleryList() {
                             <div className="truncate text-xs text-[var(--bb-fg-muted)]">
                               <span className="tabular-nums">{thongTinBoAnh(item)}</span>
                             </div>
+                            <NhanNhaBoAnh nha={item.nha} className="mt-0.5" />
                           </div>
                         </div>
                       </td>
@@ -978,6 +984,7 @@ export function GalleryList() {
                       <p className="text-xs text-[var(--bb-fg-muted)]">
                         <span className="tabular-nums">{thongTinBoAnh(item)}</span>
                       </p>
+                      <NhanNhaBoAnh nha={item.nha} />
                       <span className="inline-flex items-center gap-1.5">
                         <ChamCanhBao mau={item.warningColor} />
                         <Badge variant={statusConfig.variant} className="whitespace-nowrap" title={item.larkTenTrangThai ? `Trên Lark: ${item.larkTenTrangThai}` : undefined}>

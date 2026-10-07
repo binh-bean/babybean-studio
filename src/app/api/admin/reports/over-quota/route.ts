@@ -38,6 +38,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { HINH_THUC_GIAM_GIA } from "@/lib/gallery/tien-phat-sinh";
 import { layTienCanThuNhieuBo } from "@/lib/gallery/tien-can-thu-server";
 import { layKhachGuiAnhChon } from "@/lib/gallery/khach-gui-anh-chon";
+import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
 
 export const runtime = "nodejs";
 
@@ -226,7 +227,9 @@ export async function GET(request: Request): Promise<Response> {
       missingQuotaCount: Number((unknownRows as { n: number } | null)?.n ?? 0),
     };
 
-    return ok({ summary, items });
+    // BB-394 — nhãn nhà (khách có ≥ 2 bộ); lỗi đọc thì bỏ nhãn, danh sách vẫn đủ.
+    const nha = await docNhaCuaCacBoKhongLoi(admin, items.map((i) => i.galleryId));
+    return ok({ summary, items, nha });
   } catch (err) {
     return failUnexpected(err, requestId);
   }

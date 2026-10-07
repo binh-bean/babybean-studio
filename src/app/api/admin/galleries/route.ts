@@ -31,6 +31,7 @@ import { giaAnhThemChoBoMoi, giaRiengTheoTenGoi } from "@/lib/gallery/gia-goi-ch
 import { docBangGiaRieng } from "@/lib/gallery/gia-goi-chup-server";
 import { giaAnhChonThemMacDinh } from "@/lib/gallery/gia-anh-chon-them";
 import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
+import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
 import { chuaCoTenBe, catTrang, demTheoTrangThai } from "@/lib/gallery/loc-chua-ten-be";
 
 export const runtime = "nodejs";
@@ -524,6 +525,8 @@ export async function GET(request: Request): Promise<Response> {
     }
     // BB-335 — "Photo" (thợ chụp) từ cột Lark; 0081 chưa áp → rỗng, không 500.
     const { theoBo: photoMap } = await docLarkPhoto(admin, idsTrangNay);
+    // BB-394 — nhãn nhà "Nhà <tên> · Buổi N/M" (khách có ≥ 2 bộ): MỘT lần đọc cho cả trang; lỗi thì bỏ nhãn.
+    const nhaMap = await docNhaCuaCacBoKhongLoi(admin, idsTrangNay);
 
     const items = rawItems.map((raw) => {
       const item = raw as Record<string, unknown>;
@@ -550,6 +553,8 @@ export async function GET(request: Request): Promise<Response> {
         coLinkApp: traLinkDuoc ? boCoLink.has(String(item.id)) : true,
         // BB-335 — tên thợ chụp đọc từ cột "photo" bên Lark; null khi trống / chưa áp 0081.
         larkPhoto: photoMap.get(String(item.id)) ?? null,
+        // BB-394 — nhãn nhà; null khi khách chỉ có 1 bộ (hoặc đọc nhãn lỗi).
+        nha: nhaMap[String(item.id)] ?? null,
       };
     });
 

@@ -14,6 +14,8 @@ import { CARD_TITLE_CLASS } from "./page-header";
 import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { tenMeThat } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface Dong {
   galleryId: string;
@@ -29,6 +31,7 @@ export function LarkDaXoaReport() {
   const [items, setItems] = React.useState<Dong[] | null>(null);
   const [loi, setLoi] = React.useState<string | null>(null);
   const [dangLam, setDangLam] = React.useState<string | null>(null);
+  const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
 
   const tai = React.useCallback(async () => {
     try {
@@ -40,6 +43,7 @@ export function LarkDaXoaReport() {
       }
       setLoi(null);
       setItems(json.data.items ?? []);
+      setNha(json.data.nha ?? {});
     } catch {
       setLoi("Mất kết nối, thử lại giúp.");
     }
@@ -93,6 +97,7 @@ export function LarkDaXoaReport() {
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
+                <NhanNhaBoAnh nha={nha[it.galleryId]} className="mt-1" />
               </div>
               <Button asChild variant="outline" size="sm">
                 <Link href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}>Mở bộ ảnh</Link>

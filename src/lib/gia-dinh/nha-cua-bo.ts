@@ -61,6 +61,18 @@ function laLoiThieuCot(err: { code?: string; message?: string } | null): boolean
 }
 
 /**
+ * BB-394 — như `docNhaCuaCacBo` nhưng đọc lỗi thì trả {} (bỏ nhãn) chứ không ném:
+ * nhãn nhà chỉ là phụ, không được làm hỏng danh sách việc. MỘT lần đọc cho cả trang.
+ */
+export async function docNhaCuaCacBoKhongLoi(db: SupabaseClient, galleryIds: readonly string[]): Promise<Record<string, NhaCuaBo>> {
+  try {
+    return await docNhaCuaCacBo(db, galleryIds);
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Đọc nhãn nhà cho một loạt bộ ảnh (máy chủ, client service_role). Trả object
  * thường (galleryId → NhaCuaBo) để gửi qua JSON. Bộ thuộc khách chỉ có 1 bộ thì
  * không có mặt.

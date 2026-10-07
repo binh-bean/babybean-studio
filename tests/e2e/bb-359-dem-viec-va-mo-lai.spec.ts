@@ -4,9 +4,10 @@
  *
  * 1. Bàn làm việc: huy hiệu menu, dòng phụ lời chào, thẻ "Cần xử lý ngay", số trên từng tab
  *    trang Việc cần xử lý — BỐN chỗ phải cùng một số. Nhân sự vai branch_manager chỉ thấy
- *    chi nhánh fixture: guiAnh (tab Khách gửi ảnh chọn) + vuot (tab Ảnh vượt hạn mức) = 2.
- *    Kiểm ngược: trả dashboard.tsx về `dongCanXuLy(merged)` → thẻ có "Bộ ảnh chưa có ảnh"
- *    (bộ nhap) và thiếu "Ảnh vượt hạn mức" → ĐỎ.
+ *    chi nhánh fixture: guiAnh (tab Khách gửi ảnh chọn) + vuot (tab Ảnh vượt hạn mức)
+ *    + nhap (tab Gói chụp chưa có ảnh — luật BB-381, Đợt 18) = 3.
+ *    Kiểm ngược: trả dashboard.tsx về `dongCanXuLy(merged)` → thẻ đếm theo công thức riêng,
+ *    thiếu "Ảnh vượt hạn mức" → ĐỎ.
  *
  * 2. Khách mở bộ đã thu gọn: bìa + ảnh đã chọn hiện ngay, có câu "Bean đang mở lại…", rồi
  *    khi Đồng bộ lại (giả) xong thì lưới đủ 6 ảnh, KHÔNG F5. bb-dev chưa áp 0088 (không được
@@ -77,12 +78,19 @@ test("Bàn làm việc: huy hiệu = dòng phụ = thẻ Cần xử lý ngay = t
 
   console.info("BB359_DEM", JSON.stringify({ soHuyHieu, soDongPhu, soThe, tongTab, soHuyHieuTrangViec, dongThe, soTab }));
 
-  // Fixture: đúng 1 "Khách gửi ảnh chọn" + 1 "Ảnh vượt hạn mức"
-  expect(soHuyHieu).toBe(2);
+  // Fixture: đúng 1 "Khách gửi ảnh chọn" + 1 "Ảnh vượt hạn mức" + 1 "Gói chụp chưa có ảnh"
+  // (bộ nhap 0 ảnh — từ BB-381 là một việc có tab riêng). Mỗi tab đúng số của fixture,
+  // không chỉ tổng: tổng khớp mà lệch tab (vd bộ đã có ảnh vẫn bị đếm "chưa có ảnh") là ĐỎ.
+  expect(Object.fromEntries(soTab.filter((x) => x.so > 0).map((x) => [x.id, x.so]))).toEqual({
+    "khach-mua-them": 1,
+    "over-quota": 1,
+    "goi-chua-co-anh": 1,
+  });
+  expect(soHuyHieu).toBe(3);
   expect(soDongPhu).toBe(soHuyHieu);
   expect(soThe).toBe(soHuyHieu);
   expect(tongTab).toBe(soHuyHieuTrangViec);
-  expect(tongTab).toBe(2);
+  expect(tongTab).toBe(3);
   // tab nào có số > 0 thì thẻ có đúng một dòng cùng số (và ngược lại)
   const theoTab = soTab.filter((x) => x.so > 0).map((x) => [`can-xu-ly-ngay-${x.id}`, x.so]);
   expect(dongThe.map((x) => [x.id, x.so])).toEqual(theoTab);

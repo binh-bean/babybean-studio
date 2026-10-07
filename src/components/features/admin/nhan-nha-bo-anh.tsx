@@ -7,7 +7,16 @@
 import Link from "next/link";
 import { chuNhanNha, type NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
-export function NhanNhaBoAnh({ nha, className }: { nha: NhaCuaBo | null | undefined; className?: string }) {
+export function NhanNhaBoAnh({
+  nha,
+  className,
+  chiNhan,
+}: {
+  nha: NhaCuaBo | null | undefined;
+  className?: string;
+  /** BB-394 — chỉ hiện nhãn, không lối "Xem cả nhà": dùng khi cả thẻ đã là một link (không lồng link trong link). */
+  chiNhan?: boolean;
+}) {
   if (!nha || nha.tong < 2) return null;
   return (
     <span
@@ -15,13 +24,15 @@ export function NhanNhaBoAnh({ nha, className }: { nha: NhaCuaBo | null | undefi
       className={`inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[var(--bb-fg-muted)] ${className ?? ""}`}
     >
       <span className="rounded-full border border-[var(--bb-border)] px-2 py-0.5 tabular-nums">{chuNhanNha(nha)}</span>
-      <Link
-        href={`/admin/customers/${encodeURIComponent(nha.customerId)}`}
-        className="font-medium text-[var(--bb-fg)] underline underline-offset-2 hover:opacity-80"
-        data-testid="xem-ca-nha"
-      >
-        Xem cả nhà
-      </Link>
+      {!chiNhan && (
+        <Link
+          href={`/admin/customers/${encodeURIComponent(nha.customerId)}`}
+          className="font-medium text-[var(--bb-fg)] underline underline-offset-2 hover:opacity-80"
+          data-testid="xem-ca-nha"
+        >
+          Xem cả nhà
+        </Link>
+      )}
     </span>
   );
 }

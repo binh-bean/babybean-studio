@@ -30,6 +30,8 @@ import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { NutXuLyDatChinhSua } from "./tim-gia-dinh-admin";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface DotMuaThemCho {
   soDot: number;
@@ -108,6 +110,7 @@ export function KhachGuiAnhChonReport() {
   const [error, setError] = React.useState<string | null>(null);
   const [dong, setDong] = React.useState<DongKhachGuiView[]>([]);
   const [canConfirm, setCanConfirm] = React.useState(false);
+  const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
   const [dangMo, setDangMo] = React.useState<string | null>(null);
 
   const tai = React.useCallback(async () => {
@@ -121,6 +124,7 @@ export function KhachGuiAnhChonReport() {
       setError(null);
       setDong(json.data.boAnh ?? []);
       setCanConfirm(json.data.canConfirm === true);
+      setNha(json.data.nha ?? {});
     } catch {
       setError("Mất kết nối, thử lại giúp.");
     } finally {
@@ -178,6 +182,7 @@ export function KhachGuiAnhChonReport() {
                       {[d.customerName, d.branchName].filter(Boolean).join(" · ")}
                       {d.guiLuc && ` · gửi ${gioNgay(d.guiLuc)}`}
                     </p>
+                    <NhanNhaBoAnh nha={nha[d.galleryId]} className="mt-1" />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button

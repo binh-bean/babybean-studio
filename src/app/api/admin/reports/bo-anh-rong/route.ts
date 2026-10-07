@@ -9,6 +9,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { layBoAnhRong } from "@/lib/gallery/bo-anh-rong";
+import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
 
 export const runtime = "nodejs";
 
@@ -20,8 +21,11 @@ export async function GET(): Promise<Response> {
     const staff = await requireStaff();
     if (BLOCKED_ROLES.includes(staff.role)) return fail("FORBIDDEN", "Vai trò này không xem được danh sách này");
     const branchIds = staff.permissions.includes("system:superuser") ? null : staff.branchIds;
-    const kq = await layBoAnhRong(createAdminClient(), branchIds);
-    return ok(kq);
+    const admin = createAdminClient();
+    const kq = await layBoAnhRong(admin, branchIds);
+    // BB-394 — nhãn nhà cho cả hai tab (gói chưa có ảnh + đơn hậu kỳ), một lần đọc.
+    const nha = await docNhaCuaCacBoKhongLoi(admin, [...kq.goiChuaCoAnh, ...kq.donHauKy].map((d) => d.galleryId));
+    return ok({ ...kq, nha });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);
     return failUnexpected(err, requestId);

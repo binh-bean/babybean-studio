@@ -16,6 +16,7 @@ import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import type { StaffSession } from "@/types/domain";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
 
 export const runtime = "nodejs";
 
@@ -63,7 +64,9 @@ export async function GET(): Promise<Response> {
       customerName: ten(g.customers, "full_name"),
       thayLuc: g.lark_dong_da_xoa_luc as string,
     }));
-    return ok({ items });
+    // BB-394 — nhãn nhà (khách có ≥ 2 bộ); lỗi đọc thì bỏ nhãn, danh sách vẫn đủ.
+    const nha = await docNhaCuaCacBoKhongLoi(createAdminClient(), items.map((i) => i.galleryId));
+    return ok({ items, nha });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);
     return failUnexpected(err, requestId);

@@ -36,6 +36,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
 
 export const runtime = "nodejs";
 
@@ -158,7 +159,14 @@ export async function GET(): Promise<Response> {
 
     const galleryCount = groups.reduce((n, g) => n + g.count, 0);
 
+    // BB-394 — nhãn nhà (khách có ≥ 2 bộ): một lần đọc cho cả báo cáo; lỗi thì bỏ nhãn.
+    const nha = await docNhaCuaCacBoKhongLoi(
+      admin,
+      groups.flatMap((g) => g.items.map((i) => i.galleryId)),
+    );
+
     return ok({
+      nha,
       summary: {
         galleryCount,
         reasonCount: groups.length,
