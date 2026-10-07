@@ -19,6 +19,7 @@ import { tenMeThat, formatSo } from "@/lib/utils/dinh-dang";
 import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
 import type { KetQuaBoAnhRong } from "@/lib/gallery/bo-anh-rong";
 import { NHAN_LY_DO, type LyDoChuaCoAnh } from "@/lib/gallery/phan-loai-hoa-don";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 function useBoAnhRong() {
   const [data, setData] = React.useState<KetQuaBoAnhRong | null>(null);
@@ -98,7 +99,7 @@ export function GoiChuaCoAnhReport() {
             >
               <div className="min-w-0 flex-1 text-sm">
                 <p className="flex flex-wrap items-center gap-2 font-medium text-[var(--bb-fg)]">
-                  <span className="[overflow-wrap:anywhere]">{tenMeThat(it.customerName) || it.title}</span>
+                  <span className="[overflow-wrap:anywhere]">{tenMeThat(it.customerName) || hienTieuDeBoAnh(it.title)}</span>
                   <Badge variant="outline">{it.nhanLyDo}</Badge>
                   {it.loai === "chua_ro" && <Badge variant="outline">Chưa rõ gói</Badge>}
                 </p>
@@ -179,7 +180,7 @@ export function DonHauKyReport() {
             <li key={it.galleryId} data-testid="dong-don-hau-ky" className="flex flex-wrap items-start gap-3 px-4 py-3">
               <div className="min-w-0 flex-1 text-sm">
                 <p className="flex flex-wrap items-center gap-2 font-medium text-[var(--bb-fg)]">
-                  <span className="[overflow-wrap:anywhere]">{tenMeThat(it.customerName) || it.title}</span>
+                  <span className="[overflow-wrap:anywhere]">{tenMeThat(it.customerName) || hienTieuDeBoAnh(it.title)}</span>
                   {it.trangThaiLark && <Badge variant="outline">{it.trangThaiLark}</Badge>}
                 </p>
                 <p className="text-xs text-[var(--bb-fg-muted)] [overflow-wrap:anywhere]">
@@ -197,7 +198,7 @@ export function DonHauKyReport() {
                         className="underline hover:text-[var(--bb-fg)]"
                         data-testid="link-bo-goc"
                       >
-                        {it.boGoc.title}
+                        {hienTieuDeBoAnh(it.boGoc.title)}
                       </Link>
                     </>
                   ) : (

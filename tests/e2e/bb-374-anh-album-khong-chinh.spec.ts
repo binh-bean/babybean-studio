@@ -277,7 +277,7 @@ test("2. (sau 0092/0093) CSKH thêm 5 suất → khách chọn 5 tấm → 0 ₫
     expect(dong).toContain(`Ảnh album không chỉnh sửa: ${SO_SUAT}/${SO_SUAT} tấm (KHÔNG chỉnh — chỉ in vào album, 0 ₫)`);
     const csv = await qt.evaluate(async (id) => (await fetch(`/api/admin/galleries/${id}/export?format=csv&hien=1`)).text(), d.A.id);
     expect(csv.split(/\r?\n/).filter((x) => x.endsWith('"Không chỉnh — cho album"'))).toHaveLength(SO_SUAT);
-    // Dạng "Tên file" (cho thợ lọc ảnh CẦN CHỈNH) không nhận tấm không chỉnh.
+    // Dạng "Danh sách" (tên file, cho thợ lọc ảnh CẦN CHỈNH) không nhận tấm không chỉnh.
     const txt = await qt.evaluate(async (id) => (await fetch(`/api/admin/galleries/${id}/export?format=txt&hien=1`)).text(), d.A.id);
     expect(txt.trim()).toBe("");
   } finally {

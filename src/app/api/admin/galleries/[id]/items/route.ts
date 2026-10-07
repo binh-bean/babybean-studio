@@ -107,7 +107,8 @@ export async function GET(
       năng chưa triển khai.
     */
     const albumRowsTrongGoi = locHangInTrongGoi(summary.items).filter((h) => h.nhom === "album");
-    let albumCovers: Array<{ galleryItemId: string; name: string; fileName: string | null }> = [];
+    // BB-390 — thêm `photoId` để màn quản trị HIỆN ảnh bìa khách chọn (không chỉ tên tệp).
+    let albumCovers: Array<{ galleryItemId: string; name: string; fileName: string | null; photoId: string | null }> = [];
     if (albumRowsTrongGoi.length > 0) {
       const { data: covers, error: coversErr } = await admin
         .from("album_covers")
@@ -133,13 +134,14 @@ export async function GET(
           const selItemId = coverByItem.get(a.galleryItemId) ?? null;
           const photoId = selItemId ? photoIdBySelItem.get(selItemId) ?? null : null;
           const fileName = photoId ? fileNameByPhoto.get(photoId) ?? null : null;
-          return { galleryItemId: a.galleryItemId, name: a.name, fileName };
+          return { galleryItemId: a.galleryItemId, name: a.name, fileName, photoId: fileName ? photoId : null };
         });
       } else {
         albumCovers = albumRowsTrongGoi.map((a) => ({
           galleryItemId: a.galleryItemId,
           name: a.name,
           fileName: null,
+          photoId: null,
         }));
       }
     }

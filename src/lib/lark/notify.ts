@@ -65,6 +65,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { khongGuiRaLarkThat } from "@/lib/kiem-thu";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 export type LarkEvent =
   | "gallery.sent"
@@ -292,11 +293,40 @@ export function dungThe(
         mau: "green",
         viec: "CSKH gọi điện, nhắn tin cảm ơn, xin phản hồi về ảnh và dịch vụ.",
       },
+      // BB-392 mục 2 — thư mục "ảnh chỉnh sửa" đã về (cron quét Drive kéo ảnh
+      // về app), CSKH kiểm rồi bấm "Gửi khách duyệt". App KHÔNG tự gửi khách.
+      anh_chinh_cho_gui: {
+        tieuDe: "Ảnh chỉnh đã về",
+        mau: "blue",
+        viec: "CSKH kiểm ảnh chỉnh rồi bấm **Gửi khách duyệt** trong app.",
+      },
     };
     const loai = TIEU_DE[chu(p.loai)];
     const ds = Array.isArray(p.cacBo) ? (p.cacBo as Record<string, unknown>[]) : [];
     if (!loai || ds.length === 0) return null;
     const goc = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+    if (chu(p.loai) === "anh_chinh_cho_gui") {
+      const dongAc = ds.slice(0, 30).map((b) => {
+        const mo =
+          goc && typeof b.galleryId === "string" ? ` — [mở](${goc}/admin/galleries/${b.galleryId}#anh-chinh-sua)` : "";
+        return `• **${hienTieuDeBoAnh(chu(b.galleryTitle))}** — ${so(b.moc)} ảnh, về ${so(b.soNgay)} ngày${mo}`;
+      });
+      if (ds.length > 30) dongAc.push(`… và ${ds.length - 30} bộ nữa`);
+      const loiVao = goc ? `\n[Mở Việc cần xử lý › Ảnh chỉnh sửa](${goc}/admin/viec-can-xu-ly?tab=anh-chinh-sua)` : "";
+      return {
+        msg_type: "interactive",
+        card: {
+          header: {
+            template: loai.mau,
+            title: { tag: "plain_text", content: `${ds.length} bộ có ảnh chỉnh chờ gửi khách duyệt` },
+          },
+          elements: [
+            { tag: "div", text: { tag: "lark_md", content: `${loai.viec}${loiVao}` } },
+            { tag: "div", text: { tag: "lark_md", content: dongAc.join("\n") } },
+          ],
+        },
+      };
+    }
     const dong = ds.slice(0, 30).map((b) => {
       const ten = [chu(b.customerName), typeof b.customerPhone === "string" ? b.customerPhone : null]
         .filter((x) => x && x !== "—")

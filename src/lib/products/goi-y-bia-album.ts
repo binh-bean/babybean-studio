@@ -26,6 +26,8 @@
  * đây.
  */
 
+import { hopKhoBia, huongAnh, type HuongAnh } from "./album-khai-niem";
+
 export interface UngVienBiaAlbum {
   /** `selection_items.id` — bìa gắn vào ĐÚNG lượt chọn này, không phải ảnh chung chung. */
   selectionItemId: string;
@@ -41,10 +43,20 @@ export interface UngVienBiaAlbum {
    * số này cho mọi ảnh (khác `orderIndex`, chỉ có khi khách đã bấm thả tim).
    */
   sortIndex: number;
+  /**
+   * BB-390 — kích thước THẬT của tấm (`photos.width/height`, có thể null với
+   * ảnh chưa đọc được số đo). Chỉ dùng để ưu tiên tấm hợp khổ bìa; thiếu số
+   * liệu thì tấm đó trung tính, KHÔNG bị loại và không bịa hướng.
+   */
+  width?: number | null;
+  height?: number | null;
 }
 
-/** "Gợi ý sẵn 3–4 tấm" — chốt của chủ studio 26/09/2026. */
-export const SO_LUONG_GOI_Y_BIA_ALBUM = 4;
+/**
+ * BB-390 — Bean gợi ý 3–6 tấm (đề bài 07/10, thay "3–4 tấm" của 26/09).
+ * Mặc định 6 — đủ để ba mẹ có lựa chọn mà không thành cả lưới ảnh.
+ */
+export const SO_LUONG_GOI_Y_BIA_ALBUM = 6;
 
 /**
  * Hạng ưu tiên — số CÀNG NHỎ càng nên gợi ý trước.
@@ -78,11 +90,22 @@ export function goiYBiaAlbum(
   daThaTim: UngVienBiaAlbum[],
   anhBiaBoAnhId: string | null,
   soLuongGoiY: number = SO_LUONG_GOI_Y_BIA_ALBUM,
+  /**
+   * BB-390 — hướng bìa của cuốn album (`huongBiaTuKhoAlbum`), `null` khi danh
+   * mục không cho biết. Chỉ là nhánh phụ TRONG CÙNG HẠNG: không bao giờ đẩy một
+   * tấm không ghi chú lên trên tấm ba mẹ đã ghi chú.
+   */
+  huongBia: HuongAnh | null = null,
 ): UngVienBiaAlbum[] {
   const sapXep = [...daThaTim].sort((a, b) => {
     const ha = hangUuTien(a, anhBiaBoAnhId);
     const hb = hangUuTien(b, anhBiaBoAnhId);
     if (ha !== hb) return ha - hb;
+
+    // BB-390 — cùng hạng: tấm HỢP khổ bìa (theo số đo thật) đứng trước.
+    const ka = hopKhoBia(huongAnh(a.width, a.height), huongBia) ? 0 : 1;
+    const kb = hopKhoBia(huongAnh(b.width, b.height), huongBia) ? 0 : 1;
+    if (ka !== kb) return ka - kb;
 
     // Cùng hạng: theo thứ tự khách bấm thả tim. `orderIndex` null (dữ liệu cũ)
     // xuống cuối nhóm cùng hạng thay vì đứng lẫn lộn ở giữa.

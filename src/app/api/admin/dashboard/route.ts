@@ -3,6 +3,13 @@ import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 import { laChiNhanhCongKhai } from "@/lib/utils/chi-nhanh-cong-khai";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { docNhaCuaCacBo, type NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
+
+/** BB-392 mục 3a — gắn nhãn nhà; đọc hỏng thì trả nguyên danh sách (không làm hỏng bảng điều khiển). */
+async function ganNhaChoViec<T extends { id: unknown }>(admin: ReturnType<typeof createAdminClient>, ds: T[]): Promise<(T & { nha: NhaCuaBo | null })[]> {
+  const nha = await docNhaCuaCacBo(admin, ds.map((v) => String(v.id))).catch(() => ({}) as Record<string, NhaCuaBo>);
+  return ds.map((v) => ({ ...v, nha: nha[String(v.id)] ?? null }));
+}
 import { randomUUID } from "node:crypto";
 import { thangNay, thangTruoc, chenhLechPhanTram, nNgayGanDay, kyTruocCungDoDai, dinhDangNgayVN, ngayVN } from "@/lib/bao-cao/ky";
 import { locBoAnhThat } from "@/lib/bao-cao/loc-chung";
@@ -354,6 +361,8 @@ export async function GET(request: Request): Promise<Response> {
       /** BB-312 — xem `forceHomNay`/`waitingReopen` ở `bang-dieu-khien.ts`/`dashboard.tsx`. */
       forceHomNay?: boolean;
       waitingReopen?: { requestedAt: string; lyDo: string | null; lanThu: number };
+      /** BB-392 mục 3a — nhãn nhà khi khách có ≥ 2 bộ. */
+      nha?: NhaCuaBo | null;
     };
     let viecHomNay: ViecHomNayRow[] = [];
     let muaThem7Ngay = {
@@ -652,7 +661,7 @@ export async function GET(request: Request): Promise<Response> {
       tienDoChiNhanh,
       actionRequired: actionRequired || [],
       // BB-303 (bản vẽ BB-301) — dữ liệu mới cho Bảng điều khiển:
-      viecHomNay,
+      viecHomNay: await ganNhaChoViec(admin, viecHomNay),
       muaThem7Ngay,
       theoChiNhanhMuaThem,
       chartData,

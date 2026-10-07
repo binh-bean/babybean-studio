@@ -13,6 +13,9 @@ import Link from "next/link";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { CARD_TITLE_CLASS } from "./page-header";
 import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface DongViec {
   loai: "cho_gui" | "khach_sua";
@@ -36,6 +39,7 @@ export function moTaViec(v: Pick<DongViec, "loai" | "soAnh" | "lan" | "nhanDot">
 export function AnhChinhSuaReport() {
   const [items, setItems] = React.useState<DongViec[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
 
   const tai = React.useCallback(async () => {
     try {
@@ -47,6 +51,7 @@ export function AnhChinhSuaReport() {
       }
       setError(null);
       setItems(json.data.items ?? []);
+      setNha(json.data.nha ?? {});
     } catch {
       setError("Mất kết nối, thử lại giúp.");
     }
@@ -80,13 +85,14 @@ export function AnhChinhSuaReport() {
                 className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-sm hover:bg-[var(--bb-surface-2)]"
               >
                 <span>
-                  <span className="font-medium">{v.title}</span>
+                  <span className="font-medium">{hienTieuDeBoAnh(v.title)}</span>
                   <span className={v.loai === "khach_sua" ? "ml-2 text-[var(--bb-danger)]" : "ml-2 text-[var(--bb-fg-muted)]"}>
                     {moTaViec(v)}
                   </span>
                 </span>
                 <span className="text-xs text-[var(--bb-fg-muted)]">{formatNgayVN(v.luc)}</span>
               </Link>
+              <NhanNhaBoAnh nha={nha[v.galleryId]} className="px-4 pb-3" />
             </li>
           ))}
         </ul>

@@ -20,7 +20,7 @@ import { KhoiLinkMoiNguoiThan } from "./khoi-link-moi-nguoi-than";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatNgayVN, formatSdt, formatSo } from "@/lib/utils/dinh-dang";
-import { tachTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
+import { hienTieuDeBoAnh, tachTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 interface LichSu {
   khach: { id: string; fullName: string; phone: string | null; chatUrl: string | null; createdAt: string; tuLark: boolean };
@@ -216,7 +216,7 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
                           <span className="min-w-0">
                             {m.ten} ×{m.soLuong}
                             <span className="block text-xs text-[var(--bb-fg-muted)]">
-                              {[m.galleryTitle, m.ngay ? formatNgayVN(m.ngay) : null].filter(Boolean).join(" · ")}
+                              {[hienTieuDeBoAnh(m.galleryTitle), m.ngay ? formatNgayVN(m.ngay) : null].filter(Boolean).join(" · ")}
                             </span>
                           </span>
                           <span className="shrink-0 tabular-nums">{formatCurrencyVND(m.thanhTien)}</span>
@@ -235,7 +235,7 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
                             {p.laGiamGia ? "Giảm giá" : "Đã thu"}
                             {p.ghiChu ? ` · ${p.ghiChu}` : ""}
                             <span className="block text-xs text-[var(--bb-fg-muted)]">
-                              {[p.galleryTitle, formatNgayVN(p.ngay)].filter(Boolean).join(" · ")}
+                              {[hienTieuDeBoAnh(p.galleryTitle), formatNgayVN(p.ngay)].filter(Boolean).join(" · ")}
                             </span>
                           </span>
                           <span className="shrink-0 tabular-nums">{formatCurrencyVND(p.soTien)}</span>

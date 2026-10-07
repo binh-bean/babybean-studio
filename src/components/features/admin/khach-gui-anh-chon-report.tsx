@@ -29,6 +29,7 @@ import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./
 import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { NutXuLyDatChinhSua } from "./tim-gia-dinh-admin";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 interface DotMuaThemCho {
   soDot: number;
@@ -171,7 +172,7 @@ export function KhachGuiAnhChonReport() {
                       href={`/admin/galleries/${encodeURIComponent(d.galleryId)}`}
                       className="text-sm font-medium underline-offset-2 hover:underline"
                     >
-                      {d.galleryTitle}
+                      {hienTieuDeBoAnh(d.galleryTitle)}
                     </Link>
                     <p className="mt-0.5 text-xs text-[var(--bb-fg-muted)]">
                       {[d.customerName, d.branchName].filter(Boolean).join(" · ")}

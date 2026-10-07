@@ -34,6 +34,7 @@ import { formatNgayVN, formatSdt, tenGoiBe, formatSo, formatTien } from "@/lib/u
 import { mauAvatarStyle } from "@/lib/utils/mau-avatar";
 import { vi } from "@/i18n/vi";
 import { Phone as PhoneIcon, Copy as CopyIcon } from "lucide-react";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 const t = vi.admin.khachHang;
 
@@ -756,7 +757,7 @@ function HoSoKhach({
                       href={`/admin/galleries/${g.id}`}
                       className="min-w-0 break-words font-medium text-[var(--bb-primary)] hover:underline"
                     >
-                      {g.title}
+                      {hienTieuDeBoAnh(g.title)}
                     </Link>
                     <span className="text-xs text-[var(--bb-fg-muted)]">
                       {GALLERY_STATUS_LABEL[g.status as keyof typeof GALLERY_STATUS_LABEL] ??

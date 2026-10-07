@@ -343,6 +343,17 @@ for (const [ten, kho] of [
     expect((await anhBe.boundingBox())!.width).toBeGreaterThan(hopBe.width * 1.4);
     await chup(page, `${ten}-13-xem-lon-phong-to`);
 
+    if (ten === "mt") {
+      // BB-393 — máy tính: NHẤP MỘT LẦN là đổi phóng (trước phải nhấp đúp). Đang phóng → về 1×; nhấp lại → phóng.
+      const khungNhin = xl.getByTestId("xem-lon-canh-khung-nhin");
+      await khungNhin.click();
+      await expect(xl).toHaveAttribute("data-phong", "1.00");
+      await khungNhin.click();
+      await expect.poll(async () => Number(await xl.getAttribute("data-phong"))).toBeGreaterThan(2);
+      await page.waitForTimeout(250);
+      await chup(page, `${ten}-14-nhap-mot-lan-phong`);
+    }
+
     // Esc chỉ đóng lớp xem lớn — màn tường vẫn mở.
     await page.keyboard.press("Escape");
     await expect(xl).toBeHidden();

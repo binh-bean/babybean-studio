@@ -84,6 +84,43 @@ import {
  * tình giữ nguyên không đụng trong đợt sửa này.
  */
 const TEN_NHOM_QT: Record<string, string> = { anh_in: "Ảnh in", album: "Album", khung: "Khung" };
+
+/**
+ * BB-390 — bìa album khách chọn, HIỆN ẢNH (trước chỉ có tên tệp). Đặt cạnh dòng
+ * album trong hợp đồng để CSKH thấy ngay bìa nào mà không phải mở chỗ khác.
+ */
+function BiaAlbumQuanTri({
+  fileName,
+  photoId,
+  className,
+}: {
+  fileName: string | null;
+  photoId: string | null;
+  className?: string;
+}) {
+  return (
+    <span
+      data-testid="bia-album-quan-tri"
+      className={`inline-flex items-center gap-1.5 align-middle text-xs text-[var(--bb-fg-muted)] ${className ?? ""}`}
+    >
+      — Bìa album:
+      {photoId ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/api/img/${photoId}?w=200`}
+            alt={`Bìa album ${fileName ?? ""}`}
+            loading="lazy"
+            className="h-8 w-8 rounded object-cover ring-1 ring-[var(--bb-border)]"
+          />
+          <span>{fileName}</span>
+        </>
+      ) : (
+        <span>{fileName ?? "(chưa chọn)"}</span>
+      )}
+    </span>
+  );
+}
 export function tenThanThienMuaThem(kind: string | null, material: string | null, size: string | null): string {
   const nhom = nhomSanPham(kind, material) ?? "anh_in";
   const tienTo = TEN_NHOM_QT[nhom] ?? "Sản phẩm";
@@ -296,7 +333,7 @@ interface Detail {
   /** BB-313 mục 2 — vai hiện tại có quyền `galleries:write` không (ẩn nút sửa/xoá/thêm dòng hàng khi không có). */
   canEditItems?: boolean;
   /** BB-202 — bìa của mỗi album TRONG GÓI, `fileName: null` = chưa chọn. */
-  albumCovers?: Array<{ galleryItemId: string; name: string; fileName: string | null }>;
+  albumCovers?: Array<{ galleryItemId: string; name: string; fileName: string | null; photoId?: string | null }>;
   /**
    * BB-296 mục #6 — báo cáo chấm độc lập lần 3: cột trái trống hoác dưới thẻ
    * số liệu — không thấy ảnh khách đã chọn, không thấy TỪNG món mua thêm.
@@ -1637,7 +1674,7 @@ function KhoiChinh({
         </section>
       )}
 
-      <section>
+      <section id="dong-hop-dong" className="scroll-mt-20">
         <h2 className="text-base font-medium">Thành phần hợp đồng</h2>
         {/*
           BB-313 mục 2 (ảnh chụp app thật Đợt 9) — "Thành phần hợp đồng sửa
@@ -1688,11 +1725,7 @@ function KhoiChinh({
                     {(() => {
                       const bia = (detail.albumCovers ?? []).find((a) => a.galleryItemId === item.id);
                       if (!bia) return null;
-                      return (
-                        <span className="text-xs text-[var(--bb-fg-muted)]">
-                          — Bìa album: {bia.fileName ?? "(chưa chọn)"}
-                        </span>
-                      );
+                      return <BiaAlbumQuanTri fileName={bia.fileName} photoId={bia.photoId ?? null} />;
                     })()}
                   </span>
                   <span className="flex items-center gap-3">
@@ -1725,11 +1758,7 @@ function KhoiChinh({
                           {(() => {
                             const bia = (detail.albumCovers ?? []).find((a) => a.galleryItemId === c.id);
                             if (!bia) return null;
-                            return (
-                              <span className="ml-2 text-xs text-[var(--bb-fg-muted)]">
-                                — Bìa album: {bia.fileName ?? "(chưa chọn)"}
-                              </span>
-                            );
+                            return <BiaAlbumQuanTri fileName={bia.fileName} photoId={bia.photoId ?? null} className="ml-2" />;
                           })()}
                         </span>
                         {!locked && canSuaDong && (

@@ -253,9 +253,13 @@ export async function POST(request: Request): Promise<Response> {
     // BB-331: bộ vừa neo vào hóa đơn Lark → kéo luôn dòng hợp đồng (hạn mức
     // tính từ các dòng này, `app.gallery_quota`). Hỏng thì bộ vẫn tạo xong —
     // màn chi tiết có nút "Kéo dòng hợp đồng từ Lark" để thử lại.
+    // BB-392 mục 4: lỗi KHÔNG chỉ ghi log — trả cờ để màn kết quả của thuật sĩ
+    // báo rõ và dẫn tới nút kéo lại ở chi tiết bộ.
+    let chuaKeoDongHopDong = false;
     try {
       await keoDongHopDongTuLark(admin, galleryIdMoi);
     } catch (err) {
+      chuaKeoDongHopDong = true;
       console.error(JSON.stringify({ evt: "gallery_create_keo_dong_loi", requestId, galleryId: galleryIdMoi, loi: String((err as Error)?.message ?? err) }));
     }
 
@@ -301,6 +305,7 @@ export async function POST(request: Request): Promise<Response> {
           galleryId: galleryIdMoi,
           shareUrl,
           lark: { recordId: dong.recordId, maHoaDon: dong.maHoaDon, linkLark: dong.linkLark },
+          chuaKeoDongHopDong,
         },
       },
       {

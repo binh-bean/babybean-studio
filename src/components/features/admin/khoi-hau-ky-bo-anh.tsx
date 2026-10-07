@@ -10,6 +10,7 @@
 import React from "react";
 import Link from "next/link";
 import type { HauKyCuaBo } from "@/lib/gallery/bo-anh-rong";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 export function KhoiHauKyBoAnh({ galleryId }: { galleryId: string }) {
   const [d, setD] = React.useState<HauKyCuaBo | null>(null);
@@ -43,7 +44,7 @@ export function KhoiHauKyBoAnh({ galleryId }: { galleryId: string }) {
             <>
               Bộ gốc:{" "}
               <Link href={`/admin/galleries/${encodeURIComponent(d.boGoc.id)}`} className="underline hover:text-[var(--bb-fg)]">
-                {d.boGoc.title}
+                {hienTieuDeBoAnh(d.boGoc.title)}
               </Link>
             </>
           ) : (

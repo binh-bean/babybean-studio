@@ -24,6 +24,7 @@ import { YeuCauMoLaiBanner } from "./yeu-cau-mo-lai-banner";
 import type { DotTomTat } from "@/lib/gallery/dot-chon";
 import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { tenMeThat } from "@/lib/utils/dinh-dang";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 interface DongYeuCau {
   galleryId: string;
@@ -99,10 +100,10 @@ export function YeuCauMoLaiReport() {
                   className="font-medium text-[var(--bb-fg)] underline-offset-2 hover:underline"
                 >
                   {/* BB-325 — tiêu đề là tên mẹ; không có thì tên bộ. */}
-                  {tenMeThat(it.customerName) || it.title}
+                  {tenMeThat(it.customerName) || hienTieuDeBoAnh(it.title)}
                 </Link>
                 <span className="text-xs text-[var(--bb-fg-muted)]">
-                  {[tenMeThat(it.customerName) ? it.title : null, it.branchName].filter(Boolean).join(" · ")}
+                  {[tenMeThat(it.customerName) ? hienTieuDeBoAnh(it.title) : null, it.branchName].filter(Boolean).join(" · ")}
                 </span>
               </div>
               <YeuCauMoLaiBanner

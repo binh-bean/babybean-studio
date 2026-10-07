@@ -240,14 +240,26 @@ ownIpTest.describe("BB-279: cửa hàng tối giản", () => {
       // dòng xác nhận tách "Đã thêm vào giỏ" (tiêu đề) khỏi mô tả ("3 ảnh
       // {tên sản phẩm} · {tiền}"); giỏ dài hơn 2 món chỉ hiện 2 dòng + "Xem
       // cả N món ›" (chờ bấm mới hiện đủ).
+      //
+      // BB-391 — luật mới thay luật cũ ở các dòng dưới (phép thử lỗi thời, KHÔNG phải nới):
+      //   - BB-358 "một cách đếm món": MÓN = tổng SỐ LƯỢNG (`demMon`, src/lib/gallery/dem-mon.ts),
+      //     không phải số tấm ảnh. 3 tấm × số lượng 2 = 6 món — dòng xác nhận ghi
+      //     "{tên} · 6 món · {tiền}" (trước là "3 ảnh …"), tiêu đề giỏ "Giỏ · 6 món · {tiền}"
+      //     (trước "Giỏ · 3 món"). Cùng một con số ở hai chỗ.
+      //   - BB-362: phần giỏ nấp sau 2 dòng đầu là nút "+N món khác · X ₫ · Xem cả giỏ ›"
+      //     (trước "Xem cả 3 món ›") — canh luôn con số bù: 1 dòng ẩn × 2 = 2 món.
+      const soMon = 2 * 3;
       await ownIpExpect(cuaHang.getByRole("status")).toContainText("Đã thêm vào giỏ");
-      await ownIpExpect(cuaHang.getByRole("status")).toContainText("3 ảnh");
+      await ownIpExpect(cuaHang.getByRole("status")).toContainText(`${soMon} món · ${formatVND(tongDung)}`);
       await ownIpExpect
         .poll(async () => cuaHang.locator("footer li").count(), {
-          message: "Chưa thấy 2 dòng giỏ đầu tiên (giỏ >2 món chỉ hiện 2 + Xem cả N món)",
+          message: "Chưa thấy 2 dòng giỏ đầu tiên (giỏ >2 dòng chỉ hiện 2 + '+N món khác · Xem cả giỏ')",
         })
         .toBe(2);
-      await cuaHang.getByRole("button", { name: /Xem cả 3 món/ }).click();
+      const phanAn = cuaHang.getByTestId("gio-phan-an");
+      await ownIpExpect(phanAn).toContainText(`+2 món khác · ${formatVND(bc.unitPrice1 * 2)}`);
+      await ownIpExpect(phanAn).toContainText("Xem cả giỏ");
+      await phanAn.click();
       await ownIpExpect
         .poll(async () => cuaHang.locator("footer li").count(), {
           message: "Chưa thấy đủ 3 dòng giỏ sau khi bấm Xem cả",
@@ -261,7 +273,7 @@ ownIpTest.describe("BB-279: cửa hàng tối giản", () => {
       // phần tử THẬT SỰ hiện ở khổ 1440px.
       // BB-319: dòng "Đã thêm vào giỏ" nay hiện SAU khi lưu xong nên còn trên màn lúc này, và cũng
       // mang tổng tiền — kiểm đúng tiêu đề giỏ (một định dạng "Giỏ · N món · tiền" cho hai khổ).
-      await ownIpExpect(cuaHang.getByText(`Giỏ · 3 món · ${formatVND(tongDung)}`).and(page.locator(":visible"))).toBeVisible();
+      await ownIpExpect(cuaHang.getByText(`Giỏ · ${soMon} món · ${formatVND(tongDung)}`).and(page.locator(":visible"))).toBeVisible();
       // Cấu hình đặt lại cho món tiếp theo — ô Ảnh trở lại "+ Chọn ảnh" trống,
       // không còn hiện "Ảnh · 3 tấm" của lượt vừa mua.
       await ownIpExpect(cuaHang.getByText("Ảnh · 3 tấm")).toHaveCount(0);

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { GallerySessionError, EDITING_ROLES } from "@/lib/auth/gallery-session";
+import type { ShareRole } from "@/types/domain";
 import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail, readJsonBody } from "@/lib/api-response";
@@ -21,14 +22,17 @@ import { SetAlbumCoverSchema } from "./schema";
  *    chọn đang mở — không mượn ảnh của lượt chọn khác (bà, dì).
  * 3. Mỗi album chỉ có MỘT bìa — đặt lại là THAY, không cộng dồn.
  *
- * Vai `viewer` (link người thân chỉ xem) không gọi được — `EDITING_ROLES`
- * cùng danh sách với `/api/g/placements`.
+ * BB-390 — chỉ chủ link và người cùng chọn đặt bìa. Người thân chỉ gợi ý
+ * (`suggester`) không đặt được: bìa của họ gắn vào lượt chọn riêng của họ rồi
+ * có thể làm chủ link bị chặn chốt. Màn khách đã ẩn nút với vai này.
  */
 export const runtime = "nodejs";
 
+const VAI_DAT_BIA_ALBUM: readonly ShareRole[] = EDITING_ROLES.filter((v) => v !== "suggester");
+
 export async function POST(request: NextRequest) {
   try {
-    const session = await requirePhienBoAnh(request, EDITING_ROLES);
+    const session = await requirePhienBoAnh(request, VAI_DAT_BIA_ALBUM);
 
     const jsonBody = await readJsonBody(request);
     if (!jsonBody.ok) {

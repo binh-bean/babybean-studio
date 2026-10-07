@@ -61,8 +61,8 @@ test("Tên file cạnh số thứ tự + xuất 'Thông tin chi tiết' đúng �
     expect(dong.some((x) => x.startsWith("Số ảnh đã chọn: 3"))).toBe(true);
     await khung.screenshot({ path: path.join(THU_MUC, "xuat-thong-tin-chi-tiet.png") });
 
-    // "Tên file": mỗi dòng một tên.
-    await page.getByRole("button", { name: "Tên file" }).click();
+    // Nút "Danh sách" (BB-393: trước là "Tên file"): mỗi dòng một tên.
+    await page.getByRole("button", { name: "Danh sách", exact: true }).click();
     await expect(khung).toHaveValue(/^R01_0001\.JPG\r?\nR01_0002\.JPG\r?\nR01_0003\.JPG$/, { timeout: 30_000 });
   } finally {
     await ctx.close();

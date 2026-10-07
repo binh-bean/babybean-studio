@@ -35,6 +35,21 @@ export const TI_LE_CHAM_HAI_LAN = 2.5;
 /** Từ tỉ lệ này trở lên thì nạp bản ảnh nét hơn (xem photo-lightbox.tsx). */
 export const NGUONG_ANH_NET = 1.5;
 
+/**
+ * BB-370 — chuột đi quá ngần này (px) giữa nhấn và thả thì là KÉO, không phải nhấp.
+ * BB-393 — dùng chung cho mọi màn xem lớn có phóng (ảnh chính, cảnh treo tường).
+ */
+export const NGUONG_KEO_PX = 5;
+
+/**
+ * Máy tính: NHẤP MỘT LẦN là bật/tắt phóng (anh 01/10 + 06/10: "đang phải nhấp đôi,
+ * sửa thành nhấp chuột 1 lần"). Một lượt nhấn–thả chuột đi được `quangDuongPx` là
+ * NHẤP khi không vượt NGUONG_KEO_PX; vượt là KÉO (di ảnh), thả ra không đổi phóng.
+ */
+export function laNhapChuot(quangDuongPx: number): boolean {
+  return quangDuongPx <= NGUONG_KEO_PX;
+}
+
 /** Kẹp tỉ lệ về đúng khoảng cho phép [1×, 4×]. */
 export function kepTiLe(scale: number): number {
   return Math.min(TI_LE_LON_NHAT, Math.max(TI_LE_NHO_NHAT, scale));

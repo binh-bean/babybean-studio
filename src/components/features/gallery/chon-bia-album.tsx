@@ -25,7 +25,8 @@ import { Check } from "lucide-react";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
-import { goiYBiaAlbum, type UngVienBiaAlbum } from "@/lib/products/goi-y-bia-album";
+import { goiYBiaAlbum, SO_LUONG_GOI_Y_BIA_ALBUM, type UngVienBiaAlbum } from "@/lib/products/goi-y-bia-album";
+import { huongBiaTuKhoAlbum, khoTrongTen } from "@/lib/products/album-khai-niem";
 
 export interface AlbumCanChonBia {
   galleryItemId: string;
@@ -83,9 +84,12 @@ function KhoiMotAlbum({
   const coverPhotoIdHienThi = biaLacQuan?.photoId ?? album.coverPhotoId;
   const coverFileNameHienThi = biaLacQuan?.fileName ?? album.coverFileName;
 
+  // BB-390 — khổ bìa lấy từ tên dòng hợp đồng ("Album (Ultra HD) 20x20"): chỉ khổ
+  // vuông là chắc chắn, khổ chữ nhật không ưu tiên hướng nào (không đoán).
+  const huongBia = React.useMemo(() => huongBiaTuKhoAlbum(khoTrongTen(album.name)), [album.name]);
   const goiY = React.useMemo(
-    () => goiYBiaAlbum(anhDaThaTim, coverPhotoIdBoAnh),
-    [anhDaThaTim, coverPhotoIdBoAnh],
+    () => goiYBiaAlbum(anhDaThaTim, coverPhotoIdBoAnh, SO_LUONG_GOI_Y_BIA_ALBUM, huongBia),
+    [anhDaThaTim, coverPhotoIdBoAnh, huongBia],
   );
 
   const daChonBiaChuaCoTrongGoiY =
@@ -163,13 +167,20 @@ function KhoiMotAlbum({
         </p>
       ) : (
         <>
-          <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
+          {!xemTatCa && (
+            <p data-testid="nhan-bean-goi-y-bia" className="mt-3 text-xs text-muted-foreground">
+              {vi.gallery.loiBean.beanGoiYBiaAlbum}
+            </p>
+          )}
+          <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6">
             {danhSachXem.map((u) => {
               const dangLaBia = coverPhotoIdHienThi === u.photoId;
               return (
                 <button
                   key={u.photoId}
                   type="button"
+                  data-testid="o-goi-y-bia"
+                  aria-pressed={dangLaBia}
                   disabled={khoa || dangLuu}
                   onClick={() => {
                     // Phản hồi lạc quan: đổi ngay tại chỗ, không chờ
@@ -238,7 +249,7 @@ export function ChonBiaAlbum({
   if (albums.length === 0) return null;
 
   return (
-    <section className={cn("space-y-3", className)}>
+    <section data-testid="buoc-chon-bia-album" className={cn("space-y-3", className)}>
       {/*
         Tranh minh hoạ ngang (BabyBean vẽ riêng cho BB-202): album xanh rêu với
         một ô bìa còn trống — mở đầu khối để ba mẹ hiểu ngay đây là việc
@@ -264,6 +275,10 @@ export function ChonBiaAlbum({
             "{album}",
             albums.length > 1 ? `${albums.length} cuốn album` : "một cuốn album",
           )}
+        </p>
+        {/* BB-390 — nói rõ khái niệm: ba mẹ chỉ chọn BÌA, ruột 20–30 tấm Bean sắp. */}
+        <p data-testid="giai-thich-ruot-album" className="mt-0.5 text-xs text-muted-foreground">
+          {vi.gallery.loiBean.ruotAlbumBeanSap}
         </p>
       </div>
       {albums.map((album) => (

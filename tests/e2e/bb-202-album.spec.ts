@@ -131,7 +131,7 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
   // đúng luật BB-202: chỉ đặt mua, không chọn ảnh), "Chọn ảnh" cho nhóm gắn
   // ảnh (ảnh in/khung). Ca này viết lại để đo đúng luật đó qua giao diện MỚI,
   // không còn giả định có `<li>` liệt kê từng sản phẩm.
-  test("2. Cửa hàng — nhóm Album: nút 'Thêm vào giỏ' trực tiếp, KHÔNG có bước 'Chọn ảnh'", async ({
+  test("2. Cửa hàng — nhóm Album: màn bán hàng, nút 'Đặt album' trực tiếp, KHÔNG có bước 'Chọn ảnh'", async ({
     page,
   }) => {
     test.skip(!albumProductId, "bb-dev hiện không có sản phẩm album nào đủ điều kiện bán.");
@@ -152,16 +152,25 @@ test.describe("BB-202: bìa album trong gói + album mua thêm chỉ đặt mua"
     // Chuyển sang nhóm Album.
     await cuaHang.getByRole("button", { name: "Album", exact: true }).click();
 
-    // Nhóm Album KHÔNG gắn ảnh (BB-202: chỉ đặt mua) -> nút phải là
-    // "Thêm vào giỏ", KHÔNG BAO GIỜ là "Chọn ảnh" (đó là nút của nhóm
-    // ảnh in/khung, canGanAnh=true).
+    // Nhóm Album KHÔNG gắn ảnh (BB-202: chỉ đặt mua) -> KHÔNG BAO GIỜ có
+    // "Chọn ảnh" (đó là nút của nhóm ảnh in/khung, canGanAnh=true).
+    //
+    // ĐỔI Ở BB-390/BB-391 (07/10/2026): luật mới của anh — "bán album: mở màn
+    // bán hàng chứ không phải chọn ảnh để mua album". Tab Album không còn là bộ
+    // cấu hình chip + nút chung "Thêm vào giỏ" của BB-279 mà là MÀN BÁN HÀNG
+    // (`ban-album.tsx`, testid `man-ban-album`) với nút riêng "Đặt album" (bộ
+    // này có album trong gói nên nhãn là "Đặt thêm một cuốn") — canh bằng
+    // testid `nut-dat-album`. Điều BB-202 canh giữ nguyên: không bước chọn ảnh,
+    // một dòng mua thêm album photo_id null (kiểm DB bên dưới).
     await expect(cuaHang.getByRole("button", { name: "Chọn ảnh", exact: true })).toHaveCount(0);
-    const nutThem = cuaHang.getByRole("button", { name: "Thêm vào giỏ" });
+    const manBan = cuaHang.getByTestId("man-ban-album");
+    await expect(manBan).toBeVisible();
+    const nutThem = manBan.getByTestId("nut-dat-album");
     await expect(nutThem).toBeVisible();
 
     await nutThem.click();
 
-    // KHÔNG có lưới chọn ảnh nào mở ra — bấm "Thêm vào giỏ" là xong luôn.
+    // KHÔNG có lưới chọn ảnh nào mở ra — bấm "Đặt album" là xong luôn.
     await expect(page.getByRole("dialog", { name: "Chọn ảnh để đặt in" })).toHaveCount(0);
 
     // Đơn phải ghi nhận THẬT trong cơ sở dữ liệu: một dòng selection_addons,

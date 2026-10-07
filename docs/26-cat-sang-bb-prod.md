@@ -42,7 +42,7 @@ Ngày cắt, theo đúng thứ tự:
 
 ☐ 1. Sao lưu bb-prod (mục 1).
 ☐ 2. So khoảng lệch migration — chỉ đọc (mục 2).
-☐ 3. Áp migration, gồm cả 0086–0090 (mục 3, 3a). `verify:db` ra đủ N/N.
+☐ 3. Áp migration, gồm cả 0086–0101 (mục 3, 3a; không có 0097). `verify:db` ra đủ N/N.
 ☐ 4. Storage (mục 4) · Auth (mục 5) · webhook Lark thật (mục 5a) · tài khoản quản
    trị đầu tiên (mục 5b) · Realtime (mục 5c).
 ☐ 5. Chép cấu hình (mục 6), rồi kiểm cờ thu sản phẩm đang TẮT (mục 6a).
@@ -199,6 +199,17 @@ Bản cũ của runbook chỉ nhắc 0067–0075. Dãy đầy đủ từ lúc b�
 | 0088 | Thu gọn ảnh bộ cũ: cột `trang_thai_tu`, `danh_sach_thu_gon_luc`, `so_anh_truoc_thu_gon`, `mo_lai_anh_luc`, `mo_link_cuoi_luc`; hàm `nhan_mo_lai_anh`; viết lại `tang_luot_mo_link` (BB-357/359/363). **CHƯA áp bb-dev — cố ý** |
 | 0089 | Dựng lại 4 chỉ mục bảng `photos` (REINDEX, không đổi định nghĩa) (BB-357). **CHƯA áp bb-dev — cố ý** |
 | 0090 | Link gia đình: chỉ mục duy nhất "một link gia đình còn sống/khách", cột `galleries.so_thu_tu_khach` + trigger `gan_so_thu_tu_khach` (BB-334A). **Đã áp bb-dev 06/10** bằng `migrate-prod --chi 0090` (cờ mới, áp riêng từng tệp, không kéo 0088/0089) |
+| 0091 | Ảnh chỉnh trong app: mốc gửi `deliveries.anh_chinh_gui_luc`, chi tiết xin sửa từng tấm, vùng khoanh, ảnh mẫu (BB-371). Đã áp bb-dev 06/10 |
+| 0092 | Loại sản phẩm `album_unedited` (BB-374). Đã áp bb-dev 06/10 |
+| 0093 | Bảng `anh_album_khong_chinh` + sản phẩm "Ảnh album không chỉnh sửa" 0 ₫ (BB-374). Đã áp bb-dev 06/10 |
+| 0094 | Cột `galleries.lark_nguoi_photoshop`, `lark_photoshop_ctv` (BB-369). Đã áp bb-dev 06/10 |
+| 0095 | Bảng `anh_chinh_dot` + cột đợt trên `revision_requests` (yêu cầu sửa theo đợt mua thêm, BB-377). Đã áp bb-dev 07/10 |
+| 0096 | Hai chỉ mục báo cáo điều hành (`galleries.sent_at`, `submitted_at`) (BB-380). Đã áp bb-dev 07/10 |
+| ~~0097~~ | **Không tồn tại** — số bị bỏ qua khi chia số Đợt 18 |
+| 0098 | CSKH có `reports:financial` (xem doanh thu). Đã áp bb-dev 06/10 |
+| 0099 | Quyền theo vai: CTV `selections:read` (chỉ bộ được giao, luật RLS `selections_select`), thợ chỉnh `anh_chinh:gui_khach`, thợ chụp `galleries:edit_info` (BB-383/383b). Đã áp bb-dev 07/10 |
+| 0100 | Bảng `goi_chup_gia_anh_them` (giá ảnh chọn thêm theo gói, BB-385). Đã áp bb-dev 07/10 |
+| 0101 | Dòng settings `gallery.revision_days_estimate` = 3 (BB-387). Không bắt buộc — mã tự dùng 3 khi thiếu. CHƯA áp bb-dev |
 
 (Đầu tệp 0083 vẫn ghi "viết nhưng chưa áp" — câu đó đã cũ, bb-dev áp từ 01/10.
 Đầu tệp 0086/0087 cũng ghi "chưa áp" — đã cũ, bb-dev áp từ 02/10.)
@@ -212,7 +223,7 @@ Bản cũ của runbook chỉ nhắc 0067–0075. Dãy đầy đủ từ lúc b�
    "0088: …", "0089: …" và "0090: …" phải ghi **"đã áp"**. Nếu ghi "CHỜ CẮT" nghĩa là bước 3
    chưa áp chúng: DỪNG, báo Claude. (Trên bb-dev hai dòng đó ghi "CHỜ CẮT" và
    vẫn ĐẠT — đúng kế hoạch.) Dòng "0088" ghi "ÁP NỬA VỜI" là HỎNG: DỪNG.
-☐ 4. Không có 0078 / 0084 trong danh sách thiếu (nếu công cụ đòi chúng: DỪNG,
+☐ 4. Không có 0078 / 0084 / 0097 trong danh sách thiếu (nếu công cụ đòi chúng: DỪNG,
    báo Claude — đó là lỗi của công cụ, không phải tệp thiếu).
 ☐ 5. **0088, 0089 và 0090 áp NGAY Ở BƯỚC NÀY, cùng mọi tệp khác** (BB-363 chọn cách
    này: viết lại tài liệu cho khớp `migrate-prod`, KHÔNG thêm cờ giữ lại). Lý do:

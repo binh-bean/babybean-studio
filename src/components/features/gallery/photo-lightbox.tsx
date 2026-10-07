@@ -21,15 +21,13 @@ import {
   tiLeSauChamHaiLan,
   tiLeTuCuonChuot,
   NGUONG_ANH_NET,
+  laNhapChuot,
   TI_LE_NHO_NHAT,
   type TrangThaiPhong,
 } from "@/lib/gallery/phong-anh";
 import { formatSo } from "@/lib/utils/dinh-dang";
 import { giuA } from "@/lib/utils/giu-a";
 import { MenuTaiAnh, type MenuTaiAnhProps } from "@/components/features/gallery/menu-tai-anh";
-
-/** BB-370 — chuột đi quá ngần này (px) giữa nhấn và thả thì là KÉO, không phải nhấp. */
-const NGUONG_KEO_PX = 5;
 
 export interface PhotoLightboxProps {
   /** BB-319 (Ghi nhận K4/K5) — tên bé, hiện nhỏ dưới số thứ tự: xem lớn vẫn "gọi tên bé". */
@@ -374,7 +372,7 @@ export function PhotoLightbox({
       if (!chuotDangKeoRef.current || !keoRef.current) return;
       const dx = e.clientX - keoRef.current.x;
       const dy = e.clientY - keoRef.current.y;
-      if (Math.hypot(dx, dy) > NGUONG_KEO_PX) daKeoChuotRef.current = true;
+      if (!laNhapChuot(Math.hypot(dx, dy))) daKeoChuotRef.current = true;
       const khung = khungAnh();
       const { x, y } = kepBien(
         keoRef.current.xDau + dx,
@@ -404,7 +402,7 @@ export function PhotoLightbox({
    * phải nhấp ĐÚP — khách không biết, tưởng không phóng được.
    *
    * Nhấp và kéo cùng bắt đầu bằng `mousedown`: ghi điểm nhấn xuống, chuột đi
-   * quá NGUONG_KEO_PX thì coi là KÉO (thả ra không bật/tắt phóng).
+   * quá NGUONG_KEO_PX (luật chung ở lib/gallery/phong-anh.ts — `laNhapChuot`) thì coi là KÉO (thả ra không bật/tắt phóng).
    * Điện thoại: chạm sinh ra cả `click` giả — bỏ qua `click` đến ngay sau một
    * lượt chạm (`chamGanNhatRef`), cử chỉ chạm (chụm, chạm hai lần, vuốt) giữ
    * nguyên ở handleTouch*.
@@ -434,7 +432,7 @@ export function PhotoLightbox({
       daKeoChuotRef.current = false;
       return;
     }
-    if (xuong && Math.hypot(e.clientX - xuong.x, e.clientY - xuong.y) > NGUONG_KEO_PX) return;
+    if (xuong && !laNhapChuot(Math.hypot(e.clientX - xuong.x, e.clientY - xuong.y))) return;
     chamHaiLanPhong(diemTuTam(e.clientX, e.clientY));
   };
 

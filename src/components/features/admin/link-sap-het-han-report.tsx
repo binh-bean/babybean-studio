@@ -33,6 +33,7 @@ import { CARD_TITLE_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
 import { Badge } from "@/components/ui/badge";
 import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 interface Item {
   shareLinkId: string;
@@ -189,7 +190,7 @@ export function LinkSapHetHanReport() {
                 )}
 
                 <div className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-                  {it.galleryTitle} · {it.branchName ?? "—"}
+                  {hienTieuDeBoAnh(it.galleryTitle)} · {it.branchName ?? "—"}
                 </div>
                 <div className="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-xs text-[var(--bb-fg-muted)]">
                   <span className="select-all font-mono">{it.contractCode ?? "—"}</span>
@@ -246,7 +247,7 @@ export function LinkSapHetHanReport() {
                       "—"
                     )}
                   </td>
-                  <td className="py-2 pr-3">{it.galleryTitle}</td>
+                  <td className="py-2 pr-3">{hienTieuDeBoAnh(it.galleryTitle)}</td>
                   <td className="py-2 pr-3">{it.branchName ?? "—"}</td>
                   <td className="select-all py-2 pr-3 font-mono text-xs">
                     {it.contractCode ?? "—"}

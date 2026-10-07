@@ -29,6 +29,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { kiemTraLaiCacBoLoi, type KetQuaKiemTraLaiNhieu } from "@/lib/drive/kiem-tra-lai-loi";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import {
+  quetAnhChinhTuDrive,
+  gomTinAnhChinhChoGui,
+  gopViecChoGuiTheoBo,
+  type KetQuaQuetAnhChinh,
+} from "@/lib/anh-chinh-sua/quet-anh-chinh";
+import { coThuMucChinhSuaTrenDrive, keoAnhChinhVeApp } from "@/lib/anh-chinh-sua/quet-anh-chinh-drive";
+import { layViecAnhChinh } from "@/lib/anh-chinh-sua/viec-can-lam";
+import {
   HANH_DONG_NHAT_KY,
   KHOA_DONG_BO_GIA,
   docBangSanPhamTuLark,
@@ -61,6 +69,11 @@ const HET_GIO_KIEM_LAI_MS = 50_000;
 const TOI_THIEU_CON_LAI_MS = 8_000;
 /** Trần số bộ lỗi kiểm lại mỗi sáng — 76 bộ thật (29/09) xoay vòng trong 2 sáng. */
 const GIOI_HAN_KIEM_LAI_CRON = 40;
+/**
+ * BB-392 — lượt quét thư mục ảnh chỉnh dừng ở mốc này (tính từ đầu lượt cron),
+ * chừa phần còn lại cho bước kiểm lại bộ lỗi Drive.
+ */
+const HET_GIO_QUET_ANH_CHINH_MS = 32_000;
 
 async function chay(request: Request) {
   const batDauLuc = Date.now();
@@ -212,6 +225,66 @@ async function chay(request: Request) {
         console.error(JSON.stringify({ evt: "cron.hau_ky.dong_bo_gia_hong", lyDo: dongBoGia.loi }));
       }
 
+      // BB-392 mục 2 (anh 06/10, mục 9) — thư mục "ảnh chỉnh sửa" có trên Drive
+      // mà app chưa biết: quét nhẹ (trần 40 bộ, nghỉ giữa bộ, dừng ở mốc giờ),
+      // kéo ảnh về bằng đường "Đồng bộ ảnh". Ảnh chỉnh CHỜ CSKH bấm "Gửi khách
+      // duyệt" — không tự gửi khách. Hỏng thì ghi log, không kéo cron đỏ.
+      let quetAnhChinh: KetQuaQuetAnhChinh | { boQua: string } | { loi: string };
+      const hetGioQuetLuc = batDauLuc + HET_GIO_QUET_ANH_CHINH_MS;
+      if (hetGioQuetLuc - Date.now() < TOI_THIEU_CON_LAI_MS) {
+        quetAnhChinh = { boQua: "Hết giờ trong lượt này" };
+      } else {
+        try {
+          const db = createAdminClient();
+          const requestId = `cron-anh-chinh-${batDauLuc}`;
+          quetAnhChinh = await quetAnhChinhTuDrive({
+            db,
+            requestId,
+            hetGioLuc: hetGioQuetLuc,
+            coThuMucChinhSua: coThuMucChinhSuaTrenDrive,
+            keoAnh: (galleryId, rid) => keoAnhChinhVeApp(db, galleryId, rid),
+            ghiNhatKy: (d) =>
+              ghiNhatKy({
+                actorType: "system",
+                actorLabel: "cron",
+                branchId: d.branchId,
+                action: "gallery.anh_chinh_tu_quet",
+                entityType: "gallery",
+                entityId: d.galleryId,
+                galleryId: d.galleryId,
+                metadata: { soAnh: d.soAnh, jobId: d.requestId },
+              }),
+          });
+        } catch (err) {
+          quetAnhChinh = { loi: err instanceof Error ? err.message : String(err) };
+          console.error(JSON.stringify({ evt: "cron.hau_ky.quet_anh_chinh_hong", lyDo: quetAnhChinh.loi }));
+        }
+      }
+
+      // BB-392 mục 2b — "bắn việc cho CSKH": mỗi chi nhánh một thẻ "N bộ có ảnh
+      // chỉnh chờ gửi khách duyệt" (cùng tin nhắc hậu kỳ 08:00, cùng công tắc
+      // nhắc nội bộ, cùng chốt khongGuiRaLarkThat trong enqueueLarkNotification).
+      let nhacAnhChinh = 0;
+      try {
+        const viec = await layViecAnhChinh(createAdminClient(), null);
+        const tin = gomTinAnhChinhChoGui(gopViecChoGuiTheoBo(viec), new Date());
+        for (const t of tin) {
+          await enqueueLarkNotification({
+            branchId: t.branchId,
+            event: "hau_ky.nhac",
+            payload: { loai: "anh_chinh_cho_gui", nguoiNhan: "cskh", cacBo: t.cacBo },
+          });
+          nhacAnhChinh += t.cacBo.length;
+        }
+      } catch (err) {
+        console.error(
+          JSON.stringify({
+            evt: "cron.hau_ky.nhac_anh_chinh_hong",
+            lyDo: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
+
       // BB-326 mục 5 — bộ ảnh lỗi Drive tự lành: nhân viên bật chia sẻ xong
       // thì sáng hôm sau lỗi tự xoá, không cần ai bấm. Gói Hobby chỉ có hai
       // cron nên gửi nhờ vào lượt này; hỏng thì ghi log, không kéo cron đỏ.
@@ -242,6 +315,8 @@ async function chay(request: Request) {
         dongBoGia,
         dongBo,
         kiemLaiLoi,
+        quetAnhChinh,
+        nhacAnhChinh,
         larkXoaDong,
         hangDoiHook,
       };

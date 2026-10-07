@@ -13,6 +13,7 @@
 
 import { tenChatLieuChoKhach, tenCoChatLieuChoKhach, vietHoaChuDau } from "@/lib/products/nhom-san-pham";
 import { vi } from "@/i18n/vi";
+import { hienTieuDeBoAnh, tachMaHoaDon } from "@/lib/utils/ma-hoa-don";
 
 /** "27/9/2026" -> "27/09/2026". Nhận Date hoặc chuỗi ISO. */
 export function formatNgayVN(input: string | Date): string {
@@ -431,7 +432,8 @@ export function tinhTieuDeBoAnhQuanTri(input: {
   // (lỗi.JPG) đọc như tên gói, không phải tên người.
   const ten = tenMeThat(input.customerName) || tinhTenBiaTuDuLieu(input.babyNickname, input.babyFullName) || "";
   if (ten) return { tieuDe: ten, laMaHopDong: false };
-  return { tieuDe: input.duPhong, laMaHopDong: true };
+  // BB-392 mục 3b: tên bộ cũ dính đuôi số dòng chi tiết hoá đơn → hiển thị sạch (không sửa dữ liệu).
+  return { tieuDe: hienTieuDeBoAnh(input.duPhong) || input.duPhong, laMaHopDong: true };
 }
 
 /**
@@ -458,10 +460,13 @@ export function dongThongTinBoAnhQuanTri(input: {
   packageName?: string | null;
 }): string {
   const tenBe = tinhTenBiaTuDuLieu(input.babyNickname, input.babyFullName);
+  // BB-392 mục 3b: "HD_…#5074_12654,HD_…#5074_12886" → "HD_…#5074" (chỉ hiển thị).
+  const cacMa = tachMaHoaDon(input.maHoaDon);
+  const maHoaDon = cacMa.length > 0 ? cacMa.join(" + ") : input.maHoaDon?.trim() || null;
   const phan = [
     tenBe && tenBe !== input.tieuDe ? tenBe : null,
     input.customerPhone ? formatSdt(input.customerPhone) : null,
-    input.maHoaDon?.trim() && input.maHoaDon.trim() !== input.tieuDe ? input.maHoaDon.trim() : null,
+    maHoaDon && maHoaDon !== input.tieuDe && !(input.tieuDe ?? "").includes(maHoaDon) ? maHoaDon : null,
     input.packageName?.trim() || null,
   ];
   return phan.filter((v): v is string => !!v).join(" · ");

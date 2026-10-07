@@ -7,7 +7,8 @@
  * lớn ảnh được để xem". Bản cũ (BB-243) chạm khung chỉ mở RIÊNG tấm của bé —
  * ba mẹ mất cái mình muốn xem: tấm ảnh ĐANG Ở TRÊN TƯỜNG trông ra sao. Nay chạm
  * khung → cả cảnh hiện toàn màn (ảnh nền đầy đủ, không cắt `cover`), chụm hai
- * ngón / chạm hai lần / lăn chuột để phóng, kéo để xem chỗ khác.
+ * ngón / chạm hai lần / lăn chuột để phóng, kéo để xem chỗ khác. BB-393: máy
+ * tính NHẤP MỘT LẦN là phóng quanh con trỏ, nhấp lần nữa là thu về (như BB-370).
  *
  * Component chỉ lo khung nhìn + phóng/kéo; NỘI DUNG cảnh do nơi gọi vẽ trong
  * hệ toạ độ của ảnh nền (`rong` × `cao` px gốc), nhận bề rộng sân khấu (px màn
@@ -17,6 +18,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { X, ZoomIn, ZoomOut } from "lucide-react";
 import { vi } from "@/i18n";
+import { laNhapChuot } from "@/lib/gallery/phong-anh";
 
 const T = vi.gallery.treoTuong;
 const PHONG_TOI_DA = 4;
@@ -49,6 +51,42 @@ export function kepBienDoi(b: BienDoi, sanKhau: { w: number; h: number }, khung:
 export function phongQuanhDiem(b: BienDoi, s2: number, px: number, py: number): BienDoi {
   const k = s2 / b.s;
   return { s: s2, x: px - (px - b.x) * k, y: py - (py - b.y) * k };
+}
+
+/** Ngón tay: chạm (không phải kéo) khi đi dưới ngần này px và nhấc trong CHAM_TOI_DA_MS. */
+const CHAM_DI_TOI_DA_PX = 8;
+const CHAM_TOI_DA_MS = 300;
+/** Hai lần chạm cách nhau dưới ngần này ms và CHAM_LECH_TOI_DA_PX px là "chạm hai lần". */
+const CHAM_HAI_LAN_MS = 320;
+const CHAM_LECH_TOI_DA_PX = 30;
+
+export type HanhDongKhiTha = "doi-phong" | "nho-cham" | "khong";
+
+/**
+ * BB-393 — nhấc chuột/ngón tay khỏi khung nhìn thì làm gì.
+ *   · Chuột (máy tính): NHẤP MỘT LẦN là bật/tắt phóng quanh con trỏ — cùng luật
+ *     `laNhapChuot` với màn xem lớn ảnh chính (BB-370); đi quá ngưỡng là kéo, không đổi phóng.
+ *     Trước đây chuột phải nhấp ĐÚP (`onDoubleClick`) — anh: "sửa thành nhấp chuột 1 lần".
+ *   · Ngón tay / bút: giữ nguyên chạm HAI lần — lần đầu chỉ ghi nhớ ("nho-cham").
+ */
+export function hanhDongKhiTha(v: {
+  loaiTro: string;
+  /** Quãng đường xa nhất đã đi từ lúc nhấn (px); chụm hai ngón = 99. */
+  quangDuong: number;
+  /** ms từ lúc nhấn tới lúc nhấc. */
+  thoiGianNhan: number;
+  chamTruoc: { luc: number; x: number; y: number } | null;
+  bayGio: number;
+  x: number;
+  y: number;
+}): HanhDongKhiTha {
+  if (v.loaiTro === "mouse") return laNhapChuot(v.quangDuong) ? "doi-phong" : "khong";
+  if (v.quangDuong >= CHAM_DI_TOI_DA_PX || v.thoiGianNhan >= CHAM_TOI_DA_MS) return "khong";
+  const t = v.chamTruoc;
+  if (t && v.bayGio - t.luc < CHAM_HAI_LAN_MS && Math.hypot(v.x - t.x, v.y - t.y) < CHAM_LECH_TOI_DA_PX) {
+    return "doi-phong";
+  }
+  return "nho-cham";
 }
 
 export function XemLonCanh({ rong, cao, onDong, children }: XemLonCanhProps) {
@@ -112,6 +150,8 @@ export function XemLonCanh({ rong, cao, onDong, children }: XemLonCanhProps) {
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // Chuột: chỉ nút trái phóng/kéo (nút phải để mở trình đơn của trình duyệt).
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
     setDangKeo(true);
     ngon.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -142,7 +182,8 @@ export function XemLonCanh({ rong, cao, onDong, children }: XemLonCanhProps) {
     }
   };
 
-  const onPointerUp = (e: React.PointerEvent) => {
+  const tha = (e: React.PointerEvent, biHuy: boolean) => {
+    if (!ngon.current.has(e.pointerId)) return;
     const bdau = batDau.current;
     ngon.current.delete(e.pointerId);
     if (ngon.current.size > 0) {
@@ -153,16 +194,23 @@ export function XemLonCanh({ rong, cao, onDong, children }: XemLonCanhProps) {
     }
     batDau.current = null;
     setDangKeo(false);
-    // Chạm hai lần (ngón tay) — chuột dùng onDoubleClick.
-    if (e.pointerType !== "mouse" && bdau && bdau.diChuyen < 8 && Date.now() - bdau.luc < 300) {
-      const truoc = chamTruoc.current;
-      if (truoc && Date.now() - truoc.luc < 320 && Math.hypot(e.clientX - truoc.x, e.clientY - truoc.y) < 30) {
-        chamTruoc.current = null;
-        const p = tuTam(e.clientX, e.clientY);
-        doiPhongTaiDiem(p.x, p.y);
-      } else {
-        chamTruoc.current = { luc: Date.now(), x: e.clientX, y: e.clientY };
-      }
+    if (!bdau || biHuy) return;
+    const bayGio = Date.now();
+    const hd = hanhDongKhiTha({
+      loaiTro: e.pointerType,
+      quangDuong: bdau.diChuyen,
+      thoiGianNhan: bayGio - bdau.luc,
+      chamTruoc: chamTruoc.current,
+      bayGio,
+      x: e.clientX,
+      y: e.clientY,
+    });
+    if (hd === "doi-phong") {
+      chamTruoc.current = null;
+      const p = tuTam(e.clientX, e.clientY);
+      doiPhongTaiDiem(p.x, p.y);
+    } else if (hd === "nho-cham") {
+      chamTruoc.current = { luc: bayGio, x: e.clientX, y: e.clientY };
     }
   };
 
@@ -184,15 +232,14 @@ export function XemLonCanh({ rong, cao, onDong, children }: XemLonCanhProps) {
         ref={khungRef}
         data-testid="xem-lon-canh-khung-nhin"
         data-con-tro="mac-dinh"
-        className="absolute inset-0 touch-none select-none overflow-hidden"
+        className={
+          "absolute inset-0 touch-none select-none overflow-hidden " +
+          (bd.s > 1.05 ? (dangKeo ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in")
+        }
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onDoubleClick={(e) => {
-          const p = tuTam(e.clientX, e.clientY);
-          doiPhongTaiDiem(p.x, p.y);
-        }}
+        onPointerUp={(e) => tha(e, false)}
+        onPointerCancel={(e) => tha(e, true)}
       >
         {tiLe > 0 && (
           <div
@@ -214,7 +261,9 @@ export function XemLonCanh({ rong, cao, onDong, children }: XemLonCanhProps) {
 
       {goiY && (
         <p className="pointer-events-none absolute inset-x-0 bottom-[calc(max(20px,env(safe-area-inset-bottom))+56px)] mx-auto w-fit rounded-full bg-black/45 px-3.5 py-1.5 text-center text-[12.5px] text-white/90 backdrop-blur-sm">
-          {T.goiYPhongTo}
+          {/* BB-393 — máy có chuột thấy câu "nhấp", máy cảm ứng thấy câu "chụm / chạm hai lần". */}
+          <span className="pointer-fine:hidden">{T.goiYPhongTo}</span>
+          <span className="hidden pointer-fine:inline">{T.goiYPhongToChuot}</span>
         </p>
       )}
 

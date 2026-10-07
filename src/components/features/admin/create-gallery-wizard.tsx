@@ -56,6 +56,8 @@ interface ResultData {
   galleryId: string;
   shareUrl: string;
   lark?: { recordId: string; maHoaDon: string; linkLark: string | null };
+  /** BB-392 mục 4 — tạo xong nhưng chưa kéo được thành phần hợp đồng từ Lark. */
+  chuaKeoDongHopDong?: boolean;
 }
 
 /** BB-325 — bộ ảnh đã có trong app (trả từ API khi trùng thư mục / dòng Lark). */
@@ -364,6 +366,26 @@ export function CreateGalleryWizard({ banGhiLark }: { banGhiLark?: string | null
               </a>
             )}
           </p>
+        )}
+
+        {result.chuaKeoDongHopDong && (
+          <div
+            role="alert"
+            data-testid="canh-bao-chua-keo-dong-hop-dong"
+            className="rounded-[var(--bb-radius-sm)] border border-[var(--bb-warning,#b45309)] bg-[var(--bb-surface-2)] p-3 text-left text-sm text-[var(--bb-fg)]"
+          >
+            <p>{w.chuaKeoDongHopDong}</p>
+            <Button
+              variant="outline"
+              className="mt-2"
+              data-testid="nut-toi-keo-dong-hop-dong"
+              onClick={() =>
+                window.location.assign(`/admin/galleries/${encodeURIComponent(result.galleryId)}#dong-hop-dong`)
+              }
+            >
+              {w.moChiTietDeKeoDong}
+            </Button>
+          </div>
         )}
 
         <div className="flex flex-wrap justify-center gap-2">

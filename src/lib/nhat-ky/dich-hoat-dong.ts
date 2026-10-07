@@ -268,6 +268,11 @@ const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
   "gallery.drive_folder.change": { nhom: "nhan_vien", cau: () => "Nhân viên đổi thư mục ảnh gốc" },
   "gallery.export": { nhom: "nhan_vien", cau: () => "Nhân viên xuất báo cáo bộ ảnh" },
   "gallery.sync_requested": { nhom: "nhan_vien", cau: () => "Nhân viên đồng bộ lại ảnh từ Drive" },
+  // BB-392 — cron 08:00 thấy thư mục ảnh chỉnh sửa trên Drive, kéo ảnh về (chưa gửi khách).
+  "gallery.anh_chinh_tu_quet": {
+    nhom: "he_thong",
+    cau: () => "Hệ thống thấy thư mục ảnh chỉnh sửa trên Drive, kéo ảnh về — chờ CSKH gửi khách duyệt",
+  },
 };
 
 /**

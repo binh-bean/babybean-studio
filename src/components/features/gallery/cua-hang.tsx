@@ -71,6 +71,7 @@ import { ChonAnhNhieuTam, type AnhTrongLuoiChon } from "./chon-anh-nhieu-tam";
 import { tenChatLieuChoKhach } from "@/lib/products/nhom-san-pham";
 import { chiaDongGio, demMon, demMonCuaSanPham } from "@/lib/gallery/dem-mon";
 import { anhNhoTheoO, thuLaiAnhQuaRoute } from "@/lib/utils/chon-co-anh";
+import { BanAlbum } from "./ban-album";
 
 /** @deprecated dùng `SanPhamCuaHang` từ `@/lib/products/cau-hinh-cua-hang` — giữ tên cũ để không phải sửa mọi chỗ import. */
 export type MonTrongCuaHang = SanPhamCuaHang;
@@ -142,6 +143,8 @@ export interface CuaHangProps {
     /** Mở lưới chọn ảnh cho một món trong gói (gallery-app). Thiếu = chỉ xem. */
     onChonAnh?: (galleryItemId: string) => void;
   };
+  /** BB-390 — gói đã có album: màn bán album đổi nút thành "Đặt thêm một cuốn". */
+  coAlbumTrongGoi?: boolean;
 }
 
 /** BB-339 — một dòng giỏ đang mở xem lớn (để kiểm tra / đổi ảnh / bỏ). */
@@ -222,6 +225,7 @@ export function CuaHang({
   presetNhom,
   phuDe,
   trongGoi,
+  coAlbumTrongGoi = false,
 }: CuaHangProps) {
   const nhomMacDinh = THU_TU_NHOM[0] as NhomSanPham;
   const nhomKhaDung = React.useMemo(() => nhomCoHang(danhMuc), [danhMuc]);
@@ -409,6 +413,8 @@ export function CuaHang({
   const gioChia = chiaDongGio(daMua, xemHetGio);
 
   const dangDatPresetChoNhomNay = Boolean(presetPhotoId) && nhomDangXem === presetNhom;
+  /** BB-390 — tab Album = màn bán hàng (`BanAlbum`), không phải bộ cấu hình chọn ảnh. */
+  const laManBanAlbum = nhomDangXem === "album";
 
   // Nút hành động chính của tấm/thẻ đáy — ba nhánh y hệt logic BB-279 cũ,
   // chỉ gom vào thanh đáy dính thay vì nằm giữa nội dung cuộn.
@@ -645,6 +651,22 @@ export function CuaHang({
                 </section>
               )}
 
+              {/*
+                BB-390 — tab Album là MÀN BÁN HÀNG (anh: "mở màn bán hàng chứ không phải chọn
+                ảnh để mua album"): giới thiệu cuốn album + giá danh mục + "Đặt album", không
+                bộ cấu hình chip/số lượng, không bước chọn tấm.
+              */}
+              {laManBanAlbum ? (
+                <BanAlbum
+                  danhMuc={danhMuc}
+                  daMua={daMua}
+                  donDaGui={donDaGui}
+                  khoa={khoa}
+                  daCoAlbum={coAlbumTrongGoi}
+                  onDat={onMua}
+                />
+              ) : (
+              <>
               {/* Khối sản phẩm — tranh 64px bo 14px viền mảnh + tên serif + một dòng mô tả. */}
               <div className="flex items-center gap-3.5 py-4">
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-[14px] border border-[var(--bb-border)] bg-white">
@@ -857,6 +879,8 @@ export function CuaHang({
                   {vi.gallery.loiBean.loaiChuaBan}
                 </p>
               )}
+              </>
+              )}
             </div>
           )}
         </div>
@@ -1020,6 +1044,8 @@ export function CuaHang({
             </div>
           )}
 
+          {/* BB-390 — màn bán album có nút "Đặt album" riêng (kèm giá) ngay trong thân. */}
+          {!laManBanAlbum && (
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               {sanPham ? (
@@ -1045,6 +1071,7 @@ export function CuaHang({
             </div>
             {nutHanhDong}
           </div>
+          )}
         </footer>
       </div>
 

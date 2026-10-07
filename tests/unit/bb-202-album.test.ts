@@ -77,9 +77,9 @@ describe("BB-202 A. goiYBiaAlbum — gợi ý ảnh bìa", () => {
     expect(goiY.map((x) => x.photoId)).toEqual(["ghi-chu-trang", "khong-ghi-chu"]);
   });
 
-  it("5. Đúng 4 tấm gợi ý mặc định — dư ra thì cắt bớt, không hiện cả danh sách", () => {
+  it("5. Đúng 6 tấm gợi ý mặc định (BB-390: 3–6 tấm) — dư ra thì cắt bớt, không hiện cả danh sách", () => {
     const ds = Array.from({ length: 10 }, (_, i) => u({ photoId: `p${i}`, sortIndex: i }));
-    expect(goiYBiaAlbum(ds, null).length).toBe(4);
+    expect(goiYBiaAlbum(ds, null).length).toBe(6);
   });
 
   it("6. anhBiaBoAnhId null thì không tấm nào được hạng 'là bìa bộ ảnh'", () => {

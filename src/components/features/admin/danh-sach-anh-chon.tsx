@@ -73,7 +73,8 @@ export function DanhSachAnhChon({ galleryId, soAnh }: { galleryId: string; soAnh
   return (
     <div className="mt-3 space-y-2">
       <div className="flex flex-wrap items-center gap-1.5">
-        {nutDinhDang("ten-file", "Tên file")}
+        {/* BB-393 (anh 06/10): "tên file đổi thành danh sách". Giá trị bên trong vẫn "ten-file". */}
+        {nutDinhDang("ten-file", "Danh sách")}
         {nutDinhDang("chi-tiet", "Thông tin chi tiết")}
         <Button
           type="button"

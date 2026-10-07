@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { CARD_TITLE_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
 import { formatNgayGioVN, formatSo } from "@/lib/utils/dinh-dang";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 interface LoiItem {
   galleryId: string;
@@ -299,7 +300,7 @@ export function LoiDongBoReport() {
                   key={it.galleryId}
                   className="rounded-lg border border-[var(--bb-border)] p-3 text-sm"
                 >
-                  <div className="font-medium">{it.galleryTitle}</div>
+                  <div className="font-medium">{hienTieuDeBoAnh(it.galleryTitle)}</div>
                   <div className="mt-0.5 select-all font-mono text-xs text-[var(--bb-fg-muted)]">
                     {it.contractCode ?? "—"}
                   </div>
@@ -341,7 +342,7 @@ export function LoiDongBoReport() {
                 <tbody>
                   {g.items.map((it) => (
                     <tr key={it.galleryId} className="border-b border-[var(--bb-border)]">
-                      <td className="py-2 pr-3">{it.galleryTitle}</td>
+                      <td className="py-2 pr-3">{hienTieuDeBoAnh(it.galleryTitle)}</td>
                       {/* select-all để CSKH bôi đen một phát rồi dán sang Lark tra ngược */}
                       <td className="select-all py-2 pr-3 font-mono text-xs">
                         {it.contractCode ?? "—"}

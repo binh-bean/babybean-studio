@@ -495,13 +495,22 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
 
   // 2. Kiểm tra xem album với drive_folder_id này đã tồn tại chưa
   const { rows: existingGals } = await client.query(
-    `select id, title, status from galleries where drive_folder_id = $1 and status <> 'archived' limit 1`,
+    `select id, title, status, customer_id from galleries where drive_folder_id = $1 and status <> 'archived' limit 1`,
     [trigger.driveFolderId],
   );
   if (existingGals.length > 0) {
     // BB-376: bộ đã có (đường cũ không neo dòng) → neo vào dòng này nếu còn trống;
     // đã neo dòng khác thì không đổi, ghi nhật ký. Không làm hỏng lượt đồng bộ.
     if (write) await neoBoAnhVaoDongHauKy(client, { galleryId: existingGals[0].id, recordId: record.record_id });
+    // BB-392 (mục 11 anh 06/10): bộ ĐÃ CÓ trước BB-369 → khách vẫn "Chưa có số"
+    // vì nhánh này trả về sớm. Áp cùng luật điền số (chỉ điền khi trống; lệch
+    // thì ghi nhật ký, không đè; trùng khách khác thì không điền). Cùng chốt che
+    // dữ liệu thật như đường tạo mới.
+    const sdtLarkCu = opts.dbUrl && choPhepTenThat(opts.dbUrl) ? sdtTuDongLark(fields) : "";
+    const khachCu = (existingGals[0] as { customer_id?: string | null }).customer_id;
+    if (write && sdtLarkCu && khachCu) {
+      await dienSdtKhach(client, { customerId: khachCu, sdtLark: sdtLarkCu, larkRecordId: record.record_id, ghi: true });
+    }
     return {
       action: "already_exists",
       galleryId: existingGals[0].id,

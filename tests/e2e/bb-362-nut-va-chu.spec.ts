@@ -50,7 +50,7 @@ async function gocNutChinh(page: Page): Promise<{ nhan: string; goc: string }[]>
       const cs = getComputedStyle(el);
       const r = el.getBoundingClientRect();
       if (r.width < 60 || r.height < 28 || cs.visibility === "hidden" || cs.display === "none") continue;
-      // Chip bật/tắt ("Tên file" / "Thông tin chi tiết") và tab là bộ lọc, không phải nút chính.
+      // Chip bật/tắt ("Danh sách" / "Thông tin chi tiết") và tab là bộ lọc, không phải nút chính.
       if (el.hasAttribute("aria-pressed") || ["tab", "radio", "switch"].includes(el.getAttribute("role") ?? "")) continue;
       if (cs.backgroundColor !== "rgb(46, 42, 39)") continue;
       out.push({ nhan: (el.textContent ?? "").trim().slice(0, 40), goc: cs.borderTopLeftRadius });

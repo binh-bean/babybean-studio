@@ -13,6 +13,7 @@ import { ManLoiLink, loaiLoiTuMa } from "@/components/features/gallery/man-loi-l
 import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-cua-anh";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
+import { coBuocChonBiaAlbum } from "@/lib/products/album-khai-niem";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
 import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { useTimGiaDinh } from "@/components/features/gallery/use-tim-gia-dinh";
@@ -577,7 +578,8 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
    */
   const [presetCuaHang, setPresetCuaHang] = useState<{
     nhom: NhomSanPham;
-    photoId: string;
+    /** BB-390 — `null` khi mở màn bán album (album không gắn tấm đang xem). */
+    photoId: string | null;
   } | null>(null);
   /**
    * BB-217 — màn "treo ảnh của con lên tường", mở từ nút trong bảng sản phẩm
@@ -1452,6 +1454,9 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           retouchNote: p.retouchNote,
           orderIndex: p.orderIndex,
           sortIndex: p.sortIndex,
+          // BB-390 — số đo thật để ưu tiên tấm hợp khổ bìa (thiếu = trung tính).
+          width: p.width,
+          height: p.height,
         })),
     [photos],
   );
@@ -1497,12 +1502,15 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
   /**
    * BB-317 K-e — mỗi sản phẩm in còn thiếu ảnh MỘT dòng nhắc, kèm số ảnh thiếu.
    * Album chưa có bìa đã có dòng YÊU CẦU riêng (bìa là bắt buộc) nên không lặp
-   * lại ở đây; cuốn album đã có bìa mà chưa có ảnh nào vẫn được nhắc như thường.
+   * lại ở đây.
+   *
+   * BB-390 — cuốn album (dù đã có bìa) KHÔNG còn bị nhắc "thiếu ảnh": ruột 20–30 tấm Bean
+   * sắp, ba mẹ không xếp từng tấm vào cuốn (khái niệm anh chốt 07/10).
    */
   const dongNhacThieuAnh = useMemo(
     () =>
       sanPhamThieuAnh
-        .filter((sp) => !albumThieuBia.some((a) => a.galleryItemId === sp.galleryItemId))
+        .filter((sp) => sp.nhom !== "album" && !albumThieuBia.some((a) => a.galleryItemId === sp.galleryItemId))
         .map((sp) => ({
           galleryItemId: sp.galleryItemId,
           name: tenDongTrongGoiChoKhach(sp.name, sp.nhom),
@@ -3115,7 +3123,9 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           </div>
         </div>
       )}
-      {albumTrongGoi.length > 0 && !isLocked && (
+      {/* BB-390 — luật hiện bước chọn bìa ở `coBuocChonBiaAlbum` (gói có album, bộ còn mở,
+          người quyết đơn). Người thân chỉ gợi ý/chỉ xem không thấy nút chọn bìa không bấm được. */}
+      {coBuocChonBiaAlbum({ soAlbumTrongGoi: albumTrongGoi.length, khoa: isLocked, vaiTro: gallery.myRole }) && (
         <div className="mx-auto mt-14 max-w-[1600px] px-6 lg:px-10">
           <ChonBiaAlbum
             albums={gallery.albumBia ?? albumTrongGoi.map((a) => ({
@@ -3137,7 +3147,9 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           việc gì để làm khi bộ đã chốt (chỉ đọc, ba mẹ không đổi được) hoặc gói không có
           sản phẩm in (chỉ còn một câu hạn mức — đã có ở bìa "N tấm trong gói"): bỏ hẳn.
           Còn giữ khi bộ đang mở VÀ có sản phẩm in — đó là chỗ ba mẹ xếp ảnh vào album. */}
-      {!isLocked && hangInTrongGoi.length > 0 && (
+      {/* BB-390 — album trong gói KHÔNG nằm ở đây nữa: cuốn album không "chọn ảnh vào cuốn"
+          (ruột Bean sắp), việc của ba mẹ là chọn BÌA ở khối "Chọn ảnh bìa album" phía trên. */}
+      {!isLocked && suatInTrongGoi.length > 0 && (
         <div id="trong-goi-cua-ba-me" className="mx-auto mt-14 max-w-[1600px] space-y-5 px-6 lg:px-10">
           <h2 className="kh-h2">Trong gói của ba mẹ</h2>
           {hanMuc != null && (
@@ -3146,7 +3158,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             </p>
           )}
           <TomTatSanPhamIn
-            dong={hangInTrongGoi.map((sp) => ({
+            dong={suatInTrongGoi.map((sp) => ({
               galleryItemId: sp.galleryItemId,
               name: sp.name,
               quantity: sp.quantity,
@@ -3203,7 +3215,8 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         trongGoi={{
           hanMuc,
           daChon: selectionCounts.selectedCount,
-          mon: hangInTrongGoi.map((sp) => ({
+          // BB-390 — chỉ suất in/khung: album trong gói không chọn ảnh vào cuốn (chỉ chọn bìa).
+          mon: suatInTrongGoi.map((sp) => ({
             galleryItemId: sp.galleryItemId,
             // BB-362 — một tên cho một món: "Ảnh in UV 10×15" như giỏ và xem lớn.
             name: tenDongTrongGoiChoKhach(sp.name, sp.nhom),
@@ -3213,6 +3226,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           })),
           onChonAnh: duocChon && !isLocked ? setMonDangChonAnh : undefined,
         }}
+        coAlbumTrongGoi={albumTrongGoi.length > 0}
       />
 
       {/* BB-339 mục 3/4 — lưới chọn ảnh cho MỘT món trong gói (z-60, nổi trên cửa hàng). */}
@@ -4178,7 +4192,22 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
                 coAnhNay: placements.some(
                   (pl) => pl.galleryItemId === sp.galleryItemId && pl.photoId === anh.id,
                 ),
+                // BB-390 — album trong gói ở màn xem lớn = "Làm bìa album".
+                laBia: (gallery.albumBia ?? []).some(
+                  (a) => a.galleryItemId === sp.galleryItemId && a.coverPhotoId === anh.id,
+                ),
               }))}
+              onChonBiaAlbum={
+                coBuocChonBiaAlbum({ soAlbumTrongGoi: albumTrongGoi.length, khoa: isLocked, vaiTro: gallery.myRole })
+                  ? (galleryItemId) => void chonBiaAlbum(galleryItemId, anh.id)
+                  : undefined
+              }
+              onXemBanAlbum={() => {
+                // Cùng lý do với `onDatInTamNay` dưới: đóng màn xem lớn trước khi mở cửa hàng.
+                setLightboxIndex(null);
+                setPresetCuaHang({ nhom: "album", photoId: null });
+                setMoCuaHang(true);
+              }}
               monMuaThem={(gallery.addons?.catalogue ?? [])
                 .filter((sp) => sp.canGanAnh)
                 .map((sp) => ({

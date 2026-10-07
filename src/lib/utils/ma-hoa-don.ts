@@ -44,3 +44,20 @@ export function tachTieuDeBoAnh(title: string, maHopDong: string[] = []): { nhan
     .replace(/\s*·$/, "");
   return { nhan: nhan || "Bộ ảnh", ma };
 }
+
+/**
+ * BB-392 mục 3b — tên bộ để HIỂN THỊ ở màn quản trị (danh sách bộ ảnh, Việc cần
+ * xử lý, Bàn làm việc, chi tiết bộ, thẻ Lark). Bộ cũ còn dính đuôi số dòng chi
+ * tiết hoá đơn ("Album · HD_20260910#5074_12654,HD_20260910#5074_12886") →
+ * "Album · HD_20260910#5074". Chỉ hiển thị — KHÔNG sửa dữ liệu. Tên không có mã
+ * hoá đơn thì giữ nguyên từng chữ.
+ */
+export function hienTieuDeBoAnh(title: string | null | undefined): string {
+  const t = (title ?? "").trim();
+  if (!t) return t;
+  const { nhan, ma } = tachTieuDeBoAnh(t);
+  if (ma.length === 0) return t;
+  // Tên chỉ có mã (không nhãn chữ) → chỉ mã, không bịa "Bộ ảnh · …".
+  const conChu = t.replace(/HD_\d{6,8}#\d+(_\d+)?/gi, "").replace(/[,+·\s]/g, "");
+  return conChu ? `${nhan} · ${ma.join(" + ")}` : ma.join(" + ");
+}

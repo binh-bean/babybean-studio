@@ -13,6 +13,7 @@ import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CAC_QUYEN_GUI_KHACH_DUYET, coMotTrongCacQuyen } from "@/lib/auth/quyen-xem-bo-anh";
 import { layViecAnhChinh } from "@/lib/anh-chinh-sua/viec-can-lam";
+import { docNhaCuaCacBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 export const runtime = "nodejs";
 
@@ -36,8 +37,11 @@ export async function GET(request: Request): Promise<Response> {
       if (branchIds.length === 0) return ok({ items: [] });
     }
 
-    const items = await layViecAnhChinh(createAdminClient(), branchIds);
-    return ok({ items, coTheGui: coMotTrongCacQuyen(staff.permissions, CAC_QUYEN_GUI_KHACH_DUYET) });
+    const admin = createAdminClient();
+    const items = await layViecAnhChinh(admin, branchIds);
+    // BB-392 mục 3a — nhãn nhà (khách có ≥ 2 bộ). Lỗi đọc nhãn không làm hỏng danh sách việc.
+    const nha = await docNhaCuaCacBo(admin, items.map((v) => v.galleryId)).catch(() => ({}));
+    return ok({ items, nha, coTheGui: coMotTrongCacQuyen(staff.permissions, CAC_QUYEN_GUI_KHACH_DUYET) });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);
     return failUnexpected(err, requestId);

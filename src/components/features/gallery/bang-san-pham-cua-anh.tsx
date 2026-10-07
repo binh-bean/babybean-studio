@@ -94,6 +94,12 @@ export interface AlbumTrongGoi {
   name: string;
   coAnhNay: boolean;
   soAnh: number;
+  /**
+   * BB-390 — tấm đang xem có đang là BÌA của cuốn này không. Album trong gói ở
+   * màn xem lớn giờ là "Làm bìa album" (anh: "gợi ý chọn ảnh bìa cho album nếu
+   * trong gói có album"), không còn nút đưa/gỡ từng tấm vào ruột cuốn.
+   */
+  laBia?: boolean;
 }
 
 /**
@@ -132,10 +138,24 @@ export interface BangSanPhamCuaAnhProps {
   onDatVaoGoi: (galleryItemId: string, dat: boolean) => void;
   onDatVaoAlbum: (addonId: string, dat: boolean) => void;
   onDatMuaThem: (productId: string, soLuong: number) => void;
-  /** Mua một album mới (không gắn ảnh — ảnh đưa vào sau). */
-  onMuaAlbum: (productId: string, soLuong: number) => void;
-  /** Album trong bảng giá, để ba mẹ mua thêm một cuốn. */
+  /**
+   * Mua một album mới (không gắn ảnh — ảnh đưa vào sau).
+   * BB-390: màn xem lớn không bán album tại chỗ nữa (xem `onXemBanAlbum`) — giữ
+   * tuỳ chọn để không vỡ nơi gọi cũ.
+   */
+  onMuaAlbum?: (productId: string, soLuong: number) => void;
+  /** Album trong bảng giá — có mục nào thì hiện lối "Xem album in ảnh". */
   albumBanDuoc: MonMuaThem[];
+  /**
+   * BB-390 — mở MÀN BÁN ALBUM (tab Album của cửa hàng). Thiếu = không hiện lối.
+   * Anh: "bán album — mở màn bán hàng chứ không phải chọn ảnh để mua album".
+   */
+  onXemBanAlbum?: () => void;
+  /**
+   * BB-390 — chọn tấm đang xem làm bìa cho một album TRONG GÓI. Thiếu (người
+   * thân chỉ gợi ý/chỉ xem, hoặc bộ đã khoá) = chỉ hiện trạng thái bìa.
+   */
+  onChonBiaAlbum?: (galleryItemId: string) => void;
   /**
    * BB-217 — mở màn "treo ảnh của con lên tường" cho đúng tấm đang xem.
    *
@@ -180,7 +200,10 @@ export function BangSanPhamCuaAnh({
   // này, đổi tên có gạch dưới để qua luật no-unused-vars của dự án.
   onDatVaoAlbum: _onDatVaoAlbum,
   onDatMuaThem,
-  onMuaAlbum,
+  // BB-390: không bán album tại chỗ nữa — lối vào là `onXemBanAlbum`.
+  onMuaAlbum: _onMuaAlbum,
+  onXemBanAlbum,
+  onChonBiaAlbum,
   onXemTuong,
   onDatInTamNay,
   tong = "toi",
@@ -406,15 +429,24 @@ export function BangSanPhamCuaAnh({
             mẹ nhìn thấy chúng như nhau: một cuốn album, đang có mấy tấm.
           */}
           <ul className="space-y-1.5">
-            {albumTrongGoi.map((al) => (
+            {/*
+              BB-390 — album TRONG GÓI ở màn xem lớn = "Làm bìa album" cho tấm đang xem
+              (một cuốn một bìa). Trước đây là nút đưa/gỡ tấm này vào RUỘT cuốn — lệch
+              khái niệm của anh: ruột 20–30 tấm Bean sắp, ba mẹ chỉ chọn bìa.
+            */}
+            {albumTrongGoi.map((al) => {
+              const choChon = Boolean(onChonBiaAlbum) && anhDaChon && !al.laBia;
+              return (
               <li key={al.galleryItemId}>
                 <button
                   type="button"
-                  disabled={khoa || dangLuu}
-                  onClick={() => onDatVaoGoi(al.galleryItemId, !al.coAnhNay)}
+                  data-testid="nut-lam-bia-album"
+                  disabled={khoa || dangLuu || !choChon}
+                  aria-pressed={Boolean(al.laBia)}
+                  onClick={() => onChonBiaAlbum?.(al.galleryItemId)}
                   className={cn(
                     "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs transition-colors",
-                    al.coAnhNay
+                    al.laBia
                       ? "bg-[#7FA99B]/20 ring-1 ring-[#7FA99B]/50"
                       : T.theNen,
                     (khoa || dangLuu) && "opacity-60",
@@ -436,15 +468,22 @@ export function BangSanPhamCuaAnh({
                       </span>
                     </span>
                     <span className={cn("block", T.chuMo)}>
-                      {al.coAnhNay ? "Đã có tấm này" : `Đang có ${al.soAnh} tấm`}
+                      {al.laBia
+                        ? vi.gallery.loiBean.dangLaBiaAlbum
+                        : !anhDaChon && onChonBiaAlbum
+                          ? vi.gallery.loiBean.thaTimDeLamBia
+                          : onChonBiaAlbum
+                            ? vi.gallery.loiBean.lamBiaAlbum
+                            : vi.gallery.loiBean.ruotAlbumBeanSap}
                     </span>
                   </span>
-                  <span className="shrink-0 text-base leading-none">
-                    {al.coAnhNay ? "✓" : "+"}
+                  <span className="shrink-0 text-base leading-none" aria-hidden>
+                    {al.laBia ? "✓" : choChon ? "+" : ""}
                   </span>
                 </button>
               </li>
-            ))}
+              );
+            })}
 
             {/*
               BB-202 — chủ studio 26/09/2026: "mua thêm album trong cửa hàng =
@@ -471,42 +510,22 @@ export function BangSanPhamCuaAnh({
             ))}
           </ul>
 
-          {albumBanDuoc.length > 0 && (
-            // BB-287 mục #11 — tam giác ▶ mặc định của trình duyệt thay bằng
-            // › xoay 90° khi mở (`list-none` + `::marker`/`-webkit-details-marker`
-            // ẩn dấu gốc, `group-open:rotate-90` xoay dấu tự vẽ).
-            <details className="group mt-1.5">
-              <summary className={cn("flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-medium marker:content-none [&::-webkit-details-marker]:hidden", T.theNen)}>
-                <span>Mua thêm một cuốn album</span>
-                <span aria-hidden className="text-sm leading-none transition-transform group-open:rotate-90">
-                  ›
-                </span>
-              </summary>
-              <ul className="mt-1 space-y-1">
-                {albumBanDuoc.map((al) => (
-                  <li
-                    key={al.productId}
-                    className={cn("flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5", T.dongLong)}
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-xs">{al.name}</span>
-                      <span className={cn("block text-[11px]", T.chuMo)}>
-                        {formatCurrencyVND(al.unitPrice)}
-                        {al.size ? ` · ${formatKichThuoc(al.size)}` : ""}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      disabled={khoa || dangLuu}
-                      onClick={() => onMuaAlbum(al.productId, al.soLuong + 1)}
-                      className={cn("h-7 rounded-full px-3 text-xs disabled:opacity-30", T.theNen)}
-                    >
-                      Mua
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </details>
+          {/*
+            BB-390 — bán album KHÔNG gắn với tấm đang xem (anh: "mở màn bán hàng chứ
+            không phải chọn ảnh để mua album"). Trước đây là danh sách "Mua" ngay
+            trong màn xem một tấm — dễ hiểu nhầm là mua album CHO tấm này. Giờ chỉ
+            là lối mở màn bán album.
+          */}
+          {albumBanDuoc.length > 0 && onXemBanAlbum && (
+            <button
+              type="button"
+              data-testid="nut-xem-ban-album"
+              onClick={onXemBanAlbum}
+              className={cn("mt-1.5 flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-xs font-medium", T.theNen)}
+            >
+              <span>{vi.gallery.loiBean.banAlbumXem}</span>
+              <span aria-hidden className="text-sm leading-none">›</span>
+            </button>
           )}
         </section>
       )}

@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import Link from "next/link";
+import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 import { useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
@@ -105,6 +107,8 @@ type ChartData = {
  * vì kế thừa `ActionRequiredItem`.
  */
 type ViecHomNayItem = ViecHomNayThoLuoc & {
+  /** BB-392 mục 3a — nhãn nhà khi khách có ≥ 2 bộ. */
+  nha?: NhaCuaBo | null;
   id: string;
   title: string;
   customerName: string;
@@ -911,12 +915,15 @@ function DongViec({ item, onLamMoi }: { item: ViecHomNayItem; onLamMoi: () => Pr
   return (
     <li className="flex items-center gap-3 border-t border-[var(--bb-border)] px-4 py-3 first:border-t-0 sm:px-6">
       <AnhBiaViec coverPhotoId={item.coverPhotoId} title={tieuDe} />
-      <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`} className="min-w-0 flex-1 hover:opacity-80">
-        <p className={`truncate text-sm font-medium text-[var(--bb-fg)]${laMaHopDong ? " tabular-nums" : ""}`}>
-          {tieuDe}
-        </p>
-        <p className="truncate text-xs text-[var(--bb-fg-muted)]">{dongPhuViec(item, tieuDe)}</p>
-      </Link>
+      <div className="min-w-0 flex-1">
+        <Link href={`/admin/galleries/${encodeURIComponent(item.id)}`} className="block hover:opacity-80">
+          <p className={`truncate text-sm font-medium text-[var(--bb-fg)]${laMaHopDong ? " tabular-nums" : ""}`}>
+            {tieuDe}
+          </p>
+          <p className="truncate text-xs text-[var(--bb-fg-muted)]">{dongPhuViec(item, tieuDe)}</p>
+        </Link>
+        <NhanNhaBoAnh nha={item.nha} className="mt-1" />
+      </div>
       <span
         className={
           han.tre

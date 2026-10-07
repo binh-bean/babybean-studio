@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { CARD_TITLE_CLASS } from "./page-header";
 import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { tenMeThat } from "@/lib/utils/dinh-dang";
+import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 
 interface Dong {
   galleryId: string;
@@ -86,7 +87,7 @@ export function LarkDaXoaReport() {
           {(items ?? []).map((it) => (
             <li key={it.galleryId} data-testid="dong-lark-da-xoa" className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1 text-sm">
-                <p className="font-medium text-[var(--bb-fg)]">{tenMeThat(it.customerName) || it.title}</p>
+                <p className="font-medium text-[var(--bb-fg)]">{tenMeThat(it.customerName) || hienTieuDeBoAnh(it.title)}</p>
                 <p className="text-xs text-[var(--bb-fg-muted)] [overflow-wrap:anywhere]">
                   {[it.maHoaDon, it.branchName, `thấy mất lúc ${new Date(it.thayLuc).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}`]
                     .filter(Boolean)
