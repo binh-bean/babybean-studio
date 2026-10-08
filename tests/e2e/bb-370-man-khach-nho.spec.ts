@@ -406,8 +406,8 @@ test("2c + 4b. Quản trị: ghi chú từng ảnh + khung xem trước bìa gi�
   await page.getByRole("button", { name: /Mở trình thiết kế bìa|Đổi bìa/ }).click();
   const hop = page.getByRole("dialog", { name: "Thiết kế bìa bộ ảnh" });
   await expect(hop).toBeVisible();
-  // Không còn chọn bố cục (màn khách không đọc bố cục).
-  await expect(hop.getByRole("button", { name: "Tối giản" })).toHaveCount(0);
+  // BB-396 — chọn lại được kiểu bìa (màn khách nay đọc kiểu thật); bộ này giữ "Bên cạnh".
+  await expect(hop.getByRole("button", { name: "Kiểu bìa Bên cạnh" })).toHaveAttribute("aria-pressed", "true");
   await hop.getByRole("button", { name: /^Chọn .* làm bìa$/ }).first().click();
   const khung = page.getByTestId("khung-xem-truoc-bia");
   await expect(khung.getByTestId("ten-bo-xem-truoc")).toHaveText("Bé Bơ · 13/09/2026");

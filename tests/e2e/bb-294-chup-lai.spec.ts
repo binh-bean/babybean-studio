@@ -238,7 +238,8 @@ test.describe("BB-294 vòng 2: chụp ảnh bằng chứng", () => {
       await chupTrang(page, `09-${ten}-thiet-ke-bia-truoc-khi-chon`);
 
       // Chọn tấm đầu tiên làm bìa — xem trước phải đổi theo NGAY.
-      const tamDau = page.locator('[role="dialog"] .grid button').first();
+      // BB-396 — lưới ô kiểu bìa (cũng `.grid`) nay đứng trước lưới ảnh: tìm ô ảnh theo tên nút.
+      const tamDau = page.getByRole("dialog").getByRole("button", { name: /^Chọn .* làm bìa$/ }).first();
       await tamDau.click();
       await page.waitForTimeout(600);
 

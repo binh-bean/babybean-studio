@@ -212,7 +212,9 @@ ownIpTest.describe("BB-296 mục #1: cửa hàng — chọn ảnh rồi Thêm v�
       // tả ("2 ảnh {tên sản phẩm} · {tiền}"); giỏ hiện đủ (không gói trong
       // `<details>` nữa) là "Giỏ của ba mẹ · N món · {tiền}".
       await ownIpExpect(cuaHang.getByRole("status")).toContainText("Đã thêm vào giỏ");
-      await ownIpExpect(cuaHang.getByRole("status")).toContainText("2 ảnh");
+      // BB-390 đổi lời mô tả thành "{tên sản phẩm} · N món · {tiền}" — vẫn kiểm đúng 2 món, đúng tiền.
+      await ownIpExpect(cuaHang.getByRole("status")).toContainText("2 món");
+      await ownIpExpect(cuaHang.getByRole("status")).toContainText(formatVND(c.productAnhInPrice * 2));
       // Mỗi tấm ảnh là một dòng giỏ riêng (đúng hành vi batch có sẵn của
       // /api/g/addons — một selection_addons/tấm) — 2 tấm = 2 món. Chờ vòng
       // `loadGallery({silent:true})` (máy chủ) trả về — cùng cách bb-279 đã
@@ -535,7 +537,8 @@ pwTest.describe("BB-296 mục #2, #6, #7: quản trị — bìa placeholder, ả
 
     const editor = page.getByRole("dialog", { name: "Thiết kế bìa bộ ảnh" });
     await editor.waitFor({ state: "visible" });
-    await pwExpect(editor.getByText("Chọn một tấm bên trái")).toBeVisible();
+    // BB-396 — 4 ô "Kiểu bìa" cũng là bìa thật (cùng placeholder): đọc trong khung xem trước lớn.
+    await pwExpect(editor.getByTestId("khung-xem-truoc-bia").getByText("Chọn một tấm bên trái")).toBeVisible();
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.screenshot({ path: `${CHUP}/2-mt-thiet-ke-bia-placeholder.png` });

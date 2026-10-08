@@ -101,8 +101,10 @@ test.describe("BB-244: Chọn ảnh bìa popup full màn hình", () => {
     expect(hop.y).toBeLessThan(vp.height / 2);
 
     // Lưới hiển thị ảnh
-    // Bấm ảnh 2
-    const anh2 = dialog.locator('button img').nth(1);
+    // Bấm ảnh 2. BB-396 — 4 ô "Kiểu bìa" (bìa thật thu nhỏ, có nút chứa ảnh bên trong)
+    // nay đứng TRƯỚC lưới: tìm ô lưới theo tên nút, không theo `button img`.
+    const oLuoi = dialog.getByRole("button", { name: /^Chọn .* làm bìa$/ });
+    const anh2 = oLuoi.nth(1);
     await anh2.click();
 
     // Khung xem trước cập nhật liền.
@@ -112,12 +114,12 @@ test.describe("BB-244: Chọn ảnh bìa popup full màn hình", () => {
     // ổn định (`bia-khoi-anh`, luôn có trong `BiaBoAnh`) thay vì canh đúng
     // tên lớp CSS đang dùng lúc dựng (AGENTS.md §5a: canh hành vi, không
     // canh cách viết HTML nhất thời).
-    const xemTruoc = dialog.getByTestId("bia-khoi-anh");
+    const xemTruoc = dialog.getByTestId("khung-xem-truoc-bia").getByTestId("bia-khoi-anh");
     await expect(xemTruoc).toBeVisible();
     await expect(xemTruoc.locator(`img[src*='${photos[1]}']`)).toBeVisible();
 
     // Đổi qua ảnh 3
-    const anh3 = dialog.locator('button img').nth(2);
+    const anh3 = oLuoi.nth(2);
     await anh3.click();
     await expect(xemTruoc.locator(`img[src*='${photos[2]}']`)).toBeVisible();
 
@@ -132,12 +134,12 @@ test.describe("BB-244: Chọn ảnh bìa popup full màn hình", () => {
     // Mở lại, ảnh nháp không lưu
     await nutDoiBia.click();
     await expect(dialog).toBeVisible();
-    // BB-370 — trình thiết kế KHÔNG còn chọn bố cục: màn khách không đọc `cover_layout`
-    // (luôn bố cục "Bên cạnh"), chọn mà khách không thấy là xem trước sai.
-    await expect(dialog.getByRole("button", { name: "Tạp chí" })).toHaveCount(0);
-    
+    // BB-396 — trình thiết kế chọn lại được kiểu bìa (màn khách nay đọc `cover_layout`).
+    // Ca này KHÔNG đổi kiểu, nên lưu không được ghi `cover_layout` (kiểm cuối ca).
+    await expect(dialog.getByRole("button", { name: "Kiểu bìa Tạp chí" })).toHaveCount(1);
+
     // Bấm ảnh 3
-    const anh3_lai = dialog.locator('button img').nth(2);
+    const anh3_lai = oLuoi.nth(2);
     await anh3_lai.click();
 
     // Bấm "Lưu bìa"
@@ -151,7 +153,7 @@ test.describe("BB-244: Chọn ảnh bìa popup full màn hình", () => {
     // Kiểm db
     const { rows: kq } = await client.query("select cover_photo_id, cover_layout from galleries where id = $1", [galleryId]);
     expect(kq[0].cover_photo_id).toBe(photos[2]);
-    // Lưu bìa không đụng `cover_layout` (BB-370).
+    // Lưu bìa mà không đổi kiểu thì không đụng `cover_layout` (BB-370, BB-396 giữ luật này).
     expect(kq[0].cover_layout).toBeNull();
   });
 });

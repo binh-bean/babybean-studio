@@ -396,15 +396,16 @@ test.describe("BB-313", () => {
       }
 
       // Chờ lưới ảnh tải xong rồi bấm Ô THỨ HAI.
-      const luoi = hopThoai.locator("img[src*='/api/img/']").first();
-      await luoi.waitFor({ state: "visible", timeout: 20_000 });
-      const oAnh = hopThoai.locator("button:has(img[src*='/api/img/'])").nth(1);
+      // BB-396 — 4 ô "Kiểu bìa" (bìa thật thu nhỏ) đứng TRƯỚC lưới: tìm ô lưới theo tên nút.
+      const oLuoi = hopThoai.getByRole("button", { name: /^Chọn .* làm bìa$/ });
+      await oLuoi.first().waitFor({ state: "visible", timeout: 20_000 });
+      const oAnh = oLuoi.nth(1);
       await oAnh.click();
 
       // (d) ô đang chọn có viền rõ.
       await expect(oAnh).toHaveClass(/border-\[var\(--bb-accent\)\]/);
 
-      const khungXemTruoc = page.locator("[style*='container-type']");
+      const khungXemTruoc = page.getByTestId("khung-xem-truoc-bia");
       await expect(khungXemTruoc).toBeVisible();
       const anhBia = khungXemTruoc.locator("[data-testid='bia-khoi-anh']");
       const khoiChu = khungXemTruoc.locator("[data-testid='bia-khoi-chu']");
@@ -455,7 +456,7 @@ test.describe("BB-313", () => {
     });
   }
 
-  // BB-370 — ba bố cục Tạp chí / Tối giản / Đè chéo đã RỜI trình thiết kế bìa: màn
-  // khách không đọc `cover_layout` (luôn "Bên cạnh"), nên khung xem trước chỉ còn đúng
-  // bố cục khách thấy — các ca đo ba bố cục đó ở đây không còn đường vào để thử.
+  // BB-370 — ba bố cục Tạp chí / Tối giản / Đè chéo từng RỜI trình thiết kế bìa (màn
+  // khách không đọc `cover_layout`). BB-396 đưa lại: màn khách đọc kiểu thật, ca chọn
+  // kiểu → lưu → khách thấy nằm ở `bb-396-kieu-bia.spec.ts`.
 });

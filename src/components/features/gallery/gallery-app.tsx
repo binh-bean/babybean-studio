@@ -19,6 +19,7 @@ import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { useTimGiaDinh } from "@/components/features/gallery/use-tim-gia-dinh";
 import { ThanhDatChinhSua } from "@/components/features/gallery/thanh-dat-chinh-sua";
 import { BiaBoAnh } from "@/components/features/gallery/bia-bo-anh";
+import { propBiaTuBoAnh } from "@/lib/gallery/kieu-bia";
 import { ThanhChon } from "@/components/features/gallery/thanh-chon";
 import { ChuongThongBao } from "@/components/features/gallery/chuong-thong-bao";
 import { YeuCauMoLaiTrangThai } from "@/components/features/gallery/yeu-cau-mo-lai-trang-thai";
@@ -222,6 +223,8 @@ interface GalleryApiResponse {
   coverPhotoId?: string | null;
   /** Tiêu đề bìa CSKH tự viết (BB-215); `null` thì bìa rơi về tên bé. */
   coverHeadline?: string | null;
+  /** BB-396 — kiểu bìa CSKH chọn (`galleries.cover_layout`); null/lạ → "Bên cạnh". */
+  coverLayout?: string | null;
   /** Vai trò của link đang mở: owner, co_editor, suggester hoặc viewer. */
   myRole?: string;
   selection: {
@@ -2468,13 +2471,15 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         style={{ ["--bb-phan-tren-bia" as string]: `${phanTrenBiaCao}px` }}
       >
         <BiaBoAnh
+          // BB-396 — tiêu đề, KIỂU BÌA, loại buổi, ngày chụp, lời chào, trạng thái: dựng
+          // bằng `propBiaTuBoAnh` — CÙNG hàm khung xem trước quản trị dùng, nên kiểu bìa
+          // CSKH chọn là đúng kiểu ba mẹ thấy (null/lạ → "Bên cạnh"). Một component cho cả
+          // điện thoại lẫn máy tính. Bộ đã giao: `BiaBoAnh` vẫn dựng bìa "Đã hoàn thiện"
+          // cố định, thắng mọi kiểu (luật BB-298, giữ nguyên).
+          {...propBiaTuBoAnh(gallery)}
           anhBia={anhBia}
-          coverHeadline={gallery.coverHeadline ?? null}
           tenBe={tenBeHienThi || null}
-          sessionType={gallery.sessionType}
-          ngayChup={gallery.shootDate}
           chiNhanh={gallery.branch.name}
-          loiChao={gallery.welcomeMessage}
           soAnh={photos.length || gallery.photoCount}
           // BB-353 mục 5 — người thân được mời không chọn ảnh vào gói: không bày hạn mức/hạn chọn.
           hanMuc={laNguoiXem ? null : hanMuc}
@@ -2488,7 +2493,6 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           choPhepTai={choPhepTai}
           onTaiCaBo={taiCaBo}
           ngayGiao={gallery.review?.deliveredAt ?? null}
-          trangThai={gallery.status}
           giaiDoanTienDo={gallery.giaiDoanTienDo ?? null}
           khoiDuyet={khoiDuyet}
           laNguoiXem={laNguoiXem}

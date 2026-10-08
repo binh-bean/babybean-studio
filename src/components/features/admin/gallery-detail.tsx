@@ -24,7 +24,7 @@
 "use client";
 import { KhoiAnhChinhSuaAdmin } from "./khoi-anh-chinh-sua-admin";
 import { hienKhoiVongDuyetCu } from "@/lib/anh-chinh-sua/quan-tri";
-import { BiaBoAnhEditor } from "./bia-bo-anh-editor";
+import { BiaBoAnhEditor, type ThayDoiBia } from "./bia-bo-anh-editor";
 import { DongThoiGianHoatDong } from "./dong-thoi-gian";
 import { YeuCauMuaThemBlock } from "./yeu-cau-mua-them";
 import { TimGiaDinhBlock } from "./tim-gia-dinh-admin";
@@ -282,6 +282,8 @@ interface Detail {
   coverPhotoId: string | null;
   coverHeadline: string | null;
   welcomeMessage: string | null;
+  /** BB-396 — kiểu bìa (`galleries.cover_layout`, route items trả sẵn); null = "Bên cạnh". */
+  coverLayout?: string | null;
   /**
    * BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — nickname/họ tên đầy đủ gửi
    * RIÊNG (trước là một chuỗi `babyName` đã COALESCE sẵn), để màn hình tự áp
@@ -633,9 +635,7 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
    * cũ (xem bia/route.ts). Route kiểm lại quyền, chi nhánh và ảnh có thuộc
    * đúng bộ này không; màn hình chỉ hỏi để hiện lỗi cho CSKH đọc.
    */
-  async function saveCover(
-    thayDoi: { coverPhotoId?: string | null; coverHeadline?: string | null; welcomeMessage?: string | null },
-  ) {
+  async function saveCover(thayDoi: ThayDoiBia) {
     setBusy(true);
     setNotice(null);
     try {
