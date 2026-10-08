@@ -159,7 +159,7 @@ export function KhoiLinkBoAnhGiaDinhView(p: KhoiLinkBoAnhGiaDinhViewProps) {
               {p.daChep === "tin" ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
               {p.daChep === "tin" ? T.daChepTinNhan : T.chepTinNhan}
             </Button>
-            <NutNhanKhach url={p.chatUrl} />
+            <NutNhanKhach url={p.chatUrl} anKhiTrong />
           </div>
 
           <Link

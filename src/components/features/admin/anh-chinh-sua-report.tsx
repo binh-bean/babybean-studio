@@ -15,6 +15,7 @@ import { CARD_TITLE_CLASS } from "./page-header";
 import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { NutNhanKhach } from "./nut-nhan-khach";
 import { KhoiCongTacLamNhanh, NhanLamNhanh } from "./nhan-lam-nhanh";
 import { xepLamNhanhLenDau } from "@/lib/dich-vu/lam-anh-nhanh";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
@@ -42,6 +43,8 @@ export function AnhChinhSuaReport() {
   const [items, setItems] = React.useState<DongViec[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  /** BB-404 — link chat riêng của khách theo bộ (API trả kèm `chatTheoBo`). */
+  const [chatTheoBo, setChatTheoBo] = React.useState<Record<string, string | null>>({});
   /** BB-399 — bộ khách mua "Làm ảnh nhanh": nhãn + xếp lên đầu. */
   const [lamNhanh, setLamNhanh] = React.useState<Record<string, { hanTra: string | null; uuTien?: boolean }>>({});
 
@@ -56,6 +59,7 @@ export function AnhChinhSuaReport() {
       setError(null);
       setItems(json.data.items ?? []);
       setNha(json.data.nha ?? {});
+      setChatTheoBo(json.data.chatTheoBo ?? {});
       setLamNhanh(json.data.lamNhanh ?? {});
     } catch {
       setError("Mất kết nối, thử lại giúp.");
@@ -87,9 +91,11 @@ export function AnhChinhSuaReport() {
         <ul className="flex flex-col divide-y divide-[var(--bb-border)] rounded-lg border border-[var(--bb-border)]">
           {xepLamNhanhLenDau(items, (v) => !!lamNhanh[v.galleryId]?.uuTien).map((v) => (
             <li key={`${v.loai}-${v.galleryId}-${v.khoa ?? ""}`} data-testid="dong-anh-chinh-sua" data-loai={v.loai} data-khoa={v.khoa ?? "goc"}>
+              {/* BB-404 — icon "Nhắn khách" đứng CẠNH liên kết cả dòng (không lồng <a> trong <a>). */}
+              <div className="flex items-center hover:bg-[var(--bb-surface-2)]">
               <Link
                 href={`/admin/galleries/${encodeURIComponent(v.galleryId)}#anh-chinh-sua`}
-                className="flex flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-sm hover:bg-[var(--bb-surface-2)]"
+                className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-2 px-4 py-3 text-sm"
               >
                 <span>
                   <span className="font-medium">{hienTieuDeBoAnh(v.title)}</span>
@@ -99,6 +105,10 @@ export function AnhChinhSuaReport() {
                 </span>
                 <span className="text-xs text-[var(--bb-fg-muted)]">{formatNgayVN(v.luc)}</span>
               </Link>
+              <span className="shrink-0 pr-2">
+                <NutNhanKhach url={chatTheoBo[v.galleryId]} gonNho />
+              </span>
+              </div>
               <NhanNhaBoAnh nha={nha[v.galleryId]} className="px-4 pb-3" />
               {lamNhanh[v.galleryId] && (
                 <div className="px-4 pb-3">

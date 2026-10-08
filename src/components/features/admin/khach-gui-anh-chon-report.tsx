@@ -115,6 +115,8 @@ export function KhachGuiAnhChonReport() {
   const [dong, setDong] = React.useState<DongKhachGuiView[]>([]);
   const [canConfirm, setCanConfirm] = React.useState(false);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  /** BB-404 — link chat riêng của khách theo bộ (API trả kèm `chatTheoBo`). */
+  const [chatTheoBo, setChatTheoBo] = React.useState<Record<string, string | null>>({});
   /** BB-399 — bộ khách mua "Làm ảnh nhanh": nhãn + xếp lên đầu. */
   const [lamNhanh, setLamNhanh] = React.useState<Record<string, { soNgay: number; hanTra: string | null; uuTien?: boolean }>>({});
   const [dangMo, setDangMo] = React.useState<string | null>(null);
@@ -131,6 +133,7 @@ export function KhachGuiAnhChonReport() {
       setDong(json.data.boAnh ?? []);
       setCanConfirm(json.data.canConfirm === true);
       setNha(json.data.nha ?? {});
+      setChatTheoBo(json.data.chatTheoBo ?? {});
       setLamNhanh(json.data.lamNhanh ?? {});
     } catch {
       setError("Mất kết nối, thử lại giúp.");
@@ -198,6 +201,8 @@ export function KhachGuiAnhChonReport() {
                     />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* BB-404 — nhắn khách ngay trên dòng, không cần mở ngăn Xử lý. */}
+                    <NutNhanKhach url={chatTheoBo[d.galleryId]} gonNho />
                     <button
                       type="button"
                       data-testid="nut-xu-ly-viec"
@@ -515,10 +520,8 @@ export function NganXuLy({
             Xem đợt {m.soDot}
           </Link>
         ))}
-        <NutNhanKhach url={ct?.customerChatUrl} />
-        {ct && !ct.customerChatUrl && (
-          <span className="text-xs text-[var(--bb-fg-muted)]">Chưa có link chat với khách trên Lark.</span>
-        )}
+        {/* BB-404 — nút dùng chung: không có link → xám "Chưa có link chat" + gợi ý "Đồng bộ từ Lark". */}
+        {ct && <NutNhanKhach url={ct.customerChatUrl} />}
       </div>
     </div>
   );

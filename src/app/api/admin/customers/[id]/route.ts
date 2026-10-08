@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 import { UpdateCustomerSchema } from "../schema";
 
 export const runtime = "nodejs";
@@ -128,6 +129,8 @@ export async function GET(
         email: khach.email,
         zalo: khach.zalo,
         facebook: khach.facebook,
+        // BB-404 — link chat riêng (đã lọc http(s)) cho nút "Nhắn khách" ở ngăn hồ sơ.
+        chatUrl: linkChatKhach(khach.facebook),
         address: khach.address,
         note: khach.note,
         source: khach.source,

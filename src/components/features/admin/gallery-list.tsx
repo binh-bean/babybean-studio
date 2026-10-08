@@ -25,6 +25,7 @@ import {
 } from "@/lib/utils/dinh-dang";
 import { NutNhacKhach } from "./nut-nhac-khach";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { NutNhanKhach } from "./nut-nhan-khach";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 import type { MauCanhBao } from "@/lib/lark/trang-thai-hau-ky";
 import {
@@ -182,6 +183,8 @@ export interface GalleryItem {
   uuTien?: boolean;
   /** BB-399 — hạn trả ảnh chỉnh dự kiến (ISO); null khi chưa chốt. */
   hanTraDuKien?: string | null;
+  /** BB-404 — link chat riêng của khách; null = chưa có (icon xám "Chưa có link chat"). */
+  chatUrl?: string | null;
 }
 
 /**
@@ -452,16 +455,17 @@ function KanbanColumn({
             {xepLamNhanhLenDau(items, (i) => !!i.uuTien).map((item) => {
               const tenBeCot = item.babyName || item.babyFullName || null;
               return (
+                // BB-404 — icon "Nhắn khách" đặt NGOÀI liên kết cả thẻ (không lồng <a> trong <a>), ghim góc phải.
+                <div key={item.id} className="relative">
                 <Link
                   href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}
-                  key={item.id}
                   className="block group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] rounded-[var(--bb-radius-sm)]"
                 >
                   <Card
                     className="p-3 bg-[var(--bb-surface)] border border-[var(--bb-border)] rounded-[var(--bb-radius-sm)] shadow-xs group-hover:border-[var(--bb-primary)] group-hover:bg-[var(--bb-surface-2)]/30 transition-all space-y-2 cursor-pointer h-full"
                   >
                     {/* BB-326 — thẻ Kanban mang ảnh bìa nhỏ như hàng của bảng. */}
-                    <div className="flex items-start gap-2.5">
+                    <div className="flex items-start gap-2.5 pr-7">
                       <AnhBiaNho coverPhotoId={item.coverPhotoId} title={tieuDeBoAnh(item)} />
                       <div className="min-w-0">
                         <div className="font-semibold text-sm text-[var(--bb-fg)] group-hover:text-[var(--bb-primary)] transition-colors">
@@ -496,6 +500,10 @@ function KanbanColumn({
                     </div>
                   </Card>
                 </Link>
+                <div className="absolute right-1 top-1">
+                  <NutNhanKhach url={item.chatUrl} gonNho />
+                </div>
+                </div>
               );
             })}
             {hasMore && (
@@ -941,6 +949,8 @@ export function GalleryList() {
                           nhanh" đổi theo trạng thái (BB-303, bo-anh-danh-sach.png). */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {/* BB-404 — nhắn khách ngay trên dòng. */}
+                          <NutNhanKhach url={item.chatUrl} gonNho />
                           <Link href={`/admin/galleries/${encodeURIComponent(contractCodes[item.id] || item.id)}`}>
                             <Button
                               variant="ghost"
@@ -1073,6 +1083,8 @@ export function GalleryList() {
                         <Eye className="h-3.5 w-3.5 mr-1" /> Xem bộ ảnh
                       </Button>
                     </Link>
+                    {/* BB-404 — nhắn khách ngay trên thẻ. */}
+                    <NutNhanKhach url={item.chatUrl} gonNho />
                     <LamNhanh
                       item={item}
                       onCopyLink={() => void copyShareLink(item.id)}

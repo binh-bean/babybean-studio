@@ -28,6 +28,7 @@ import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
 import { docDongHauKy, LoiTraLark, duoiSoDienThoai } from "@/lib/lark/tra-hau-ky";
 import { noiKhoaKhachNeuTrong } from "@/lib/lark/noi-khoa-khach";
+import { ghiLinkChatNeuTrong } from "@/lib/lark/ghi-link-chat";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { boAnhTheoDongLark, boAnhTheoThuMuc } from "@/lib/gallery/bo-anh-da-co";
 import { timHoacTaoGoiLark } from "@/lib/gallery/goi-chup-lark";
@@ -36,6 +37,7 @@ import { docBangGiaRieng } from "@/lib/gallery/gia-goi-chup-server";
 import { giaAnhChonThemMacDinh } from "@/lib/gallery/gia-anh-chon-them";
 import { docLarkPhoto } from "@/lib/lark/photo-hau-ky";
 import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
+import { layLinkChatTheoBo } from "@/lib/lien-lac/link-chat-khach-server";
 import { chuaCoTenBe, catTrang, demTheoTrangThai } from "@/lib/gallery/loc-chua-ten-be";
 
 export const runtime = "nodejs";
@@ -273,6 +275,9 @@ export async function POST(request: Request): Promise<Response> {
           metadata: { ketQua: noi, cachKhop: "dong_hau_ky", larkHaukyRecordId: dong.recordId, ...(noi === "trung_khach" ? { canhBao: "co_the_trung_khach" } : {}) },
         });
       }
+      // BB-404 — link chat riêng của khách (ô "Chat với khách" của dòng Hậu Kỳ, chỉ phần URL)
+      // → `customers.facebook` khi còn trống; không đè link nhân viên đã sửa tay.
+      await ghiLinkChatNeuTrong(admin, khachMoi, dong.linkChat);
     }
 
 
@@ -577,6 +582,8 @@ export async function GET(request: Request): Promise<Response> {
     const nhaMap = await docNhaCuaCacBoKhongLoi(admin, idsTrangNay);
     // BB-399 — "Làm nhanh" + hạn trả dự kiến (bộ đã chốt). Lỗi đọc → Map rỗng, không nhãn.
     const hanTraMap = await layHanTraNhieuBo(admin, idsTrangNay);
+    // BB-404 — link chat riêng của khách cho icon "Nhắn khách" trên từng thẻ/dòng (một truy vấn cho cả trang).
+    const chatMap = await layLinkChatTheoBo(admin, idsTrangNay);
 
     const items = rawItems.map((raw) => {
       const item = raw as Record<string, unknown>;
@@ -609,6 +616,8 @@ export async function GET(request: Request): Promise<Response> {
         lamNhanh: hanTraMap.get(String(item.id))?.lamNhanh ?? false,
         uuTien: idsUuTien.has(String(item.id)),
         hanTraDuKien: hanTraMap.get(String(item.id))?.hanTra ?? null,
+        // BB-404 — null = khách chưa có link chat (icon xám).
+        chatUrl: chatMap[String(item.id)] ?? null,
       };
     });
 

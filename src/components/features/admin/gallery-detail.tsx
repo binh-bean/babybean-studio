@@ -56,6 +56,7 @@ import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./
 import { KhoiHoaDon } from "./khoi-hoa-don";
 import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
+import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 import { KhoiLinkBoAnhGiaDinh } from "./khoi-link-bo-anh-gia-dinh";
 import { KhoiLinkMoiNguoiThan } from "./khoi-link-moi-nguoi-than";
 import { NutKeoDongHopDong } from "./nut-keo-dong-hop-dong";
@@ -982,7 +983,7 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
                 {vi.admin.export.title} ↓
               </a>
             )}
-            {/* BB-331: "Nhắn khách" — mở link chat Lark ở tab mới; không có link thì ẩn. */}
+            {/* BB-331/BB-404: "Nhắn khách" — mở link chat Lark ở tab mới; chưa có link → nút xám + gợi ý "Đồng bộ từ Lark". */}
             <NutNhanKhach url={detail.customerChatUrl} />
             {/* BB-308: menu ⋯ gom các thao tác phụ; hành vi/API từng thao tác giữ nguyên. */}
             <MenuThaoTacPhu
@@ -2051,7 +2052,9 @@ function MenuThaoTacPhu({
     luaChonMoLai(detail.status, cacDotTomTat(detail)).duoc && detail.canReopen === true;
   const coTheGiaHan = quyen.guiLink && !!detail.shareLink && detail.shareLink.status !== "active";
   const coTheTaoLink = quyen.guiLink && !detail.customerId;
-  if (!quyen.suaThongTin && !quyen.dongBo && !quyen.guiLink && !coTheMoLai) return null;
+  // BB-404 — "Nhắn khách" cũng có trong menu ⋯ (cùng link với nút đầu trang).
+  const linkChat = linkChatKhach(detail.customerChatUrl);
+  if (!quyen.suaThongTin && !quyen.dongBo && !quyen.guiLink && !coTheMoLai && !linkChat) return null;
 
   return (
     <div ref={hopRef} className="relative shrink-0">
@@ -2071,6 +2074,19 @@ function MenuThaoTacPhu({
           aria-label="Thao tác khác"
           className="absolute right-0 z-20 mt-2 w-64 rounded-lg border border-[var(--bb-border)] bg-[var(--bb-surface)] p-1.5 shadow-lg"
         >
+          {linkChat && (
+            <a
+              role="menuitem"
+              href={linkChat}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="menu-nhan-khach"
+              onClick={() => setOpen(false)}
+              className="block w-full rounded-md px-3 py-2 text-left text-sm text-[var(--bb-fg)] hover:bg-[var(--bb-surface-2)]"
+            >
+              Nhắn khách
+            </a>
+          )}
           {quyen.dongBo && (
             <MenuMuc
               disabled={busy || !detail.driveFolderUrl}

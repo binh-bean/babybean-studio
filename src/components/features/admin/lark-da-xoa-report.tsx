@@ -15,6 +15,7 @@ import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { tenMeThat } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { NutNhanKhach } from "./nut-nhan-khach";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface Dong {
@@ -32,6 +33,8 @@ export function LarkDaXoaReport() {
   const [loi, setLoi] = React.useState<string | null>(null);
   const [dangLam, setDangLam] = React.useState<string | null>(null);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  /** BB-404 — link chat riêng của khách theo bộ (API trả kèm `chatTheoBo`). */
+  const [chatTheoBo, setChatTheoBo] = React.useState<Record<string, string | null>>({});
 
   const tai = React.useCallback(async () => {
     try {
@@ -44,6 +47,7 @@ export function LarkDaXoaReport() {
       setLoi(null);
       setItems(json.data.items ?? []);
       setNha(json.data.nha ?? {});
+      setChatTheoBo(json.data.chatTheoBo ?? {});
     } catch {
       setLoi("Mất kết nối, thử lại giúp.");
     }
@@ -99,6 +103,8 @@ export function LarkDaXoaReport() {
                 </p>
                 <NhanNhaBoAnh nha={nha[it.galleryId]} className="mt-1" />
               </div>
+              {/* BB-404 — nhắn khách ngay trên dòng. */}
+              <NutNhanKhach url={chatTheoBo[it.galleryId]} gonNho />
               <Button asChild variant="outline" size="sm">
                 <Link href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}>Mở bộ ảnh</Link>
               </Button>

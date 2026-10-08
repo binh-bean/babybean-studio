@@ -17,6 +17,7 @@ import { layDanhSachChoXacNhanDot, layDanhSachViecDot1 } from "@/lib/gallery/dot
 import { gomTheoBoAnh, layDot1ChoXacNhan } from "@/lib/gallery/khach-gui-anh-chon";
 import { layDatChinhSuaChoXuLy } from "@/lib/gallery/tim-gia-dinh-server";
 import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
+import { layLinkChatTheoBo } from "@/lib/lien-lac/link-chat-khach-server";
 
 export const runtime = "nodejs";
 
@@ -58,6 +59,8 @@ export async function GET(request: Request): Promise<Response> {
     const boAnh = gomTheoBoAnh(dot1, items, viecDot1, datChinhSua);
     // BB-394 — nhãn nhà (khách có ≥ 2 bộ): một lần đọc cho cả tab; lỗi thì bỏ nhãn.
     const nha = await docNhaCuaCacBoKhongLoi(admin, boAnh.map((d) => d.galleryId));
+    // BB-404 — link chat riêng của khách theo bộ (một truy vấn) cho icon "Nhắn khách" trên từng dòng.
+    const chatTheoBo = await layLinkChatTheoBo(admin, boAnh.map((d) => d.galleryId));
     // BB-399 — "Làm nhanh" + hạn trả dự kiến cho từng bộ (lỗi đọc → không nhãn).
     const hanTra = await layHanTraNhieuBo(admin, boAnh.map((d) => d.galleryId));
     const lamNhanh = Object.fromEntries(
@@ -66,6 +69,7 @@ export async function GET(request: Request): Promise<Response> {
 
     return ok({
       nha,
+      chatTheoBo,
       lamNhanh,
       // Không trả anh_ids (danh sách id ảnh) — hàng đợi chỉ cần số liệu; ảnh xem ở trang bộ ảnh.
       items: items.map((d) => ({

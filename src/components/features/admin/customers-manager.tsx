@@ -35,6 +35,7 @@ import { mauAvatarStyle } from "@/lib/utils/mau-avatar";
 import { vi } from "@/i18n/vi";
 import { Phone as PhoneIcon, Copy as CopyIcon } from "lucide-react";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
+import { NutNhanKhach } from "./nut-nhan-khach";
 
 const t = vi.admin.khachHang;
 
@@ -49,6 +50,8 @@ interface DongKhach {
   trungSdtChiNhanhKhac: boolean;
   /** BB-303 — tên bé đầu tiên của khách, cho dòng phụ "mẹ của Bé …". `null` = chưa có bé nào ghi nhận. */
   babyName: string | null;
+  /** BB-404 — link chat riêng của khách (null = chưa có → nút xám). */
+  chatUrl?: string | null;
 }
 
 interface Be {
@@ -87,6 +90,8 @@ interface ChiTiet {
     truongBiGhiDe: string[];
     /** BB-303 — tổng tiền mua thêm mọi bộ ảnh của khách (đã chốt). */
     tongMuaThem: number;
+    /** BB-404 — link chat riêng của khách (đã lọc http(s)). */
+    chatUrl?: string | null;
   };
   be: Be[];
   boAnh: BoAnh[];
@@ -268,11 +273,12 @@ export function CustomersManager({
           {/* Dưới `lg` mỗi khách là một thẻ — bảng năm cột không vừa 375px. */}
           <ul className="flex flex-col gap-2 lg:hidden">
             {items.map((k) => (
-              <li key={k.id}>
+              <li key={k.id} className="flex items-start gap-1 rounded-lg border border-[var(--bb-border)] hover:bg-[var(--bb-surface-2)]">
+                {/* BB-404 — nút "Nhắn khách" đứng NGOÀI nút mở hồ sơ (không lồng <a> trong <button>). */}
                 <button
                   type="button"
                   onClick={() => setDangMo(k.id)}
-                  className="w-full rounded-lg border border-[var(--bb-border)] p-3 text-left text-sm hover:bg-[var(--bb-surface-2)]"
+                  className="min-w-0 flex-1 p-3 text-left text-sm"
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-9 w-9 shrink-0">
@@ -315,6 +321,9 @@ export function CustomersManager({
                     </div>
                   </div>
                 </button>
+                <div className="shrink-0 p-2">
+                  <NutNhanKhach url={k.chatUrl} gonNho />
+                </div>
               </li>
             ))}
           </ul>
@@ -328,6 +337,9 @@ export function CustomersManager({
                   <th className="whitespace-nowrap py-2 pr-3 font-medium">{t.cot.chiNhanh}</th>
                   <th className="whitespace-nowrap py-2 pr-3 text-right font-medium">{t.cot.soBo}</th>
                   <th className="whitespace-nowrap py-2 pr-3 font-medium">{t.cot.ganNhat}</th>
+                  <th className="w-10 py-2 pr-3 font-medium">
+                    <span className="sr-only">Nhắn khách</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -382,6 +394,9 @@ export function CustomersManager({
                     <td className="py-2 pr-3">{k.branchName}</td>
                     <td className="py-2 pr-3 text-right tabular-nums">{formatSo(k.soBoAnh)}</td>
                     <td className="whitespace-nowrap py-2 pr-3 tabular-nums">{k.boAnhMoiNhat ? ngay(k.boAnhMoiNhat) : "—"}</td>
+                    <td className="py-1 pr-3">
+                      <NutNhanKhach url={k.chatUrl} gonNho />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -641,8 +656,10 @@ function HoSoKhach({
           {/* BB-303 (khach-hang.png) — "Gọi" mở app điện thoại; "Zalo" CHỈ
               hiện số để nhân viên tự chép rồi dán vào Zalo (không tự gửi gì —
               chưa có đường gửi Zalo trong app). Chỉ hiện khi có dữ liệu thật. */}
-          {!dangSua && (ct.khach.phone || ct.khach.zalo) && (
-            <div className="flex flex-wrap gap-2">
+          {/* BB-404 — "Nhắn khách" luôn có mặt ở ngăn hồ sơ (xám khi chưa có link chat). */}
+          {!dangSua && (
+            <div className="flex flex-wrap items-center gap-2">
+              <NutNhanKhach url={ct.khach.chatUrl} />
               {ct.khach.phone && (
                 <Button asChild variant="outline" size="sm">
                   <a href={`tel:${ct.khach.phone}`}>

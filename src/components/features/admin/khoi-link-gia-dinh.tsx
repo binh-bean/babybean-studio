@@ -230,7 +230,7 @@ export function KhoiLinkGiaDinhView(props: KhoiLinkGiaDinhViewProps) {
                 {T.chiaSe}
               </Button>
             )}
-            <NutNhanKhach url={p.chatUrl} />
+            <NutNhanKhach url={p.chatUrl} anKhiTrong />
           </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-[var(--bb-border)] pt-3">

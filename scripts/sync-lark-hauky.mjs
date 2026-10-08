@@ -514,7 +514,8 @@ async function main() {
         branchId,
         // Che: KHÔNG lấy "Tên KH", KHÔNG lấy nhãn text của ô link (là tên thư
         // mục, mang tên mẹ và tên bé). Mã hợp đồng vừa duy nhất vừa tra được bên Lark.
-        chatUrl: cellLink(f["Chat với khách"]) || null,
+        // BB-404: chỉ URL http(s) — ô này đi thẳng vào href nút "Nhắn khách".
+        chatUrl: ((u) => (/^https?:\/\/[^\s]+$/i.test(u) ? u : null))(String(cellLink(f["Chat với khách"]) ?? "").trim()),
         driveUrl: photoUrl,
         driveFolderId: folderId,
         folderKey: key,
@@ -635,8 +636,9 @@ async function main() {
            values ($1, $2, $3, $4, coalesce(nullif($5, ''), '0000000000'), $6)
            on conflict (lark_customer_key) where lark_customer_key is not null
            do update set
-             -- Link chat có thể đổi; tên bí danh thì không, nó dẫn xuất từ khoá.
-             facebook = coalesce(excluded.facebook, customers.facebook),
+             -- BB-404: link chat chỉ ghi khi đang TRỐNG — không đè link nhân viên
+             -- đã sửa tay (trước đây Lark luôn đè). Tên bí danh dẫn xuất từ khoá.
+             facebook = coalesce(nullif(btrim(customers.facebook), ''), excluded.facebook),
              full_name = excluded.full_name,
              phone = coalesce(nullif(excluded.phone, '0000000000'), customers.phone),
              note = excluded.note,

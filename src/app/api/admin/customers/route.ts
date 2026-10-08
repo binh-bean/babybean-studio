@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,7 @@ interface DongKhach {
   phone_normalized: string | null;
   branch_id: string;
   created_at: string;
+  facebook?: string | null;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -52,7 +54,7 @@ export async function GET(request: Request): Promise<Response> {
 
     let truyVan = admin
       .from("customers")
-      .select("id, full_name, phone, phone_normalized, branch_id, created_at", {
+      .select("id, full_name, phone, phone_normalized, branch_id, created_at, facebook", {
         count: "exact",
       })
       .in("branch_id", branchIds)
@@ -167,6 +169,8 @@ export async function GET(request: Request): Promise<Response> {
           trungSdtChiNhanhKhac: (demSo.get(String(k.phone_normalized))?.size ?? 0) > 1,
           // BB-303 — tên bé đầu tiên, cho dòng phụ "mẹ của Bé …". `null` = khách chưa có bé nào ghi nhận.
           babyName: beDauTien.get(k.id) ?? null,
+          // BB-404 — link chat riêng của khách (cùng truy vấn danh sách, không N+1) cho nút "Nhắn khách".
+          chatUrl: linkChatKhach(k.facebook),
         };
       }),
     });

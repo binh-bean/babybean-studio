@@ -21,6 +21,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, requirePermission, requireBranch, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 import { trangThaiBoAnh } from "@/lib/lark/trang-thai-app-lark";
 import { tomTatLuotGhe } from "@/lib/khach-hang/luot-ghe";
 import { tinhTongKhach } from "@/lib/khach-hang/tong-gia-tri";
@@ -213,7 +214,8 @@ export async function GET(
         id: khach.id,
         fullName: khach.full_name,
         phone: khach.phone,
-        chatUrl: khach.facebook,
+        // BB-404: chỉ trả URL http(s) hợp lệ.
+        chatUrl: linkChatKhach(khach.facebook),
         createdAt: khach.created_at,
         tuLark: khach.lark_customer_key !== null,
       },

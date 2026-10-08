@@ -934,7 +934,7 @@ function DongViec({ item, onLamMoi }: { item: ViecHomNayItem; onLamMoi: () => Pr
         <IconHan className="h-3.5 w-3.5" aria-hidden="true" />
         {han.text}
       </span>
-      {/* BB-331: "Nhắn khách" — link chat Lark, mở tab mới; không có link thì ẩn. */}
+      {/* BB-331/BB-404: "Nhắn khách" — link chat Lark, mở tab mới; không có link → icon xám. */}
       <NutNhanKhach url={item.customerChatUrl} gonNho />
       <NutLamNhanhViec item={item} dangXuLy={dangXuLy} onChuyenChinh={() => void chuyenChinh()} />
     </li>

@@ -21,10 +21,11 @@ import type { KetQuaBoAnhRong } from "@/lib/gallery/bo-anh-rong";
 import { NHAN_LY_DO, type LyDoChuaCoAnh } from "@/lib/gallery/phan-loai-hoa-don";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { NutNhanKhach } from "./nut-nhan-khach";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 function useBoAnhRong() {
-  const [data, setData] = React.useState<(KetQuaBoAnhRong & { nha?: Record<string, NhaCuaBo> }) | null>(null);
+  const [data, setData] = React.useState<(KetQuaBoAnhRong & { nha?: Record<string, NhaCuaBo>; chatTheoBo?: Record<string, string | null> }) | null>(null);
   const [loi, setLoi] = React.useState<string | null>(null);
   const tai = React.useCallback(async () => {
     try {
@@ -35,7 +36,7 @@ function useBoAnhRong() {
         return;
       }
       setLoi(null);
-      setData(json.data as KetQuaBoAnhRong & { nha?: Record<string, NhaCuaBo> });
+      setData(json.data as KetQuaBoAnhRong & { nha?: Record<string, NhaCuaBo>; chatTheoBo?: Record<string, string | null> });
     } catch {
       setLoi("Mất kết nối, thử lại giúp.");
     }
@@ -140,6 +141,8 @@ export function GoiChuaCoAnhReport() {
                     {dangDongBo === it.galleryId ? "Đang gửi…" : "Đồng bộ"}
                   </Button>
                 )}
+                {/* BB-404 — nhắn khách ngay trên dòng. */}
+                <NutNhanKhach url={data?.chatTheoBo?.[it.galleryId]} gonNho />
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}>Mở bộ ảnh</Link>
                 </Button>
@@ -210,6 +213,8 @@ export function DonHauKyReport() {
                   )}
                 </p>
               </div>
+              {/* BB-404 — nhắn khách ngay trên dòng. */}
+              <NutNhanKhach url={data?.chatTheoBo?.[it.galleryId]} gonNho />
               <Button asChild variant="outline" size="sm">
                 <Link href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}>Mở đơn</Link>
               </Button>

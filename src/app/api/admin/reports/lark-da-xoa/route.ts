@@ -17,6 +17,7 @@ import type { StaffSession } from "@/types/domain";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
+import { layLinkChatTheoBo } from "@/lib/lien-lac/link-chat-khach-server";
 
 export const runtime = "nodejs";
 
@@ -66,7 +67,9 @@ export async function GET(): Promise<Response> {
     }));
     // BB-394 — nhãn nhà (khách có ≥ 2 bộ); lỗi đọc thì bỏ nhãn, danh sách vẫn đủ.
     const nha = await docNhaCuaCacBoKhongLoi(createAdminClient(), items.map((i) => i.galleryId));
-    return ok({ items, nha });
+    // BB-404 — link chat riêng của khách theo bộ (một truy vấn) cho icon "Nhắn khách" trên từng dòng.
+    const chatTheoBo = await layLinkChatTheoBo(createAdminClient(), items.map((i) => i.galleryId));
+    return ok({ items, nha, chatTheoBo });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);
     return failUnexpected(err, requestId);

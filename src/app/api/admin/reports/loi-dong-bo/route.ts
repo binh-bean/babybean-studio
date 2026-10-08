@@ -37,6 +37,7 @@ import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
+import { layLinkChatTheoBo } from "@/lib/lien-lac/link-chat-khach-server";
 
 export const runtime = "nodejs";
 
@@ -165,8 +166,12 @@ export async function GET(): Promise<Response> {
       groups.flatMap((g) => g.items.map((i) => i.galleryId)),
     );
 
+    // BB-404 — link chat riêng của khách theo bộ (một truy vấn) cho icon "Nhắn khách" trên từng dòng.
+    const chatTheoBo = await layLinkChatTheoBo(admin, groups.flatMap((g) => g.items.map((i) => i.galleryId)));
+
     return ok({
       nha,
+      chatTheoBo,
       summary: {
         galleryCount,
         reasonCount: groups.length,

@@ -17,6 +17,7 @@ import { docDongHauKy, LoiTraLark } from "@/lib/lark/tra-hau-ky";
 import { boAnhTheoDongLark } from "@/lib/gallery/bo-anh-da-co";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { noiKhoaKhachNeuTrong } from "@/lib/lark/noi-khoa-khach";
+import { ghiLinkChatNeuTrong } from "@/lib/lark/ghi-link-chat";
 
 export const runtime = "nodejs";
 // BB-331: kéo dòng hợp đồng từ Lark ngay sau khi gắn (3–9 giây, đo 30/09).
@@ -103,6 +104,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         metadata: { ketQua: noi, cachKhop: "dong_hau_ky", larkHaukyRecordId: dong.recordId, ...(noi === "trung_khach" ? { canhBao: "co_the_trung_khach" } : {}) },
       });
     }
+    // BB-404 — link chat riêng của khách từ dòng Hậu Kỳ vừa gắn → `customers.facebook` khi còn trống.
+    await ghiLinkChatNeuTrong(admin, gal.customer_id as string | null, dong.linkChat);
 
 
     // BB-331: gắn xong là kéo luôn dòng hợp đồng + hạn mức từ hóa đơn Lark —

@@ -26,6 +26,7 @@ import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { tenMeThat } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { NutNhanKhach } from "./nut-nhan-khach";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface DongYeuCau {
@@ -47,6 +48,8 @@ export function YeuCauMoLaiReport() {
   const [items, setItems] = React.useState<DongYeuCau[]>([]);
   const [canReopen, setCanReopen] = React.useState(false);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  /** BB-404 — link chat riêng của khách theo bộ (API trả kèm `chatTheoBo`). */
+  const [chatTheoBo, setChatTheoBo] = React.useState<Record<string, string | null>>({});
 
   const tai = React.useCallback(async (alive: () => boolean = () => true) => {
     try {
@@ -61,6 +64,7 @@ export function YeuCauMoLaiReport() {
       setItems(json.data.items ?? []);
       setCanReopen(json.data.canReopen === true);
       setNha(json.data.nha ?? {});
+      setChatTheoBo(json.data.chatTheoBo ?? {});
     } catch {
       if (alive()) setError("Mất kết nối, thử lại giúp.");
     } finally {
@@ -99,13 +103,17 @@ export function YeuCauMoLaiReport() {
           {items.map((it) => (
             <li key={it.galleryId} data-testid="dong-yeu-cau-mo-lai" className="flex flex-col gap-1.5">
               <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                <Link
-                  href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}
-                  className="font-medium text-[var(--bb-fg)] underline-offset-2 hover:underline"
-                >
-                  {/* BB-325 — tiêu đề là tên mẹ; không có thì tên bộ. */}
-                  {tenMeThat(it.customerName) || hienTieuDeBoAnh(it.title)}
-                </Link>
+                <span className="inline-flex items-center gap-1">
+                  <Link
+                    href={`/admin/galleries/${encodeURIComponent(it.galleryId)}`}
+                    className="font-medium text-[var(--bb-fg)] underline-offset-2 hover:underline"
+                  >
+                    {/* BB-325 — tiêu đề là tên mẹ; không có thì tên bộ. */}
+                    {tenMeThat(it.customerName) || hienTieuDeBoAnh(it.title)}
+                  </Link>
+                  {/* BB-404 — nhắn khách ngay trên dòng. */}
+                  <NutNhanKhach url={chatTheoBo[it.galleryId]} gonNho />
+                </span>
                 <span className="text-xs text-[var(--bb-fg-muted)]">
                   {[tenMeThat(it.customerName) ? hienTieuDeBoAnh(it.title) : null, it.branchName].filter(Boolean).join(" · ")}
                 </span>

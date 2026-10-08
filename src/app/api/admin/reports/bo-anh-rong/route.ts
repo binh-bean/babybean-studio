@@ -10,6 +10,7 @@ import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { layBoAnhRong } from "@/lib/gallery/bo-anh-rong";
 import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
+import { layLinkChatTheoBo } from "@/lib/lien-lac/link-chat-khach-server";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,9 @@ export async function GET(): Promise<Response> {
     const kq = await layBoAnhRong(admin, branchIds);
     // BB-394 — nhãn nhà cho cả hai tab (gói chưa có ảnh + đơn hậu kỳ), một lần đọc.
     const nha = await docNhaCuaCacBoKhongLoi(admin, [...kq.goiChuaCoAnh, ...kq.donHauKy].map((d) => d.galleryId));
-    return ok({ ...kq, nha });
+    // BB-404 — link chat riêng của khách theo bộ (một truy vấn) cho icon "Nhắn khách" trên từng dòng.
+    const chatTheoBo = await layLinkChatTheoBo(admin, [...kq.goiChuaCoAnh, ...kq.donHauKy].map((d) => d.galleryId));
+    return ok({ ...kq, nha, chatTheoBo });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);
     return failUnexpected(err, requestId);

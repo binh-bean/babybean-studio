@@ -41,6 +41,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { docNhaCuaCacBoKhongLoi } from "@/lib/gia-dinh/nha-cua-bo";
+import { layLinkChatTheoBo } from "@/lib/lien-lac/link-chat-khach-server";
 
 export const runtime = "nodejs";
 
@@ -152,7 +153,9 @@ export async function GET(request: Request): Promise<Response> {
 
     // BB-394 — nhãn nhà (khách có ≥ 2 bộ); lỗi đọc thì bỏ nhãn, danh sách vẫn đủ.
     const nha = await docNhaCuaCacBoKhongLoi(admin, items.map((i) => i.galleryId));
-    return ok({ soNgay, tong, items, nha });
+    // BB-404 — link chat riêng của khách theo bộ (một truy vấn) cho icon "Nhắn khách" trên từng dòng.
+    const chatTheoBo = await layLinkChatTheoBo(admin, items.map((i) => i.galleryId));
+    return ok({ soNgay, tong, items, nha, chatTheoBo });
   } catch (err) {
     return failUnexpected(err, requestId);
   }

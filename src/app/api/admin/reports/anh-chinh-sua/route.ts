@@ -15,6 +15,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CAC_QUYEN_GUI_KHACH_DUYET, coMotTrongCacQuyen } from "@/lib/auth/quyen-xem-bo-anh";
 import { layViecAnhChinh } from "@/lib/anh-chinh-sua/viec-can-lam";
 import { docNhaCuaCacBo } from "@/lib/gia-dinh/nha-cua-bo";
+import { layLinkChatTheoBo } from "@/lib/lien-lac/link-chat-khach-server";
 
 export const runtime = "nodejs";
 
@@ -47,7 +48,9 @@ export async function GET(request: Request): Promise<Response> {
     const lamNhanh = Object.fromEntries(
       [...hanTra].filter(([, h]) => h.lamNhanh).map(([id, h]) => [id, { soNgay: h.soNgay, hanTra: h.hanTra, uuTien: h.uuTien }]),
     );
-    return ok({ items, nha, lamNhanh, coTheGui: coMotTrongCacQuyen(staff.permissions, CAC_QUYEN_GUI_KHACH_DUYET) });
+    // BB-404 — link chat riêng của khách theo bộ (một truy vấn) cho icon "Nhắn khách" trên từng dòng.
+    const chatTheoBo = await layLinkChatTheoBo(admin, items.map((v) => v.galleryId));
+    return ok({ items, nha, chatTheoBo, lamNhanh, coTheGui: coMotTrongCacQuyen(staff.permissions, CAC_QUYEN_GUI_KHACH_DUYET) });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);
     return failUnexpected(err, requestId);

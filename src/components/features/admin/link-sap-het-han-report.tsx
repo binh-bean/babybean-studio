@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { NutNhanKhach } from "./nut-nhan-khach";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface Item {
@@ -69,6 +70,8 @@ export function LinkSapHetHanReport() {
   const [tong, setTong] = React.useState<Tong | null>(null);
   const [items, setItems] = React.useState<Item[]>([]);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  /** BB-404 — link chat riêng của khách theo bộ (API trả kèm `chatTheoBo`). */
+  const [chatTheoBo, setChatTheoBo] = React.useState<Record<string, string | null>>({});
 
   React.useEffect(() => {
     let alive = true;
@@ -86,6 +89,7 @@ export function LinkSapHetHanReport() {
         setTong(json.data.tong);
         setItems(json.data.items);
         setNha(json.data.nha ?? {});
+        setChatTheoBo(json.data.chatTheoBo ?? {});
       } catch {
         if (alive) setError("Mất kết nối, thử lại giúp.");
       } finally {
@@ -184,14 +188,18 @@ export function LinkSapHetHanReport() {
                 </div>
 
                 {/* Số điện thoại lên hàng đầu và bấm gọi được ngay. */}
-                {it.customerPhone && (
-                  <a
-                    href={`tel:${it.customerPhone}`}
-                    className="mt-1 inline-block font-mono text-sm underline underline-offset-2"
-                  >
-                    {it.customerPhone}
-                  </a>
-                )}
+                <div className="mt-1 flex items-center gap-2">
+                  {it.customerPhone && (
+                    <a
+                      href={`tel:${it.customerPhone}`}
+                      className="inline-block font-mono text-sm underline underline-offset-2"
+                    >
+                      {it.customerPhone}
+                    </a>
+                  )}
+                  {/* BB-404 — nhắn khách ngay trên dòng. */}
+                  <NutNhanKhach url={chatTheoBo[it.galleryId]} gonNho />
+                </div>
 
                 <div className="mt-1 text-xs text-[var(--bb-fg-muted)]">
                   {hienTieuDeBoAnh(it.galleryTitle)} · {it.branchName ?? "—"}
@@ -232,12 +240,15 @@ export function LinkSapHetHanReport() {
                     </Badge>
                   </td>
                   <td className="py-2 pr-3">
-                    <Link
-                      href={`/admin/galleries/${it.galleryId}`}
-                      className="underline underline-offset-2"
-                    >
-                      {it.customerName ?? "—"}
-                    </Link>
+                    <span className="inline-flex items-center gap-1">
+                      <Link
+                        href={`/admin/galleries/${it.galleryId}`}
+                        className="underline underline-offset-2"
+                      >
+                        {it.customerName ?? "—"}
+                      </Link>
+                      <NutNhanKhach url={chatTheoBo[it.galleryId]} gonNho />
+                    </span>
                   </td>
                   {/* Bấm được: CSKH mở bảng này trên điện thoại ở quầy. */}
                   <td className="py-2 pr-3">

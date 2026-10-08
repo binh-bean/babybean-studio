@@ -38,6 +38,7 @@ import { TheSoLieu } from "./the-so-lieu";
 import { formatNgayGioVN, formatSo } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { NutNhanKhach } from "./nut-nhan-khach";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface LoiItem {
@@ -89,6 +90,8 @@ export function LoiDongBoReport() {
   const [summary, setSummary] = React.useState<TomTat | null>(null);
   const [groups, setGroups] = React.useState<NhomLoi[]>([]);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  /** BB-404 — link chat riêng của khách theo bộ (API trả kèm `chatTheoBo`). */
+  const [chatTheoBo, setChatTheoBo] = React.useState<Record<string, string | null>>({});
   const [dangThuLai, setDangThuLai] = React.useState<Set<string>>(new Set());
   const [ketQua, setKetQua] = React.useState<Record<string, TrangThaiThuLai>>({});
   const [loiThuLai, setLoiThuLai] = React.useState<string | null>(null);
@@ -106,6 +109,7 @@ export function LoiDongBoReport() {
       setSummary(json.data.summary);
       setGroups(json.data.groups);
       setNha(json.data.nha ?? {});
+      setChatTheoBo(json.data.chatTheoBo ?? {});
       setError(null);
       // Xoá dấu "đã gửi yêu cầu" của lượt trước. Bộ nào còn nằm đây sau khi
       // tải lại nghĩa là lần thử đó KHÔNG ăn thua, nên phải trả lại nút Thử
@@ -313,14 +317,17 @@ export function LoiDongBoReport() {
                     {it.branchName} · {it.statusLabel} · {formatDateTime(it.lastSyncedAt)}
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2">
-                    <a
-                      href={it.driveFolderUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-[var(--bb-primary)] underline underline-offset-4"
-                    >
-                      Mở thư mục
-                    </a>
+                    <span className="flex items-center gap-2">
+                      <a
+                        href={it.driveFolderUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-[var(--bb-primary)] underline underline-offset-4"
+                      >
+                        Mở thư mục
+                      </a>
+                      <NutNhanKhach url={chatTheoBo[it.galleryId]} gonNho />
+                    </span>
                     <TrangThaiNut
                       dangChay={dangThuLai.has(it.galleryId)}
                       ketQua={ketQua[it.galleryId]}
@@ -372,11 +379,14 @@ export function LoiDongBoReport() {
                         </a>
                       </td>
                       <td className="py-2 text-right">
-                        <TrangThaiNut
-                          dangChay={dangThuLai.has(it.galleryId)}
-                          ketQua={ketQua[it.galleryId]}
-                          onClick={() => void thuLai([it])}
-                        />
+                        <span className="inline-flex items-center gap-1">
+                          <NutNhanKhach url={chatTheoBo[it.galleryId]} gonNho />
+                          <TrangThaiNut
+                            dangChay={dangThuLai.has(it.galleryId)}
+                            ketQua={ketQua[it.galleryId]}
+                            onClick={() => void thuLai([it])}
+                          />
+                        </span>
                       </td>
                     </tr>
                   ))}
