@@ -94,7 +94,41 @@ export async function layHoacTaoLuotChon(
     if (daTao) return daTao;
   }
   if (error || !taoMoi) throw error ?? new Error("Tạo lượt chọn không trả về gì");
+  await ghiMocKhachMoBoAnh(admin, args.galleryId);
   return taoMoi.id as string;
+}
+
+/**
+ * BB-402 — mốc "khách đã mở bộ ảnh" cho bộ đi qua link GIA ĐÌNH.
+ *
+ * Lỗi anh báo 08/10 (bộ HD_20260924#5261): khách đã chọn và chốt mà `galleries.sent_at`
+ * và `first_viewed_at` đều NULL. Nguyên nhân: `sent_at` chỉ được ghi ở route CSKH "Tạo
+ * link gửi khách" (`/api/admin/galleries/[id]/share-link`). Bộ mới của khách ĐÃ có link
+ * gia đình (`/k/<mã>`) không bao giờ đi qua route đó — link gia đình tạo theo khách,
+ * không theo bộ — nên không đường nào đặt mốc; còn `first_viewed_at` thì chưa từng có
+ * đường ghi (xem `bao-cao/dieu-hanh/cong-thuc.ts`).
+ *
+ * Lượt chọn được TẠO đúng lúc một người cầm link mở bộ lần đầu (đầu tệp), nên đây là
+ * chỗ đặt mốc: `first_viewed_at` nếu đang trống; `sent_at` nếu đang trống (bộ đã tới tay
+ * gia đình muộn nhất là lúc này). Chỉ ghi khi đang NULL — không ghi đè mốc gửi link
+ * của CSKH. KHÔNG đặt `due_at` (hạn chốt tự huỷ bộ ảnh — việc đó thuộc nút của CSKH).
+ *
+ * Không bao giờ ném: hụt mốc chỉ làm báo cáo thiếu một dòng, không được chặn ba mẹ mở ảnh.
+ */
+export async function ghiMocKhachMoBoAnh(admin: SupabaseClient, galleryId: string): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    const [xem, gui] = await Promise.all([
+      admin.from("galleries").update({ first_viewed_at: now }).eq("id", galleryId).is("first_viewed_at", null),
+      admin.from("galleries").update({ sent_at: now }).eq("id", galleryId).is("sent_at", null),
+    ]);
+    const loi = xem?.error ?? gui?.error;
+    if (loi) console.error(JSON.stringify({ evt: "gallery.moc_mo_bo_anh_hut", galleryId, lyDo: loi.message }));
+  } catch (err) {
+    console.error(
+      JSON.stringify({ evt: "gallery.moc_mo_bo_anh_hut", galleryId, lyDo: err instanceof Error ? err.message : String(err) }),
+    );
+  }
 }
 
 async function timLuotDaCo(

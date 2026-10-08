@@ -320,6 +320,8 @@ interface Detail {
   sessionType: string | null;
   /** BB-200 (3/3) — nhãn quản trị đã tính từ trạng thái app + mã Lark. */
   statusLabel?: string;
+  /** BB-402 — câu + bước ba mẹ đang thấy trên màn khách (`tienDoHaiMan`). */
+  khachDangThay?: { cau: string; buoc: string | null };
   /** Mức cảnh báo từ Lark; null = chưa đọc được hoặc không áp dụng. */
   warningColor?: MauCanhBao | null;
   /** Tên trạng thái bên Lark (TRANG_THAI_LARK), để dòng "Lark: …". */
@@ -956,6 +958,13 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
                 <NutChepMa ma={detail.contractCodes.join(" + ")} />
               </span>
             )}
+            {/* BB-402 — đúng điều ba mẹ đang thấy (cùng hàm `tienDoHaiMan` với màn khách). */}
+            {detail.khachDangThay && (
+              <span data-testid="khach-dang-thay" className="mt-1 block text-xs">
+                Khách đang thấy: {detail.khachDangThay.buoc ? `${detail.khachDangThay.buoc} · ` : ""}
+                {detail.khachDangThay.cau}
+              </span>
+            )}
             {/* BB-200: dòng "Lark: …" nằm trong khối Nhật ký ở cột phải (DongThoiGianHoatDong), không ở đây. */}
           </>
         }
@@ -1308,7 +1317,7 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
               <h2 className="text-base font-medium">{vi.admin.export.title}</h2>
               {/* BB-327 (chủ studio 29/09): hiện CHỮ ngay trong app + nút Chép, chỉ
                   ảnh đã chọn — không cần tải tệp nữa. */}
-              <DanhSachAnhChon galleryId={galleryId} soAnh={detail.selectedCount} />
+              <DanhSachAnhChon galleryId={galleryId} soAnh={detail.selectedCount} dotChon={detail.dotChon} />
             </section>
           )}
 

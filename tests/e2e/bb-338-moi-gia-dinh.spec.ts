@@ -164,41 +164,18 @@ test.describe("BB-338: mời gia đình + người được mời + thanh tiến
       if (the) window.scrollTo(0, the.getBoundingClientRect().top + window.scrollY - 120);
     });
     await page.getByRole("button", { name: "Mua ảnh in, album in ảnh" }).click();
-    const man = page.getByTestId("man-mua-them-sau-duyet");
+    // BB-400 vòng 2 — màn mua của gia đình nay THAY cả trang, dùng CHUNG lưới + xem lớn + cửa
+    // hàng (không còn danh sách một cột + tấm chọn ảnh riêng của BB-338).
+    const man = page.getByTestId("man-mua-gia-dinh");
     await expect(man).toBeVisible();
-    const dongSp = man.getByTestId("dong-san-pham-mua-them");
-    const soDong = await dongSp.count();
-    test.skip(soDong === 0, "Bảng giá bb-dev không có ảnh in đang bán");
-    const xs = new Set<number>();
-    for (let i = 0; i < Math.min(soDong, 4); i++) xs.add(Math.round((await dongSp.nth(i).boundingBox())!.x));
-    expect(xs.size, "danh sách phải là MỘT cột").toBe(1);
+    await expect(man.getByTestId("the-anh").first()).toBeVisible();
+    // Tim gia đình đi theo sang màn mua (tấm đã thả tim ở trên).
+    await expect(man.getByRole("button", { name: "Bỏ chọn" })).toHaveCount(1);
+    await expect(man.getByTestId("nut-gui-mua-gia-dinh")).toBeDisabled();
     await page.screenshot({ path: `${THU_MUC_ANH}/2d-mua-them-gon-390.png` });
 
-    // 2e — mở tấm chọn, chọn rồi HUỶ → không còn gì trong giỏ.
-    await dongSp.first().getByRole("button", { name: "Chọn ảnh" }).click();
-    const tam = page.getByTestId("tam-chon-anh-mua-them");
-    await expect(tam).toBeVisible();
-    await expect(tam.getByRole("button", { name: "Tấm đã thả tim (1)" })).toBeVisible();
-    await tam.getByTestId("o-anh-mua-them").first().click();
-    await expect(tam.getByTestId("o-anh-mua-them").first()).toHaveAttribute("aria-pressed", "true");
-    await page.screenshot({ path: `${THU_MUC_ANH}/2e-tam-chon-anh-390.png` });
-    await tam.getByRole("button", { name: "Huỷ chọn ảnh" }).click();
-    await expect(tam).toHaveCount(0);
-    await expect(man.getByRole("button", { name: "Gửi yêu cầu cho Bean" })).toBeDisabled();
-
-    // Chọn lại, bấm Xong → dòng sản phẩm báo "Đã chọn 1 tấm".
-    await dongSp.first().getByRole("button", { name: "Chọn ảnh" }).click();
-    await tam.getByTestId("o-anh-mua-them").first().click();
-    await tam.getByRole("button", { name: /^Xong/ }).click();
-    await expect(dongSp.first()).toContainText("Đã chọn 1 tấm");
-
-    // Back của điện thoại: lớp trong (tấm chọn) đóng trước, rồi tới màn mua thêm — không văng khỏi bộ ảnh.
+    // Back của điện thoại: đóng màn mua — không văng khỏi bộ ảnh.
     const urlBoAnh = page.url();
-    await dongSp.first().getByRole("button", { name: "Sửa ảnh" }).click();
-    await expect(tam).toBeVisible();
-    await page.goBack();
-    await expect(tam).toHaveCount(0);
-    await expect(man).toBeVisible();
     await page.goBack();
     await expect(man).toHaveCount(0);
     expect(page.url()).toBe(urlBoAnh);

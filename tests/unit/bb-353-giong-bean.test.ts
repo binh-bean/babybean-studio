@@ -60,6 +60,10 @@ const KHONG_PHAI_LOI_BEAN = new Set([
   "gallery.giaDinh.albumGiaDinh",
   // BB-378 — TIÊU ĐỀ lời mời lưu app (nói lợi ích), không phải câu; câu đi kèm (`luuApp.loiIch`) kết "ạ".
   "gallery.luuApp.tieuDe",
+  // BB-402 vòng 2 — NHÃN CHIP lọc ("Gia đình thích · 3"), không phải câu: phép thử coi là câu
+  // chỉ vì có chữ "gia đình". Thêm "ạ" vào nhãn chip là sai kiểu chữ; chip cùng tên dùng ở
+  // đợt 1 và màn đợt N (BB-400 `chipLocLuotChon`, e2e bb-345/bb-400 khớp /^Gia đình thích/).
+  "gallery.locGiaDinhThich",
 ]);
 
 function phang(obj: unknown, tien = ""): [string, string][] {

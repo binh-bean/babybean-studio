@@ -184,8 +184,8 @@ test("(c) gia đình mở link mời — 390: không 'tấm trong gói', chip �
     if (the) window.scrollTo(0, the.getBoundingClientRect().top + window.scrollY - 120);
   });
   await thanh.getByRole("button", { name: "Mua ảnh in, album in ảnh" }).click();
-  await expect(page.getByTestId("man-mua-them-sau-duyet")).toBeVisible();
+  await expect(page.getByTestId("man-mua-gia-dinh")).toBeVisible();
   await page.goBack();
-  await expect(page.getByTestId("man-mua-them-sau-duyet")).toHaveCount(0);
+  await expect(page.getByTestId("man-mua-gia-dinh")).toHaveCount(0);
   expect(page.url()).toBe(url);
 });

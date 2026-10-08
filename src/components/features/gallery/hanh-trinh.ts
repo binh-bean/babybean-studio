@@ -1,4 +1,4 @@
-import { trangThaiKhach } from "@/lib/lark/trang-thai-app-lark";
+import { trangThaiKhach, type MaTrangThaiBoAnh } from "@/lib/lark/trang-thai-app-lark";
 import type { KhoiVungDuyet } from "@/lib/anh-chinh-sua/vong-duyet";
 import { vi } from "@/i18n/vi";
 
@@ -15,28 +15,44 @@ export type TenTranh =
   | "link-het-han";
 
 /**
+ * BB-402 — tranh + bước của thẻ hành trình ĐỌC TỪ `trangThaiKhach()` (cùng hàm của
+ * bìa, tiêu đề thẻ, màn quản trị qua `trangThaiBoAnh`), không tự suy lại từ
+ * status/giai đoạn như trước.
+ *
+ * Lỗi anh báo 08/10: hai bảng tự suy riêng lệch nhau — `approved` (ba mẹ đã duyệt,
+ * chờ in) rơi vào tranh "duyệt" + bước "Duyệt ảnh", Lark "Đã chốt chưa in" (GĐ7)
+ * cũng thế, trong khi `trangThaiKhach` nói "Ảnh đã chốt, Bean đang chuẩn bị in"
+ * (bước "In & giao"). Nay một bảng theo MÃ trạng thái, đọc một lần.
+ */
+const HANH_TRINH_THEO_MA: Record<MaTrangThaiBoAnh, { buoc: number; tranh: TenTranh | null }> = {
+  moi_nhap: { buoc: 0, tranh: null },
+  dang_tai: { buoc: 0, tranh: null },
+  loi_tai: { buoc: 0, tranh: null },
+  cho_tao_link: { buoc: 0, tranh: null },
+  san_sang: { buoc: 0, tranh: null },
+  cho_khach_chon: { buoc: 0, tranh: null },
+  cho_studio_xac_nhan: { buoc: 0, tranh: "chot-thanh-cong" },
+  da_chon_hinh: { buoc: 1, tranh: "tien-do-ghi-nhan" },
+  dang_chinh_sua: { buoc: 2, tranh: "tien-do-chinh-sua" },
+  leader_kiem: { buoc: 2, tranh: "tien-do-chinh-sua" },
+  cho_khach_duyet: { buoc: 3, tranh: "tien-do-duyet" },
+  // Ba mẹ đã xin sửa: thợ đang làm lại — thanh ở "Đang chỉnh" (như trước BB-402).
+  dang_sua_theo_yeu_cau: { buoc: 2, tranh: "tien-do-chinh-sua" },
+  da_chot_cho_in: { buoc: 4, tranh: "tien-do-in" },
+  dang_in: { buoc: 4, tranh: "tien-do-in" },
+  hinh_da_ve: { buoc: 4, tranh: "tien-do-da-ve" },
+  da_giao: { buoc: 4, tranh: "tien-do-da-giao" },
+  da_cham_soc: { buoc: 4, tranh: "tien-do-da-giao" },
+  het_han: { buoc: 0, tranh: null },
+  luu_tru: { buoc: 0, tranh: null },
+};
+
+/**
  * Ánh xạ trạng thái bộ ảnh sang tên tranh hành trình.
  */
 export function tranhHanhTrinh(status: string, giaiDoan: number | null, photoCount: number = -1): TenTranh | null {
   if (photoCount === 0) return "chua-co-anh";
-  
-  if (status === "awaiting_approval") return "tien-do-duyet";
-  if (status === "delivered") return "tien-do-da-giao";
-  
-  if (giaiDoan === 2) return "tien-do-ghi-nhan";
-  if (giaiDoan === 3 || giaiDoan === 4 || giaiDoan === 6) return "tien-do-chinh-sua";
-  if (giaiDoan === 5 || giaiDoan === 7) return "tien-do-duyet";
-  if (giaiDoan === 8) return "tien-do-in";
-  if (giaiDoan === 9) return "tien-do-da-ve";
-  if (giaiDoan === 10 || giaiDoan === 11) return "tien-do-da-giao";
-
-  if (status === "submitted") return "chot-thanh-cong";
-  if (status === "in_retouch") return "tien-do-chinh-sua";
-  if (status === "approved") return "tien-do-duyet";
-  
-  if (status === "ready" || status === "in_review") return null;
-
-  return null;
+  return HANH_TRINH_THEO_MA[trangThaiKhach(status, giaiDoan).ma].tranh;
 }
 
 /**
@@ -122,30 +138,7 @@ export interface HanhTrinhInfo {
 export const BUOC_HANH_TRINH = ["Chờ xác nhận", "Chờ chỉnh", "Đang chỉnh", "Duyệt ảnh", "In/nhận ảnh"] as const;
 
 export function buocHanhTrinh(status: string, giaiDoan: number | null): HanhTrinhInfo {
-  const buoc = [...BUOC_HANH_TRINH];
-  let hienTai = 0;
-
-  if (status === "awaiting_approval") {
-    hienTai = 3;
-  } else if (status === "delivered") {
-    hienTai = 4;
-  } else if (giaiDoan != null) {
-    // Máy chủ (`nhanHienThi`) chỉ gửi giai đoạn khi CSKH đã xác nhận hoặc Lark
-    // đã sang "Đã chọn hình" trở lên; giai đoạn 1 ("Đã gửi file gốc") coi như 2.
-    if (giaiDoan <= 2) hienTai = 1;
-    else if (giaiDoan === 3 || giaiDoan === 4 || giaiDoan === 6) hienTai = 2;
-    else if (giaiDoan === 5 || giaiDoan === 7) hienTai = 3;
-    else hienTai = 4;
-  } else if (status === "submitted") {
-    hienTai = 0;
-  } else if (status === "in_retouch") {
-    // CSKH đã xác nhận, chưa có tin Lark "Đang làm" → đang xếp hàng.
-    hienTai = 1;
-  } else if (status === "approved") {
-    hienTai = 3;
-  }
-
-  return { buoc, hienTai };
+  return { buoc: [...BUOC_HANH_TRINH], hienTai: HANH_TRINH_THEO_MA[trangThaiKhach(status, giaiDoan).ma].buoc };
 }
 
 /**

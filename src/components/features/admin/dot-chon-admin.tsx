@@ -5,7 +5,7 @@
  * OWNER: DEV-FE. Task BB-321. Chủ studio 29/09/2026: sau khi đợt 1 chốt và được
  * xác nhận, khách MUA THÊM ảnh theo từng đợt (đợt 2, 3, …). CSKH cần thấy:
  *   · "Khách mua thêm đợt N: X ảnh · Y ₫" kèm hai nút Xác nhận / Từ chối (lý do);
- *   · ảnh theo TỪNG đợt, và tải danh sách "chỉ đợt N" cho thợ chỉnh ảnh.
+ *   · ảnh theo TỪNG đợt, và xem + chép danh sách "chỉ đợt N" cho thợ chỉnh ảnh (BB-403: hiện trên trang, không tải tệp).
  *
  * Tách THÀNH COMPONENT RIÊNG (không viết thẳng vào `gallery-detail.tsx`): cùng
  * lý do với `yeu-cau-mo-lai-banner.tsx` — file đó đang được nhiều đội sửa. File
@@ -21,6 +21,7 @@
 import React from "react";
 import { formatGioVN, formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
+import { moDanhSachDot } from "@/lib/gallery/danh-sach-theo-dot";
 
 export interface DotQuanTriView {
   soDot: number;
@@ -236,7 +237,6 @@ export function DotChonQuanTri({
   onDone: () => void | Promise<void>;
 }) {
   if (!dotChon || dotChon.length === 0) return null;
-  const co = encodeURIComponent(galleryId);
   const choXacNhan = dotChon.filter((d) => d.trangThai === "cho_xac_nhan");
 
   return (
@@ -248,7 +248,7 @@ export function DotChonQuanTri({
       <h2 className="text-base font-medium">Đợt chọn</h2>
       <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
         Ảnh khách chọn theo từng đợt. Đợt 2 trở đi là ảnh khách mua thêm — thợ chỉnh ảnh chỉ cần làm
-        đợt mới (tải &ldquo;chỉ đợt N&rdquo;). Cập nhật hợp đồng bên Lark bằng tay sau khi xác nhận.
+        đợt mới (bấm &ldquo;Xem danh sách đợt N&rdquo; để xem và chép). Cập nhật hợp đồng bên Lark bằng tay sau khi xác nhận.
       </p>
 
       {choXacNhan.length > 0 && (
@@ -322,20 +322,15 @@ export function DotChonQuanTri({
 
             {d.anh.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
-                <a
-                  href={`/api/admin/galleries/${co}/export?dot=${d.soDot}`}
-                  download
+                {/* BB-403 (anh 08/10): không tải tệp — mở danh sách đúng đợt ngay ở khối "Xuất danh sách". */}
+                <button
+                  type="button"
+                  onClick={() => moDanhSachDot(d.soDot)}
+                  data-testid={`xem-danh-sach-dot-${d.soDot}`}
                   className="rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-2.5 py-1 text-xs hover:bg-[var(--bb-surface-2)]"
                 >
-                  Tải danh sách chỉ đợt {d.soDot}
-                </a>
-                <a
-                  href={`/api/admin/galleries/${co}/export?format=chi-tiet&dot=${d.soDot}`}
-                  download
-                  className="rounded-[var(--bb-radius-sm)] border border-[var(--bb-border)] px-2.5 py-1 text-xs hover:bg-[var(--bb-surface-2)]"
-                >
-                  Chi tiết chỉ đợt {d.soDot}
-                </a>
+                  Xem danh sách đợt {d.soDot}
+                </button>
               </div>
             )}
           </li>

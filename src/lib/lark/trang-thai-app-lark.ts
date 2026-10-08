@@ -20,8 +20,8 @@
  *      chưa "Đang làm" thì bộ ảnh đang XẾP HÀNG — khách không được thấy "đang
  *      chỉnh" khi chưa ai chỉnh.
  */
-import { giaiDoanCua } from "@/lib/lark/trang-thai-hau-ky";
-import { maLarkConHieuLuc } from "@/lib/gallery-status";
+import { giaiDoanCua, giaiDoanSauSan, nhanHienThi } from "@/lib/lark/trang-thai-hau-ky";
+import { maLarkConHieuLuc, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { vi } from "@/i18n/vi";
 import type { KhoiVungDuyet } from "@/lib/anh-chinh-sua/vong-duyet";
 
@@ -163,6 +163,19 @@ function ra(ma: MaTrangThaiBoAnh, giaiDoanLark: number | null = null): TrangThai
 }
 
 /**
+ * Nhánh "Lark là nguồn" (giai đoạn ≥ 2, app không chờ duyệt) — MỘT chỗ cho cả
+ * `trangThaiBoAnh` (quản trị) lẫn `trangThaiKhach` (màn khách).
+ *   · App đã giao mà Lark còn chậm: tin app.
+ *   · BB-402 — app đã chứng minh xa hơn Lark (vd `approved` mà Lark còn "Đã gửi
+ *     duyệt"/"Sửa"): nâng lên sàn của app (`giaiDoanSauSan`), không lùi nhãn.
+ */
+function theoGiaiDoanLark(status: string, gd: number): TrangThaiBoAnh {
+  if (status === "delivered" && gd < 10) return ra("da_giao");
+  const g = giaiDoanSauSan(status, gd);
+  return ra(THEO_GIAI_DOAN_LARK[g] ?? "da_chon_hinh", g);
+}
+
+/**
  * Trạng thái + nhãn hai màn của một bộ ảnh (hoặc một bản ghi Lark chưa thành
  * bộ ảnh khi `status = null`).
  */
@@ -179,11 +192,7 @@ export function trangThaiBoAnh(v: DauVaoTrangThai): TrangThaiBoAnh {
   const gd = giaiDoanCua(ma);
 
   // Lark là nguồn từ "Đã chọn hình" trở đi (BB-285), trừ lúc app đang chờ duyệt.
-  if (gd !== null && gd >= 2 && s !== "awaiting_approval") {
-    // App đã ghi "đã giao" mà Lark còn chậm: tin app, không lùi nhãn.
-    if (s === "delivered" && gd < 10) return ra("da_giao");
-    return ra(THEO_GIAI_DOAN_LARK[gd] ?? "da_chon_hinh", gd);
-  }
+  if (gd !== null && gd >= 2 && s !== "awaiting_approval") return theoGiaiDoanLark(s, gd);
 
   switch (s) {
     case "draft":
@@ -246,12 +255,38 @@ export function trangThaiKhach(
 ): TrangThaiBoAnh {
   let kq: TrangThaiBoAnh;
   if (giaiDoan != null && giaiDoan >= 2 && status !== "awaiting_approval") {
-    kq = status === "delivered" && giaiDoan < 10 ? ra("da_giao") : ra(THEO_GIAI_DOAN_LARK[giaiDoan] ?? "da_chon_hinh", giaiDoan);
+    kq = theoGiaiDoanLark(status, giaiDoan);
   } else {
     kq = trangThaiBoAnh({ status, coDriveLink: true, coLinkApp: true });
   }
   if (tuyChon.khoa && (kq.buocKhach ?? 0) === 0) return { ...kq, ...TAM_KHOA_KHACH };
   return kq;
+}
+
+/**
+ * BB-402 — tiến độ của MỘT bộ ảnh cho CẢ HAI màn, từ cùng một dòng dữ liệu:
+ *   · `quanTri`  — nhãn huy hiệu màn quản trị (`nhanHienThi`, bảng quản trị theo Lark);
+ *   · `giaiDoan` — số giai đoạn máy chủ gửi màn khách (`giaiDoanTienDo`);
+ *   · `khach`    — đúng trạng thái màn khách vẽ (`trangThaiKhach` với giai đoạn ấy);
+ *   · `buocKhach`— tên bước trên thanh 5 bước của khách (BUOC_KHACH), null = chưa tới.
+ * Mã Lark đi qua `maLarkConHieuLuc` (BB-327) như route khách — hai màn không thể đọc
+ * hai mã Lark khác nhau.
+ */
+export function tienDoHaiMan(g: {
+  status: string;
+  lark_trang_thai?: string | null;
+  lark_trang_thai_tu?: string | Date | null;
+  reopened_at?: string | Date | null;
+}): { quanTri: string; giaiDoan: number | null; khach: TrangThaiBoAnh; buocKhach: string | null } {
+  const ma = maLarkConHieuLuc(g);
+  const nhan = nhanHienThi(g.status, ma, (s) => GALLERY_STATUS_LABEL[s] ?? s);
+  const khach = trangThaiKhach(g.status, nhan.giaiDoan);
+  return {
+    quanTri: nhan.quanTri,
+    giaiDoan: nhan.giaiDoan,
+    khach,
+    buocKhach: khach.buocKhach === null ? null : BUOC_KHACH[khach.buocKhach] ?? null,
+  };
 }
 
 /** Câu trạng thái trên bìa / màn cảm ơn, gắn tên bé (thiếu tên thì "bé"). */

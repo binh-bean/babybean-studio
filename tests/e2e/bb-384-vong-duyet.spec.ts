@@ -96,6 +96,7 @@ test.describe("BB-384: vòng duyệt luôn trong app", () => {
     await expect(page.getByTestId("bean-dang-chuan-bi-duyet")).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText("Mở thư mục ảnh đã chỉnh")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Duyệt, cho in" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Duyệt cả bộ" })).toHaveCount(0); // BB-401
     await expect(page.getByTestId("khoi-anh-chinh")).toHaveCount(0);
     // Thanh đáy: bước duyệt, không phải "Đủ trong gói · Yêu cầu sửa lại".
     await expect(page.getByTestId("thanh-duyet-dong")).toContainText("Bean đang chuẩn bị");
@@ -140,13 +141,17 @@ test.describe("BB-384: vòng duyệt luôn trong app", () => {
     await expect(khoi).toBeInViewport();
     await expect(page.getByTestId("bean-dang-chuan-bi-duyet")).toHaveCount(0);
 
-    await khoi.getByRole("button", { name: "Yêu cầu sửa" }).click();
-    await expect(khoi.getByTestId("ai-se-sua")).toContainText("trong khoảng 3 ngày");
-    await khoi.getByTestId("o-anh-chinh").first().click();
-    await page.getByTestId("chon-can-sua").click();
-    await page.getByRole("textbox", { name: "Ba mẹ muốn Bean sửa gì ở tấm này ạ?" }).fill("Da bé sáng hơn chút");
-    await page.getByTestId("xem-lon-anh-chinh").getByRole("button", { name: "Đóng" }).click();
-    await khoi.getByRole("button", { name: "Gửi yêu cầu sửa" }).click();
+    // BB-401 — duyệt từng tấm trong màn xem lớn.
+    await khoi.getByTestId("nut-bat-dau-duyet").click();
+    const xem = page.getByTestId("xem-lon-anh-chinh");
+    await xem.getByTestId("nut-can-sua-tam").click();
+    await xem.getByRole("textbox", { name: "Ba mẹ muốn Bean sửa gì ở tấm này ạ?" }).fill("Da bé sáng hơn chút");
+    await xem.getByTestId("nut-xong-ghi-chu").click();
+    await xem.getByTestId("nut-gui-yeu-cau-sua").click();
+    await page.getByTestId("tom-tat-gui-sua").getByTestId("nut-xac-nhan-gui-sua").click();
+    const loiXinLoi = page.getByTestId("xac-nhan-da-gui-sua");
+    await expect(loiXinLoi.getByTestId("han-sua")).toContainText("trong khoảng 3 ngày", { timeout: 30_000 });
+    await loiXinLoi.getByTestId("nut-dong-ket-qua").click();
 
     // Bộ về "đang sửa": khung thông tin xác nhận rõ đã nhận gì.
     const daNhan = page.getByTestId("da-nhan-yeu-cau-sua");
@@ -170,6 +175,10 @@ test.describe("BB-384: vòng duyệt luôn trong app", () => {
     await khoi.getByTestId("nut-gui-khach-duyet").click();
     await khoi.getByTestId("dong-y-gui-khach").click();
     await expect(khoi.getByTestId("trang-thai-gui-anh-chinh")).toContainText("Đã gửi khách", { timeout: 30_000 });
+    // BB-401 vòng 3 — "Đã gửi khách lúc …" ĐÃ có từ lượt gửi ở ca 2, nên dòng trên qua ngay khi
+    // lượt gửi lại còn đang chạy (POST ~2,6 giây) → trang khách mở trước khi bộ về "chờ duyệt"
+    // (đỏ 08/10: khách thấy "đang chờ chỉnh", không có khối ảnh chỉnh). Chờ lời báo CỦA LƯỢT NÀY.
+    await expect(khoi).toContainText("Đã gửi 2 ảnh cho khách duyệt", { timeout: 30_000 });
 
     const khach = await browser.newPage({ extraHTTPHeaders: { "x-forwarded-for": ipMoi() } });
     await chanLh3TrenTrinhDuyet(khach);
@@ -180,7 +189,11 @@ test.describe("BB-384: vòng duyệt luôn trong app", () => {
     await expect(khach.getByTestId("loi-moi-in-them")).toHaveCount(0);
     // Lịch sử theo tấm: lần 1 · Bean đã sửa.
     await expect(khoiKhach.getByTestId("vong-sua-khach").first()).toContainText("Bean đã sửa");
-    await khoiKhach.getByRole("button", { name: "Duyệt, cho in" }).click();
+    // BB-401 — "Duyệt cả bộ" hỏi lại một chạm rồi cảm ơn.
+    await khoiKhach.getByTestId("nut-duyet-ca-bo-khoi").click();
+    await khach.getByTestId("hop-duyet-ca-bo").getByTestId("nut-xac-nhan-duyet-ca-bo").click();
+    await expect(khach.getByTestId("cam-on-da-duyet")).toBeVisible({ timeout: 30_000 });
+    await khach.getByTestId("cam-on-da-duyet").getByRole("button", { name: "Về bộ ảnh" }).click();
     await expect(khach.getByTestId("loi-moi-in-them")).toBeVisible({ timeout: 30_000 });
     await expect(khach.getByTestId("anh-moi-in")).toHaveCount(2);
     expect((await pg.query(`select status from galleries where id = $1`, [boA.id])).rows[0].status).toBe("approved");

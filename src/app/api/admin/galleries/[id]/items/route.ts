@@ -21,8 +21,8 @@ import { diaChiDayDu } from "@/lib/lark/ghi-link-app";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { getGalleryContractSummary } from "@/lib/selection/contract";
-import { nhanHienThi, mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-hau-ky";
-import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-hau-ky";
+import { tienDoHaiMan } from "@/lib/lark/trang-thai-app-lark";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layChiTietDotQuanTri, layThongTinChotDot1 } from "@/lib/gallery/dot-chon-server";
@@ -84,7 +84,7 @@ export async function GET(
       // Bé …" + dòng phụ "khách · SĐT · chi nhánh · ngày chụp"
       // (quan-tri-chi-tiet.png). Cùng luật viết liền một dòng (BB-150,
       // BB-215, BB-200) — Supabase suy kiểu từ chuỗi literal, nối chuỗi mất kiểu.
-      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_doc_luc, submitted_at, customer_id, shoot_id, package_id, editor_id")
+      .select("id, branch_id, title, status, lark_contract_codes, extra_photo_price, photo_count, drive_folder_url, drive_folder_id, last_synced_at, sync_error, cover_photo_id, cover_headline, welcome_message, cover_layout, baby_id, lark_hauky_record_id, lark_trang_thai, lark_trang_thai_tu, reopened_at, lark_canh_bao, lark_doc_luc, submitted_at, customer_id, shoot_id, package_id, editor_id")
       .eq("id", galleryId)
       .single();
 
@@ -447,6 +447,7 @@ export async function GET(
     const { data: goiChup } = packageId
       ? await admin.from("packages").select("name").eq("id", packageId).maybeSingle()
       : { data: null };
+    const tienDo = tienDoHaiMan(gallery);
 
     return ok({
       galleryId: gallery.id,
@@ -492,11 +493,11 @@ export async function GET(
       // và màn danh sách (src/lib/lark/trang-thai-hau-ky.ts). Không trả mã
       // Lark thô (`lark_trang_thai`/`lark_canh_bao`) — đó là chi tiết triển
       // khai nội bộ, màn hình chỉ cần nhãn và tên đã dịch.
-      statusLabel: nhanHienThi(
-        gallery.status,
-        gallery.lark_trang_thai,
-        (s) => GALLERY_STATUS_LABEL[s] ?? s,
-      ).quanTri,
+      // BB-402 — `tienDoHaiMan`: CÙNG hàm route khách (`/api/g/gallery`) dùng, nên huy
+      // hiệu này và màn khách luôn nói cùng một giai đoạn.
+      statusLabel: tienDo.quanTri,
+      // BB-402 — điều ba mẹ đang thấy (câu + bước trên thanh 5 bước), để CSKH đối chiếu.
+      khachDangThay: { cau: tienDo.khach.khach, buoc: tienDo.buocKhach },
       warningColor: mauCanhBao(gallery.lark_canh_bao),
       larkTenTrangThai: gallery.lark_trang_thai
         ? (TRANG_THAI_LARK as Record<string, { ten: string }>)[gallery.lark_trang_thai]?.ten ?? null

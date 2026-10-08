@@ -87,6 +87,28 @@ export const vi = {
     filterAll: "Tất cả",
     filterSelected: "Đã chọn",
     filterUnselected: "Chưa chọn",
+    /** BB-400 — chip + dấu tim của gia đình được mời; cùng tên ở mọi lượt chọn. */
+    locGiaDinhThich: "Gia đình thích",
+    /** BB-400 — nút So sánh ở mọi lượt chọn (biểu tượng điện thoại, chip máy tính). */
+    nutSoSanh: "So sánh",
+    /** BB-400 — gia đình được mời, màn xem lớn: lối "Đặt in tấm này" (gửi yêu cầu cho Bean). */
+    giaDinhDatInTamNay: "Đặt in tấm này",
+    /** BB-400 vòng 4 — nút cố định ở màn xem lớn, mọi vai, mọi lượt. */
+    xemTrenTuong: "Xem trên tường nhà",
+    xemTrenTuongNgan: "Trên tường",
+    /** BB-400 vòng 4 — nút đặt ở màn treo tường khi vai không đặt thẳng được. */
+    datLoiDotMoi: "Chọn thêm ảnh",
+    datLoiGoiY: "Gợi ý tấm này",
+    giaDinhDatInGiaiThich: "Gia đình chọn sản phẩm, Bean gọi báo giá ạ",
+    /** BB-400 vòng 2 — người cùng chọn / người gợi ý ở đợt N. */
+    goiYDotCau: "Đã gợi ý {n} tấm · ba mẹ sẽ chốt ạ",
+    goiYDotNut: "Gợi ý ảnh cho đợt mới",
+    /** BB-400 vòng 2 — màn mua thêm của gia đình (thay cả trang). */
+    muaGiaDinhTieuDe: "Đặt in ảnh cho",
+    muaGiaDinhCauTrong: "Thả tim tấm thích, rồi chọn sản phẩm ạ",
+    muaGiaDinhCau: "{n} món · tạm tính {tien}",
+    muaGiaDinhNutPhu: "Thêm ảnh in, khung, album",
+    muaGiaDinhNutGui: "Gửi yêu cầu",
     quotaWarningDontAsk: "Không hỏi lại trong lần chọn này",
     quotaHardLimit: "Ba mẹ đã chọn tối đa {max} tấm cho bộ ảnh này ạ",
 
@@ -580,8 +602,9 @@ export const vi = {
       canSuaChung: "ghi chú chung",
       // Hạ hoả (BB-387, anh chốt 07/10) — Bean nhận phần chưa đúng về mình, KHÔNG nêu tên
       // thợ chỉnh; thời gian là khoảng ước tính, không hứa cứng ({n} từ Cài đặt, mặc định 3).
+      // BB-401 — ĐÚNG NGUYÊN VĂN câu anh chốt 08/10 (một câu, dấu phẩy, không tên thợ).
       suaLoiBean:
-        "Bean thành thật xin lỗi vì chưa làm hài lòng ba mẹ trong lần chỉnh sửa ảnh này ạ. Yêu cầu của ba mẹ đã được ghi nhận và chuyển đến bộ phận hậu kỳ ạ.",
+        "Bean thành thật xin lỗi vì chưa làm hài lòng ba mẹ trong lần chỉnh sửa ảnh này, yêu cầu của ba mẹ đã được ghi nhận và chuyển đến bộ phận hậu kỳ ạ.",
       hanSua: "Bean sẽ gửi lại ảnh đã sửa trong khoảng {n} ngày ạ.",
       daNhanTieuDe: "Bean đã nhận yêu cầu sửa lần {n} ạ",
       daNhanSoTam: "{n} tấm cần sửa:",
@@ -591,6 +614,45 @@ export const vi = {
       moiInMoTa: "Những tấm đẹp này in thêm để tặng ông bà hay treo trong nhà thì xinh lắm ạ.",
       moiInNut: "Chọn ảnh in thêm",
       moiInGia: "từ {gia}",
+      // BB-401 — duyệt TỪNG TẤM ngay trong màn xem lớn (anh 08/10).
+      goiYTungTam: "Chạm vào ảnh để xem lớn, so với ảnh gốc và duyệt từng tấm ạ.",
+      batDauDuyet: "Xem & duyệt từng tấm",
+      duyetTamNay: "Duyệt tấm này",
+      duyetCaBo: "Duyệt cả bộ",
+      guiYeuCauSo: "Gửi yêu cầu sửa ({n})",
+      ttDaDuyet: "Đã duyệt",
+      ttXinSua: "Xin sửa",
+      ttChuaXem: "Chưa xem",
+      ttDaXem: "Đã xem",
+      demTomTat: "Đã duyệt {duyet} · Xin sửa {sua} · Chưa duyệt {chua}",
+      tamThu: "Tấm {i}/{n}",
+      ghiChuMoDau:
+        "Bean xin lỗi vì tấm này chưa đúng ý ba mẹ ạ. Ba mẹ ghi giúp Bean mong muốn, khoanh chỗ cần sửa hoặc gửi kèm ảnh minh hoạ ạ.",
+      themAnhMinhHoa: "Thêm ảnh minh hoạ",
+      anhMinhHoaGoiY: "Ba mẹ có ảnh minh hoạ mong muốn thì gửi kèm giúp Bean, tối đa 3 ảnh cho mỗi tấm ạ.",
+      anhMinhHoaSo: "Ảnh {n}",
+      boAnhMinhHoa: "Bỏ ảnh minh hoạ",
+      loiAnhMinhHoaLoai: "Bean chỉ nhận ảnh JPG, PNG, WEBP hoặc HEIC ạ.",
+      loiAnhMinhHoaDungLuong: "Ảnh này hơi lớn, ba mẹ chọn giúp Bean ảnh dưới 5 MB nhé ạ.",
+      toiDaAnhMinhHoa: "Mỗi tấm gửi kèm tối đa 3 ảnh minh hoạ ạ.",
+      boYeuCauSuaTam: "Bỏ yêu cầu sửa tấm này",
+      xongGhiChu: "Xong",
+      nhapGiuTrenMay: "Bean giữ ghi chú của ba mẹ trên máy này cho tới khi ba mẹ gửi ạ.",
+      tomTatTieuDe: "Ba mẹ xem lại giúp Bean trước khi gửi ạ",
+      tomTatDaDuyet: "{n} tấm ba mẹ đã duyệt ạ.",
+      tomTatChuaDuyet: "{n} tấm ba mẹ chưa bấm duyệt, Bean giữ nguyên các tấm này ạ.",
+      suaLai: "Sửa lại",
+      xemLai: "Xem lại",
+      dangGui: "Bean đang gửi ạ…",
+      duyetCaBoTieuDe: "Ba mẹ duyệt cả bộ ảnh ạ?",
+      duyetCaBoMoTa: "Bộ có {tong} tấm: {duyet} tấm đã duyệt, {chua} tấm chưa duyệt ạ.",
+      duyetCaBoCoSua: "{n} tấm ba mẹ đang ghi cần sửa, duyệt cả bộ thì Bean sẽ không sửa các tấm này ạ.",
+      duyetCaBoSauDo: "Duyệt xong, Bean chuyển ảnh sang in ngay ạ.",
+      xacNhanDuyetCaBo: "Duyệt cả bộ, cho in",
+      camOnTieuDe: "Bean cảm ơn ba mẹ đã duyệt ảnh ạ",
+      camOnMoTa: "Bean chuyển ảnh sang in ngay và sẽ báo ba mẹ khi ảnh sẵn sàng ạ.",
+      veBoAnh: "Về bộ ảnh",
+      loiLuuDuyet: "Bean chưa lưu được lựa chọn của tấm này, ba mẹ bấm lại giúp Bean nhé ạ.",
     },
   },
   admin: {

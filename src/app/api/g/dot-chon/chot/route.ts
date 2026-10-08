@@ -118,6 +118,7 @@ export async function POST(request: Request): Promise<Response> {
       giaMoiAnh: Number(gallery.extra_photo_price ?? 0),
       bietAnhInChamHon: input.bietAnhInChamHon === true,
       dongDichVu,
+      ghiChu: input.ghiChu,
     });
     if (!kq.ok) return fail(kq.code, kq.message, kq.chiTiet ? { chiTiet: kq.chiTiet } : undefined);
 

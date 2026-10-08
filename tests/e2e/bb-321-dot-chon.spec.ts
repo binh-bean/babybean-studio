@@ -204,14 +204,15 @@ test.describe.serial("BB-321: đợt chọn — khách mua thêm, CSKH xác nh�
     const tim = man.getByRole("button", { name: "Chọn ảnh này" });
     await tim.first().evaluate((el) => (el as HTMLElement).click());
     await tim.first().evaluate((el) => (el as HTMLElement).click());
-    await expect(man.getByTestId("cau-tong-dot")).toHaveText(/^2 ảnh mới · 60\.000\s₫$/);
+    await expect(man.getByTestId("cau-tong-dot")).toHaveText(/^2 tấm mới · 60\.000\s₫$/);
     await chupHaiKho(page, "dot2-chon");
 
     await page.setViewportSize(DT);
     await man.getByTestId("nut-chot-dot").click();
     const hop = page.getByTestId("hop-xac-nhan-dot");
     await expect(hop).toBeVisible();
-    await expect(hop.getByTestId("noi-dung-xac-nhan")).toContainText("2 ảnh");
+    // BB-358 / BB-400: đơn vị đếm ảnh ở màn khách là "tấm".
+    await expect(hop.getByTestId("noi-dung-xac-nhan")).toContainText("2 tấm");
     await expect(hop.getByTestId("tong-tien-dot")).toContainText("60.000");
     await chupHaiKho(page, "dot2-xac-nhan");
 
@@ -221,7 +222,7 @@ test.describe.serial("BB-321: đợt chọn — khách mua thêm, CSKH xác nh�
     // Trang tải lại; trạng thái đợt 2 = chờ xác nhận.
     const dot2 = page.getByTestId("trang-thai-dot-2");
     await expect(dot2).toBeVisible({ timeout: 30_000 });
-    await expect(dot2).toContainText("Đợt 2 · 2 ảnh");
+    await expect(dot2).toContainText("Đợt 2 · 2 tấm");
     await expect(dot2).toContainText("Bean đang xác nhận đợt này ạ");
     await expect(page.getByTestId("man-chon-them-anh")).toHaveCount(0); // chốt xong quay về màn chính
     await dot2.scrollIntoViewIfNeeded();
@@ -250,7 +251,7 @@ test.describe.serial("BB-321: đợt chọn — khách mua thêm, CSKH xác nh�
     // Ảnh 1–5 đã khoá (đợt 1 + đợt 2 đang chờ) → tim đầu tiên còn chọn được là ảnh 6.
     await expect(man.getByTestId("huy-hieu-khoa").filter({ hasText: "Đợt 2" })).toHaveCount(2);
     await man.getByRole("button", { name: "Chọn ảnh này" }).first().evaluate((el) => (el as HTMLElement).click());
-    await expect(man.getByTestId("cau-tong-dot")).toHaveText(/^1 ảnh mới · 30\.000\s₫$/);
+    await expect(man.getByTestId("cau-tong-dot")).toHaveText(/^1 tấm mới · 30\.000\s₫$/);
     await man.getByTestId("nut-chot-dot").click();
     await page.getByTestId("nut-xac-nhan-chot-dot").click();
     await expect(page.getByTestId("trang-thai-dot-3")).toBeVisible({ timeout: 30_000 });
@@ -317,7 +318,7 @@ test.describe.serial("BB-321: đợt chọn — khách mua thêm, CSKH xác nh�
     await page.setViewportSize(DT);
     await page.getByRole("button", { name: "Tiếp tục đợt 4" }).click();
     const man = page.getByTestId("man-chon-them-anh");
-    await expect(man.getByTestId("cau-tong-dot")).toHaveText(/^1 ảnh mới · 30\.000\s₫$/);
+    await expect(man.getByTestId("cau-tong-dot")).toHaveText(/^1 tấm mới · 30\.000\s₫$/);
     await expect(man.getByRole("button", { name: "Bỏ chọn" })).toHaveCount(1); // đúng tấm của đợt bị trả
   });
 

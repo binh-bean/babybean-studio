@@ -56,7 +56,9 @@ export function mocCanBaoKhach(d: {
   maMoi: string | null;
   trangThaiApp: string;
 }): MocBaoKhach | null {
-  if (d.trangThaiApp === "delivered") return null;
+  // BB-402 — ba mẹ đã DUYỆT ảnh chỉnh trong app (`approved`): "đã xác nhận danh sách" /
+  // "đang chỉnh ảnh" là tin CŨ hơn điều ba mẹ đang thấy (Lark đổi trễ) — không báo lùi.
+  if (d.trangThaiApp === "delivered" || d.trangThaiApp === "approved") return null;
   const cu = giaiDoanCua(d.maCu);
   const moi = giaiDoanCua(d.maMoi);
   if (cu === null || moi === null) return null;

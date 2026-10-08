@@ -31,8 +31,9 @@ import { ghepGhiChu } from "@/lib/anh-chinh-sua/nhan-dien";
 const CHU = (html: string) =>
   html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, "").replace(/ /g, " ");
 
+// BB-401 — anh chốt lại 08/10: đúng MỘT câu, nối bằng dấu phẩy.
 const CAU_CUA_ANH =
-  "Bean thành thật xin lỗi vì chưa làm hài lòng ba mẹ trong lần chỉnh sửa ảnh này ạ. Yêu cầu của ba mẹ đã được ghi nhận và chuyển đến bộ phận hậu kỳ ạ.";
+  "Bean thành thật xin lỗi vì chưa làm hài lòng ba mẹ trong lần chỉnh sửa ảnh này, yêu cầu của ba mẹ đã được ghi nhận và chuyển đến bộ phận hậu kỳ ạ.";
 
 describe("BB-387 · 1+2 · lời xin lỗi và khoảng ngày trong khung đã nhận yêu cầu sửa", () => {
   const note = ghepGhiChu("", [{ photoId: "a", tenAnh: "IMG_0001.jpg", ghiChu: "da sáng hơn", vung: [], anhMau: [] }]);

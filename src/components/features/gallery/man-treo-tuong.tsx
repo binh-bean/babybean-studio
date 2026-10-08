@@ -110,6 +110,12 @@ export interface ManTreoTuongProps {
    * in đó (`gan_voi_addon_id`, migration 0104). Thiếu = hai dòng rời như cũ.
    */
   onDatInKemKhung?: (photoId: string, productIdIn: string, soLuongIn: number, productIdKhung: string) => void;
+  /**
+   * BB-400 vòng 4 — vai/trạng thái KHÔNG đặt thẳng vào giỏ ở đây (gia đình được mời, bộ đã
+   * khoá, người gợi ý ở đợt N): nút chính dẫn sang LỐI MUA của vai đó với đúng tấm đang xem.
+   * Thiếu = chỉ xem (một dòng giải thích như cũ).
+   */
+  loiDatKhac?: { nhan: string; onBam: (photoId: string) => void } | null;
 }
 
 /**
@@ -250,6 +256,7 @@ export function ManTreoTuong({
   coBanDau = null,
   coKhungBanDau = false,
   onDatInKemKhung,
+  loiDatKhac = null,
 }: ManTreoTuongProps) {
   const [chiSo, setChiSo] = useState(chiSoBanDau);
   const [maPhong, setMaPhong] = useState<MaPhong>("phong-khach");
@@ -1206,6 +1213,16 @@ export function ManTreoTuong({
               className="h-11 shrink-0 rounded-full bg-bb-fg px-5 text-sm font-medium text-bb-bg transition hover:opacity-90 disabled:opacity-40"
             >
               {dangLuu ? "Đang lưu…" : "Thêm vào giỏ"}
+            </button>
+          ) : loiDatKhac && anhDangXem ? (
+            // BB-400 vòng 4 — xem được mà không đặt thẳng được: dẫn sang lối mua của vai.
+            <button
+              type="button"
+              data-testid="nut-dat-loi-khac-treo-tuong"
+              onClick={() => loiDatKhac.onBam(anhDangXem.id)}
+              className="h-11 shrink-0 rounded-full bg-bb-fg px-5 text-sm font-medium text-bb-bg transition hover:opacity-90"
+            >
+              {loiDatKhac.nhan}
             </button>
           ) : (
             <p className="max-w-[55%] text-right text-[11.5px] leading-snug text-bb-fg-muted">

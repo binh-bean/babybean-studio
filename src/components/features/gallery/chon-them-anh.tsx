@@ -28,6 +28,7 @@ import { formatKichThuoc } from "@/lib/utils/dinh-dang";
 import { nhanTrangThaiDotChoKhach, soDotKeTiep, type TrangThaiDot } from "@/lib/gallery/dot-chon";
 import { cumTenBe, dongDauManDot, locNhapConChonDuoc, type DongGioDot } from "./dot-chon-khach";
 import { goiApiKhach } from "@/lib/utils/goi-api-khach";
+import { vi } from "@/i18n";
 
 // ---------------------------------------------------------------------------
 // Dữ liệu `/api/g/dot-chon` (hợp đồng của DEV-BE, `layTrangThaiDotChoKhach`)
@@ -70,6 +71,11 @@ export interface TrangThaiDotKhach {
 export interface NhapDot {
   anh: string[];
   gio: DongGioDot[];
+  /**
+   * BB-400 — ghi chú cho thợ của tấm MỚI trong đợt (photoId -> lời dặn), giữ trong nháp
+   * như tim của đợt; gửi kèm lúc "Chốt đợt N" (`/api/g/dot-chon/chot`, trường `ghiChu`).
+   */
+  ghiChu?: Record<string, string>;
 }
 
 const NHAP_RONG: NhapDot = { anh: [], gio: [] };
@@ -79,7 +85,7 @@ function docNhap(galleryId: string): NhapDot | null {
   try {
     const raw = window.localStorage.getItem(khoaNhap(galleryId));
     if (!raw) return null;
-    const j = JSON.parse(raw) as { anh?: unknown; gio?: unknown };
+    const j = JSON.parse(raw) as { anh?: unknown; gio?: unknown; ghiChu?: unknown };
     const anh = Array.isArray(j.anh) ? j.anh.filter((x): x is string => typeof x === "string") : [];
     const gio = Array.isArray(j.gio)
       ? (j.gio as DongGioDot[]).filter(
@@ -91,7 +97,13 @@ function docNhap(galleryId: string): NhapDot | null {
             (d.photoId === null || typeof d.photoId === "string"),
         )
       : [];
-    return { anh, gio };
+    const ghiChu: Record<string, string> = {};
+    if (j.ghiChu && typeof j.ghiChu === "object") {
+      for (const [id, chu] of Object.entries(j.ghiChu as Record<string, unknown>)) {
+        if (typeof chu === "string" && chu.trim()) ghiChu[id] = chu.slice(0, 500);
+      }
+    }
+    return { anh, gio, ghiChu };
   } catch {
     return null;
   }
@@ -203,17 +215,28 @@ export function DotChonTrenManChinh({
   soAnhNhap,
   soMonNhap,
   onMo,
+  onGoiY,
+  nutPhu = false,
 }: {
+  /**
+   * BB-402 vòng 3 — thanh đáy đã có nút chính "Chọn thêm ảnh": nút của thẻ hạ xuống kiểu
+   * PHỤ (viền, không nền đặc) — màn chỉ có MỘT nút chính, mà thẻ vẫn giữ đủ lối vào, giá
+   * mỗi ảnh, "Tiếp tục đợt N". (Vòng 2 từng ẨN hẳn hàng lối vào: thẻ biến mất khi chưa có
+   * đợt nào, mất câu giá — e2e bb-321/bb-400 bắt được.)
+   */
+  nutPhu?: boolean;
   tt: TrangThaiDotKhach | null;
   tenBe: string | null;
   soAnhNhap: number;
   soMonNhap: number;
   onMo: () => void;
+  /** BB-400 vòng 2 — người cùng chọn / người gợi ý: lối vào màn đợt ở chế độ gợi ý. */
+  onGoiY?: () => void;
 }) {
   if (!tt || !tt.cheDoChonThem) return null;
 
   const cacDot = [...tt.cacDot].sort((a, b) => b.soDot - a.soDot);
-  if (cacDot.length === 0 && !tt.coTheChot) return null;
+  if (cacDot.length === 0 && !tt.coTheChot && !onGoiY) return null;
 
   const soDotMoi = soDotKeTiep(tt.cacDot);
   const coNhap = soAnhNhap > 0 || soMonNhap > 0;
@@ -285,9 +308,28 @@ export function DotChonTrenManChinh({
           <button
             type="button"
             onClick={onMo}
-            className="h-11 w-full shrink-0 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 sm:h-10 sm:w-auto"
+            data-kieu-nut={nutPhu ? "phu" : "chinh"}
+            className={
+              nutPhu
+                ? "h-11 w-full shrink-0 rounded-full border border-foreground/30 bg-transparent px-5 text-sm font-medium text-foreground transition hover:bg-foreground/5 sm:h-10 sm:w-auto"
+                : "h-11 w-full shrink-0 rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 sm:h-10 sm:w-auto"
+            }
           >
             {coNhap ? `Tiếp tục đợt ${soDotMoi}` : "Chọn thêm ảnh"}
+          </button>
+        </div>
+      )}
+
+      {/* BB-400 vòng 2 — người cùng chọn / người gợi ý: vào CÙNG màn đợt, tim là gợi ý cho ba mẹ. */}
+      {!tt.coTheChot && onGoiY && (
+        <div className={cacDot.length > 0 ? "mt-3.5 border-t border-border pt-3.5" : undefined}>
+          <button
+            type="button"
+            data-testid="nut-goi-y-dot"
+            onClick={onGoiY}
+            className="h-11 w-full rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90 sm:h-10 sm:w-auto"
+          >
+            {vi.gallery.goiYDotNut}
           </button>
         </div>
       )}

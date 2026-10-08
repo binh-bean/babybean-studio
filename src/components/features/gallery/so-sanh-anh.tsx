@@ -69,6 +69,8 @@ export interface SoSanhAnhProps {
    * vuốt đã chốt lúc bật "Ghim để vuốt" — bỏ nhầm thì thả tim lại được).
    */
   tatCaAnh?: PhotoPublic[];
+  /** BB-400 — tấm đã chốt ở đợt trước (màn "Chọn thêm ảnh · Đợt N"): tim của RIÊNG tấm đó khoá, như `PhotoLightbox.khoaTimAnh`. */
+  khoaTimAnh?: (photo: PhotoPublic) => boolean;
 }
 
 export function SoSanhAnh({
@@ -83,6 +85,7 @@ export function SoSanhAnh({
   hanMuc,
   anhDaThaTim = [],
   tatCaAnh = [],
+  khoaTimAnh,
 }: SoSanhAnhProps) {
   // Hướng màn đo bằng bề ngang/cao thật của cửa sổ — cùng cách LuoiAnh đo,
   // không dùng CSS orientation vì codebase này chọn cột theo bề ngang
@@ -265,7 +268,7 @@ export function SoSanhAnh({
             photo={ghimPhoto}
             ghim
             dangGui={mutatingIds.has(ghimPhoto.id)}
-            khoa={isLocked}
+            khoa={isLocked || (khoaTimAnh?.(ghimPhoto) ?? false)}
             onToggleHeart={onToggleHeart}
             onPhongTo={onPhongTo}
             onGhim={() => troGhim(ghimPhoto.id)}
@@ -292,7 +295,7 @@ export function SoSanhAnh({
                 photo={vuotPhoto}
                 ghim={false}
                 dangGui={mutatingIds.has(vuotPhoto.id)}
-                khoa={isLocked}
+                khoa={isLocked || (khoaTimAnh?.(vuotPhoto) ?? false)}
                 onToggleHeart={onToggleHeart}
                 onPhongTo={onPhongTo}
                 onGhim={() => troGhim(vuotPhoto.id)}
@@ -346,7 +349,7 @@ export function SoSanhAnh({
               photo={photo}
               thuTu={i + 1}
               dangGui={mutatingIds.has(photo.id)}
-              khoa={isLocked}
+              khoa={isLocked || (khoaTimAnh?.(photo) ?? false)}
               onToggleHeart={onToggleHeart}
               onBoKhoi={onBoKhoi}
               onPhongTo={onPhongTo}

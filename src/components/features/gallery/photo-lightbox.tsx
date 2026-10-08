@@ -3,7 +3,7 @@ import { urlAnhDuPhong, type CoMaTepDrive } from "@/lib/utils/anh-lh3";
 import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Printer, PenLine } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Printer, PenLine, Frame } from "lucide-react";
 import { cn } from "@/components/ui/utils";
 import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { vi } from "@/i18n";
@@ -87,6 +87,11 @@ export interface PhotoLightboxProps {
    * prop này thì hành vi y như cũ.
    */
   khoaTimAnh?: (photo: PhotoPublic) => boolean;
+  /**
+   * BB-400 vòng 4 — mở "Xem trên tường / bàn nhà" với tấm đang xem. Nút cố định góc phải
+   * trên, cùng chỗ ở mọi màn; thiếu prop = không có nút (danh mục không có ảnh in).
+   */
+  onXemTuong?: (photo: PhotoPublic) => void;
 }
 
 /**
@@ -131,6 +136,7 @@ export function PhotoLightbox({
   banner,
   dungCho,
   khoaTimAnh,
+  onXemTuong,
 }: PhotoLightboxProps) {
   /**
    * Tấm trượt từ dưới lên trên điện thoại: bảng sản phẩm hoặc ô ghi chú.
@@ -624,6 +630,8 @@ export function PhotoLightbox({
   const isMutating = mutatingIds.has(currentPhoto.id);
   // BB-321 — tấm đã chốt ở đợt trước: tim đứng yên (xem `khoaTimAnh`).
   const timBiKhoa = isLocked || (khoaTimAnh?.(currentPhoto) ?? false);
+  // BB-400 — ghi chú của tấm đã chốt ở đợt trước đã gửi Bean: chỉ đọc, như bộ đã khoá.
+  const ghiChuChiDoc = timBiKhoa;
   const nhanDungCho = dungCho?.(currentPhoto) ?? [];
 
   return (
@@ -709,7 +717,25 @@ export function PhotoLightbox({
           )}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-start justify-end gap-1">
+          {/* BB-400 vòng 4 — "Xem trên tường / bàn nhà": CỐ ĐỊNH góc phải trên ở MỌI màn xem lớn
+              (đợt 1, đợt N, gợi ý, gia đình, bộ đã giao), có chữ để dễ thấy; tấm nào cũng xem được. */}
+          {onXemTuong && (
+            <button
+              type="button"
+              data-testid="nut-xem-tuong"
+              onClick={(e) => {
+                e.stopPropagation();
+                onXemTuong(currentPhoto);
+              }}
+              aria-label={vi.gallery.xemTrenTuong}
+              title={vi.gallery.xemTrenTuong}
+              className="mt-1.5 flex h-8 items-center gap-1.5 rounded-full border border-[#e5dcd2] bg-white/80 px-3 text-[12.5px] font-medium text-[#2e2a27] transition hover:bg-white active:scale-95 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
+            >
+              <Frame className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" />
+              {vi.gallery.xemTrenTuongNgan}
+            </button>
+          )}
           {onTaiAnh && menuTai && (
             // Chặn nổi bọt: bấm trong thực đơn không được lọt xuống lớp đóng màn xem lớn.
             <div onClick={(e) => e.stopPropagation()}>
@@ -960,7 +986,7 @@ export function PhotoLightbox({
                 {/* BB-370 (anh 06/10, ảnh 1c8e9516) — bộ đã chốt: ô nhập bị khoá + mờ 50% nên
                     ghi chú ba mẹ đã gửi gần như KHÔNG đọc được (chỉ thấy chữ mờ "đã chốt").
                     Nay hiện nguyên văn ghi chú, chữ đậm rõ, chỉ đọc. */}
-                {isLocked ? (
+                {ghiChuChiDoc ? (
                   <GhiChuChiDoc ghiChu={currentPhoto.retouchNote} />
                 ) : (
                 <textarea
@@ -1105,8 +1131,8 @@ export function PhotoLightbox({
         </div>
 
         <div className={cn("mx-auto max-w-md overflow-hidden px-6 transition-all duration-300 lg:hidden", tamMo === "ghi-chu" ? "max-h-[150px] pb-3 opacity-100" : "max-h-0 opacity-0")}>
-          {onLuuGhiChu && isLocked && <GhiChuChiDoc ghiChu={currentPhoto.retouchNote} />}
-          {onLuuGhiChu && !isLocked && (
+          {onLuuGhiChu && ghiChuChiDoc && <GhiChuChiDoc ghiChu={currentPhoto.retouchNote} />}
+          {onLuuGhiChu && !ghiChuChiDoc && (
             <input
               id="ghi-chu-anh"
               type="text"

@@ -19,6 +19,7 @@ import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { signGallerySession, SESSION_COOKIE } from "@/lib/auth/gallery-session";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
+import { ghiMocKhachMoBoAnh } from "@/lib/selection/luot-chon-theo-link";
 import type { GallerySession, ShareRole } from "@/types/domain";
 
 const RATE_LIMIT_PER_IP = 10;
@@ -154,6 +155,8 @@ export async function dangNhapBangMa(
 
         if (insErr || !created) throw insErr ?? new Error("selection insert returned nothing");
         selectionId = created.id;
+        // BB-402 — lần mở đầu tiên của link này: mốc first_viewed_at (+ sent_at nếu trống).
+        await ghiMocKhachMoBoAnh(admin, link.gallery_id);
       }
     }
   }

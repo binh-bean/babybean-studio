@@ -167,6 +167,26 @@ export function trangThaiDuyetDot(moc: MocDot | null | undefined, coVongSuaMo: b
 }
 
 /**
+ * BB-402 — số ĐỢT MUA THÊM đang chờ ba mẹ duyệt ảnh chỉnh (CSKH đã gửi, ba mẹ chưa
+ * duyệt, không có vòng sửa mở). Màn khách dùng để giữ nút chính ở "duyệt" thay vì
+ * "Chọn thêm ảnh" khi bộ gốc đã duyệt mà một đợt mua thêm còn chờ. `mocDot = null`
+ * (chưa áp 0095) → 0: mọi tấm đi theo vòng của bộ.
+ */
+export function soDotMuaThemChoDuyet(
+  mocDot: ReadonlyMap<string, MocDot> | null,
+  vong: ReadonlyArray<{ resolved_at: string | null; dot_khoa: string | null }>,
+): number {
+  if (!mocDot) return 0;
+  let n = 0;
+  for (const [khoa, moc] of mocDot) {
+    if (!laKhoaMuaThem(khoa)) continue;
+    const mo = vong.some((v) => v.resolved_at === null && v.dot_khoa === khoa);
+    if (trangThaiDuyetDot(moc, mo) === "cho_duyet") n++;
+  }
+  return n;
+}
+
+/**
  * Trạng thái của nhóm "Trong gói" suy từ trạng thái bộ ảnh (BB-371): bộ chờ duyệt
  * thì chờ duyệt, đang chỉnh mà có vòng sửa mở thì đang sửa, đã duyệt/đã giao thì xong.
  */

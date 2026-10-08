@@ -139,6 +139,31 @@ export function laKhoaTheoLark(maLark: string | null | undefined): boolean {
  */
 const KHONG_DE_LARK_MO_RONG = new Set(["awaiting_approval"]);
 
+/**
+ * BB-402 — giai đoạn THẤP NHẤT mà trạng thái app đã chứng minh, khi Lark chậm
+ * hơn app (hoặc app chưa đọc được Lark).
+ *
+ * Lỗi anh báo 08/10 (bộ HD_20260924#5261): ba mẹ đã DUYỆT ảnh chỉnh trong app
+ * (`approved`), Lark chưa ai đổi (`lark_trang_thai` NULL). Luật cũ ép mọi bộ
+ * "theo Lark" mà thiếu Lark về giai đoạn 2 ("Đã chọn hình") — đúng cho
+ * `in_retouch`, SAI cho `approved`: màn khách lùi về "Bean đã nhận danh sách,
+ * ảnh đang chờ chỉnh" (bước "Chờ chỉnh") trong khi quản trị ghi "Khách đã duyệt,
+ * ảnh đang đi in". App đã biết ba mẹ duyệt xong ⇒ ít nhất "Đã chốt chưa in" (7).
+ *
+ * Dùng CHUNG cho `nhanHienThi` (quản trị + `giaiDoanTienDo` gửi màn khách) và
+ * `trangThaiBoAnh`/`trangThaiKhach` (trang-thai-app-lark.ts) — một luật, hai màn.
+ */
+export const GIAI_DOAN_TOI_THIEU_THEO_APP: Readonly<Record<string, number>> = {
+  in_retouch: 2,
+  approved: 7,
+};
+
+/** Giai đoạn Lark sau khi nâng lên mức app đã chứng minh (không bao giờ lùi nhãn). */
+export function giaiDoanSauSan(trangThaiApp: string, gd: number | null): number {
+  const san = GIAI_DOAN_TOI_THIEU_THEO_APP[trangThaiApp] ?? 2;
+  return gd === null || gd < san ? san : gd;
+}
+
 export function nhanHienThi(
   trangThaiApp: string,
   maLark: string | null | undefined,
@@ -151,8 +176,8 @@ export function nhanHienThi(
   if (!theoLark) {
     return { quanTri: nhanApp(trangThaiApp), khach: null, giaiDoan: null };
   }
-  let gd = gdLark;
-  if (gd === null || gd < 2) gd = 2;
+  // BB-402 — sàn theo trạng thái app (approved ≥ 7), không ép mọi bộ về 2.
+  const gd = giaiDoanSauSan(trangThaiApp, gdLark);
   // App đã ghi "đã giao" mà Lark còn chậm: tin app, không lùi nhãn.
   if (trangThaiApp === "delivered" && gd < 10) {
     return { quanTri: nhanApp(trangThaiApp), khach: null, giaiDoan: null };

@@ -73,10 +73,15 @@ export interface ThanhChonProps {
    * lại được nút chính ngay lập tức, không phải chờ mount lại.
    */
   an?: boolean;
+  /**
+   * BB-402 vòng 2 — lối PHỤ nhỏ (liên kết, không phải nút chính). Anh chốt 08/10: bộ đang
+   * chỉnh có nút chính "Chọn thêm ảnh"; muốn đổi danh sách đã chốt thì "Nhắn Bean".
+   */
+  loiPhu?: { nhan: string; href: string } | null;
 }
 
 
-export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0, nutChinhBiChan = false, an = false }: ThanhChonProps) {
+export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaThem, soChuaGui = 0, nutChinhBiChan = false, an = false, loiPhu = null }: ThanhChonProps) {
 
   const vuot = soTamThem > 0;
   // BB-355 — bản vẽ "Màn khách v8": dòng phụ (kể cả "Chọn thêm 2 · 100.000 ₫") dùng
@@ -221,6 +226,19 @@ export function ThanhChon({ daChon, hanMuc, soTamThem, tienThem, nutChinh, muaTh
               </span>
             )}
           </button>
+        )}
+
+        {/* BB-402 vòng 2 — lối PHỤ nhỏ cạnh nút chính (vd "Nhắn Bean" khi đang chỉnh). */}
+        {loiPhu && (
+          <a
+            href={loiPhu.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="loi-phu-thanh-day"
+            className="shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[12px] font-medium text-[#6b6057] underline-offset-2 transition hover:text-[#2E2A27] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] lg:text-[13px]"
+          >
+            {loiPhu.nhan}
+          </a>
         )}
 
         {nutChinh && (

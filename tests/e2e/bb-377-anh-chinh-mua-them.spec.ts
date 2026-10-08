@@ -188,10 +188,10 @@ test.describe("BB-377: ảnh chỉnh của ảnh mua thêm — CSKH gửi đợt
     await chup(page, "5-khach-so-sanh-mua-them-390.png");
     await xem.getByRole("button", { name: "Đóng" }).click();
 
-    // Xin sửa: đã áp 0095 → nút nằm trong khối "Mua thêm đợt 2"; chưa áp → nút chung cả bộ.
-    await khoi.getByRole("button", { name: "Yêu cầu sửa" }).click();
+    // Xin sửa — BB-401: ngay trong màn xem lớn ("Cần sửa tấm này"); đã áp 0095 thì gửi vào
+    // vòng của đợt "Mua thêm đợt 2", chưa áp thì vòng chung cả bộ (kế hoạch gửi tự chia).
     await nhomMt.getByTestId("o-anh-chinh").first().click();
-    await xem.getByTestId("chon-can-sua").click();
+    await xem.getByTestId("nut-can-sua-tam").click();
     await xem.getByRole("textbox", { name: "Ba mẹ muốn Bean sửa gì ở tấm này ạ?" }).fill("Fixture BB-377 tấm mua thêm sáng hơn");
     await xem.getByTestId("nut-khoanh-vung").click();
     const anh = xem.getByTestId("anh-khoanh");
@@ -199,9 +199,13 @@ test.describe("BB-377: ảnh chỉnh của ảnh mua thêm — CSKH gửi đợt
     await page.mouse.click(hop.x + hop.width * 0.5, hop.y + hop.height * 0.4);
     await expect(anh).toHaveAttribute("data-so-vung", "1");
     await chup(page, "6-khach-khoanh-mua-them-390.png");
-    await xem.getByRole("button", { name: "Đóng" }).click();
-    await expect(khoi.getByTestId("so-tam-can-sua")).toHaveText("1 tấm cần sửa");
-    await khoi.getByRole("button", { name: "Gửi yêu cầu sửa" }).click();
+    await xem.getByTestId("nut-xong-ghi-chu").click();
+    await xem.getByTestId("nut-gui-yeu-cau-sua").click();
+    const tomTat = page.getByTestId("tom-tat-gui-sua");
+    await expect(tomTat.getByTestId("so-tam-can-sua")).toContainText("1 tấm cần sửa");
+    await tomTat.getByTestId("nut-xac-nhan-gui-sua").click();
+    await expect(page.getByTestId("xac-nhan-da-gui-sua")).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId("nut-dong-ket-qua").click();
     await expect(page.getByText("Bean đã nhận yêu cầu sửa lần 1 của ba mẹ ạ.").first()).toBeVisible({ timeout: 30_000 });
     await chup(page, "7-khach-da-gui-yeu-cau-390.png");
 

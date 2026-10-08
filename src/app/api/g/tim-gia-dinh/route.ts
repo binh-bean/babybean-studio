@@ -31,6 +31,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import { TOI_DA_ANH_CHINH_SUA } from "@/lib/gallery/tim-gia-dinh";
 import { docTimCuaLink, demTimGiaDinh, laChuaAp0083 } from "@/lib/gallery/tim-gia-dinh-server";
+import { maLarkConHieuLuc } from "@/lib/gallery-status";
+import { dangCheDoChonThem } from "@/lib/gallery/dot-chon";
+import { duocGhiTimGiaDinh } from "@/lib/gallery/luot-chon";
 
 export const runtime = "nodejs";
 
@@ -68,9 +71,15 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const { theoAnh, chuaApMigration } = await demTimGiaDinh(admin, session.galleryId);
+    // BB-400 vòng 2 — người cùng chọn / người gợi ý: kèm gợi ý CỦA CHÍNH link này (đợt N).
+    const cuaToi =
+      session.role === "co_editor" || session.role === "suggester"
+        ? (await docTimCuaLink(admin, session.shareLinkId, session.galleryId)).ids
+        : undefined;
     return ok({
       vai: "ba_me",
       giaDinh: Array.from(theoAnh, ([photoId, soNguoi]) => ({ photoId, soNguoi })),
+      ...(cuaToi ? { cuaToi } : {}),
       chuaApMigration,
     });
   } catch (err) {
@@ -83,7 +92,7 @@ export async function POST(request: Request): Promise<Response> {
   const requestId = randomUUID();
   try {
     const session = await requirePhienBoAnh(request);
-    if (session.role !== "viewer") {
+    if (session.role === "owner") {
       return fail("FORBIDDEN", "Ba mẹ thả tim ở danh sách chọn ảnh của mình ạ");
     }
 
@@ -98,13 +107,18 @@ export async function POST(request: Request): Promise<Response> {
 
     const { data: gallery, error: gErr } = await admin
       .from("galleries")
-      .select("id, status")
+      .select("id, status, lark_trang_thai, lark_trang_thai_tu, reopened_at")
       .eq("id", session.galleryId)
       .maybeSingle();
     if (gErr) throw gErr;
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     if (!dangMoChoKhachXem(gallery.status as string)) {
       return fail("CONFLICT", "Bộ ảnh này không còn mở cho gia đình ạ");
+    }
+    // BB-400 vòng 2 — người cùng chọn / người gợi ý chỉ GỢI Ý ở đợt N (đợt 1 họ chọn thẳng
+    // qua /api/g/selection như cũ). Cùng hàm quyết với màn khách (`duocGhiTimGiaDinh`).
+    if (!duocGhiTimGiaDinh(session.role, dangCheDoChonThem(gallery.status as string, maLarkConHieuLuc(gallery)))) {
+      return fail("FORBIDDEN", "Đợt 1 đang mở — chọn thẳng vào danh sách của bộ ảnh ạ");
     }
 
     // Ảnh phải thuộc ĐÚNG bộ ảnh của phiên — kiểm trước khi chạm bảng tim.

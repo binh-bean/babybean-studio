@@ -97,7 +97,8 @@ describe("BB-384 · khung ReviewPanel không còn đường duyệt bằng link 
     expect(html).toContain("IMG_0001.jpg");
     expect(html).toContain("Bé hơi tối");
     // BB-387 — lời xin lỗi của anh + khoảng ngày; KHÔNG nêu tên thợ chỉnh.
-    expect(html).toContain("Yêu cầu của ba mẹ đã được ghi nhận và chuyển đến bộ phận hậu kỳ");
+    // BB-401 — anh chốt lại 08/10: một câu nối bằng dấu phẩy.
+    expect(html).toContain("ảnh này, yêu cầu của ba mẹ đã được ghi nhận và chuyển đến bộ phận hậu kỳ");
     expect(html).toContain("trong khoảng 3 ngày");
     expect(html).not.toContain("<button");
   });

@@ -174,6 +174,10 @@ export const PHAN_LOAI_BANG = {
   roles: { nhom: NHOM_GIU, lyDo: "vai trò tự tạo trong app (BB-172)" },
   settings: { nhom: NHOM_GIU, lyDo: "cài đặt vận hành (webhook, hàng đợi hook, mốc đồng bộ)" },
   packages: { nhom: NHOM_GIU, lyDo: "gói chụp — danh mục app tự quản, không script nào nạp lại" },
+  goi_chup_gia_anh_them: {
+    nhom: NHOM_GIU,
+    lyDo: "giá ảnh thêm theo mã gói (0100) — cấu hình Admin nhập ở màn Gói chụp, khoá theo ma_goi, không trỏ dữ liệu bị xoá",
+  },
   schema_migrations: {
     nhom: NHOM_GIU,
     lyDo: "sổ ghi nhận migration đã áp (0076) — xoá là migrate-prod áp lại cả dãy lên dữ liệu thật",
@@ -223,7 +227,13 @@ export const PHAN_LOAI_BANG = {
   },
   yeu_cau_mua_them: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "yêu cầu mua lần hai của khách (0072)" },
   revision_request_items: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "chi tiết từng tấm của vòng sửa ảnh chỉnh (0091)" },
+  anh_chinh_duyet_tam: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "tấm ảnh chỉnh ba mẹ bấm Duyệt tấm này (0108, BB-401)" },
   revision_requests: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "vòng duyệt ảnh chỉnh" },
+  anh_chinh_dot: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "mốc gửi/duyệt ảnh chỉnh theo đợt mua thêm (0095)" },
+  hoa_don_bo_anh: {
+    nhom: NHOM_XOA_DU_LIEU_THU,
+    lyDo: "mã hoá đơn Lark gán cho bộ ảnh (0102, BB-395) — gán lại sau khi nạp, bộ ảnh mới id mới",
+  },
   deliveries: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "giao hàng" },
   activity_logs: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "nhật ký thao tác" },
   notifications: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "hàng đợi tin Lark" },
@@ -268,9 +278,14 @@ export const THU_TU_XOA = [
   "lark_nhac_da_gui",
   // 0072: product_id BẮT BUỘC, KHÔNG cascade -> phải đứng TRƯỚC products.
   "yeu_cau_mua_them",
+  // 0108 (BB-401): tham chiếu galleries/photos — đứng TRƯỚC photos.
+  "anh_chinh_duyet_tam",
   // 0091: tham chiếu revision_requests và photos — đứng TRƯỚC cả hai.
   "revision_request_items",
   "revision_requests",
+  // 0095 / 0102: chỉ trỏ galleries (cascade); đặt trước galleries cho nhất quán.
+  "anh_chinh_dot",
+  "hoa_don_bo_anh",
   "deliveries",
   "gallery_items",
   // 0079: bản sao dòng Hậu Kỳ; branch_id/gallery_id đều "set null" nên thứ tự

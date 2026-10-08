@@ -33,6 +33,7 @@ import {
 import { getGalleryContractSummary } from "@/lib/selection/contract";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
 import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
+import { ghiChuChoAnhMoi } from "@/lib/gallery/luot-chon";
 
 // ---------------------------------------------------------------------------
 // Nhận diện lỗi "chưa áp migration"
@@ -484,6 +485,8 @@ export async function chotDotChon(
      * Cộng vào giỏ + tiền sản phẩm của đợt; KHÔNG một mình tạo được đợt (đợt cần ảnh hoặc hàng).
      */
     dongDichVu?: DongSanPhamDot[];
+    /** BB-400 — ghi chú cho thợ của tấm mới (chỉ tấm thuộc đợt này được ghi). */
+    ghiChu?: ReadonlyArray<{ photoId: string; ghiChu: string }>;
   },
 ): Promise<KetQuaChotDot> {
   const photoIds = Array.from(new Set(p.photoIds));
@@ -513,7 +516,7 @@ export async function chotDotChon(
   // 2. Ảnh đã nằm trong đợt khác thì KHOÁ — không chọn lại ở đây.
   const { data: dongCo, error: eCo } = await admin
     .from("selection_items")
-    .select("id, photo_id, mark, dot")
+    .select("id, photo_id, mark, dot, retouch_note")
     .eq("selection_id", p.selectionId);
   if (eCo) {
     if (laLoiChuaApMigration(eCo)) {
@@ -521,7 +524,7 @@ export async function chotDotChon(
     }
     throw eCo;
   }
-  type DongCo = { id: string; photo_id: string; mark: string | null; dot: number | null };
+  type DongCo = { id: string; photo_id: string; mark: string | null; dot: number | null; retouch_note?: string | null };
   const cacDongCo = (dongCo ?? []) as DongCo[];
 
   const daChonMap = new Map<string, number>(
@@ -623,7 +626,8 @@ export async function chotDotChon(
     for (const d of cacDongCo.filter((x) => x.mark !== "selected" && hopLe.includes(x.photo_id))) {
       const { error: e2 } = await admin
         .from("selection_items")
-        .update({ mark: d.mark, dot: d.dot ?? 1 })
+        // BB-400 — trả cả ghi chú cũ (đợt này có thể đã ghi đè ghi chú của dòng nâng lên).
+        .update({ mark: d.mark, dot: d.dot ?? 1, retouch_note: d.retouch_note ?? null })
         .eq("id", d.id);
       kiem("trả dòng ảnh cũ", e2);
     }
@@ -645,6 +649,8 @@ export async function chotDotChon(
     const dongCoTheoAnh = new Map(cacDongCo.map((d) => [d.photo_id, d]));
     const cacThem = hopLe.filter((id) => !dongCoTheoAnh.has(id));
     const cacNang = hopLe.filter((id) => dongCoTheoAnh.has(id));
+    // BB-400 — ghi chú cho thợ của tấm mới, cùng cột `retouch_note` với đợt 1.
+    const ghiChuMoi = ghiChuChoAnhMoi(p.ghiChu, hopLe);
 
     if (cacThem.length > 0) {
       const { error } = await admin.from("selection_items").insert(
@@ -654,6 +660,7 @@ export async function chotDotChon(
           gallery_id: p.galleryId,
           mark: "selected",
           dot: soDot,
+          retouch_note: ghiChuMoi.get(photoId) ?? null,
         })),
       );
       if (error) throw error;
@@ -665,6 +672,17 @@ export async function chotDotChon(
         .eq("selection_id", p.selectionId)
         .in("photo_id", cacNang);
       if (error) throw error;
+      // Dòng nâng lên có ghi chú mới thì ghi riêng từng tấm (ít tấm; không có thì giữ ghi chú cũ).
+      for (const photoId of cacNang) {
+        const chu = ghiChuMoi.get(photoId);
+        if (!chu) continue;
+        const { error: eGc } = await admin
+          .from("selection_items")
+          .update({ retouch_note: chu })
+          .eq("selection_id", p.selectionId)
+          .eq("photo_id", photoId);
+        if (eGc) throw eGc;
+      }
     }
 
     // 7. Sản phẩm mua thêm của đợt, đơn giá chốt lúc này (luật 1 của BB-105).

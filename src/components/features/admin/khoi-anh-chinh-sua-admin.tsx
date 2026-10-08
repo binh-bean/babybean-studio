@@ -5,7 +5,7 @@
  *     ảnh gốc ghép theo tên;
  *   · nút "Gửi khách duyệt" — chỉ sau nút này khách mới thấy ảnh chỉnh;
  *   · các lần khách xin sửa: từng tấm, ghi chú, vùng khoanh (vẽ đè lên ảnh), ảnh
- *     mẫu (URL ký 10 phút).
+ *     mẫu (qua route cùng origin `…/anh-chinh-sua/anh-mau`, xét quyền mỗi lần xem).
  *
  * Bộ không có ảnh chỉnh và chưa có yêu cầu sửa chi tiết nào thì khối tự ẩn.
  */
@@ -56,6 +56,14 @@ interface DuLieu {
     }[];
   }[];
   tinhNang: { chiTiet: boolean; theoDot: boolean };
+  /**
+   * BB-401 vòng 2 — tấm khách đã bấm "Duyệt tấm này" (còn hiệu lực trong vòng gửi hiện tại).
+   * `null`/thiếu = chưa áp migration 0108.
+   */
+  duyetTam?: {
+    tong: number;
+    daDuyet: { photoId: string; fileName: string; nhan: string; duyetLuc: string }[];
+  } | null;
   /** BB-384 — số ảnh chỉnh trong gói khách đang thấy trong app. */
   soAnhKhachThay?: number;
   /** BB-384 — "Khách chưa xem được ảnh chỉnh — …" khi bộ ở bước duyệt mà khách không thấy tấm nào. */
@@ -340,6 +348,30 @@ export function KhoiAnhChinhSuaAdmin({
         </div>
       ))}
 
+      {/* BB-401 vòng 2 — thợ/CSKH biết khách đã ưng những tấm nào (đừng đụng khi sửa). */}
+      {d.duyetTam && d.duyetTam.tong > 0 && (
+        <div className="mt-4 rounded-md border border-[var(--bb-border)] p-3 text-sm" data-testid="duyet-tam-admin">
+          <p className="font-medium" data-testid="dem-duyet-tam-admin">
+            Khách đã duyệt {formatSo(d.duyetTam.daDuyet.length)}/{formatSo(d.duyetTam.tong)} tấm
+          </p>
+          {d.duyetTam.daDuyet.length > 0 && (
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {d.duyetTam.daDuyet.map((x) => (
+                <li
+                  key={x.photoId}
+                  data-testid="tam-da-duyet-admin"
+                  className="rounded-full bg-[var(--bb-surface-2)] px-2.5 py-0.5 text-xs"
+                  title={`Duyệt lúc ${formatNgayVN(x.duyetLuc)}`}
+                >
+                  ✓ {x.fileName}
+                  {coMuaThem ? ` · ${x.nhan}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {d.vongSua.length > 0 && (
         <div className="mt-4 flex flex-col gap-3">
           {d.vongSua.map((v) => (
@@ -398,13 +430,19 @@ export function KhoiAnhChinhSuaAdmin({
                           <p className="text-xs text-[var(--bb-fg-muted)]">{formatSo(it.marks.length)} vùng khoanh</p>
                         )}
                         {it.anhMau.length > 0 && (
-                          <div className="mt-1 flex gap-2">
-                            {it.anhMau.map((u, i) => (
-                              <a key={i} href={u} target="_blank" rel="noopener noreferrer" title="Ảnh mẫu khách gửi">
-                                {/* eslint-disable-next-line @next/next/no-img-element -- URL ký Storage, sống 10 phút */}
-                                <img src={u} alt={`Ảnh mẫu ${i + 1}`} className="h-16 w-16 rounded object-cover" />
-                              </a>
-                            ))}
+                          // BB-401 — ảnh minh hoạ khách tải lên khi bấm "Cần sửa tấm này" (bấm để mở to).
+                          <div className="mt-1" data-testid="anh-minh-hoa-admin">
+                            <p className="text-xs text-[var(--bb-fg-muted)]">
+                              Ảnh minh hoạ khách gửi ({formatSo(it.anhMau.length)})
+                            </p>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              {it.anhMau.map((u, i) => (
+                                <a key={i} href={u} target="_blank" rel="noopener noreferrer" title="Ảnh minh hoạ khách gửi">
+                                  {/* eslint-disable-next-line @next/next/no-img-element -- ảnh mẫu qua route quản trị cùng origin (bucket riêng tư) */}
+                                  <img src={u} alt={`Ảnh minh hoạ ${i + 1}`} className="h-20 w-20 rounded object-cover" />
+                                </a>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </li>

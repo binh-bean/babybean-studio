@@ -73,6 +73,8 @@ export interface ReviewData {
    * mặc định 3). Màn khách KHÔNG nêu tên thợ chỉnh nên không còn trường người chỉnh.
    */
   soNgaySua?: number;
+  /** BB-402 — số đợt mua thêm CSKH đã gửi duyệt mà ba mẹ chưa duyệt (`loaiNutChinh`). */
+  soDotMuaThemChoDuyet?: number;
 }
 
 /**

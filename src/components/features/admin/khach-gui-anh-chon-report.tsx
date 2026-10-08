@@ -25,6 +25,7 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { NutXuLyDot, dongTomTatDot } from "./dot-chon-admin";
+import { duongDanMoDanhSach } from "@/lib/gallery/danh-sach-theo-dot";
 import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./form-thanh-toan";
 import { KhoiHoaDon } from "./khoi-hoa-don";
 import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
@@ -236,7 +237,7 @@ export function KhachGuiAnhChonReport() {
 }
 
 /** Ngăn chi tiết của một bộ ảnh — đủ công cụ để xong việc mà không rời trang. */
-function NganXuLy({
+export function NganXuLy({
   dong,
   canConfirm,
   onDone,
@@ -505,13 +506,14 @@ function NganXuLy({
 
       {/* 5. Xuất danh sách + 6. Nhắn khách */}
       <div className="flex flex-wrap items-center gap-2" data-testid="khoi-xuat-nhan">
-        <a href={`/api/admin/galleries/${co}/export`} download className={NUT_PHU}>
-          Tải danh sách ảnh đã chọn
-        </a>
+        {/* BB-403 (anh 08/10): không tải tệp — mở danh sách ngay trên trang bộ ảnh, đúng đợt, có nút chép. */}
+        <Link href={duongDanMoDanhSach(gid, null)} className={NUT_PHU} data-testid="xem-danh-sach-anh-chon">
+          Xem danh sách ảnh đã chọn
+        </Link>
         {dong.dotMuaThem.map((m) => (
-          <a key={m.soDot} href={`/api/admin/galleries/${co}/export?dot=${m.soDot}`} download className={NUT_PHU}>
-            Chỉ đợt {m.soDot}
-          </a>
+          <Link key={m.soDot} href={duongDanMoDanhSach(gid, m.soDot)} className={NUT_PHU} data-testid={`xem-danh-sach-dot-${m.soDot}`}>
+            Xem đợt {m.soDot}
+          </Link>
         ))}
         <NutNhanKhach url={ct?.customerChatUrl} />
         {ct && !ct.customerChatUrl && (

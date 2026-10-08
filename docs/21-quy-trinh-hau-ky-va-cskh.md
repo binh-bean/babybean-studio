@@ -366,8 +366,11 @@ khách chọn ảnh + sản phẩm  →  "Chốt đợt N"  →  cho_xac_nhan  (
 - Thẻ **"Khách mua thêm đợt N: X ảnh · Y ₫"** (Xác nhận / Từ chối (lý do)) ở đầu
   trang chi tiết bộ ảnh và ở tab **Khách mua thêm** của `/admin/viec-can-xu-ly`
   (cùng huy hiệu "Cần xử lý ngay").
-- Khối "Đợt chọn" liệt kê ảnh THEO ĐỢT; nút **"Tải danh sách chỉ đợt N"** =
-  `GET /api/admin/galleries/[id]/export?dot=N` để thợ chỉnh ảnh làm đúng ảnh mới.
+- Khối "Đợt chọn" liệt kê ảnh THEO ĐỢT. Từ BB-403 (anh 08/10) KHÔNG còn nút tải: bấm
+  **"Xem danh sách đợt N"** (hoặc chip **Đợt N** ở khối "Xuất danh sách") thì danh sách hiện ngay
+  trên trang (`GET /api/admin/galleries/[id]/export?hien=1&dot=N`), có nút **Chép tên tệp** /
+  **Chép bản chi tiết** để thợ chỉnh ảnh làm đúng ảnh mới. Tab "Khách gửi ảnh chọn" có lối
+  "Xem đợt N" dẫn tới `/admin/galleries/<id>#xuat-danh-sach-dot-N`.
 
 ### Nút "Mở lại" của CSKH
 

@@ -3,8 +3,8 @@
  *
  * Trả: từng tấm ảnh chỉnh (ghép ảnh gốc theo tên), tấm nào CHƯA gửi khách
  * (mới về sau lần "Gửi khách duyệt" gần nhất), và các vòng khách xin sửa với
- * đủ chi tiết từng tấm: ghi chú, vùng khoanh, ảnh mẫu (URL KÝ 10 phút — bucket
- * riêng tư, không bao giờ trả đường công khai).
+ * đủ chi tiết từng tấm: ghi chú, vùng khoanh, ảnh mẫu (qua route cùng origin `anh-mau` —
+ * bucket riêng tư, không bao giờ trả đường công khai).
  */
 
 import { randomUUID } from "node:crypto";
@@ -17,9 +17,8 @@ import { canhBaoKhachChuaXem } from "@/lib/anh-chinh-sua/vong-duyet";
 import { maLarkConHieuLuc } from "@/lib/gallery-status";
 import { giaiDoanCua } from "@/lib/lark/trang-thai-hau-ky";
 import {
-  BUCKET_ANH_MAU,
-  HAN_URL_KY_GIAY,
   coBangChiTiet,
+  laDuongDanAnhMau,
   docBoiCanhAnhChinh,
   docChiTietVong,
   docVongSua,
@@ -35,6 +34,8 @@ import {
   trangThaiDuyetDot,
   trangThaiDuyetTrongGoi,
 } from "@/lib/anh-chinh-sua/theo-dot";
+import { tamDuyetConHieuLuc } from "@/lib/anh-chinh-sua/duyet-tung-tam";
+import { docDuyetTam } from "@/lib/anh-chinh-sua/duyet-tam-du-lieu";
 
 export const runtime = "nodejs";
 
@@ -61,11 +62,13 @@ export async function GET(
     const lyDoChan = xetQuyenXemBoAnh(staff, gallery as { branch_id: string; editor_id: string | null });
     if (lyDoChan) return fail("FORBIDDEN", CAU_CHAN_BO_ANH[lyDoChan].tieuDe);
 
-    const [bc, vong, chiTiet, coBang] = await Promise.all([
+    const [bc, vong, chiTiet, coBang, dongDuyet] = await Promise.all([
       docBoiCanhAnhChinh(admin, galleryId),
       docVongSua(admin, galleryId, false),
       docChiTietVong(admin, galleryId),
       coBangChiTiet(admin),
+      // BB-401 vòng 2 — tấm khách đã bấm "Duyệt tấm này" (0108); null = chưa áp.
+      docDuyetTam(admin, galleryId),
     ]);
     const theoDot = bc.mocDot !== null;
     const guiLuc = bc.mocChung;
@@ -75,13 +78,10 @@ export async function GET(
       ...bc.goc.map((g) => [g.id, g.file_name] as [string, string]),
     ]);
 
-    // URL ký cho mọi ảnh mẫu trong một lượt.
-    const duongDan = [...new Set(chiTiet.flatMap((c) => c.reference_paths ?? []))];
-    const urlKy = new Map<string, string>();
-    if (duongDan.length > 0) {
-      const { data: ky } = await admin.storage.from(BUCKET_ANH_MAU).createSignedUrls(duongDan, HAN_URL_KY_GIAY);
-      for (const k of ky ?? []) if (k.path && k.signedUrl) urlKy.set(k.path, k.signedUrl);
-    }
+    // BB-401 vòng 3 — ảnh mẫu đi qua route cùng origin (xét quyền lại mỗi lần xem): URL ký của
+    // Storage bị CSP `img-src` chặn nên trước đây ảnh không bao giờ hiện trên màn quản trị.
+    const urlAnhMau = (p: string) =>
+      `/api/admin/galleries/${galleryId}/anh-chinh-sua/anh-mau?p=${encodeURIComponent(p)}`;
 
     const anh = bc.anhChinh.map((a) => {
       const g = gocTheoId.get(bc.gocCua.get(a.id) ?? "");
@@ -147,9 +147,36 @@ export async function GET(
       soAnhKhachThay,
     });
 
+    // BB-401 vòng 2 — "Khách đã duyệt n/N tấm": N = ảnh chỉnh đã gửi khách; n = dấu duyệt bấm
+    // sau mốc gửi gần nhất của vòng tấm đó (gửi lại sau khi sửa thì khách duyệt lại từ đầu).
+    const daGui = anh.filter((a) => !a.chuaGui);
+    const idDaGui = new Set(daGui.map((a) => a.id));
+    const khoaTheoId = new Map(anh.map((a) => [a.id, a.khoa]));
+    const duyetTam =
+      dongDuyet === null
+        ? null
+        : (() => {
+            const conHieuLuc = tamDuyetConHieuLuc(dongDuyet, (id) =>
+              idDaGui.has(id) ? mocGuiCuaKhoa(khoaTheoId.get(id) ?? KHOA_TRONG_GOI, guiLuc, bc.mocDot) : null,
+            );
+            return {
+              tong: daGui.length,
+              daDuyet: dongDuyet
+                .filter((d) => conHieuLuc.has(d.photo_id))
+                .map((d) => ({
+                  photoId: d.photo_id,
+                  fileName: tenTheoId.get(d.photo_id) ?? "",
+                  nhan: nhanCuaKhoa(khoaTheoId.get(d.photo_id) ?? KHOA_TRONG_GOI, bc.nhom),
+                  duyetLuc: d.duyet_luc,
+                }))
+                .sort((a, b) => a.fileName.localeCompare(b.fileName)),
+            };
+          })();
+
     return ok({
       trangThai: gallery.status,
       guiLuc,
+      duyetTam,
       anh,
       soChuaGui,
       coTheGui: coTheGuiTrongGoi(anhVongChung.length, soChuaGui),
@@ -177,7 +204,7 @@ export async function GET(
                 deXuatBoi: bc.nhom.find((n) => n.khoa === khoaTam)?.deXuatBoi ?? null,
                 note: c.note,
                 marks: chuanHoaVung(c.marks),
-                anhMau: (c.reference_paths ?? []).map((p) => urlKy.get(p)).filter((u): u is string => !!u),
+                anhMau: (c.reference_paths ?? []).filter((p) => laDuongDanAnhMau(p, galleryId)).map(urlAnhMau),
               };
             }),
         };

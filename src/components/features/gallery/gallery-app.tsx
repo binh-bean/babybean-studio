@@ -7,6 +7,7 @@ import { ReviewPanel, type ReviewData } from "@/components/features/gallery/revi
 import { TheHanhTrinh } from "@/components/features/gallery/the-hanh-trinh";
 import { AnhChinhSuaKhach } from "@/components/features/gallery/anh-chinh-sua-khach";
 import { khoiVungDuyet, thanhDayBuocDuyet } from "@/lib/anh-chinh-sua/vong-duyet";
+import { coLoiNhanBean, loaiNutChinh, NHAN_NUT_CHINH } from "@/lib/gallery/nut-chinh-khach";
 import { tranhHanhTrinh } from "@/components/features/gallery/hanh-trinh";
 import { DanhSachBuoiChup } from "@/components/features/gallery/danh-sach-buoi-chup";
 import { ManLoiLink, loaiLoiTuMa } from "@/components/features/gallery/man-loi-link";
@@ -38,20 +39,31 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { demMon, demMonInChuaAnhHienThi } from "@/lib/gallery/dem-mon";
 import { giuA, giuCuoi } from "@/lib/utils/giu-a";
 import { MenuTaiAnh } from "@/components/features/gallery/menu-tai-anh";
-import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
+import { PhotoLightbox, type PhotoLightboxProps } from "@/components/features/gallery/photo-lightbox";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
 import { NutLenDauTrang } from "@/components/features/gallery/nut-len-dau-trang";
 import { CamOnSauChot } from "@/components/features/gallery/cam-on-sau-chot";
 import { OLamAnhNhanh, TheLamAnhNhanhSauChot } from "@/components/features/gallery/lam-anh-nhanh-khach";
 import { tamTinhHopChot, type LamAnhNhanhKhach } from "@/lib/dich-vu/lam-anh-nhanh";
+import { duSoSanh, SO_SANH_TOI_THIEU } from "@/lib/gallery/so-sanh";
 import {
-  themVaoSoSanh,
-  boKhoiSoSanh,
-  duSoSanh,
-  daDuSoSanh,
-  SO_SANH_TOI_DA,
-  SO_SANH_TOI_THIEU,
-} from "@/lib/gallery/so-sanh";
+  cachDatTuManTreo,
+  chipLocLuotChon,
+  congCuLuotChon,
+  locAnhLuotChon,
+  nguCanhTuVai,
+} from "@/lib/gallery/luot-chon";
+import {
+  DatInChoGiaDinh,
+  demAnhTheoNhom,
+  HangChipLoc,
+  HangNhomAnh,
+  NutSoSanh,
+  propsCongCuXemLon,
+  ThanhDauSoSanh,
+  ThanhDaySoSanh,
+  useSoSanhLuotChon,
+} from "@/components/features/gallery/cong-cu-luot-chon";
 
 /**
  * BB-272 — tách tải chậm cho những khối KHÔNG cần ngay lúc vào trang.
@@ -83,8 +95,14 @@ const ManTreoTuong = dynamic(
 const CuaHang = dynamic(() => import("@/components/features/gallery/cua-hang").then((m) => m.CuaHang), {
   ssr: false,
 });
+import type { DongGioGiaDinh } from "@/components/features/gallery/man-mua-gia-dinh";
 const MoiMuaLanHai = dynamic(
   () => import("@/components/features/gallery/moi-mua-lan-hai").then((m) => m.MoiMuaLanHai),
+  { ssr: false },
+);
+// BB-400 vòng 2 — màn mua của gia đình được mời (thay cả trang, xem nhánh `moMuaNguoiXem`).
+const ManMuaGiaDinh = dynamic(
+  () => import("@/components/features/gallery/man-mua-gia-dinh").then((m) => m.ManMuaGiaDinh),
   { ssr: false },
 );
 // BB-321 — màn "Chọn thêm ảnh · Đợt N" (thay cả trang khi mở, xem nhánh `moManDot`).
@@ -117,7 +135,6 @@ const HuongDanThemManHinh = dynamic(
 const SoSanhAnh = dynamic(() => import("@/components/features/gallery/so-sanh-anh").then((m) => m.SoSanhAnh), {
   ssr: false,
 });
-import { Columns2, X as XIcon } from "lucide-react";
 import { taiTheoLo, doDocDuocDungLuong, type TienDoTai } from "@/lib/utils/tai-anh";
 import {
   tinhTenBiaTuDuLieu,
@@ -571,9 +588,19 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
    * lên thì bấm ảnh trong lưới là đánh dấu so sánh (tối đa 4), không mở màn
    * xem lớn. Toán thêm/bớt/giới hạn nằm ở `lib/gallery/so-sanh.ts`.
    */
-  const [soSanhBat, setSoSanhBat] = useState(false);
-  const [dsSoSanh, setDsSoSanh] = useState<string[]>([]);
-  const [moSoSanh, setMoSoSanh] = useState(false);
+  // BB-400 — cùng hook với màn "Chọn thêm ảnh · Đợt N" (`cong-cu-luot-chon.tsx`).
+  const soSanh = useSoSanhLuotChon(photos, setStatusMessage);
+  const {
+    soSanhBat,
+    dsSoSanh,
+    moSoSanh,
+    setMoSoSanh,
+    onToggleSoSanh,
+    boKhoiManSoSanh,
+    huySoSanh,
+    soSanhTheoAnh,
+    anhDangSoSanh,
+  } = soSanh;
 
   /**
    * Ba mẹ đã bấm Chốt, CSKH chưa xác nhận → màn hình KHOÁ MỀM.
@@ -593,6 +620,11 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
   const [moCuaHang, setMoCuaHang] = useState(false);
   // BB-355 (c) — người được mời mở màn mua ảnh in/album từ nút túi ở thanh đáy.
   const [moMuaNguoiXem, setMoMuaNguoiXem] = useState(false);
+  // BB-400 vòng 2 — màn mua của gia đình (thay cả trang): giỏ chờ gửi giữ ở đây để đóng/mở
+  // lại không mất; tấm "Đặt in tấm này" mở thẳng cửa hàng; số lần gửi để làm mới thẻ "đã gửi".
+  const [gioGiaDinh, setGioGiaDinh] = useState<DongGioGiaDinh[]>([]);
+  const [datInTamGiaDinh, setDatInTamGiaDinh] = useState<string | null>(null);
+  const [soLanGuiGiaDinh, setSoLanGuiGiaDinh] = useState(0);
   /**
    * BB-279 — đường thứ hai vào cửa hàng: "Đặt in tấm này" ở màn xem ảnh lớn
    * mở thẳng ĐÚNG nhóm sản phẩm với tấm đang xem đã chọn sẵn, bỏ qua bước
@@ -611,6 +643,13 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
    * trước đó, không nhảy về tấm đầu.
    */
   const [manTreoTuongTuAnh, setManTreoTuongTuAnh] = useState<string | null>(null);
+  /** BB-400 vòng 4 — tấm NGOÀI lưới đang ướm (ảnh đã chỉnh): mang theo tên tệp + kích thước. */
+  const [anhTreoNgoai, setAnhTreoNgoai] = useState<{
+    id: string;
+    fileName: string;
+    width: number | null;
+    height: number | null;
+  } | null>(null);
   /**
    * BB-398 — mở màn treo tường TỪ CỬA HÀNG: mang theo đúng chất liệu + khổ (+ khung) ba mẹ
    * vừa chọn ở cửa hàng. `null` = mở từ màn xem lớn (màn treo tự chọn mặc định như cũ).
@@ -1040,6 +1079,10 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
     void loadGallery();
   }, [loadGallery]);
 
+  // BB-401 — khối ảnh chỉnh đang hiện lời xin lỗi / lời cảm ơn sau khi ba mẹ gửi: giữ khối
+  // mở dù bộ đã sang "đang sửa"/"đã duyệt" (sự kiện tức thì nạp lại bộ ngay) cho tới khi ba mẹ đóng.
+  const [giuKhoiAnhChinh, setGiuKhoiAnhChinh] = useState(false);
+
   /**
    * Thao tác THẢ TIM = CHỌN ẢNH.
    * CẢNH BÁO BẢO VỆ:
@@ -1208,63 +1251,18 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
   );
 
   /**
-   * BB-218 — đánh dấu/bỏ đánh dấu một tấm để so sánh. Bấm ảnh trong lưới khi
-   * chế độ so sánh đang bật gọi thẳng hàm này (xem `onToggle` của LuoiAnh).
-   *
-   * Đã đủ 4 tấm mà bấm thêm một tấm mới thì KHÔNG lặng lẽ bỏ qua — báo cho ba
-   * mẹ biết vì sao bấm không thấy gì xảy ra (cùng cơ chế `statusMessage` đã
-   * dùng cho các lỗi chọn ảnh khác).
-   */
-  const onToggleSoSanh = useCallback(
-    (photo: PhotoPublic) => {
-      // Đọc danh sách hiện tại rồi mới đặt — báo lỗi nằm NGOÀI hàm cập nhật
-      // trạng thái, vì React có thể gọi hàm cập nhật hai lần.
-      if (dsSoSanh.includes(photo.id)) {
-        setDsSoSanh(boKhoiSoSanh(dsSoSanh, photo.id));
-        return;
-      }
-      if (daDuSoSanh(dsSoSanh)) {
-        setStatusMessage(
-          vi.gallery.loiBean.soSanhToiDa.replace("{n}", String(SO_SANH_TOI_DA)),
-        );
-        return;
-      }
-      setDsSoSanh(themVaoSoSanh(dsSoSanh, photo.id));
-    },
-    [dsSoSanh],
-  );
-
-  /**
-   * Bỏ một tấm ngay trong màn so sánh. Còn dưới 2 tấm thì ĐÓNG màn so sánh
-   * luôn — nếu chỉ ẩn nó đi (moSoSanh vẫn bật), lần sau ba mẹ đánh dấu thêm
-   * một tấm ở lưới thì màn so sánh tự bật lên không báo trước.
-   */
-  const boKhoiManSoSanh = useCallback(
-    (photo: PhotoPublic) => {
-      const conLai = boKhoiSoSanh(dsSoSanh, photo.id);
-      setDsSoSanh(conLai);
-      if (!duSoSanh(conLai)) setMoSoSanh(false);
-    },
-    [dsSoSanh],
-  );
-
-  /** Huỷ hẳn chế độ so sánh: tắt chế độ chọn VÀ xoá danh sách đang đánh dấu. */
-  const huySoSanh = useCallback(() => {
-    setSoSanhBat(false);
-    setDsSoSanh([]);
-    setMoSoSanh(false);
-  }, []);
-
-  /**
    * BB-218 — "So sánh với tấm khác" trong màn xem lớn: đưa tấm đang xem vào
-   * danh sách so sánh, đóng màn xem lớn, quay về lưới ở chế độ chọn (bật
-   * `soSanhBat` nếu chưa bật) để ba mẹ chọn thêm tấm còn lại.
+   * danh sách so sánh, đóng màn xem lớn, quay về lưới ở chế độ chọn. Đánh dấu /
+   * bỏ / huỷ so sánh nằm ở `useSoSanhLuotChon` (BB-400, dùng chung với màn đợt).
    */
-  const onSoSanhTuLightbox = useCallback((photo: PhotoPublic) => {
-    setDsSoSanh((cu) => (cu.includes(photo.id) ? cu : themVaoSoSanh(cu, photo.id)));
-    setSoSanhBat(true);
-    setLightboxIndex(null);
-  }, []);
+  const themSoSanhTuXemLon = soSanh.themTuXemLon;
+  const onSoSanhTuLightbox = useCallback(
+    (photo: PhotoPublic) => {
+      themSoSanhTuXemLon(photo);
+      setLightboxIndex(null);
+    },
+    [themSoSanhTuXemLon],
+  );
 
   /**
    * BB-218 — chạm hai lần một tấm trong màn so sánh: mở tấm đó trong màn xem
@@ -1373,6 +1371,11 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
     // sánh — ba mẹ đang so dở, không phải đang xem lưới.
     if (lightboxDungDanhSachDay && soSanhBat && duSoSanh(dsSoSanh)) setMoSoSanh(true);
   });
+  // BB-400 vòng 2 — màn mua của gia đình (thay cả trang): Back đóng màn, vẫn ở bộ ảnh (BB-338).
+  const dongMuaGiaDinh = useNutBackDong(moMuaNguoiXem, () => {
+    setMoMuaNguoiXem(false);
+    setDatInTamGiaDinh(null);
+  });
   const dongCuaHang = useNutBackDong(moCuaHang, () => {
     setMoCuaHang(false);
     setPresetCuaHang(null);
@@ -1380,12 +1383,16 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
   const dongHopChot = useNutBackDong(showSubmitModal, () => setShowSubmitModal(false));
 
   const laNguoiXem = gallery?.myRole === "viewer";
+  // BB-400 vòng 2 — người cùng chọn / người gợi ý khi bộ đã sang đợt N: GỢI Ý ảnh cho đợt mới
+  // bằng tim chung (cùng kho tim gia đình); ba mẹ thấy dấu "Gia đình thích" trên lưới đợt.
+  const goiYDot =
+    (gallery?.myRole === "co_editor" || gallery?.myRole === "suggester") && dotChon.tt?.cheDoChonThem === true;
   const {
     timCuaToi: timNguoiXem,
     doiTim: doiTimNguoiXem,
     giaDinhThich,
     chuaApMigration: timChuaAp0083,
-  } = useTimGiaDinh(gallery?.id, laNguoiXem);
+  } = useTimGiaDinh(gallery?.id, laNguoiXem || goiYDot);
   /** Nguồn ảnh cho lưới/màn xem lớn: người xem thấy tim CỦA HỌ, ba mẹ thấy như cũ. */
   const nguonAnh = useMemo(
     () =>
@@ -1395,34 +1402,10 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
     [laNguoiXem, photos, timNguoiXem],
   );
 
-  // Lọc danh sách ảnh
-  const filteredPhotos = useMemo(() => {
-    return nguonAnh.filter((p) => {
-      if (selectedSubfolder && p.subfolder !== selectedSubfolder) {
-        return false;
-      }
-      if (filter === "selected") return p.mark === "selected";
-      if (filter === "unselected") return p.mark !== "selected";
-      if (filter === "giaDinh") return giaDinhThich.has(p.id);
-      return true;
-    });
-  }, [nguonAnh, filter, selectedSubfolder, giaDinhThich]);
-
-  /**
-   * BB-218 — photoId -> thứ tự 1–4 trong danh sách so sánh. Map (không phải
-   * mảng) truyền vào LuoiAnh để TheAnh chỉ nhận một SỐ nguyên thô (giá trị
-   * đơn) mỗi lần dựng, đúng LUẬT 2 ở đầu `luoi-anh.tsx`.
-   */
-  const soSanhTheoAnh = useMemo(() => {
-    const m = new Map<string, number>();
-    dsSoSanh.forEach((id, i) => m.set(id, i + 1));
-    return m;
-  }, [dsSoSanh]);
-
-  /** Các tấm đang so sánh, đúng thứ tự ba mẹ đã chọn — dùng cho màn so sánh. */
-  const anhDangSoSanh = useMemo(
-    () => dsSoSanh.map((id) => photos.find((p) => p.id === id)).filter((p): p is PhotoPublic => !!p),
-    [dsSoSanh, photos],
+  // Lọc danh sách ảnh — BB-400: cùng hàm lọc với màn đợt (`locAnhLuotChon`).
+  const filteredPhotos = useMemo(
+    () => locAnhLuotChon(nguonAnh, filter, selectedSubfolder, giaDinhThich),
+    [nguonAnh, filter, selectedSubfolder, giaDinhThich],
   );
 
   // Chuyển đổi thành phần hợp đồng cho component ContractBreakdown
@@ -1521,14 +1504,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
    * cho khách duyệt — mỗi loại là một thư mục. Nên **không ghi cứng tên concept
    * nào vào mã**; nhóm theo cái gì có trong dữ liệu.
    */
-  const demTheoNhom = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const p of photos) {
-      if (!p.subfolder) continue;
-      m.set(p.subfolder, (m.get(p.subfolder) ?? 0) + 1);
-    }
-    return m;
-  }, [photos]);
+  const demTheoNhom = useMemo(() => demAnhTheoNhom(photos), [photos]);
 
   /**
    * BB-180 — sản phẩm in còn thiếu ảnh, để nhắc trước khi chốt.
@@ -2158,15 +2134,40 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
   const duocChon = vaiTro === "owner" || vaiTro === "co_editor" || vaiTro === "suggester";
   const duocChot = vaiTro === "owner";
   const khoaTim = isLocked || !duocChon;
-  // BB-287 mục #7 — báo cáo chấm: bấm liền vài tim thì "Đã chọn" (đọc từ
-  // `selectionCounts`, cập nhật lạc quan theo TỪNG cú bấm) và "Chưa chọn"
-  // (trước đây tự đếm lại `photos.filter(mark==="selected")`) là HAI PHÉP
-  // ĐẾM ĐỘC LẬP — ảnh vừa thả tim cập nhật `mark` ở một chỗ, cập nhật
-  // `selectionCounts` ở chỗ khác, không cùng lúc với mọi thao tác đang xếp
-  // hàng (hàng chờ ngoại tuyến, rollback lỗi mạng…). Trừ thẳng từ
-  // `selectionCounts.selectedCount` — CÙNG MỘT NGUỒN với thanh chọn và bìa —
-  // để "Tất cả"/"Đã chọn"/"Chưa chọn" luôn cộng đúng lại thành tổng số ảnh.
-  const soChuaChon = photos.length - selectionCounts.selectedCount;
+  // BB-400 — công cụ của lượt này: CÙNG hàm với màn "Chọn thêm ảnh · Đợt N".
+  const nguCanhLuot = nguCanhTuVai(vaiTro);
+  const congCu = congCuLuotChon(nguCanhLuot, { choPhepTai });
+  /*
+    BB-400 vòng 4 — "Xem trên tường / bàn nhà" ở MỌI màn, MỌI vai: xem không bao giờ đòi đã
+    chọn (cần danh mục có ảnh in để ướm). Nhận cả ảnh ngoài lưới (ảnh đã chỉnh) kèm kích thước.
+  */
+  const coAnhInDeTreo = (gallery.addons?.catalogue ?? []).some((sp) => sp.nhom === "anh_in");
+  const moXemTuong = coAnhInDeTreo
+    ? (anh: { id: string; fileName?: string; width?: number | null; height?: number | null }) => {
+        setAnhTreoNgoai(
+          anh.fileName !== undefined
+            ? { id: anh.id, fileName: anh.fileName, width: anh.width ?? null, height: anh.height ?? null }
+            : null,
+        );
+        setTreoTuongBanDau(null);
+        setManTreoTuongTuAnh(anh.id);
+      }
+    : null;
+  /** Nút tải của màn xem lớn (một tấm + thực đơn BB-330) — dùng chung cho đợt 1 và màn đợt N. */
+  const taiAnhXemLon: Pick<PhotoLightboxProps, "onTaiAnh" | "menuTai"> | null = choPhepTai
+    ? {
+        onTaiAnh: (p) => taiMotAnh({ id: p.id, fileName: p.fileName }),
+        menuTai: {
+          soAnh: photos.length,
+          dungLuong: doDocDuocDungLuong(gallery.tongDungLuongAnh),
+          soDaChon: soAnhDaChon,
+          onTaiDaChon: taiAnhDaChon,
+          onTaiCaBo: taiCaBo,
+        },
+      }
+    : null;
+  // BB-287 mục #7 — "Chưa chọn" trừ thẳng từ `selectionCounts.selectedCount` (CÙNG MỘT
+  // NGUỒN với thanh chọn và bìa) — nay tính trong `chipLocLuotChon` từ đúng hai số đó.
   // BB-310 mục 6/7 — NGUỒN DUY NHẤT cho tên gọi bé ở màn khách (bìa, đầu
   // lưới; "cảm ơn"/"đã giao" tính riêng ở nhánh return sớm của chúng vì
   // `gallery` chưa chắc còn giữ tham chiếu này lúc đó). Chỉ đạo admin
@@ -2191,25 +2192,60 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
   // BB-317 K-g — hạn mức chưa biết: nút "Chốt danh sách" trông như bị khoá và
   // bấm ra đúng MỘT câu giải thích, không mở hộp chốt (chưa chọn được tấm nào).
   const chotBiChan = !isLocked && !gallery.quotaKnown;
+  /*
+    BB-402 — loại nút chính theo GIAI ĐOẠN (`loaiNutChinh`, hàm thuần dùng chung với phép
+    thử). Lỗi anh báo 08/10: bộ đã duyệt ảnh chỉnh, đã đi in mà nút vẫn "Yêu cầu sửa lại".
+    Studio đã xác nhận trở đi (đang chỉnh, đã duyệt, in, đã giao — anh chốt vòng 2) →
+    "Chọn thêm ảnh" (mở màn đợt mua thêm như thẻ `DotChonTrenManChinh`); chưa duyệt xong
+    thì kèm lối phụ "Nhắn Bean" để xin đổi danh sách đã chốt.
+  */
+  const soDotMuaThemChoDuyet = gallery.review?.soDotMuaThemChoDuyet ?? 0;
+  const dauVaoNut = {
+    status: gallery.status,
+    giaiDoan: gallery.giaiDoanTienDo ?? null,
+    khoa: isLocked,
+    daChotChoXacNhan,
+    soDotMuaThemChoDuyet,
+  };
+  const loaiNut = loaiNutChinh(dauVaoNut);
+  const loiPhuThanhDay =
+    duocChot && coLoiNhanBean(dauVaoNut) && gallery.branch.chatUrl
+      ? { nhan: NHAN_NUT_CHINH.nhan_bean, href: gallery.branch.chatUrl }
+      : null;
+  const moChonThem = async () => {
+    const tt = dotChon.tt ?? (await taiLaiDotChon());
+    if (tt?.cheDoChonThem && tt.coTheChot) {
+      setMoManDot(true);
+      return;
+    }
+    // Chưa mở được đợt mới (vd đợt trước còn chờ Bean xác nhận): đưa ba mẹ tới thẻ đợt —
+    // nó nói đúng trạng thái từng đợt.
+    const the = document.querySelector('[data-testid="chon-them-anh"]');
+    if (the) the.scrollIntoView({ behavior: "smooth", block: "center" });
+    else setStatusMessage(vi.gallery.loiBean.dotChoXacNhan);
+  };
   const nutChinh = !duocChot
     ? null
-    : !isLocked
+    : loaiNut === "chot"
     ? {
         nhan: vi.gallery.submitCta,
         onClick: () => (chotBiChan ? setStatusMessage(CAU_CHUA_CO_HAN_MUC) : setShowSubmitModal(true)),
       }
-    : daChotChoXacNhan
+    : loaiNut === "sua_danh_sach"
       ? // Đã chốt, CSKH chưa xác nhận: mở lại là việc của chính ba mẹ.
         // BB-362 (vòng 9–10) — "Chọn thêm ảnh" đã là lối mua đợt 2 (trả tiền) sau khi
         // Bean xác nhận; ở đây là sửa lại danh sách trong gói, nên gọi đúng việc.
-        { nhan: "Sửa danh sách", onClick: () => setMoKhoaChon(true) }
-      : // Đã khoá thật: không sửa thẳng được, nhưng phải có ĐƯỜNG NÓI.
-        // BB-312 — đang có yêu cầu CHƯA XỬ LÝ thì nhãn nói rõ, tránh cảm
-        // giác "bấm gửi yêu cầu mới" khi thật ra chỉ có chỗ xem lại trạng
-        // thái (hộp thoại tự ẩn ô viết/nút gửi khi đang chờ, xem bên dưới).
-        gallery.reopenRequest?.trangThai === "cho_xu_ly"
+        { nhan: NHAN_NUT_CHINH.sua_danh_sach, onClick: () => setMoKhoaChon(true) }
+      : loaiNut === "chon_them"
+        ? { nhan: NHAN_NUT_CHINH.chon_them, onClick: () => void moChonThem() }
+        : // Đã khoá thật, CHƯA duyệt (đang chỉnh/xếp hàng): không sửa thẳng được, nhưng phải
+          // có ĐƯỜNG NÓI. BB-312 — đang có yêu cầu CHƯA XỬ LÝ thì nhãn nói rõ, tránh cảm
+          // giác "bấm gửi yêu cầu mới" khi thật ra chỉ có chỗ xem lại trạng
+          // thái (hộp thoại tự ẩn ô viết/nút gửi khi đang chờ, xem bên dưới).
+          // ("duyet": thanh đáy là thanh duyệt `thanhDuyet`, nhánh này không hiện.)
+          gallery.reopenRequest?.trangThai === "cho_xu_ly"
           ? { nhan: `Đã gửi yêu cầu · lần ${gallery.reopenRequest.lanThu}`, onClick: () => setXinSuaLai(true) }
-          : { nhan: "Yêu cầu sửa lại", onClick: () => setXinSuaLai(true) };
+          : { nhan: NHAN_NUT_CHINH.xin_sua_lai, onClick: () => setXinSuaLai(true) };
 
   /*
     BB-258 — chủ studio 26/09/2026: "Bộ ảnh đã được ghi nhận yêu cầu" hiện HAI
@@ -2239,13 +2275,15 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         coVongSuaMo: gallery.review.rounds.some((r) => !r.resolved),
       })
     : null;
-  const thanhDuyet = duocChon ? thanhDayBuocDuyet({ status: gallery.status, soAnhChinhTrongApp }) : null;
+  const thanhDuyet = duocChon
+    ? thanhDayBuocDuyet({ status: gallery.status, soAnhChinhTrongApp, soDotMuaThemChoDuyet })
+    : null;
 
   /*
     BB-321 — màn "Chọn thêm ảnh · Đợt N" THAY cả trang (không phải lớp phủ): lưới
     cuộn ảo theo cửa sổ (BB-131). Chỉ ba mẹ đứng tên (owner) chốt được đợt.
   */
-  if (moManDot && dotChon.tt?.cheDoChonThem && dotChon.tt.coTheChot) {
+  if (moManDot && dotChon.tt?.cheDoChonThem && (dotChon.tt.coTheChot || goiYDot)) {
     const taiLaiSauDot = () => {
       void loadGallery({ silent: true });
       void dotChon.taiLai();
@@ -2309,29 +2347,66 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             veTheDot();
           }}
           onCanTaiLai={taiLaiSauDot}
+          // BB-400 — đủ công cụ như đợt 1: dấu/chip gia đình thích, tải ảnh, nhắn Bean, báo ngắn.
+          giaDinhThich={giaDinhThich}
+          taiAnh={taiAnhXemLon}
+          chatUrl={gallery.branch.chatUrl ?? null}
+          onBao={setStatusMessage}
+          goiY={goiYDot && !dotChon.tt.coTheChot ? { timCuaToi: timNguoiXem, doiTim: doiTimNguoiXem } : null}
         />
       </>
     );
   }
 
-  const nutLoc = (loai: "all" | "selected" | "unselected" | "giaDinh", nhan: string, so: number) => (
-    <button
-      type="button"
-      onClick={() => setFilter(loai)}
-      aria-pressed={filter === loai}
-      className={cn(
-        // BB-319 — điện thoại 13px + `px-2.5` + khe 2: ba chip ("Tất cả 400 · Đã chọn 17 · Chưa chọn 383")
-        // vừa MỘT hàng 342px, không chip nào cụt ở mép phải. Máy tính giữ 14px/`px-4`.
-        "shrink-0 whitespace-nowrap rounded-full border border-[#2e2a27] px-2.5 py-1.5 text-[13px] transition-colors lg:px-4 lg:text-[14px]",
-        filter === loai
-          ? "bg-[#2e2a27] text-[#fdfbf9]"
-          : "bg-[#fdfbf9] text-[#2e2a27] hover:bg-[#2e2a27]/5",
-      )}
-    >
-      {nhan}
-      <span className="ml-1 opacity-70">{formatSo(so)}</span>
-    </button>
-  );
+  /*
+    BB-400 vòng 2 — gia đình được mời "Đặt in / mua thêm": màn THAY cả trang như màn đợt N,
+    cùng lưới + xem lớn + so sánh + cửa hàng; gửi yêu cầu qua `/api/g/mua-them` như cũ.
+  */
+  if (laNguoiXem && moMuaNguoiXem && dangMoChoKhachXem(gallery.status)) {
+    const dongMua = dongMuaGiaDinh;
+    return (
+      <>
+        {statusMessage && (
+          <div
+            data-testid="thong-bao-trang-thai"
+            className="fixed left-4 right-4 top-4 z-[60] mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl bg-[#2a2420] p-4 text-[#fffdf9] shadow-lg"
+          >
+            <span className="text-sm">{statusMessage}</span>
+            <button type="button" onClick={() => setStatusMessage(null)} aria-label={vi.common.close} className="px-2 py-1 text-sm opacity-70">
+              ✕
+            </button>
+          </div>
+        )}
+        <ManMuaGiaDinh
+          photos={nguonAnh}
+          subfolders={gallery.subfolders}
+          tenBe={tenBeHienThi || null}
+          danhMuc={(gallery.addons?.catalogue ?? []).map((sp) => ({
+            productId: sp.productId,
+            name: sp.name,
+            material: sp.material,
+            size: sp.size,
+            unitPrice: sp.unitPrice,
+            nhom: sp.nhom as NhomSanPham,
+            canGanAnh: sp.canGanAnh,
+          }))}
+          gio={gioGiaDinh}
+          setGio={(sua) => setGioGiaDinh((cu) => sua(cu))}
+          onToggleHeart={doiTimNguoiXem}
+          onDong={dongMua}
+          onDaGui={() => {
+            dongMua();
+            setSoLanGuiGiaDinh((n) => n + 1);
+            setStatusMessage(vi.gallery.loiBean.daGuiSeGoi);
+          }}
+          chatUrl={gallery.branch.chatUrl ?? null}
+          taiAnh={taiAnhXemLon}
+          onBao={setStatusMessage}
+          datInTamBanDau={datInTamGiaDinh}
+        />
+      </>
+    );
+  }
 
   /** BB-319 (luật 1 + 5) — MỘT tên cho một món ở mọi chỗ (xem lớn, hộp chốt, cửa hàng): "Ảnh in UV 10×15". */
   const tenMonGio = (productId: string, ten: string) => {
@@ -2354,6 +2429,10 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
       soAnhNhap={dotChon.anhNhap.length}
       soMonNhap={dotChon.nhap.gio.length}
       onMo={() => setMoManDot(true)}
+      onGoiY={goiYDot ? () => setMoManDot(true) : undefined}
+      // BB-402 vòng 3 — thanh đáy đã có nút chính "Chọn thêm ảnh": nút của thẻ thành kiểu
+      // PHỤ (viền) — một nút chính trên màn, thẻ vẫn đủ lối vào/giá/"Tiếp tục đợt N".
+      nutPhu={duocChot && loaiNut === "chon_them"}
     />
   ) : null;
   /*
@@ -2401,7 +2480,10 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           dành cho ba mẹ). Route `/api/g/mua-them` tự kiểm lại đúng luật
           này theo `session.role === "viewer"` — không tin giao diện.
         */}
+        {/* BB-400 vòng 2 — màn MUA nay là `ManMuaGiaDinh` (thay cả trang, lưới + xem lớn chung).
+            Ở đây chỉ còn thẻ "đã gửi yêu cầu" (moNgoai luôn false); `key` làm mới sau mỗi lần gửi. */}
         <MoiMuaLanHai
+          key={soLanGuiGiaDinh}
           status={gallery.status}
           soVongSua={0}
           moGate={dangMoChoKhachXem(gallery.status)}
@@ -2419,7 +2501,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             canGanAnh: sp.canGanAnh,
           }))}
           anhDaChon={photos.map((p) => ({ id: p.id, fileName: p.fileName }))}
-          moNgoai={moMuaNguoiXem}
+          moNgoai={false}
           onDoiMo={setMoMuaNguoiXem}
         />
       </div>
@@ -2747,24 +2829,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           rủi ro hồi quy các phép thử BB-217/218 hiện có) — bù đúng phần còn
           thiếu: một câu chỉ dẫn + Huỷ đứng riêng một hàng.
         */}
-        {soSanhBat && (
-          <div
-            data-testid="thanh-dau-so-sanh"
-            className="border-b border-border/70 bg-background px-6 py-3 lg:px-10"
-          >
-            <div className="mx-auto flex max-w-[1600px] items-center justify-between">
-              <span className="font-medium text-[14px] text-foreground">
-                Chọn 2–4 tấm để so sánh
-              </span>
-              <button type="button" onClick={huySoSanh} className="text-[14px] text-muted-foreground hover:text-foreground">
-                Huỷ
-              </button>
-            </div>
-            <p className="mx-auto mt-1 max-w-[1600px] text-[12px] text-muted-foreground">
-              {vi.gallery.loiBean.soSanhHuongDan}
-            </p>
-          </div>
-        )}
+        {soSanhBat && <ThanhDauSoSanh onHuy={huySoSanh} />}
 
         {/*
           Hàng 1 — CHỈ điện thoại (bản vẽ `luoi-dien-thoai.html` .dau1): logo
@@ -2850,19 +2915,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             )}
           </div>
           <div className="flex items-center justify-self-end">
-            <button
-              type="button"
-              onClick={() => (soSanhBat ? huySoSanh() : setSoSanhBat(true))}
-              aria-pressed={soSanhBat}
-              aria-label="So sánh"
-              title="So sánh"
-              className={cn(
-                "grid h-10 w-10 place-items-center rounded-full transition",
-                soSanhBat ? "bg-foreground text-background" : "text-foreground hover:bg-surface-2",
-              )}
-            >
-              <Columns2 className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
-            </button>
+            <NutSoSanh kieu="bieu-tuong" bat={soSanhBat} onDoi={soSanh.doiSoSanh} />
             <span data-testid="chuong-hang-dinh" className={cn("contents", dauTrangConThay && "[&>*]:invisible")}>
               <ChuongThongBao galleryId={gallery.id} status={gallery.status} />
             </span>
@@ -2925,13 +2978,18 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
               */}
               {!soSanhBat && (
                 <>
-                  {nutLoc("all", vi.gallery.filterAll, photos.length)}
-                  {laNguoiXem
-                    ? timNguoiXem.size > 0 && nutLoc("selected", "Gia đình thích", timNguoiXem.size)
-                    : !isLocked && nutLoc("selected", vi.gallery.filterSelected, selectionCounts.selectedCount)}
-                  {!laNguoiXem && !isLocked && nutLoc("unselected", vi.gallery.filterUnselected, soChuaChon)}
-                  {/* BB-345 — ba mẹ thấy tấm gia đình (link mời) thích; không tự thêm vào gói. */}
-                  {!laNguoiXem && giaDinhThich.size > 0 && nutLoc("giaDinh", "Gia đình thích", giaDinhThich.size)}
+                  {/* BB-400 — cùng hàng chip với màn đợt (`chipLocLuotChon`): tên, thứ tự, số đếm.
+                      BB-345 — ba mẹ thấy tấm gia đình (link mời) thích; không tự thêm vào gói. */}
+                  <HangChipLoc
+                    chips={chipLocLuotChon(nguCanhLuot, {
+                      tong: photos.length,
+                      daChon: laNguoiXem ? timNguoiXem.size : selectionCounts.selectedCount,
+                      giaDinhThich: congCu.giaDinhThich ? giaDinhThich.size : 0,
+                      khoa: isLocked,
+                    })}
+                    loc={filter}
+                    onLoc={setFilter}
+                  />
                   {photosLoading && <Spinner className="mb-2.5 h-4 w-4 shrink-0 text-muted-foreground lg:mb-0" />}
                 </>
               )}
@@ -2948,21 +3006,8 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
               đây `ml-auto` đẩy nó ra tít mép phải cùng tin nhắn/chuông,
               đúng lỗi báo cáo chấm BB-299 mục 1).
             */}
-            <button
-              type="button"
-              onClick={() => (soSanhBat ? huySoSanh() : setSoSanhBat(true))}
-              aria-pressed={soSanhBat}
-              className={cn(
-                // BB-319 — điện thoại: So sánh là biểu tượng ở hàng 1 phía trên; ở đây chỉ máy tính.
-                "mb-2.5 ml-auto hidden shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors lg:mb-0 lg:ml-0 lg:flex",
-                soSanhBat
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Columns2 className="h-3.5 w-3.5" aria-hidden="true" />
-              So sánh
-            </button>
+            {/* BB-319 — điện thoại: So sánh là biểu tượng ở hàng 1 phía trên; ở đây chỉ máy tính. */}
+            <NutSoSanh kieu="chip" bat={soSanhBat} onDoi={soSanh.doiSoSanh} />
 
             {/*
               Tin nhắn + chuông — CHỈ máy tính ở đây (`hidden lg:flex`, đẩy
@@ -3004,32 +3049,14 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             Chỉ hiện khi có từ HAI nhóm: một thẻ "Quân JPG 300" duy nhất không
             lọc được gì, chỉ thêm chữ.
           */}
-          {gallery.subfolders.length > 1 && (
-            <div
-              aria-label={vi.gallery.subfolderTitle}
-              className="-mx-6 flex gap-2 overflow-x-auto px-6 pb-3 sm:mx-0 sm:px-0"
-            >
-              {["", ...gallery.subfolders].map((folder) => (
-                <button
-                  key={folder || "tat-ca"}
-                  type="button"
-                  onClick={() => setSelectedSubfolder(folder)}
-                  aria-pressed={selectedSubfolder === folder}
-                  className={cn(
-                    "shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors",
-                    selectedSubfolder === folder
-                      ? "bg-foreground text-background"
-                      : "border border-border hover:bg-surface-2",
-                  )}
-                >
-                  {folder || vi.gallery.subfolderAll}
-                  <span className="ml-1.5 opacity-60">
-                    {folder ? (demTheoNhom.get(folder) ?? 0) : photos.length}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+          <HangNhomAnh
+            nhom={gallery.subfolders}
+            dangChon={selectedSubfolder}
+            onChon={setSelectedSubfolder}
+            demTheoNhom={demTheoNhom}
+            tong={photos.length}
+            className="-mx-6 px-6 pb-3 sm:mx-0 sm:px-0"
+          />
         </div>
       </header>
 
@@ -3098,15 +3125,19 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           {/* BB-384 — vòng duyệt LUÔN trong app (`khoiVungDuyet`): không còn khung link
               Drive + ô chữ chung. Bộ ở bước duyệt mà app chưa có ảnh chỉnh → lời Bean
               "đang chuẩn bị", không nút duyệt mù. */}
-          {khoiDuyet === "anh_trong_app" && (
+          {(khoiDuyet === "anh_trong_app" || giuKhoiAnhChinh) && (
             <AnhChinhSuaKhach
+              onGiuMo={setGiuKhoiAnhChinh}
+              // BB-400 vòng 4 — xem ảnh ĐÃ CHỈNH trên tường / bàn nhà.
+              onXemTuong={moXemTuong ?? undefined}
               onDaQuyet={async ({ quyetDinh, lan }) => {
                 setStatusMessage(
                   quyetDinh === "approve"
                     ? vi.gallery.loiBean.duyetChuyenIn
                     : vi.gallery.anhChinh.daNhan.replace("{n}", String(lan ?? 1)),
                 );
-                await loadGallery();
+                // BB-402 vòng 2 — nạp lại NỀN: không nháy màn chờ, không cuộn về đầu trang.
+                await loadGallery({ silent: true });
               }}
               moiInThem={{
                 danhMuc: gallery.addons?.catalogue ?? [],
@@ -3245,7 +3276,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
               setLightboxIndex(idx);
             }}
             onToggleSoSanh={onToggleSoSanh}
-            giaDinhThich={laNguoiXem ? undefined : giaDinhThich}
+            giaDinhThich={congCu.giaDinhThich ? giaDinhThich : undefined}
             khongChinh={laNguoiXem ? undefined : tapAnhKhongChinh}
           />
         )}
@@ -3316,7 +3347,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         BB-374 — suất "Ảnh album không chỉnh sửa": nói rõ ngay trên trang (giọng Bean) và đếm
         "x / N" RIÊNG, tách khỏi bộ đếm ảnh chỉnh sửa. Chọn tấm ở màn xem lớn (mục cùng tên).
       */}
-      {soSuatKhongChinh > 0 && !laNguoiXem && gallery.myRole !== "suggester" && (
+      {soSuatKhongChinh > 0 && congCu.albumKhongChinh && (
         <div className="mx-auto mt-4 w-full max-w-[1600px] px-4 sm:px-6">
           <div
             data-testid="the-album-khong-chinh"
@@ -3499,29 +3530,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           "bước tiếp theo của việc chốt ảnh" là hai việc khác nhau ba mẹ chỉ
           làm MỘT lúc.
         */
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-6 pb-[max(12px,env(safe-area-inset-bottom))]">
-          <div className="pointer-events-auto mx-auto flex h-[60px] max-w-xl items-center gap-1 rounded-full bg-[#2a2420] pl-4 pr-2 text-[#fffdf9] shadow-[0_14px_32px_-10px_rgba(27,23,20,.55)]">
-            <button
-              type="button"
-              onClick={() => duSoSanh(dsSoSanh) && setMoSoSanh(true)}
-              disabled={!duSoSanh(dsSoSanh)}
-              className="min-w-0 flex-1 truncate text-left text-[14px] font-medium disabled:cursor-default disabled:opacity-70"
-            >
-              {duSoSanh(dsSoSanh)
-                ? `Đã chọn ${dsSoSanh.length} tấm để so sánh · Xem`
-                : `Chọn ít nhất 2 tấm để so sánh (đã chọn ${dsSoSanh.length})`}
-            </button>
-            <button
-              type="button"
-              onClick={huySoSanh}
-              aria-label="Huỷ so sánh"
-              title="Huỷ so sánh"
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-white/80 transition hover:bg-white/10"
-            >
-              <XIcon className="h-5 w-5" strokeWidth={1.8} aria-hidden="true" />
-            </button>
-          </div>
-        </div>
+        <ThanhDaySoSanh ds={dsSoSanh} onXem={() => setMoSoSanh(true)} onHuy={huySoSanh} />
       ) : thanhDuyet ? (
         /*
           BB-384 — BƯỚC DUYỆT: "5 / 5 tấm · Đủ trong gói · Yêu cầu sửa lại" là thanh của
@@ -3563,8 +3572,12 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         // (không còn gì "còn thiếu" để chọn, và "Yêu cầu sửa lại" là luồng
         // của lúc duyệt ảnh chỉnh). Bản vẽ `da-giao-*.png` không có thanh
         // đáy — bỏ hẳn khi đã giao.
-        duocChon && gallery.status !== "delivered" && (
+        // BB-402 vòng 2 — anh chốt 08/10: bộ ĐÃ GIAO cũng có thanh đáy, nút chính "Chọn thêm
+        // ảnh" (cùng chỗ mọi giai đoạn). Lý do BB-310 bỏ thanh ("Yêu cầu sửa lại" sai ngữ cảnh)
+        // không còn: nút giờ theo giai đoạn (`loaiNutChinh`).
+        duocChon && (
         <ThanhChon
+          loiPhu={loiPhuThanhDay}
           an={thanhNoiAn}
           daChon={selectionCounts.selectedCount}
           hanMuc={hanMuc}
@@ -4344,24 +4357,10 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           tenBe={tenBeHienThi || null}
           onClose={dongXemLon}
           onToggleHeart={laNguoiXem ? doiTimNguoiXem : handleToggleHeart}
-          onTaiAnh={choPhepTai ? (p) => taiMotAnh({ id: p.id, fileName: p.fileName }) : null}
-          // BB-330 — nút tải ở màn xem lớn mở cùng thực đơn với màn ngoài.
-          menuTai={
-            choPhepTai
-              ? {
-                  soAnh: photos.length,
-                  dungLuong: doDocDuocDungLuong(gallery.tongDungLuongAnh),
-                  soDaChon: soAnhDaChon,
-                  onTaiDaChon: taiAnhDaChon,
-                  onTaiCaBo: taiCaBo,
-                }
-              : null
-          }
           mutatingIds={mutatingIds}
           isLocked={laNguoiXem ? false : khoaTim}
           daChon={laNguoiXem ? timNguoiXem.size : soAnhDaChon}
           hanMuc={laNguoiXem ? null : gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
-          onLuuGhiChu={laNguoiXem ? undefined : luuGhiChuAnh}
           onSoSanh={onSoSanhTuLightbox}
           dungCho={(anh) => {
             // Gộp đủ ba đường một tấm ảnh thành hàng — cùng ba nguồn với dấu
@@ -4410,13 +4409,35 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
               )
             ) : null
           }
-          bangSanPham={laNguoiXem ? undefined : (anh, tong) => (
+          // BB-400 — ghi chú / "Đặt in" / tải: cùng bộ lọc theo vai với màn đợt (`propsCongCuXemLon`).
+          // BB-330 — nút tải ở màn xem lớn mở cùng thực đơn với màn ngoài (`taiAnhXemLon`).
+          {...propsCongCuXemLon(congCu, {
+            luuGhiChu: luuGhiChuAnh,
+            taiAnh: taiAnhXemLon,
+            // BB-400 vòng 4 — "Trên tường" cố định ở màn xem lớn, MỌI vai (xem không đòi đã chọn).
+            xemTuong: moXemTuong ?? undefined,
+            bangSanPham: congCu.muaQuaYeuCau ? (
+            // BB-400 — gia đình được mời: "Đặt in" trong xem lớn mở ĐÚNG màn mua của gia đình
+            // (`MoiMuaLanHai`, gửi yêu cầu `/api/g/mua-them`) — không cụt ở màn xem lớn.
+            dangMoChoKhachXem(gallery.status)
+              ? (anh) => (
+                  <DatInChoGiaDinh
+                    onDatIn={() => {
+                      if (!timNguoiXem.has(anh.id)) doiTimNguoiXem(anh);
+                      setLightboxIndex(null);
+                      setDatInTamGiaDinh(anh.id);
+                      setMoMuaNguoiXem(true);
+                    }}
+                  />
+                )
+              : undefined
+          ) : (anh, tong) => (
             <BangSanPhamCuaAnh
               tong={tong}
               anhDaChon={anh.mark === "selected"}
               // BB-374 — người thân gợi ý (suggester) không quyết ảnh in vào album (route chặn).
               albumKhongChinh={
-                soSuatKhongChinh > 0 && gallery.myRole !== "suggester"
+                soSuatKhongChinh > 0 && congCu.albumKhongChinh
                   ? {
                       soSuat: soSuatKhongChinh,
                       daChon: anhKhongChinh.length,
@@ -4518,14 +4539,8 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
               // ba mẹ mở xem lớn một tấm chưa tim (phần lớn lúc mới vào) là không có nút. Nới:
               // tấm nào cũng XEM trên tường được (chỉ cần danh mục có ảnh in); đặt vào giỏ thì
               // máy chủ vẫn đòi tấm đã chọn như cũ.
-              onXemTuong={
-                (gallery.addons?.catalogue ?? []).some((sp) => sp.nhom === "anh_in")
-                  ? () => {
-                      setTreoTuongBanDau(null);
-                      setManTreoTuongTuAnh(anh.id);
-                    }
-                  : undefined
-              }
+              // BB-400 vòng 4 — cùng hàm mở với nút "Trên tường" cố định của màn xem lớn.
+              onXemTuong={congCu.xemTuong && moXemTuong ? () => moXemTuong(anh) : undefined}
               // BB-279 — "Đặt in tấm này": mở cửa hàng thẳng vào nhóm này với
               // tấm đang xem đã chọn sẵn (đường thứ hai vào cửa hàng).
               //
@@ -4541,27 +4556,33 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
                 setMoCuaHang(true);
               }}
             />
-          )}
+          ),
+          })}
         />
       )}
 
       {/* MÀN SO SÁNH NHIỀU TẤM (BB-218) — 2–4 tấm cạnh nhau, bỏ bớt ngay tại chỗ. */}
       {moSoSanh && anhDangSoSanh.length >= SO_SANH_TOI_THIEU && (
         <SoSanhAnh
-          photos={anhDangSoSanh}
+          // BB-400 — gia đình được mời so sánh bằng tim CỦA HỌ (trước đây: tim của ba mẹ, bị khoá).
+          photos={
+            laNguoiXem
+              ? anhDangSoSanh.map((p) => ({ ...p, mark: timNguoiXem.has(p.id) ? ("selected" as const) : null }))
+              : anhDangSoSanh
+          }
           mutatingIds={mutatingIds}
-          isLocked={khoaTim}
-          onToggleHeart={handleToggleHeart}
+          isLocked={laNguoiXem ? false : khoaTim}
+          onToggleHeart={laNguoiXem ? doiTimNguoiXem : handleToggleHeart}
           onBoKhoi={boKhoiManSoSanh}
           onDong={() => setMoSoSanh(false)}
           onPhongTo={onPhongToTuSoSanh}
-          daChon={soAnhDaChon}
-          hanMuc={gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
+          daChon={laNguoiXem ? timNguoiXem.size : soAnhDaChon}
+          hanMuc={laNguoiXem ? null : gallery.quotaKnown ? (gallery.includedQuota ?? null) : null}
           // BB-242: chế độ "Ghim & vuốt" vuốt qua toàn bộ tấm đã thả tim khi
           // chỉ đánh dấu đúng 2 tấm so sánh — cần danh sách này để vẽ đúng.
-          anhDaThaTim={anhDaChonHopThoai}
+          anhDaThaTim={laNguoiXem ? nguonAnh.filter((p) => p.mark === "selected") : anhDaChonHopThoai}
           // BB-370 — khung vuốt vẽ được cả tấm vừa bỏ tim ngay tại chỗ.
-          tatCaAnh={photos}
+          tatCaAnh={nguonAnh}
         />
       )}
 
@@ -4569,20 +4590,53 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
       {manTreoTuongTuAnh && (() => {
         // BB-398 — tấm mở màn có thể CHƯA thả tim (ảnh bìa, tấm đang xem lớn): đưa nó lên
         // đầu danh sách lướt, không thì màn treo mở nhầm sang tấm đã chọn đầu tiên.
+        // BB-400 vòng 4 — gia đình được mời lướt qua tấm CỦA HỌ đã thả tim; ảnh đã chỉnh (ngoài
+        // lưới) mang theo kích thước riêng (`anhTreoNgoai`).
+        const dsGoc = laNguoiXem ? nguonAnh.filter((p) => p.mark === "selected") : anhDaChonHopThoai;
         const tamDau =
-          anhDaChonHopThoai.find((p) => p.id === manTreoTuongTuAnh) ??
+          dsGoc.find((p) => p.id === manTreoTuongTuAnh) ??
           photos.find((p) => p.id === manTreoTuongTuAnh) ??
+          (anhTreoNgoai?.id === manTreoTuongTuAnh ? anhTreoNgoai : null) ??
           { id: manTreoTuongTuAnh, fileName: "", width: null, height: null };
-        const dsTreo = anhDaChonHopThoai.some((p) => p.id === tamDau.id)
-          ? anhDaChonHopThoai
-          : [tamDau, ...anhDaChonHopThoai];
+        const dsTreo = dsGoc.some((p) => p.id === tamDau.id) ? dsGoc : [tamDau, ...dsGoc];
+        // BB-400 vòng 4 — XEM luôn được; ĐẶT theo vai + trạng thái (`cachDatTuManTreo`).
+        const cachDat = cachDatTuManTreo({
+          nguCanh: nguCanhLuot,
+          khoa: isLocked,
+          dotMoiMo: dotChon.tt?.cheDoChonThem === true && (dotChon.tt.coTheChot || goiYDot),
+          moChoGiaDinh: dangMoChoKhachXem(gallery.status),
+        });
+        const dongTreo = () => {
+          setManTreoTuongTuAnh(null);
+          setTreoTuongBanDau(null);
+          setAnhTreoNgoai(null);
+        };
+        const loiDatKhac =
+          cachDat === "giaDinh"
+            ? {
+                nhan: vi.gallery.giaDinhDatInTamNay,
+                onBam: (photoId: string) => {
+                  dongTreo();
+                  setLightboxIndex(null);
+                  setDatInTamGiaDinh(photoId);
+                  setMoMuaNguoiXem(true);
+                },
+              }
+            : cachDat === "dotMoi" || cachDat === "goiY"
+              ? {
+                  nhan: cachDat === "dotMoi" ? vi.gallery.datLoiDotMoi : vi.gallery.goiYDotNut,
+                  onBam: () => {
+                    dongTreo();
+                    setLightboxIndex(null);
+                    setMoManDot(true);
+                  },
+                }
+              : null;
         return (
         <ManTreoTuong
           mo
-          onDong={() => {
-            setManTreoTuongTuAnh(null);
-            setTreoTuongBanDau(null);
-          }}
+          onDong={dongTreo}
+          loiDatKhac={loiDatKhac}
           anh={dsTreo.map((p) => ({
             id: p.id,
             fileName: p.fileName,
@@ -4621,7 +4675,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
               quantity: m.quantity,
             }))}
           khoa={isLocked}
-          duocChon={duocChon}
+          duocChon={duocChon && cachDat === "gio"}
           dangLuu={placing}
           onDatVaoGoi={(photoId, galleryItemId, dat) => changePlacement(photoId, galleryItemId, dat)}
           onDatMuaThem={(photoId, productId, soLuong) =>

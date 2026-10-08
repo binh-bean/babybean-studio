@@ -1,4 +1,4 @@
-import { isSubmittedOrLater, GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
+import { isSubmittedOrLater } from "@/lib/gallery-status";
 import type { NextResponse } from "next/server";
 import { requireGallerySession, GallerySessionError } from "@/lib/auth/gallery-session";
 import { chotBoAnhChoPhien, boAnhYeuCau } from "@/lib/auth/phien-bo-anh";
@@ -13,13 +13,13 @@ import { bamMaLink } from "@/lib/auth/bam-ma-link";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
 import { locHangInTrongGoi } from "@/lib/products/hang-in-trong-goi";
-import { nhanHienThi } from "@/lib/lark/trang-thai-hau-ky";
-import { trangThaiKhach } from "@/lib/lark/trang-thai-app-lark";
+import { tienDoHaiMan } from "@/lib/lark/trang-thai-app-lark";
 import { khoaChonCuaKhach } from "@/lib/gallery/khoa-chon-khach";
 import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layDuLieuChungBoAnh } from "@/lib/gallery/du-lieu-chung-bo-anh";
 import { laThuMucChinhSua } from "@/lib/anh-chinh-sua/nhan-dien";
-import { docTomTatAnhChinh } from "@/lib/anh-chinh-sua/du-lieu";
+import { docTomTatAnhChinh, docVongSua } from "@/lib/anh-chinh-sua/du-lieu";
+import { soDotMuaThemChoDuyet } from "@/lib/anh-chinh-sua/theo-dot";
 import { TIEN_TO_DONG_HOA_DON } from "@/lib/hoa-don/han-muc-hoa-don";
 import { soSuatAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh";
 import { docAnhAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh-server";
@@ -549,21 +549,20 @@ async function traDuLieu(
         deliveredAt: string | null;
         rounds: Array<{ round: number; note: string; createdAt: string; resolved: boolean }>;
         soNgaySua: number;
+        soDotMuaThemChoDuyet: number;
       } | null> => {
         if (!["in_retouch", "awaiting_approval", "approved", "delivered"].includes(gallery.status)) {
           return null;
         }
-        const [{ data: delivery }, { data: rounds }, soNgaySua] = await Promise.all([
+        const [{ data: delivery }, rounds, soNgaySua] = await Promise.all([
           supabase
             .from("deliveries")
             .select("final_drive_url, delivered_at")
             .eq("gallery_id", gallery.id)
             .maybeSingle(),
-          supabase
-            .from("revision_requests")
-            .select("round, note, created_at, resolved_at")
-            .eq("gallery_id", gallery.id)
-            .order("round", { ascending: true }),
+          // BB-402 — đọc kèm `dot_khoa` (0095; chưa áp thì hàm tự bỏ cột) để đếm đợt mua
+          // thêm đang chờ duyệt. Đọc hỏng thì coi như chưa có vòng nào (như trước).
+          docVongSua(supabase, gallery.id, true).catch(() => []),
           // BB-387 — "trong khoảng {n} ngày" cho lời Bean khi ba mẹ xin sửa (chưa có dòng → 3).
           // KHÔNG trả tên thợ chỉnh ra màn khách.
           docSoNgaySuaDuKien(supabase),
@@ -576,13 +575,16 @@ async function traDuLieu(
           finalDriveUrl: delivery?.final_drive_url ?? null,
           // BB-298 — ngày giao thật cho dấu "Đã hoàn thiện" ở màn "Đã giao".
           deliveredAt: delivery?.delivered_at ?? null,
-          rounds: (rounds ?? []).map((r) => ({
-            round: r.round as number,
-            note: r.note as string,
-            createdAt: r.created_at as string,
+          rounds: rounds.map((r) => ({
+            round: r.round,
+            note: r.note,
+            createdAt: r.created_at,
             resolved: r.resolved_at !== null,
           })),
           soNgaySua,
+          // BB-402 — đợt mua thêm CSKH đã gửi duyệt mà ba mẹ chưa duyệt: nút chính của ba
+          // mẹ là "duyệt" (không phải "Chọn thêm ảnh") — `loaiNutChinh`.
+          soDotMuaThemChoDuyet: soDotMuaThemChoDuyet(tomTatAnhChinh.mocDot, rounds),
         };
       })(),
     ]);
@@ -686,16 +688,10 @@ async function traDuLieu(
     // (xem chú thích cũ dưới đây) — chỉ trả boolean đã tính sẵn.
     // BB-338 — công thức tách ra `khoaChonCuaKhach` để `/api/g/xin-sua-lai`
     // dùng ĐÚNG luật này (trước đó route ấy chỉ xét status, lệch với màn khách).
-    const {
-      khoa: khoaChonTheoLark,
-      quaHan60Ngay,
-      larkHieuLuc,
-    } = khoaChonCuaKhach(gallery);
-    const tienDo = nhanHienThi(
-      gallery.status,
-      larkHieuLuc,
-      (s) => GALLERY_STATUS_LABEL[s] ?? s,
-    );
+    const { khoa: khoaChonTheoLark, quaHan60Ngay } = khoaChonCuaKhach(gallery);
+    // BB-402 — CÙNG hàm với huy hiệu màn quản trị (items route): một dòng dữ liệu → một
+    // giai đoạn cho cả hai màn.
+    const tienDo = tienDoHaiMan(gallery);
 
     const responseData = {
       id: gallery.id,
@@ -711,7 +707,7 @@ async function traDuLieu(
       nhanTienDo: quaHan60Ngay
         ? "Bộ ảnh đã quá hạn chọn, ba mẹ nhắn Bean để được hỗ trợ ạ."
         : tienDo.giaiDoan != null
-          ? trangThaiKhach(gallery.status, tienDo.giaiDoan).khach
+          ? tienDo.khach.khach
           : null,
       // BB-225 — số giai đoạn (2–11, docs/21) để màn khách chọn tranh "hành
       // trình bộ ảnh". Chỉ là con số giai đoạn, không phải mã Lark.

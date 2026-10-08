@@ -62,10 +62,12 @@ test("1. Khách gửi ảnh chọn: một dòng mỗi bộ, mở 'Xử lý' có 
     await expect(khoiTt.getByTestId("khoi-hoa-don")).toBeVisible({ timeout: 20_000 });
     await khoiTt.getByTestId("nhap-tay-du-phong").locator("summary").click({ timeout: 20_000 });
     await expect(khoiTt.locator('input[name="giamGiaPhanTram"]')).toBeVisible({ timeout: 20_000 });
-    await expect(ngan.getByRole("link", { name: "Tải danh sách ảnh đã chọn" })).toHaveAttribute(
+    // BB-403 (anh 08/10): không còn nút tải — lối "Xem danh sách" mở thẳng khối danh sách ở trang bộ ảnh.
+    await expect(ngan.getByRole("link", { name: "Xem danh sách ảnh đã chọn" })).toHaveAttribute(
       "href",
-      `/api/admin/galleries/${d.daChot.id}/export`,
+      `/admin/galleries/${d.daChot.id}#xuat-danh-sach`,
     );
+    await expect(ngan.locator("a[download]")).toHaveCount(0);
     await expect(ngan.getByRole("button", { name: "Từ chối (lý do)" })).toBeVisible();
     await dong.screenshot({ path: path.join(THU_MUC, "dong-khach-gui-anh-chon.png") });
 

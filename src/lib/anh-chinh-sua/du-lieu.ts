@@ -185,18 +185,24 @@ export async function docChiTietVong(db: SupabaseClient, galleryId: string): Pro
 export async function docTomTatAnhChinh(
   db: SupabaseClient,
   galleryId: string,
-): Promise<{ anh: AnhChinhTho[]; guiLuc: string | null; laThay: (trangThaiBo: string, a: AnhChinhTho) => boolean }> {
+): Promise<{
+  anh: AnhChinhTho[];
+  guiLuc: string | null;
+  laThay: (trangThaiBo: string, a: AnhChinhTho) => boolean;
+  /** BB-402 — mốc gửi/duyệt từng đợt mua thêm (null = chưa áp 0095 hoặc chưa có ảnh chỉnh). */
+  mocDot: Map<string, MocDot> | null;
+}> {
   const khongThay = () => false;
   try {
     const anh = await docAnhChinh(db, galleryId);
-    if (anh.length === 0) return { anh, guiLuc: null, laThay: khongThay };
+    if (anh.length === 0) return { anh, guiLuc: null, laThay: khongThay, mocDot: null };
     const [guiLuc, mocDot, nhom] = await Promise.all([
       docMocGui(db, galleryId),
       docMocDot(db, galleryId),
       docNhomMuaThem(db, galleryId),
     ]);
     if (mocDot === null || nhom.length === 0) {
-      return { anh, guiLuc, laThay: (tt, a) => khachThayAnhChinh(tt, guiLuc, a.created_at) };
+      return { anh, guiLuc, laThay: (tt, a) => khachThayAnhChinh(tt, guiLuc, a.created_at), mocDot };
     }
     const goc = await docAnhGoc(db, galleryId);
     const gocCua = ghepAnhChinhVoiGoc(
@@ -214,9 +220,10 @@ export async function docTomTatAnhChinh(
           mocDot,
           anhTaoLuc: a.created_at,
         }),
+      mocDot,
     };
   } catch {
-    return { anh: [], guiLuc: null, laThay: khongThay };
+    return { anh: [], guiLuc: null, laThay: khongThay, mocDot: null };
   }
 }
 

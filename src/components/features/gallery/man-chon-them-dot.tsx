@@ -28,8 +28,7 @@
 
 import { dotDuocDongKhung } from "@/lib/products/khung-gan-anh-in";
 import React from "react";
-import { ArrowLeft, Printer } from "lucide-react";
-import { cn } from "@/components/ui/utils";
+import { Printer } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -41,9 +40,29 @@ import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import type { SanPhamCuaHang } from "@/lib/products/cau-hinh-cua-hang";
 import type { PhotoPublic } from "@/types/domain";
 import { vi } from "@/i18n";
+import {
+  cachDatTuManTreo,
+  chipLocLuotChon,
+  congCuLuotChon,
+  datGhiChuNhap,
+  ghiChuGuiKemDot,
+  locAnhLuotChon,
+  type LoaiLoc,
+} from "@/lib/gallery/luot-chon";
 import { LuoiAnh } from "./luoi-anh";
-import { PhotoLightbox } from "./photo-lightbox";
+import { PhotoLightbox, type PhotoLightboxProps } from "./photo-lightbox";
 import { CuaHang, type DongDaMua } from "./cua-hang";
+import { SoSanhAnh } from "./so-sanh-anh";
+import { BangSanPhamCuaAnh } from "./bang-san-pham-cua-anh";
+import { ManTreoTuong } from "./man-treo-tuong";
+import {
+  DauManLuotChon,
+  demAnhTheoNhom,
+  propsCongCuXemLon,
+  ThanhDayLuot,
+  ThanhDaySoSanh,
+  useSoSanhLuotChon,
+} from "./cong-cu-luot-chon";
 import type { NhapDot, TrangThaiDotKhach } from "./chon-them-anh";
 import {
   cumTenBe,
@@ -63,7 +82,10 @@ import type { LamAnhNhanhKhach } from "@/lib/dich-vu/lam-anh-nhanh";
 /** Máy chủ nhận tối đa 20 cho mỗi dòng (`ChotDotChonSchema`). */
 const SO_LUONG_TOI_DA = 20;
 const KHONG_DANG_GUI = new Set<string>();
-const KHONG_SO_SANH = new Map<string, number>();
+const KHONG_GIA_DINH_THICH = new Set<string>();
+// BB-400 — công cụ của lượt "dotThem" (ba mẹ chọn thêm): CÙNG hàm với đợt 1.
+const NGU_CANH = "dotThem" as const;
+const khongLamGi = () => {};
 
 export interface MonCatalogue {
   productId: string;
@@ -109,6 +131,12 @@ export function ManChonThemDot({
   onDong,
   onDaChot,
   onCanTaiLai,
+  giaDinhThich = KHONG_GIA_DINH_THICH,
+  taiAnh = null,
+  chatUrl = null,
+  onBao,
+  xemLonBanDau = null,
+  goiY = null,
 }: {
   photos: PhotoPublic[];
   subfolders: string[];
@@ -131,11 +159,33 @@ export function ManChonThemDot({
   onDaChot: (soDot: number) => void;
   /** Máy chủ báo có tấm vừa bị khoá: tải lại ảnh + trạng thái đợt. */
   onCanTaiLai: () => void;
+  /** BB-400 — tấm gia đình (link mời) đã thả tim: dấu "Gia đình" + chip "Gia đình thích" như đợt 1. */
+  giaDinhThich?: Set<string>;
+  /** BB-400 — nút tải của màn xem lớn (bộ ảnh cho tải); null = không cho tải. Cùng thực đơn với đợt 1. */
+  taiAnh?: Pick<PhotoLightboxProps, "onTaiAnh" | "menuTai"> | null;
+  /** BB-400 — "Nhắn Bean" ở đầu màn, cùng chỗ với đợt 1. */
+  chatUrl?: string | null;
+  /** BB-400 — câu báo ngắn (vd. đã đủ 4 tấm so sánh) — màn chính hiện ở dải thông báo. */
+  onBao?: (cau: string) => void;
+  /** Mở thẳng màn xem lớn ở tấm thứ N của lưới (vd. vào màn đợt từ đúng một tấm). */
+  xemLonBanDau?: number | null;
+  /**
+   * BB-400 vòng 2 — người cùng chọn / người gợi ý ở đợt N: CÙNG màn này, tim là GỢI Ý lưu
+   * chung trên máy chủ (`/api/g/tim-gia-dinh`), ba mẹ thấy dấu "Gia đình thích" trên lưới
+   * đợt. Không giỏ, không ghi chú, không chốt — chỉ ba mẹ chốt và trả tiền.
+   */
+  goiY?: { timCuaToi: Set<string>; doiTim: (photo: { id: string }) => void } | null;
 }) {
-  const [filter, setFilter] = React.useState<"all" | "selected" | "unselected">("all");
+  const laGoiY = goiY != null;
+  const [filter, setFilter] = React.useState<LoaiLoc>("all");
   const [nhom, setNhom] = React.useState("");
-  const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
+  /** Màn xem lớn: chỉ số + danh sách nguồn ("loc" = đang lọc; "day" = cả bộ, mở từ màn so sánh). */
+  const [xemLon, setXemLon] = React.useState<{ i: number; nguon: "loc" | "day" } | null>(
+    xemLonBanDau === null ? null : { i: xemLonBanDau, nguon: "loc" },
+  );
   const [moCuaHang, setMoCuaHang] = React.useState(false);
+  const [presetCuaHang, setPresetCuaHang] = React.useState<{ nhom: NhomSanPham; photoId: string | null } | null>(null);
+  const [treoTuongTuAnh, setTreoTuongTuAnh] = React.useState<string | null>(null);
   const [hoi, setHoi] = React.useState(false);
   const [ten, setTen] = React.useState(tenKhach ?? "");
   const [bietAnhInCham, setBietAnhInCham] = React.useState(false);
@@ -192,23 +242,43 @@ export function ManChonThemDot({
     return m;
   }, [photos, tt.dotTheoAnh]);
 
+  const ghiChuNhap = nhap.ghiChu;
+  const timGoiY = goiY?.timCuaToi ?? null;
   const dsAnh = React.useMemo(() => {
+    if (timGoiY) {
+      // Người gợi ý: tấm khoá theo đợt giữ nguyên; tấm khác hiện tim GỢI Ý của chính họ.
+      return photos.map((p) => {
+        if ((dotKhoaTheoAnh.get(p.id) ?? 0) > 0) return p;
+        const mark = timGoiY.has(p.id) ? ("selected" as const) : null;
+        return p.mark === mark ? p : { ...p, mark };
+      });
+    }
     const trongNhap = new Set(anhNhap);
     // Giữ NGUYÊN object của tấm không đổi — `TheAnh` được memo theo prop (LUẬT 2 luoi-anh).
-    return photos.map((p) => (trongNhap.has(p.id) && p.mark !== "selected" ? { ...p, mark: "selected" as const } : p));
-  }, [photos, anhNhap]);
+    // BB-400 — tấm mới mang ghi chú của nháp (dấu bút trên thẻ + ô ghi chú xem lớn).
+    return photos.map((p) => {
+      if (!trongNhap.has(p.id) || p.mark === "selected") return p;
+      const chu = ghiChuNhap?.[p.id] ?? null;
+      return { ...p, mark: "selected" as const, retouchNote: chu ?? p.retouchNote ?? null };
+    });
+  }, [photos, anhNhap, ghiChuNhap, timGoiY, dotKhoaTheoAnh]);
 
+  // BB-400 — cùng hàm lọc, cùng hàng chip với đợt 1.
   const dsLoc = React.useMemo(
-    () =>
-      dsAnh.filter((p) => {
-        if (nhom && p.subfolder !== nhom) return false;
-        if (filter === "selected") return p.mark === "selected";
-        if (filter === "unselected") return p.mark !== "selected";
-        return true;
-      }),
-    [dsAnh, filter, nhom],
+    () => locAnhLuotChon(dsAnh, filter, nhom, giaDinhThich),
+    [dsAnh, filter, nhom, giaDinhThich],
   );
   const soDaChon = dsAnh.filter((p) => p.mark === "selected").length;
+  const demTheoNhom = React.useMemo(() => demAnhTheoNhom(photos), [photos]);
+  const nguCanh = laGoiY ? ("goiY" as const) : NGU_CANH;
+  const congCu = congCuLuotChon(nguCanh, { choPhepTai: taiAnh != null, dotThem: true });
+  const chips = chipLocLuotChon(nguCanh, {
+    tong: photos.length,
+    daChon: soDaChon,
+    giaDinhThich: congCu.giaDinhThich ? giaDinhThich.size : 0,
+    khoa: false,
+  });
+  const soSanh = useSoSanhLuotChon(dsAnh, onBao ?? khongLamGi);
 
   const soSanPhamTheoAnh = React.useMemo(() => {
     const m = new Map<string, number>();
@@ -238,12 +308,49 @@ export function ManChonThemDot({
     (photo: PhotoPublic) => {
       const dot = dotKhoaTheoAnh.get(photo.id) ?? 0;
       if (dot > 0) return;
+      // BB-400 vòng 2 — người gợi ý: tim là gợi ý chung (máy chủ), không chạm nháp của ba mẹ.
+      if (goiY) {
+        goiY.doiTim(photo);
+        return;
+      }
       setNhap((cu) => ({ ...cu, anh: doiAnhTrongNhap(cu.anh, photo.id, dot) }));
     },
-    [dotKhoaTheoAnh, setNhap],
+    [dotKhoaTheoAnh, setNhap, goiY],
   );
-  const moAnh = React.useCallback((i: number) => setLightboxIndex(i), []);
-  const boQua = React.useCallback(() => {}, []);
+  const moAnh = React.useCallback((i: number) => setXemLon({ i, nguon: "loc" }), []);
+  const khoaTimAnh = React.useCallback((p: PhotoPublic) => (dotKhoaTheoAnh.get(p.id) ?? 0) > 0, [dotKhoaTheoAnh]);
+
+  /**
+   * BB-400 — ghi chú cho thợ của tấm MỚI: ghi vào nháp ngay (phản hồi tức thì như tim của
+   * đợt), gửi kèm lúc chốt. Tấm đã chốt đợt trước: ô ghi chú chỉ đọc (`khoaTimAnh`).
+   */
+  const luuGhiChu = React.useCallback(
+    async (photo: PhotoPublic, chu: string): Promise<boolean> => {
+      if ((dotKhoaTheoAnh.get(photo.id) ?? 0) > 0 || !anhNhap.includes(photo.id)) return false;
+      setNhap((cu) => ({ ...cu, ghiChu: datGhiChuNhap(cu.ghiChu, photo.id, chu) }));
+      return true;
+    },
+    [anhNhap, dotKhoaTheoAnh, setNhap],
+  );
+
+  const datMon = React.useCallback(
+    (productId: string, photoId: string | null, soLuong: number) =>
+      setNhap((cu) => ({ ...cu, gio: datDong(cu.gio, productId, photoId, soLuong) })),
+    [setNhap],
+  );
+  const moCuaHangVoi = (preset: { nhom: NhomSanPham; photoId: string | null } | null) => {
+    setXemLon(null);
+    setPresetCuaHang(preset);
+    setMoCuaHang(true);
+  };
+  const coAnhIn = danhMuc.some((sp) => sp.nhom === "anh_in");
+  /** BB-400 vòng 4 — mở "Xem trên tường / bàn nhà" (chồng lên màn xem lớn, đóng là về đúng tấm). */
+  const moTreo = congCu.xemTuong && coAnhIn ? (anh: { id: string }) => setTreoTuongTuAnh(anh.id) : null;
+  const dsTreoDot = React.useMemo(() => {
+    const daChon = dsAnh.filter((p) => p.mark === "selected");
+    const tamDau = treoTuongTuAnh ? dsAnh.find((p) => p.id === treoTuongTuAnh) : undefined;
+    return tamDau && !daChon.some((p) => p.id === tamDau.id) ? [tamDau, ...daChon] : daChon;
+  }, [dsAnh, treoTuongTuAnh]);
 
   async function chot() {
     if (ten.trim().length === 0 || thieuTick) return;
@@ -262,6 +369,8 @@ export function ManChonThemDot({
             soLuong: d.soLuong,
             ...(d.ganVoiAddonId ? { ganVoiAddonId: d.ganVoiAddonId } : {}),
           })),
+          // BB-400 — ghi chú cho thợ của tấm mới (chỉ tấm còn trong đợt).
+          ghiChu: ghiChuGuiKemDot(anhNhap, nhap.ghiChu),
           ...(soMonChuaAnh > 0 ? { bietAnhInChamHon: bietAnhInCham } : {}),
           ...(laChonLamNhanh ? { lamAnhNhanh: true } : {}),
         }),
@@ -276,7 +385,7 @@ export function ManChonThemDot({
         if (res.status === 409) onCanTaiLai();
         return;
       }
-      setNhap(() => ({ anh: [], gio: [] }));
+      setNhap(() => ({ anh: [], gio: [], ghiChu: {} }));
       setHoi(false);
       onDaChot(json?.data?.soDot ?? soDot);
     } catch {
@@ -286,75 +395,39 @@ export function ManChonThemDot({
     }
   }
 
-  const nutLoc = (loai: "all" | "selected" | "unselected", nhan: string, so: number) => (
-    <button
-      type="button"
-      onClick={() => setFilter(loai)}
-      aria-pressed={filter === loai}
-      className={cn(
-        "shrink-0 whitespace-nowrap rounded-full border border-[#2e2a27] px-4 py-1.5 text-[14px] transition-colors",
-        filter === loai ? "bg-[#2e2a27] text-[#fdfbf9]" : "bg-[#fdfbf9] text-[#2e2a27] hover:bg-[#2e2a27]/5",
-      )}
-    >
-      {nhan}
-      <span className="ml-1 opacity-70">{formatSo(so)}</span>
-    </button>
-  );
-
   const gia = dongDauManDot(tt.giaMoiAnh);
   const anhMoi = photos.filter((p) => anhNhap.includes(p.id));
 
   return (
     <div data-testid="man-chon-them-anh" className="min-h-[100dvh] bg-background pb-44 text-foreground lg:pb-32">
       {/* ĐẦU MÀN — MỘT dòng + hàng lọc, dính khi cuộn (cùng kiểu `#dau-luoi-anh`). */}
-      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/95 backdrop-blur-md">
-        <div className="mx-auto max-w-[1600px] px-6 lg:flex lg:h-14 lg:items-center lg:px-10">
-          <div className="flex min-h-14 items-center gap-1.5 lg:min-h-0">
-            <button
-              type="button"
-              onClick={onDong}
-              aria-label="Quay lại bộ ảnh"
-              className="-ml-2.5 grid h-11 w-11 shrink-0 place-items-center rounded-full transition hover:bg-surface-2"
-            >
-              <ArrowLeft className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
-            </button>
-            <h1 data-testid="dong-dau-man-dot" className="min-w-0 text-[14px] leading-snug lg:text-[15px]">
+      <DauManLuotChon
+        testIdTieuDe="dong-dau-man-dot"
+        tieuDe={
+          laGoiY ? (
+            <>
+              Gợi ý thêm ảnh cho <span className="font-display text-[16px] lg:text-[17px]">{cumTenBe(tenBe)}</span>
+            </>
+          ) : (
+            <>
               Chọn thêm ảnh cho <span className="font-display text-[16px] lg:text-[17px]">{cumTenBe(tenBe)}</span>
               {gia && <span className="whitespace-nowrap text-muted-foreground"> · {gia}</span>}
-            </h1>
-          </div>
-
-          <span className="mx-6 hidden h-5 w-px shrink-0 bg-border lg:inline-block" aria-hidden="true" />
-
-          <nav aria-label="Lọc ảnh" className="flex items-center gap-3 overflow-x-auto pb-4 pt-1 lg:p-0">
-            {nutLoc("all", vi.gallery.filterAll, photos.length)}
-            {nutLoc("selected", vi.gallery.filterSelected, soDaChon)}
-            {nutLoc("unselected", vi.gallery.filterUnselected, photos.length - soDaChon)}
-          </nav>
-        </div>
-
-        {subfolders.length > 1 && (
-          <div
-            aria-label={vi.gallery.subfolderTitle}
-            className="mx-auto flex max-w-[1600px] gap-2 overflow-x-auto px-6 pb-3 lg:px-10"
-          >
-            {["", ...subfolders].map((f) => (
-              <button
-                key={f || "tat-ca"}
-                type="button"
-                onClick={() => setNhom(f)}
-                aria-pressed={nhom === f}
-                className={cn(
-                  "shrink-0 rounded-full px-3 py-1.5 text-xs transition-colors",
-                  nhom === f ? "bg-foreground text-background" : "border border-border hover:bg-surface-2",
-                )}
-              >
-                {f || vi.gallery.subfolderAll}
-              </button>
-            ))}
-          </div>
-        )}
-      </header>
+            </>
+          )
+        }
+        onDong={onDong}
+        chips={chips}
+        loc={filter}
+        onLoc={setFilter}
+        soSanh={soSanh}
+        coSoSanh={congCu.soSanh}
+        chatUrl={chatUrl}
+        nhom={subfolders}
+        nhomDangChon={nhom}
+        onChonNhom={setNhom}
+        demTheoNhom={demTheoNhom}
+        tong={photos.length}
+      />
 
       {/* LƯỚI — đúng component của màn chọn chính. Lề điện thoại 24. */}
       <section aria-label="Ảnh của buổi chụp" className="mx-auto max-w-[1600px] px-6 pt-4 lg:px-10 lg:pt-6">
@@ -368,17 +441,28 @@ export function ManChonThemDot({
             mutatingIds={KHONG_DANG_GUI}
             khoa={false}
             soSanPhamTheoAnh={soSanPhamTheoAnh}
-            soSanhBat={false}
-            soSanhTheoAnh={KHONG_SO_SANH}
+            soSanhBat={soSanh.soSanhBat}
+            soSanhTheoAnh={soSanh.soSanhTheoAnh}
             dotKhoaTheoAnh={dotKhoaTheoAnh}
+            giaDinhThich={congCu.giaDinhThich ? giaDinhThich : undefined}
             onToggle={doiAnh}
             onOpen={moAnh}
-            onToggleSoSanh={boQua}
+            onToggleSoSanh={soSanh.onToggleSoSanh}
           />
         )}
       </section>
 
-      {/* THANH ĐÁY — MỘT câu + nút phụ (sản phẩm, tuỳ chọn) + nút chính. */}
+      {/* THANH ĐÁY — MỘT câu + nút phụ (sản phẩm, tuỳ chọn) + nút chính.
+          BB-400 — đang chọn tấm để so sánh: thanh so sánh THAY thanh đợt, như đợt 1. */}
+      {soSanh.soSanhBat ? (
+        <ThanhDaySoSanh ds={soSanh.dsSoSanh} onXem={() => soSanh.setMoSoSanh(true)} onHuy={soSanh.huySoSanh} />
+      ) : laGoiY ? (
+        // BB-400 vòng 2 — người gợi ý: MỘT câu, không nút chốt (chỉ ba mẹ chốt và trả tiền).
+        <ThanhDayLuot
+          testId="thanh-day-goi-y"
+          cau={vi.gallery.goiYDotCau.replace("{n}", formatSo(goiY?.timCuaToi.size ?? 0))}
+        />
+      ) : (
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-6 pb-[max(16px,env(safe-area-inset-bottom))] lg:pb-6">
         <div
           data-testid="thanh-day-dot"
@@ -417,11 +501,18 @@ export function ManChonThemDot({
           </div>
         </div>
       </div>
+      )}
 
       {/* SẢN PHẨM — cửa hàng đã duyệt, chạy trên giỏ của đợt (không gọi /api/g/addons). */}
       <CuaHang
         mo={moCuaHang}
-        onDong={() => setMoCuaHang(false)}
+        onDong={() => {
+          setMoCuaHang(false);
+          setPresetCuaHang(null);
+        }}
+        // BB-400 — "Đặt in tấm này" từ màn xem lớn mở thẳng nhóm + tấm đó (như đợt 1, BB-279).
+        presetNhom={presetCuaHang?.nhom ?? null}
+        presetPhotoId={presetCuaHang?.photoId ?? null}
         khoa={false}
         dangLuu={false}
         phuDe={`Tính vào đợt ${soDot}`}
@@ -465,16 +556,61 @@ export function ManChonThemDot({
         }}
       />
 
-      {/* XEM LỚN — đúng màn xem lớn của màn chính; tim tấm đã chốt đứng yên. */}
-      {lightboxIndex !== null && (
+      {/* XEM LỚN — đúng màn xem lớn của màn chính, ĐỦ công cụ như đợt 1 (BB-400): tim, ghi
+          chú, "Đặt in" theo ảnh, xem trên tường, tải; tim + ghi chú tấm đã chốt đứng yên. */}
+      {xemLon !== null && (
         <PhotoLightbox
-          photos={dsLoc}
-          initialIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
+          photos={xemLon.nguon === "day" ? dsAnh : dsLoc}
+          initialIndex={xemLon.i}
+          tenBe={tenBe}
+          onClose={() => {
+            const tuSoSanh = xemLon.nguon === "day";
+            setXemLon(null);
+            // Mở từ màn so sánh (chạm hai lần) thì đóng xong quay lại màn so sánh — như đợt 1.
+            if (tuSoSanh && soSanh.soSanhBat && soSanh.dsSoSanh.length >= 2) soSanh.setMoSoSanh(true);
+          }}
           onToggleHeart={doiAnh}
           mutatingIds={KHONG_DANG_GUI}
           isLocked={false}
-          khoaTimAnh={(p) => (dotKhoaTheoAnh.get(p.id) ?? 0) > 0}
+          khoaTimAnh={khoaTimAnh}
+          {...propsCongCuXemLon(congCu, {
+            luuGhiChu,
+            taiAnh,
+            // BB-400 vòng 4 — "Trên tường" cố định ở màn xem lớn, cả ba mẹ lẫn người gợi ý.
+            xemTuong: moTreo ?? undefined,
+            bangSanPham: (anh, tong) => (
+                  <BangSanPhamCuaAnh
+                    tong={tong}
+                    anhDaChon={anh.mark === "selected"}
+                    khoa={false}
+                    dangLuu={false}
+                    // Đợt N không có suất trong gói — chỉ sản phẩm mua thêm vào giỏ của đợt.
+                    suatTrongGoi={[]}
+                    albumTrongGoi={[]}
+                    albumDaMua={[]}
+                    donDaGui={false}
+                    monMuaThem={danhMuc
+                      .filter((sp) => sp.canGanAnh)
+                      .map((sp) => ({
+                        ...sp,
+                        soLuong: gio.find((d) => d.productId === sp.productId && d.photoId === anh.id)?.soLuong ?? 0,
+                      }))}
+                    albumBanDuoc={danhMuc
+                      .filter((sp) => sp.nhom === "album")
+                      .map((sp) => ({
+                        ...sp,
+                        soLuong: gio.find((d) => d.productId === sp.productId && d.photoId === null)?.soLuong ?? 0,
+                      }))}
+                    onDatVaoGoi={khongLamGi}
+                    onDatVaoAlbum={khongLamGi}
+                    onDatMuaThem={(productId, soLuong) => datMon(productId, anh.id, soLuong)}
+                    onXemBanAlbum={() => moCuaHangVoi({ nhom: "album", photoId: null })}
+                    // BB-398 — tấm nào cũng XEM trên tường được; BB-400 vòng 4 — cùng hàm với nút cố định.
+                    onXemTuong={moTreo ? () => moTreo(anh) : undefined}
+                    onDatInTamNay={(nhomSp) => moCuaHangVoi({ nhom: nhomSp, photoId: anh.id })}
+                  />
+                ),
+          })}
           dungCho={(p) => {
             const nhan: string[] = [];
             const dot = dotKhoaTheoAnh.get(p.id) ?? 0;
@@ -486,6 +622,70 @@ export function ManChonThemDot({
             }
             return nhan;
           }}
+        />
+      )}
+
+      {/* SO SÁNH — đúng màn so sánh của đợt 1 (BB-218); tim tấm đã chốt đứng yên. */}
+      {soSanh.moSoSanh && soSanh.anhDangSoSanh.length >= 2 && (
+        <SoSanhAnh
+          photos={soSanh.anhDangSoSanh}
+          mutatingIds={KHONG_DANG_GUI}
+          isLocked={false}
+          khoaTimAnh={khoaTimAnh}
+          onToggleHeart={doiAnh}
+          onBoKhoi={soSanh.boKhoiManSoSanh}
+          onDong={() => soSanh.setMoSoSanh(false)}
+          onPhongTo={(p) => {
+            const i = dsAnh.findIndex((x) => x.id === p.id);
+            if (i < 0) return;
+            soSanh.setMoSoSanh(false);
+            setXemLon({ i, nguon: "day" });
+          }}
+          anhDaThaTim={dsAnh.filter((p) => p.mark === "selected")}
+          tatCaAnh={dsAnh}
+        />
+      )}
+
+      {/* XEM TRÊN TƯỜNG NHÀ — đúng màn BB-217; món chọn ở đây vào giỏ của đợt. */}
+      {treoTuongTuAnh && (
+        <ManTreoTuong
+          mo
+          onDong={() => setTreoTuongTuAnh(null)}
+          // BB-400 vòng 4 — người gợi ý XEM được; nút đặt thành "Gợi ý tấm này" (không mua thay ba mẹ).
+          loiDatKhac={
+            laGoiY
+              ? {
+                  nhan: vi.gallery.datLoiGoiY,
+                  onBam: (photoId) => {
+                    if (!goiY?.timCuaToi.has(photoId) && (dotKhoaTheoAnh.get(photoId) ?? 0) === 0) {
+                      goiY?.doiTim({ id: photoId });
+                    }
+                    setTreoTuongTuAnh(null);
+                  },
+                }
+              : null
+          }
+          // Cùng cách đợt 1 (BB-398): tấm đang xem đứng đầu nếu chưa chọn, rồi các tấm đã chọn.
+          anh={dsTreoDot.map((p) => ({ id: p.id, fileName: p.fileName, width: p.width, height: p.height }))}
+          chiSoBanDau={Math.max(0, dsTreoDot.findIndex((p) => p.id === treoTuongTuAnh))}
+          danhMuc={danhMuc
+            .filter((sp) => sp.nhom === "anh_in" || sp.nhom === "khung")
+            .map((sp) => ({
+              productId: sp.productId,
+              name: sp.name,
+              material: sp.material,
+              size: sp.size,
+              unitPrice: sp.unitPrice,
+              nhom: sp.nhom,
+            }))}
+          suatTrongGoi={[]}
+          placements={[]}
+          addonsDaDat={gio.map((d) => ({ productId: d.productId, photoId: d.photoId, quantity: d.soLuong }))}
+          khoa={false}
+          duocChon={cachDatTuManTreo({ nguCanh, trongManGio: true, khoa: false, dotMoiMo: true, moChoGiaDinh: true }) === "gio"}
+          dangLuu={false}
+          onDatVaoGoi={khongLamGi}
+          onDatMuaThem={(photoId, productId, soLuong) => datMon(productId, photoId, soLuong)}
         />
       )}
 

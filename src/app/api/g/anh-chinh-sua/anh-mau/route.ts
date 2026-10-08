@@ -17,8 +17,16 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { GallerySessionError } from "@/lib/auth/gallery-session";
 import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { BUCKET_ANH_MAU, coBangChiTiet, coBucketAnhMau } from "@/lib/anh-chinh-sua/du-lieu";
+import {
+  BUCKET_ANH_MAU,
+  coBangChiTiet,
+  coBucketAnhMau,
+  docBoiCanhAnhChinh,
+  docVongSua,
+} from "@/lib/anh-chinh-sua/du-lieu";
 import { kieuTheoChuKy, TOI_DA_BYTE_ANH_MAU } from "@/lib/anh-chinh-sua/nhan-dien";
+import { laKhoaMuaThem, trangThaiDuyetDot, type TrangThaiDuyetDot } from "@/lib/anh-chinh-sua/theo-dot";
+import { nhanAnhMinhHoaDuoc } from "@/lib/anh-chinh-sua/duyet-tung-tam";
 
 const TOI_DA_TAM_MOT_BO = 30;
 
@@ -44,7 +52,19 @@ export async function POST(request: Request): Promise<Response> {
       .eq("id", session.galleryId)
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
+    // BB-401 — đợt MUA THÊM duyệt riêng (BB-377) khi bộ có thể đã duyệt/đã giao: ba mẹ xin
+    // sửa ảnh mua thêm cũng gửi kèm được ảnh minh hoạ. Chỉ đọc thêm khi bộ không ở bước duyệt.
+    let cacDot: TrangThaiDuyetDot[] = [];
     if (gallery.status !== "awaiting_approval") {
+      const bc = await docBoiCanhAnhChinh(admin, gallery.id);
+      if (bc.mocDot) {
+        const vong = await docVongSua(admin, gallery.id, false);
+        cacDot = [...bc.mocDot.entries()]
+          .filter(([khoa]) => laKhoaMuaThem(khoa))
+          .map(([khoa, moc]) => trangThaiDuyetDot(moc, vong.some((v) => v.resolved_at === null && v.dot_khoa === khoa)));
+      }
+    }
+    if (!nhanAnhMinhHoaDuoc({ trangThaiBo: gallery.status, cacDotMuaThem: cacDot })) {
       return fail("INVALID_INPUT", "Bộ ảnh chưa tới bước duyệt ảnh đã chỉnh ạ.");
     }
 

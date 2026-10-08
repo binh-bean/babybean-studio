@@ -18,7 +18,9 @@ describe("BB-225 Hanh trinh", () => {
   });
 
   it("giai doan null ma in_retouch -> mac dinh", () => {
-    expect(tranhHanhTrinh("in_retouch", null, 10)).toBe("tien-do-chinh-sua");
+    // BB-402 — tranh theo CÙNG mã trạng thái với bước (xếp hàng chờ chỉnh = "ghi nhận"),
+    // không còn tranh "đang chỉnh" đi kèm bước "Chờ chỉnh".
+    expect(tranhHanhTrinh("in_retouch", null, 10)).toBe("tien-do-ghi-nhan");
     expect(buocHanhTrinh("in_retouch", null).hienTai).toBe(1);
   });
 
@@ -34,10 +36,11 @@ describe("BB-225 Hanh trinh", () => {
     expect(buocHanhTrinh("in_retouch", 6).hienTai).toBe(2);
   });
 
-  it("tien-do-duyet (giaiDoan = 5, 7 hoac status = awaiting_approval)", () => {
+  it("tien-do-duyet (giaiDoan = 5 hoac status = awaiting_approval)", () => {
     expect(tranhHanhTrinh("in_retouch", 5, 10)).toBe("tien-do-duyet");
-    expect(tranhHanhTrinh("in_retouch", 7, 10)).toBe("tien-do-duyet");
-    expect(buocHanhTrinh("in_retouch", 7).hienTai).toBe(3);
+    // BB-402 — Lark "Đã chốt chưa in" (GĐ7) là SAU khi duyệt: bước In/nhận ảnh, tranh in.
+    expect(tranhHanhTrinh("in_retouch", 7, 10)).toBe("tien-do-in");
+    expect(buocHanhTrinh("in_retouch", 7).hienTai).toBe(4);
 
     // status awaiting_approval ghi de
     expect(tranhHanhTrinh("awaiting_approval", 3, 10)).toBe("tien-do-duyet");
@@ -67,9 +70,10 @@ describe("BB-225 Hanh trinh", () => {
 
 // Opus soát BB-225: `approved` (đã duyệt, chờ in/giao) từng không có thẻ.
 describe("BB-225: approved có thẻ", () => {
-  it("approved chưa có giai đoạn Lark → tranh duyệt, bước Duyệt", () => {
-    expect(tranhHanhTrinh("approved", null)).toBe("tien-do-duyet");
-    expect(buocHanhTrinh("approved", null).hienTai).toBe(3);
+  // BB-402 — anh báo 08/10: đã duyệt mà tiến trình khách vẫn đứng ở "Duyệt ảnh".
+  it("approved chưa có giai đoạn Lark → tranh in, bước In/nhận ảnh (đã qua Duyệt)", () => {
+    expect(tranhHanhTrinh("approved", null)).toBe("tien-do-in");
+    expect(buocHanhTrinh("approved", null).hienTai).toBe(4);
   });
   it("approved + Lark Đã gửi in → tranh in", () => {
     expect(tranhHanhTrinh("approved", 8)).toBe("tien-do-in");

@@ -198,11 +198,12 @@ test.describe("BB-371: ảnh chỉnh sửa — CSKH gửi duyệt, khách xem/so
     await chup(page, "4-khach-so-sanh-truoc-sau-390.png");
     await xem.getByRole("button", { name: "Đóng" }).click();
 
-    // Yêu cầu sửa.
-    await khoi.getByRole("button", { name: "Yêu cầu sửa" }).click();
+    // Yêu cầu sửa — BB-401: ngay trong màn xem lớn ("Cần sửa tấm này"), không còn nút
+    // "Yêu cầu sửa" dưới lưới.
     await khoi.getByTestId("o-anh-chinh").first().click();
-    await xem.getByTestId("chon-can-sua").click();
-    await expect(xem.getByTestId("chon-can-sua")).toHaveAttribute("aria-pressed", "true");
+    await xem.getByTestId("nut-can-sua-tam").click();
+    await expect(xem.getByTestId("nut-can-sua-tam")).toHaveCount(0); // bảng ghi chú thay thanh duyệt
+    await expect(xem.getByTestId("bang-sua-tam")).toBeVisible();
     await xem.getByRole("textbox", { name: "Ba mẹ muốn Bean sửa gì ở tấm này ạ?" }).fill("Fixture BB-371 da bé sáng hơn");
     if (coBangChiTiet) {
       await xem.getByTestId("nut-khoanh-vung").click();
@@ -215,10 +216,17 @@ test.describe("BB-371: ảnh chỉnh sửa — CSKH gửi duyệt, khách xem/so
       await expect(xem.getByTestId("nut-khoanh-vung")).toHaveCount(0);
     }
     await chup(page, "5-khach-ghi-chu-tam-390.png");
-    await xem.getByRole("button", { name: "Đóng" }).click();
-    await expect(khoi.getByTestId("so-tam-can-sua")).toHaveText("1 tấm cần sửa");
-    await khoi.getByLabel("Ba mẹ muốn nhắn thêm gì cho Bean không ạ?").fill("Fixture BB-371 cảm ơn Bean");
-    await khoi.getByRole("button", { name: "Gửi yêu cầu sửa" }).click();
+    await xem.getByTestId("nut-xong-ghi-chu").click();
+    await expect(xem.getByTestId("trang-thai-tam-xem-lon")).toHaveAttribute("data-trang-thai", "xin_sua");
+    await xem.getByTestId("nut-gui-yeu-cau-sua").click();
+    const tomTat = page.getByTestId("tom-tat-gui-sua");
+    await expect(tomTat.getByTestId("so-tam-can-sua")).toContainText("1 tấm cần sửa");
+    await tomTat.getByLabel("Ba mẹ muốn nhắn thêm gì cho Bean không ạ?").fill("Fixture BB-371 cảm ơn Bean");
+    await tomTat.getByTestId("nut-xac-nhan-gui-sua").click();
+    // BB-401 — lời xin lỗi anh chốt hiện ngay, đóng thì về khung "đã nhận".
+    const loiXinLoi = page.getByTestId("xac-nhan-da-gui-sua");
+    await expect(loiXinLoi.getByTestId("loi-xin-loi-sua")).toContainText("Bean thành thật xin lỗi", { timeout: 30_000 });
+    await loiXinLoi.getByTestId("nut-dong-ket-qua").click();
 
     // BB-388 — BB-384 (anh 06/10) thay khung "đã nhận" bằng khung xác nhận rõ: tiêu đề
     // `anhChinh.daNhanTieuDe` ("… lần N ạ") + danh sách tấm cần sửa + lời xin lỗi (BB-387).

@@ -59,8 +59,22 @@ export interface ThanhDayDuyet {
  * Bước duyệt = bộ đang chờ khách duyệt (`awaiting_approval`). Có ảnh chỉnh trong app
  * thì nút chính dẫn vào khối duyệt; chưa có thì chỉ có lời Bean, không nút.
  */
-export function thanhDayBuocDuyet(p: { status: string; soAnhChinhTrongApp: number }): ThanhDayDuyet | null {
-  if (p.status !== "awaiting_approval") return null;
+export function thanhDayBuocDuyet(p: {
+  status: string;
+  soAnhChinhTrongApp: number;
+  /**
+   * BB-402 — số đợt mua thêm đang chờ ba mẹ duyệt ảnh chỉnh (bộ gốc có thể đã duyệt /
+   * đã giao). Có đợt chờ duyệt thì thanh đáy là thanh DUYỆT của đợt đó, không phải
+   * "Chọn thêm ảnh" hay "Yêu cầu sửa lại".
+   */
+  soDotMuaThemChoDuyet?: number;
+}): ThanhDayDuyet | null {
+  if (p.status !== "awaiting_approval") {
+    if ((p.soDotMuaThemChoDuyet ?? 0) > 0 && p.soAnhChinhTrongApp > 0) {
+      return { dong: "Ảnh chỉnh mua thêm chờ ba mẹ duyệt", nut: "Xem & duyệt ảnh chỉnh" };
+    }
+    return null;
+  }
   if (p.soAnhChinhTrongApp > 0) {
     return {
       dong: `${p.soAnhChinhTrongApp} ảnh chỉnh chờ ba mẹ duyệt`,

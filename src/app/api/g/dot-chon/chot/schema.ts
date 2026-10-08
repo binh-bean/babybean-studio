@@ -32,6 +32,20 @@ export const ChotDotChonSchema = z.object({
   items: z.array(DongSanPhamSchema).max(30, "Mỗi đợt tối đa 30 dòng sản phẩm").default([]),
   /** BB-399 — ô "Làm ảnh nhanh" ở hộp chốt đợt (không tích sẵn). Giá máy chủ tự đọc từ `products`. */
   lamAnhNhanh: z.boolean().optional(),
+  /**
+   * BB-400 — ghi chú cho thợ chỉnh ảnh của tấm MỚI trong đợt (cùng trường `retouch_note`
+   * với đợt 1, cùng trần 500 ký tự). Tấm không thuộc `photoIds` của đợt bị bỏ qua — đợt
+   * này không sửa ghi chú của tấm đã chốt.
+   */
+  ghiChu: z
+    .array(
+      z.object({
+        photoId: z.string().uuid("photoId phải là UUID hợp lệ"),
+        ghiChu: z.string().trim().max(500, "Ghi chú tối đa 500 ký tự"),
+      }),
+    )
+    .max(500)
+    .default([]),
 });
 
 export type ChotDotChonInput = z.infer<typeof ChotDotChonSchema>;

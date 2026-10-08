@@ -31,10 +31,13 @@ import {
   duocQuyetAnhChinh,
   gomTheoDot,
   laKhoaMuaThem,
+  mocGuiCuaKhoa,
   nhanCuaKhoa,
   trangThaiDuyetDot,
   trangThaiDuyetTrongGoi,
 } from "@/lib/anh-chinh-sua/theo-dot";
+import { tamDuyetConHieuLuc } from "@/lib/anh-chinh-sua/duyet-tung-tam";
+import { docDuyetTam } from "@/lib/anh-chinh-sua/duyet-tam-du-lieu";
 
 export const runtime = "nodejs";
 
@@ -51,7 +54,7 @@ export async function GET(request: Request): Promise<Response> {
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
 
-    const [bc, vong, chiTiet, coBang, coBucket, soNgaySua] = await Promise.all([
+    const [bc, vong, chiTiet, coBang, coBucket, soNgaySua, dongDuyet] = await Promise.all([
       docBoiCanhAnhChinh(admin, gallery.id),
       docVongSua(admin, gallery.id, true),
       docChiTietVong(admin, gallery.id),
@@ -60,6 +63,8 @@ export async function GET(request: Request): Promise<Response> {
       // BB-387 — "trong khoảng {n} ngày" cho lời Bean khi ba mẹ xin sửa (chưa có dòng → 3).
       // KHÔNG trả tên thợ chỉnh ra màn khách.
       docSoNgaySuaDuKien(admin),
+      // BB-401 vòng 2 — dấu "Duyệt tấm này" trên máy chủ (0108); null = chưa áp.
+      docDuyetTam(admin, gallery.id),
     ]);
     // BB-377 — mỗi tấm theo mốc gửi của ĐÚNG đợt nó (trong gói / mua thêm đợt N).
     const duocXem = bc.anhChinh.filter((a) => khachThayTrongBoiCanh(bc, gallery.status, a));
@@ -126,6 +131,16 @@ export async function GET(request: Request): Promise<Response> {
       };
     });
 
+    // BB-401 vòng 2 — tấm ba mẹ đã bấm duyệt, còn hiệu lực trong vòng gửi hiện tại.
+    const daDuyetTam =
+      dongDuyet === null
+        ? null
+        : [
+            ...tamDuyetConHieuLuc(dongDuyet, (id) =>
+              idDuocXem.has(id) ? mocGuiCuaKhoa(bc.khoaCua.get(id) ?? KHOA_TRONG_GOI, bc.mocChung, bc.mocDot) : null,
+            ),
+          ];
+
     return ok({
       trangThai: gallery.status,
       // Vòng duyệt cũ (một quyết định cho cả bộ): ảnh trong gói, hoặc mọi tấm khi chưa áp 0095.
@@ -137,6 +152,7 @@ export async function GET(request: Request): Promise<Response> {
       tinhNang: { vungKhoanh: coBang, anhMau: coBang && coBucket },
       laChu,
       soNgaySua,
+      daDuyetTam,
     });
   } catch (err) {
     if (err instanceof GallerySessionError) return fail(err.code);
