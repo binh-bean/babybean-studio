@@ -32,6 +32,8 @@ import { NutNhanKhach } from "./nut-nhan-khach";
 import { NutXuLyDatChinhSua } from "./tim-gia-dinh-admin";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { NhanLamNhanh } from "./nhan-lam-nhanh";
+import { xepLamNhanhLenDau } from "@/lib/dich-vu/lam-anh-nhanh";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface DotMuaThemCho {
@@ -112,6 +114,8 @@ export function KhachGuiAnhChonReport() {
   const [dong, setDong] = React.useState<DongKhachGuiView[]>([]);
   const [canConfirm, setCanConfirm] = React.useState(false);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  /** BB-399 — bộ khách mua "Làm ảnh nhanh": nhãn + xếp lên đầu. */
+  const [lamNhanh, setLamNhanh] = React.useState<Record<string, { soNgay: number; hanTra: string | null; uuTien?: boolean }>>({});
   const [dangMo, setDangMo] = React.useState<string | null>(null);
 
   const tai = React.useCallback(async () => {
@@ -126,6 +130,7 @@ export function KhachGuiAnhChonReport() {
       setDong(json.data.boAnh ?? []);
       setCanConfirm(json.data.canConfirm === true);
       setNha(json.data.nha ?? {});
+      setLamNhanh(json.data.lamNhanh ?? {});
     } catch {
       setError("Mất kết nối, thử lại giúp.");
     } finally {
@@ -162,7 +167,7 @@ export function KhachGuiAnhChonReport() {
         <p className="text-sm text-[var(--bb-fg-muted)]">Không có bộ ảnh nào đang chờ — mọi việc đã được xử lý.</p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {dong.map((d) => {
+          {xepLamNhanhLenDau(dong, (d) => !!lamNhanh[d.galleryId]?.uuTien).map((d) => {
             const mo = dangMo === d.galleryId;
             return (
               <li
@@ -184,6 +189,12 @@ export function KhachGuiAnhChonReport() {
                       {d.guiLuc && ` · gửi ${gioNgay(d.guiLuc)}`}
                     </p>
                     <NhanNhaBoAnh nha={nha[d.galleryId]} className="mt-1" />
+                    <NhanLamNhanh
+                      lamNhanh={!!lamNhanh[d.galleryId]}
+                      uuTien={lamNhanh[d.galleryId]?.uuTien ?? false}
+                      hanTra={lamNhanh[d.galleryId]?.hanTra ?? null}
+                      className="mt-1"
+                    />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button

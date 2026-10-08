@@ -21,6 +21,21 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateAddonSchema } from "./schema";
 import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 import { giaDuocBaoTuDong } from "@/lib/products/kich-thuoc-dang-ban";
+import { batBuocChonAnh, kiemKhungGanIn, LOI_KHUNG } from "@/lib/products/khung-gan-anh-in";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * BB-398 — số khung gắn một dòng in không vượt số lượng in: giảm số in thì kẹp khung gắn theo
+ * xuống bằng số in (bỏ hẳn dòng in thì khoá ngoại 0104 `on delete cascade` tự xoá khung).
+ */
+async function kepKhungTheoDongIn(admin: SupabaseClient, idDongIn: string, soLuongIn: number): Promise<void> {
+  const { error } = await admin
+    .from("selection_addons")
+    .update({ quantity: soLuongIn })
+    .eq("gan_voi_addon_id", idDongIn)
+    .gt("quantity", soLuongIn);
+  if (error) throw error;
+}
 
 export const runtime = "nodejs";
 
@@ -186,7 +201,9 @@ export async function POST(request: Request): Promise<Response> {
             .delete()
             .eq("selection_id", session.selectionId)
             .eq("product_id", product.id)
-            .eq("photo_id", photoIdLo);
+            .eq("photo_id", photoIdLo)
+            // BB-398 — chỉ dòng KHÔNG gắn in (khung gắn dòng in đi đường `ganVoiAddonId`).
+            .is("gan_voi_addon_id", null);
           if (delErr) throw delErr;
           continue;
         }
@@ -199,6 +216,7 @@ export async function POST(request: Request): Promise<Response> {
           .eq("selection_id", session.selectionId)
           .eq("product_id", product.id)
           .eq("photo_id", photoIdLo)
+          .is("gan_voi_addon_id", null)
           .maybeSingle();
 
         const ghi = dongCu
@@ -218,6 +236,7 @@ export async function POST(request: Request): Promise<Response> {
           .select("id, selection_id, product_id, photo_id, quantity, unit_price, created_at")
           .single();
         if (ghiErr || !data) throw ghiErr || new Error("Không lưu được sản phẩm mua thêm (batch)");
+        if (dongCu && nhom === "anh_in") await kepKhungTheoDongIn(admin, (data as { id: string }).id, input.quantity);
         ketQua.push(data as unknown as DongMuaThemBatch);
       }
 
@@ -272,7 +291,158 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    if (canGanAnh(nhom) && !photoId) {
+    /**
+     * BB-398 — KHUNG GẮN DÒNG IN ("Đóng khung ảnh đã đặt in"). Máy chủ kiểm lại mọi
+     * luật (`kiemKhungGanIn`): dòng in cùng lượt chọn, là ẢNH IN, không UV, khổ khung =
+     * khổ in, số khung ≤ số in. Ảnh của dòng khung LẤY TỪ dòng in, không tin client.
+     */
+    if (input.ganVoiAddonId) {
+      if (input.photoIds && input.photoIds.length > 0) {
+        return fail("INVALID_INPUT", "Khung gắn dòng in không đặt theo nhiều tấm được");
+      }
+      const { data: dongInRow, error: dongInErr } = await admin
+        .from("selection_addons")
+        .select("id, selection_id, photo_id, quantity, dot, gan_voi_addon_id, product:products (kind, material, size)")
+        .eq("id", input.ganVoiAddonId)
+        .maybeSingle();
+      if (dongInErr) throw dongInErr;
+      const spIn = dongInRow
+        ? ((Array.isArray(dongInRow.product) ? dongInRow.product[0] : dongInRow.product) as
+            | { kind: string | null; material: string | null; size: string | null }
+            | null)
+        : null;
+      // BB-398 vòng 3 — route này ghi lượt chọn gốc (đợt 1). Khung gắn cùng dòng in ở ĐỢT KHÁC
+      // (đợt mua thêm) vẫn tính vào trần "số khung ≤ số in".
+      const { data: khungDotKhac, error: eDotKhac } = await admin
+        .from("selection_addons")
+        .select("quantity")
+        .eq("gan_voi_addon_id", input.ganVoiAddonId)
+        .neq("dot", 1);
+      if (eDotKhac) throw eDotKhac;
+      const soKhungDotKhac = (khungDotKhac ?? []).reduce((t, r) => t + Number(r.quantity), 0);
+      const kq = kiemKhungGanIn({
+        selectionId: session.selectionId,
+        sanPhamKhung: { kind: product.kind, material: product.material, size: product.size },
+        dongIn:
+          dongInRow && spIn && !dongInRow.gan_voi_addon_id
+            ? {
+                id: dongInRow.id as string,
+                selectionId: dongInRow.selection_id as string,
+                photoId: (dongInRow.photo_id as string | null) ?? null,
+                quantity: Number(dongInRow.quantity),
+                sanPham: spIn,
+              }
+            : null,
+        soLuong: input.quantity === 0 ? 0 : input.quantity + soKhungDotKhac,
+      });
+      if (!kq.ok) {
+        return fail(
+          kq.lyDo === "khong_thay_dong_in" || kq.lyDo === "khac_luot_chon" ? "NOT_FOUND" : "INVALID_INPUT",
+          LOI_KHUNG[kq.lyDo],
+        );
+      }
+      const idDongIn = dongInRow!.id as string;
+
+      interface DongKhungGan {
+        id: string;
+        selection_id: string;
+        product_id: string;
+        quantity: number;
+        unit_price: number;
+        created_at: string;
+      }
+      let addonKhung: DongKhungGan | null = null;
+      if (input.quantity === 0) {
+        const { error: delErr } = await admin
+          .from("selection_addons")
+          .delete()
+          .eq("selection_id", session.selectionId)
+          .eq("product_id", product.id)
+          .eq("gan_voi_addon_id", idDongIn)
+          .eq("dot", 1);
+        if (delErr) throw delErr;
+      } else {
+        const { data: dongCu } = await admin
+          .from("selection_addons")
+          .select("id")
+          .eq("selection_id", session.selectionId)
+          .eq("product_id", product.id)
+          .eq("gan_voi_addon_id", idDongIn)
+          .eq("dot", 1)
+          .maybeSingle();
+        const ghi = dongCu
+          ? admin
+              .from("selection_addons")
+              .update({ quantity: input.quantity, unit_price: unitPrice })
+              .eq("id", dongCu.id)
+          : admin.from("selection_addons").insert({
+              selection_id: session.selectionId,
+              product_id: product.id,
+              photo_id: (dongInRow!.photo_id as string | null) ?? null,
+              gan_voi_addon_id: idDongIn,
+              dot: 1,
+              quantity: input.quantity,
+              unit_price: unitPrice,
+            });
+        const { data, error: ghiErr } = await ghi
+          .select("id, selection_id, product_id, quantity, unit_price, created_at")
+          .single();
+        if (ghiErr || !data) throw ghiErr || new Error("Không lưu được khung gắn dòng in");
+        addonKhung = data as unknown as DongKhungGan;
+      }
+
+      const { data: tatCaDong, error: sumErrKhung } = await admin
+        .from("selection_addons")
+        .select("quantity, unit_price")
+        .eq("selection_id", session.selectionId);
+      if (sumErrKhung) throw sumErrKhung;
+      const tongKhung = (tatCaDong || []).reduce((t, r) => t + Number(r.unit_price) * r.quantity, 0);
+
+      const { error: logErrKhung } = await admin.from("activity_logs").insert({
+        actor_type: "customer",
+        actor_id: session.selectionId,
+        actor_label: "Customer",
+        action: input.quantity === 0 ? "addon.khung_gan_in_remove" : "addon.khung_gan_in_set",
+        entity_type: "gallery",
+        entity_id: session.galleryId,
+        metadata: {
+          addonId: addonKhung?.id ?? null,
+          productId: product.id,
+          productName: product.name,
+          ganVoiAddonId: idDongIn,
+          quantity: input.quantity,
+          unitPrice,
+        },
+      });
+      if (logErrKhung) console.error("[activity_logs] Ghi hụt:", logErrKhung);
+
+      return NextResponse.json(
+        {
+          data: {
+            addon: addonKhung
+              ? {
+                  id: addonKhung.id,
+                  selectionId: addonKhung.selection_id,
+                  productId: addonKhung.product_id,
+                  productName: product.name,
+                  material: product.material,
+                  size: product.size,
+                  ganVoiAddonId: idDongIn,
+                  quantity: addonKhung.quantity,
+                  unitPrice,
+                  totalPrice: unitPrice * addonKhung.quantity,
+                  createdAt: addonKhung.created_at,
+                }
+              : null,
+            totalAddonsAmount: tongKhung,
+          },
+        },
+        { status: 200, headers: { "Cache-Control": "no-store" } },
+      );
+    }
+
+    // BB-398 — chỉ ẢNH IN bắt buộc ảnh; khung không ảnh là KHUNG LẺ (bán như cũ).
+    if (batBuocChonAnh(nhom) && !photoId) {
       return fail("INVALID_INPUT", vi.gallery.loiBean.chonAnhCanIn);
     }
 
@@ -319,6 +489,8 @@ export async function POST(request: Request): Promise<Response> {
         .eq("product_id", product.id);
       // Bỏ mua ĐÚNG dòng của tấm ảnh đó, không quét sạch mọi tấm cùng sản phẩm.
       xoa = photoId ? xoa.eq("photo_id", photoId) : xoa.is("photo_id", null);
+      // BB-398 — khung gắn dòng in chỉ bỏ qua `ganVoiAddonId`, không bị quét theo ảnh.
+      xoa = xoa.is("gan_voi_addon_id", null);
       const { error: delErr } = await xoa;
       if (delErr) throw delErr;
     }
@@ -351,6 +523,7 @@ export async function POST(request: Request): Promise<Response> {
         .eq("selection_id", session.selectionId)
         .eq("product_id", product.id);
       timDong = photoId ? timDong.eq("photo_id", photoId) : timDong.is("photo_id", null);
+      timDong = timDong.is("gan_voi_addon_id", null);
       const { data: dongCu } = await timDong.maybeSingle();
 
       const ghi = dongCu
@@ -371,6 +544,7 @@ export async function POST(request: Request): Promise<Response> {
         .single();
       if (ghiErr || !data) throw ghiErr || new Error("Không lưu được sản phẩm mua thêm");
       addon = data as unknown as DongMuaThem;
+      if (dongCu && nhom === "anh_in") await kepKhungTheoDongIn(admin, addon.id, input.quantity);
     }
 
     // 6. Calculate total addons amount for the current selection session

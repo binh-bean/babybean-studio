@@ -8,6 +8,7 @@
  * `/api/admin/reports/yeu-cau-mo-lai` (BB-312).
  */
 
+import { layHanTraNhieuBo } from "@/lib/dich-vu/lam-anh-nhanh-server";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
@@ -57,9 +58,15 @@ export async function GET(request: Request): Promise<Response> {
     const boAnh = gomTheoBoAnh(dot1, items, viecDot1, datChinhSua);
     // BB-394 — nhãn nhà (khách có ≥ 2 bộ): một lần đọc cho cả tab; lỗi thì bỏ nhãn.
     const nha = await docNhaCuaCacBoKhongLoi(admin, boAnh.map((d) => d.galleryId));
+    // BB-399 — "Làm nhanh" + hạn trả dự kiến cho từng bộ (lỗi đọc → không nhãn).
+    const hanTra = await layHanTraNhieuBo(admin, boAnh.map((d) => d.galleryId));
+    const lamNhanh = Object.fromEntries(
+      [...hanTra].filter(([, h]) => h.lamNhanh).map(([id, h]) => [id, { soNgay: h.soNgay, hanTra: h.hanTra, uuTien: h.uuTien }]),
+    );
 
     return ok({
       nha,
+      lamNhanh,
       // Không trả anh_ids (danh sách id ảnh) — hàng đợi chỉ cần số liệu; ảnh xem ở trang bộ ảnh.
       items: items.map((d) => ({
         galleryId: d.galleryId,

@@ -99,6 +99,24 @@ export const en: Messages = {
     // BB-353 — Bean's customer voice; customer screens ship Vietnamese only, English copy pending (BB-069).
     loiBean: vi.gallery.loiBean,
     giaDinh: vi.gallery.giaDinh,
+    lamNhanh: {
+      ten: "Express editing",
+      moTa: "Bean edits your photos first — you receive them in about {nhanh} days instead of the standard {tieuChuan} days.",
+      daChon: "Express editing selected",
+      daChonMoTa: "Bean is prioritising this gallery — you receive your photos in about {n} days.",
+      hanTra: "Bean delivers edited photos in about {n} days, expected on {ngay}.",
+      hanTraKhongNgay: "Bean delivers edited photos in about {n} days.",
+      tamTinh: "Subtotal",
+      theTieuDe: "Want your photos sooner?",
+      nutMua: "Choose express editing · {gia}",
+      dangGui: "Bean is saving…",
+      daMuaXong: "Bean has your express request — photos in about {n} days.",
+      loiKhongCoSanPham: "Express editing is not available right now, please message Bean.",
+      loiDaMua: "This gallery already has express editing.",
+      loiQuaGiaiDoan: "Your edited photos are already ready, express editing is not needed.",
+      loiChiNguoiChinh: "Only the main link holder can choose express editing.",
+      loiTamDung: "Bean is very busy right now and has paused express editing — thank you for understanding.",
+    },
     anhChinh: vi.gallery.anhChinh,
 
     lightbox: {
@@ -352,6 +370,10 @@ export const en: Messages = {
         "lark.webhook_url": "Lark group webhook",
         "lark.nhac_noi_bo": "Internal reminders to Lark",
         "thanh_toan.thu_san_pham_qua_app": "Collect extra product payments in the app",
+        "hau_ky.so_ngay_tra_tieu_chuan": "Standard days to deliver edited photos",
+        "hau_ky.so_ngay_lam_nhanh": "Days to deliver with express editing",
+        "dich_vu.lam_anh_nhanh_lark_id": "Express editing product (Lark record id)",
+        "dich_vu.lam_anh_nhanh_bat": "Accept express editing",
       },
       moTa: {
         "gallery.default_due_days": "Days from sending the link until the customer must confirm.",
@@ -376,6 +398,10 @@ export const en: Messages = {
           "Post-production and unconfirmed-selection reminders to Lark, for STAFF only. Does NOT affect customer-facing messages (selection submitted, reopen request, extra purchase, review approve/revise) — those always send. Off because Lark's own automation in another group already covers this.",
         "thanh_toan.thu_san_pham_qua_app":
           "Prints, frames, albums bought as extras. Off (default): collected via Lark — not counted in Amount due / Outstanding, shown as a separate line. On: counted and recorded in the app. Photo money (over quota, extra rounds, edit files) is always collected in the app.",
+        "hau_ky.so_ngay_tra_tieu_chuan": "Estimate (not a promise) after the customer submits. Default 14.",
+        "hau_ky.so_ngay_lam_nhanh": "Estimate when the customer buys express editing. Default 5. Price comes from Lark.",
+        "dich_vu.lam_anh_nhanh_bat": "Turn off when retouching is overloaded: customers cannot buy express editing; galleries that already bought keep priority.",
+        "dich_vu.lam_anh_nhanh_lark_id": "Empty: find the active product named \"Làm ảnh nhanh\". Set: use exactly that product even if renamed on Lark.",
       },
       dangBat: "On",
       dangTat: "Off",

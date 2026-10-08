@@ -16,9 +16,10 @@
  * phần gói còn trống không dùng ở đợt sau — nên câu của đợt KHÔNG có vế "trong gói".
  */
 
+import { batBuocChonAnh } from "@/lib/products/khung-gan-anh-in";
 import { vi } from "@/i18n";
 import { demSanPhamInChuaAnh, tinhTienDot } from "@/lib/gallery/dot-chon";
-import { canGanAnh, type NhomSanPham } from "@/lib/products/nhom-san-pham";
+import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 
 // ---------------------------------------------------------------------------
@@ -85,6 +86,8 @@ export interface DongGioDot {
   productId: string;
   photoId: string | null;
   soLuong: number;
+  /** BB-398 vòng 3 — khung gắn một dòng in ĐÃ LƯU (id `selection_addons`). */
+  ganVoiAddonId?: string | null;
 }
 
 /**
@@ -99,7 +102,8 @@ export function soMonChuaCoAnhTrongGio(
   const muaThem = gio
     .filter((d) => {
       const nhom = nhomTheoMa(d.productId);
-      return nhom === "album" || canGanAnh(nhom);
+      // BB-398 — khung không ảnh là KHUNG LẺ (bán không ảnh), không phải "chưa có ảnh".
+      return nhom === "album" || batBuocChonAnh(nhom);
     })
     .map((d) => ({ soLuong: Math.max(0, d.soLuong), daCoAnh: d.photoId !== null }));
   return demSanPhamInChuaAnh({ hangTrongGoi: [], soXepTheoHang: new Map(), muaThem });

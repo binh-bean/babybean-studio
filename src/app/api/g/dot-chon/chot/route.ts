@@ -39,6 +39,8 @@ import { chotDotChon, layCacDot } from "@/lib/gallery/dot-chon-server";
 import { ChotDotChonSchema } from "./schema";
 import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
 import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
+import { daMuaCuaBo, docCaiDatLamNhanh, timSanPhamLamNhanh } from "@/lib/dich-vu/lam-anh-nhanh-server";
+import type { DongSanPhamDot } from "@/lib/gallery/dot-chon-server";
 
 export const runtime = "nodejs";
 
@@ -81,6 +83,27 @@ export async function POST(request: Request): Promise<Response> {
       return fail("RATE_LIMITED", "Ba mẹ đã gửi khá nhiều đợt đang chờ, CSKH sẽ liên hệ trước khi nhận thêm");
     }
 
+    // BB-399 — "Làm ảnh nhanh" ở hộp chốt đợt: máy chủ tự tìm sản phẩm + giá; bộ đã mua rồi thì
+    // không bán lần hai (màn khách đã ẩn ô — tới đây là trình duyệt cũ/hai tab).
+    const caiDatNhanh = await docCaiDatLamNhanh(admin, gallery.branch_id ?? null);
+    const dongDichVu: DongSanPhamDot[] = [];
+    if (input.lamAnhNhanh === true) {
+      if (await daMuaCuaBo(admin, gallery.id, session.selectionId, caiDatNhanh.cacGhim)) {
+        return fail("CONFLICT", vi.gallery.lamNhanh.loiDaMua);
+      }
+      if (!caiDatNhanh.bat) return fail("CONFLICT", vi.gallery.lamNhanh.loiTamDung); // BB-399 vòng 3
+      const sanPhamNhanh = await timSanPhamLamNhanh(admin, caiDatNhanh.ghim);
+      if (!sanPhamNhanh) return fail("CONFLICT", vi.gallery.lamNhanh.loiKhongCoSanPham);
+      dongDichVu.push({
+        productId: sanPhamNhanh.id,
+        ten: String(sanPhamNhanh.name ?? vi.gallery.lamNhanh.ten),
+        photoId: null,
+        soLuong: 1,
+        donGia: Number(sanPhamNhanh.list_price),
+        dichVu: true,
+      });
+    }
+
     const kq = await chotDotChon(admin, {
       galleryId: gallery.id,
       selectionId: session.selectionId,
@@ -89,10 +112,12 @@ export async function POST(request: Request): Promise<Response> {
         productId: i.productId,
         photoId: i.photoId ?? null,
         soLuong: i.soLuong,
+        ganVoiAddonId: i.ganVoiAddonId ?? null,
       })),
       tenNguoiChot: input.tenNguoiChot,
       giaMoiAnh: Number(gallery.extra_photo_price ?? 0),
       bietAnhInChamHon: input.bietAnhInChamHon === true,
+      dongDichVu,
     });
     if (!kq.ok) return fail(kq.code, kq.message, kq.chiTiet ? { chiTiet: kq.chiTiet } : undefined);
 
@@ -148,7 +173,9 @@ export async function POST(request: Request): Promise<Response> {
         nguoiChot: input.tenNguoiChot,
         customerName: khach?.full_name ?? null,
         customerPhone: cheSoDienThoai(khach?.phone),
-        cacMon: dot.sanPham.map((s) => ({ ten: s.ten, soLuong: s.soLuong })),
+        cacMon: dot.sanPham.filter((s) => !s.dichVu).map((s) => ({ ten: s.ten, soLuong: s.soLuong })),
+        // BB-399 — khoá tránh chữ "anh" ("nhanh" cũng dính, locBoAnh cắt theo tên khoá).
+        lamGapNgay: dot.sanPham.some((s) => s.dichVu) ? caiDatNhanh.soNgayNhanh : 0,
         submittedAt: dot.submittedAt,
       },
     });

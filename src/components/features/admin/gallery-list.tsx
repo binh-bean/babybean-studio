@@ -1,5 +1,7 @@
 "use client";
 
+import { NhanLamNhanh } from "./nhan-lam-nhanh";
+import { xepLamNhanhLenDau } from "@/lib/dich-vu/lam-anh-nhanh";
 import React, { useEffect, useState, useCallback } from "react";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { taoBoDemYeuCau } from "@/lib/utils/yeu-cau-moi-nhat";
@@ -174,6 +176,12 @@ export interface GalleryItem {
   larkPhoto?: string | null;
   /** BB-394 — nhãn nhà (khách có ≥ 2 bộ): "Nhà <tên> · Buổi N/M". */
   nha?: NhaCuaBo | null;
+  /** BB-399 — khách mua "Làm ảnh nhanh": nhãn + xếp lên đầu cho thợ. */
+  lamNhanh?: boolean;
+  /** BB-399 vòng 3 — làm nhanh VÀ còn chờ trả ảnh chỉnh: nhãn "Ưu tiên" + lên đầu. */
+  uuTien?: boolean;
+  /** BB-399 — hạn trả ảnh chỉnh dự kiến (ISO); null khi chưa chốt. */
+  hanTraDuKien?: string | null;
 }
 
 /**
@@ -441,7 +449,7 @@ function KanbanColumn({
           </div>
         ) : (
           <>
-            {items.map((item) => {
+            {xepLamNhanhLenDau(items, (i) => !!i.uuTien).map((item) => {
               const tenBeCot = item.babyName || item.babyFullName || null;
               return (
                 <Link
@@ -462,6 +470,7 @@ function KanbanColumn({
                         </div>
                         {tenBeCot && <p className="text-xs text-[var(--bb-fg-muted)]">bé {tenBeCot}</p>}
                         <NhanNhaBoAnh nha={item.nha} chiNhan className="mt-1" />
+                        <NhanLamNhanh lamNhanh={item.lamNhanh} uuTien={item.uuTien ?? false} hanTra={item.hanTraDuKien} className="mt-1" />
                       </div>
                     </div>
                     <div className="text-xs text-[var(--bb-fg-muted)] space-y-1">
@@ -821,7 +830,7 @@ export function GalleryList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--bb-border)]">
-                {items.map((item) => {
+                {xepLamNhanhLenDau(items, (i) => !!i.uuTien).map((item) => {
                   const statusConfig = getStatusBadgeConfig(item.status);
                   const tienDoTong = item.includedQuota > 0 ? item.includedQuota : item.selectedCount;
 
@@ -851,6 +860,7 @@ export function GalleryList() {
                               <span className="tabular-nums">{thongTinBoAnh(item)}</span>
                             </div>
                             <NhanNhaBoAnh nha={item.nha} className="mt-0.5" />
+                            <NhanLamNhanh lamNhanh={item.lamNhanh} uuTien={item.uuTien ?? false} hanTra={item.hanTraDuKien} className="mt-0.5" />
                           </div>
                         </div>
                       </td>
@@ -958,7 +968,7 @@ export function GalleryList() {
 
           {/* Màn hình nhỏ (< lg): MỖI BỘ ẢNH MỘT THẺ CHO CSKH */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 lg:hidden">
-            {items.map((item) => {
+            {xepLamNhanhLenDau(items, (i) => !!i.uuTien).map((item) => {
               const statusConfig = getStatusBadgeConfig(item.status);
 
               return (
@@ -985,6 +995,7 @@ export function GalleryList() {
                         <span className="tabular-nums">{thongTinBoAnh(item)}</span>
                       </p>
                       <NhanNhaBoAnh nha={item.nha} />
+                      <NhanLamNhanh lamNhanh={item.lamNhanh} uuTien={item.uuTien ?? false} hanTra={item.hanTraDuKien} className="mt-0.5" />
                       <span className="inline-flex items-center gap-1.5">
                         <ChamCanhBao mau={item.warningColor} />
                         <Badge variant={statusConfig.variant} className="whitespace-nowrap" title={item.larkTenTrangThai ? `Trên Lark: ${item.larkTenTrangThai}` : undefined}>

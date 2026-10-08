@@ -5,6 +5,7 @@
  * Hạn mức lấy từ app.gallery_quota(), cây hai tầng (dòng hợp đồng cha và thành phần con).
  */
 
+import { nhanKhungChoTho } from "@/lib/products/khung-gan-anh-in";
 import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 import { randomUUID, createHash } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
@@ -359,11 +360,29 @@ export async function GET(
     const { data: addonPurchaseRows } = primarySel?.id
       ? await admin
           .from("selection_addons")
-          .select("id, product_id, photo_id, quantity, unit_price, products(name, material, size, kind)")
+          .select("id, product_id, photo_id, gan_voi_addon_id, quantity, unit_price, products(name, material, size, kind), photos(file_name)")
           .eq("selection_id", primarySel.id)
           .order("created_at", { ascending: true })
       : { data: [] as never[] };
-    const addonPurchases = (addonPurchaseRows ?? []).map((r) => {
+    // BB-398 — dòng khung: "Khung cho: <tệp> · <chất liệu> <khổ>" (gắn dòng in, 0104) / "Khung lẻ".
+    const dongXetKhung = (addonPurchaseRows ?? []).map((r) => {
+      const p = r.products as unknown as { material: string | null; size: string | null; kind: string | null } | null;
+      return {
+        id: r.id as string,
+        photoId: (r.photo_id as string | null) ?? null,
+        ganVoiAddonId: ((r as { gan_voi_addon_id?: string | null }).gan_voi_addon_id ?? null) as string | null,
+        kind: p?.kind ?? null,
+        material: p?.material ?? null,
+        size: p?.size ?? null,
+      };
+    });
+    const tenTepTheoAnh = new Map<string, string>();
+    for (const r of addonPurchaseRows ?? []) {
+      const ph = (r as { photos?: { file_name?: string | null } | { file_name?: string | null }[] | null }).photos;
+      const mot = Array.isArray(ph) ? ph[0] : ph;
+      if (r.photo_id && mot?.file_name) tenTepTheoAnh.set(r.photo_id as string, mot.file_name);
+    }
+    const addonPurchases = (addonPurchaseRows ?? []).map((r, i) => {
       const p = r.products as unknown as {
         name: string | null;
         material: string | null;
@@ -371,6 +390,8 @@ export async function GET(
         kind: string | null;
       } | null;
       return {
+        ganVoiAddonId: dongXetKhung[i]!.ganVoiAddonId,
+        nhanKhung: nhanKhungChoTho(dongXetKhung[i]!, dongXetKhung, (id) => tenTepTheoAnh.get(id) ?? null),
         id: r.id as string,
         productId: r.product_id as string,
         photoId: (r.photo_id as string | null) ?? null,

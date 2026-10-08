@@ -26,6 +26,7 @@
  * năng của nó (BB-131).
  */
 
+import { dotDuocDongKhung } from "@/lib/products/khung-gan-anh-in";
 import React from "react";
 import { ArrowLeft, Printer } from "lucide-react";
 import { cn } from "@/components/ui/utils";
@@ -56,6 +57,8 @@ import {
   type DongGioDot,
 } from "./dot-chon-khach";
 import { goiApiKhach } from "@/lib/utils/goi-api-khach";
+import { OLamAnhNhanh } from "./lam-anh-nhanh-khach";
+import type { LamAnhNhanhKhach } from "@/lib/dich-vu/lam-anh-nhanh";
 
 /** Máy chủ nhận tối đa 20 cho mỗi dòng (`ChotDotChonSchema`). */
 const SO_LUONG_TOI_DA = 20;
@@ -73,12 +76,22 @@ export interface MonCatalogue {
   canGanAnh: boolean;
 }
 
-const khoaDong = (productId: string, photoId: string | null) => `${productId}::${photoId ?? ""}`;
+// BB-398 vòng 3 — khung gắn dòng in là dòng RIÊNG theo dòng in (không trùng khung lẻ / khung theo ảnh).
+const khoaDong = (productId: string, photoId: string | null, ganVoiAddonId?: string | null) =>
+  ganVoiAddonId ? `${productId}::gan::${ganVoiAddonId}` : `${productId}::${photoId ?? ""}`;
 
-function datDong(gio: readonly DongGioDot[], productId: string, photoId: string | null, soLuong: number): DongGioDot[] {
-  const con = gio.filter((d) => khoaDong(d.productId, d.photoId) !== khoaDong(productId, photoId));
+export function datDong(
+  gio: readonly DongGioDot[],
+  productId: string,
+  photoId: string | null,
+  soLuong: number,
+  ganVoiAddonId: string | null = null,
+): DongGioDot[] {
+  const khoa = khoaDong(productId, photoId, ganVoiAddonId);
+  const con = gio.filter((d) => khoaDong(d.productId, d.photoId, d.ganVoiAddonId) !== khoa);
   const n = Math.min(SO_LUONG_TOI_DA, Math.max(0, Math.floor(soLuong)));
-  return n > 0 ? [...con, { productId, photoId, soLuong: n }] : con;
+  if (n <= 0) return con;
+  return [...con, ganVoiAddonId ? { productId, photoId, soLuong: n, ganVoiAddonId } : { productId, photoId, soLuong: n }];
 }
 
 export function ManChonThemDot({
@@ -87,6 +100,8 @@ export function ManChonThemDot({
   tenBe,
   tenKhach,
   catalogue,
+  lamAnhNhanh = null,
+  dongDaLuu = [],
   tt,
   nhap,
   anhNhap,
@@ -100,6 +115,13 @@ export function ManChonThemDot({
   tenBe: string | null;
   tenKhach: string | null;
   catalogue: MonCatalogue[];
+  /** BB-399 — "Làm ảnh nhanh" (giá Lark + số ngày, đã mua chưa). null = ẩn ô. */
+  lamAnhNhanh?: LamAnhNhanhKhach | null;
+  /**
+   * BB-398 vòng 3 — mọi dòng mua thêm ĐÃ LƯU (mọi đợt, có `dot`). Lối "Đóng khung ảnh đã đặt
+   * in" chỉ lấy tấm in đợt 1 / đợt đã xác nhận (`dotDuocDongKhung`), cùng luật máy chủ.
+   */
+  dongDaLuu?: Array<DongDaMua & { dot: number }>;
   tt: TrangThaiDotKhach;
   nhap: NhapDot;
   /** Ảnh nháp CÒN chọn được (đã lọc tấm khoá) — từ `useDotChon`. */
@@ -117,6 +139,10 @@ export function ManChonThemDot({
   const [hoi, setHoi] = React.useState(false);
   const [ten, setTen] = React.useState(tenKhach ?? "");
   const [bietAnhInCham, setBietAnhInCham] = React.useState(false);
+  /** BB-399 — ô làm nhanh của hộp chốt đợt (không tích sẵn). */
+  const [chonLamNhanh, setChonLamNhanh] = React.useState(false);
+  const laChonLamNhanh = chonLamNhanh && !!lamAnhNhanh?.coBan && !lamAnhNhanh.daMua;
+  const giaLamNhanh = laChonLamNhanh ? (lamAnhNhanh?.gia ?? 0) : 0;
   const [dangGui, setDangGui] = React.useState(false);
   const [loi, setLoi] = React.useState<string | null>(null);
   const hopRef = React.useRef<HTMLDivElement>(null);
@@ -147,6 +173,12 @@ export function ManChonThemDot({
     [catalogue],
   );
   const theoMa = React.useMemo(() => new Map(danhMuc.map((sp) => [sp.productId, sp])), [danhMuc]);
+  // BB-398 vòng 3 — dòng ĐÃ LƯU dùng cho lối đóng khung: dòng in của đợt 1 / đợt đã xác nhận, và
+  // MỌI khung đã gắn (đếm trần "khung ≤ số in"). Dòng in của đợt còn chờ: đóng khung sau khi xác nhận.
+  const dongInDuocDongKhung = React.useMemo(
+    () => dongDaLuu.filter((d) => d.ganVoiAddonId || dotDuocDongKhung(d.dot, tt.cacDot)),
+    [dongDaLuu, tt.cacDot],
+  );
   // Giỏ chỉ giữ món CÒN bán trong đợt (nháp cũ có thể còn món nay đã ngừng / bị loại).
   const gio = React.useMemo(() => nhap.gio.filter((d) => theoMa.has(d.productId)), [nhap.gio, theoMa]);
 
@@ -224,8 +256,14 @@ export function ManChonThemDot({
         body: JSON.stringify({
           tenNguoiChot: ten.trim(),
           photoIds: anhNhap,
-          items: gio.map((d) => ({ productId: d.productId, photoId: d.photoId, soLuong: d.soLuong })),
+          items: gio.map((d) => ({
+            productId: d.productId,
+            photoId: d.photoId,
+            soLuong: d.soLuong,
+            ...(d.ganVoiAddonId ? { ganVoiAddonId: d.ganVoiAddonId } : {}),
+          })),
           ...(soMonChuaAnh > 0 ? { bietAnhInChamHon: bietAnhInCham } : {}),
+          ...(laChonLamNhanh ? { lamAnhNhanh: true } : {}),
         }),
       });
       const json = (await res.json().catch(() => null)) as {
@@ -391,12 +429,16 @@ export function ManChonThemDot({
         daMua={gio.map<DongDaMua>((d) => {
           const sp = theoMa.get(d.productId);
           return {
-            id: khoaDong(d.productId, d.photoId),
+            id: khoaDong(d.productId, d.photoId, d.ganVoiAddonId),
             productId: d.productId,
             name: sp?.name ?? "",
             quantity: d.soLuong,
             totalPrice: (sp?.unitPrice ?? 0) * d.soLuong,
             photoId: d.photoId,
+            ganVoiAddonId: d.ganVoiAddonId ?? null,
+            kind: sp ? (catalogue.find((c) => c.productId === d.productId)?.kind ?? null) : null,
+            material: sp?.material ?? null,
+            size: sp?.size ?? null,
           };
         })}
         tongTien={tom.tienSanPham}
@@ -411,6 +453,16 @@ export function ManChonThemDot({
             gio: photoIds.reduce((g, id) => datDong(g, productId, id, soLuong), cu.gio),
           }))
         }
+        // BB-398 vòng 3 — "Đóng khung ảnh đã đặt in" cho tấm in ĐÃ LƯU (đợt 1 / đợt đã xác nhận):
+        // khung vào giỏ đợt này, gắn dòng in; máy chủ kiểm lại lúc chốt (`kiemKhungGanInTrongDot`).
+        dongDaLuu={dongInDuocDongKhung}
+        onDongKhung={(ganVoiAddonId, productId, soLuong) => {
+          const dongIn = dongDaLuu.find((d) => d.id === ganVoiAddonId);
+          setNhap((cu) => ({
+            ...cu,
+            gio: datDong(cu.gio, productId, dongIn?.photoId ?? null, soLuong, ganVoiAddonId),
+          }));
+        }}
       />
 
       {/* XEM LỚN — đúng màn xem lớn của màn chính; tim tấm đã chốt đứng yên. */}
@@ -488,13 +540,22 @@ export function ManChonThemDot({
                     </ul>
                   </div>
                 )}
+                {laChonLamNhanh && (
+                  <div data-testid="dong-lam-nhanh-dot" className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">{vi.gallery.lamNhanh.ten}</span>
+                    <span className="tabular-nums">{formatCurrencyVND(giaLamNhanh)}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-3 border-t border-border pt-2.5 font-semibold">
                   <span>Tổng đợt {soDot}</span>
                   <span data-testid="tong-tien-dot" className="tabular-nums">
-                    {formatCurrencyVND(tom.tong)}
+                    {formatCurrencyVND(tom.tong + giaLamNhanh)}
                   </span>
                 </div>
               </div>
+
+              {/* BB-399 — "Làm ảnh nhanh" (không tích sẵn; đã mua → "Đã chọn", không bán lần hai). */}
+              <OLamAnhNhanh thongTin={lamAnhNhanh} chon={chonLamNhanh} onChon={setChonLamNhanh} />
 
               {anhMoi.length > 0 && (
                 <div className="mt-4">

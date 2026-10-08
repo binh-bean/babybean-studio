@@ -29,6 +29,7 @@
  * hai vế: đúng lượt chọn chính, và đúng `mark = 'selected'`.
  */
 
+import { laKhung } from "@/lib/products/khung-gan-anh-in";
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fail, failUnexpected } from "@/lib/api-response";
@@ -135,7 +136,7 @@ async function xuatChiTiet(
     photoIds.length
       ? admin
           .from("selection_addons")
-          .select("photo_id, quantity, products(name)")
+          .select("id, photo_id, gan_voi_addon_id, quantity, products(name, material, size)")
           .eq("selection_id", luotChon.id)
           .in("photo_id", photoIds)
       : Promise.resolve({ data: [] }),
@@ -163,14 +164,22 @@ async function xuatChiTiet(
   }
 
   const tenSanPhamTheoAnh = new Map<string, string[]>();
-  for (const r of (muaThemAnhRes.data ?? []) as unknown as {
+  const dongMuaThemAnh = (muaThemAnhRes.data ?? []) as unknown as {
+    id: string;
     photo_id: string;
+    gan_voi_addon_id?: string | null;
     quantity?: number;
-    products?: { name?: string } | null;
-  }[]) {
+    products?: { name?: string; material?: string | null; size?: string | null } | null;
+  }[];
+  for (const r of dongMuaThemAnh) {
     const ten = r.products?.name;
     if (!ten) continue;
-    const nhan = r.quantity && r.quantity > 1 ? `${ten} (mua thêm x${r.quantity})` : `${ten} (mua thêm)`;
+    // BB-398 — khung gắn dòng in (0104): nói rõ bọc TẤM IN nào (chất liệu + khổ của dòng in).
+    const dongIn = r.gan_voi_addon_id ? dongMuaThemAnh.find((d) => d.id === r.gan_voi_addon_id) : null;
+    const boc = dongIn
+      ? `, bọc tấm ${[dongIn.products?.material, dongIn.products?.size].filter(Boolean).join(" ")}`
+      : "";
+    const nhan = r.quantity && r.quantity > 1 ? `${ten} (mua thêm x${r.quantity}${boc})` : `${ten} (mua thêm${boc})`;
     const ds = tenSanPhamTheoAnh.get(r.photo_id) ?? [];
     ds.push(nhan);
     tenSanPhamTheoAnh.set(r.photo_id, ds);
@@ -206,6 +215,55 @@ async function xuatChiTiet(
     );
   }
   dongViet.push(`Số ảnh đã chọn: ${dong.length}`);
+  // BB-398 — KHUNG LẺ (không gắn ảnh, không gắn dòng in): thợ giao riêng khung, không in ảnh nào.
+  if (dot === null) {
+    const { data: khongAnh } = await admin
+      .from("selection_addons")
+      .select("quantity, products(name, kind, material)")
+      .eq("selection_id", luotChon.id)
+      .is("photo_id", null)
+      .is("gan_voi_addon_id", null);
+    for (const r of (khongAnh ?? []) as unknown as {
+      quantity?: number;
+      products?: { name?: string; kind?: string | null; material?: string | null } | null;
+    }[]) {
+      if (!r.products?.name || !laKhung({ kind: r.products.kind ?? null, material: r.products.material ?? null })) continue;
+      dongViet.push(`Khung lẻ (không kèm ảnh): ${r.products.name} x${r.quantity ?? 1}`);
+    }
+  } else {
+    // BB-398 vòng 3 — đợt mua thêm đóng khung cho tấm in của ĐỢT TRƯỚC: tấm đó không nằm trong
+    // danh sách ảnh của đợt này, nên ghi riêng ở đầu tệp (tên tệp + chất liệu/khổ tấm in).
+    const { data: khungGan } = await admin
+      .from("selection_addons")
+      .select("quantity, photo_id, gan_voi_addon_id, products(name), photos(file_name)")
+      .eq("selection_id", luotChon.id)
+      .eq("dot", dot)
+      .not("gan_voi_addon_id", "is", null);
+    const dsKhung = (khungGan ?? []) as unknown as {
+      quantity?: number;
+      photo_id: string | null;
+      gan_voi_addon_id: string;
+      products?: { name?: string } | null;
+      photos?: { file_name?: string } | null;
+    }[];
+    const idsIn = Array.from(new Set(dsKhung.filter((r) => !r.photo_id || !photoIds.includes(r.photo_id)).map((r) => r.gan_voi_addon_id)));
+    const { data: dongIn } = idsIn.length
+      ? await admin.from("selection_addons").select("id, dot, products(material, size)").in("id", idsIn)
+      : { data: [] };
+    const inTheoId = new Map(
+      ((dongIn ?? []) as unknown as { id: string; dot: number | null; products?: { material?: string | null; size?: string | null } | null }[]).map(
+        (r) => [r.id, r],
+      ),
+    );
+    for (const r of dsKhung) {
+      const inGoc = inTheoId.get(r.gan_voi_addon_id);
+      if (!inGoc) continue; // tấm in cùng đợt — đã ghi theo ảnh bên dưới
+      const chiTiet = [inGoc.products?.material, inGoc.products?.size].filter(Boolean).join(" ");
+      dongViet.push(
+        `Khung cho tấm in đợt ${inGoc.dot ?? 1}: ${r.products?.name ?? "Khung"} x${r.quantity ?? 1} — ${r.photos?.file_name ?? "(chưa rõ tệp)"}${chiTiet ? ` · ${chiTiet}` : ""}`,
+      );
+    }
+  }
   // BB-374 — thợ phải biết ngay từ đầu tệp: có những tấm KHÔNG chỉnh, chỉ in vào album.
   if (khongChinh.soSuat > 0) {
     dongViet.push(

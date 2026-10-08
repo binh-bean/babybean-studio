@@ -28,6 +28,8 @@ import { kiemTraNhoStudioChon, kiemTraSanPhamInChuaAnh } from "@/lib/gallery/dot
 import { demSanPhamInChuaGanAnh, laLoiThieuCot } from "@/lib/gallery/dot-chon-server";
 import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
 import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
+import { daMuaCuaBo, docCaiDatLamNhanh, ghiMuaLamNhanh, timSanPhamLamNhanh } from "@/lib/dich-vu/lam-anh-nhanh-server";
+import { laSanPhamLamNhanh } from "@/lib/dich-vu/lam-anh-nhanh";
 
 export const runtime = "nodejs";
 
@@ -209,6 +211,22 @@ export async function POST(request: Request): Promise<Response> {
     const kiemIn = kiemTraSanPhamInChuaAnh({ soChuaAnh: soInChuaAnh, biet: input.bietAnhInChamHon === true });
     if (!kiemIn.ok) return fail(kiemIn.code, kiemIn.message, kiemIn.chiTiet);
 
+    // 5c. BB-399 — "Làm ảnh nhanh": ba mẹ tích ô ở hộp chốt. Máy chủ tự tìm sản phẩm đang bán
+    // và lấy giá từ `products` (đồng bộ Lark) — không tin giá trình duyệt. Ghi TRƯỚC khi đổi
+    // trạng thái: không có sản phẩm thì từ chối cả lượt chốt (ba mẹ đã chọn trả tiền cho một
+    // thứ — chốt mà lặng lẽ bỏ nó là sai lời hứa). Đã mua (chốt lại sau khi mở) → không ghi lần hai.
+    const caiDatNhanh = await docCaiDatLamNhanh(admin, gallery.branch_id ?? null);
+    if (input.lamAnhNhanh === true) {
+      const daMua = await daMuaCuaBo(admin, session.galleryId, session.selectionId, caiDatNhanh.cacGhim);
+      if (!daMua) {
+        // BB-399 vòng 3 — công tắc tắt (hậu kỳ quá tải): từ chối nhã nhặn, không chốt lặng lẽ bỏ dịch vụ.
+        if (!caiDatNhanh.bat) return fail("CONFLICT", vi.gallery.lamNhanh.loiTamDung);
+        const sanPhamNhanh = await timSanPhamLamNhanh(admin, caiDatNhanh.ghim);
+        if (!sanPhamNhanh) return fail("CONFLICT", vi.gallery.lamNhanh.loiKhongCoSanPham);
+        await ghiMuaLamNhanh(admin, { selectionId: session.selectionId, sanPham: sanPhamNhanh, dot: 1 });
+      }
+    }
+
     const extraCount = Math.max(0, selected - includedQuota);
     const extraAmount = extraCount * Number(gallery.extra_photo_price);
     const submittedAt = new Date().toISOString();
@@ -351,6 +369,9 @@ export async function POST(request: Request): Promise<Response> {
       đứng sau giao dịch đã commit, không được phép làm hỏng nút Chốt.
     */
     let cacMonMuaThem: { ten: string; soLuong: number }[] = [];
+    // BB-399 — bộ có làm ảnh nhanh: thẻ Lark có dòng riêng "Làm ảnh nhanh (N ngày)", không lẫn
+    // vào danh sách mua thêm.
+    let coLamNhanh = false;
     try {
       const { data: monMua } = await admin
         .from("selection_addons")
@@ -358,12 +379,16 @@ export async function POST(request: Request): Promise<Response> {
         .eq("selection_id", session.selectionId);
       const idSanPham = [...new Set((monMua ?? []).map((m) => m.product_id))];
       if (idSanPham.length > 0) {
-        const { data: sanPham } = await admin.from("products").select("id, name").in("id", idSanPham);
-        const tenTheoId = new Map((sanPham ?? []).map((s) => [s.id, String(s.name)]));
-        cacMonMuaThem = (monMua ?? []).map((m) => ({
-          ten: tenTheoId.get(m.product_id) ?? "Sản phẩm",
-          soLuong: Number(m.quantity),
-        }));
+        const { data: sanPham } = await admin.from("products").select("id, name, lark_record_id").in("id", idSanPham);
+        const theoId = new Map((sanPham ?? []).map((s) => [s.id, s as { name: string | null; lark_record_id: string | null }]));
+        const laNhanh = (id: string) => laSanPhamLamNhanh(theoId.get(id), caiDatNhanh.cacGhim);
+        coLamNhanh = (monMua ?? []).some((m) => laNhanh(m.product_id));
+        cacMonMuaThem = (monMua ?? [])
+          .filter((m) => !laNhanh(m.product_id))
+          .map((m) => ({
+            ten: String(theoId.get(m.product_id)?.name ?? "Sản phẩm"),
+            soLuong: Number(m.quantity),
+          }));
       }
     } catch {
       cacMonMuaThem = [];
@@ -400,6 +425,8 @@ export async function POST(request: Request): Promise<Response> {
         // BB-321 — khoá tránh chữ "anh" (locBoAnh cắt theo tên khoá).
         nhoStudioSoTam: kiemNho.soNho,
         soMonInThieuTam: soInChuaAnh,
+        // BB-399 — khoá tránh chữ "anh" (cả "nhanh" cũng dính — locBoAnh cắt theo tên khoá).
+        lamGapNgay: coLamNhanh ? caiDatNhanh.soNgayNhanh : 0,
       },
     });
 
@@ -419,6 +446,7 @@ export async function POST(request: Request): Promise<Response> {
         extraAmount,
         ...(kiemNho.soNho > 0 ? { nhoStudioChonThem: kiemNho.soNho } : {}),
         ...(soInChuaAnh > 0 ? { soSanPhamInChuaAnh: soInChuaAnh } : {}),
+        ...(coLamNhanh ? { lamAnhNhanh: true } : {}),
       },
     });
     if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);

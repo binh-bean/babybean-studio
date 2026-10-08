@@ -14,10 +14,12 @@
  * Việt) chứ không nuốt: ghi đợt mua trên môi trường thiếu bảng phải kêu lên.
  */
 
+import { dotDuocDongKhung, kiemKhungGanInTrongDot, LOI_KHUNG, type DongInXet } from "@/lib/products/khung-gan-anh-in";
+import { batBuocChonAnh } from "@/lib/products/khung-gan-anh-in";
 import { vi } from "@/i18n";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
+import { nhomSanPham, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
 import {
   CAU_BIET_ANH_IN_CHAM,
   CAU_DONG_Y_STUDIO_CHON,
@@ -64,6 +66,17 @@ export interface DongSanPhamDot {
   photoId: string | null;
   soLuong: number;
   donGia: number;
+  /**
+   * BB-399 — dòng DỊCH VỤ (vd "Làm ảnh nhanh"), không phải hàng của cửa hàng: không điền sẵn
+   * lại vào giỏ khi đợt bị trả (giỏ chỉ nhận hàng `sanPhamBanChoKhach`), máy chủ tự thêm lại
+   * khi ba mẹ tích ô làm nhanh lần nữa.
+   */
+  dichVu?: boolean;
+  /**
+   * BB-398 vòng 3 — dòng KHUNG gắn một dòng in đã lưu (`selection_addons.id`, migration 0104).
+   * Giữ trong bản chụp để đợt bị trả thì giỏ điền sẵn lại đúng khung gắn đúng tấm in.
+   */
+  ganVoiAddonId?: string | null;
 }
 
 export interface DongDot {
@@ -284,6 +297,8 @@ export interface DauVaoSanPham {
   productId: string;
   photoId: string | null;
   soLuong: number;
+  /** BB-398 vòng 3 — khung gắn dòng in đã lưu; máy chủ lấy ảnh từ dòng in, bỏ `photoId` gửi lên. */
+  ganVoiAddonId?: string | null;
 }
 
 export type KetQuaChuanBiSanPham =
@@ -301,12 +316,15 @@ export async function chuanBiSanPham(
   admin: SupabaseClient,
   dauVao: DauVaoSanPham[],
   anhDuocGan: ReadonlySet<string>,
+  /** BB-398 vòng 3 — cần khi có dòng khung gắn in: lượt chọn + các đợt (để biết đợt nào đã xác nhận). */
+  ngoaiCanh?: { selectionId: string; cacDot: ReadonlyArray<{ soDot: number; trangThai: string }> },
 ): Promise<KetQuaChuanBiSanPham> {
   if (dauVao.length === 0) return { ok: true, dong: [], tienSanPham: 0, soChuaAnh: 0 };
 
   const gop = new Map<string, DauVaoSanPham>();
   for (const d of dauVao) {
-    const khoa = `${d.productId}::${d.photoId ?? ""}`;
+    // Khung gắn in: khoá theo dòng in (ảnh lấy từ dòng in, không tin `photoId` gửi lên).
+    const khoa = d.ganVoiAddonId ? `${d.productId}::gan::${d.ganVoiAddonId}` : `${d.productId}::${d.photoId ?? ""}`;
     const cu = gop.get(khoa);
     gop.set(khoa, cu ? { ...cu, soLuong: Math.min(20, cu.soLuong + d.soLuong) } : { ...d });
   }
@@ -319,9 +337,77 @@ export async function chuanBiSanPham(
   if (error) throw error;
   const pMap = new Map((products ?? []).map((p) => [p.id as string, p]));
 
+  // BB-398 vòng 3 — khung gắn dòng in ĐÃ LƯU: kiểm bằng CÙNG luật cửa hàng (`kiemKhungGanIn`),
+  // đếm cả khung đã gắn ở các đợt trước; ảnh của dòng khung = ảnh của dòng in.
+  const dongKhungGan = Array.from(gop.values()).filter((d) => d.ganVoiAddonId);
+  const anhCuaDongIn = new Map<string, string | null>();
+  if (dongKhungGan.length > 0) {
+    if (!ngoaiCanh) {
+      return { ok: false, code: "INVALID_INPUT", message: vi.gallery.loiBean.khungTuChoi.khong_thay_dong_in };
+    }
+    const idsIn = Array.from(new Set(dongKhungGan.map((d) => d.ganVoiAddonId as string)));
+    const { data: dongInTho, error: eIn } = await admin
+      .from("selection_addons")
+      .select("id, selection_id, photo_id, quantity, dot, gan_voi_addon_id, product:products (kind, material, size)")
+      .in("id", idsIn);
+    if (eIn) throw eIn;
+    const { data: khungDaGan, error: eDaGan } = await admin
+      .from("selection_addons")
+      .select("gan_voi_addon_id, quantity")
+      .in("gan_voi_addon_id", idsIn);
+    if (eDaGan) throw eDaGan;
+
+    type SpIn = { kind: string | null; material: string | null; size: string | null };
+    const dongInMap = new Map<string, DongInXet & { dot: number }>();
+    for (const r of (dongInTho ?? []) as unknown as Array<{
+      id: string;
+      selection_id: string;
+      photo_id: string | null;
+      quantity: number;
+      dot: number | null;
+      gan_voi_addon_id: string | null;
+      product: SpIn | SpIn[] | null;
+    }>) {
+      const sp = Array.isArray(r.product) ? r.product[0] : r.product;
+      if (!sp || r.gan_voi_addon_id) continue; // dòng khung không làm "dòng in" được
+      dongInMap.set(r.id, {
+        id: r.id,
+        selectionId: r.selection_id,
+        photoId: r.photo_id ?? null,
+        quantity: Number(r.quantity),
+        sanPham: sp,
+        dot: Number(r.dot ?? 1) || 1,
+      });
+      anhCuaDongIn.set(r.id, r.photo_id ?? null);
+    }
+    const daGan = new Map<string, number>();
+    for (const r of (khungDaGan ?? []) as Array<{ gan_voi_addon_id: string | null; quantity: number }>) {
+      if (r.gan_voi_addon_id) daGan.set(r.gan_voi_addon_id, (daGan.get(r.gan_voi_addon_id) ?? 0) + Number(r.quantity));
+    }
+    const kq = kiemKhungGanInTrongDot({
+      selectionId: ngoaiCanh.selectionId,
+      dongMoi: dongKhungGan.map((d) => ({ productId: d.productId, ganVoiAddonId: d.ganVoiAddonId as string, soLuong: d.soLuong })),
+      sanPham: new Map(
+        (products ?? []).map((p) => [p.id as string, { kind: p.kind as string | null, material: p.material as string | null, size: p.size as string | null }]),
+      ),
+      dongIn: dongInMap,
+      daGan,
+      dotDuoc: (dot) => dotDuocDongKhung(dot, ngoaiCanh.cacDot),
+    });
+    if (!kq.ok) {
+      const loi = kq.lyDo === "dot_chua_xac_nhan" ? vi.gallery.loiBean.khungDotChuaXacNhan : LOI_KHUNG[kq.lyDo];
+      return {
+        ok: false,
+        code: kq.lyDo === "khong_thay_dong_in" || kq.lyDo === "khac_luot_chon" ? "NOT_FOUND" : "INVALID_INPUT",
+        message: loi,
+      };
+    }
+  }
+
   const dong: DongSanPhamDot[] = [];
   let soChuaAnh = 0;
-  for (const d of gop.values()) {
+  for (const g of gop.values()) {
+    const d: DauVaoSanPham = g.ganVoiAddonId ? { ...g, photoId: anhCuaDongIn.get(g.ganVoiAddonId) ?? null } : g;
     const p = pMap.get(d.productId);
     if (!p || !p.is_active) {
       return { ok: false, code: "NOT_FOUND", message: "Có sản phẩm không tồn tại hoặc đã ngừng kinh doanh" };
@@ -339,8 +425,10 @@ export async function chuanBiSanPham(
     // Sản phẩm in (ảnh in/khung) chưa gắn ảnh, hoặc album (ảnh đưa vào sau) — KHÔNG
     // từ chối ở đây nữa: đếm lại, và bước chốt đòi khách tick "biết ảnh sẽ chậm hơn".
     const nhom = nhomSanPham(p.kind, p.material);
-    if (!d.photoId && (canGanAnh(nhom) || nhom === "album")) soChuaAnh += d.soLuong;
-    if (d.photoId && !anhDuocGan.has(d.photoId)) {
+    // BB-398 — khung không ảnh là KHUNG LẺ, không đếm là "chưa có ảnh".
+    if (!d.photoId && (batBuocChonAnh(nhom) || nhom === "album")) soChuaAnh += d.soLuong;
+    // Khung gắn in: ảnh là ảnh của dòng in đã lưu (đã chọn từ trước) — không xét lại.
+    if (d.photoId && !d.ganVoiAddonId && !anhDuocGan.has(d.photoId)) {
       return { ok: false, code: "INVALID_INPUT", message: "Tấm ảnh gắn với sản phẩm phải là ảnh ba mẹ đã chọn" };
     }
     dong.push({
@@ -349,6 +437,7 @@ export async function chuanBiSanPham(
       photoId: d.photoId,
       soLuong: d.soLuong,
       donGia: Number(p.list_price),
+      ...(d.ganVoiAddonId ? { ganVoiAddonId: d.ganVoiAddonId } : {}),
     });
   }
 
@@ -390,6 +479,11 @@ export async function chotDotChon(
     giaMoiAnh: number;
     /** Khách đã tick "Tôi biết nếu chưa chọn ảnh in, thời gian nhận ảnh sẽ lâu hơn timeline". */
     bietAnhInChamHon?: boolean;
+    /**
+     * BB-399 — dòng dịch vụ (Làm ảnh nhanh) route đã kiểm sẵn (sản phẩm đang bán, chưa mua).
+     * Cộng vào giỏ + tiền sản phẩm của đợt; KHÔNG một mình tạo được đợt (đợt cần ảnh hoặc hàng).
+     */
+    dongDichVu?: DongSanPhamDot[];
   },
 ): Promise<KetQuaChotDot> {
   const photoIds = Array.from(new Set(p.photoIds));
@@ -445,7 +539,10 @@ export async function chotDotChon(
 
   // 3. Sản phẩm.
   const anhDuocGan = new Set<string>([...daChonMap.keys(), ...hopLe]);
-  const sp = await chuanBiSanPham(admin, p.sanPham, anhDuocGan);
+  const sp = await chuanBiSanPham(admin, p.sanPham, anhDuocGan, {
+    selectionId: p.selectionId,
+    cacDot: await layCacDot(admin, p.galleryId),
+  });
   if (!sp.ok) return { ok: false, code: sp.code, message: sp.message };
 
   // Sản phẩm in chưa gắn ảnh: phải có cờ "biết ảnh sẽ chậm hơn" — máy chủ tự kiểm.
@@ -454,6 +551,13 @@ export async function chotDotChon(
 
   if (hopLe.length === 0 && sp.dong.length === 0) {
     return { ok: false, code: "INVALID_INPUT", message: "Ba mẹ chọn ít nhất một tấm ảnh hoặc một sản phẩm để chốt đợt này nhé" };
+  }
+
+  // BB-399 — dịch vụ (đã kiểm ở route) vào chung giỏ + tiền sản phẩm của đợt.
+  const dichVu = (p.dongDichVu ?? []).map((d) => ({ ...d, photoId: null, dichVu: true }));
+  if (dichVu.length > 0) {
+    sp.dong.push(...dichVu);
+    sp.tienSanPham += dichVu.reduce((t, d) => t + d.donGia * d.soLuong, 0);
   }
 
   // 4. Tiền, chụp lại. Từ đợt 2 mọi ảnh mới tính tiền từ ảnh đầu tiên (chủ studio 29/09/2026).
@@ -573,6 +677,9 @@ export async function chotDotChon(
           quantity: d.soLuong,
           unit_price: d.donGia,
           dot: soDot,
+          // BB-398 vòng 3 — khung gắn dòng in của đợt trước (0104). Chỉ ghi khi có, để dòng
+          // thường vẫn ghi được trên CSDL chưa áp 0104.
+          ...(d.ganVoiAddonId ? { gan_voi_addon_id: d.ganVoiAddonId } : {}),
         })),
       );
       if (error) throw error;
@@ -720,7 +827,8 @@ export async function layTrangThaiDotChoKhach(
 
   const traLai = cacDot.filter((d) => d.traLai);
   const anhIds = Array.from(new Set(traLai.flatMap((d) => d.anhIds)));
-  const sanPham = traLai.flatMap((d) => d.sanPham);
+  // BB-399 — dòng dịch vụ (Làm ảnh nhanh) không điền sẵn vào giỏ (xem `DongSanPhamDot.dichVu`).
+  const sanPham = traLai.flatMap((d) => d.sanPham).filter((s) => !s.dichVu);
   const dongCuoi = traLai.length > 0 ? traLai[traLai.length - 1] : null;
 
   const theoAnh: Record<string, number> = {};
@@ -962,7 +1070,7 @@ export async function demSanPhamInChuaGanAnh(
       const pr = Array.isArray(a.products) ? a.products[0] : a.products;
       return { a, nhom: pr ? nhomSanPham(pr.kind, pr.material) : null };
     })
-    .filter(({ nhom }) => nhom === "album" || canGanAnh(nhom));
+    .filter(({ nhom }) => nhom === "album" || batBuocChonAnh(nhom));
 
   const idAlbum = cacDong.filter(({ nhom }) => nhom === "album").map(({ a }) => a.id);
   const albumCoAnh = new Set<string>();

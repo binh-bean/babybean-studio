@@ -16,6 +16,8 @@ import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CAI_DAT_SUA_DUOC, PatchSettingsSchema, cheBot, kieuCaiDat, timDinhNghia } from "./schema";
 import { KHOA_THU_SAN_PHAM_QUA_APP, KHOA_THU_SAN_PHAM_QUA_APP_TU, laBatThuSanPhamQuaApp } from "@/lib/gallery/tien-phat-sinh";
+import { KHOA_BAT_LAM_NHANH, KHOA_SAN_PHAM_LAM_NHANH, cauTrangThaiSanPhamLamNhanh, chuanHoaGhim } from "@/lib/dich-vu/lam-anh-nhanh";
+import { timSanPhamLamNhanh } from "@/lib/dich-vu/lam-anh-nhanh-server";
 
 export const runtime = "nodejs";
 
@@ -42,7 +44,8 @@ export async function GET(): Promise<Response> {
     const dangCo = new Map((data ?? []).map((d) => [d.key, d.value]));
 
     const items = CAI_DAT_SUA_DUOC.map((c) => {
-      const giaTri = dangCo.get(c.key) ?? null;
+      // BB-399 vòng 3 — công tắc làm nhanh mặc định BẬT: thiếu dòng thì hiện "Đang bật", đúng như app chạy.
+      const giaTri = dangCo.get(c.key) ?? (c.key === KHOA_BAT_LAM_NHANH ? true : null);
       return {
         key: c.key,
         nhom: c.nhom,
@@ -55,7 +58,18 @@ export async function GET(): Promise<Response> {
       };
     });
 
-    return ok({ items });
+    // BB-399 vòng 2 — dòng trạng thái chỉ đọc cạnh ô record id "Làm ảnh nhanh": sản phẩm app
+    // đang dùng (ghim, không thì theo tên). Tra hỏng thì không có dòng — không chặn màn Cài đặt.
+    const ghim = chuanHoaGhim(dangCo.get(KHOA_SAN_PHAM_LAM_NHANH) ?? null);
+    const spNhanh = await timSanPhamLamNhanh(admin, ghim).then(
+      (sp) => ({ ok: true as const, sp }),
+      () => ({ ok: false as const, sp: null }),
+    );
+    const itemsCoTrangThai = items.map((it) =>
+      it.key === KHOA_SAN_PHAM_LAM_NHANH && spNhanh.ok ? { ...it, trangThai: cauTrangThaiSanPhamLamNhanh(spNhanh.sp) } : it,
+    );
+
+    return ok({ items: itemsCoTrangThai });
   } catch (err) {
     if (err instanceof AuthError) {
       return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);

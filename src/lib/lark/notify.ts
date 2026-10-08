@@ -92,7 +92,9 @@ export type LarkEvent =
   /** BB-284 — khách DUYỆT ảnh đã chỉnh, không xin sửa gì thêm. Chuyển in. */
   | "review.approved"
   /** BB-284 — khách xin sửa kèm ghi chú, sau khi xem bản đã chỉnh. */
-  | "review.changes_requested";
+  | "review.changes_requested"
+  /** BB-399 — ba mẹ mua "Làm ảnh nhanh" SAU khi đã chốt (thẻ sau chốt). */
+  | "dich_vu.lam_nhanh";
 
 export interface LarkNotification {
   /** Chi nhánh của bộ ảnh. `null` = tin của nhóm quản lý chung. */
@@ -351,6 +353,58 @@ export function dungThe(
     };
   }
 
+  /**
+   * BB-399 — dòng "Làm ảnh nhanh (N ngày)". Khoá payload `lamGapNgay` (KHÔNG chứa chữ "anh":
+   * `locBoAnh()` cắt mọi khoá có "anh" — "nhanh" cũng dính). 0/thiếu = không mua.
+   */
+  const dongLamNhanh = (): Record<string, unknown> | null =>
+    so(p.lamGapNgay) > 0
+      ? {
+          tag: "div",
+          text: {
+            tag: "lark_md",
+            content: `**Làm ảnh nhanh (${so(p.lamGapNgay)} ngày)** — thợ ưu tiên chỉnh bộ này.`,
+          },
+        }
+      : null;
+
+  if (event === "dich_vu.lam_nhanh") {
+    const ngay = so(p.lamGapNgay);
+    if (ngay <= 0) return null;
+    const han = typeof p.hanTraDuKien === "string" ? new Date(p.hanTraDuKien) : null;
+    const hanChu =
+      han && !Number.isNaN(han.getTime())
+        ? `${String(han.getDate()).padStart(2, "0")}/${String(han.getMonth() + 1).padStart(2, "0")}/${han.getFullYear()}`
+        : "—";
+    const elements: Record<string, unknown>[] = [
+      {
+        tag: "div",
+        fields: [o("Bộ ảnh", chu(p.galleryTitle)), o("Giá", tien(p.donGia)), o("Hạn trả dự kiến", hanChu)],
+      },
+      dongLamNhanh()!,
+      {
+        tag: "div",
+        text: {
+          tag: "lark_md",
+          content: 'Khách mua sau khi đã chốt danh sách. CSKH thêm dòng "Làm ảnh nhanh" vào hoá đơn Lark.',
+        },
+      },
+    ];
+    if (diaChiAdmin) {
+      elements.push({
+        tag: "action",
+        actions: [{ tag: "button", text: { tag: "plain_text", content: "Mở bộ ảnh" }, type: "primary", url: diaChiAdmin }],
+      });
+    }
+    return {
+      msg_type: "interactive",
+      card: {
+        header: { template: "orange", title: { tag: "plain_text", content: `Khách chọn làm ảnh nhanh (${ngay} ngày)` } },
+        elements,
+      },
+    };
+  }
+
   if (event === "selection.submitted") {
     const thua = so(p.extraCount);
     const truong = [
@@ -392,6 +446,8 @@ export function dungThe(
         },
       });
     }
+    const lamNhanhChot = dongLamNhanh();
+    if (lamNhanhChot) elements.push(lamNhanhChot);
 
     /*
       BB-202 — dòng "Bìa album": tên tệp (không đuôi, xem submit/route.ts).
@@ -497,6 +553,8 @@ export function dungThe(
         text: { tag: "lark_md", content: ["**Mua thêm:**", ...dong].join("\n") },
       });
     }
+    const lamNhanhDot = dongLamNhanh();
+    if (lamNhanhDot) elements.push(lamNhanhDot);
     elements.push({
       tag: "div",
       text: {

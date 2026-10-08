@@ -14,6 +14,7 @@ import { BangSanPhamCuaAnh } from "@/components/features/gallery/bang-san-pham-c
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { coBuocChonBiaAlbum } from "@/lib/products/album-khai-niem";
+import { soKhungGanTheo } from "@/lib/products/khung-gan-anh-in";
 import { locHangInTrongGoi, conThieuAnh } from "@/lib/products/hang-in-trong-goi";
 import { LuoiAnh } from "@/components/features/gallery/luoi-anh";
 import { useTimGiaDinh } from "@/components/features/gallery/use-tim-gia-dinh";
@@ -41,6 +42,8 @@ import { PhotoLightbox } from "@/components/features/gallery/photo-lightbox";
 import { LoiGoiYLuuApp } from "@/components/features/gallery/loi-goi-y-luu-app";
 import { NutLenDauTrang } from "@/components/features/gallery/nut-len-dau-trang";
 import { CamOnSauChot } from "@/components/features/gallery/cam-on-sau-chot";
+import { OLamAnhNhanh, TheLamAnhNhanhSauChot } from "@/components/features/gallery/lam-anh-nhanh-khach";
+import { tamTinhHopChot, type LamAnhNhanhKhach } from "@/lib/dich-vu/lam-anh-nhanh";
 import {
   themVaoSoSanh,
   boKhoiSoSanh,
@@ -272,6 +275,8 @@ interface GalleryApiResponse {
    * mức): `soSuat` tấm ba mẹ được chọn thêm cho album; `photoIds` tấm đã chọn.
    */
   albumKhongChinh?: { soSuat: number; photoIds: string[] };
+  /** BB-399 — dịch vụ "Làm ảnh nhanh": giá (Lark), số ngày, đã mua chưa, hạn trả. null = không đọc được. */
+  lamAnhNhanh?: LamAnhNhanhKhach | null;
   /** BB-202 — bìa của mỗi album TRONG GÓI. Rỗng = gói không có album nào. */
   albumBia?: Array<{
     galleryItemId: string;
@@ -310,6 +315,16 @@ interface GalleryApiResponse {
       size: string | null;
       /** Tấm ảnh sản phẩm này in ra (migration 0061). */
       photoId?: string | null;
+      kind?: string | null;
+      material?: string | null;
+      /** BB-398 — dòng khung gắn dòng in nào (migration 0104). */
+      ganVoiAddonId?: string | null;
+      /** BB-398 — tên tệp của tấm ảnh (máy chủ ghép sẵn). */
+      fileName?: string | null;
+      /** BB-398 vòng 3 — số đợt của dòng (1 = lượt chọn gốc). */
+      dot?: number;
+      /** BB-399 — dòng dịch vụ (Làm ảnh nhanh), không phải hàng của cửa hàng. */
+      dichVu?: boolean;
     }>;
     /** Danh mục ba mẹ CÓ THỂ mua thêm — xem ghi chú ở `/api/g/gallery`. */
     catalogue?: Array<{
@@ -512,6 +527,8 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
    */
   const [dongYStudioChon, setDongYStudioChon] = useState(false);
   const [bietAnhInChamDot1, setBietAnhInChamDot1] = useState(false);
+  /** BB-399 — ô "Làm ảnh nhanh" của hộp chốt đợt 1 (KHÔNG tích sẵn). */
+  const [chonLamNhanh, setChonLamNhanh] = useState(false);
   /** BB-321 — màn "Chọn thêm ảnh · Đợt N" đang mở (thay cả trang). */
   const [moManDot, setMoManDot] = useState(false);
   // BB-289 — bản vẽ hộp chốt (BB-285) thêm "Xem chi tiết" mở NGAY TRONG hộp:
@@ -594,6 +611,15 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
    * trước đó, không nhảy về tấm đầu.
    */
   const [manTreoTuongTuAnh, setManTreoTuongTuAnh] = useState<string | null>(null);
+  /**
+   * BB-398 — mở màn treo tường TỪ CỬA HÀNG: mang theo đúng chất liệu + khổ (+ khung) ba mẹ
+   * vừa chọn ở cửa hàng. `null` = mở từ màn xem lớn (màn treo tự chọn mặc định như cũ).
+   */
+  const [treoTuongBanDau, setTreoTuongBanDau] = useState<{
+    chatLieu: string | null;
+    co: string | null;
+    coKhung: boolean;
+  } | null>(null);
 
   /*
     BB-258 — thanh nổi (ThanhChon) từng nằm cố định giữa đáy màn và CHE tên
@@ -971,8 +997,19 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
   // phía studio không đổi tim của ba mẹ.
   // BB-351 — đang ở màn Cảm ơn mà studio MỞ LẠI (bộ về `in_review`): rời màn đó ngay để ba mẹ
   // thấy lưới ảnh + câu "Studio đã mở lại", không phải F5.
+  //
+  // BB-399 vòng 4 (e2e bb-399 ca 1 bắt): ngay lúc bấm Xác nhận, `gallery` còn là dữ liệu CŨ — bộ
+  // ĐANG `in_review` (bộ gửi khách chọn) — nên điều kiện cũ tắt màn Cảm ơn ngay lượt vẽ đầu, ba mẹ
+  // không bao giờ thấy nó (và không thấy "Bean trả ảnh chỉnh trong khoảng N ngày"). Chỉ coi là
+  // "studio mở lại" khi đã THẤY bộ ở trạng thái sau chốt rồi mới quay về `in_review`.
+  const daThayBoSauChot = useRef(false);
   useEffect(() => {
-    if (vuaChotXong && gallery?.status === "in_review") setVuaChotXong(false);
+    if (!vuaChotXong) {
+      daThayBoSauChot.current = false;
+      return;
+    }
+    if (gallery?.status && gallery.status !== "in_review") daThayBoSauChot.current = true;
+    else if (gallery?.status === "in_review" && daThayBoSauChot.current) setVuaChotXong(false);
   }, [vuaChotXong, gallery?.status]);
 
   // BB-359 — bộ đang thu gọn: sự kiện tức thì (`studio.mo_lai_anh` khi Đồng bộ lại xong)
@@ -1282,6 +1319,8 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           generalNote: customerNote.trim() || undefined,
           // BB-321 — cờ đồng ý của hai ô tick mới, đúng tên trường `SubmitSelectionSchema`.
           ...coGuiChotDot1(oTickDot1, { dongYStudioChon, bietAnhInCham: bietAnhInChamDot1 }),
+          // BB-399 — chỉ gửi khi ô đang hiện (có bán, chưa mua) và ba mẹ đã tích.
+          ...(chonLamNhanh && gallery?.lamAnhNhanh?.coBan && !gallery.lamAnhNhanh.daMua ? { lamAnhNhanh: true } : {}),
         }),
       });
 
@@ -1548,6 +1587,15 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
     dongYStudioChon,
     bietAnhInCham: bietAnhInChamDot1,
   });
+  /** BB-399 — ô làm nhanh đang tích VÀ đang bán, chưa mua (mua rồi thì đã nằm trong "Mua thêm"). */
+  const laChonLamNhanhHopChot = chonLamNhanh && !!gallery?.lamAnhNhanh?.coBan && !gallery.lamAnhNhanh.daMua;
+  /** BB-399 — tạm tính hộp chốt: ảnh chọn thêm + mua thêm + làm nhanh (nếu tích). */
+  const tamTinhChot = tamTinhHopChot({
+    tienAnhThem: gallery?.quotaKnown ? selectionCounts.extraAmount : 0,
+    tienMuaThem: gallery?.addons?.totalAmount ?? 0,
+    giaLamNhanh: gallery?.lamAnhNhanh?.gia ?? 0,
+    chonLamNhanh: laChonLamNhanhHopChot,
+  });
 
   /**
    * BB-212 — dải ảnh nhỏ trong hộp "Chốt danh sách": những tấm ba mẹ SẮP chốt.
@@ -1718,10 +1766,26 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
    * trên màn hình đúng bằng con số máy chủ vừa tính — tiền là chỗ không được
    * phép đoán ở máy khách.
    */
+  /**
+   * BB-398 — giỏ hiện tại cho các hàm ghi bên dưới (đếm khung gắn theo dòng in sắp bỏ) mà
+   * không phải thêm `gallery` vào mảng phụ thuộc của từng `useCallback`.
+   */
+  const gioHienTaiRef = useRef<NonNullable<GalleryApiResponse["addons"]>["items"]>([]);
+  gioHienTaiRef.current = gallery?.addons?.items ?? [];
+
+  /** BB-398 — số khung gắn theo các dòng IN sắp bị bỏ (cascade 0104) để báo ba mẹ. */
+  const demKhungSeBo = useCallback((productId: string, photoIds: readonly string[]): number => {
+    const dongIn = gioHienTaiRef.current.filter(
+      (m) => m.productId === productId && !m.ganVoiAddonId && m.photoId && photoIds.includes(m.photoId),
+    );
+    return dongIn.reduce((t, d) => t + soKhungGanTheo(gioHienTaiRef.current, d.id), 0);
+  }, []);
+
   const datSoLuongMuaThem = useCallback(
     // BB-319 (luật 5) — trả `true` CHỈ khi máy chủ đã lưu và giỏ đã tải lại: cửa hàng
     // dựa vào đó mới báo "Đã thêm vào giỏ" (xem `onMua` ở `cua-hang.tsx`).
     async (productId: string, soLuong: number, photoId?: string | null): Promise<boolean> => {
+      const soKhungBo = soLuong === 0 && photoId ? demKhungSeBo(productId, [photoId]) : 0;
       setPlacing(true);
       try {
         const res = await goiApiKhach("/api/g/addons", {
@@ -1738,6 +1802,86 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         // cửa hàng xoá cả trang thành "Đang tải…", hộp cửa hàng biến mất, trang
         // cuộn về đầu. Cùng lỗi `loadGallery()` không truyền `silent` đã vá ở
         // mục #24 (chọn ảnh bìa, xem ghi chú ngay trên) — chỉ khác nơi gọi.
+        await loadGallery({ silent: true, boQuaAnh: true });
+        if (soKhungBo > 0) setStatusMessage(vi.gallery.loiBean.khungBiBoTheoIn.replace("{n}", String(soKhungBo)));
+        return true;
+      } catch {
+        setStatusMessage(vi.gallery.loiBean.matKetNoi);
+        return false;
+      } finally {
+        setPlacing(false);
+      }
+    },
+    [loadGallery, demKhungSeBo],
+  );
+
+  /**
+   * BB-398 — "Đóng khung ảnh đã đặt in": đặt số khung (TUYỆT ĐỐI) gắn vào một dòng in đã
+   * đặt. Máy chủ kiểm lại mọi luật (`kiemKhungGanIn`) và tự lấy ảnh của dòng in.
+   */
+  const datKhungGanIn = useCallback(
+    async (ganVoiAddonId: string, productId: string, soLuong: number): Promise<boolean> => {
+      setPlacing(true);
+      try {
+        const res = await goiApiKhach("/api/g/addons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId, quantity: soLuong, ganVoiAddonId }),
+        });
+        if (!res.ok) {
+          const json = await res.json().catch(() => null);
+          setStatusMessage(json?.error?.message ?? vi.gallery.loiBean.khongLuuDuoc);
+          return false;
+        }
+        await loadGallery({ silent: true, boQuaAnh: true });
+        return true;
+      } catch {
+        setStatusMessage(vi.gallery.loiBean.matKetNoi);
+        return false;
+      } finally {
+        setPlacing(false);
+      }
+    },
+    [loadGallery],
+  );
+
+  /**
+   * BB-398 — màn treo tường "Bọc khung HQ": thêm tấm in (mua thêm) RỒI thêm khung GẮN đúng
+   * dòng in vừa ghi (`gan_voi_addon_id`), không còn hai dòng rời chỉ chung `photo_id`.
+   */
+  const datInKemKhung = useCallback(
+    async (photoId: string, productIdIn: string, soLuongIn: number, productIdKhung: string): Promise<boolean> => {
+      setPlacing(true);
+      try {
+        const resIn = await goiApiKhach("/api/g/addons", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ productId: productIdIn, quantity: soLuongIn, photoId }),
+        });
+        const jsonIn = await resIn.json().catch(() => null);
+        if (!resIn.ok) {
+          setStatusMessage(jsonIn?.error?.message ?? vi.gallery.loiBean.khongLuuDuoc);
+          return false;
+        }
+        const idDongIn = jsonIn?.data?.addon?.id as string | undefined;
+        if (idDongIn) {
+          const daGan = gioHienTaiRef.current
+            .filter((m) => m.ganVoiAddonId === idDongIn && m.productId === productIdKhung)
+            .reduce((t, m) => t + m.quantity, 0);
+          const resKhung = await goiApiKhach("/api/g/addons", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              productId: productIdKhung,
+              quantity: Math.min(soLuongIn, daGan + 1),
+              ganVoiAddonId: idDongIn,
+            }),
+          });
+          if (!resKhung.ok) {
+            const jsonKhung = await resKhung.json().catch(() => null);
+            setStatusMessage(jsonKhung?.error?.message ?? vi.gallery.loiBean.khongLuuDuoc);
+          }
+        }
         await loadGallery({ silent: true, boQuaAnh: true });
         return true;
       } catch {
@@ -1758,6 +1902,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
   const datNhieuAnhMuaThem = useCallback(
     async (productId: string, soLuong: number, photoIds: string[]): Promise<boolean> => {
       if (photoIds.length === 0) return false;
+      const soKhungBo = soLuong === 0 ? demKhungSeBo(productId, photoIds) : 0;
       setPlacing(true);
       try {
         const res = await goiApiKhach("/api/g/addons", {
@@ -1773,6 +1918,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         // BB-293 mục #1 — xem chú thích ở `datSoLuongMuaThem` bên trên: đổi
         // tab cửa hàng sau khi mua không được xoá cả trang.
         await loadGallery({ silent: true, boQuaAnh: true });
+        if (soKhungBo > 0) setStatusMessage(vi.gallery.loiBean.khungBiBoTheoIn.replace("{n}", String(soKhungBo)));
         return true;
       } catch {
         setStatusMessage(vi.gallery.loiBean.matKetNoi);
@@ -1781,7 +1927,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         setPlacing(false);
       }
     },
-    [loadGallery],
+    [loadGallery, demKhungSeBo],
   );
 
   /**
@@ -1932,6 +2078,26 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         }}
         // BB-351 — studio xác nhận (tín hiệu tức thì đã tải lại `gallery`) → chữ đổi ngay.
         studioDaXacNhan={gallery.status !== "submitted" && gallery.status !== "in_review"}
+        // BB-399 — hạn trả ảnh chỉnh (14 / 5 ngày). Dữ liệu chưa tải lại sau chốt thì suy từ ô vừa tích.
+        lamAnhNhanh={
+          <TheLamAnhNhanhSauChot
+            thongTin={gallery.lamAnhNhanh}
+            hanTra={
+              gallery.lamAnhNhanh?.hanTra ??
+              (gallery.lamAnhNhanh
+                ? {
+                    soNgay:
+                      gallery.lamAnhNhanh.daMua || (chonLamNhanh && gallery.lamAnhNhanh.coBan)
+                        ? gallery.lamAnhNhanh.soNgayNhanh
+                        : gallery.lamAnhNhanh.soNgayTieuChuan,
+                    hanTra: null,
+                  }
+                : null)
+            }
+            laChuBo={gallery.myRole === "owner"}
+            onDaMua={() => loadGallery({ silent: true })}
+          />
+        }
       />
     );
   }
@@ -2112,6 +2278,22 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           tenBe={tenBeHienThi || null}
           tenKhach={gallery.customerName ?? null}
           catalogue={gallery.addons?.catalogue ?? []}
+          lamAnhNhanh={gallery.lamAnhNhanh ?? null}
+          // BB-398 vòng 3 — dòng in/khung ĐÃ LƯU cho lối "Đóng khung ảnh đã đặt in" của giỏ đợt.
+          dongDaLuu={(gallery.addons?.items ?? []).map((m) => ({
+            id: m.id,
+            productId: m.productId,
+            name: m.name,
+            quantity: m.quantity,
+            totalPrice: m.totalPrice,
+            photoId: m.photoId ?? null,
+            ganVoiAddonId: m.ganVoiAddonId ?? null,
+            kind: m.kind ?? null,
+            material: m.material ?? null,
+            size: m.size ?? null,
+            fileName: m.fileName ?? photos.find((p) => p.id === m.photoId)?.fileName ?? null,
+            dot: m.dot ?? 1,
+          }))}
           tt={dotChon.tt}
           nhap={dotChon.nhap}
           anhNhap={dotChon.anhNhap}
@@ -2880,6 +3062,16 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
                 : null
             }
           />
+          {/* BB-399 — sau chốt: "Bean trả ảnh chỉnh trong khoảng N ngày" + mua làm nhanh (nếu còn). */}
+          {gallery.lamAnhNhanh?.hanTra && (
+            <div className="mx-auto mt-3 max-w-3xl">
+              <TheLamAnhNhanhSauChot
+                thongTin={gallery.lamAnhNhanh}
+                laChuBo={gallery.myRole === "owner"}
+                onDaMua={() => loadGallery({ silent: true })}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -3212,15 +3404,22 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           nhom: sp.nhom as NhomSanPham,
           canGanAnh: sp.canGanAnh,
         }))}
-        daMua={(gallery.addons?.items ?? []).map((m) => ({
+        // BB-399 — dòng dịch vụ (Làm ảnh nhanh) không nằm trong giỏ cửa hàng (không sửa/bỏ ở đây).
+        daMua={(gallery.addons?.items ?? []).filter((m) => !m.dichVu).map((m) => ({
           id: m.id,
           productId: m.productId,
           name: m.name,
           quantity: m.quantity,
           totalPrice: m.totalPrice,
           photoId: m.photoId ?? null,
+          // BB-398 — để lối "Đóng khung ảnh đã đặt in" biết dòng nào là in, dòng nào là khung gắn.
+          ganVoiAddonId: m.ganVoiAddonId ?? null,
+          kind: m.kind ?? null,
+          material: m.material ?? null,
+          size: m.size ?? null,
+          fileName: m.fileName ?? photos.find((p) => p.id === m.photoId)?.fileName ?? null,
         }))}
-        tongTien={gallery.addons?.totalAmount ?? 0}
+        tongTien={(gallery.addons?.items ?? []).filter((m) => !m.dichVu).reduce((t, m) => t + m.totalPrice, 0)}
         anhDaChon={photos
           .filter((p) => p.mark === "selected")
           .map((p) => ({ id: p.id, fileName: p.fileName }))}
@@ -3247,6 +3446,20 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           onChonAnh: duocChon && !isLocked ? setMonDangChonAnh : undefined,
         }}
         coAlbumTrongGoi={albumTrongGoi.length > 0}
+        // BB-398 — khung gắn dòng in; bìa cho "Xem album trên bàn"; lối vào màn treo tường.
+        onDongKhung={(ganVoiAddonId, productId, soLuong) => datKhungGanIn(ganVoiAddonId, productId, soLuong)}
+        anhBiaId={gallery.coverPhotoId ?? photos.find((p) => p.mark === "selected")?.id ?? photos[0]?.id ?? null}
+        onXemTrenTuong={
+          (gallery.addons?.catalogue ?? []).some((sp) => sp.nhom === "anh_in")
+            ? (photoId, chatLieu, co, coKhung) => {
+                const batDau =
+                  photoId ?? gallery.coverPhotoId ?? anhDaChonHopThoai[0]?.id ?? photos[0]?.id ?? null;
+                if (!batDau) return;
+                setTreoTuongBanDau({ chatLieu, co, coKhung });
+                setManTreoTuongTuAnh(batDau);
+              }
+            : undefined
+        }
       />
 
       {/* BB-339 mục 3/4 — lưới chọn ảnh cho MỘT món trong gói (z-60, nổi trên cửa hàng). */}
@@ -3720,6 +3933,21 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
                     </span>
                   </div>
                 )}
+                {/* BB-399 — làm ảnh nhanh vừa tích: cộng vào tạm tính (giá từ Lark qua máy chủ). */}
+                {laChonLamNhanhHopChot && (
+                  <div data-testid="dong-lam-nhanh-hop-chot" className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{vi.gallery.lamNhanh.ten}</span>
+                    <span className="font-semibold">{formatCurrencyVND(gallery.lamAnhNhanh?.gia ?? 0)}</span>
+                  </div>
+                )}
+                {tamTinhChot > 0 && (
+                  <div className="flex items-center justify-between border-t border-border pt-2.5 font-semibold">
+                    <span>{vi.gallery.lamNhanh.tamTinh}</span>
+                    <span data-testid="tam-tinh-hop-chot" className="tabular-nums">
+                      {formatCurrencyVND(tamTinhChot)}
+                    </span>
+                  </div>
+                )}
 
                 {/*
                   BB-289 — "Xem chi tiết" mở NGAY TRONG hộp chốt (bản vẽ
@@ -3839,6 +4067,9 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
                 chữ cũ ("chọn luôn thì… để sau cũng được, CSKH sẽ hỏi lại") bị
                 bỏ vì đứng ngay dưới "để xác nhận" nghe như hai luật ngược nhau.
               */}
+              {/* BB-399 — "Làm ảnh nhanh" (không tích sẵn; không bán → ẩn; đã mua → "Đã chọn"). */}
+              <OLamAnhNhanh thongTin={gallery.lamAnhNhanh} chon={chonLamNhanh} onChon={setChonLamNhanh} />
+
               {albumThieuBia.length > 0 && (
                 <div
                   data-testid="loi-nhac-hop-chot"
@@ -4282,10 +4513,17 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
               }
               // BB-217 — chỉ hiện lối vào màn treo tường khi tấm đang xem đã
               // được chọn (đúng đề bài) và danh mục thật sự có ảnh in để treo.
+              //
+              // BB-398 — anh "không thấy nữa": điều kiện cũ đòi tấm đang xem ĐÃ thả tim, nên
+              // ba mẹ mở xem lớn một tấm chưa tim (phần lớn lúc mới vào) là không có nút. Nới:
+              // tấm nào cũng XEM trên tường được (chỉ cần danh mục có ảnh in); đặt vào giỏ thì
+              // máy chủ vẫn đòi tấm đã chọn như cũ.
               onXemTuong={
-                anh.mark === "selected" &&
                 (gallery.addons?.catalogue ?? []).some((sp) => sp.nhom === "anh_in")
-                  ? () => setManTreoTuongTuAnh(anh.id)
+                  ? () => {
+                      setTreoTuongBanDau(null);
+                      setManTreoTuongTuAnh(anh.id);
+                    }
                   : undefined
               }
               // BB-279 — "Đặt in tấm này": mở cửa hàng thẳng vào nhóm này với
@@ -4328,11 +4566,24 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
       )}
 
       {/* BB-217 — màn "treo ảnh của con lên tường", toàn màn hình. */}
-      {manTreoTuongTuAnh && (
+      {manTreoTuongTuAnh && (() => {
+        // BB-398 — tấm mở màn có thể CHƯA thả tim (ảnh bìa, tấm đang xem lớn): đưa nó lên
+        // đầu danh sách lướt, không thì màn treo mở nhầm sang tấm đã chọn đầu tiên.
+        const tamDau =
+          anhDaChonHopThoai.find((p) => p.id === manTreoTuongTuAnh) ??
+          photos.find((p) => p.id === manTreoTuongTuAnh) ??
+          { id: manTreoTuongTuAnh, fileName: "", width: null, height: null };
+        const dsTreo = anhDaChonHopThoai.some((p) => p.id === tamDau.id)
+          ? anhDaChonHopThoai
+          : [tamDau, ...anhDaChonHopThoai];
+        return (
         <ManTreoTuong
           mo
-          onDong={() => setManTreoTuongTuAnh(null)}
-          anh={anhDaChonHopThoai.map((p) => ({
+          onDong={() => {
+            setManTreoTuongTuAnh(null);
+            setTreoTuongBanDau(null);
+          }}
+          anh={dsTreo.map((p) => ({
             id: p.id,
             fileName: p.fileName,
             width: p.width,
@@ -4340,8 +4591,11 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           }))}
           chiSoBanDau={Math.max(
             0,
-            anhDaChonHopThoai.findIndex((p) => p.id === manTreoTuongTuAnh)
+            dsTreo.findIndex((p) => p.id === manTreoTuongTuAnh)
           )}
+          chatLieuBanDau={treoTuongBanDau?.chatLieu ?? null}
+          coBanDau={treoTuongBanDau?.co ?? null}
+          coKhungBanDau={treoTuongBanDau?.coKhung ?? false}
           danhMuc={(gallery.addons?.catalogue ?? [])
             .filter((sp) => sp.nhom === "anh_in" || sp.nhom === "khung")
             .map((sp) => ({
@@ -4358,11 +4612,14 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             quantity: sp.quantity,
           }))}
           placements={placements}
-          addonsDaDat={(gallery.addons?.items ?? []).map((m) => ({
-            productId: m.productId,
-            photoId: m.photoId ?? null,
-            quantity: m.quantity,
-          }))}
+          addonsDaDat={(gallery.addons?.items ?? [])
+            // BB-398 — khung GẮN dòng in đếm riêng theo dòng in (datInKemKhung), không cộng vào khung theo ảnh.
+            .filter((m) => !m.ganVoiAddonId)
+            .map((m) => ({
+              productId: m.productId,
+              photoId: m.photoId ?? null,
+              quantity: m.quantity,
+            }))}
           khoa={isLocked}
           duocChon={duocChon}
           dangLuu={placing}
@@ -4370,8 +4627,12 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           onDatMuaThem={(photoId, productId, soLuong) =>
             void datSoLuongMuaThem(productId, soLuong, photoId)
           }
+          onDatInKemKhung={(photoId, productIdIn, soLuongIn, productIdKhung) =>
+            void datInKemKhung(photoId, productIdIn, soLuongIn, productIdKhung)
+          }
         />
-      )}
+        );
+      })()}
 
       {/*
         BB-213 — tấm hướng dẫn "Lưu app", mở từ chip BB-278/BB-281 ở đầu

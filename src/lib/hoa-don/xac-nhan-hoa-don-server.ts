@@ -26,6 +26,8 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StaffSession } from "@/types/domain";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { docCaiDatLamNhanh } from "@/lib/dich-vu/lam-anh-nhanh-server";
+import { doiDongLamNhanhThanhSanPham } from "@/lib/dich-vu/lam-anh-nhanh";
 import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
 import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 import { KHOA_THU_SAN_PHAM_QUA_APP, laBatThuSanPhamQuaApp } from "@/lib/gallery/tien-phat-sinh";
@@ -295,12 +297,15 @@ export async function layPhatSinhApp(
 async function docTatCa(
   nguon: NguonHoaDon,
   cacMa: string[],
+  admin: SupabaseClient,
 ): Promise<{ ok: true; ds: HoaDonChuan[] } | { ok: false; message: string }> {
   try {
     const ds = await Promise.all(cacMa.map((m) => nguon.layHoaDon(m)));
     const thieu = cacMa.filter((_, i) => !ds[i]);
     if (thieu.length > 0) return { ok: false, message: `Không tìm thấy hoá đơn ${thieu.join(", ")} bên Lark. Chưa có gì được ghi.` };
-    return { ok: true, ds: ds as HoaDonChuan[] };
+    // BB-399 vòng 2 — dòng "Làm ảnh nhanh" 0đ (studio tặng) đối chiếu như sản phẩm; dòng 0đ khác giữ luật cũ.
+    const { cacGhim } = await docCaiDatLamNhanh(admin, null);
+    return { ok: true, ds: doiDongLamNhanhThanhSanPham(ds as HoaDonChuan[], cacGhim) };
   } catch (e) {
     if (!(e instanceof LoiNguonHoaDon)) console.error(JSON.stringify({ evt: "hoa_don.doc_loi", loi: e instanceof Error ? e.message : String(e) }));
     return { ok: false, message: cauLoiNguon(e) };
@@ -354,7 +359,7 @@ export async function dongBoHoaDonChoBo(admin: SupabaseClient, v: DauVaoDongBo):
   if (cacMa.length === 0) return { ok: false, code: "INVALID_INPUT", message: "Bộ ảnh chưa có mã hoá đơn nào. Nhập mã rồi bấm Đồng bộ." };
 
   // 1. Đọc HẾT từ nguồn trước khi ghi gì.
-  const doc = await docTatCa(v.nguon, cacMa);
+  const doc = await docTatCa(v.nguon, cacMa, admin);
   if (!doc.ok) return { ok: false, code: "LARK", message: doc.message };
   const hoaDons = doc.ds;
 
@@ -1213,7 +1218,7 @@ export async function goiYBoTheoHoaDon(
   | { ok: true; hoaDon: { ma: string; tongPhaiThu: number; daThu: number; conLai: number; lyDoChuaDu: string[] }; daGanCho: string | null; ds: (BoUngVien & { diem: number; lyDo: string[] })[]; goiY: string | null }
   | { ok: false; message: string }
 > {
-  const doc = await docTatCa(p.nguon, [p.ma]);
+  const doc = await docTatCa(p.nguon, [p.ma], admin);
   if (!doc.ok) return { ok: false, message: doc.message };
   const hd = doc.ds[0];
   if (!hd) return { ok: false, message: `Không tìm thấy hoá đơn ${p.ma}.` };

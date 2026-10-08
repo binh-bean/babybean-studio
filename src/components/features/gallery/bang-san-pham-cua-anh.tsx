@@ -39,6 +39,7 @@ import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatKichThuoc, nhanTrangThaiGio } from "@/lib/utils/dinh-dang";
 import { giuA } from "@/lib/utils/giu-a";
+import { khoTrongTen, nhanSoAnhChoCacCuon } from "@/lib/products/album-khai-niem";
 
 export interface SuatTrongGoi {
   galleryItemId: string;
@@ -432,7 +433,7 @@ export function BangSanPhamCuaAnh({
             {/*
               BB-390 — album TRONG GÓI ở màn xem lớn = "Làm bìa album" cho tấm đang xem
               (một cuốn một bìa). Trước đây là nút đưa/gỡ tấm này vào RUỘT cuốn — lệch
-              khái niệm của anh: ruột 20–30 tấm Bean sắp, ba mẹ chỉ chọn bìa.
+              khái niệm của anh: ruột (số tấm theo khổ, BB-398) Bean sắp, ba mẹ chỉ chọn bìa.
             */}
             {albumTrongGoi.map((al) => {
               const choChon = Boolean(onChonBiaAlbum) && anhDaChon && !al.laBia;
@@ -474,7 +475,10 @@ export function BangSanPhamCuaAnh({
                           ? vi.gallery.loiBean.thaTimDeLamBia
                           : onChonBiaAlbum
                             ? vi.gallery.loiBean.lamBiaAlbum
-                            : vi.gallery.loiBean.ruotAlbumBeanSap}
+                            : vi.gallery.loiBean.ruotAlbumBeanSap.replace(
+                                "{soAnh}",
+                                nhanSoAnhChoCacCuon([khoTrongTen(al.name)]),
+                              )}
                     </span>
                   </span>
                   <span className="shrink-0 text-base leading-none" aria-hidden>

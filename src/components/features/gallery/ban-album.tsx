@@ -4,7 +4,8 @@
  * BB-390 — MÀN BÁN ALBUM (thay luồng "chọn ảnh để mua album").
  *
  * Anh (Bản yêu cầu, P0): "bán album — mở màn bán hàng chứ không phải chọn ảnh
- * để mua album". Album là SẢN PHẨM in: một quyển ghép từ 20–30 tấm, có một ảnh
+ * để mua album". Album là SẢN PHẨM in: một quyển ghép từ nhiều tấm (số tấm theo
+ * khổ — BB-398, `SO_ANH_THEO_KHO_ALBUM`), có một ảnh
  * bìa. Màn này chỉ GIỚI THIỆU cuốn album và nhận ĐẶT — ba mẹ không chọn tấm nào
  * ở đây; Bean/CSKH liên hệ sắp ảnh và bìa sau.
  *
@@ -23,7 +24,8 @@ import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatKichThuoc, nhanTrangThaiGio, tenSanPhamChoKhach } from "@/lib/utils/dinh-dang";
 import { tenChatLieuChoKhach } from "@/lib/products/nhom-san-pham";
-import { cuonAlbumDangBan, donDatAlbum } from "@/lib/products/album-khai-niem";
+import { cuonAlbumDangBan, donDatAlbum, nhanSoAnhAlbum, nhanSoAnhChoCacCuon } from "@/lib/products/album-khai-niem";
+import { XemAlbumTrenBan } from "./xem-album-tren-ban";
 import type { SanPhamAlbumTrongDanhMuc } from "@/lib/products/album-khai-niem";
 
 export interface BanAlbumProps {
@@ -37,17 +39,41 @@ export interface BanAlbumProps {
   daCoAlbum: boolean;
   /** Ghi số lượng TUYỆT ĐỐI, không gắn ảnh. `false` = máy chủ từ chối (đã báo riêng). */
   onDat: (productId: string, soLuong: number, photoId: null) => void | boolean | Promise<void | boolean>;
+  /**
+   * BB-398 — ảnh làm bìa cho màn "Xem album trên bàn" (ảnh bìa bộ ảnh hoặc tấm ba mẹ
+   * thả tim đầu tiên). Thiếu = vẫn mở được, bìa trơn.
+   */
+  anhBiaId?: string | null;
 }
 
-export function BanAlbum({ danhMuc, daMua, donDaGui, khoa, daCoAlbum, onDat }: BanAlbumProps) {
+export function BanAlbum({ danhMuc, daMua, donDaGui, khoa, daCoAlbum, onDat, anhBiaId = null }: BanAlbumProps) {
   const dsCuon = React.useMemo(() => cuonAlbumDangBan(danhMuc), [danhMuc]);
   const [chon, setChon] = React.useState<string | null>(null);
   const [dangGui, setDangGui] = React.useState(false);
   const [daGhiNhan, setDaGhiNhan] = React.useState<string | null>(null);
+  /** BB-398 — màn "Xem album trên bàn" (đặt cuốn lên ảnh mặt bàn thật, đúng khổ cm). */
+  const [moTrenBan, setMoTrenBan] = React.useState(false);
 
   const dangChon = dsCuon.find((sp) => sp.productId === chon) ?? dsCuon[0] ?? null;
   const soCuon = (productId: string) =>
     daMua.filter((d) => d.productId === productId).reduce((t, d) => t + d.quantity, 0);
+  // BB-398 — số ảnh theo KHỔ đang chọn; chưa có cuốn nào → nói chung theo bảng.
+  const soAnhDangChon = dangChon ? nhanSoAnhAlbum(dangChon.size) : null;
+  const soAnhMoTa = soAnhDangChon ?? nhanSoAnhChoCacCuon(dsCuon.map((sp) => sp.size));
+
+  const datCuon = async (sp: (typeof dsCuon)[number]): Promise<boolean> => {
+    const don = donDatAlbum(sp.productId, soCuon(sp.productId));
+    setDangGui(true);
+    try {
+      const ok = await onDat(don.productId, don.soLuong, don.photoId);
+      if (ok === false) return false;
+      setChon(sp.productId);
+      setDaGhiNhan(`album ${sp.size ? `${formatKichThuoc(sp.size)} cm` : tenSanPhamChoKhach(sp)}`);
+      return true;
+    } finally {
+      setDangGui(false);
+    }
+  };
 
   return (
     <section data-testid="man-ban-album" className="pb-6">
@@ -63,12 +89,12 @@ export function BanAlbum({ danhMuc, daMua, donDaGui, khoa, daCoAlbum, onDat }: B
       />
 
       <h3 className="kh-h2 mt-4 text-foreground">{vi.gallery.loiBean.banAlbumTieuDe}</h3>
-      <p className="mt-1 text-sm text-foreground">{giuA(vi.gallery.loiBean.banAlbumMoTa)}</p>
+      <p className="mt-1 text-sm text-foreground">{giuA(vi.gallery.loiBean.banAlbumMoTa.replace("{soAnh}", soAnhMoTa))}</p>
 
       <ul className="mt-3 grid grid-cols-2 gap-2 text-[13px] text-foreground">
         <li className="flex items-center gap-1.5 rounded-xl bg-[var(--bb-surface-2)] px-3 py-2">
           <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} aria-hidden="true" />
-          {vi.gallery.loiBean.banAlbumSoAnh}
+          <span data-testid="ban-album-so-anh">{vi.gallery.loiBean.banAlbumSoAnh.replace("{soAnh}", soAnhMoTa)}</span>
         </li>
         <li className="flex items-center gap-1.5 rounded-xl bg-[var(--bb-surface-2)] px-3 py-2">
           <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.4} aria-hidden="true" />
@@ -110,8 +136,14 @@ export function BanAlbum({ danhMuc, daMua, donDaGui, khoa, daCoAlbum, onDat }: B
                       )}
                     >
                       <span className="min-w-0">
-                        <span className="block text-sm font-medium text-foreground">
-                          {sp.size ? `${formatKichThuoc(sp.size)} cm` : tenSanPhamChoKhach(sp)}
+                        <span data-testid="ban-album-dong-kho" className="block text-sm font-medium text-foreground">
+                          {sp.size
+                            ? nhanSoAnhAlbum(sp.size)
+                              ? vi.gallery.loiBean.banAlbumDongKho
+                                  .replace("{kho}", formatKichThuoc(sp.size))
+                                  .replace("{soAnh}", nhanSoAnhAlbum(sp.size) as string)
+                              : `${formatKichThuoc(sp.size)} cm`
+                            : tenSanPhamChoKhach(sp)}
                         </span>
                         {chatLieu && (
                           <span className="block text-xs text-muted-foreground">
@@ -134,6 +166,20 @@ export function BanAlbum({ danhMuc, daMua, donDaGui, khoa, daCoAlbum, onDat }: B
             </ul>
           </div>
 
+          {/* BB-398 — hình dung cuốn album trên mặt bàn thật (như UV), đổi khổ để so. */}
+          <button
+            type="button"
+            data-testid="nut-xem-album-tren-ban"
+            onClick={() => setMoTrenBan(true)}
+            className="mt-3.5 flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--bb-border)] bg-white px-3.5 py-3 text-left transition hover:bg-[var(--bb-surface-2)]"
+          >
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-foreground">{vi.gallery.loiBean.albumTrenBanNut}</span>
+              <span className="block text-xs text-muted-foreground">{giuA(vi.gallery.loiBean.albumTrenBanNutPhu)}</span>
+            </span>
+            <span aria-hidden className="shrink-0 text-base leading-none text-muted-foreground">→</span>
+          </button>
+
           <p className="mt-3.5 text-xs text-muted-foreground">
             {giuA(vi.gallery.loiBean.banAlbumKhongCanChonAnh)}
           </p>
@@ -149,17 +195,7 @@ export function BanAlbum({ danhMuc, daMua, donDaGui, khoa, daCoAlbum, onDat }: B
               type="button"
               data-testid="nut-dat-album"
               disabled={khoa || dangGui}
-              onClick={async () => {
-                const don = donDatAlbum(dangChon.productId, soCuon(dangChon.productId));
-                setDangGui(true);
-                try {
-                  const ok = await onDat(don.productId, don.soLuong, don.photoId);
-                  if (ok === false) return;
-                  setDaGhiNhan(`album ${dangChon.size ? `${formatKichThuoc(dangChon.size)} cm` : tenSanPhamChoKhach(dangChon)}`);
-                } finally {
-                  setDangGui(false);
-                }
-              }}
+              onClick={() => void datCuon(dangChon)}
               className="mt-4 h-11 w-full rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90 disabled:opacity-40"
             >
               {daCoAlbum || soCuon(dangChon.productId) > 0
@@ -170,6 +206,23 @@ export function BanAlbum({ danhMuc, daMua, donDaGui, khoa, daCoAlbum, onDat }: B
             </button>
           )}
         </>
+      )}
+
+      {moTrenBan && dsCuon.length > 0 && (
+        <XemAlbumTrenBan
+          cuon={dsCuon.map((sp) => ({ productId: sp.productId, size: sp.size, unitPrice: sp.unitPrice }))}
+          productIdBanDau={dangChon?.productId ?? null}
+          anhBiaId={anhBiaId}
+          khoa={khoa || dangGui}
+          onDong={() => setMoTrenBan(false)}
+          onDat={async (productId) => {
+            const sp = dsCuon.find((c) => c.productId === productId);
+            if (!sp) return false;
+            const ok = await datCuon(sp);
+            if (ok) setMoTrenBan(false);
+            return ok;
+          }}
+        />
       )}
     </section>
   );

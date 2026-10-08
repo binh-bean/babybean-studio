@@ -41,6 +41,14 @@ export const CreateAddonSchema = z.object({
     .min(1, "photoIds không được rỗng nếu có mặt")
     .max(50, "Mỗi lượt chỉ đặt tối đa 50 tấm")
     .optional(),
+
+  /**
+   * BB-398 — KHUNG GẮN DÒNG IN: id dòng `selection_addons` (ảnh in) mà khung này bọc
+   * ("Đóng khung ảnh đã đặt in"). Chỉ dùng với sản phẩm khung; route tự lấy `photo_id`
+   * của dòng in (bỏ qua `photoId` gửi lên) và kiểm `kiemKhungGanIn`. Không dùng chung
+   * với `photoIds`.
+   */
+  ganVoiAddonId: z.string().uuid("ganVoiAddonId phải là UUID hợp lệ").nullish(),
 });
 
 export type CreateAddonInput = z.infer<typeof CreateAddonSchema>;

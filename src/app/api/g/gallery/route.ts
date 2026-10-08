@@ -23,6 +23,7 @@ import { docTomTatAnhChinh } from "@/lib/anh-chinh-sua/du-lieu";
 import { TIEN_TO_DONG_HOA_DON } from "@/lib/hoa-don/han-muc-hoa-don";
 import { soSuatAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh";
 import { docAnhAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh-server";
+import { thongTinLamNhanhChoKhach } from "@/lib/dich-vu/lam-anh-nhanh-server";
 
 /**
  * BB-341 — MỘT vòng cho lần đầu mở link.
@@ -175,7 +176,7 @@ async function traDuLieu(
       supabase
         .from("galleries")
         .select(`
-        id, title, welcome_message, status, baby_id, customer_id, shoot_date:shoots(shoot_date, concept),
+        id, title, welcome_message, status, baby_id, customer_id, branch_id, shoot_date:shoots(shoot_date, concept),
         branch:branches(name, address, hotline, zalo_oa),
         photo_count, included_quota, extra_photo_price, max_selection, allow_extra, due_at,
         cover_photo_id, cover_headline, cover_layout, download_enabled, notes_enabled, invite_enabled,
@@ -248,6 +249,8 @@ async function traDuLieu(
         selection_id,
         product_id,
         photo_id,
+        gan_voi_addon_id,
+        dot,
         quantity,
         unit_price,
         created_at,
@@ -256,6 +259,9 @@ async function traDuLieu(
           kind,
           material,
           size
+        ),
+        photo:photos (
+          file_name
         )
       `)
         .eq("selection_id", session.selectionId)
@@ -332,6 +338,20 @@ async function traDuLieu(
     if (galleryError || !gallery) {
       return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     }
+
+    // BB-399 — "Làm ảnh nhanh": giá + số ngày + đã mua chưa + hạn trả. Chạy song song với đợt 1
+    // còn lại; lỗi đọc → null (màn khách không bao giờ hỏng vì dịch vụ bán thêm này).
+    const pLamNhanh = chayNgay(
+      pSelection.then(({ data: sel }) =>
+        thongTinLamNhanhChoKhach(supabase, {
+          galleryId,
+          branchId: (gallery as { branch_id?: string | null }).branch_id ?? null,
+          selectionId: session.selectionId,
+          trangThai: gallery.status,
+          chotLuc: (sel as { submitted_at?: string | null } | null)?.submitted_at ?? null,
+        }),
+      ).catch(() => null),
+    );
 
     const [
       { chatSetting, banner: rawBanner, catalogue: rawCatalogue },
@@ -583,7 +603,20 @@ async function traDuLieu(
         // Tấm ảnh sản phẩm này in ra — màn khách hiện ngay cạnh dòng hàng, để
         // ba mẹ thấy mình đặt in ĐÚNG tấm nào.
         photoId: (row as { photo_id?: string | null }).photo_id ?? null,
+        // BB-398 — khung gắn dòng in (0104) + tên tệp của tấm ảnh (lối "Đóng khung ảnh đã
+        // đặt in" hiện tên tệp kể cả khi trang ảnh chứa tấm đó chưa tải về máy khách).
+        ganVoiAddonId: (row as { gan_voi_addon_id?: string | null }).gan_voi_addon_id ?? null,
+        // BB-398 vòng 3 — đợt của dòng (đợt mua thêm chỉ đóng khung tấm in đợt 1 / đợt đã xác nhận).
+        dot: Number((row as { dot?: number | null }).dot ?? 1) || 1,
+        fileName: (() => {
+          const ph = (row as { photo?: { file_name?: string | null } | { file_name?: string | null }[] | null }).photo;
+          const mot = Array.isArray(ph) ? ph[0] : ph;
+          return mot?.file_name ?? null;
+        })(),
         createdAt: row.created_at,
+        // BB-399 — dòng DỊCH VỤ (vd "Làm ảnh nhanh"): không phải hàng của cửa hàng — màn khách
+        // không bày nó trong giỏ cửa hàng (không sửa/bỏ được qua /api/g/addons).
+        dichVu: prod?.kind === "addon" || prod?.kind === "service",
       };
     });
 
@@ -783,6 +816,11 @@ async function traDuLieu(
         soSuat: soSuatAlbumKhongChinh(contractSummary.items),
         photoIds: (await pAlbumKhongChinh).photoIds,
       },
+      /**
+       * BB-399 — dịch vụ "Làm ảnh nhanh" (xem src/lib/dich-vu/lam-anh-nhanh.ts). null = không đọc
+       * được → màn khách ẩn ô và nói hạn theo mặc định.
+       */
+      lamAnhNhanh: await pLamNhanh,
     };
 
     return ok(responseData);

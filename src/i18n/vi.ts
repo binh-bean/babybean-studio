@@ -134,14 +134,17 @@ export const vi = {
       thaTimVaiTamTruoc: "Ba mẹ thả tim vài tấm trước, hoặc bấm “Tất cả” ạ.",
       thaTimTruocChonBia: "Ba mẹ thả tim vài tấm trước, rồi chọn một tấm làm bìa ạ.",
       chonBiaAlbumMoTa: "Gói của ba mẹ có {album} ạ. Ba mẹ chọn bìa trong những tấm đã thả tim ạ.",
-      // BB-390 — album là SẢN PHẨM in (quyển 20–30 tấm, một ảnh bìa). Trong gói: ba mẹ chọn BÌA;
+      // BB-390 — album là SẢN PHẨM in (một quyển, một ảnh bìa). Trong gói: ba mẹ chọn BÌA;
       // ruột Bean sắp. Không có trong gói: màn BÁN album, đặt xong Bean liên hệ sắp ảnh.
       beanGoiYBiaAlbum: "Bean gợi ý những tấm hợp làm bìa, ba mẹ đổi được tới khi chốt ạ.",
-      ruotAlbumBeanSap: "Ruột album 20–30 tấm Bean sắp từ ảnh ba mẹ đã chọn ạ.",
+      // BB-398 — {soAnh} theo khổ (`nhanSoAnhChoCacCuon`, album-khai-niem.ts): "25–30 ảnh" / "20–40 ảnh tuỳ khổ".
+      ruotAlbumBeanSap: "Ruột album {soAnh} Bean sắp từ ảnh ba mẹ đã chọn ạ.",
       banAlbumTieuDe: "Album in ảnh",
-      banAlbumMoTa: "Một cuốn album in từ 20–30 tấm ảnh của bé, có một ảnh bìa riêng ạ.",
+      banAlbumMoTa: "Một cuốn album in từ {soAnh} của bé, có một ảnh bìa riêng ạ.",
       banAlbumKhongCanChonAnh: "Ba mẹ chưa cần chọn ảnh lúc này ạ. Đặt xong, Bean liên hệ để sắp ảnh và bìa cùng ba mẹ ạ.",
-      banAlbumSoAnh: "20–30 tấm ảnh",
+      banAlbumSoAnh: "{soAnh}",
+      // BB-398 — mỗi dòng khổ trong màn bán album: "Khổ 20×20 cm · 25–30 ảnh".
+      banAlbumDongKho: "Khổ {kho} cm · {soAnh}",
       banAlbumMotBia: "Một ảnh bìa riêng",
       banAlbumNhanKho: "Khổ",
       banAlbumNhanChatLieu: "Chất liệu",
@@ -151,6 +154,44 @@ export const vi = {
       banAlbumSoCuon: "Đã đặt {n} cuốn",
       banAlbumChuaMoBan: "Album chưa mở bán trên app ạ. Ba mẹ nhắn Bean để được tư vấn nhé ạ.",
       banAlbumXem: "Xem album in ảnh",
+      // BB-398 — "Xem album trên bàn": cuốn album đặt lên ảnh mặt bàn thật, đúng khổ cm (như UV).
+      albumTrenBanNut: "Xem album trên bàn",
+      albumTrenBanNutPhu: "Đặt cuốn album lên mặt bàn thật, đúng khổ ạ.",
+      albumTrenBanTieuDe: "Album trên bàn",
+      albumTrenBanMoTa: "Cuốn album đặt trên mặt bàn thật, to nhỏ đúng khổ ba mẹ chọn ạ.",
+      albumTrenBanNhanKho: "Đổi khổ để so",
+      albumTrenBanBiaMinhHoa: "Bìa đang dùng ảnh của bộ ảnh để minh hoạ, Bean sắp bìa thật cùng ba mẹ sau ạ.",
+      albumTrenBanDat: "Đặt album khổ này",
+      albumTrenBanKhongVua: "Khổ này Bean chưa ướm được trên bàn ạ.",
+      // BB-398 — Khung có HAI cách bán: mua khung lẻ, hoặc đóng khung cho ảnh đã đặt in.
+      khungLoiLe: "Mua khung lẻ",
+      khungLoiLeMoTa: "Chọn khổ và kiểu khung, không cần chọn ảnh ạ.",
+      khungLoiGanIn: "Đóng khung ảnh đã đặt in",
+      khungLoiGanInMoTa: "Khung đúng khổ của tấm ảnh in ba mẹ đã đặt ạ.",
+      khungChuaCoAnhIn: "Ba mẹ chưa đặt tấm ảnh in nào bọc khung được ạ. Ba mẹ đặt in (Gỗ, Tráng gương, Mica…) trước, rồi quay lại đóng khung nhé ạ.",
+      khungUvKhongBoc: "Ảnh UV là ảnh giấy nên không bọc khung ạ.",
+      khungThemChoDong: "Thêm khung",
+      khungDaCo: "Đã có khung",
+      khungChuaCoCo: "Chưa có khung khổ này ạ.",
+      khungDaThem: "Bean đã thêm khung {kho} cho tấm {tep} ạ.",
+      khungLeGhiChu: "Khung lẻ, Bean giao riêng khung, không kèm ảnh ạ.",
+      khungBiBoTheoIn: "Bean đã bỏ luôn {n} khung gắn với tấm in vừa bỏ ạ.",
+      // Máy chủ từ chối khung gắn dòng in (`kiemKhungGanIn`, lib/products/khung-gan-anh-in.ts).
+      khungTuChoi: {
+        khong_phai_khung: "Chỉ khung mới gắn được vào một tấm ảnh in ạ.",
+        khong_thay_dong_in: "Bean không tìm thấy tấm ảnh in này trong giỏ ạ.",
+        khac_luot_chon: "Bean không tìm thấy tấm ảnh in này trong giỏ ạ.",
+        khong_phai_anh_in: "Khung chỉ gắn được vào một tấm ảnh in ạ.",
+        uv_khong_boc: "Ảnh UV là ảnh giấy nên không bọc khung ạ.",
+        kho_lech: "Khung phải đúng khổ của tấm ảnh in ạ.",
+        vuot_so_luong: "Số khung không được nhiều hơn số tấm in ạ.",
+      },
+      // BB-398 vòng 3 — đợt mua thêm chỉ đóng khung tấm in của đợt 1 hoặc đợt ĐÃ xác nhận.
+      khungDotChuaXacNhan: "Tấm in này thuộc đợt Bean chưa xác nhận, ba mẹ đóng khung sau khi Bean xác nhận đợt đó nhé ạ.",
+      // BB-398 — lối vào "xem trên không gian" từ cửa hàng.
+      xemTrenTuongNha: "Xem trên tường nhà",
+      xemTrenBanNha: "Xem trên bàn nhà",
+      xemTrenTuongNhaPhu: "Ướm đúng cỡ và chất liệu",
       // BB-390 — màn xem lớn: album TRONG GÓI là chọn BÌA, không xếp từng tấm vào cuốn.
       lamBiaAlbum: "Làm bìa album",
       dangLaBiaAlbum: "Đang là bìa album",
@@ -457,6 +498,29 @@ export const vi = {
      * sửa chi tiết từng tấm. Khách có thể đang không vui: Bean nói nhẹ, nhận lỗi về
      * mình, cho ba mẹ thấy được lắng nghe.
      */
+    /**
+     * BB-399 — dịch vụ "Làm ảnh nhanh" (anh chốt 08/10/2026: tiêu chuẩn 14 ngày, làm nhanh 5
+     * ngày). Số ngày + giá luôn điền từ dữ liệu ({nhanh}, {tieuChuan}, {gia}) — không viết cứng.
+     * "khoảng": ước tính, không hứa cứng.
+     */
+    lamNhanh: {
+      ten: "Làm ảnh nhanh",
+      moTa: "Bean ưu tiên chỉnh, ba mẹ nhận ảnh trong khoảng {nhanh} ngày thay vì {tieuChuan} ngày tiêu chuẩn ạ.",
+      daChon: "Đã chọn làm ảnh nhanh",
+      daChonMoTa: "Bean ưu tiên chỉnh bộ ảnh này, ba mẹ nhận ảnh trong khoảng {n} ngày ạ.",
+      hanTra: "Bean trả ảnh chỉnh trong khoảng {n} ngày, dự kiến ngày {ngay} ạ.",
+      hanTraKhongNgay: "Bean trả ảnh chỉnh trong khoảng {n} ngày ạ.",
+      tamTinh: "Tạm tính",
+      theTieuDe: "Ba mẹ muốn nhận ảnh sớm hơn ạ?",
+      nutMua: "Chọn làm ảnh nhanh · {gia}",
+      dangGui: "Bean đang ghi nhận, ba mẹ đợi chút ạ.",
+      daMuaXong: "Bean đã nhận làm ảnh nhanh, ba mẹ nhận ảnh trong khoảng {n} ngày ạ.",
+      loiKhongCoSanPham: "Hiện Bean chưa nhận làm ảnh nhanh, ba mẹ nhắn Bean để được hỗ trợ ạ.",
+      loiDaMua: "Bộ ảnh này đã chọn làm ảnh nhanh rồi ạ.",
+      loiQuaGiaiDoan: "Ảnh chỉnh của bé đã sẵn sàng nên không cần làm nhanh nữa ạ.",
+      loiChiNguoiChinh: "Chỉ người nhận link chính mới chọn được làm ảnh nhanh ạ.",
+      loiTamDung: "Hiện Bean đang nhiều việc nên tạm ngưng nhận làm ảnh nhanh, ba mẹ thông cảm giúp Bean ạ.",
+    },
     anhChinh: {
       tieuDe: "Ảnh đã chỉnh của bé",
       moDau: "Bean đã chỉnh xong {n} tấm, mời ba mẹ xem kỹ từng tấm ạ.",
@@ -721,6 +785,10 @@ export const vi = {
         "lark.webhook_url": "Webhook nhóm Lark",
         "lark.nhac_noi_bo": "Nhắc nội bộ vào Lark",
         "thanh_toan.thu_san_pham_qua_app": "Thu tiền sản phẩm mua thêm trong app",
+        "hau_ky.so_ngay_tra_tieu_chuan": "Số ngày trả ảnh chỉnh tiêu chuẩn",
+        "hau_ky.so_ngay_lam_nhanh": "Số ngày trả khi làm ảnh nhanh",
+        "dich_vu.lam_anh_nhanh_lark_id": "Sản phẩm Làm ảnh nhanh (record id Lark)",
+        "dich_vu.lam_anh_nhanh_bat": "Nhận làm ảnh nhanh",
       },
       moTa: {
         "gallery.default_due_days": "Bao nhiêu ngày kể từ lúc gửi link thì khách phải chốt.",
@@ -745,6 +813,14 @@ export const vi = {
           "Nhắc hậu kỳ và nhắc khách chưa chốt gửi vào Lark cho NHÂN VIÊN. KHÔNG ảnh hưởng tin khách↔studio (khách chốt ảnh, xin mở lại, mua thêm, duyệt/xin sửa) — những tin đó luôn gửi. Đang tắt vì automatic của Lark ở nhóm khác đã lo phần này.",
         "thanh_toan.thu_san_pham_qua_app":
           "Ảnh in, khung, album khách mua thêm. Tắt (mặc định): thu qua Lark — không tính vào Phải thu / Còn thiếu, chỉ hiện dòng \"Sản phẩm mua thêm · thu qua Lark\". Bật: cộng vào Phải thu và ghi thu trong app. Tiền ảnh (vượt hạn mức, ảnh đợt thêm, Edit file) luôn thu trong app.",
+        "hau_ky.so_ngay_tra_tieu_chuan":
+          "Bean hẹn trả ảnh chỉnh trong khoảng N ngày sau khi khách chốt danh sách. Là ước tính, không phải cam kết. Chưa đặt thì dùng 14.",
+        "hau_ky.so_ngay_lam_nhanh":
+          "Khách mua \"Làm ảnh nhanh\" thì Bean hẹn trong khoảng N ngày. Chưa đặt thì dùng 5. Giá lấy từ sản phẩm trên Lark.",
+        "dich_vu.lam_anh_nhanh_lark_id":
+          "Để trống: app tìm sản phẩm tên \"Làm ảnh nhanh\" đang kinh doanh. Có record id: chỉ dùng đúng sản phẩm đó, Lark đổi tên vẫn nhận đúng. Sản phẩm ngừng kinh doanh thì khách không thấy ô làm nhanh.",
+        "dich_vu.lam_anh_nhanh_bat":
+          "Tắt khi hậu kỳ quá tải: khách không thấy ô/thẻ mua Làm ảnh nhanh, API mua từ chối nhã nhặn. Bộ đã mua vẫn giữ nhãn ưu tiên và hạn. Mặc định bật.",
       },
       dangBat: "Đang bật",
       dangTat: "Đang tắt",

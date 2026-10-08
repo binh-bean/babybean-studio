@@ -40,6 +40,7 @@ import { PageHeader, PAGE_TITLE_FALLBACK_CLASS } from "./page-header";
 import { TheSoLieu } from "./the-so-lieu";
 import type { QuyenThaoTacBoAnh } from "@/lib/auth/quyen-xem-bo-anh";
 import { KhoiTenBe } from "./khoi-ten-be";
+import { KhoiHanTraAdmin } from "./nhan-lam-nhanh";
 
 import React from "react";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
@@ -359,6 +360,10 @@ interface Detail {
     material: string | null;
     size: string | null;
     kind: string | null;
+    /** BB-398 — dòng khung gắn dòng in nào (0104). */
+    ganVoiAddonId?: string | null;
+    /** BB-398 — "Khung cho: <tệp> · <chất liệu> <khổ>" / "Khung lẻ"; dòng không phải khung = null. */
+    nhanKhung?: string | null;
   }>;
 }
 
@@ -1027,6 +1032,9 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
         <p className="rounded-md border border-[var(--bb-border)] p-3 text-sm">{notice}</p>
       )}
 
+      {/* BB-399 — nhãn "Làm nhanh" + hạn trả ảnh chỉnh dự kiến (ngày chốt + 14 / + 5). */}
+      <KhoiHanTraAdmin galleryId={galleryId} />
+
       {/* BB-290 lượt 2: hàng 4 số liệu theo quan-tri-chi-tiet.png — bốn THẺ
           RIÊNG (trước là một thẻ lớn chia bốn cột trong). "Vượt hạn mức" và
           "Còn phải thu" (thông tin tài chính chi tiết) vẫn còn đủ ở khối
@@ -1582,6 +1590,11 @@ function KhoiChinh({
                   {tenThanThienMuaThem(a.kind, a.material, a.size)}
                   {a.quantity > 1 && (
                     <span className="text-[var(--bb-fg-muted)]"> ×{a.quantity}</span>
+                  )}
+                  {a.nhanKhung && (
+                    <span data-testid="nhan-khung-quan-tri" className="block text-xs text-[var(--bb-fg-muted)]">
+                      {a.nhanKhung}
+                    </span>
                   )}
                 </span>
                 <span className="shrink-0 text-sm font-medium">

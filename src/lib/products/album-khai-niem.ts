@@ -11,7 +11,7 @@
  *
  * Nên app chỉ có HAI việc với album:
  *   1. Album TRONG GÓI → bước "Chọn ảnh bìa album" (Bean gợi ý, ba mẹ chọn 1).
- *      Ruột album (20–30 tấm) Bean/CSKH sắp từ ảnh chỉnh + suất "Ảnh album không
+ *      Ruột album (số tấm theo khổ — BB-398) Bean/CSKH sắp từ ảnh chỉnh + suất "Ảnh album không
  *      chỉnh sửa" (BB-374) — ba mẹ KHÔNG xếp từng tấm vào cuốn.
  *   2. BÁN album (gói không có, hoặc muốn thêm cuốn) → MÀN BÁN HÀNG: giới thiệu
  *      cuốn album + giá trong danh mục + nút "Đặt album". Không bắt chọn tấm.
@@ -103,8 +103,68 @@ export function hopKhoBia(anh: HuongAnh | null, bia: HuongAnh | null): boolean {
 // 3. Bán album — chỉ mục có trong danh mục hậu kỳ, đặt KHÔNG kèm ảnh
 // ---------------------------------------------------------------------------
 
-/** Số tấm của một cuốn — lời anh: "ghép từ 20-30 ảnh". Không phải số trang in. */
-export const SO_ANH_MOT_CUON = { min: 20, max: 30 } as const;
+/**
+ * BB-398 — SỐ ẢNH MỘT CUỐN THEO KHỔ (anh 08/10/2026), nguồn DUY NHẤT. Thay hằng
+ * chung "20–30 tấm" cũ (BB-390): mỗi khổ một khoảng riêng. Không phải số trang in.
+ *
+ *     15×21: 20–25 ảnh · 20×20: 25–30 ảnh · 25×25: 30–35 ảnh
+ *     30×30: 35–40 ảnh · 20×30: 30–35 ảnh
+ *
+ * Khoá là khổ CHUẨN HOÁ (số nhỏ trước, `chuanKhoAlbum`) — album chữ nhật luôn là
+ * cuốn đứng (BB-391), nên "30x20" và "20x30" là một khổ.
+ */
+export const SO_ANH_THEO_KHO_ALBUM: Readonly<Record<string, { min: number; max: number }>> = {
+  "15x21": { min: 20, max: 25 },
+  "20x20": { min: 25, max: 30 },
+  "25x25": { min: 30, max: 35 },
+  "30x30": { min: 35, max: 40 },
+  "20x30": { min: 30, max: 35 },
+};
+
+/** "20×30", "30 x 20", "20X30" → "20x30" (số nhỏ trước). Không đọc được → `null`. */
+export function chuanKhoAlbum(size: string | null | undefined): string | null {
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*[x×*]\s*(\d+(?:[.,]\d+)?)\s*(?:cm)?\s*$/i.exec(size ?? "");
+  if (!m) return null;
+  const a = Number(m[1]!.replace(",", "."));
+  const b = Number(m[2]!.replace(",", "."));
+  if (!a || !b) return null;
+  return `${Math.min(a, b)}x${Math.max(a, b)}`;
+}
+
+/** Khoảng số ảnh của một khổ album. Khổ không có trong bảng → `null` (không hiện số, không đoán). */
+export function soAnhCuaKhoAlbum(size: string | null | undefined): { min: number; max: number } | null {
+  const kho = chuanKhoAlbum(size);
+  return kho ? (SO_ANH_THEO_KHO_ALBUM[kho] ?? null) : null;
+}
+
+/** "25–30 ảnh" cho một khổ; khổ không có trong bảng → `null`. */
+export function nhanSoAnhAlbum(size: string | null | undefined): string | null {
+  const k = soAnhCuaKhoAlbum(size);
+  return k ? `${k.min}–${k.max} ảnh` : null;
+}
+
+/**
+ * Khoảng CHUNG khi chưa biết khổ (vd lời giới thiệu chung, hoặc gói có nhiều cuốn khác khổ):
+ * suy từ chính bảng trên (nhỏ nhất → lớn nhất), không phải một hằng thứ hai.
+ */
+export function khoangSoAnhChung(): { min: number; max: number } {
+  const ds = Object.values(SO_ANH_THEO_KHO_ALBUM);
+  return { min: Math.min(...ds.map((k) => k.min)), max: Math.max(...ds.map((k) => k.max)) };
+}
+
+/**
+ * Cụm số ảnh cho một NHÓM cuốn (theo khổ từng cuốn): mọi cuốn cùng một khoảng → khoảng đó
+ * ("25–30 ảnh"); khác nhau hoặc có cuốn không rõ khổ → nói chung ("20–40 ảnh tuỳ khổ").
+ */
+export function nhanSoAnhChoCacCuon(sizes: ReadonlyArray<string | null | undefined>): string {
+  const nhan = new Set(sizes.map((s) => nhanSoAnhAlbum(s)));
+  if (nhan.size === 1) {
+    const [mot] = Array.from(nhan);
+    if (mot) return mot;
+  }
+  const c = khoangSoAnhChung();
+  return `${c.min}–${c.max} ảnh tuỳ khổ`;
+}
 
 export interface SanPhamAlbumTrongDanhMuc {
   productId: string;
@@ -148,7 +208,7 @@ export interface DonDatAlbum {
 
 /**
  * Lệnh "Đặt album" — đi đúng đường đặt mua thêm sẵn có (`/api/g/addons`, một
- * dòng giỏ không ảnh). Ba mẹ KHÔNG phải chọn 20–30 tấm ở bước này.
+ * dòng giỏ không ảnh). Ba mẹ KHÔNG phải chọn từng tấm ruột ở bước này.
  */
 export function donDatAlbum(productId: string, soCuonDaDat: number): DonDatAlbum {
   return { productId, soLuong: Math.max(0, Math.floor(soCuonDaDat)) + 1, photoId: null };

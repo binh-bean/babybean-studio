@@ -18,6 +18,30 @@
  * gọi hook này giữ nguyên phần đó của mình, hook chỉ lo mỗi việc focus.
  */
 import { useEffect, useRef, type RefObject } from "react";
+import { useLopHopThoai } from "./lop-hop-thoai";
+
+type PhimVao = Pick<KeyboardEvent, "key" | "preventDefault">;
+
+/**
+ * BB-398 vòng 2 — bộ xử lý phím của một hộp thoại: CHỈ khi hộp đang là lớp TRÊN CÙNG
+ * (`lop-hop-thoai.ts`). Màn treo tường / album trên bàn mở đè lên cửa hàng thì Esc và
+ * Tab thuộc về màn đó — cửa hàng bên dưới không đóng, không kéo focus về.
+ */
+export function taoXuLyPhimHopThoai<E extends PhimVao>(opts: {
+  laTren: () => boolean;
+  onDong: () => void;
+  xuLyTab: (e: E) => void;
+}): (e: E) => void {
+  return (e) => {
+    if (!opts.laTren()) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      opts.onDong();
+      return;
+    }
+    if (e.key === "Tab") opts.xuLyTab(e);
+  };
+}
 
 const CHON_PHAN_TU_CO_THE_FOCUS =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -36,6 +60,8 @@ export function useBayFocusHopThoai(
   const phanTuTruocKhiMoRef = useRef<HTMLElement | null>(null);
   const onDongRef = useRef(onDong);
   onDongRef.current = onDong;
+  // Đăng ký TRƯỚC effect gắn phím bên dưới (cùng component → chạy theo thứ tự khai báo).
+  const laTren = useLopHopThoai(mo);
 
   useEffect(() => {
     if (!mo) return;
@@ -56,13 +82,7 @@ export function useBayFocusHopThoai(
       }
     }
 
-    const khiGoPhim = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onDongRef.current();
-        return;
-      }
-      if (e.key !== "Tab") return;
+    const xuLyTab = (e: KeyboardEvent) => {
       const hienTai = hopRef.current;
       if (!hienTai) return;
       const phanTu = layDanhSachFocusDuoc(hienTai);
@@ -84,6 +104,11 @@ export function useBayFocusHopThoai(
         dau.focus();
       }
     };
+    const khiGoPhim = taoXuLyPhimHopThoai<KeyboardEvent>({
+      laTren,
+      onDong: () => onDongRef.current(),
+      xuLyTab,
+    });
 
     // Capture phase: chặn Tab thoát khỏi hộp trước khi trình duyệt tự tính
     // phần tử kế tiếp trong toàn trang.
@@ -93,5 +118,5 @@ export function useBayFocusHopThoai(
       const veLai = phanTuTruocKhiMoRef.current;
       if (veLai && document.contains(veLai)) veLai.focus();
     };
-  }, [mo, hopRef]);
+  }, [mo, hopRef, laTren]);
 }

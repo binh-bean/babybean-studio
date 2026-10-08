@@ -27,6 +27,12 @@ export const SubmitSelectionSchema = z.object({
   dongYAnhStudioChon: z.boolean().optional(),
   /** Ô tick "Tôi biết nếu chưa chọn ảnh in, thời gian nhận ảnh sẽ lâu hơn timeline" — bắt buộc khi còn sản phẩm in chưa gắn ảnh. */
   bietAnhInChamHon: z.boolean().optional(),
+  /**
+   * BB-399 — ô "Làm ảnh nhanh" (không tích sẵn). true → máy chủ tự tìm sản phẩm đang bán, giá
+   * từ `products` (không nhận giá từ trình duyệt), ghi một dòng `selection_addons` đợt 1. Đã
+   * mua rồi thì không ghi lần hai.
+   */
+  lamAnhNhanh: z.boolean().optional(),
 });
 
 export type SubmitSelectionInput = z.infer<typeof SubmitSelectionSchema>;

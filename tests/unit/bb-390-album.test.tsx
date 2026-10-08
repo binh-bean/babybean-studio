@@ -172,7 +172,8 @@ describe("BB-390 3. bán album", () => {
     expect(banAlbumCanChonAnh()).toBe(false);
   });
 
-  it("màn bán dựng thật: giới thiệu 20–30 tấm + 1 bìa, giá từ danh mục, nút Đặt album — không lưới chọn ảnh", () => {
+  // BB-398 — số tấm THEO KHỔ (20×20: 25–30 ảnh), không còn "20–30 tấm" chung.
+  it("màn bán dựng thật: giới thiệu số ảnh theo khổ + 1 bìa, giá từ danh mục, nút Đặt album — không lưới chọn ảnh", () => {
     const html = renderToStaticMarkup(
       React.createElement(BanAlbum, {
         danhMuc: DANH_MUC,
@@ -185,7 +186,8 @@ describe("BB-390 3. bán album", () => {
     );
     const chu = CHU(html);
     expect(html).toContain('data-testid="man-ban-album"');
-    expect(chu).toContain("20–30 tấm ảnh");
+    expect(chu).toContain("25–30 ảnh");
+    expect(chu).toContain("Khổ 20×20 cm · 25–30 ảnh");
     expect(chu).toContain("Một ảnh bìa riêng");
     expect(html.match(/data-testid="lua-chon-album"/g)?.length).toBe(2);
     expect(html).toContain('data-testid="nut-dat-album"');

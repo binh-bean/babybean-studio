@@ -30,6 +30,8 @@ interface CaiDat {
   biMat: boolean;
   value: unknown;
   daCauHinh: boolean;
+  /** BB-399 vòng 2 — dòng trạng thái chỉ đọc do máy chủ tính (vd sản phẩm Làm ảnh nhanh đang dùng). */
+  trangThai?: string;
 }
 
 const NHOM: { id: CaiDat["nhom"]; ten: string }[] = [
@@ -226,6 +228,11 @@ export function SettingsManager() {
                       placeholder={c.biMat && !c.daCauHinh ? t.chuaCauHinh : undefined}
                       onChange={(e) => setNhap((s) => ({ ...s, [c.key]: e.target.value }))}
                     />
+                  )}
+                  {c.trangThai && (
+                    <p data-testid={`trang-thai-${c.key}`} className="mt-1.5 text-xs text-[var(--bb-fg-muted)]">
+                      {c.trangThai}
+                    </p>
                   )}
                 </Field>
               ))}

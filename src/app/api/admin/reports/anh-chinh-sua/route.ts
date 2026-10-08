@@ -7,6 +7,7 @@
  * không vào (việc gửi khách là của CSKH). Không trả tên/SĐT khách.
  */
 
+import { layHanTraNhieuBo } from "@/lib/dich-vu/lam-anh-nhanh-server";
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
@@ -41,7 +42,12 @@ export async function GET(request: Request): Promise<Response> {
     const items = await layViecAnhChinh(admin, branchIds);
     // BB-392 mục 3a — nhãn nhà (khách có ≥ 2 bộ). Lỗi đọc nhãn không làm hỏng danh sách việc.
     const nha = await docNhaCuaCacBo(admin, items.map((v) => v.galleryId)).catch(() => ({}));
-    return ok({ items, nha, coTheGui: coMotTrongCacQuyen(staff.permissions, CAC_QUYEN_GUI_KHACH_DUYET) });
+    // BB-399 — bộ khách mua "Làm ảnh nhanh": nhãn + hạn trả dự kiến (lỗi đọc → không nhãn).
+    const hanTra = await layHanTraNhieuBo(admin, items.map((v) => v.galleryId));
+    const lamNhanh = Object.fromEntries(
+      [...hanTra].filter(([, h]) => h.lamNhanh).map(([id, h]) => [id, { soNgay: h.soNgay, hanTra: h.hanTra, uuTien: h.uuTien }]),
+    );
+    return ok({ items, nha, lamNhanh, coTheGui: coMotTrongCacQuyen(staff.permissions, CAC_QUYEN_GUI_KHACH_DUYET) });
   } catch (err) {
     if (err instanceof AuthError) return fail(err.code);
     return failUnexpected(err, requestId);

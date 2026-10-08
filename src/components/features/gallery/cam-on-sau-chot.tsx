@@ -74,6 +74,11 @@ export interface CamOnSauChotProps {
    * không phải F5: hết "Chờ studio xác nhận… Vẫn thêm được ảnh".
    */
   studioDaXacNhan?: boolean;
+  /**
+   * BB-399 — khối "Bean trả ảnh chỉnh trong khoảng N ngày" (+ mua làm nhanh). Truyền sẵn từ
+   * `gallery-app.tsx` (`TheLamAnhNhanhSauChot`) — màn đệm này không tự gọi API.
+   */
+  lamAnhNhanh?: React.ReactNode;
 }
 
 export function CamOnSauChot({
@@ -88,6 +93,7 @@ export function CamOnSauChot({
   tienMuaThem,
   onXemTienDo,
   studioDaXacNhan = false,
+  lamAnhNhanh = null,
 }: CamOnSauChotProps) {
   return (
     <div
@@ -162,6 +168,8 @@ export function CamOnSauChot({
           </div>
         )}
       </div>
+
+      {lamAnhNhanh && <div className="mt-3 w-full empty:hidden">{lamAnhNhanh}</div>}
 
       {/*
         BB-289 lượt 2 — nút NGAY SAU nội dung (không `mt-auto`/`min-h-[80dvh]`

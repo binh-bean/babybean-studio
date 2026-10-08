@@ -7,6 +7,8 @@
  * Order of operations: parse -> authenticate -> authorize -> mutate -> log -> respond.
  */
 
+import { layBoLamNhanhDangCho, layHanTraNhieuBo } from "@/lib/dich-vu/lam-anh-nhanh-server";
+import { TRANG_THAI_CON_HAN_TRA, ghepTrangUuTien, xepLamNhanhLenDau } from "@/lib/dich-vu/lam-anh-nhanh";
 import { keoDongHopDongTuLark } from "@/lib/lark/dong-hop-dong";
 import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -424,6 +426,11 @@ export async function GET(request: Request): Promise<Response> {
     });
 
     const trangThaiLoc = query.status && query.status.length > 0 ? query.status : null;
+    // BB-399 vòng 3 — bộ ƯU TIÊN làm nhanh (đã mua, còn chờ trả ảnh chỉnh) lên ĐẦU danh sách ở
+    // máy chủ, xuyên trang (RPC phân trang không có cột này — không đổi hàm SQL dùng chung).
+    const idsUuTien = new Set((await layBoLamNhanhDangCho(admin, targetBranchIds)).map((b) => b.galleryId));
+    /** Số dòng RPC thật của trang này — con trỏ trang tính theo nó, không theo số dòng đã ghép. */
+    let soDongRpc: number | null = null;
     // BB-379 — "Chưa có tên bé": RPC không có tham số này, nên đọc hết các trang (kho ~500 bộ,
     // 200/trang) KHÔNG lọc trạng thái, lọc ở đây rồi tự cắt trang + tự đếm theo trạng thái.
     // Lọc trạng thái cũng làm ở đây để các số đếm theo trạng thái vẫn đủ.
@@ -446,12 +453,30 @@ export async function GET(request: Request): Promise<Response> {
         off += (t.items ?? []).length;
       }
       const theoTrangThai = trangThaiLoc ? daLoc.filter((r) => trangThaiLoc.includes(String(r.status) as never)) : daLoc;
-      const { items: trangNay, hasMore: conNua } = catTrang(theoTrangThai, offset, limit);
+      const { items: trangNay, hasMore: conNua } = catTrang(
+        xepLamNhanhLenDau(theoTrangThai, (r) => idsUuTien.has(String(r.id))),
+        offset,
+        limit,
+      );
       result = { items: trangNay, counts: demTheoTrangThai(daLoc), hasMore: conNua, limit, offset };
     } else {
       const kq = await goiRpc(offset, limit, trangThaiLoc);
       result = kq.data;
       rpcError = kq.error;
+      if (!kq.error && idsUuTien.size > 0) {
+        const trangRpc = ((kq.data ?? {}) as { items?: Array<Record<string, unknown>> }).items ?? [];
+        soDongRpc = trangRpc.length;
+        // Trang đầu: đọc các dòng ưu tiên qua CÙNG RPC (cùng bộ lọc), chỉ ở trạng thái còn chờ trả.
+        let hangUuTien: Array<Record<string, unknown>> = [];
+        const trangThaiUuTien = ((trangThaiLoc ?? TRANG_THAI_CON_HAN_TRA) as readonly string[]).filter((t) =>
+          TRANG_THAI_CON_HAN_TRA.includes(t),
+        );
+        if (offset === 0 && trangThaiUuTien.length > 0) {
+          const k2 = await goiRpc(0, 200, trangThaiUuTien as typeof trangThaiLoc);
+          if (!k2.error) hangUuTien = ((k2.data ?? {}) as { items?: Array<Record<string, unknown>> }).items ?? [];
+        }
+        result = { ...(kq.data as object), items: ghepTrangUuTien(trangRpc, hangUuTien, idsUuTien, offset) };
+      }
     }
 
     if (rpcError) {
@@ -550,6 +575,8 @@ export async function GET(request: Request): Promise<Response> {
     const { theoBo: photoMap } = await docLarkPhoto(admin, idsTrangNay);
     // BB-394 — nhãn nhà "Nhà <tên> · Buổi N/M" (khách có ≥ 2 bộ): MỘT lần đọc cho cả trang; lỗi thì bỏ nhãn.
     const nhaMap = await docNhaCuaCacBoKhongLoi(admin, idsTrangNay);
+    // BB-399 — "Làm nhanh" + hạn trả dự kiến (bộ đã chốt). Lỗi đọc → Map rỗng, không nhãn.
+    const hanTraMap = await layHanTraNhieuBo(admin, idsTrangNay);
 
     const items = rawItems.map((raw) => {
       const item = raw as Record<string, unknown>;
@@ -578,11 +605,15 @@ export async function GET(request: Request): Promise<Response> {
         larkPhoto: photoMap.get(String(item.id)) ?? null,
         // BB-394 — nhãn nhà; null khi khách chỉ có 1 bộ (hoặc đọc nhãn lỗi).
         nha: nhaMap[String(item.id)] ?? null,
+        // BB-399 — bộ khách mua "Làm ảnh nhanh" + hạn trả ảnh chỉnh dự kiến (null khi chưa chốt).
+        lamNhanh: hanTraMap.get(String(item.id))?.lamNhanh ?? false,
+        uuTien: idsUuTien.has(String(item.id)),
+        hanTraDuKien: hanTraMap.get(String(item.id))?.hanTra ?? null,
       };
     });
 
     const nextCursor = hasMore
-      ? Buffer.from(JSON.stringify({ o: offset + items.length })).toString("base64url")
+      ? Buffer.from(JSON.stringify({ o: offset + (soDongRpc ?? items.length) })).toString("base64url")
       : null;
 
     return ok(

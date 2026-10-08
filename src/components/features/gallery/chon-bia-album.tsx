@@ -26,7 +26,7 @@ import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { goiYBiaAlbum, SO_LUONG_GOI_Y_BIA_ALBUM, type UngVienBiaAlbum } from "@/lib/products/goi-y-bia-album";
-import { huongBiaTuKhoAlbum, khoTrongTen } from "@/lib/products/album-khai-niem";
+import { huongBiaTuKhoAlbum, khoTrongTen, nhanSoAnhChoCacCuon } from "@/lib/products/album-khai-niem";
 
 export interface AlbumCanChonBia {
   galleryItemId: string;
@@ -276,9 +276,12 @@ export function ChonBiaAlbum({
             albums.length > 1 ? `${albums.length} cuốn album` : "một cuốn album",
           )}
         </p>
-        {/* BB-390 — nói rõ khái niệm: ba mẹ chỉ chọn BÌA, ruột 20–30 tấm Bean sắp. */}
+        {/* BB-390 — nói rõ khái niệm: ba mẹ chỉ chọn BÌA, ruột Bean sắp. BB-398: số tấm theo khổ cuốn. */}
         <p data-testid="giai-thich-ruot-album" className="mt-0.5 text-xs text-muted-foreground">
-          {vi.gallery.loiBean.ruotAlbumBeanSap}
+          {vi.gallery.loiBean.ruotAlbumBeanSap.replace(
+            "{soAnh}",
+            nhanSoAnhChoCacCuon(albums.map((a) => khoTrongTen(a.name))),
+          )}
         </p>
       </div>
       {albums.map((album) => (

@@ -9,6 +9,7 @@
  */
 
 import { Dashboard } from "@/components/features/admin/dashboard";
+import { KhoiCongTacLamNhanh } from "@/components/features/admin/nhan-lam-nhanh";
 import { requireStaff, AuthError, layHoTenNhanVien } from "@/lib/auth/staff";
 
 export default async function AdminDashboardPage() {
@@ -32,6 +33,9 @@ export default async function AdminDashboardPage() {
   // max-w-6xl, xem ghi chú ở /admin/settings/page.tsx.
   return (
     <main className="mx-auto min-w-0 max-w-6xl space-y-4 lg:space-y-6">
+      {/* BB-399 vòng 3 — bộ ƯU TIÊN làm nhanh đang chờ (hạn gần nhất trước) + công tắc nhận làm
+          nhanh — đứng ĐẦU trang để thấy trước mọi việc khác. Ẩn khi không có bộ nào và công tắc đang bật. */}
+      <KhoiCongTacLamNhanh hienDanhSach />
       <Dashboard hoTen={hoTen} />
     </main>
   );

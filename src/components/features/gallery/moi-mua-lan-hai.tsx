@@ -68,6 +68,7 @@
  *   - `anhThich`: những tấm người xem đã thả tim trên lưới — hiện trước.
  */
 
+import { batBuocChonAnh } from "@/lib/products/khung-gan-anh-in";
 import { vi } from "@/i18n";
 import React from "react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -387,6 +388,8 @@ export function MoiMuaLanHai({
                   className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface"
                 >
                   {theoNhom.map((m) => {
+                    // BB-398 — cùng luật cửa hàng: chỉ ảnh in phải chọn ảnh; khung bán LẺ không ảnh.
+                    const canChonAnh = m.canGanAnh && batBuocChonAnh(m.nhom);
                     const so = soLuongDat(m.productId, null);
                     const soTam = gio
                       .filter((d) => d.productId === m.productId && d.photoId !== null)
@@ -400,12 +403,12 @@ export function MoiMuaLanHai({
                             <span className="font-semibold text-foreground tabular-nums">{formatCurrencyVND(m.unitPrice)}</span>
                             {moTaPhu ? ` · ${moTaPhu}` : ""}
                           </p>
-                          {m.canGanAnh && soTam > 0 && (
+                          {canChonAnh && soTam > 0 && (
                             <p className="mt-1 text-xs font-medium text-moss">Đã chọn {soTam} tấm</p>
                           )}
                         </div>
 
-                        {m.canGanAnh ? (
+                        {canChonAnh ? (
                           <button
                             type="button"
                             disabled={dangGui}

@@ -94,7 +94,7 @@ describe("BB-245 (2): POST /api/g/mua-them", () => {
   let customerId = "";
   let selectionId = "";
   let shareLinkId = "";
-  let spGanAnh = ""; // sản phẩm BẮT BUỘC gắn ảnh (in/khung)
+  let spGanAnh = ""; // sản phẩm BẮT BUỘC gắn ảnh (ảnh in — BB-398: khung lẻ không cần ảnh)
   let anh1 = "";
 
   function phien(role = "owner") {
@@ -163,7 +163,8 @@ describe("BB-245 (2): POST /api/g/mua-them", () => {
     const { rows: sp } = await client.query(
       `select id from products
         where is_active and list_price is not null and price_confidence >= 0.8 and price_samples >= 5
-          and (material ilike 'khung%' or kind = 'print')
+          -- BB-398: khung bán LẺ không ảnh được — sản phẩm BẮT BUỘC ảnh chỉ còn ảnh in.
+          and kind = 'print' and coalesce(material, '') not ilike 'khung%'
         order by list_price limit 1`,
     );
     spGanAnh = sp[0]?.id ?? "";
@@ -190,7 +191,7 @@ describe("BB-245 (2): POST /api/g/mua-them", () => {
     expect(res3.status).toBe(400);
   });
 
-  it("sản phẩm nhóm gắn ảnh (in/khung) mà THIẾU photoId → 400", async () => {
+  it("sản phẩm ẢNH IN mà THIẾU photoId → 400 (BB-398: khung lẻ thì được)", async () => {
     if (!spGanAnh) return; // bảng giá sạch thì bỏ qua ca này, giống bb-105
     phien();
     const res = await goi({ items: [{ productId: spGanAnh, soLuong: 1 }] });

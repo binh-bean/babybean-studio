@@ -1,4 +1,5 @@
 "use client";
+import { useLopHopThoai } from "@/lib/utils/lop-hop-thoai";
 import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 /**
@@ -97,6 +98,18 @@ export interface ManTreoTuongProps {
   dangLuu: boolean;
   onDatVaoGoi: (photoId: string, galleryItemId: string, dat: boolean) => void;
   onDatMuaThem: (photoId: string, productId: string, soLuong: number) => void;
+  /**
+   * BB-398 — mở từ CỬA HÀNG: chất liệu + khổ (+ khung) ba mẹ vừa chọn ở đó. Thiếu = màn
+   * treo tự chọn mặc định như cũ (gói đã mua → cỡ lớn nhất vừa tường).
+   */
+  chatLieuBanDau?: string | null;
+  coBanDau?: string | null;
+  coKhungBanDau?: boolean;
+  /**
+   * BB-398 — "Bọc khung HQ" cho tấm in MUA THÊM: thêm tấm in rồi thêm khung GẮN đúng dòng
+   * in đó (`gan_voi_addon_id`, migration 0104). Thiếu = hai dòng rời như cũ.
+   */
+  onDatInKemKhung?: (photoId: string, productIdIn: string, soLuongIn: number, productIdKhung: string) => void;
 }
 
 /**
@@ -233,18 +246,24 @@ export function ManTreoTuong({
   dangLuu,
   onDatVaoGoi,
   onDatMuaThem,
+  chatLieuBanDau = null,
+  coBanDau = null,
+  coKhungBanDau = false,
+  onDatInKemKhung,
 }: ManTreoTuongProps) {
   const [chiSo, setChiSo] = useState(chiSoBanDau);
   const [maPhong, setMaPhong] = useState<MaPhong>("phong-khach");
-  const [chatLieu, setChatLieu] = useState<string | null>(null);
+  // BB-398 — mở từ cửa hàng: bắt đầu ĐÚNG chất liệu/khổ đã chọn ở đó (khổ không vừa tường
+  // phòng đang xem thì hiệu ứng "cỡ vừa" bên dưới tự đổi sang cỡ vừa, như mọi lần đổi phòng).
+  const [chatLieu, setChatLieu] = useState<string | null>(chatLieuBanDau);
   // BB-293 mục #4 — báo cáo chấm độc lập: khởi tạo cứng "40x60" từng khiến
   // hiệu ứng chọn mặc định-lớn-nhất bên dưới KHÔNG chạy nếu "40x60" TÌNH CỜ
   // đã là một cỡ hợp lệ (`coVua.includes(co)` đúng ngay từ đầu) — dù danh
   // mục có cỡ lớn hơn 40×60 cũng vừa tường. Bắt đầu từ rỗng để hiệu ứng mặc
   // định (ưu tiên gói đã mua, rồi tới cỡ lớn nhất đang bán) luôn tự chạy lúc
   // mở màn.
-  const [co, setCo] = useState<CoKhungCm>("");
-  const [coKhung, setCoKhung] = useState(false);
+  const [co, setCo] = useState<CoKhungCm>(coBanDau ?? "");
+  const [coKhung, setCoKhung] = useState(coKhungBanDau && coTheBocKhung(chatLieuBanDau));
   // BB-358 (anh 02/10) — UV là ảnh giấy: không bọc khung. Đổi sang UV thì bỏ khung đang bật.
   useEffect(() => {
     if (!coTheBocKhung(chatLieu)) setCoKhung(false);
@@ -344,10 +363,14 @@ export function ManTreoTuong({
   // đóng luôn cả hai lớp. Lớp "xem lớn tấm của bé" (BB-243) mở TRÊN màn tường
   // này nên Esc phải đóng nó trước, giống cách photo-lightbox.tsx tự đóng lớp
   // con (tamMo) trước khi đóng cả màn.
+  // BB-398 vòng 2 — màn treo là một LỚP: mở đè cửa hàng thì cửa hàng không nhận Esc/Tab.
+  const laLopTren = useLopHopThoai(mo);
   useEffect(() => {
     if (!mo) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // Có lớp khác đè lên màn treo (hiếm) thì để lớp đó xử lý.
+      if (!laLopTren()) return;
       e.stopImmediatePropagation();
       if (xemLon) {
         setXemLon(false);
@@ -357,7 +380,7 @@ export function ManTreoTuong({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [mo, onDong, xemLon]);
+  }, [mo, onDong, xemLon, laLopTren]);
 
   // Khoá cuộn trang nền — màn này chiếm toàn màn hình.
   useEffect(() => {
@@ -639,6 +662,17 @@ export function ManTreoTuong({
 
   const themVaoDon = useCallback(() => {
     if (xemDuocThoi || !sanPhamAnh || !anhDangXem) return;
+    // BB-398 — tấm in MUA THÊM + "Bọc khung HQ" (khung cũng mua thêm): một lượt ghi
+    // in rồi khung GẮN đúng dòng in đó, thay vì hai dòng rời chỉ chung ảnh.
+    if (!suatAnhVua && coKhung && sanPhamKhung && !suatKhungVua && onDatInKemKhung) {
+      onDatInKemKhung(
+        anhDangXem.id,
+        sanPhamAnh.productId,
+        soLuongDaDat(sanPhamAnh.productId, anhDangXem.id) + 1,
+        sanPhamKhung.productId,
+      );
+      return;
+    }
     if (suatAnhVua) {
       onDatVaoGoi(anhDangXem.id, suatAnhVua.galleryItemId, true);
     } else {
@@ -665,6 +699,7 @@ export function ManTreoTuong({
     suatKhungVua,
     onDatVaoGoi,
     onDatMuaThem,
+    onDatInKemKhung,
     soLuongDaDat,
   ]);
 

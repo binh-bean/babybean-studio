@@ -15,6 +15,8 @@ import { CARD_TITLE_CLASS } from "./page-header";
 import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
 import { hienTieuDeBoAnh } from "@/lib/utils/ma-hoa-don";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
+import { KhoiCongTacLamNhanh, NhanLamNhanh } from "./nhan-lam-nhanh";
+import { xepLamNhanhLenDau } from "@/lib/dich-vu/lam-anh-nhanh";
 import type { NhaCuaBo } from "@/lib/gia-dinh/nha-cua-bo";
 
 interface DongViec {
@@ -40,6 +42,8 @@ export function AnhChinhSuaReport() {
   const [items, setItems] = React.useState<DongViec[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  /** BB-399 — bộ khách mua "Làm ảnh nhanh": nhãn + xếp lên đầu. */
+  const [lamNhanh, setLamNhanh] = React.useState<Record<string, { hanTra: string | null; uuTien?: boolean }>>({});
 
   const tai = React.useCallback(async () => {
     try {
@@ -52,6 +56,7 @@ export function AnhChinhSuaReport() {
       setError(null);
       setItems(json.data.items ?? []);
       setNha(json.data.nha ?? {});
+      setLamNhanh(json.data.lamNhanh ?? {});
     } catch {
       setError("Mất kết nối, thử lại giúp.");
     }
@@ -74,11 +79,13 @@ export function AnhChinhSuaReport() {
           xem từng tấm, vùng khoanh và ảnh mẫu trong bộ ảnh.
         </p>
       </header>
+      {/* BB-399 vòng 3 — công tắc nhận làm nhanh (hậu kỳ quá tải) + số bộ làm nhanh đang chờ. */}
+      <KhoiCongTacLamNhanh />
       {items.length === 0 ? (
         <p className="text-sm text-[var(--bb-fg-muted)]">Không có ảnh chỉnh nào đang chờ.</p>
       ) : (
         <ul className="flex flex-col divide-y divide-[var(--bb-border)] rounded-lg border border-[var(--bb-border)]">
-          {items.map((v) => (
+          {xepLamNhanhLenDau(items, (v) => !!lamNhanh[v.galleryId]?.uuTien).map((v) => (
             <li key={`${v.loai}-${v.galleryId}-${v.khoa ?? ""}`} data-testid="dong-anh-chinh-sua" data-loai={v.loai} data-khoa={v.khoa ?? "goc"}>
               <Link
                 href={`/admin/galleries/${encodeURIComponent(v.galleryId)}#anh-chinh-sua`}
@@ -93,6 +100,11 @@ export function AnhChinhSuaReport() {
                 <span className="text-xs text-[var(--bb-fg-muted)]">{formatNgayVN(v.luc)}</span>
               </Link>
               <NhanNhaBoAnh nha={nha[v.galleryId]} className="px-4 pb-3" />
+              {lamNhanh[v.galleryId] && (
+                <div className="px-4 pb-3">
+                  <NhanLamNhanh lamNhanh uuTien={lamNhanh[v.galleryId]?.uuTien ?? false} hanTra={lamNhanh[v.galleryId]?.hanTra ?? null} />
+                </div>
+              )}
             </li>
           ))}
         </ul>

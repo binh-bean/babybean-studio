@@ -114,8 +114,12 @@ test.describe("BB-254: mời ông bà cùng xem", () => {
   }) => {
     // 1. Ba mẹ mở link chính, mời "Bà nội".
     await page.goto(`/g/${maLinkBaMe}`);
-    await expect(page.getByText("Mời ông bà cùng xem")).toBeVisible();
-    await page.getByRole("button", { name: "Mời", exact: true }).click();
+    // BB-355 (bản vẽ "Màn khách v8" a): bộ ĐANG CHỌN mời từ nút viền "Mời ông bà cùng xem" trên bìa
+    // (`MoiNguoiThan kieu="nut-bia"`); thẻ có nút "Mời" riêng chỉ còn ở bộ đã giao (gallery-app.tsx
+    // `theMoiOngBa` trong khối `dangGiao`). Spec cũ chờ nút "Mời" không còn trên bộ in_review.
+    const nutMoi = page.getByRole("button", { name: "Mời ông bà cùng xem" }).first();
+    await expect(nutMoi).toBeVisible();
+    await nutMoi.click();
 
     const oNhap = page.getByPlaceholder("Ví dụ: Bà nội");
     await oNhap.fill("Bà nội");

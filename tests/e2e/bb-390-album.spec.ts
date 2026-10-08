@@ -1,5 +1,5 @@
 /**
- * BB-390 — album đúng khái niệm của anh: album là SẢN PHẨM in (quyển 20–30 tấm, một
+ * BB-390 — album đúng khái niệm của anh: album là SẢN PHẨM in (quyển, số tấm theo khổ — BB-398 — một
  * ảnh bìa).
  *   Ca 1. Bộ A — gói CÓ album: hiện bước "Chọn ảnh bìa album", Bean gợi ý (≤ 6 tấm, chỉ
  *         tấm đã thả tim), bấm một tấm → lưu bìa (POST /api/g/album-cover 200), đổi được.
@@ -182,9 +182,10 @@ test.describe("BB-390: album = sản phẩm in — chọn bìa (trong gói) và 
 
     const man = hop.getByTestId("man-ban-album");
     await expect(man).toBeVisible();
-    // BB-391 — `exact`: câu mô tả ("…in từ 20–30 tấm ảnh của bé…") cũng chứa cụm này → chế độ
-    // nghiêm của Playwright báo 2 phần tử. Canh đúng ô đặc điểm "20–30 tấm ảnh".
-    await expect(man.getByText("20–30 tấm ảnh", { exact: true })).toBeVisible();
+    // BB-398 — số ảnh THEO KHỔ (anh 08/10): ô đặc điểm là "25–30 ảnh" (20×20)… hoặc nói chung
+    // "20–40 ảnh tuỳ khổ"; không còn "20–30 tấm ảnh" chung cho mọi khổ.
+    await expect(man.getByTestId("ban-album-so-anh")).toHaveText(/^\d+–\d+ ảnh( tuỳ khổ)?$/);
+    await expect(man.getByText("20–30 tấm ảnh", { exact: true })).toHaveCount(0);
     // Không lưới ảnh của bé, không bước "Chọn ảnh".
     await expect(man.locator('img[src^="/api/img/"]')).toHaveCount(0);
     await expect(hop.getByRole("button", { name: "Chọn ảnh", exact: true })).toHaveCount(0);

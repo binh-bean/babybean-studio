@@ -16,6 +16,13 @@
  */
 import { z } from "zod";
 import { KHOA_SO_NGAY_SUA, SO_NGAY_SUA_TOI_DA } from "@/lib/anh-chinh-sua/han-sua";
+import {
+  KHOA_BAT_LAM_NHANH,
+  KHOA_SAN_PHAM_LAM_NHANH,
+  KHOA_SO_NGAY_LAM_NHANH,
+  KHOA_SO_NGAY_TRA_TIEU_CHUAN,
+  SO_NGAY_TRA_TOI_DA,
+} from "@/lib/dich-vu/lam-anh-nhanh";
 
 /** Nhóm để màn hình xếp ô, không ảnh hưởng gì tới dữ liệu. */
 export type NhomCaiDat = "album" | "anh" | "quang-cao" | "lien-lac" | "thanh-toan";
@@ -70,6 +77,18 @@ export const CAI_DAT_SUA_DUOC: DinhNghiaCaiDat[] = [
   { key: "gallery.invite_default", nhom: "album", schema: z.boolean() },
   // BB-387 — "Bean sẽ gửi lại ảnh đã sửa trong khoảng {n} ngày": ước tính, không hứa cứng.
   { key: KHOA_SO_NGAY_SUA, nhom: "album", schema: soNgay(1, SO_NGAY_SUA_TOI_DA) },
+  // BB-399 — thời gian trả ảnh chỉnh (anh chốt 08/10: tiêu chuẩn 14, làm nhanh 5). "Khoảng", không hứa cứng.
+  { key: KHOA_SO_NGAY_TRA_TIEU_CHUAN, nhom: "album", schema: soNgay(1, SO_NGAY_TRA_TOI_DA) },
+  { key: KHOA_SO_NGAY_LAM_NHANH, nhom: "album", schema: soNgay(1, SO_NGAY_TRA_TOI_DA) },
+  // BB-399 vòng 3 — công tắc nhận làm nhanh (tắt khi hậu kỳ quá tải). Đứng NGAY trên ô record id
+  // (+ dòng "Đang dùng: …") để Admin thấy cả hai một chỗ. Công tắc nhanh: Việc cần xử lý › Ảnh chỉnh sửa.
+  { key: KHOA_BAT_LAM_NHANH, nhom: "album", schema: z.boolean() },
+  // BB-399 — record id Lark của sản phẩm "Làm ảnh nhanh" (ghim). Rỗng = tìm theo tên.
+  {
+    key: KHOA_SAN_PHAM_LAM_NHANH,
+    nhom: "album",
+    schema: z.string().trim().max(64).regex(/^[A-Za-z0-9_-]*$/, { message: "Record id Lark chỉ gồm chữ, số, _ và -" }),
+  },
 
   // --- Ảnh -----------------------------------------------------------------
   { key: "gallery.watermark_default", nhom: "anh", schema: z.boolean() },

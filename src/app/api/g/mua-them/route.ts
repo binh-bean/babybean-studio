@@ -62,7 +62,8 @@ import { GallerySessionError } from "@/lib/auth/gallery-session";
 import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CreateYeuCauMuaThemSchema } from "./schema";
-import { nhomSanPham, canGanAnh, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
+import { nhomSanPham, sanPhamBanChoKhach } from "@/lib/products/nhom-san-pham";
+import { batBuocChonAnh } from "@/lib/products/khung-gan-anh-in";
 import { enqueueLarkNotification, cheSoDienThoai } from "@/lib/lark/notify";
 import { dangMoChoKhachXem } from "@/lib/gallery/mo-cho-khach-xem";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -232,7 +233,9 @@ export async function POST(request: Request): Promise<Response> {
       const nhom = nhomSanPham(product.kind, product.material);
 
       const photoId = item.photoId ?? null;
-      if (canGanAnh(nhom) && !photoId) {
+      // BB-398 — cùng luật cửa hàng (`batBuocChonAnh`): chỉ ẢNH IN bắt buộc ảnh; khung không
+      // ảnh là KHUNG LẺ.
+      if (batBuocChonAnh(nhom) && !photoId) {
         return fail("INVALID_INPUT", vi.gallery.loiBean.chonAnhCanIn);
       }
 
