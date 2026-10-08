@@ -52,6 +52,7 @@ import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { luaChonMoLai, type DotTomTat } from "@/lib/gallery/dot-chon";
 import { cauBaoSauDoiHanMuc, tinhPhatSinhTheoHanMuc } from "@/lib/gallery/tien-phat-sinh";
 import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./form-thanh-toan";
+import { KhoiHoaDon } from "./khoi-hoa-don";
 import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { KhoiLinkBoAnhGiaDinh } from "./khoi-link-bo-anh-gia-dinh";
@@ -233,6 +234,8 @@ interface Detail {
   includedQuota: number | null;
   totalValue: number;
   selectedCount: number;
+  /** BB-395 vòng 3 — ảnh ĐỢT 1 (tính vượt hạn mức; ảnh đợt ≥ 2 tính tiền theo đợt). */
+  selectedCountDot1?: number;
   shareLink: {
     id: string;
     status: string;
@@ -466,7 +469,7 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
     cauBaoSauDoiHanMuc({
       hanMucTruoc,
       hanMucSau,
-      soAnhDaChon: detail.selectedCount,
+      soAnhDaChon: detail.selectedCountDot1 ?? detail.selectedCount,
       giaAnhVuot: detail.extraPhotoPrice,
       anhDaMuaThem,
       soTienLucChot: detail.snapshotAmount ?? 0,
@@ -1628,7 +1631,7 @@ function KhoiChinh({
               .filter((a) => a.kind === "edited_photo")
               .reduce((t, a) => t + a.quantity, 0);
             const moi = tinhPhatSinhTheoHanMuc({
-              soAnhDaChon: detail.selectedCount,
+              soAnhDaChon: detail.selectedCountDot1 ?? detail.selectedCount,
               hanMuc: detail.quotaKnown ? detail.includedQuota : null,
               giaAnhVuot: detail.extraPhotoPrice,
               anhDaMuaThem,
@@ -1654,18 +1657,27 @@ function KhoiChinh({
             );
           })()}
           <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-            Tiền thu ngoài app. Đây chỉ là chỗ đánh dấu đã thu. Ghi sai thì ghi thêm
-            một dòng trừ kèm lý do — dòng cũ không sửa được.
+            Tiền thu ngoài app. Xác nhận bằng mã hoá đơn bên Lark; ghi sai thì Admin/Quản lý ghi
+            thêm một dòng trừ kèm lý do — dòng cũ không sửa được.
           </p>
           {quyen.ghi ? (
-          <PaymentForm
-            disabled={busy}
-            conThieu={detail.amountToCollect}
-            chuaPhatSinh={detail.amountToCollect <= 0}
-            khoa={detail.khoaKhiThu}
-            sanPhamQuaLark={detail.sanPhamQuaLark ?? 0}
-            onSubmit={(a, m, n, pt, xn) => recordPayment(a, m, n, pt, xn)}
-          />
+            // BB-395: đường chính là mã hoá đơn; form nhập tay cũ chỉ còn trong mục dự phòng.
+            <KhoiHoaDon
+              galleryId={galleryId}
+              onDaDongBo={onDelivered}
+              nhapTay={
+                quyen.nhapTay ? (
+                  <PaymentForm
+                    disabled={busy}
+                    conThieu={detail.amountToCollect}
+                    chuaPhatSinh={detail.amountToCollect <= 0}
+                    khoa={detail.khoaKhiThu}
+                    sanPhamQuaLark={detail.sanPhamQuaLark ?? 0}
+                    onSubmit={(a, m, n, pt, xn) => recordPayment(a, m, n, pt, xn)}
+                  />
+                ) : null
+              }
+            />
           ) : (
             <p data-testid="thanh-toan-chi-xem" className="mt-2 text-xs text-[var(--bb-fg-muted)]">
               Vai của bạn chỉ xem — ghi thu do CSKH hoặc Admin.

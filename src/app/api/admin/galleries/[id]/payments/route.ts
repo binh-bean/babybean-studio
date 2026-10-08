@@ -67,6 +67,7 @@ import {
 } from "@/lib/gallery/xac-nhan-danh-sach";
 import { layMotDot } from "@/lib/gallery/dot-chon-server";
 import { phatSuKienBoAnh } from "@/lib/supabase/tuc-thi";
+import { coQuyenNhapTay } from "@/lib/hoa-don/xac-nhan-hoa-don-server";
 import { LOAI_TUC_THI } from "@/lib/utils/tuc-thi-su-kien";
 
 export const runtime = "nodejs";
@@ -132,7 +133,8 @@ export async function GET(
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
     requireBranch(staff, gallery.branch_id);
     const [tien, khoaKhiThu] = await Promise.all([soTienSauGhi(admin, galleryId), layKhoaKhiThu(admin, galleryId)]);
-    return ok({ ...tien, khoaKhiThu });
+    // BB-395: form nhập tay chỉ hiện cho người có quyền dự phòng.
+    return ok({ ...tien, khoaKhiThu, quyenNhapTay: coQuyenNhapTay(staff) });
   } catch (err) {
     if (err instanceof AuthError) return fail("FORBIDDEN", "Không có quyền xem thanh toán");
     return failUnexpected(err, requestId);
@@ -148,6 +150,11 @@ export async function POST(
   try {
     const staff = await requireStaff();
     requirePermission(staff, "galleries:write");
+    // BB-395 (anh chốt 08/10): nhập tiền tay chỉ còn là đường DỰ PHÒNG cho Admin/Quản lý
+    // (quyền `thanh_toan:nhap_tay`, migration 0102). Vai khác xác nhận bằng mã hoá đơn.
+    if (!coQuyenNhapTay(staff)) {
+      return fail("FORBIDDEN", "Xác nhận bằng mã hoá đơn. Nhập tiền tay chỉ dành cho Admin/Quản lý.");
+    }
 
     const { id: galleryId } = await context.params;
     if (!UUID_RE.test(galleryId)) return fail("INVALID_INPUT", "Mã bộ ảnh không hợp lệ");
@@ -200,6 +207,10 @@ export async function POST(
     // biết vì sao sổ bị trừ.
     if (amount < 0 && note.length === 0) {
       return fail("INVALID_INPUT", "Dòng trừ tiền phải ghi lý do");
+    }
+    // BB-395: nhập tay (không qua hoá đơn) luôn phải ghi lý do.
+    if (note.length === 0) {
+      return fail("INVALID_INPUT", "Nhập tiền tay phải ghi lý do (vì sao không xác nhận bằng mã hoá đơn)");
     }
     // Giảm giá cũng là một khoản làm giảm số phải thu — không lý do thì không ai biết vì sao.
     if (coGiamGia && note.length === 0) {

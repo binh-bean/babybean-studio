@@ -92,6 +92,8 @@ test("Bộ chỉ mua sản phẩm: dòng 'thu qua Lark' 40.000 ₫, Phải thu 0
 
   const khoi = page.getByTestId("khoi-thanh-toan-chi-tiet");
   await expect(khoi).toBeVisible({ timeout: 40_000 });
+  // BB-395: form nhập tay (chủ studio) nằm trong mục dự phòng của khối mã hoá đơn.
+  await khoi.getByTestId("nhap-tay-du-phong").locator("summary").click({ timeout: 20_000 });
   const dong = khoi.getByTestId("dong-san-pham-qua-lark");
   await expect(dong).toBeVisible({ timeout: 20_000 });
   await expect(dong).toHaveText(/^Sản phẩm mua thêm: 40\.000\s?₫ · thu qua Lark$/);

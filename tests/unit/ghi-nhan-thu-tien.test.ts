@@ -28,8 +28,15 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
   let shareLinkId: string;
 
   const params = () => ({ params: Promise.resolve({ id: galleryId }) });
+  // BB-395: nhập tay chỉ còn cho Admin/Quản lý và bắt ghi lý do — dòng THU mặc định một lý do
+  // thử (dòng trừ giữ nguyên để ca 4 vẫn kiểm "trừ mà không lý do → từ chối").
   const body = (v: unknown) =>
-    new Request("http://localhost", { method: "POST", body: JSON.stringify(v) });
+    new Request("http://localhost", {
+      method: "POST",
+      body: JSON.stringify(
+        v && typeof v === "object" && Number((v as { amount?: unknown }).amount) > 0 ? { note: "Fixture nhập tay", ...v } : v,
+      ),
+    });
 
   function asRole(role: string) {
     vi.spyOn(staffAuth, "requireStaff").mockResolvedValue({
@@ -90,7 +97,7 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
   });
 
   it("1. Thu đủ -> còn thiếu 0", async () => {
-    asRole("cs");
+    asRole("branch_manager");
     const res = await pay(body({ amount: 300000, method: "chuyen_khoan" }), params());
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -99,7 +106,7 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
   });
 
   it("2. Thu hai lần -> cộng dồn, còn thiếu giảm dần", async () => {
-    asRole("cs");
+    asRole("branch_manager");
     await pay(body({ amount: 100000, method: "tien_mat" }), params());
     const res = await pay(body({ amount: 150000, method: "chuyen_khoan" }), params());
     const json = await res.json();
@@ -108,7 +115,7 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
   });
 
   it("3. Ghi nhầm thì ghi dòng TRỪ, dòng cũ vẫn còn nguyên", async () => {
-    asRole("cs");
+    asRole("branch_manager");
     await pay(body({ amount: 300000, method: "tien_mat" }), params());
     await pay(
       body({ amount: -300000, method: "tien_mat", note: "Ghi nhầm bộ khác, đính chính" }),
@@ -126,7 +133,7 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
   });
 
   it("4. Dòng trừ mà không ghi lý do -> từ chối", async () => {
-    asRole("cs");
+    asRole("branch_manager");
     const res = await pay(body({ amount: -100000, method: "tien_mat" }), params());
     expect(res.status).toBe(400);
 
@@ -138,7 +145,7 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
   });
 
   it("5. Số tiền 0, số lẻ, hoặc hình thức lạ -> từ chối", async () => {
-    asRole("cs");
+    asRole("branch_manager");
     for (const b of [
       { amount: 0, method: "tien_mat" },
       { amount: 1000.5, method: "tien_mat" },
@@ -162,11 +169,17 @@ describe("BB-123: ghi nhận thu tiền phát sinh", () => {
     expect(res.status).toBe(403);
   });
 
+  it("6b. BB-395: CSKH (không có thanh_toan:nhap_tay) KHÔNG nhập tay được — chỉ đường mã hoá đơn", async () => {
+    asRole("cs");
+    const res = await pay(body({ amount: 100000, method: "tien_mat" }), params());
+    expect(res.status).toBe(403);
+  });
+
   it("7. Số PHẢI TRẢ lấy từ con số khách đã nhìn thấy lúc chốt", async () => {
     // CSKH đổi hạn mức sau đó thì phát sinh tính lại sẽ khác, nhưng khách đã
     // trả theo số cũ — biên nhận phải khớp cái khách nhìn thấy.
     await client.query("update galleries set included_quota = 16 where id = $1", [galleryId]);
-    asRole("cs");
+    asRole("branch_manager");
     const res = await pay(body({ amount: 50000, method: "tien_mat" }), params());
     const json = await res.json();
     expect(json.data.dueAmount).toBe(300000);

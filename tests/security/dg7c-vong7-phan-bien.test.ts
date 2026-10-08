@@ -334,7 +334,9 @@ describe("(f) thu tiền + khoá", () => {
       staffId: "00000000-0000-4000-8000-00000000dg7c".replace("dg7c", "0d70"),
       role: "cs",
       roleName: "cs",
-      permissions: ["galleries:write"],
+      // BB-395: ghi sổ tay cần thêm quyền dự phòng `thanh_toan:nhap_tay` — giữ để các ca dưới
+      // vẫn kiểm đúng luật 400/IDOR như cũ, không dừng ở cửa quyền.
+      permissions: ["galleries:write", "thanh_toan:nhap_tay"],
       branchIds,
     } as never);
 

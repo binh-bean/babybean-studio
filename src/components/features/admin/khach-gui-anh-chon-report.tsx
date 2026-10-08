@@ -26,6 +26,7 @@ import { SU_KIEN_VIEC_DOI } from "@/lib/utils/viec-can-xu-ly-tabs";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
 import { NutXuLyDot, dongTomTatDot } from "./dot-chon-admin";
 import { PaymentForm, cauSauKhiThu, ghiThanhToan, type TuyChonXacNhan } from "./form-thanh-toan";
+import { KhoiHoaDon } from "./khoi-hoa-don";
 import type { KhoaKhiThu } from "@/lib/gallery/khoa-khi-thu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { NutXuLyDatChinhSua } from "./tim-gia-dinh-admin";
@@ -471,13 +472,21 @@ function NganXuLy({
             )}
           </p>
           {canConfirm && (
-            <PaymentForm
-              disabled={busy}
-              conThieu={ct.amountToCollect}
-              chuaPhatSinh={ct.amountToCollect <= 0}
-              khoa={ct.khoaKhiThu}
-              sanPhamQuaLark={ct.sanPhamQuaLark ?? 0}
-              onSubmit={(a, m, n, pt, xn) => thanhToan(a, m, n, pt, xn)}
+            // BB-395: xác nhận bằng mã hoá đơn; form nhập tay chỉ hiện (trong mục dự phòng) khi
+            // máy chủ báo người xem có quyền `thanh_toan:nhap_tay`.
+            <KhoiHoaDon
+              galleryId={gid}
+              onDaDongBo={taiChiTiet}
+              nhapTay={
+                <PaymentForm
+                  disabled={busy}
+                  conThieu={ct.amountToCollect}
+                  chuaPhatSinh={ct.amountToCollect <= 0}
+                  khoa={ct.khoaKhiThu}
+                  sanPhamQuaLark={ct.sanPhamQuaLark ?? 0}
+                  onSubmit={(a, m, n, pt, xn) => thanhToan(a, m, n, pt, xn)}
+                />
+              }
             />
           )}
         </section>

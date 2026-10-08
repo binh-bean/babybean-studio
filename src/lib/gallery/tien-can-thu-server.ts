@@ -32,8 +32,10 @@ import {
   tienVuotHanMucConPhaiThu,
   tongPhaiThuCuaBo,
 } from "@/lib/gallery/tien-phat-sinh";
-import { laLoiChuaApMigration } from "@/lib/gallery/dot-chon-server";
+import { laLoiChuaApMigration, laLoiThieuBang, laLoiThieuCot } from "@/lib/gallery/dot-chon-server";
 import { layDongThanhToanTheoBo, tinhTienQuyDoi } from "@/lib/gallery/han-muc-thanh-toan";
+import { TIEN_TO_DONG_HOA_DON, tinhTienHoaDon, type DongHanMucHoaDon } from "@/lib/hoa-don/han-muc-hoa-don";
+import { dotTinhVaoPhaiThu } from "@/lib/hoa-don/doi-chieu-hoa-don";
 
 export interface TienCanThuBo {
   /** Số còn phải thu — 0 nghĩa là chưa phát sinh (hoặc đã thu đủ): khối thanh toán không bấm được. */
@@ -87,17 +89,18 @@ export async function layTienCanThuNhieuBo(
   const ids = [...new Set(galleryIds)];
   const ketQua = new Map<string, TienCanThuBo>();
   if (ids.length === 0) return ketQua;
-  const [sel, pay, theoAnh, dot, bo, dongTT, caiDat] = await Promise.all([
+  const [sel, pay, theoAnh, dotMoi, bo, dongTT, caiDat, dongHD] = await Promise.all([
     admin
       .from("selections")
       .select("id, gallery_id, snapshot_extra_amount, snapshot_extra_count, submitted_at")
       .in("gallery_id", ids)
       .eq("is_primary", true),
-    admin.from("gallery_payments").select("gallery_id, amount").in("gallery_id", ids),
+    admin.from("gallery_payments").select("gallery_id, amount, ma_hoa_don").in("gallery_id", ids),
     admin.from("v_over_quota_unbilled").select("gallery_id, unbilled_amount, unbilled_count").in("gallery_id", ids),
     admin
       .from("selection_rounds")
-      .select("gallery_id, tien_anh, tien_san_pham, san_pham, submitted_at")
+      // BB-395 vòng 2: `ma_hoa_don` (0080) — đợt đã trả bằng hoá đơn KHÔNG tính lại (dotTinhVaoPhaiThu).
+      .select("gallery_id, tien_anh, tien_san_pham, san_pham, submitted_at, trang_thai, ma_hoa_don")
       .in("gallery_id", ids)
       .eq("trang_thai", "da_xac_nhan")
       .gte("so_dot", 2),
@@ -108,7 +111,43 @@ export async function layTienCanThuNhieuBo(
       .select("key, value")
       .in("key", [KHOA_THU_SAN_PHAM_QUA_APP, KHOA_THU_SAN_PHAM_QUA_APP_TU])
       .is("branch_id", null),
+    // BB-395 — dòng hạn mức do hoá đơn (xem `TienHanMucHoaDon`).
+    admin
+      .from("gallery_items")
+      .select("gallery_id, quantity, line_total, created_at, products(kind)")
+      .in("gallery_id", ids)
+      .like("lark_record_id", `${TIEN_TO_DONG_HOA_DON}%`),
   ]);
+  if (dongHD.error) throw dongHD.error;
+  // Có bảng đợt mà thiếu cột `ma_hoa_don` (0080 chưa áp) → đọc lại như cũ, KHÔNG bỏ tiền các đợt.
+  const dot =
+    dotMoi.error && laLoiThieuCot(dotMoi.error) && !laLoiThieuBang(dotMoi.error)
+      ? await admin
+          .from("selection_rounds")
+          .select("gallery_id, tien_anh, tien_san_pham, san_pham, submitted_at, trang_thai")
+          .in("gallery_id", ids)
+          .eq("trang_thai", "da_xac_nhan")
+          .gte("so_dot", 2)
+      : dotMoi;
+  type DongHDRow = {
+    gallery_id: string;
+    quantity: number | string;
+    line_total: number | string | null;
+    created_at: string;
+    products?: { kind: string | null } | null;
+  };
+  const dongHDTheoBo = new Map<string, DongHanMucHoaDon[]>();
+  for (const r of (dongHD.data ?? []) as unknown as DongHDRow[]) {
+    const g = String(r.gallery_id);
+    const ds = dongHDTheoBo.get(g) ?? [];
+    ds.push({
+      quantity: Number(r.quantity),
+      lineTotal: r.line_total == null ? null : Number(r.line_total),
+      createdAt: String(r.created_at),
+      laAnhChinh: r.products?.kind === "edited_photo",
+    });
+    dongHDTheoBo.set(g, ds);
+  }
   // Đọc hụt cài đặt = tắt (mặc định): không chặn màn tiền vì một dòng cài đặt.
   const caiDatTheoKhoa = new Map(
     (caiDat.error ? [] : ((caiDat.data ?? []) as { key: string; value: unknown }[])).map((r) => [r.key, r.value]),
@@ -130,8 +169,13 @@ export async function layTienCanThuNhieuBo(
   };
   const luotTheoBo = new Map(((sel.data ?? []) as Luot[]).map((r) => [String(r.gallery_id), r]));
   const ghiCoTheoBo = new Map<string, number>();
-  for (const r of (pay.data ?? []) as { gallery_id: string; amount: number | string }[]) {
+  /** BB-395 — phần ghi có đến từ hoá đơn (dòng sổ có `ma_hoa_don`). */
+  const ghiCoHoaDonTheoBo = new Map<string, number>();
+  for (const r of (pay.data ?? []) as { gallery_id: string; amount: number | string; ma_hoa_don?: string | null }[]) {
     ghiCoTheoBo.set(String(r.gallery_id), (ghiCoTheoBo.get(String(r.gallery_id)) ?? 0) + Number(r.amount));
+    if (r.ma_hoa_don) {
+      ghiCoHoaDonTheoBo.set(String(r.gallery_id), (ghiCoHoaDonTheoBo.get(String(r.gallery_id)) ?? 0) + Number(r.amount));
+    }
   }
   type VRow = { gallery_id: string; unbilled_amount: number | string | null; unbilled_count: number | null };
   const vTheoBo = new Map(((theoAnh.data ?? []) as VRow[]).map((r) => [String(r.gallery_id), r]));
@@ -151,8 +195,13 @@ export async function layTienCanThuNhieuBo(
       tien_san_pham: number | string | null;
       san_pham: unknown;
       submitted_at?: string | null;
+      trang_thai: string;
+      ma_hoa_don?: string | null;
     };
-    const dotRows = (dot.data ?? []) as DotRow[];
+    // BB-395 vòng 2: đợt đã trả bằng hoá đơn không vào "Phải thu" lần nữa (xem `dotTinhVaoPhaiThu`).
+    const dotRows = dotTinhVaoPhaiThu(
+      ((dot.data ?? []) as DotRow[]).map((r) => ({ ...r, trangThai: r.trang_thai, maHoaDon: r.ma_hoa_don ?? null })),
+    );
     const dongSp = (r: DotRow) => (Array.isArray(r.san_pham) ? r.san_pham : []) as DongSp[];
     // "Edit file" trong giỏ đợt ≥ 2 là tiền ẢNH: cần loại sản phẩm của từng dòng.
     const spIds = new Set<string>();
@@ -194,12 +243,21 @@ export async function layTienCanThuNhieuBo(
       quantity: number | string;
       unit_price: number | string | null;
       dot?: number | null;
+      ma_hoa_don?: string | null;
       products?: { kind: string | null } | null;
     };
+    // BB-395 vòng 2: `selection_addons.ma_hoa_don` (0102) — dòng giỏ đợt 1 đã trả bằng hoá đơn.
     let addon: { data: unknown[] | null; error: { message: string; code?: string } | null } = await admin
       .from("selection_addons")
-      .select("selection_id, quantity, unit_price, dot, products(kind)")
+      .select("selection_id, quantity, unit_price, dot, ma_hoa_don, products(kind)")
       .in("selection_id", [...boTheoLuot.keys()]);
+    if (addon.error && laLoiChuaApMigration(addon.error)) {
+      // Chưa áp 0102 (chưa có cột `ma_hoa_don`).
+      addon = await admin
+        .from("selection_addons")
+        .select("selection_id, quantity, unit_price, dot, products(kind)")
+        .in("selection_id", [...boTheoLuot.keys()]);
+    }
     if (addon.error && laLoiChuaApMigration(addon.error)) {
       // Chưa áp 0077 (chưa có cột `dot`): mọi dòng là đợt 1.
       addon = await admin
@@ -210,6 +268,8 @@ export async function layTienCanThuNhieuBo(
     if (addon.error) throw addon.error;
     for (const r of (addon.data ?? []) as AddonRow[]) {
       if (r.dot != null && Number(r.dot) !== 1) continue;
+      // Đã trả bằng hoá đơn: tiền nằm trong sổ theo giá hoá đơn (ghiCoNgoaiVuot) — không tính lại.
+      if (r.ma_hoa_don) continue;
       const g = boTheoLuot.get(String(r.selection_id));
       if (!g) continue;
       const tien = Number(r.unit_price ?? 0) * Number(r.quantity ?? 0);
@@ -242,8 +302,15 @@ export async function layTienCanThuNhieuBo(
     // BB-363: chỉ phần chốt từ mốc hiệu lực đi vào công thức; phần trước mốc vẫn "thu qua Lark".
     const tienSanPhamTrongApp = Math.min(tienSanPham, sanPhamTrongAppTheoBo.get(galleryId) ?? 0);
     const giaAnhHienTai = giaTheoBo.get(galleryId) ?? 0;
-    const quyDoi = tinhTienQuyDoi(dongTT.get(galleryId) ?? [], giaAnhHienTai, luot?.submitted_at);
     const soAnhLucChot = Number(luot?.snapshot_extra_count ?? 0);
+    const quyDoiTT = tinhTienQuyDoi(dongTT.get(galleryId) ?? [], giaAnhHienTai, luot?.submitted_at);
+    // BB-395 — dòng hạn mức do hoá đơn: cộng tiền hoá đơn, trừ phần số lúc chốt đã tính trùng.
+    const hd = tinhTienHoaDon(
+      dongHDTheoBo.get(galleryId) ?? [],
+      { chotLuc: luot?.submitted_at, soAnhLucChot, tienLucChot },
+      ghiCoHoaDonTheoBo.get(galleryId) ?? 0,
+    );
+    const quyDoi = { ...quyDoiTT, hoaDon: hd };
     const giaMotAnh = tienLucChot > 0 && soAnhLucChot > 0 ? tienLucChot / soAnhLucChot : giaAnhHienTai;
     const congThuc = { tienTheoAnh, tienLucChot, tienDotMuaThem, tienSanPham: tienSanPhamTrongApp, thuSanPhamQuaApp, quyDoi };
     const tongPhaiThu = tongPhaiThuCuaBo(congThuc);

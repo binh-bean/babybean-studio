@@ -35,7 +35,8 @@ describe("BB-320: sửa dòng hàng khi đã chốt + giảm giá %", () => {
       staffId,
       role: "cs",
       branchIds: [branchId],
-      permissions: quyenCuaVai("cs"),
+      // BB-395: nhập tay (kèm giảm giá) cần quyền dự phòng `thanh_toan:nhap_tay`.
+      permissions: [...quyenCuaVai("cs"), "thanh_toan:nhap_tay"],
     } as unknown as Awaited<ReturnType<typeof staffAuth.requireStaff>>);
   }
 

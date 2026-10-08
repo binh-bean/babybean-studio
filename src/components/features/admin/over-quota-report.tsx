@@ -50,7 +50,10 @@ interface ThongTinThu {
   /** BB-360 — sản phẩm mua thêm thu qua Lark (không nằm trong `amountToCollect`). */
   sanPhamQuaLark?: number;
   khoaKhiThu: KhoaKhiThu;
+  /** BB-395 — người xem có quyền nhập tay (dự phòng) không. */
+  quyenNhapTay?: boolean;
 }
+import { GanHoaDonTheoKhach, KhoiHoaDon } from "./khoi-hoa-don";
 import { NutNhacKhach } from "./nut-nhac-khach";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { NhanNhaBoAnh } from "./nhan-nha-bo-anh";
@@ -92,6 +95,9 @@ export function OverQuotaReport() {
   const [summary, setSummary] = React.useState<ReportSummary | null>(null);
   const [items, setItems] = React.useState<ReportItem[]>([]);
   const [nha, setNha] = React.useState<Record<string, NhaCuaBo>>({});
+  const [hoaDonCanXuLy, setHoaDonCanXuLy] = React.useState<
+    { galleryId: string; galleryTitle: string; maHoaDon: string; trangThai: string }[]
+  >([]);
   // BB-331: dòng đang mở form "Xác nhận thanh toán" + câu báo sau khi ghi.
   const [moThanhToan, setMoThanhToan] = React.useState<string | null>(null);
   const [dangGhi, setDangGhi] = React.useState(false);
@@ -127,6 +133,7 @@ export function OverQuotaReport() {
       setSummary(json.data.summary);
       setItems(json.data.items);
       setNha(json.data.nha ?? {});
+      setHoaDonCanXuLy(json.data.hoaDonCanXuLy ?? []);
     } catch {
       if (alive.current) setError("Mất kết nối, thử lại giúp.");
     } finally {
@@ -215,14 +222,25 @@ export function OverQuotaReport() {
                 return <p className="mt-2 text-sm text-[var(--bb-danger)]">Không tải được trạng thái thanh toán, đóng rồi mở lại giúp.</p>;
               }
               if (!tt) return <p className="mt-2 text-sm text-[var(--bb-fg-muted)]">Đang tải…</p>;
+              // BB-395: đường chính là mã hoá đơn; nhập tay chỉ cho Admin/Quản lý (dự phòng).
               return (
-                <PaymentForm
-                  disabled={dangGhi}
-                  conThieu={tt.amountToCollect}
-                  chuaPhatSinh={tt.amountToCollect <= 0}
-                  khoa={tt.khoaKhiThu}
-                  sanPhamQuaLark={tt.sanPhamQuaLark ?? 0}
-                  onSubmit={(a, m, n, pt, xn) => xacNhanThanhToan(it, a, m, n, pt, xn)}
+                <KhoiHoaDon
+                  galleryId={it.galleryId}
+                  onDaDongBo={async () => {
+                    await Promise.all([tai(), taiThongTinThu(it.galleryId)]);
+                  }}
+                  nhapTay={
+                    tt.quyenNhapTay ? (
+                      <PaymentForm
+                        disabled={dangGhi}
+                        conThieu={tt.amountToCollect}
+                        chuaPhatSinh={tt.amountToCollect <= 0}
+                        khoa={tt.khoaKhiThu}
+                        sanPhamQuaLark={tt.sanPhamQuaLark ?? 0}
+                        onSubmit={(a, m, n, pt, xn) => xacNhanThanhToan(it, a, m, n, pt, xn)}
+                      />
+                    ) : null
+                  }
                 />
               );
             })()}
@@ -278,6 +296,33 @@ export function OverQuotaReport() {
           </>
         )}
       </p>
+
+      {/* BB-395 — gán hoá đơn từ cấp KHÁCH + các bộ có hoá đơn còn Thiếu / Thừa / chưa đủ. */}
+      <GanHoaDonTheoKhach onDaGan={tai} />
+      {hoaDonCanXuLy.length > 0 && (
+        <section data-testid="hoa-don-can-xu-ly" className="rounded-md border border-[var(--bb-border)] p-3">
+          <h3 className="text-sm font-medium">Hoá đơn cần xử lý</h3>
+          <ul className="mt-2 flex flex-col gap-1 text-sm">
+            {hoaDonCanXuLy.map((h) => (
+              <li key={h.maHoaDon} className="flex flex-wrap items-center gap-2">
+                <Link href={`/admin/galleries/${encodeURIComponent(h.galleryId)}#thanh-toan`} className="underline">
+                  {h.galleryTitle || "Bộ ảnh"}
+                </Link>
+                <span className="text-[var(--bb-fg-muted)]">{h.maHoaDon}</span>
+                <span className={h.trangThai === "thua" ? "text-[var(--bb-warning,#8a5a00)]" : "text-[var(--bb-danger)]"}>
+                  {h.trangThai === "thua"
+                    ? "Thừa — chờ khách chọn tiếp"
+                    : h.trangThai === "chua_du_dieu_kien"
+                      ? "Chưa đủ điều kiện"
+                      : h.trangThai === "hon_hop"
+                        ? "Thừa + thiếu"
+                        : "Thiếu — liên hệ khách"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {thongBao && !items.some((it) => it.galleryId === thongBao.id) && (
         <p role="status" data-testid="thong-bao-da-xu-ly" className="text-sm text-[var(--bb-fg-muted)]">

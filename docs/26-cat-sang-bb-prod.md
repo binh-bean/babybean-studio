@@ -42,7 +42,7 @@ Ngày cắt, theo đúng thứ tự:
 
 ☐ 1. Sao lưu bb-prod (mục 1).
 ☐ 2. So khoảng lệch migration — chỉ đọc (mục 2).
-☐ 3. Áp migration, gồm cả 0086–0101 (mục 3, 3a; không có 0097). `verify:db` ra đủ N/N.
+☐ 3. Áp migration, gồm cả 0086–0103 (mục 3, 3a; không có 0097). `verify:db` ra đủ N/N.
 ☐ 4. Storage (mục 4) · Auth (mục 5) · webhook Lark thật (mục 5a) · tài khoản quản
    trị đầu tiên (mục 5b) · Realtime (mục 5c).
 ☐ 5. Chép cấu hình (mục 6), rồi kiểm cờ thu sản phẩm đang TẮT (mục 6a).
@@ -210,6 +210,8 @@ Bản cũ của runbook chỉ nhắc 0067–0075. Dãy đầy đủ từ lúc b�
 | 0099 | Quyền theo vai: CTV `selections:read` (chỉ bộ được giao, luật RLS `selections_select`), thợ chỉnh `anh_chinh:gui_khach`, thợ chụp `galleries:edit_info` (BB-383/383b). Đã áp bb-dev 07/10 |
 | 0100 | Bảng `goi_chup_gia_anh_them` (giá ảnh chọn thêm theo gói, BB-385). Đã áp bb-dev 07/10 |
 | 0101 | Dòng settings `gallery.revision_days_estimate` = 3 (BB-387). Không bắt buộc — mã tự dùng 3 khi thiếu. CHƯA áp bb-dev |
+| 0102 | Bảng `hoa_don_bo_anh` (mã hoá đơn gán cho bộ ảnh, `ma_hoa_don` unique — một mã một bộ; RLS bật, chỉ service_role) + cột `selection_addons.ma_hoa_don` (giỏ đợt 1 đã trả bằng hoá đơn) + quyền mới `thanh_toan:nhap_tay` cho owner/admin/branch_manager (BB-395, docs/27). BẮT BUỘC trước khi mở màn xác nhận bằng hoá đơn; thiếu thì route báo "chờ áp 0102". CHƯA áp bb-dev |
+| 0103 | Sửa lỗi tính tiền trùng: `v_over_quota_unbilled` + `v_over_quota_summary` chỉ đếm ảnh/“Edit file” ĐỢT 1 (`selection_items.dot = 1`, `selection_addons.dot = 1`); ảnh đợt ≥ 2 tính tiền theo đợt. `create or replace view`, cột + quyền giữ nguyên (BB-395 vòng 3). CHƯA áp bb-dev |
 
 (Đầu tệp 0083 vẫn ghi "viết nhưng chưa áp" — câu đó đã cũ, bb-dev áp từ 01/10.
 Đầu tệp 0086/0087 cũng ghi "chưa áp" — đã cũ, bb-dev áp từ 02/10.)

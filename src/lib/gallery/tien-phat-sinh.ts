@@ -135,7 +135,10 @@ export function tienVuotHanMucConPhaiThu(p: {
   /** BB-348 — xem `TienHanMucDaQuyDoi`. Bỏ trống = bộ chưa có dòng hạn mức nào do thanh toán. */
   quyDoi?: TienHanMucDaQuyDoi;
 }): number {
-  return tienConPhaiThuSauGhiCo(tienVuotHanMucPhaiThu(p), p.daGhiCo);
+  // BB-395: tiền hoá đơn ghi cho phần KHÔNG thuộc vượt hạn mức ("Edit file" mua thêm, sản phẩm)
+  // không được trừ vào phần vượt — trừ vào đó là đẩy hạn mức lên cho ảnh khách chưa trả.
+  const ngoaiVuot = Math.max(0, p.quyDoi?.hoaDon?.ghiCoNgoaiVuot ?? 0);
+  return tienConPhaiThuSauGhiCo(tienVuotHanMucPhaiThu(p), p.daGhiCo - ngoaiVuot);
 }
 
 /**
@@ -155,6 +158,26 @@ export function tienVuotHanMucConPhaiThu(p: {
 export interface TienHanMucDaQuyDoi {
   tatCa: number;
   truocChot: number;
+  /** BB-395 — dòng hạn mức do HOÁ ĐƠN (`gallery_items.lark_record_id = 'hoa_don:…'`). */
+  hoaDon?: TienHanMucHoaDon;
+}
+
+/**
+ * BB-395 — xác nhận bằng hoá đơn thêm dòng "Edit file × N" (N = file hoá đơn nâng hạn mức)
+ * vào bộ ảnh, và ghi tiền các phiếu thu vào sổ. KHÔNG chạy `dongBoHanMucTheoThanhToan` cho
+ * phần đó (một cơ chế, không hai). Để số tiền không lệch:
+ *   · `tien`  — tiền hoá đơn của các dòng đó (giá trên HOÁ ĐƠN, không phải giá ảnh hiện tại):
+ *     cộng vào phần vượt phải thu, đúng bằng phần tiền hoá đơn ghi có cho nó → tự triệt tiêu.
+ *   · `truLucChot` — số lúc chốt (`snapshot_extra_amount`) đã tính những ảnh mà dòng hoá đơn
+ *     TẠO SAU lúc chốt nay phủ: min(số ảnh của dòng sau chốt, số ảnh lúc chốt) × giá lúc chốt.
+ *     Trừ ra để ảnh đó không bị đòi hai lần (một lần trong số lúc chốt, một lần qua `tien`).
+ *   · `ghiCoNgoaiVuot` — tiền hoá đơn ghi sổ cho phần KHÔNG phải vượt hạn mức ("Edit file" mua
+ *     thêm trên app, sản phẩm khi cờ bật): không trừ vào phần vượt.
+ */
+export interface TienHanMucHoaDon {
+  tien: number;
+  truLucChot: number;
+  ghiCoNgoaiVuot: number;
 }
 
 /** Phần vượt hạn mức phải thu, CHƯA trừ khoản ghi có (số lúc chốt khi có, không thì số theo ảnh). */
@@ -164,9 +187,11 @@ export function tienVuotHanMucPhaiThu(p: {
   quyDoi?: TienHanMucDaQuyDoi;
 }): number {
   const lucChot = Number(p.tienLucChot ?? 0);
+  const hd = p.quyDoi?.hoaDon;
+  const tienHoaDon = Math.max(0, hd?.tien ?? 0);
   return Number.isFinite(lucChot) && lucChot > 0
-    ? lucChot + Math.max(0, p.quyDoi?.truocChot ?? 0)
-    : p.tienTheoAnh + Math.max(0, p.quyDoi?.tatCa ?? 0);
+    ? Math.max(0, lucChot - Math.max(0, hd?.truLucChot ?? 0)) + Math.max(0, p.quyDoi?.truocChot ?? 0) + tienHoaDon
+    : p.tienTheoAnh + Math.max(0, p.quyDoi?.tatCa ?? 0) + tienHoaDon;
 }
 
 /**
@@ -243,7 +268,11 @@ export function tongPhaiThuCuaBo(p: {
 }): number {
   const vuot = tienVuotHanMucPhaiThu({ tienTheoAnh: p.tienTheoAnh, tienLucChot: p.tienLucChot, quyDoi: p.quyDoi });
   const dot = Number.isFinite(p.tienDotMuaThem) ? Math.max(0, p.tienDotMuaThem) : 0;
-  return vuot + dot + tienSanPhamTinhVaoPhaiThu(p.tienSanPham ?? 0, p.thuSanPhamQuaApp === true);
+  // BB-395 vòng 2: tiền hoá đơn ghi sổ cho phần KHÔNG phải vượt hạn mức đợt 1 (đợt ≥ 2, "Edit
+  // file"/sản phẩm mua thêm — các mục đó đã được BỎ khỏi `tienDotMuaThem`/`tienSanPham` khi hoá
+  // đơn phủ đủ) cũng là "Phải thu": đúng bằng phần sổ ghi có cho nó → tự triệt tiêu theo giá HOÁ ĐƠN.
+  const hoaDonNgoaiVuot = Math.max(0, p.quyDoi?.hoaDon?.ghiCoNgoaiVuot ?? 0);
+  return vuot + dot + hoaDonNgoaiVuot + tienSanPhamTinhVaoPhaiThu(p.tienSanPham ?? 0, p.thuSanPhamQuaApp === true);
 }
 
 /**

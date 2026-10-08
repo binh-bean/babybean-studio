@@ -163,6 +163,8 @@ test.describe("BB-320: sửa hạn mức bộ đã chốt + giảm giá %", () =
     await dangNhapNhanVien(page, email, password);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`/admin/galleries/${boChot}`);
+    // BB-395: form nhập tay (chủ studio) nằm trong mục dự phòng của khối mã hoá đơn.
+    await page.getByTestId("nhap-tay-du-phong").locator("summary").click({ timeout: 30_000 });
     const oGiam = page.getByLabel("Giảm giá %");
     await expect(oGiam).toBeVisible({ timeout: 30_000 });
 
@@ -177,6 +179,10 @@ test.describe("BB-320: sửa hạn mức bộ đã chốt + giảm giá %", () =
     const nutGhi = page.getByRole("button", { name: "Ghi giảm giá và thu" });
     await expect(nutGhi).toBeDisabled();
     await page.locator('input[name="note"]').fill("Khách quen");
+    // Lỗi thời từ BB-349 (không do BB-395): bộ `submitted` → ô "Đồng thời xác nhận danh sách và khoá"
+    // tick sẵn và nút chờ tick "chắc chắn". Ca này thử phần GIẢM GIÁ nên bỏ tick khoá (cùng cách
+    // bb-344 ca 2) — luật khoá kèm thu đã có bb-349 canh.
+    await page.locator('input[name="khoaBoAnh"]').uncheck();
     await expect(nutGhi).toBeEnabled();
     await nutGhi.click();
 

@@ -153,7 +153,8 @@ describe.skipIf(!coDb)("BB-363 tiền trên bb-dev", () => {
   }
 
   const thu = async (galleryId: string, v: Record<string, unknown>) => {
-    const res = await ghiThu(new Request("http://localhost", { method: "POST", body: JSON.stringify(v) }), {
+    // BB-395: nhập tay bắt ghi lý do — mặc định một lý do thử nếu ca không tự ghi.
+    const res = await ghiThu(new Request("http://localhost", { method: "POST", body: JSON.stringify({ note: "Fixture nhập tay", ...v }) }), {
       params: Promise.resolve({ id: galleryId }),
     });
     return { status: res.status, json: await res.json() };

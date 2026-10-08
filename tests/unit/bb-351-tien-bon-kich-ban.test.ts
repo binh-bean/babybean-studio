@@ -169,7 +169,7 @@ describe("BB-351: một công thức tiền — 4 kịch bản, mọi nơi cùng
   it("4. thu đủ phần vượt qua route → hạn mức quy đổi (+2), phải thu vẫn 100.000, còn 0 — phản hồi POST cùng số", async () => {
     const { id } = await taoBo("quy doi", 7, 2);
     const res = await ghiThu(
-      new Request("http://localhost", { method: "POST", body: JSON.stringify({ amount: 2 * GIA, method: "chuyen_khoan" }) }),
+      new Request("http://localhost", { method: "POST", body: JSON.stringify({ amount: 2 * GIA, method: "chuyen_khoan", note: "Fixture nhập tay" }) }),
       ctx(id),
     );
     const j = await res.json();
@@ -190,7 +190,7 @@ describe("BB-351: một công thức tiền — 4 kịch bản, mọi nơi cùng
     const ma = `fixture-bb351-${RUN}-ma`;
     const goi = () =>
       ghiThu(
-        new Request("http://localhost", { method: "POST", body: JSON.stringify({ amount: GIA, method: "tien_mat", requestId: ma }) }),
+        new Request("http://localhost", { method: "POST", body: JSON.stringify({ amount: GIA, method: "tien_mat", requestId: ma, note: "Fixture nhập tay" }) }),
         ctx(id),
       ).then((r) => r.json());
     const r1 = await goi();
@@ -205,7 +205,7 @@ describe("BB-351: một công thức tiền — 4 kịch bản, mọi nơi cùng
   it("B#12: dòng hạn mức tự tạo khi thu tiền không sửa/xoá tay được (400), GET đánh dấu tuThanhToan", async () => {
     const { id } = await taoBo("khoa dong", 7, 2);
     const r = await ghiThu(
-      new Request("http://localhost", { method: "POST", body: JSON.stringify({ amount: 2 * GIA, method: "chuyen_khoan" }) }),
+      new Request("http://localhost", { method: "POST", body: JSON.stringify({ amount: 2 * GIA, method: "chuyen_khoan", note: "Fixture nhập tay" }) }),
       ctx(id),
     );
     expect(r.status).toBe(200);

@@ -122,6 +122,10 @@ test("Ảnh vượt hạn mức: mỗi dòng có Xác nhận thanh toán / Mở 
     await thaoTac.getByTestId("nut-xac-nhan-thanh-toan").click();
     const form = hangThaoTac.getByTestId("form-thanh-toan-vuot-han-muc");
     await expect(form).toBeVisible();
+    // BB-395: đường chính là mã hoá đơn; nhập tay (chủ studio có quyền) nằm trong mục dự phòng, bắt lý do.
+    await expect(form.getByTestId("khoi-hoa-don")).toBeVisible({ timeout: 20_000 });
+    await form.getByTestId("nhap-tay-du-phong").locator("summary").click();
+    await form.locator('input[name="note"]').fill("Fixture BB-331 nhập tay");
     // Đúng form BB-320: có ô Giảm giá %, số tiền điền sẵn bằng số còn phải thu.
     await expect(form.locator('input[name="giamGiaPhanTram"]')).toBeVisible();
     const soTien = Number(await form.locator('input[name="amount"]').inputValue());
@@ -170,7 +174,11 @@ test("Cài đặt: bày đủ kích thước đang bán, kể cả kích thướ
     await expect(khoi.locator('[data-trang-thai="khach_thay"]').first()).toBeVisible();
     // Anh chốt 30/09: có giá là khách thấy, không còn ngưỡng số lần bán.
     expect(await khoi.locator('[data-trang-thai="thieu_mau_gia"]').count()).toBe(0);
-    await expect(khoi).not.toContainText(/canvas|cavas/i);
+    // Lỗi thời (không do BB-395): bảng giá anh gửi 01/10 CÓ bán "Kim Tuyến" — danh mục Lark đặt tên
+    // chất liệu là "Cavas/Kim tuyến" (bb-dev 08/10: 30×45 … 80×120). Vẫn cấm canvas THUẦN (không
+    // kèm Kim tuyến), và bắt buộc nhóm Kim tuyến phải hiện (27/09 từng bị ẩn nhầm vì chữ "canvas").
+    await expect(khoi).not.toContainText(/(canvas|cavas)(?!\s*\/\s*kim\s*tuy)/i);
+    await expect(khoi).toContainText(/kim tuyến/i);
     if (CHUP) await khoi.screenshot({ path: path.join(CHUP, "kich-thuoc.png") });
   } finally {
     await ctx.close();

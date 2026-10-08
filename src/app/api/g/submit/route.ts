@@ -180,7 +180,10 @@ export async function POST(request: Request): Promise<Response> {
       .from("selection_items")
       .select("*", { count: "exact", head: true })
       .eq("selection_id", session.selectionId)
-      .eq("mark", "selected");
+      .eq("mark", "selected")
+      // BB-395 vòng 3: số lúc chốt ĐỢT 1 chỉ đếm ảnh đợt 1 — ảnh đợt ≥ 2 (còn nằm trong lượt chọn
+      // khi đợt 1 được mở lại) đã tính tiền theo đợt; đếm vào đây là đòi hai lần (0103 sửa view).
+      .eq("dot", 1);
 
     if (countError) {
       throw countError;

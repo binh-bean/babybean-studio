@@ -141,6 +141,28 @@ const TU_DIEN: Record<string, { nhom: NhomHoatDong; cau: HamDich }> = {
         : `Nhân viên ghi nhận thu ${formatVND(amount)}`;
     },
   },
+  // BB-395 — xác nhận phát sinh bằng mã hoá đơn (xac-nhan-hoa-don-server.ts).
+  "gallery.hoa_don_gan": {
+    nhom: "tien",
+    cau: (m) => `Gán hoá đơn ${chuoi(m, "maHoaDon") ?? ""}${m?.epGan ? " (ép gán)" : ""}`.trim(),
+  },
+  "gallery.hoa_don_dong_bo": {
+    nhom: "tien",
+    cau: (m) => {
+      const tt = chuoi(m, "trangThai");
+      const chu = tt === "khop" ? "khớp" : tt === "thua" ? "thừa" : tt === "thieu" ? "thiếu" : tt === "hon_hop" ? "thừa + thiếu" : (tt ?? "");
+      const ghi = so(m, "daGhiSo") ?? 0;
+      return `Đồng bộ hoá đơn: ${chu}${ghi > 0 ? `, ghi sổ ${formatVND(ghi)}` : ""}`;
+    },
+  },
+  "gallery.hoa_don_bo_muc": {
+    nhom: "tien",
+    cau: (m) => `Bỏ ${so(m, "soLuong") ?? 0} ${chuoi(m, "khoa") === "file" ? "ảnh chọn dư" : "sản phẩm dư"} theo hoá đơn`,
+  },
+  "gallery.hoa_don_go_gan": {
+    nhom: "tien",
+    cau: (m) => `Gỡ gán hoá đơn ${chuoi(m, "maHoaDon") ?? ""}`.trim(),
+  },
   // BB-348 — hạn mức tự đổi theo sổ thu (han-muc-thanh-toan.ts); âm = dòng đính chính.
   "gallery.quota_by_payment": {
     nhom: "tien",

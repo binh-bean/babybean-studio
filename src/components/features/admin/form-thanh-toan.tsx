@@ -175,7 +175,8 @@ export function PaymentForm({
   const coGiam = giamPt.trim() !== "" && phanTram !== 0;
   const giamOk = !coGiam || (phanTramHopLe && giam !== null && giam.soTienGiam > 0);
   const soTienOk = amountOk ? parsed > 0 || note.trim().length > 0 : coGiam && Number.isInteger(parsed);
-  const valid = giamOk && soTienOk && (!coGiam || note.trim().length > 0);
+  // BB-395: form này giờ là đường NHẬP TAY dự phòng — mọi dòng đều bắt ghi lý do (route cũng chặn).
+  const valid = giamOk && soTienOk && note.trim().length > 0;
 
   // BB-349 — xác nhận + khoá cùng lúc, và ô "chắc chắn" bắt buộc.
   const [khoaBoAnh, setKhoaBoAnh] = React.useState(true);
@@ -242,7 +243,7 @@ export function PaymentForm({
         </Select>
       </label>
       <label className="flex min-w-48 flex-1 flex-col gap-1 text-xs">
-        {coGiam ? "Lý do giảm giá" : "Ghi chú"}
+        {coGiam ? "Lý do giảm giá" : "Lý do nhập tay"}
         <Input
           type="text"
           name="note"
@@ -251,7 +252,11 @@ export function PaymentForm({
           disabled={disabled}
           onChange={(e) => setNote(e.target.value)}
           placeholder={
-            coGiam ? "Bắt buộc: lý do giảm giá" : parsed < 0 ? "Bắt buộc: lý do trừ tiền" : "Mã giao dịch, ghi chú…"
+            coGiam
+              ? "Bắt buộc: lý do giảm giá"
+              : parsed < 0
+                ? "Bắt buộc: lý do trừ tiền"
+                : "Bắt buộc: vì sao không xác nhận bằng mã hoá đơn"
           }
           className="h-9 min-h-0 px-2 py-2 text-sm"
         />

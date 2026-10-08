@@ -41,6 +41,7 @@ import { docNguoiChinhSua } from "@/lib/lark/nguoi-chinh-sua-lark";
 import { docDauThuGon } from "@/lib/van-hanh/don-rac";
 import { docAnhAlbumKhongChinhCuaBo } from "@/lib/gallery/anh-album-khong-chinh-server";
 import { laSanPhamAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh";
+import { demAnhDot1 } from "@/lib/gallery/dot-chon";
 
 export const runtime = "nodejs";
 
@@ -153,10 +154,13 @@ export async function GET(
     // sẽ đếm trùng tấm ảnh mà cả hai cùng chọn — đúng lỗi đã phải sửa ở 0022.
     const { data: selRows } = await admin
       .from("selection_items")
-      .select("photo_id")
+      .select("photo_id, dot")
       .eq("gallery_id", gallery.id)
       .eq("mark", "selected");
     const selectedCount = new Set((selRows ?? []).map((r) => r.photo_id)).size;
+    // BB-395 vòng 3: số ảnh ĐỢT 1 — dùng cho "Theo hạn mức hiện tại: vượt N ảnh" (ảnh đợt ≥ 2 tính
+    // tiền theo đợt, cùng luật view 0103).
+    const selectedCountDot1 = demAnhDot1((selRows ?? []) as { photo_id: string; dot?: number | null }[]);
 
     // Link chia sẻ chính của bộ ảnh.
     //
@@ -532,6 +536,7 @@ export async function GET(
       includedQuota: summary.includedQuota,
       totalValue: summary.totalValue,
       selectedCount,
+      selectedCountDot1,
       // BB-188: đủ trường để màn CSKH nói được link đang ở tình trạng nào và
       // còn bao lâu. Tuyệt đối KHÔNG trả `token_hash` — sau khi bỏ PIN, mã link
       // là thứ duy nhất che ảnh của một nhà. `token_prefix` (6 ký tự) chỉ để đối

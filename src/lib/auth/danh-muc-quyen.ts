@@ -87,6 +87,14 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
   { ma: "roles:manage", ten: "Quản lý vai trò và phân quyền", nhom: "Nhân sự" },
   { ma: "activity_logs:read", ten: "Xem nhật ký thao tác", nhom: "Nhân sự" },
 
+  // BB-395 (migration 0102) — route `[id]/payments` (nhập tiền tay, bắt ghi lý do) và ép gán
+  // hoá đơn / gỡ gán ở `[id]/hoa-don` đòi quyền này. Mặc định: owner, admin, branch_manager.
+  {
+    ma: "thanh_toan:nhap_tay",
+    ten: "Nhập tiền tay, ép gán / gỡ gán hoá đơn (dự phòng khi không xác nhận được bằng hoá đơn)",
+    nhom: "Báo cáo",
+    dangCoHieuLuc: true,
+  },
   { ma: "reports:operations", ten: "Xem báo cáo vận hành", nhom: "Báo cáo" },
   { ma: "reports:financial", ten: "Xem báo cáo doanh thu", nhom: "Báo cáo" },
 

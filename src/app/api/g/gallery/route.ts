@@ -20,6 +20,7 @@ import { layTrangThaiXinMoLai } from "@/lib/gallery/yeu-cau-mo-lai";
 import { layDuLieuChungBoAnh } from "@/lib/gallery/du-lieu-chung-bo-anh";
 import { laThuMucChinhSua } from "@/lib/anh-chinh-sua/nhan-dien";
 import { docTomTatAnhChinh } from "@/lib/anh-chinh-sua/du-lieu";
+import { TIEN_TO_DONG_HOA_DON } from "@/lib/hoa-don/han-muc-hoa-don";
 import { soSuatAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh";
 import { docAnhAlbumKhongChinh } from "@/lib/gallery/anh-album-khong-chinh-server";
 
@@ -368,10 +369,32 @@ async function traDuLieu(
 
     const selected = selectedCount || 0;
     const favorite = favoriteCount || 0;
+    // BB-395 vòng 3: "ảnh chọn thêm" (vượt hạn mức) chỉ tính ảnh ĐỢT 1 — ảnh đợt ≥ 2 tính tiền theo
+    // đợt. Chỉ cần đếm riêng khi bộ có ảnh đợt ≥ 2 (hiếm); không thì bằng `selected`.
+    const { count: soAnhDotSau } = await supabase
+      .from("selection_items")
+      .select("id", { count: "exact", head: true })
+      .eq("selection_id", session.selectionId)
+      .eq("mark", "selected")
+      .gte("dot", 2);
+    const selectedDot1 = Math.max(0, selected - (soAnhDotSau ?? 0));
     const extraCount = quotaKnown && includedQuota !== null
-      ? Math.max(0, selected - includedQuota)
+      ? Math.max(0, selectedDot1 - includedQuota)
       : 0;
     const extraAmount = extraCount * gallery.extra_photo_price;
+
+    // BB-395 — "Thừa tiền": hoá đơn trả nhiều file hơn khách đã chọn → phần hạn mức đã trả còn
+    // lại để ba mẹ chọn tiếp. Tính theo hạn mức HIỆN TẠI (không theo số lúc chốt).
+    const { data: dongHoaDon } = await supabase
+      .from("gallery_items")
+      .select("quantity, products(kind)")
+      .eq("gallery_id", galleryId)
+      .like("lark_record_id", `${TIEN_TO_DONG_HOA_DON}%`);
+    const anhHoaDon = ((dongHoaDon ?? []) as unknown as { quantity: number; products?: { kind: string | null } | null }[])
+      .filter((r) => r.products?.kind === "edited_photo")
+      .reduce((t, r) => t + Number(r.quantity ?? 0), 0);
+    const anhDaTraConLai =
+      quotaKnown && includedQuota !== null ? Math.max(0, Math.min(anhHoaDon, includedQuota - selectedDot1)) : 0;
 
     // ---------------- Đợt 2 ----------------
     const selectionItemIds = (userSelectionItems || []).map((si) => si.id);
@@ -701,6 +724,8 @@ async function traDuLieu(
       tongDungLuongAnh: tongDungLuong,
       quotaKnown: finalQuotaKnown,
       includedQuota: finalIncludedQuota,
+      // BB-395 — số ảnh đã thanh toán (qua hoá đơn) mà ba mẹ chưa chọn.
+      anhDaTraConLai,
       extraPhotoPrice: gallery.extra_photo_price,
       maxSelection: gallery.max_selection,
       allowExtra: gallery.allow_extra,

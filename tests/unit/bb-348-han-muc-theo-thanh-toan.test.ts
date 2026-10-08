@@ -96,7 +96,8 @@ describe("BB-348: hạn mức tăng theo thanh toán, không trừ hai lần", (
     return (json.data.items as { galleryId: string; unbilledAmount: number }[]).find((i) => i.galleryId === id) ?? null;
   };
   const thu = async (id: string, v: Record<string, unknown>) => {
-    const res = await ghiThu(new Request("http://localhost", { method: "POST", body: JSON.stringify(v) }), {
+    // BB-395: nhập tay bắt ghi lý do — mặc định một lý do thử nếu ca không tự ghi.
+    const res = await ghiThu(new Request("http://localhost", { method: "POST", body: JSON.stringify({ note: "Fixture nhập tay", ...v }) }), {
       params: Promise.resolve({ id }),
     });
     const json = await res.json();

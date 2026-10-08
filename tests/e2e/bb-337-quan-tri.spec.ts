@@ -56,8 +56,12 @@ test("1. Khách gửi ảnh chọn: một dòng mỗi bộ, mở 'Xử lý' có 
     await dong.getByTestId("nut-xu-ly-viec").click();
     const ngan = dong.getByTestId("ngan-xu-ly");
     await expect(ngan.getByTestId("khoi-dot-1")).toBeVisible();
-    // Xác nhận thanh toán = đúng form BB-320 (ô Giảm giá %).
-    await expect(ngan.getByTestId("khoi-thanh-toan").locator('input[name="giamGiaPhanTram"]')).toBeVisible({ timeout: 20_000 });
+    // BB-395: xác nhận thanh toán = khối mã hoá đơn; form BB-320 (ô Giảm giá %) nằm trong mục "Nhập tay
+    // (dự phòng)" — chủ studio có quyền nên mục hiện, mở ra mới thấy ô (spec đổi theo BB-395).
+    const khoiTt = ngan.getByTestId("khoi-thanh-toan");
+    await expect(khoiTt.getByTestId("khoi-hoa-don")).toBeVisible({ timeout: 20_000 });
+    await khoiTt.getByTestId("nhap-tay-du-phong").locator("summary").click({ timeout: 20_000 });
+    await expect(khoiTt.locator('input[name="giamGiaPhanTram"]')).toBeVisible({ timeout: 20_000 });
     await expect(ngan.getByRole("link", { name: "Tải danh sách ảnh đã chọn" })).toHaveAttribute(
       "href",
       `/api/admin/galleries/${d.daChot.id}/export`,
@@ -82,6 +86,9 @@ test("2. Chi tiết bộ ảnh CHƯA phát sinh tiền vẫn có 'Xác nhận th
     const khoi = page.getByTestId("khoi-thanh-toan-chi-tiet");
     await expect(khoi).toBeVisible({ timeout: 30_000 });
     await expect(khoi).toContainText("Xác nhận thanh toán");
+    // BB-395: khối có đường mã hoá đơn; form nhập tay (chủ studio) nằm trong mục dự phòng.
+    await expect(khoi.getByTestId("khoi-hoa-don")).toBeVisible();
+    await khoi.getByTestId("nhap-tay-du-phong").locator("summary").click();
     await expect(khoi.locator('input[name="giamGiaPhanTram"]')).toBeVisible();
     await expect(khoi).toBeInViewport({ timeout: 10_000 });
     await khoi.screenshot({ path: path.join(THU_MUC, "chi-tiet-xac-nhan-thanh-toan.png") });

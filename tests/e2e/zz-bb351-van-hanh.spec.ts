@@ -95,7 +95,9 @@ test.describe("BB-351: hành trình vận hành — tiền một công thức", 
     const u = await supa().auth.admin.createUser({ email, password: matKhau, email_confirm: true });
     if (u.error) throw u.error;
     userId = u.data.user!.id;
-    await pg.query(`insert into staff_profiles (id, full_name, email, role) values ($1,$2,$3,'cs')`, [userId, `${NHAN} CSKH`, email]);
+    // BB-395: nhập tiền tay chỉ còn cho Admin/Quản lý (`thanh_toan:nhap_tay`) → kịch bản thu tiền tay
+    // chạy bằng vai Quản lý. Ca "CSKH không thấy nhập tay + 403" nằm ở bb-349 và bb-395 (ca 4).
+    await pg.query(`insert into staff_profiles (id, full_name, email, role) values ($1,$2,$3,'branch_manager')`, [userId, `${NHAN} Quản lý`, email]);
     await pg.query(`insert into staff_branches (staff_id, branch_id, is_primary) values ($1,$2,true)`, [userId, branchId]);
     customerId = (
       await pg.query(`insert into customers (branch_id, full_name, phone) values ($1,$2,'0901000001') returning id`, [
@@ -290,6 +292,9 @@ test.describe("BB-351: hành trình vận hành — tiền một công thức", 
       // Thu tiền ngay trong dòng (form không có ô khoá)
       await buoc("cskh_thu_trong_dong", async () => {
         const tt = dong.getByTestId("khoi-thanh-toan");
+        // BB-395: form nhập tay nằm trong mục dự phòng + bắt ghi lý do.
+        await tt.getByTestId("nhap-tay-du-phong").locator("summary").click();
+        await tt.locator('input[name="note"]').fill("Fixture BB-351 nhập tay");
         ghi("dong_co_o_khoa", await tt.locator('input[name="khoaBoAnh"]').count());
         if (await tt.locator('input[name="khoaBoAnh"]').count()) await tt.locator('input[name="khoaBoAnh"]').uncheck();
         const amount = await tt.locator('input[name="amount"]').inputValue();
@@ -397,6 +402,8 @@ test.describe("BB-351: hành trình vận hành — tiền một công thức", 
         await khach.getByRole("button", { name: "Xác nhận" }).click();
         ghi("submit_lan2_status", (await cho).status());
         await page.goto(`/admin/galleries/${galleryId}`);
+        await page.getByTestId("nhap-tay-du-phong").locator("summary").click({ timeout: 30_000 });
+        await page.locator('input[name="note"]').first().fill("Fixture BB-351 nhập tay");
         const nut = page.getByRole("button", { name: "Ghi nhận đã thu" });
         await expect(nut).toBeVisible({ timeout: 30_000 });
         await page.waitForTimeout(1500);
@@ -476,6 +483,8 @@ test.describe("BB-351: hành trình vận hành — tiền một công thức", 
       });
       await buoc("thu_dot_2", async () => {
         await page.goto(`/admin/galleries/${galleryId}`);
+        await page.getByTestId("nhap-tay-du-phong").locator("summary").click({ timeout: 30_000 });
+        await page.locator('input[name="note"]').first().fill("Fixture BB-351 nhập tay đợt 2");
         const nut = page.getByRole("button", { name: "Ghi nhận đã thu" });
         await expect(nut).toBeVisible({ timeout: 30_000 });
         await page.waitForTimeout(1500);

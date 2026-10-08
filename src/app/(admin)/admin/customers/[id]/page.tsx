@@ -26,7 +26,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   return (
     <main className="mx-auto max-w-6xl">
-      <TrangKhachHang key={id} customerId={id} />
+      {/* BB-395: lối gán mã hoá đơn theo khách — cùng quyền với route (`galleries:write`). */}
+      <TrangKhachHang key={id} customerId={id} ganHoaDon={permissions.includes("galleries:write")} />
     </main>
   );
 }

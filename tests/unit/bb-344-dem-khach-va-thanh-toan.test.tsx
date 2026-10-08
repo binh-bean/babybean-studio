@@ -118,11 +118,15 @@ describe("BB-344 B: nếu không phát sinh thì khối thanh toán không nhấ
     expect(html).toContain(CAU_CHUA_PHAT_SINH_TIEN);
   });
 
-  it("B2. còn phải thu > 0 → nút bấm được (số tiền điền sẵn) và không có câu cảnh báo", () => {
-    // Form điền sẵn số tiền = còn thiếu nên hợp lệ ngay lúc dựng (không cần useEffect).
+  it("B2. còn phải thu > 0 → ô nhập mở (số tiền điền sẵn), không có câu cảnh báo; nút chờ LÝ DO (BB-395)", () => {
+    // Form điền sẵn số tiền = còn thiếu. BB-395: form là đường nhập tay dự phòng → nút chỉ bấm
+    // được khi đã ghi lý do (lúc dựng chưa có lý do nên nút khoá, nhưng ô nhập thì mở).
     const html = renderToStaticMarkup(<PaymentForm conThieu={300000} onSubmit={() => {}} />);
-    const nut = html.match(/<button[^>]*>/)?.[0] ?? "";
-    expect(nut).not.toMatch(DA_KHOA);
+    const oSoTien = html.match(/<input[^>]*name="amount"[^>]*>/)?.[0] ?? "";
+    expect(oSoTien).not.toMatch(DA_KHOA);
+    expect(oSoTien).toContain('value="300000"');
+    const oLyDo = html.match(/<input[^>]*name="note"[^>]*>/)?.[0] ?? "";
+    expect(oLyDo).not.toMatch(DA_KHOA);
     expect(html).not.toContain(CAU_CHUA_PHAT_SINH_TIEN);
   });
 
@@ -139,7 +143,7 @@ describe("BB-344 B: nếu không phát sinh thì khối thanh toán không nhấ
   it("B4. máy chủ: bộ không phát sinh thì từ chối ghi thu và giảm giá, sổ không có dòng nào", async () => {
     asOwner();
     for (const body of [
-      { amount: 100000, method: "tien_mat" },
+      { amount: 100000, method: "tien_mat", note: "Fixture nhập tay" },
       { discountPercent: 10, note: "thử", amount: 0, method: "tien_mat" },
     ]) {
       const res = await ghiThu(post(body), params(d.khongPhatSinh));
@@ -151,11 +155,11 @@ describe("BB-344 B: nếu không phát sinh thì khối thanh toán không nhấ
 
   it("B5. máy chủ: bộ vượt hạn mức thu được như cũ; thu đủ rồi (còn phải thu 0) thì không thu thêm, nhưng dòng TRỪ đính chính vẫn ghi được", async () => {
     asOwner();
-    const thu = await ghiThu(post({ amount: 300000, method: "chuyen_khoan" }), params(d.vuotHanMuc));
+    const thu = await ghiThu(post({ amount: 300000, method: "chuyen_khoan", note: "Fixture nhập tay" }), params(d.vuotHanMuc));
     expect(thu.status).toBe(200);
     expect((await thu.json()).data.outstanding).toBe(0);
 
-    const thuThem = await ghiThu(post({ amount: 1000, method: "tien_mat" }), params(d.vuotHanMuc));
+    const thuThem = await ghiThu(post({ amount: 1000, method: "tien_mat", note: "Fixture nhập tay" }), params(d.vuotHanMuc));
     expect(thuThem.status).toBe(400);
 
     const sau = await chiTietBo(new Request("http://localhost"), params(d.vuotHanMuc));

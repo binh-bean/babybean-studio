@@ -124,6 +124,15 @@ export interface TienDot {
  * `daChonTruoc` và `hanMuc` giữ trong kiểu để bên gọi cũ không vỡ biên dịch,
  * nhưng KHÔNG còn ảnh hưởng tới tiền.
  */
+/**
+ * BB-395 vòng 3 — số ảnh ĐỢT 1 đang chọn (mỗi ảnh một lần), để tính "vượt hạn mức". Ảnh đợt ≥ 2
+ * đã tính tiền theo đợt (`tinhTienDot`) — đếm chúng vào vượt hạn mức là đòi hai lần. Cùng luật
+ * với view `v_over_quota_unbilled` (migration 0103). Dòng thiếu `dot` (chưa áp 0077) = đợt 1.
+ */
+export function demAnhDot1(rows: readonly { photo_id: string; dot?: number | null }[]): number {
+  return new Set(rows.filter((r) => Number(r.dot ?? 1) === 1).map((r) => r.photo_id)).size;
+}
+
 export function tinhTienDot(p: {
   soAnhMoi: number;
   /** @deprecated không còn dùng — đợt ≥ 2 tính tiền từ ảnh đầu tiên. */

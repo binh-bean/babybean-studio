@@ -53,6 +53,8 @@ test("1. Bộ không phát sinh tiền: khối thanh toán hiện nhưng nút kh
   try {
     const khoi = page.getByTestId("khoi-thanh-toan-chi-tiet");
     await expect(khoi).toBeVisible({ timeout: 30_000 });
+    // BB-395: form nhập tay nằm trong mục "Nhập tay (dự phòng)" — chủ studio có quyền, mở ra.
+    await khoi.getByTestId("nhap-tay-du-phong").locator("summary").click();
     await expect(khoi.getByTestId("chua-phat-sinh-tien")).toHaveText("Chưa phát sinh tiền cần thu");
     await expect(khoi.getByRole("button", { name: "Ghi nhận đã thu" })).toBeDisabled();
     await expect(khoi.locator('input[name="amount"]')).toBeDisabled();
@@ -68,7 +70,10 @@ test("2. Bộ vượt hạn mức: nút dùng được; ghi thu đủ xong thì 
   try {
     const khoi = page.getByTestId("khoi-thanh-toan-chi-tiet");
     await expect(khoi).toBeVisible({ timeout: 30_000 });
+    await khoi.getByTestId("nhap-tay-du-phong").locator("summary").click();
     await expect(khoi.getByTestId("chua-phat-sinh-tien")).toHaveCount(0);
+    // BB-395: nhập tay bắt ghi lý do.
+    await khoi.locator('input[name="note"]').fill("Fixture BB-344 nhập tay");
     const nut = khoi.getByRole("button", { name: "Ghi nhận đã thu" });
     // BB-349: bộ đã chốt → ô "xác nhận + khoá" tick sẵn và nút chờ tick "chắc chắn". Ca này chỉ
     // thử phần TIỀN (BB-344) nên bỏ tick khoá — khi đó không cần "chắc chắn", nút dùng được ngay.
@@ -124,20 +129,28 @@ test("3. Bàn làm việc: dòng 'Khách gửi ảnh chọn' cùng số với ta
   }
 });
 
-test("4. Bàn làm việc: có khách xin mở lại thì hiện dòng 'Khách xin mở lại', bấm mở tab 'Yêu cầu mở lại'", async ({ browser, baseURL }) => {
+test("4. Bàn làm việc: có khách xin mở lại thì hiện dòng 'Yêu cầu mở lại', bấm mở đúng tab đó", async ({ browser, baseURL }) => {
   const { page, ctx } = await mo(browser, baseURL!, "about:blank");
   try {
-    // Giả lập ở BIÊN mạng (không giả lập hook): lấy đáp trả thật rồi đặt choMoLai = 2.
-    await page.route("**/api/admin/can-xu-ly", async (route) => {
+    // Giả lập ở BIÊN mạng (không giả lập hook). BB-395 vòng 4 (spec lỗi thời, không do BB-395): từ
+    // BB-359 thẻ "Cần xử lý ngay" đọc số theo TAB (`demViecCanXuLy` → `/api/admin/reports/yeu-cau-mo-lai`,
+    // đếm `items`), không còn đọc `choMoLai` của `/api/admin/can-xu-ly` — giả lập route cũ không đổi
+    // được gì. Lấy đáp trả thật rồi đặt đúng 2 dòng.
+    const URL_MO_LAI = "**/api/admin/reports/yeu-cau-mo-lai";
+    await page.route(URL_MO_LAI, async (route) => {
       const res = await route.fetch();
       const json = await res.json();
-      json.data.choMoLai = 2;
+      const mau = { galleryId: "00000000-0000-4000-8000-000000000001", galleryTitle: "Fixture BB-344 mở lại" };
+      json.data.items = [mau, { ...mau, galleryId: "00000000-0000-4000-8000-000000000002" }];
       await route.fulfill({ response: res, json });
     });
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
-    const dong = page.getByTestId("can-xu-ly-ngay-rows").getByRole("link", { name: /Khách xin mở lại/ });
+    // Nhãn dòng = nhãn TAB (`ketQuaDemViec`: `nhan: tab.label`) → "Yêu cầu mở lại".
+    const dong = page.getByTestId("can-xu-ly-ngay-rows").getByRole("link", { name: /Yêu cầu mở lại/ });
     await expect(dong).toBeVisible({ timeout: 40_000 });
     await expect(dong).toContainText("2");
+    // Tab mở ra đọc dữ liệu THẬT (bỏ giả lập trước khi bấm).
+    await page.unroute(URL_MO_LAI);
     await dong.click();
     await expect(page).toHaveURL(/\/admin\/viec-can-xu-ly\?tab=yeu-cau-mo-lai/, { timeout: 20_000 });
   } finally {

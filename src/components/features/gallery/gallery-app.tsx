@@ -211,6 +211,8 @@ interface GalleryApiResponse {
   options?: { download?: boolean; notes?: boolean; invite?: boolean };
   quotaKnown: boolean;
   includedQuota: number | null;
+  /** BB-395 — số ảnh đã thanh toán qua hoá đơn mà ba mẹ chưa chọn (0 = không có). */
+  anhDaTraConLai?: number;
   extraPhotoPrice: number;
   maxSelection: number | null;
   allowExtra: boolean;
@@ -2890,6 +2892,9 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
         isLocked ||
         !gallery.quotaKnown ||
         !duocChon ||
+        // BB-395 — thẻ "Ba mẹ còn N ảnh đã thanh toán" nằm trong khối này: khối phải mở cả khi bộ
+        // đang chọn bình thường (không khoá, đã biết hạn mức) — e2e bb-395 ca 3 bắt lỗi này.
+        (gallery.anhDaTraConLai ?? 0) > 0 ||
         (gallery.reopenRequest && gallery.reopenRequest.trangThai !== "khong_co")) && (
         <div className="mx-auto max-w-3xl space-y-3 px-6 pt-5 empty:hidden">
           {/* BB-371 — CSKH đã gửi ảnh chỉnh trong app: ba mẹ xem, so trước/sau, duyệt
@@ -2990,6 +2995,17 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
                 </a>
               )}
             </div>
+          )}
+
+          {/* BB-395 — "Thừa tiền": hoá đơn đã trả nhiều ảnh hơn ba mẹ chọn → chọn tiếp phần đã trả. */}
+          {(gallery.anhDaTraConLai ?? 0) > 0 && !isLocked && duocChon && (
+            <p
+              role="status"
+              data-testid="the-anh-da-tra-con-lai"
+              className="rounded-2xl border border-border bg-surface-2 p-4 text-pretty text-sm font-medium"
+            >
+              {giuA(vi.gallery.anhDaTraConLai.replace("{n}", formatSo(gallery.anhDaTraConLai ?? 0)))}
+            </p>
           )}
         </div>
       )}

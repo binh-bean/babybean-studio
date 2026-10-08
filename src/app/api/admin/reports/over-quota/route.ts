@@ -229,7 +229,25 @@ export async function GET(request: Request): Promise<Response> {
 
     // BB-394 — nhãn nhà (khách có ≥ 2 bộ); lỗi đọc thì bỏ nhãn, danh sách vẫn đủ.
     const nha = await docNhaCuaCacBoKhongLoi(admin, items.map((i) => i.galleryId));
-    return ok({ summary, items, nha });
+
+    // BB-395 — bộ đã gán hoá đơn mà đối chiếu còn Thiếu / Thừa / chưa đủ điều kiện: hiện ở
+    // CHÍNH tab này (không mở tab mới). Thừa không còn tiền nợ nên không nằm trong `items`.
+    // Chưa áp 0102 (chưa có bảng) → danh sách rỗng, báo cáo vẫn chạy.
+    const hoaDonCanXuLy: { galleryId: string; galleryTitle: string; maHoaDon: string; trangThai: string }[] = [];
+    {
+      const { data: hdRows, error: hdErr } = await admin
+        .from("hoa_don_bo_anh")
+        .select("gallery_id, ma_hoa_don, trang_thai, galleries!inner(title, branch_id)")
+        .in("trang_thai", ["thua", "thieu", "hon_hop", "chua_du_dieu_kien"])
+        .in("galleries.branch_id", branchIds)
+        .limit(200);
+      if (!hdErr) {
+        for (const r of (hdRows ?? []) as unknown as { gallery_id: string; ma_hoa_don: string; trang_thai: string; galleries: { title: string } | null }[]) {
+          hoaDonCanXuLy.push({ galleryId: r.gallery_id, galleryTitle: r.galleries?.title ?? "", maHoaDon: r.ma_hoa_don, trangThai: r.trang_thai });
+        }
+      }
+    }
+    return ok({ summary, items, nha, hoaDonCanXuLy });
   } catch (err) {
     return failUnexpected(err, requestId);
   }

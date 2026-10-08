@@ -78,7 +78,8 @@ describe("BB-349: thu tiền kèm xác nhận + khoá bộ ảnh", () => {
   }
 
   const thu = async (id: string, v: Record<string, unknown>) => {
-    const res = await ghiThu(new Request("http://localhost", { method: "POST", body: JSON.stringify(v) }), {
+    // BB-395: nhập tay bắt ghi lý do — mặc định một lý do thử nếu ca không tự ghi.
+    const res = await ghiThu(new Request("http://localhost", { method: "POST", body: JSON.stringify({ note: "Fixture nhập tay", ...v }) }), {
       params: Promise.resolve({ id }),
     });
     return { status: res.status, json: await res.json() };

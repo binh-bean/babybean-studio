@@ -147,6 +147,22 @@ test.describe.serial("BB-349: thu tiền kèm xác nhận + khoá", () => {
       // CSKH mở chi tiết bộ ảnh.
       await dangNhapNhanVien(page, email, matKhau);
       await page.goto(`/admin/galleries/${galleryId}`, { waitUntil: "domcontentloaded" });
+      // BB-395: CSKH không còn nhập tiền tay — không thấy form (chỉ đường mã hoá đơn), máy chủ 403.
+      await expect(page.getByTestId("khoi-hoa-don")).toBeVisible({ timeout: 40_000 });
+      await expect(page.getByTestId("nhap-tay-du-phong")).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Ghi nhận đã thu" })).toHaveCount(0);
+      const r403 = await page.request.post(`/api/admin/galleries/${galleryId}/payments`, {
+        data: { amount: 1000, method: "tien_mat", note: "Fixture BB-349" },
+      });
+      expect(r403.status()).toBe(403);
+      // Phần thu tiền chuyển sang vai có quyền dự phòng: Quản lý (`thanh_toan:nhap_tay`, 0102).
+      await pg.query(
+        `update staff_profiles set role = 'branch_manager', role_id = (select id from roles where name = 'branch_manager' limit 1) where email = $1`,
+        [email],
+      );
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await page.getByTestId("nhap-tay-du-phong").locator("summary").click({ timeout: 40_000 });
+      await page.locator('input[name="note"]').fill("Fixture BB-349 nhập tay");
       const canhBao = page.getByTestId("canh-bao-xac-nhan");
       await expect(canhBao).toBeVisible({ timeout: 40_000 });
       await expect(canhBao).toContainText("Khách đang sửa lại danh sách, chưa gửi lại");

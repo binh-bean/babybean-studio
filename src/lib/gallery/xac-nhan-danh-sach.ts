@@ -162,7 +162,8 @@ export async function chotThayKhachTheoDanhSachHienTai(
     .from("selection_items")
     .select("*", { count: "exact", head: true })
     .eq("selection_id", sel.id)
-    .eq("mark", "selected");
+    .eq("mark", "selected")
+    .eq("dot", 1); // BB-395 vòng 3: số lúc chốt đợt 1 — ảnh đợt ≥ 2 tính tiền theo đợt
   if (ec) throw ec;
   const daChon = count ?? 0;
   const hanMuc = hm === null || hm === undefined ? null : Number(hm);

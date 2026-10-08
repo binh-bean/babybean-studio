@@ -17,6 +17,7 @@ import { TheSoLieu } from "./the-so-lieu";
 import { NutNhanKhach } from "./nut-nhan-khach";
 import { KhoiLinkGiaDinh } from "./khoi-link-gia-dinh";
 import { KhoiLinkMoiNguoiThan } from "./khoi-link-moi-nguoi-than";
+import { GanHoaDonTheoKhach } from "./khoi-hoa-don";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatNgayVN, formatSdt, formatSo } from "@/lib/utils/dinh-dang";
@@ -53,7 +54,7 @@ function nhanLinkApp(l: LichSu["lichSuChup"][number]["linkApp"]): { chu: string;
   return { chu: "Link cũ hết hạn", kieu: "outline" };
 }
 
-export function TrangKhachHang({ customerId }: { customerId: string }) {
+export function TrangKhachHang({ customerId, ganHoaDon = false }: { customerId: string; ganHoaDon?: boolean }) {
   const [ls, setLs] = React.useState<LichSu | null>(null);
   const [loi, setLoi] = React.useState<string | null>(null);
 
@@ -143,6 +144,8 @@ export function TrangKhachHang({ customerId }: { customerId: string }) {
         </div>
 
         <div className="flex min-w-0 flex-col gap-6">
+          {/* BB-395 vòng 2 — gán mã hoá đơn từ trang khách: chỉ bộ của CHÍNH khách này. */}
+          {ganHoaDon && <GanHoaDonTheoKhach customerId={customerId} />}
           <section className={KHUNG} data-testid="lich-su-chup">
             <h2 className={CARD_TITLE_CLASS}>Lịch sử chụp ({formatSo(lichSuChup.length)})</h2>
             {lichSuChup.length === 0 ? (

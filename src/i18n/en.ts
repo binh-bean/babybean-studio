@@ -73,6 +73,7 @@ export const en: Messages = {
   gallery: {
     dangMoLaiAnh: "Bean is reopening all of your baby's photos, please wait a moment",
     dangMoLaiAnhGiaDinh: "Bean is reopening all of the baby's photos, family, please wait a moment",
+    anhDaTraConLai: "You still have {n} paid photos to choose — please pick them anytime",
 
     filterAll: "All",
     filterSelected: "Selected",

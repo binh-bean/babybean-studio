@@ -81,6 +81,8 @@ export const vi = {
     dangMoLaiAnh: "Bean đang mở lại toàn bộ ảnh của bé, ba mẹ chờ chút ạ",
     /** BB-360 — cùng câu cho người thân (link mời gia đình, không phải ba mẹ). */
     dangMoLaiAnhGiaDinh: "Bean đang mở lại toàn bộ ảnh của bé, gia đình chờ chút ạ",
+    // BB-395 — hoá đơn trả nhiều ảnh hơn ba mẹ đã chọn: phần đã thanh toán còn lại.
+    anhDaTraConLai: "Ba mẹ còn {n} ảnh đã thanh toán, ba mẹ chọn tiếp nhé ạ",
 
     filterAll: "Tất cả",
     filterSelected: "Đã chọn",

@@ -107,10 +107,16 @@ export interface QuyenThaoTacBoAnh {
   daGiao: boolean;
   /** `galleries:export` — khối "Xuất danh sách ảnh đã chọn". */
   xuat: boolean;
+  /**
+   * BB-395 — `thanh_toan:nhap_tay` (hoặc `system:superuser`): form NHẬP TIỀN TAY (dự phòng),
+   * ép gán / gỡ gán hoá đơn. Vai khác chỉ thấy đường mã hoá đơn. Thiếu = không có.
+   */
+  nhapTay?: boolean;
 }
 
 export function quyenThaoTacBoAnh(permissions: string[]): QuyenThaoTacBoAnh {
   return {
+    nhapTay: permissions.includes("thanh_toan:nhap_tay") || permissions.includes("system:superuser"),
     ghi: permissions.includes("galleries:write"),
     suaThongTin: coMotTrongCacQuyen(permissions, CAC_QUYEN_SUA_THONG_TIN),
     dongBo: coMotTrongCacQuyen(permissions, CAC_QUYEN_DONG_BO),
