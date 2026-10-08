@@ -40,6 +40,7 @@ import { cn } from "@/components/ui/utils";
 import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { chonCoAnhTheoO } from "@/lib/utils/chon-co-anh";
 import { vi } from "@/i18n";
+import { NutXemTrongNha } from "./xem-trong-nha";
 import type { PhotoPublic } from "@/types/domain";
 import {
   kheSoLe,
@@ -91,6 +92,12 @@ interface TheAnhProps {
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
   onToggleSoSanh: (photo: PhotoPublic) => void;
+  /**
+   * BB-405 — nút "Xem trong nhà" trên ô (đối xứng tim, góc dưới trái): mở thẳng trình
+   * xem chung (trên tường / album trên bàn) với tấm này, không cần thả tim trước. Hàm
+   * ổn định hoặc thiếu (thiếu = màn đó không có danh mục để ướm) — LUẬT 2 đầu tệp.
+   */
+  onXemTrongNha?: (photo: PhotoPublic) => void;
 }
 
 const TheAnh = memo(function TheAnh({
@@ -112,7 +119,9 @@ const TheAnh = memo(function TheAnh({
   onToggle,
   onOpen,
   onToggleSoSanh,
+  onXemTrongNha,
 }: TheAnhProps) {
+  const coNutTrongNha = !!onXemTrongNha && !soSanhBat;
   const coViTri = x !== undefined && y !== undefined && w !== undefined && h !== undefined;
 
   const moAnhHoacSoSanh = () => (soSanhBat ? onToggleSoSanh(photo) : onOpen(thuTu));
@@ -232,7 +241,7 @@ const TheAnh = memo(function TheAnh({
         {giaDinhThich && !soSanhBat && (
           <span
             data-testid="dau-gia-dinh-thich"
-            className={cn(CHIP_NGUYEN_KHOI, "pointer-events-none absolute bottom-2 left-2 z-10 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-[#8a4b3c] shadow-sm")}
+            className={cn(CHIP_NGUYEN_KHOI, "pointer-events-none absolute bottom-2 z-10 flex items-center gap-1 rounded-full bg-[#fffdf9]/90 px-2 py-[3px] text-[11px] font-medium text-[#8a4b3c] shadow-sm", coNutTrongNha ? "left-12" : "left-2")}
             title="Gia đình đã thả tim tấm này"
           >
             <Heart className="h-3 w-3 fill-current" aria-hidden="true" />
@@ -318,6 +327,9 @@ const TheAnh = memo(function TheAnh({
           </span>
         )}
 
+        {/* BB-405 — "Xem trong nhà": góc DƯỚI TRÁI, đối xứng tim; xem không đòi đã chọn/đã mở khoá. */}
+        {coNutTrongNha && <NutXemTrongNha thuTu={thuTu} onBam={() => onXemTrongNha!(photo)} />}
+
         {(!khoa || daChon) && !soSanhBat && dotKhoa === 0 && (
           <button
             type="button"
@@ -388,6 +400,8 @@ export interface LuoiAnhProps {
   onToggle: (photo: PhotoPublic) => void;
   onOpen: (thuTu: number) => void;
   onToggleSoSanh: (photo: PhotoPublic) => void;
+  /** BB-405 — nút "Xem trong nhà" trên mỗi ô. Thiếu = không có nút. Truyền hàm ổn định. */
+  onXemTrongNha?: (photo: PhotoPublic) => void;
 }
 
 /** Cửa sổ dựng tính theo "bậc" nửa màn hình — xem luật 3 ở đầu tệp. */
@@ -409,6 +423,7 @@ export function LuoiAnh({
   onToggle,
   onOpen,
   onToggleSoSanh,
+  onXemTrongNha,
 }: LuoiAnhProps) {
   const khungRef = useRef<HTMLDivElement | null>(null);
 
@@ -510,6 +525,7 @@ export function LuoiAnh({
               onToggle={onToggle}
               onOpen={onOpen}
               onToggleSoSanh={onToggleSoSanh}
+              onXemTrongNha={onXemTrongNha}
             />
           ))}
         </div>
@@ -539,6 +555,7 @@ export function LuoiAnh({
                 onToggle={onToggle}
                 onOpen={onOpen}
                 onToggleSoSanh={onToggleSoSanh}
+                onXemTrongNha={onXemTrongNha}
               />
             );
           })}

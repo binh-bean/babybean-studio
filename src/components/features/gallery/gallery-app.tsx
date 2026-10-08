@@ -159,6 +159,7 @@ import Link from "next/link";
 import { ChuyenBoAnh, type GiaDinhTrongBo } from "@/components/features/gallery/chuyen-bo-anh";
 import { duongDanNha, tenBoHienThi } from "@/lib/utils/trang-gia-dinh";
 import { ThuongHieuBoAnh } from "@/components/features/gallery/thuong-hieu-bo-anh";
+import { albumXemTrongNha } from "@/components/features/gallery/xem-trong-nha";
 import { vi } from "@/i18n";
 import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
@@ -659,6 +660,15 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
     co: string | null;
     coKhung: boolean;
   } | null>(null);
+  /**
+   * BB-405 — nút "Xem trong nhà" trên TỪNG Ô của lưới (đối xứng tim): mở thẳng trình xem
+   * chung với tấm đó, không cần thả tim. Hàm ỔN ĐỊNH (TheAnh được memo — LUẬT 2 luoi-anh.tsx).
+   */
+  const xemTrongNhaTuO = useCallback((p: { id: string }) => {
+    setAnhTreoNgoai(null);
+    setTreoTuongBanDau(null);
+    setManTreoTuongTuAnh(p.id);
+  }, []);
 
   /*
     BB-258 — thanh nổi (ThanhChon) từng nằm cố định giữa đáy màn và CHE tên
@@ -2606,19 +2616,9 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           ô TRÁI cho cân, bên phải còn tải + chuông. Máy tính: về cụm phải.
         */}
         <div className="flex items-center justify-self-start lg:hidden">
-          {/* BB-334B (anh chốt Q4 ★) — trên link gia đình, góc trái là nút về trang gia đình
-              thay biểu tượng chat; chat vẫn có ở bìa (BiaBoAnh) và đầu trang máy tính. */}
-          {giaDinh ? (
-            <Link
-              href={duongDanNha(giaDinh.ma)}
-              aria-label={vi.gallery.giaDinh.veTrangGiaDinh}
-              title={vi.gallery.giaDinh.veTrangGiaDinh}
-              data-testid="nut-ve-gia-dinh"
-              className="grid h-10 w-10 place-items-center rounded-full text-foreground transition hover:bg-surface-2"
-            >
-              <LayoutGrid className="h-5 w-5" strokeWidth={1.5} aria-hidden="true" />
-            </Link>
-          ) : gallery.branch.chatUrl && (
+          {/* BB-405 — góc trái điện thoại về lại biểu tượng nhắn studio cho MỌI link: lối "về
+              trang gia đình" nay là dòng chữ "Album gia đình" ở hàng dưới (cùng tên bộ). */}
+          {gallery.branch.chatUrl && (
             <a
               href={gallery.branch.chatUrl}
               target="_blank"
@@ -2631,33 +2631,29 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             </a>
           )}
         </div>
-        {giaDinh && (
-          <Link
-            href={duongDanNha(giaDinh.ma)}
-            data-testid="nut-ve-gia-dinh-may-tinh"
-            className="hidden items-center gap-2 text-[15px] font-medium text-foreground transition hover:opacity-80 lg:inline-flex lg:w-[200px]"
-          >
-            <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={1.5} aria-hidden="true" />
-            {vi.gallery.giaDinh.albumGiaDinh}
-          </Link>
-        )}
         {/*
-          BB-306 — logo hạt đậu đứng TRƯỚC chữ, căn giữa dọc theo chữ
-          (`items-center`). `data-testid="ten-thuong-hieu"` VÀ `justify-self-center`
-          dời từ chữ sang khối bọc này — bb-278 đo bounding box của đúng
-          testid này để kiểm căn giữa màn hình, nay đo cả logo+chữ như MỘT
-          cụm thương hiệu, không phải căn giữa riêng chữ nữa (logo cố định
-          gắn liền chữ là thay đổi thiết kế có chủ đích, không phải hồi quy).
+          BB-405 (anh 08/10: "bỏ tên và mã hóa đơn ngay dưới tên và logo chuyển sang bên dưới
+          từ Album gia đình") — tên bộ đang mở (bấm để đổi buổi chụp, BB-334B) KHÔNG còn nằm
+          dưới logo; nó đứng NGAY DƯỚI dòng "← Album gia đình":
+            · điện thoại — hàng thứ hai của thanh (`col-span-3 row-start-2`), sát lề trái;
+            · máy tính — cột trái (thanh là flex trái-phải), cùng bề ngang 200px như cũ.
+          Một khối duy nhất cho cả hai cỡ (không nhân đôi nút), logo ở giữa đứng một mình.
         */}
-        {(() => {
-          // BB-370 — cụm thương hiệu dùng chung với khung xem trước bìa (quản trị).
-          const thuongHieu = <ThuongHieuBoAnh />;
-          if (!giaDinh) return thuongHieu;
-          // BB-334B (bản vẽ 03/04) — tên bộ đang mở ngay dưới logo, bấm để đổi buổi chụp.
+        {giaDinh && (() => {
           const boDangMo = giaDinh.boAnh.find((b) => b.id === giaDinh.boHienTaiId);
           return (
-            <div className="flex min-w-0 flex-col items-center justify-self-center">
-              {thuongHieu}
+            <div
+              data-testid="khoi-album-gia-dinh"
+              className="col-span-3 row-start-2 flex min-w-0 flex-col items-start justify-self-stretch border-t border-[#efe7de] pt-2 lg:w-[220px] lg:shrink-0 lg:border-t-0 lg:pt-0"
+            >
+              <Link
+                href={duongDanNha(giaDinh.ma)}
+                data-testid="nut-ve-gia-dinh"
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground transition hover:text-foreground lg:gap-2 lg:text-[15px] lg:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4 lg:h-[18px] lg:w-[18px]" strokeWidth={1.5} aria-hidden="true" />
+                {vi.gallery.giaDinh.albumGiaDinh}
+              </Link>
               <button
                 type="button"
                 data-testid="nut-doi-buoi-chup"
@@ -2665,7 +2661,7 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
                 aria-expanded={moChuyenBo}
                 aria-label={vi.gallery.giaDinh.doiBuoiChup}
                 onClick={() => setMoChuyenBo((v) => !v)}
-                className="mt-1 inline-flex max-w-[220px] items-center gap-1 rounded-full px-2 py-0.5 text-[13px] font-medium text-[#2e2a27] transition hover:bg-surface-2 lg:mt-1.5 lg:max-w-[320px] lg:bg-[#f3ede6] lg:px-3 lg:py-1"
+                className="-ml-2 mt-0.5 inline-flex min-h-[32px] max-w-full items-center gap-1 rounded-full px-2 text-[14px] font-medium text-[#2e2a27] transition hover:bg-surface-2 lg:-ml-0 lg:mt-1 lg:max-w-[220px] lg:bg-[#f3ede6] lg:px-3 lg:text-[13px]"
               >
                 <span className="truncate">{boDangMo ? tenBoHienThi(boDangMo) : vi.gallery.giaDinh.doiBuoiChup}</span>
                 <ChevronDown
@@ -2677,6 +2673,12 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             </div>
           );
         })()}
+        {/*
+          BB-306 — logo hạt đậu đứng TRƯỚC chữ, căn giữa dọc theo chữ. BB-370 — cụm thương
+          hiệu dùng chung với khung xem trước bìa (quản trị). BB-405 — đứng một mình (tên bộ
+          đã dời xuống dưới "Album gia đình").
+        */}
+        <ThuongHieuBoAnh />
         <div className="flex items-center justify-self-end gap-1">
           {/*
             BB-281 — "Nhắn cho studio" thu thành biểu tượng (trước là pill có
@@ -3278,6 +3280,8 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             onToggleSoSanh={onToggleSoSanh}
             giaDinhThich={congCu.giaDinhThich ? giaDinhThich : undefined}
             khongChinh={laNguoiXem ? undefined : tapAnhKhongChinh}
+            // BB-405 — "Xem trong nhà" trên từng ô, mọi vai (xem không đòi đã chọn).
+            onXemTrongNha={moXemTuong ? xemTrongNhaTuO : undefined}
           />
         )}
       </section>
@@ -4642,6 +4646,8 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
             fileName: p.fileName,
             width: p.width,
             height: p.height,
+            // BB-405 vòng 2 — bìa cuốn album đi CÙNG đường ảnh ô lưới (lh3 thẳng khi có mã tệp).
+            maTepDrive: (p as { maTepDrive?: string | null }).maTepDrive ?? null,
           }))}
           chiSoBanDau={Math.max(
             0,
@@ -4684,6 +4690,39 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
           onDatInKemKhung={(photoId, productIdIn, soLuongIn, productIdKhung) =>
             void datInKemKhung(photoId, productIdIn, soLuongIn, productIdKhung)
           }
+          // BB-405 — "Album trên bàn" của "Xem trong nhà": cùng đường đặt album của cửa hàng
+          // (`/api/g/addons`, không gắn ảnh). Vai không đặt thẳng được → `loiDatKhac` ở trên.
+          album={albumXemTrongNha(
+            (gallery.addons?.catalogue ?? []).map((sp) => ({
+              productId: sp.productId,
+              name: sp.name,
+              material: sp.material,
+              size: sp.size,
+              unitPrice: sp.unitPrice,
+              nhom: sp.nhom as NhomSanPham,
+            })),
+            {
+              nguCanh: nguCanhLuot,
+              onDat: (productId, soLuong) => datSoLuongMuaThem(productId, soLuong, null),
+              // BB-405 vòng 2 — người gợi ý KHÔNG đặt album (không tự trả tiền): nút thành
+              // "Gợi ý tấm này" — thả tim gợi ý tấm đang xem cho ba mẹ (đợt 1), hoặc lối của
+              // màn tường khi bộ đã sang đợt N. Gia đình được mời dùng lối của màn tường.
+              loiDatKhac:
+                loiDatKhac ??
+                (nguCanhLuot === "goiY" && !khoaTim
+                  ? {
+                      nhan: vi.gallery.datLoiGoiY,
+                      onBam: (photoId: string) => {
+                        const tam = photos.find((p) => p.id === photoId);
+                        if (tam && tam.mark !== "selected" && tam.mark !== "suggested") {
+                          void handleToggleHeart(tam);
+                        }
+                        dongTreo();
+                      },
+                    }
+                  : null),
+            },
+          )}
         />
         );
       })()}

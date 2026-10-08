@@ -4,7 +4,7 @@ import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 import React, { useState, useEffect, useRef } from "react";
 import { BiaBoAnh, type BiaBoAnhProps } from "@/components/features/gallery/bia-bo-anh";
 import { MAU_CHU_BIA, dienMau } from "@/lib/gallery/mau-chu-bia";
-import { ArrowLeft, Bell, ChevronDown, LayoutGrid, MessageCircle, X } from "lucide-react";
+import { ArrowLeft, Bell, ChevronDown, MessageCircle, X } from "lucide-react";
 import { CARD_TITLE_CLASS } from "./page-header";
 import { useBayFocusHopThoai } from "@/lib/utils/bay-focus-hop-thoai";
 import { tinhTenBiaTuDuLieu } from "@/lib/utils/dinh-dang";
@@ -609,51 +609,72 @@ function KhungBiaThat({
   );
 }
 
-/** Chiều cao đầu trang màn khách trên điện thoại (thương hiệu + tên bộ), px. */
-const CAO_DAU_TRANG_DIEN_THOAI = 86;
-/** Chiều cao đầu trang màn khách trên máy tính, px. */
-const CAO_DAU_TRANG_MAY_TINH = 86;
+/**
+ * Chiều cao đầu trang màn khách trên điện thoại, px. BB-405 — hai hàng: thương hiệu
+ * (biểu tượng 40px + đệm 14px trên/dưới) rồi "← Album gia đình" + tên bộ ngay dưới.
+ */
+const CAO_DAU_TRANG_DIEN_THOAI = 140;
+/** Chiều cao đầu trang màn khách trên máy tính, px (cột trái: "Album gia đình" + tên bộ). */
+const CAO_DAU_TRANG_MAY_TINH = 84;
 
 /**
  * BB-370 — đầu trang màn khách trong khung xem trước: cụm thương hiệu DÙNG
  * CHUNG (`ThuongHieuBoAnh`) + tên bộ thân thiện đúng như ô chuyển bộ của khách
  * (`tenBoThanThien` — không bao giờ là mã hoá đơn). Biểu tượng hai bên chỉ để
  * giữ đúng bố cục, không bấm được (khung xem trước `pointer-events-none`).
+ *
+ * BB-405 — khớp bố cục mới của màn khách: logo đứng MỘT MÌNH ở giữa; tên bộ nằm
+ * NGAY DƯỚI "← Album gia đình" (điện thoại: hàng thứ hai sát lề trái; máy tính:
+ * cột trái).
  */
 function DauTrangXemTruoc({ kho, tenBo }: { kho: KhoXemTruoc; tenBo: string }) {
   const mt = kho === "may-tinh";
+  const khoiAlbum = (
+    <div
+      data-testid="khoi-album-gia-dinh-xem-truoc"
+      className={`flex min-w-0 flex-col items-start ${mt ? "w-[220px]" : "col-span-3 border-t border-[#efe7de] pt-2"}`}
+      aria-hidden="true"
+    >
+      <span
+        className={`inline-flex items-center font-medium ${
+          mt ? "gap-2 text-[15px] text-[#2e2a27]" : "gap-1.5 text-[13px] text-[#6f6760]"
+        }`}
+      >
+        <ArrowLeft className={mt ? "h-[18px] w-[18px]" : "h-4 w-4"} strokeWidth={1.5} />
+        Album gia đình
+      </span>
+      <span
+        data-testid="ten-bo-xem-truoc"
+        className={`inline-flex min-h-[32px] max-w-full items-center gap-1 rounded-full font-medium text-[#2e2a27] ${
+          mt ? "mt-1 max-w-[220px] bg-[#f3ede6] px-3 text-[13px]" : "-ml-2 mt-0.5 px-2 text-[14px]"
+        }`}
+      >
+        <span className="truncate">{tenBo}</span>
+        <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+      </span>
+    </div>
+  );
   return (
     <div
       data-testid="dau-trang-xem-truoc"
-      className={`grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center border-b border-[#e5dcd2] bg-[#fdfbf9] ${
-        mt ? "px-10" : "px-3.5"
+      className={`border-b border-[#e5dcd2] bg-[#fdfbf9] ${
+        mt
+          ? "flex items-center justify-between px-10"
+          : "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] content-center items-center gap-2 px-3.5"
       }`}
       style={{ height: `${mt ? CAO_DAU_TRANG_MAY_TINH : CAO_DAU_TRANG_DIEN_THOAI}px` }}
     >
       {mt ? (
-        <span className="inline-flex items-center gap-2 text-[15px] font-medium text-[#2e2a27]" aria-hidden="true">
-          <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={1.5} />
-          Album gia đình
-        </span>
+        khoiAlbum
       ) : (
-        <LayoutGrid className="h-5 w-5 text-[#2e2a27]" strokeWidth={1.5} aria-hidden="true" />
+        <MessageCircle className="h-5 w-5 text-[#2e2a27]" strokeWidth={1.5} aria-hidden="true" />
       )}
-      <div className="flex min-w-0 flex-col items-center">
-        <ThuongHieuBoAnh kho={kho} />
-        <span
-          data-testid="ten-bo-xem-truoc"
-          className={`inline-flex max-w-[220px] items-center gap-1 truncate rounded-full text-[13px] font-medium text-[#2e2a27] ${
-            mt ? "mt-1.5 max-w-[320px] bg-[#f3ede6] px-3 py-1" : "mt-1 px-2 py-0.5"
-          }`}
-        >
-          <span className="truncate">{tenBo}</span>
-          <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
-        </span>
-      </div>
+      <ThuongHieuBoAnh kho={kho} />
       <div className="flex items-center justify-end gap-4 text-[#2e2a27]" aria-hidden="true">
         {mt && <MessageCircle className="h-5 w-5" strokeWidth={1.5} />}
         <Bell className="h-5 w-5" strokeWidth={1.5} />
       </div>
+      {!mt && khoiAlbum}
     </div>
   );
 }

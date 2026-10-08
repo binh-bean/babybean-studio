@@ -19,6 +19,11 @@
 import React from "react";
 import { vi } from "@/i18n";
 import { giuA } from "@/lib/utils/giu-a";
+import { urlAnh, urlAnhDuPhong } from "@/lib/utils/anh-lh3";
+import type { ThumbnailWidth } from "@/types/domain";
+
+/** Cỡ ảnh bìa cuốn album — một bậc HỢP LỆ của `THUMBNAIL_WIDTHS` (route `/api/img` chỉ nhận các bậc đó). */
+const CO_ANH_BIA: ThumbnailWidth = 800;
 import { cn } from "@/components/ui/utils";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { formatKichThuoc } from "@/lib/utils/dinh-dang";
@@ -42,13 +47,35 @@ export interface XemAlbumTrenBanProps {
   cuon: CuonTrenBan[];
   productIdBanDau: string | null;
   anhBiaId: string | null;
+  /**
+   * BB-405 vòng 2 — mã tệp Drive của ảnh bìa (trường phụ `/api/g/photos`, BB-341): có thì đi
+   * THẲNG lh3 như ô lưới (`urlAnh`), không thì qua `/api/img` với cỡ HỢP LỆ.
+   */
+  maTepDriveBia?: string | null;
   khoa: boolean;
   onDong: () => void;
-  /** Đặt cuốn khổ đang xem. `false` = máy chủ từ chối (đã báo riêng). */
-  onDat: (productId: string) => Promise<boolean>;
+  /**
+   * Đặt cuốn khổ đang xem. `false` = máy chủ từ chối (đã báo riêng). BB-405 — thiếu =
+   * vai này không đặt thẳng được: dùng `loiDatKhac` (nếu có) hoặc chỉ xem.
+   */
+  onDat?: (productId: string) => Promise<boolean>;
+  /** BB-405 — đầu màn dùng chung của "Xem trong nhà" (hai lựa chọn Trên tường | Album trên bàn). */
+  dauTrang?: React.ReactNode;
+  /** BB-405 — cùng luật màn treo tường: vai không đặt thẳng được thì nút dẫn sang lối của vai. */
+  loiDatKhac?: { nhan: string; onBam: () => void } | null;
 }
 
-export function XemAlbumTrenBan({ cuon, productIdBanDau, anhBiaId, khoa, onDong, onDat }: XemAlbumTrenBanProps) {
+export function XemAlbumTrenBan({
+  cuon,
+  productIdBanDau,
+  anhBiaId,
+  maTepDriveBia = null,
+  khoa,
+  onDong,
+  onDat,
+  dauTrang = null,
+  loiDatKhac = null,
+}: XemAlbumTrenBanProps) {
   const [chon, setChon] = React.useState<string | null>(productIdBanDau);
   const [dangDat, setDangDat] = React.useState(false);
   const dang = cuon.find((c) => c.productId === chon) ?? cuon[0] ?? null;
@@ -80,6 +107,7 @@ export function XemAlbumTrenBan({ cuon, productIdBanDau, anhBiaId, khoa, onDong,
       <div className="flex max-h-[96dvh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-[22px] bg-background sm:rounded-[22px]">
         <header className="flex shrink-0 items-start justify-between gap-3 px-4 pb-2 pt-4 sm:px-6">
           <div className="min-w-0">
+            {dauTrang && <div className="mb-2.5">{dauTrang}</div>}
             <h3 className="kh-h2 text-foreground">{vi.gallery.loiBean.albumTrenBanTieuDe}</h3>
             <p className="mt-0.5 text-pretty text-xs text-muted-foreground">{giuA(vi.gallery.loiBean.albumTrenBanMoTa)}</p>
           </div>
@@ -115,6 +143,7 @@ export function XemAlbumTrenBan({ cuon, productIdBanDau, anhBiaId, khoa, onDong,
                 gocXoayDo={viTri.gocXoayDo}
                 dayPx={viTri.dayPx}
                 anhBiaId={anhBiaId}
+                maTepDriveBia={maTepDriveBia}
                 kho={dang.size ?? ""}
               />
             ) : (
@@ -161,6 +190,22 @@ export function XemAlbumTrenBan({ cuon, productIdBanDau, anhBiaId, khoa, onDong,
         </div>
 
         <footer className="shrink-0 border-t border-[var(--bb-border)] px-4 py-3 sm:px-6">
+          {!onDat ? (
+            loiDatKhac ? (
+              <button
+                type="button"
+                data-testid="nut-dat-loi-khac-album-tren-ban"
+                onClick={loiDatKhac.onBam}
+                className="h-11 w-full rounded-full bg-[var(--bb-fg)] px-6 text-sm font-medium text-[var(--bb-bg)] transition hover:opacity-90"
+              >
+                {loiDatKhac.nhan}
+              </button>
+            ) : (
+              <p data-testid="album-tren-ban-chi-xem" className="text-center text-[12px] text-muted-foreground">
+                {vi.gallery.loiBean.dangChiXemChuaDat}
+              </p>
+            )
+          ) : (
           <button
             type="button"
             data-testid="nut-dat-album-kho-nay"
@@ -177,6 +222,7 @@ export function XemAlbumTrenBan({ cuon, productIdBanDau, anhBiaId, khoa, onDong,
           >
             {vi.gallery.loiBean.albumTrenBanDat} · {formatCurrencyVND(dang.unitPrice)}
           </button>
+          )}
         </footer>
       </div>
     </div>
@@ -192,12 +238,14 @@ function CuonAlbum({
   gocXoayDo,
   dayPx,
   anhBiaId,
+  maTepDriveBia = null,
   kho,
 }: {
   viTri: { x: number; y: number; rong: number; cao: number };
   gocXoayDo: number;
   dayPx: number;
   anhBiaId: string | null;
+  maTepDriveBia?: string | null;
   kho: string;
 }) {
   const pt = phanTramTrongVung(viTri);
@@ -241,8 +289,23 @@ function CuonAlbum({
       {/* Bìa. */}
       <div className="absolute inset-0 overflow-hidden rounded-[2px] bg-[#efe6d8] ring-1 ring-black/10">
         {anhBiaId ? (
-          // eslint-disable-next-line @next/next/no-img-element -- ảnh của bộ ảnh qua route proxy
-          <img src={`/api/img/${anhBiaId}?w=640`} alt="" draggable={false} className="h-full w-full object-cover" />
+          // BB-405 vòng 2 — trước đây `/api/img/<id>?w=640`: 640 KHÔNG thuộc `THUMBNAIL_WIDTHS`
+          // nên route từ chối → ảnh vỡ. Nay CÙNG đường ô lưới: `urlAnh` (lh3 thẳng khi có mã tệp,
+          // cỡ 800 hợp lệ), lỗi thì lùi một lần về `/api/img?qua=1` như `luoi-anh.tsx`.
+          // eslint-disable-next-line @next/next/no-img-element -- ảnh Drive, không qua next/image
+          <img
+            data-testid="bia-cuon-album"
+            src={urlAnh({ id: anhBiaId, maTepDrive: maTepDriveBia }, CO_ANH_BIA)}
+            alt=""
+            draggable={false}
+            className="h-full w-full object-cover"
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (img.dataset.qua === "1") return;
+              img.dataset.qua = "1";
+              img.src = urlAnhDuPhong(anhBiaId, CO_ANH_BIA);
+            }}
+          />
         ) : (
           <span className="grid h-full w-full place-items-center font-display text-[3cqw] text-[#6b6057]">Album</span>
         )}

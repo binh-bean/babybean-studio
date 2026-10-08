@@ -55,6 +55,7 @@ import { CuaHang, type DongDaMua } from "./cua-hang";
 import { SoSanhAnh } from "./so-sanh-anh";
 import { BangSanPhamCuaAnh } from "./bang-san-pham-cua-anh";
 import { ManTreoTuong } from "./man-treo-tuong";
+import { albumXemTrongNha } from "./xem-trong-nha";
 import {
   DauManLuotChon,
   demAnhTheoNhom,
@@ -351,6 +352,8 @@ export function ManChonThemDot({
     const tamDau = treoTuongTuAnh ? dsAnh.find((p) => p.id === treoTuongTuAnh) : undefined;
     return tamDau && !daChon.some((p) => p.id === tamDau.id) ? [tamDau, ...daChon] : daChon;
   }, [dsAnh, treoTuongTuAnh]);
+  // BB-405 — nút "Xem trong nhà" trên từng ô: hàm ỔN ĐỊNH (TheAnh được memo — LUẬT 2 luoi-anh).
+  const xemTrongNhaTuO = React.useCallback((p: PhotoPublic) => setTreoTuongTuAnh(p.id), []);
 
   async function chot() {
     if (ten.trim().length === 0 || thieuTick) return;
@@ -448,6 +451,7 @@ export function ManChonThemDot({
             onToggle={doiAnh}
             onOpen={moAnh}
             onToggleSoSanh={soSanh.onToggleSoSanh}
+            onXemTrongNha={moTreo ? xemTrongNhaTuO : undefined}
           />
         )}
       </section>
@@ -666,7 +670,7 @@ export function ManChonThemDot({
               : null
           }
           // Cùng cách đợt 1 (BB-398): tấm đang xem đứng đầu nếu chưa chọn, rồi các tấm đã chọn.
-          anh={dsTreoDot.map((p) => ({ id: p.id, fileName: p.fileName, width: p.width, height: p.height }))}
+          anh={dsTreoDot.map((p) => ({ id: p.id, fileName: p.fileName, width: p.width, height: p.height, maTepDrive: (p as { maTepDrive?: string | null }).maTepDrive ?? null }))}
           chiSoBanDau={Math.max(0, dsTreoDot.findIndex((p) => p.id === treoTuongTuAnh))}
           danhMuc={danhMuc
             .filter((sp) => sp.nhom === "anh_in" || sp.nhom === "khung")
@@ -686,6 +690,24 @@ export function ManChonThemDot({
           dangLuu={false}
           onDatVaoGoi={khongLamGi}
           onDatMuaThem={(photoId, productId, soLuong) => datMon(productId, photoId, soLuong)}
+          // BB-405 — "Album trên bàn": cuốn vào giỏ của đợt (người gợi ý đi `loiDatKhac` ở trên).
+          album={albumXemTrongNha(danhMuc, {
+            nguCanh,
+            trongManGio: true,
+            onDat: (productId, soLuong) => datMon(productId, null, soLuong),
+            // BB-405 vòng 2 — người gợi ý: không đặt album, chỉ gợi ý tấm cho ba mẹ (như màn tường).
+            loiDatKhac: laGoiY
+              ? {
+                  nhan: vi.gallery.datLoiGoiY,
+                  onBam: (photoId) => {
+                    if (!goiY?.timCuaToi.has(photoId) && (dotKhoaTheoAnh.get(photoId) ?? 0) === 0) {
+                      goiY?.doiTim({ id: photoId });
+                    }
+                    setTreoTuongTuAnh(null);
+                  },
+                }
+              : null,
+          })}
         />
       )}
 

@@ -46,6 +46,8 @@ import {
   type KetQuaDongBoGia,
 } from "@/lib/lark/dong-bo-gia-san-pham";
 
+import { docLinkChatTuLark, dongBoLinkChatTuLark, type KetQuaDongBoLinkChat } from "@/lib/lark/dong-bo-link-chat";
+
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -74,6 +76,13 @@ const GIOI_HAN_KIEM_LAI_CRON = 40;
  * chừa phần còn lại cho bước kiểm lại bộ lỗi Drive.
  */
 const HET_GIO_QUET_ANH_CHINH_MS = 32_000;
+/**
+ * BB-407 — bước đồng bộ link chat chỉ bắt đầu khi lượt cron mới chạy chưa quá mốc này
+ * (đọc hai bảng Lark + ghi vài trăm khách chừng vài giây), và đọc Lark bị cắt ở
+ * `GIOI_HAN_DOC_LINK_CHAT_MS` — chừa chỗ cho bước quét Drive / kiểm lại phía sau.
+ */
+const HET_GIO_DONG_BO_LINK_CHAT_MS = 20_000;
+const GIOI_HAN_DOC_LINK_CHAT_MS = 12_000;
 
 async function chay(request: Request) {
   const batDauLuc = Date.now();
@@ -225,6 +234,34 @@ async function chay(request: Request) {
         console.error(JSON.stringify({ evt: "cron.hau_ky.dong_bo_gia_hong", lyDo: dongBoGia.loi }));
       }
 
+      // BB-407 — link chat riêng của khách: Lark là nguồn đúng, đổi bên Lark thì sáng hôm sau
+      // app cập nhật theo (trước đây chỉ cập nhật khi một dòng Hậu Kỳ được đồng bộ). Chỉ
+      // ĐỌC Lark; khách có link Lark khác giá trị đang có thì ghi đè, Lark trống/hỏng/mơ hồ
+      // thì giữ nguyên. Kết quả chỉ là SỐ ĐẾM (không tên, không link). Đặt TRƯỚC bước quét
+      // Drive/kiểm lại (hai bước đó ăn theo mốc giờ); hết giờ sớm hoặc hỏng thì ghi log, không
+      // kéo cron đỏ.
+      let dongBoLinkChat: KetQuaDongBoLinkChat | { boQua: string } | { loi: string };
+      if (Date.now() - batDauLuc > HET_GIO_DONG_BO_LINK_CHAT_MS) {
+        dongBoLinkChat = { boQua: "Hết giờ trong lượt này" };
+      } else {
+        try {
+          dongBoLinkChat = await dongBoLinkChatTuLark({
+            client,
+            docLark: () =>
+              Promise.race([
+                docLinkChatTuLark({ LARK_APP_ID, LARK_APP_SECRET, LARK_BASE_APP_TOKEN }),
+                new Promise<never>((_, tuChoi) =>
+                  setTimeout(() => tuChoi(new Error("Đọc Lark quá lâu")), GIOI_HAN_DOC_LINK_CHAT_MS).unref?.(),
+                ),
+              ]),
+            ghi: true,
+          });
+        } catch (err) {
+          dongBoLinkChat = { loi: err instanceof Error ? err.message : String(err) };
+          console.error(JSON.stringify({ evt: "cron.hau_ky.dong_bo_link_chat_loi", lyDo: dongBoLinkChat.loi }));
+        }
+      }
+
       // BB-392 mục 2 (anh 06/10, mục 9) — thư mục "ảnh chỉnh sửa" có trên Drive
       // mà app chưa biết: quét nhẹ (trần 40 bộ, nghỉ giữa bộ, dừng ở mốc giờ),
       // kéo ảnh về bằng đường "Đồng bộ ảnh". Ảnh chỉnh CHỜ CSKH bấm "Gửi khách
@@ -313,6 +350,7 @@ async function chay(request: Request) {
         nhac,
         nhacChuaDoc,
         dongBoGia,
+        dongBoLinkChat,
         dongBo,
         kiemLaiLoi,
         quetAnhChinh,

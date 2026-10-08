@@ -217,7 +217,8 @@ test("3. chuyển bộ — tấm trượt (390) và bảng thả xuống (1440) 
   // Máy tính.
   await vao(page, 1440, 900, `/k/${d.giaDinhA.ma}/2`);
   await choLuoi(page);
-  await expect(page.getByTestId("nut-ve-gia-dinh-may-tinh")).toBeVisible();
+  // BB-405 — một lối "← Album gia đình" cho cả hai cỡ (tên bộ ngay dưới nó).
+  await expect(page.getByTestId("nut-ve-gia-dinh")).toBeVisible();
   await page.getByTestId("nut-doi-buoi-chup").click();
   await expect(page.getByTestId("chuyen-bo-anh").getByTestId("dong-chuyen-bo")).toHaveCount(2);
   await page.waitForTimeout(400);
@@ -238,7 +239,7 @@ test("4. link cũ /g/<mã> vẫn chạy như cũ, thấy CHUNG lượt chọn ch
     await choLuoi(page);
     await expect(page.getByTestId("the-anh")).toHaveCount(2);
     await expect(page.getByTestId("nut-doi-buoi-chup")).toHaveCount(0);
-    await expect(page.getByTestId("nut-ve-gia-dinh-may-tinh")).toHaveCount(0);
+    await expect(page.getByTestId("nut-ve-gia-dinh")).toHaveCount(0);
     // Lượt chọn chính của A1 dùng chung: 2 tấm tab 1 đã chọn hiện ở đây.
     await expect(page.getByTestId("the-anh").getByRole("button", { name: /^Bỏ chọn$/ })).toHaveCount(2);
 

@@ -96,6 +96,15 @@ export const vi = {
     /** BB-400 vòng 4 — nút cố định ở màn xem lớn, mọi vai, mọi lượt. */
     xemTrenTuong: "Xem trên tường nhà",
     xemTrenTuongNgan: "Trên tường",
+    /** BB-405 — lối vào chung "Xem trong nhà" (nút trên ô ảnh + màn xem lớn) và hai lựa chọn của nó. */
+    xemTrongNha: {
+      nhan: "Xem trong nhà",
+      nhanTam: "Xem trong nhà — ảnh {n}",
+      nhanThanh: "Trong nhà — xem trên tường nhà, album trên bàn",
+      ngan: "Trong nhà",
+      trenTuong: "Trên tường",
+      albumTrenBan: "Album trên bàn",
+    },
     /** BB-400 vòng 4 — nút đặt ở màn treo tường khi vai không đặt thẳng được. */
     datLoiDotMoi: "Chọn thêm ảnh",
     datLoiGoiY: "Gợi ý tấm này",

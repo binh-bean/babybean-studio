@@ -73,7 +73,9 @@ export function NutNhanKhach({
 
   if (gonNho) {
     return (
-      <span
+      <button
+        type="button"
+        aria-disabled="true"
         data-testid="nut-nhan-khach-trong"
         title={CHU_NHAN_KHACH.goiYDayDu}
         onClick={chanLan}
@@ -81,7 +83,7 @@ export function NutNhanKhach({
       >
         <MessageCircle className="h-4 w-4" aria-hidden="true" />
         <span className="sr-only">{`${CHU_NHAN_KHACH.chuaCo} — ${CHU_NHAN_KHACH.goiY}`}</span>
-      </span>
+      </button>
     );
   }
 

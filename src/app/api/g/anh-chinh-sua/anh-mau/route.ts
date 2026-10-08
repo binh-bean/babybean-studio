@@ -17,6 +17,7 @@ import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { GallerySessionError } from "@/lib/auth/gallery-session";
 import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiNhatKy } from "@/lib/nhat-ky";
 import {
   BUCKET_ANH_MAU,
   coBangChiTiet,
@@ -48,7 +49,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const { data: gallery } = await admin
       .from("galleries")
-      .select("id, status")
+      .select("id, status, branch_id")
       .eq("id", session.galleryId)
       .maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
@@ -87,6 +88,19 @@ export async function POST(request: Request): Promise<Response> {
     const duongDan = `${gallery.id}/${randomUUID()}.${kieu}`;
     const { error } = await kho.upload(duongDan, byte, { contentType: MIME[kieu], upsert: false });
     if (error) throw error;
+
+    // Ghi MÃ và kích cỡ thôi — không ghi tên tệp khách đặt (có thể là tên con) hay đường dẫn ký.
+    await ghiNhatKy({
+      actorType: "customer",
+      actorId: session.selectionId,
+      actorLabel: "Customer",
+      branchId: (gallery.branch_id as string | null | undefined) ?? null,
+      action: "anh_chinh.gui_anh_mau",
+      entityType: "gallery",
+      entityId: gallery.id,
+      galleryId: gallery.id,
+      metadata: { kieu, soByte: tep.size, vai: session.role },
+    });
 
     return ok({ duongDan });
   } catch (err) {

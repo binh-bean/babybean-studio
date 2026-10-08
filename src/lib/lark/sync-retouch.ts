@@ -17,7 +17,7 @@ import { dienSdtKhach, sdtTuDongLark } from "@/lib/lark/sdt-khach-lark";
 import { tachMaHoaDon } from "@/lib/utils/ma-hoa-don";
 import { neoBoAnhVaoDongHauKy } from "@/lib/lark/neo-dong-hau-ky";
 import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
-import { ghiLinkChatNeuTrongPg } from "@/lib/lark/ghi-link-chat";
+import { ghiLinkChatTheoLarkPg } from "@/lib/lark/ghi-link-chat";
 
 export const HOST = "https://open.larksuite.com/open-apis";
 
@@ -530,9 +530,9 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
         .catch((e: unknown) => console.error(JSON.stringify({ evt: "lark.sync_retouch.noi_khoa_loi", loi: (e as { message?: string })?.message ?? String(e) })));
     }
     // BB-404: nhánh này trả về sớm nên trước đây KHÔNG BAO GIỜ ghi link chat cho khách của bộ
-    // đã có (tạo bằng thuật sĩ/tay) → nút "Nhắn khách" xám mãi. Ghi khi còn trống, không đè.
+    // đã có (tạo bằng thuật sĩ/tay) → nút "Nhắn khách" xám mãi. Ghi theo Lark (khác thì cập nhật).
     if (write && khachCu) {
-      await ghiLinkChatNeuTrongPg(client, khachCu, extractChatLink(getField(fields, /chat\s*với\s*khách|link\s*chat|chat/i)));
+      await ghiLinkChatTheoLarkPg(client, khachCu, extractChatLink(getField(fields, /chat\s*với\s*khách|link\s*chat|chat/i)));
     }
     return {
       action: "already_exists",
@@ -645,11 +645,12 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
 
     if (custRows.length > 0) {
       customerId = custRows[0].id;
-      // Cập nhật facebook link nếu chưa có, cập nhật lại tên và lark_customer_key
+      // Cập nhật link chat theo Lark, tên và lark_customer_key
       await client.query(
-        // BB-404: chuỗi trắng cũng là "chưa có" (coalesce cũ bỏ qua '' → nút xám mãi).
-        `update customers set 
-           facebook = coalesce(nullif(btrim(facebook), ''), $1),
+        // BB-407 — link chat theo Lark: Lark có link http(s) hợp lệ (`facebookChatUrl` đã qua
+        // `linkChatKhach`) thì ghi đè; Lark trống/hỏng (null) thì giữ nguyên link đang có.
+        `update customers set
+           facebook = coalesce(nullif(btrim($1::text), ''), nullif(btrim(facebook), '')),
            full_name = $2,
            lark_customer_key = coalesce(lark_customer_key, $3)
          where id = $4`,

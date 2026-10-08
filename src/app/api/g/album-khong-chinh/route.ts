@@ -4,6 +4,7 @@ import { GallerySessionError } from "@/lib/auth/gallery-session";
 import type { GallerySession } from "@/types/domain";
 import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiNhatKy } from "@/lib/nhat-ky";
 import { ok, fail, readJsonBody } from "@/lib/api-response";
 import { isGalleryLocked, maLarkConHieuLuc } from "@/lib/gallery-status";
 import { laLoiChuaApMigration } from "@/lib/gallery/dot-chon-server";
@@ -37,14 +38,40 @@ const Schema = z.object({ photoId: z.string().uuid("photoId không hợp lệ") 
 async function kiemBoAnh(admin: ReturnType<typeof createAdminClient>, session: GallerySession) {
   const { data: gallery } = await admin
     .from("galleries")
-    .select("id, status, lark_trang_thai, lark_trang_thai_tu, reopened_at")
+    .select("id, status, branch_id, lark_trang_thai, lark_trang_thai_tu, reopened_at")
     .eq("id", session.galleryId)
     .maybeSingle();
-  if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
+  if (!gallery) return { chan: fail("NOT_FOUND", "Không tìm thấy bộ ảnh"), branchId: null };
+  const branchId = (gallery.branch_id as string | null) ?? null;
   if (isGalleryLocked(gallery.status, maLarkConHieuLuc(gallery))) {
-    return fail("GALLERY_LOCKED", "Bộ ảnh đã chốt, ba mẹ nhắn Bean nếu muốn đổi ảnh album ạ.");
+    return {
+      chan: fail("GALLERY_LOCKED", "Bộ ảnh đã chốt, ba mẹ nhắn Bean nếu muốn đổi ảnh album ạ."),
+      branchId,
+    };
   }
-  return null;
+  return { chan: null, branchId };
+}
+
+/** BB-408 — nhật ký: chỉ id ảnh + số suất/số đã chọn, không tên bé, không link. */
+async function ghiNhatKyAlbumKhongChinh(
+  session: GallerySession,
+  branchId: string | null,
+  action: "album_khong_chinh.chon" | "album_khong_chinh.bo",
+  photoId: string,
+  soDaChon: number,
+  soSuat: number,
+) {
+  await ghiNhatKy({
+    actorType: "customer",
+    actorId: session.selectionId,
+    actorLabel: "Customer",
+    branchId,
+    action,
+    entityType: "gallery",
+    entityId: session.galleryId,
+    galleryId: session.galleryId,
+    metadata: { photoId, soDaChon, soSuat, vai: session.role },
+  });
 }
 
 async function docInput(request: NextRequest) {
@@ -73,7 +100,7 @@ export async function POST(request: NextRequest) {
     const { photoId } = parsed.data;
 
     const admin = createAdminClient();
-    const chan = await kiemBoAnh(admin, session);
+    const { chan, branchId } = await kiemBoAnh(admin, session);
     if (chan) return chan;
 
     // Ảnh phải thuộc ĐÚNG bộ đang mở — id ảnh đến từ thân yêu cầu, không tin cậy.
@@ -127,6 +154,10 @@ export async function POST(request: NextRequest) {
     }
 
     const moi = await trangThai(admin, session);
+    // Chỉ ghi khi tấm này MỚI vào suất (bấm lại tấm đã chọn không đổi gì).
+    if (!truoc.photoIds.includes(photoId)) {
+      await ghiNhatKyAlbumKhongChinh(session, branchId, "album_khong_chinh.chon", photoId, moi.photoIds.length, moi.soSuat);
+    }
     return ok({ soSuat: moi.soSuat, photoIds: moi.photoIds });
   } catch (error) {
     if (error instanceof GallerySessionError) return fail(error.code);
@@ -143,9 +174,10 @@ export async function DELETE(request: NextRequest) {
     const { photoId } = parsed.data;
 
     const admin = createAdminClient();
-    const chan = await kiemBoAnh(admin, session);
+    const { chan, branchId } = await kiemBoAnh(admin, session);
     if (chan) return chan;
 
+    const truoc = await trangThai(admin, session);
     // Xoá theo CẢ lượt chọn của phiên: id ảnh của bộ khác không khớp dòng nào.
     const { error } = await admin
       .from(BANG_ANH_ALBUM_KHONG_CHINH)
@@ -155,6 +187,10 @@ export async function DELETE(request: NextRequest) {
     if (error && !laLoiChuaApMigration(error)) throw error;
 
     const moi = await trangThai(admin, session);
+    // Chỉ ghi khi thật sự có tấm bị bỏ ra khỏi suất.
+    if (truoc.photoIds.includes(photoId) && !moi.photoIds.includes(photoId)) {
+      await ghiNhatKyAlbumKhongChinh(session, branchId, "album_khong_chinh.bo", photoId, moi.photoIds.length, moi.soSuat);
+    }
     return ok({ soSuat: moi.soSuat, photoIds: moi.photoIds });
   } catch (error) {
     if (error instanceof GallerySessionError) return fail(error.code);

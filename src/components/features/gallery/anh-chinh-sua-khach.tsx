@@ -32,6 +32,7 @@ import { giuA } from "@/lib/utils/giu-a";
 import { formatNgayVN, formatTien } from "@/lib/utils/dinh-dang";
 import { TOI_DA_ANH_MAU, type VungKhoanh } from "@/lib/anh-chinh-sua/nhan-dien";
 import { AnhKhoanhVung } from "./anh-khoanh-vung";
+import { NutXemTrongNha } from "./xem-trong-nha";
 import { KHOA_TRONG_GOI, type TrangThaiDuyetDot } from "@/lib/anh-chinh-sua/theo-dot";
 import { cauHanSua } from "@/lib/anh-chinh-sua/han-sua";
 import {
@@ -570,6 +571,13 @@ export function AnhChinhSuaKhach({
               />
             </button>
             {moVong && <ChipTrangThai tt={tt} testId="trang-thai-o-anh" className="absolute left-1.5 top-1.5" />}
+            {/* BB-405 — "Xem trong nhà" ngay trên ô ảnh đã chỉnh (góc dưới trái, như lưới chọn). */}
+            {onXemTuong && (
+              <NutXemTrongNha
+                thuTu={i}
+                onBam={() => onXemTuong({ id: a.id, fileName: a.fileName, width: a.width, height: a.height })}
+              />
+            )}
           </li>
         );
       })}
@@ -930,15 +938,11 @@ export function XemLonDuyet(p: PropsXemLon) {
         </span>
         <span className="flex shrink-0 items-center gap-1">
           {p.xemTuong && (
-            <button
-              type="button"
-              data-testid="nut-xem-tuong"
-              aria-label={vi.gallery.xemTrenTuong}
-              onClick={() => p.xemTuong?.({ id: a.id, fileName: a.fileName, width: a.width, height: a.height })}
-              className="rounded-full border border-white/25 px-3 py-1.5 text-[12.5px] font-medium hover:bg-white/10"
-            >
-              {vi.gallery.xemTrenTuongNgan}
-            </button>
+            // BB-405 — cùng nút "Xem trong nhà" (ngôi nhà) với lưới chọn và màn xem lớn.
+            <NutXemTrongNha
+              kieu="thanh-toi"
+              onBam={() => p.xemTuong?.({ id: a.id, fileName: a.fileName, width: a.width, height: a.height })}
+            />
           )}
           <button type="button" onClick={p.hanh.dong} className="shrink-0 rounded-full px-3 py-1.5 hover:bg-white/10">
             {t.dong}

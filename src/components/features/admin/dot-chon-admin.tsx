@@ -247,8 +247,9 @@ export function DotChonQuanTri({
     >
       <h2 className="text-base font-medium">Đợt chọn</h2>
       <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">
-        Ảnh khách chọn theo từng đợt. Đợt 2 trở đi là ảnh khách mua thêm — thợ chỉnh ảnh chỉ cần làm
-        đợt mới (bấm &ldquo;Xem danh sách đợt N&rdquo; để xem và chép). Cập nhật hợp đồng bên Lark bằng tay sau khi xác nhận.
+        Tóm tắt từng đợt khách chọn. Đợt 2 trở đi là ảnh khách mua thêm — thợ chỉnh ảnh chỉ cần làm
+        đợt mới. Danh sách tên tệp xem và chép ở khối &ldquo;Xuất danh sách&rdquo; bên phải, phía dưới
+        (bấm &ldquo;Xem danh sách đợt N&rdquo; để nhảy tới đúng đợt). Cập nhật hợp đồng bên Lark bằng tay sau khi xác nhận.
       </p>
 
       {choXacNhan.length > 0 && (
@@ -299,19 +300,6 @@ export function DotChonQuanTri({
             )}
             {d.trangThai === "da_mo_lai" && d.lyDoMoLai && (
               <p className="mt-1 text-xs text-[var(--bb-fg-muted)]">Lý do mở lại: {d.lyDoMoLai}</p>
-            )}
-
-            {d.anh.length > 0 && (
-              <ul className="mt-2 flex flex-wrap gap-1.5">
-                {d.anh.map((a) => (
-                  <li
-                    key={a.photoId}
-                    className="rounded-full border border-[var(--bb-border)] px-2 py-0.5 text-[11px] tabular-nums"
-                  >
-                    {a.fileName}
-                  </li>
-                ))}
-              </ul>
             )}
 
             {d.sanPham.length > 0 && (

@@ -106,6 +106,20 @@ const NGOAI_LE: Record<string, string> = {
     "BB-349 dời thân route vào `xacNhanDotMuaThem` (src/lib/gallery/xac-nhan-danh-sach.ts): " +
     "chính hàm đó chuyển đợt sang da_xac_nhan VÀ gọi ghiNhatKy `selection.round_confirm`. " +
     "Route chỉ kiểm quyền, gọi hàm, rồi gửi thông báo đẩy.",
+  "admin/galleries/[id]/hoa-don":
+    "BB-395/BB-408 — route chỉ kiểm quyền rồi gọi các hàm trong " +
+    "src/lib/hoa-don/xac-nhan-hoa-don-server.ts, và CHÍNH các hàm đó ghi nhật ký ngay sau " +
+    "khi đổi dữ liệu: `dongBoHoaDonChoBo` (gallery.hoa_don_gan, gallery.hoa_don_dong_bo, " +
+    "customer.noi_khoa_lark), `boAnhDu` + `boMucDu` (gallery.hoa_don_bo_muc), `goGanHoaDon` " +
+    "(gallery.hoa_don_go_gan). Ghi thêm ở route là ghi đôi.",
+  "admin/galleries/[id]/retouch-done":
+    "BB-384/BB-408 — route chỉ là lớp vỏ gọi thẳng POST của `anh-chinh-sua/gui-khach`, " +
+    "nơi chuyển bộ sang awaiting_approval VÀ ghi `gallery.anh_chinh_gui_khach` vào " +
+    "activity_logs. Ghi thêm ở đây là ghi đôi một lượt bấm.",
+  "admin/hoa-don/goi-y":
+    "BB-395/BB-408 — dùng POST chỉ để mã hoá đơn không nằm trên địa chỉ. Đọc hoá đơn từ " +
+    "nguồn rồi GỢI Ý bộ ảnh khớp, không gán gì và không ghi bảng nào; việc gán thật đi qua " +
+    "`admin/galleries/[id]/hoa-don`, nơi có nhật ký gallery.hoa_don_gan.",
   "admin/galleries/[id]/lam-nong-anh":
     "BB-286 — chỉ kéo trước ảnh từ Drive và ghi vào bộ đệm Storage (bucket " +
     "thumbnails), không đổi bất cứ hàng nào trong cơ sở dữ liệu nghiệp vụ. " +

@@ -271,6 +271,8 @@ test.describe.serial("BB-321: đợt chọn — khách mua thêm, CSKH xác nh�
     await expect(khoi).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("the-dot-2")).toContainText("Khách mua thêm đợt 2: 2 ảnh");
     await expect(page.getByTestId("the-dot-3")).toContainText("Khách mua thêm đợt 3: 1 ảnh");
+    // BB-406: khối "Đợt chọn" không in tên tệp (xem ở khối "Xuất danh sách" bên dưới).
+    await expect(khoi).not.toContainText("BB321_004.jpg");
     await chupHaiKho(page, "quan-tri-dot", async () => {
       await khoi.scrollIntoViewIfNeeded();
     });

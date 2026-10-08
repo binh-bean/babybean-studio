@@ -17,6 +17,7 @@ import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
 import { GallerySessionError } from "@/lib/auth/gallery-session";
 import { requirePhienBoAnh } from "@/lib/auth/phien-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ghiNhatKy } from "@/lib/nhat-ky";
 import { docBoiCanhAnhChinh, docVongSua, khachThayTrongBoiCanh } from "@/lib/anh-chinh-sua/du-lieu";
 import {
   KHOA_TRONG_GOI,
@@ -44,7 +45,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const admin = createAdminClient();
-    const { data: gallery } = await admin.from("galleries").select("id, status").eq("id", session.galleryId).maybeSingle();
+    const { data: gallery } = await admin.from("galleries").select("id, status, branch_id").eq("id", session.galleryId).maybeSingle();
     if (!gallery) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
 
     const bc = await docBoiCanhAnhChinh(admin, gallery.id);
@@ -73,6 +74,20 @@ export async function POST(request: Request): Promise<Response> {
       duyet: body.duyet,
       luc: new Date().toISOString(),
     });
+    // Chỉ ghi nhật ký khi dấu duyệt THẬT SỰ nằm ở máy chủ (chưa áp 0108 thì chưa ghi gì để tra lại).
+    if (kq === "ok") {
+      await ghiNhatKy({
+        actorType: "customer",
+        actorId: session.selectionId,
+        actorLabel: "Customer",
+        branchId: (gallery.branch_id as string | null | undefined) ?? null,
+        action: body.duyet ? "anh_chinh.duyet_tam" : "anh_chinh.bo_duyet_tam",
+        entityType: "gallery",
+        entityId: gallery.id,
+        galleryId: gallery.id,
+        metadata: { photoId: anh.id, khoa: laDotMuaThemRieng ? khoa : KHOA_TRONG_GOI, vai: session.role },
+      });
+    }
     return ok({ luuMayChu: kq === "ok", photoId: anh.id, duyet: body.duyet });
   } catch (err) {
     if (err instanceof GallerySessionError) return fail(err.code);

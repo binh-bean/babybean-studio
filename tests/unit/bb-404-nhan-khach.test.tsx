@@ -32,7 +32,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 
 import { extractChatLink, syncSingleRetouchRecord } from "@/lib/lark/sync-retouch";
 import { bocDongHauKy } from "@/lib/lark/tra-hau-ky";
-import { ghiLinkChatNeuTrong, ghiLinkChatNeuTrongPg, SQL_GHI_LINK_CHAT_NEU_TRONG } from "@/lib/lark/ghi-link-chat";
+import { ghiLinkChatTheoLark, ghiLinkChatTheoLarkPg, SQL_GHI_LINK_CHAT_THEO_LARK } from "@/lib/lark/ghi-link-chat";
 import { layLinkChatTheoBo, layLinkChatTheoKhach } from "@/lib/lien-lac/link-chat-khach-server";
 import { NutNhanKhach } from "@/components/features/admin/nut-nhan-khach";
 import { GET as getKhachHang } from "@/app/api/admin/customers/route";
@@ -144,36 +144,58 @@ describe("BB-404: dòng Hậu Kỳ mang link chat (thuật sĩ tạo bộ / gắ
   });
 });
 
-describe("BB-404: ghiLinkChatNeuTrong — ghi khi trống, không đè link nhân viên đã sửa", () => {
-  it("facebook NULL → ghi link", async () => {
+describe("BB-404/407: ghiLinkChatTheoLark — Lark là nguồn đúng: khác thì ghi đè, giống thì không ghi, trống thì giữ", () => {
+  const LINK_TAY = "https://m.me/sua-tay-404";
+  it("facebook NULL → ghi link (có điều kiện is null)", async () => {
     const db = dbGia({ customers: [{ id: "k1", facebook: null }] });
-    expect(await ghiLinkChatNeuTrong(db.client, "k1", LINK)).toBe("da_ghi");
+    expect(await ghiLinkChatTheoLark(db.client, "k1", LINK)).toBe("da_ghi");
     expect(db.ghi).toHaveLength(1);
     expect(db.ghi[0]?.giaTri).toEqual({ facebook: LINK });
+    expect(db.ghi[0]?.loc).toContainEqual(["is", "facebook", null]);
   });
   it("facebook chuỗi trắng → coi là trống, ghi link", async () => {
     const bang = { customers: [{ id: "k1", facebook: "   " }] };
     const db = dbGia(bang);
-    expect(await ghiLinkChatNeuTrong(db.client, "k1", LINK)).toBe("da_ghi");
+    expect(await ghiLinkChatTheoLark(db.client, "k1", LINK)).toBe("da_ghi");
     expect(bang.customers[0]?.facebook).toBe(LINK);
   });
-  it("đã có link (nhân viên sửa tay) → KHÔNG đè", async () => {
-    const bang = { customers: [{ id: "k1", facebook: "https://m.me/sua-tay-404" }] };
+  it("đã có link KHÁC (Lark vừa đổi) → GHI ĐÈ theo Lark, có điều kiện so lại giá trị cũ", async () => {
+    const bang = { customers: [{ id: "k1", facebook: LINK_TAY }] };
     const db = dbGia(bang);
-    expect(await ghiLinkChatNeuTrong(db.client, "k1", LINK)).toBe("da_co");
+    expect(await ghiLinkChatTheoLark(db.client, "k1", LINK)).toBe("da_ghi");
+    expect(bang.customers[0]?.facebook).toBe(LINK);
+    expect(db.ghi).toHaveLength(1);
+    // chống đè đồng thời: câu UPDATE chỉ trúng khi giá trị vẫn là giá trị cũ vừa đọc
+    expect(db.ghi[0]?.loc).toContainEqual(["eq", "facebook", LINK_TAY]);
+  });
+  it("link Lark GIỐNG giá trị đang có (kể cả thừa khoảng trắng) → da_co, không ghi", async () => {
+    const bang = { customers: [{ id: "k1", facebook: `  ${LINK} ` }] };
+    const db = dbGia(bang);
+    expect(await ghiLinkChatTheoLark(db.client, "k1", LINK)).toBe("da_co");
     expect(db.ghi).toHaveLength(0);
-    expect(bang.customers[0]?.facebook).toBe("https://m.me/sua-tay-404");
+    expect(bang.customers[0]?.facebook).toBe(`  ${LINK} `);
+  });
+  it("Lark trống/hỏng → giữ nguyên link đang có, không xoá", async () => {
+    const bang = { customers: [{ id: "k1", facebook: LINK_TAY }] };
+    const db = dbGia(bang);
+    expect(await ghiLinkChatTheoLark(db.client, "k1", null)).toBe("khong_co_link");
+    expect(await ghiLinkChatTheoLark(db.client, "k1", "")).toBe("khong_co_link");
+    expect(await ghiLinkChatTheoLark(db.client, "k1", "javascript:alert(1)")).toBe("khong_co_link");
+    expect(db.ghi).toHaveLength(0);
+    expect(bang.customers[0]?.facebook).toBe(LINK_TAY);
   });
   it("link hỏng (javascript:) / thiếu khách → không ghi gì", async () => {
     const db = dbGia({ customers: [{ id: "k1", facebook: null }] });
-    expect(await ghiLinkChatNeuTrong(db.client, "k1", "javascript:alert(1)")).toBe("khong_co_link");
-    expect(await ghiLinkChatNeuTrong(db.client, null, LINK)).toBe("khong_co_link");
+    expect(await ghiLinkChatTheoLark(db.client, "k1", "javascript:alert(1)")).toBe("khong_co_link");
+    expect(await ghiLinkChatTheoLark(db.client, null, LINK)).toBe("khong_co_link");
+    expect(await ghiLinkChatTheoLark(db.client, "khong-co", LINK)).toBe("khong_thay_khach");
     expect(db.ghi).toHaveLength(0);
   });
 });
 
-describe("BB-404: đồng bộ Hậu Kỳ — bộ ĐÃ CÓ (thuật sĩ/tay) vẫn được ghi link chat", () => {
-  // pg GIẢ: giữ một khách trong bộ nhớ, áp đúng câu SQL "ghi khi trống" của ghi-link-chat.
+describe("BB-404/407: đồng bộ Hậu Kỳ — bộ ĐÃ CÓ vẫn được cập nhật link chat theo Lark", () => {
+  // pg GIẢ: giữ một khách trong bộ nhớ, áp đúng điều kiện của SQL_GHI_LINK_CHAT_THEO_LARK
+  // (`btrim(coalesce(facebook,'')) is distinct from $1`) — chỉ ghi khi KHÁC, không còn "chỉ khi trống".
   const clientGia = (facebook: string | null) => {
     const khach = { id: "kh-cu", facebook };
     const cauLenh: { sql: string; params?: unknown[] }[] = [];
@@ -183,9 +205,9 @@ describe("BB-404: đồng bộ Hậu Kỳ — bộ ĐÃ CÓ (thuật sĩ/tay) v�
         if (sql.includes("from galleries where drive_folder_id")) {
           return { rows: [{ id: "gal-cu", title: "Album", status: "draft", customer_id: "kh-cu" }], rowCount: 1 };
         }
-        if (sql === SQL_GHI_LINK_CHAT_NEU_TRONG) {
-          const trong = khach.facebook == null || khach.facebook.trim() === "";
-          if (params?.[1] === khach.id && trong) {
+        if (sql === SQL_GHI_LINK_CHAT_THEO_LARK) {
+          const khac = (khach.facebook ?? "").trim() !== params?.[0];
+          if (params?.[1] === khach.id && khac) {
             khach.facebook = params?.[0] as string;
             return { rows: [], rowCount: 1 };
           }
@@ -196,16 +218,18 @@ describe("BB-404: đồng bộ Hậu Kỳ — bộ ĐÃ CÓ (thuật sĩ/tay) v�
     } as unknown as import("pg").Client;
     return { client, cauLenh, khach };
   };
-  const banGhi = {
+  const banGhiVoi = (chat: unknown) => ({
     record_id: "rec_bb404",
     fields: {
       "Trạng thái": "Đã gửi file gốc",
       "Link ảnh gửi khách": "https://drive.google.com/drive/folders/1Fixture404aaaaaaaaaaaaaaaaaaaa",
       "Hợp đồng": "HD_20991231#404",
-      "Chat với khách": [{ link: LINK, text: TEN_GIA, type: "url" }],
+      "Chat với khách": chat,
     },
-  };
+  });
+  const banGhi = banGhiVoi([{ link: LINK, text: TEN_GIA, type: "url" }]);
   const chung = { branches: [], staffList: [], index: 0, dbUrl: "postgresql://localhost/test" };
+  const soLanGhi = (cauLenh: { sql: string }[]) => cauLenh.filter((c) => c.sql === SQL_GHI_LINK_CHAT_THEO_LARK).length;
 
   it("khách cũ trống link → ghi link (chỉ phần URL)", async () => {
     const a = clientGia(null);
@@ -214,18 +238,43 @@ describe("BB-404: đồng bộ Hậu Kỳ — bộ ĐÃ CÓ (thuật sĩ/tay) v�
     expect(a.khach.facebook).toBe(LINK);
     expect(JSON.stringify(a.cauLenh)).not.toContain(TEN_GIA);
   });
-  it("khách cũ đã có link → không đè; chạy thử (write=false) → không ghi", async () => {
+  it("khách cũ đã có link KHÁC → GHI ĐÈ theo Lark", async () => {
     const a = clientGia("https://m.me/sua-tay-404");
     await syncSingleRetouchRecord({ ...chung, client: a.client, record: banGhi, write: true });
-    expect(a.khach.facebook).toBe("https://m.me/sua-tay-404");
+    expect(a.khach.facebook).toBe(LINK);
+    expect(soLanGhi(a.cauLenh)).toBe(1);
+  });
+  it("khách cũ đã có link GIỐNG Lark → không ghi (rowCount 0, giá trị y nguyên)", async () => {
+    const a = clientGia(LINK);
+    await syncSingleRetouchRecord({ ...chung, client: a.client, record: banGhi, write: true });
+    expect(a.khach.facebook).toBe(LINK);
+    // câu SQL vẫn được gửi (điều kiện nằm ở DB) nhưng không đổi dòng nào
+    const ghi = a.cauLenh.find((c) => c.sql === SQL_GHI_LINK_CHAT_THEO_LARK);
+    expect(ghi?.params).toEqual([LINK, "kh-cu"]);
+  });
+  it("Lark trống / link hỏng → KHÔNG gửi câu ghi, giữ link đang có", async () => {
+    for (const chat of [[], [{ link: "", text: TEN_GIA }], [{ link: "javascript:alert(1)", text: TEN_GIA }]]) {
+      const a = clientGia("https://m.me/sua-tay-404");
+      await syncSingleRetouchRecord({ ...chung, client: a.client, record: banGhiVoi(chat), write: true });
+      expect(a.khach.facebook).toBe("https://m.me/sua-tay-404");
+      expect(soLanGhi(a.cauLenh)).toBe(0);
+    }
+  });
+  it("chạy thử (write=false) → không ghi", async () => {
     const b = clientGia(null);
     await syncSingleRetouchRecord({ ...chung, client: b.client, record: banGhi, write: false });
     expect(b.khach.facebook).toBeNull();
+    expect(soLanGhi(b.cauLenh)).toBe(0);
   });
-  it("ghiLinkChatNeuTrongPg từ chối link không http(s)", async () => {
+  it("ghiLinkChatTheoLarkPg từ chối link không http(s)", async () => {
     const a = clientGia(null);
-    expect(await ghiLinkChatNeuTrongPg(a.client as never, "kh-cu", "javascript:alert(1)")).toBe("khong_co_link");
+    expect(await ghiLinkChatTheoLarkPg(a.client as never, "kh-cu", "javascript:alert(1)")).toBe("khong_co_link");
     expect(a.khach.facebook).toBeNull();
+  });
+  it("ghiLinkChatTheoLarkPg: khác → da_ghi, giống → da_co", async () => {
+    const a = clientGia("https://m.me/cu-404");
+    expect(await ghiLinkChatTheoLarkPg(a.client as never, "kh-cu", LINK)).toBe("da_ghi");
+    expect(await ghiLinkChatTheoLarkPg(a.client as never, "kh-cu", LINK)).toBe("da_co");
   });
 });
 

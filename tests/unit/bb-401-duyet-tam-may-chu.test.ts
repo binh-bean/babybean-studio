@@ -17,8 +17,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const phien = { galleryId: "g1", role: "owner" as string };
+const phien = { galleryId: "g1", selectionId: "s1", role: "owner" as string };
 vi.mock("@/lib/auth/phien-bo-anh", () => ({ requirePhienBoAnh: async () => phien }));
+
+// BB-408 — nhật ký: bắt các dòng route gửi đi (ghiNhatKy thật cần DB).
+const nhatKy: Record<string, unknown>[] = [];
+vi.mock("@/lib/nhat-ky", () => ({
+  ghiNhatKy: async (dong: Record<string, unknown>) => {
+    nhatKy.push(dong);
+  },
+}));
 
 const goi: { bang: string; thaoTac: string; giaTri?: unknown; loc: Record<string, unknown> }[] = [];
 const db = { status: "awaiting_approval", loiBang: null as null | { code: string } };
@@ -98,6 +106,7 @@ const gui = async (than: unknown) => {
 
 beforeEach(() => {
   goi.length = 0;
+  nhatKy.length = 0;
   phien.role = "owner";
   db.status = "awaiting_approval";
   db.loiBang = null;
@@ -112,6 +121,31 @@ describe("BB-401 vòng 2 · 1 · route lưu dấu duyệt từng tấm", () => {
     expect(goi).toHaveLength(1);
     expect(goi[0]).toMatchObject({ bang: "anh_chinh_duyet_tam", thaoTac: "upsert" });
     expect(goi[0]!.giaTri).toMatchObject({ gallery_id: "g1", photo_id: "p1", khoa: "goc" });
+  });
+
+  it("BB-408 · duyệt / bỏ duyệt đều để lại nhật ký chỉ có mã (không tên, không link)", async () => {
+    await gui({ photoId: "p1", duyet: true });
+    await gui({ photoId: "p2", duyet: false });
+    expect(nhatKy).toHaveLength(2);
+    expect(nhatKy[0]).toMatchObject({
+      actorType: "customer",
+      action: "anh_chinh.duyet_tam",
+      entityId: "g1",
+      galleryId: "g1",
+      metadata: { photoId: "p1", khoa: "goc", vai: "owner" },
+    });
+    expect(nhatKy[1]).toMatchObject({ action: "anh_chinh.bo_duyet_tam", metadata: { photoId: "p2" } });
+    expect(JSON.stringify(nhatKy)).not.toContain("IMG_");
+  });
+
+  it("BB-408 · bị từ chối hoặc chưa lưu được ở máy chủ → không có dòng nhật ký nào", async () => {
+    phien.role = "viewer";
+    await gui({ photoId: "p1", duyet: true });
+    phien.role = "owner";
+    await gui({ photoId: "khac", duyet: true });
+    db.loiBang = { code: "42P01" };
+    await gui({ photoId: "p1", duyet: true });
+    expect(nhatKy).toEqual([]);
   });
 
   it("bỏ duyệt (đổi sang Cần sửa) → xoá đúng dòng của bộ + tấm", async () => {

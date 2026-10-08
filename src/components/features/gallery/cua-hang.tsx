@@ -55,6 +55,7 @@ import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 import { cn } from "@/components/ui/utils";
 import React from "react";
+import { House } from "lucide-react";
 import { formatCurrencyVND } from "@/components/ui/contract-breakdown";
 import { THU_TU_NHOM, TEN_NHOM, type NhomSanPham } from "@/lib/products/nhom-san-pham";
 import {
@@ -869,8 +870,9 @@ export function CuaHang({
                                   <button
                                     type="button"
                                     onClick={() => onXemTrenTuong(dongIn.photoId, dongIn.material, dongIn.size, true)}
-                                    className="shrink-0 text-[12px] font-medium underline underline-offset-2"
+                                    className="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium underline underline-offset-2"
                                   >
+                                    <House className="h-3.5 w-3.5" strokeWidth={1.6} aria-hidden="true" />
                                     {vi.gallery.loiBean.xemTrenTuongNha}
                                   </button>
                                 )}
@@ -1129,7 +1131,9 @@ export function CuaHang({
                   onClick={() => onXemTrenTuong(anhChoXemTuong, chatLieu, kichThuoc, false)}
                   className="mt-3.5 flex w-full items-center justify-between gap-2 rounded-xl bg-[#2E2A27] px-3.5 py-3 text-left transition hover:bg-[#3a352f]"
                 >
-                  <span className="min-w-0">
+                  {/* BB-405 — cùng biểu tượng ngôi nhà của lối "Xem trong nhà" ở mọi màn. */}
+                  <House className="h-[18px] w-[18px] shrink-0 text-[#fdfbf9]" strokeWidth={1.6} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold text-[#fdfbf9]">
                       {laChatLieuUV(chatLieu) ? vi.gallery.loiBean.xemTrenBanNha : vi.gallery.loiBean.xemTrenTuongNha}
                     </span>

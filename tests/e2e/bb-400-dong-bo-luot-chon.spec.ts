@@ -304,7 +304,8 @@ test.describe.serial("BB-400: đồng bộ các lượt chọn", () => {
     await phamVi.getByRole("button", { name: `Xem ảnh ${n}` }).evaluate((el) => (el as HTMLElement).click());
     const nut = page.getByTestId("nut-xem-tuong");
     test.skip((await nut.count()) === 0, "Bảng giá bb-dev không có ảnh in đang bán");
-    await expect(nut).toHaveText(/Trên tường/);
+    // BB-405: nhãn nút đổi thành "Trong nhà" (mở trình xem chung Trên tường | Album trên bàn).
+    await expect(nut).toHaveText(/Trong nhà/);
     await nut.click();
     const man = page.getByRole("dialog", { name: "Xem ảnh trên tường" });
     await expect(man).toBeVisible();

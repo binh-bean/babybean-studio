@@ -16,8 +16,11 @@
  *        · theo record_id = `galleries.lark_hauky_record_id` (khách chưa có khoá Lark).
  *   Phần `text` của ô URL là TÊN KHÁCH — không bao giờ đọc/in. Chỉ nhận URL http(s).
  *
- * Luật ghi: CHỈ khách đang TRỐNG (NULL/chuỗi trắng) — không đè link nhân viên đã sửa tay.
+ * Luật ghi (BB-407 — Lark là nguồn đúng, cùng luật với app và cron hằng ngày): link Lark hợp lệ
+ * và KHÁC giá trị đang có → ghi đè; giống → không ghi; Lark trống/hỏng → giữ nguyên.
  * Một khách khớp nhiều link KHÁC nhau → mơ hồ, bỏ qua (đếm riêng). Một giao dịch.
+ * Phần thuần (đọc + so khớp + câu SQL ghi) nằm ở `src/lib/lark/dong-bo-link-chat-thuan.ts`,
+ * dùng chung với cron `hau-ky` — tệp đó không có import alias nên node nạp thẳng được.
  *
  * Chạy:
  *   node --env-file=.env.local scripts/bb404-bu-link-chat.mjs          # chỉ đọc, in số đếm
@@ -25,54 +28,27 @@
  *   (bb-prod: thêm --that-su-la-bb-prod)
  * Chỉ in SỐ ĐẾM — không tên, không SĐT, không link, không mã khách.
  */
-import { createHash } from "node:crypto";
 import pg from "pg";
 import { inMoiTruong, kiemTraMoiTruongChoPhep, kiemTraCoBbProd } from "./lib/moi-truong.mjs";
 // Cùng bộ lọc http(s) với app (tệp không có import alias nên node nạp thẳng được).
 import { linkChatKhach } from "../src/lib/lien-lac/link-chat-khach.ts";
+import {
+  MAU_BANG_HAU_KY as BANG_HAU_KY,
+  MAU_BANG_KHACH_HANG as BANG_KHACH_HANG,
+  SQL_GHI_LINK_CHAT_THEO_LARK,
+  SQL_KHACH_VA_BO,
+  gomLinkChatTuLark,
+  khachTuDongSql,
+  tinhKeHoachLinkChat,
+} from "../src/lib/lark/dong-bo-link-chat-thuan.ts";
 
 const HOST = "https://open.larksuite.com/open-apis";
-const BANG_KHACH_HANG = /Khách\s*Hàng/i;
-const BANG_HAU_KY = /h[aậ]u\s*k[yỳ]/i;
 
 const need = (name) => {
   const v = process.env[name];
   if (!v) throw new Error(`Thiếu biến môi trường ${name} (chạy kèm --env-file=.env.local).`);
   return v;
 };
-
-/** Cùng công thức `customerKey` của sync-retouch.ts / sync-lark-hauky.mjs. */
-function customerKey(ma) {
-  return createHash("sha256").update(String(ma)).digest("hex").slice(0, 12);
-}
-
-/** Chữ của ô (chỉ dùng cho ô MÃ — không dùng cho ô URL vì text của ô URL là tên khách). */
-function cellText(value) {
-  if (value == null) return "";
-  if (Array.isArray(value)) {
-    return value
-      .map((v) => (v == null ? "" : typeof v === "object" ? (v.text ?? v.name ?? v.fullPhoneNum ?? "") : String(v)))
-      .join("");
-  }
-  if (typeof value === "object") return value.text ?? value.name ?? value.fullPhoneNum ?? "";
-  return String(value);
-}
-
-/** Link http(s) đầu tiên của ô URL/lookup — chỉ đọc `link`, bỏ `text`. */
-function linkCuaO(value) {
-  const ung = Array.isArray(value) ? value : value == null ? [] : [value];
-  for (const v of ung) {
-    const tho = typeof v === "string" ? v : v && typeof v === "object" ? v.link : null;
-    const link = linkChatKhach(tho);
-    if (link) return link;
-  }
-  return null;
-}
-
-function oTheoMau(fields, mau) {
-  for (const k of Object.keys(fields ?? {})) if (mau.test(k)) return fields[k];
-  return undefined;
-}
 
 async function larkAuth() {
   const res = await fetch(`${HOST}/auth/v3/tenant_access_token/internal`, {
@@ -105,13 +81,6 @@ async function docBang(auth, baseToken, mauTen) {
   return rows;
 }
 
-/** Gom link theo khoá; khoá có ≥ 2 link KHÁC nhau → null (mơ hồ). */
-function themLink(map, khoa, link) {
-  if (!khoa || !link) return;
-  if (!map.has(khoa)) map.set(khoa, link);
-  else if (map.get(khoa) !== link) map.set(khoa, null);
-}
-
 async function main() {
   const args = process.argv.slice(2);
   const ghi = args.includes("--ghi");
@@ -131,82 +100,28 @@ async function main() {
   const khachHang = await docBang(auth, baseToken, BANG_KHACH_HANG);
   const hauKy = await docBang(auth, baseToken, BANG_HAU_KY);
 
-  const theoKhoaKH = new Map(); // khoá → link (bảng Khách Hàng)
-  for (const r of khachHang) {
-    const ma = cellText(r.fields?.["Mã Khách Hàng"]).trim();
-    themLink(theoKhoaKH, ma ? customerKey(ma) : null, linkCuaO(oTheoMau(r.fields, /^link\s*chat$/i)));
-  }
-  const theoKhoaHK = new Map(); // khoá → link (Hậu Kỳ "Chat với khách")
-  const theoDongHK = new Map(); // record_id → link
-  for (const r of hauKy) {
-    const link = linkCuaO(oTheoMau(r.fields, /chat\s*v[ớo]i\s*kh[áa]ch/i));
-    const ma = cellText(oTheoMau(r.fields, /mã\s*kh|mã\s*khách\s*hàng/i)).trim();
-    themLink(theoKhoaHK, ma ? customerKey(ma) : null, link);
-    themLink(theoDongHK, r.record_id, link);
-  }
+  const nguon = gomLinkChatTuLark(khachHang, hauKy, linkChatKhach);
 
   // --- DB ---
   const c = new pg.Client({ connectionString: url });
   await c.connect();
   try {
-    const { rows: trong } = await c.query(
-      `select c.id, c.lark_customer_key,
-              coalesce(array_agg(g.lark_hauky_record_id) filter (where g.lark_hauky_record_id is not null), '{}') as dong
-         from customers c
-         left join galleries g on g.customer_id = c.id
-        where nullif(btrim(coalesce(c.facebook, '')), '') is null
-        group by c.id, c.lark_customer_key`,
-    );
-
-    const dem = { khachTrong: trong.length, theoKhachHang: 0, theoHauKyMaKH: 0, theoDongHauKy: 0, moHo: 0, khongCoTrenLark: 0 };
-    const seGhi = [];
-    for (const k of trong) {
-      let link = null;
-      let nguon = null;
-      let moHo = false;
-      if (k.lark_customer_key) {
-        const a = theoKhoaKH.get(k.lark_customer_key);
-        if (a) [link, nguon] = [a, "theoKhachHang"];
-        else if (a === null) moHo = true;
-        if (!link) {
-          const b = theoKhoaHK.get(k.lark_customer_key);
-          if (b) [link, nguon] = [b, "theoHauKyMaKH"];
-          else if (b === null) moHo = true;
-        }
-      }
-      if (!link) {
-        const tuDong = new Set();
-        for (const rid of k.dong ?? []) {
-          const l = theoDongHK.get(rid);
-          if (l) tuDong.add(l);
-          else if (l === null) moHo = true;
-        }
-        if (tuDong.size === 1) [link, nguon] = [[...tuDong][0], "theoDongHauKy"];
-        else if (tuDong.size > 1) moHo = true;
-      }
-      if (link) {
-        dem[nguon] += 1;
-        seGhi.push([link, k.id]);
-      } else if (moHo) dem.moHo += 1;
-      else dem.khongCoTrenLark += 1;
-    }
+    const { rows } = await c.query(SQL_KHACH_VA_BO);
+    const { seGhi, dem } = tinhKeHoachLinkChat(nguon, rows.map(khachTuDongSql));
 
     console.log(`Lark: ${khachHang.length} dòng Khách Hàng, ${hauKy.length} dòng Hậu Kỳ (chỉ đọc).`);
     console.log("Số đếm (không tên, không link):");
-    console.table({ ...dem, seGhi: seGhi.length });
+    console.table(dem);
     if (!ghi) {
-      console.log("Chỉ xem. Thêm --ghi để ghi (một giao dịch, chỉ khách đang trống).");
+      console.log("Chỉ xem. Thêm --ghi để ghi (một giao dịch, chỉ khách có link Lark KHÁC giá trị đang có).");
       return;
     }
 
     await c.query("begin");
     try {
       let daGhi = 0;
-      for (const [link, id] of seGhi) {
-        const kq = await c.query(
-          `update customers set facebook = $1 where id = $2 and nullif(btrim(coalesce(facebook, '')), '') is null`,
-          [link, id],
-        );
+      for (const m of seGhi) {
+        const kq = await c.query(SQL_GHI_LINK_CHAT_THEO_LARK, [m.link, m.id]);
         daGhi += kq.rowCount ?? 0;
       }
       await c.query("commit");

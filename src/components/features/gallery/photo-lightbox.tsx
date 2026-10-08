@@ -3,7 +3,8 @@ import { urlAnhDuPhong, type CoMaTepDrive } from "@/lib/utils/anh-lh3";
 import { khoaCuonTrang } from "@/lib/utils/khoa-cuon-trang";
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Printer, PenLine, Frame } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Heart, Minimize2, Printer, PenLine } from "lucide-react";
+import { NutXemTrongNha } from "./xem-trong-nha";
 import { cn } from "@/components/ui/utils";
 import { CHIP_NGUYEN_KHOI } from "@/lib/utils/chip-nguyen-khoi";
 import { vi } from "@/i18n";
@@ -721,20 +722,8 @@ export function PhotoLightbox({
           {/* BB-400 vòng 4 — "Xem trên tường / bàn nhà": CỐ ĐỊNH góc phải trên ở MỌI màn xem lớn
               (đợt 1, đợt N, gợi ý, gia đình, bộ đã giao), có chữ để dễ thấy; tấm nào cũng xem được. */}
           {onXemTuong && (
-            <button
-              type="button"
-              data-testid="nut-xem-tuong"
-              onClick={(e) => {
-                e.stopPropagation();
-                onXemTuong(currentPhoto);
-              }}
-              aria-label={vi.gallery.xemTrenTuong}
-              title={vi.gallery.xemTrenTuong}
-              className="mt-1.5 flex h-8 items-center gap-1.5 rounded-full border border-[#e5dcd2] bg-white/80 px-3 text-[12.5px] font-medium text-[#2e2a27] transition hover:bg-white active:scale-95 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--bb-primary)] focus-visible:ring-offset-2"
-            >
-              <Frame className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" />
-              {vi.gallery.xemTrenTuongNgan}
-            </button>
+            // BB-405 — cùng biểu tượng ngôi nhà + cùng trình xem chung "Xem trong nhà" với nút trên ô ảnh.
+            <NutXemTrongNha kieu="thanh-sang" className="mt-1.5" onBam={() => onXemTuong(currentPhoto)} />
           )}
           {onTaiAnh && menuTai && (
             // Chặn nổi bọt: bấm trong thực đơn không được lọt xuống lớp đóng màn xem lớn.

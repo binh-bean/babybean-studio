@@ -28,7 +28,7 @@ import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
 import { docDongHauKy, LoiTraLark, duoiSoDienThoai } from "@/lib/lark/tra-hau-ky";
 import { noiKhoaKhachNeuTrong } from "@/lib/lark/noi-khoa-khach";
-import { ghiLinkChatNeuTrong } from "@/lib/lark/ghi-link-chat";
+import { ghiLinkChatTheoLark } from "@/lib/lark/ghi-link-chat";
 import { ghiNhatKy } from "@/lib/nhat-ky";
 import { boAnhTheoDongLark, boAnhTheoThuMuc } from "@/lib/gallery/bo-anh-da-co";
 import { timHoacTaoGoiLark } from "@/lib/gallery/goi-chup-lark";
@@ -276,8 +276,8 @@ export async function POST(request: Request): Promise<Response> {
         });
       }
       // BB-404 — link chat riêng của khách (ô "Chat với khách" của dòng Hậu Kỳ, chỉ phần URL)
-      // → `customers.facebook` khi còn trống; không đè link nhân viên đã sửa tay.
-      await ghiLinkChatNeuTrong(admin, khachMoi, dong.linkChat);
+      // → `customers.facebook` (BB-407: Lark là nguồn đúng — khác thì ghi đè, Lark trống thì giữ nguyên).
+      await ghiLinkChatTheoLark(admin, khachMoi, dong.linkChat);
     }
 
 

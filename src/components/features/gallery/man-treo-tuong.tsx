@@ -54,13 +54,18 @@ import { MAU_KHUNG, MAU_KHUNG_MAC_DINH } from "@/lib/gallery/mau-khung";
 import { BAN_UV, tinhAnhGiayTrenBan, vungNhinTrenAnh } from "@/lib/gallery/ban-uv";
 import type { NhomSanPham } from "@/lib/products/nhom-san-pham";
 import { coTheBocKhung, laChatLieuUV } from "@/lib/products/nhom-san-pham";
+import { donDatAlbum } from "@/lib/products/album-khai-niem";
 import { XemLonCanh } from "@/components/features/gallery/xem-lon-canh";
+import { XemAlbumTrenBan, type CuonTrenBan } from "@/components/features/gallery/xem-album-tren-ban";
+import { ChonCachXemTrongNha, type CachXemTrongNha } from "@/components/features/gallery/xem-trong-nha";
 
 export interface AnhTreoTuong {
   id: string;
   fileName: string;
   width: number | null;
   height: number | null;
+  /** BB-405 vòng 2 — mã tệp Drive (BB-341): ảnh bìa cuốn album đi CÙNG đường ô lưới. */
+  maTepDrive?: string | null;
 }
 
 /** Một dòng danh mục bán — CÙNG hình dạng với `MonMuaThem` ở bảng sản phẩm. */
@@ -116,6 +121,26 @@ export interface ManTreoTuongProps {
    * Thiếu = chỉ xem (một dòng giải thích như cũ).
    */
   loiDatKhac?: { nhan: string; onBam: (photoId: string) => void } | null;
+  /**
+   * BB-405 — "Xem trong nhà": màn này là trình xem CHUNG, có hai lựa chọn ngang hàng
+   * "Trên tường" | "Album trên bàn". Album dùng lại `XemAlbumTrenBan`, bìa minh hoạ là
+   * tấm đang xem. Thiếu / không có cuốn nào đang bán = chỉ "Trên tường" như cũ.
+   *
+   * Đặt album theo ĐÚNG luật vai của màn này: đặt thẳng chỉ khi `duocChon && !khoa`
+   * và không có `loiDatKhac`; vai khác dùng `loiDatKhac` (gợi ý / gia đình / đợt mới).
+   */
+  album?: {
+    cuon: CuonTrenBan[];
+    /**
+     * Ghi số lượng TUYỆT ĐỐI của cuốn (không gắn ảnh). `false` = máy chủ từ chối. CHỈ có khi
+     * vai được đặt thẳng (BB-405 vòng 2 — người gợi ý / gia đình được mời không tự trả tiền).
+     */
+    onDat?: (productId: string, soLuong: number) => Promise<boolean | void> | boolean | void;
+    /** BB-405 vòng 2 — lối của vai không đặt thẳng album (vd. "Gợi ý tấm này" cho ba mẹ). */
+    loiDatKhac?: { nhan: string; onBam: (photoId: string) => void } | null;
+  } | null;
+  /** BB-405 — mở thẳng lựa chọn nào (mặc định "Trên tường"). */
+  cachBanDau?: CachXemTrongNha;
 }
 
 /**
@@ -257,7 +282,15 @@ export function ManTreoTuong({
   coKhungBanDau = false,
   onDatInKemKhung,
   loiDatKhac = null,
+  album = null,
+  cachBanDau = "tuong",
 }: ManTreoTuongProps) {
+  // BB-405 — lựa chọn đang xem của "Xem trong nhà". Không có cuốn album nào = chỉ tường.
+  const coAlbum = !!album && album.cuon.length > 0;
+  const [cachXem, setCachXem] = useState<CachXemTrongNha>(cachBanDau);
+  useEffect(() => {
+    if (mo) setCachXem(cachBanDau);
+  }, [mo, cachBanDau]);
   const [chiSo, setChiSo] = useState(chiSoBanDau);
   const [maPhong, setMaPhong] = useState<MaPhong>("phong-khach");
   // BB-398 — mở từ cửa hàng: bắt đầu ĐÚNG chất liệu/khổ đã chọn ở đó (khổ không vừa tường
@@ -345,7 +378,8 @@ export function ManTreoTuong({
     ro.observe(el);
     if (cumPhongRef.current) ro.observe(cumPhongRef.current);
     return () => ro.disconnect();
-  }, [mo]);
+    // BB-405 vòng 2 — cảnh tường dựng lại khi quay về từ "Album trên bàn": đo lại phần tử mới.
+  }, [mo, cachXem]);
 
   useEffect(() => {
     if (!mo || !laUv) return;
@@ -363,7 +397,7 @@ export function ManTreoTuong({
     ro.observe(el);
     if (loiBeanRef.current) ro.observe(loiBeanRef.current);
     return () => ro.disconnect();
-  }, [mo, laUv]);
+  }, [mo, laUv, cachXem]);
 
   // Esc đóng ĐÚNG MỘT LỚP — bắt ở pha capture và chặn lan, vì màn xem lớn
   // (PhotoLightbox) nằm ngay dưới cũng nghe Esc: không chặn thì một lần bấm
@@ -735,6 +769,48 @@ export function ManTreoTuong({
     keoBatDau.current = null;
   };
 
+  /*
+    BB-405 — lựa chọn "Album trên bàn" của "Xem trong nhà": DÙNG LẠI màn album BB-398, bìa
+    minh hoạ là tấm đang xem. BB-405 vòng 2 — dựng THAY CHỖ cảnh tường (không chồng lên):
+    chỉ MỘT công tắc hai lựa chọn nhìn thấy, không còn thanh "Ẩn bảng"/phòng/bảng tường phía
+    sau. Đóng là đóng cả lối.
+
+    Đặt album: thẳng CHỈ khi màn cha truyền `album.onDat` (vai được đặt thẳng — xem
+    `albumXemTrongNha`) VÀ màn treo cho chọn; vai khác: `album.loiDatKhac` (vd. người gợi ý
+    → "Gợi ý tấm này"), rồi tới `loiDatKhac` của màn tường; còn lại chỉ xem.
+  */
+  if (coAlbum && album && cachXem === "ban") {
+    const loiAlbum = album.loiDatKhac ?? (xemDuocThoi ? loiDatKhac : null);
+    const onDatAlbum =
+      !xemDuocThoi && album.onDat
+        ? async (productId: string) => {
+            const soCu = addonsDaDat
+              .filter((m) => m.productId === productId && m.photoId === null)
+              .reduce((t, m) => t + m.quantity, 0);
+            const kq = await album.onDat?.(productId, donDatAlbum(productId, soCu).soLuong);
+            return kq !== false;
+          }
+        : undefined;
+    return (
+      <XemAlbumTrenBan
+        key={anhDangXem?.id ?? "album"}
+        cuon={album.cuon}
+        productIdBanDau={null}
+        anhBiaId={anhDangXem?.id ?? null}
+        maTepDriveBia={anhDangXem?.maTepDrive ?? null}
+        khoa={dangLuu}
+        onDong={onDong}
+        dauTrang={<ChonCachXemTrongNha cach="ban" nen="sang" onDoi={setCachXem} />}
+        onDat={onDatAlbum}
+        loiDatKhac={
+          !onDatAlbum && loiAlbum && anhDangXem
+            ? { nhan: loiAlbum.nhan, onBam: () => loiAlbum.onBam(anhDangXem.id) }
+            : null
+        }
+      />
+    );
+  }
+
   return (
     <div
       role="dialog"
@@ -942,6 +1018,15 @@ export function ManTreoTuong({
               <ChevronRight className="h-5 w-5" />
             </button>
           </>
+        )}
+
+        {/* BB-405 — hai lựa chọn của "Xem trong nhà", góc TRÁI trên (phải là Ẩn bảng/Đóng). */}
+        {coAlbum && (
+          <ChonCachXemTrongNha
+            cach="tuong"
+            onDoi={setCachXem}
+            className="absolute left-3 top-4 z-20 sm:left-4"
+          />
         )}
 
         <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
@@ -1303,6 +1388,7 @@ export function ManTreoTuong({
           }}
         </XemLonCanh>
       )}
+
     </div>
   );
 }

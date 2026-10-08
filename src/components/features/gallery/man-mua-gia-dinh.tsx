@@ -40,6 +40,7 @@ import { CuaHang, type DongDaMua } from "./cua-hang";
 import { SoSanhAnh } from "./so-sanh-anh";
 import { BangSanPhamCuaAnh } from "./bang-san-pham-cua-anh";
 import { ManTreoTuong } from "./man-treo-tuong";
+import { albumXemTrongNha } from "./xem-trong-nha";
 import { cumTenBe } from "./dot-chon-khach";
 import {
   DauManLuotChon,
@@ -155,6 +156,8 @@ export function ManMuaGiaDinh({
     const tamDau = treoTuong ? photos.find((p) => p.id === treoTuong) : undefined;
     return tamDau && !thich.some((p) => p.id === tamDau.id) ? [tamDau, ...thich] : thich;
   }, [photos, treoTuong]);
+  // BB-405 — nút "Xem trong nhà" trên từng ô: hàm ỔN ĐỊNH (TheAnh được memo — LUẬT 2 luoi-anh).
+  const xemTrongNhaTuO = React.useCallback((p: PhotoPublic) => setTreoTuong(p.id), []);
 
   async function gui() {
     if (gio.length === 0) return;
@@ -229,6 +232,7 @@ export function ManMuaGiaDinh({
             onToggle={onToggleHeart}
             onOpen={(i) => setXemLon({ i, nguon: "loc" })}
             onToggleSoSanh={soSanh.onToggleSoSanh}
+            onXemTrongNha={moTreo ? xemTrongNhaTuO : undefined}
           />
         )}
       </section>
@@ -386,7 +390,7 @@ export function ManMuaGiaDinh({
         <ManTreoTuong
           mo
           onDong={() => setTreoTuong(null)}
-          anh={dsTreo.map((p) => ({ id: p.id, fileName: p.fileName, width: p.width, height: p.height }))}
+          anh={dsTreo.map((p) => ({ id: p.id, fileName: p.fileName, width: p.width, height: p.height, maTepDrive: (p as { maTepDrive?: string | null }).maTepDrive ?? null }))}
           chiSoBanDau={Math.max(0, dsTreo.findIndex((p) => p.id === treoTuong))}
           danhMuc={danhMuc
             .filter((sp) => sp.nhom === "anh_in" || sp.nhom === "khung")
@@ -406,6 +410,12 @@ export function ManMuaGiaDinh({
           dangLuu={false}
           onDatVaoGoi={khongLamGi}
           onDatMuaThem={(photoId, productId, soLuong) => datMon(productId, photoId, soLuong)}
+          // BB-405 — "Album trên bàn": cuốn vào giỏ YÊU CẦU của gia đình (không trả tiền ở đây).
+          album={albumXemTrongNha(danhMuc, {
+            nguCanh: "giaDinh",
+            trongManGio: true,
+            onDat: (productId, soLuong) => datMon(productId, null, soLuong),
+          })}
         />
       )}
 
