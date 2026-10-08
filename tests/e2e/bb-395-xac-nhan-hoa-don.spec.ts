@@ -11,6 +11,8 @@
  *   4. CSKH (không có `thanh_toan:nhap_tay`) KHÔNG thấy form nhập tay; chủ studio thấy trong mục dự phòng.
  *   5. Khách 2 bộ: gán từ tab "Ảnh vượt hạn mức" → gợi ý đúng bộ theo dòng Hậu Kỳ, bấm chọn mới gán.
  *   6. Một mã một bộ: gán lại 9002 cho bộ khác → bị chặn.
+ *   9. (BB-397) Khách chưa nối khoá Lark: HĐ 9012 cùng khách nguồn với hoá đơn gốc 9011 của bộ →
+ *      CSKH gán được (không cần ép), app nối `lark_customer_key` cho khách + ghi nhật ký.
  *
  * Dữ liệu: tests/fixtures/bb-395.ts (nền Fixture riêng, dọn theo id ở afterAll).
  * Chạy: PW_PORT=3210 npx playwright test tests/e2e/bb-395-xac-nhan-hoa-don.spec.ts --workers=1
@@ -21,6 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { duLieuBB395, donDepBB395, type DuLieuBB395 } from "../fixtures/bb-395";
 import { dangNhapNhanVien } from "./helpers/dang-nhap-thu-lai";
+import { KHOA_KHACH_FIXTURE_CHUA_NOI } from "@/lib/hoa-don/nguon-hoa-don";
 
 let d: DuLieuBB395;
 const THU_MUC = "test-results/bb-395";
@@ -295,6 +298,33 @@ test("8. Trang khách hàng: gán theo khách — hoá đơn của khách khác 
     await khoi.getByTestId("nut-tim-bo-theo-hoa-don").click();
     await expect(khoi).toContainText("Hoá đơn này của khách khác", { timeout: 30_000 });
     await expect(khoi.getByTestId("bo-ung-vien")).toHaveCount(0);
+  } finally {
+    await ctx.close();
+  }
+});
+
+test("9. (BB-397) Khách chưa nối khoá Lark: khớp qua hoá đơn gốc của bộ → gán được, app tự nối khoá", async ({ browser, baseURL }) => {
+  const { rows: truoc } = await d.pg.query(`select lark_customer_key from customers where id = $1`, [d.khachChuaNoi]);
+  expect(truoc[0].lark_customer_key).toBeNull();
+  const { page, ctx } = await mo(browser, baseURL!, "cs", `/admin/galleries/${d.bo.chuaNoi}#thanh-toan`);
+  try {
+    const khoi = await dongBo(page, "HD_20990101#9012");
+    // Trước BB-397: "Khách của bộ ảnh chưa nối với khách bên Lark… Chỉ Admin/Quản lý ép gán được".
+    await expect(khoi.getByTestId("thong-bao-hoa-don")).toContainText("Khớp hoá đơn", { timeout: 30_000 });
+    await expect(khoi.getByTestId("thong-bao-hoa-don")).not.toContainText("chưa nối với khách bên Lark");
+    await khoi.screenshot({ path: path.join(THU_MUC, "9-khop-qua-hoa-don-goc.png") });
+
+    const { rows: gan } = await d.pg.query(
+      `select ep_gan_ly_do, trang_thai, ket_qua->>'khopKhach' khop_khach from hoa_don_bo_anh where ma_hoa_don = 'HD_20990101#9012'`,
+    );
+    expect(gan[0]).toMatchObject({ ep_gan_ly_do: null, trang_thai: "khop", khop_khach: "khop_qua_hoa_don_goc" });
+    const { rows: sau } = await d.pg.query(`select lark_customer_key from customers where id = $1`, [d.khachChuaNoi]);
+    expect(sau[0].lark_customer_key).toBe(KHOA_KHACH_FIXTURE_CHUA_NOI);
+    const { rows: nk } = await d.pg.query(
+      `select metadata from activity_logs where entity_id = $1 and action = 'customer.noi_khoa_lark'`,
+      [d.khachChuaNoi],
+    );
+    expect(nk[0]?.metadata).toMatchObject({ ketQua: "da_noi", cachKhop: "khop_qua_hoa_don_goc", maHoaDonGoc: ["HD_20990101#9011"] });
   } finally {
     await ctx.close();
   }

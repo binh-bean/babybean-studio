@@ -511,6 +511,20 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
     if (write && sdtLarkCu && khachCu) {
       await dienSdtKhach(client, { customerId: khachCu, sdtLark: sdtLarkCu, larkRecordId: record.record_id, ghi: true });
     }
+    // BB-397: bộ ĐÃ CÓ (tạo bằng thuật sĩ/tay trước khi lượt đồng bộ thấy dòng) → khách có thể
+    // chưa mang khoá Lark, và nhánh này trả về sớm nên trước đây KHÔNG BAO GIỜ đặt khoá. Đặt
+    // khi còn trống và chưa khách nào giữ khoá đó (uq_customers_lark_key); lỗi không làm hỏng lượt.
+    const maKhCu = cellText(getField(fields, /mã\s*kh|mã\s*khách\s*hàng/i)).trim();
+    if (write && maKhCu && khachCu) {
+      await client
+        .query(
+          `update customers set lark_customer_key = $1
+            where id = $2 and lark_customer_key is null
+              and not exists (select 1 from customers c2 where c2.lark_customer_key = $1)`,
+          [customerKey(maKhCu), khachCu],
+        )
+        .catch((e: unknown) => console.error(JSON.stringify({ evt: "lark.sync_retouch.noi_khoa_loi", loi: (e as { message?: string })?.message ?? String(e) })));
+    }
     return {
       action: "already_exists",
       galleryId: existingGals[0].id,

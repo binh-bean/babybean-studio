@@ -13,6 +13,9 @@
  *   · thieu : `in_review`, chọn 12 (vượt 2) → HĐ 9004 (1 file) = Thiếu 1 → bỏ 1 → Khớp.
  *   · thua  : `in_review`, chọn 13 (vượt 3) → HĐ 9003 (5 file) = Thừa 2 → khách thấy "còn 2 ảnh".
  *   · haiBoD, haiBoE : cùng khách, mỗi bộ vượt 2; bộ E có dòng Hậu Kỳ MA_HAU_KY_FIXTURE → HĐ 9009 gợi ý E.
+ *   · chuaNoi (BB-397): khách THỨ HAI, `lark_customer_key` NULL (như khách tạo bằng thuật sĩ);
+ *     bộ có hoá đơn gốc 9011 (cùng khách nguồn với HĐ phát sinh 9012), vượt 2 → 9012 khớp qua
+ *     hoá đơn gốc và app nối khoá `KHOA_KHACH_FIXTURE_CHUA_NOI` vào khách.
  * Hai nhân sự: CSKH (không có quyền nhập tay) và chủ studio.
  */
 import { Client } from "pg";
@@ -26,24 +29,38 @@ export interface DuLieuBB395 {
   runId: string;
   branchId: string;
   customerId: string;
+  /** BB-397: khách chưa nối khoá Lark. */
+  khachChuaNoi: string;
   staffIds: string[];
   emailCs: string;
   emailOwner: string;
   password: string;
-  bo: { khop: string; thieu: string; thua: string; haiBoD: string; haiBoE: string; dot2: string; dot2b: string };
+  bo: { khop: string; thieu: string; thua: string; haiBoD: string; haiBoE: string; dot2: string; dot2b: string; chuaNoi: string };
   /** Token link khách (chữ rõ) của bộ "thua" — để mở màn khách. */
   tokenThua: string;
 }
 
 async function taoBo(
   pg: Client,
-  p: { branchId: string; customerId: string; runId: string; ten: string; status: string; soChon: number; chot: boolean; hauKy?: string; anhChinhId: string },
+  p: { branchId: string; customerId: string; runId: string; ten: string; status: string; soChon: number; chot: boolean; hauKy?: string; anhChinhId: string; maGoc?: string },
 ): Promise<{ id: string; token: string }> {
   const { rows: g } = await pg.query(
     `insert into galleries (branch_id, customer_id, title, status, drive_folder_id, drive_folder_url,
-                            included_quota, extra_photo_price, photo_count, lark_hauky_record_id)
-     values ($1,$2,$3,$4,$5,'https://example.com/x',10,50000,$6,$7) returning id`,
-    [p.branchId, p.customerId, `Fixture BB-395-${p.runId} ${p.ten}`, p.status, `SEED_FOLDER_ID_395_${p.runId}_${p.ten}`, p.soChon, p.hauKy ?? null],
+                            included_quota, extra_photo_price, photo_count, lark_hauky_record_id,
+                            lark_contract_code, lark_contract_codes)
+     values ($1,$2,$3,$4,$5,'https://example.com/x',10,50000,$6,$7,$8,$9) returning id`,
+    [
+      p.branchId,
+      p.customerId,
+      `Fixture BB-395-${p.runId} ${p.ten}`,
+      p.status,
+      `SEED_FOLDER_ID_395_${p.runId}_${p.ten}`,
+      p.soChon,
+      p.hauKy ?? null,
+      p.maGoc ?? null,
+      // `lark_contract_codes` NOT NULL (mặc định '{}') — bộ không có mã gốc là mảng rỗng, không phải null.
+      p.maGoc ? [p.maGoc] : [],
+    ],
   );
   const id = g[0].id as string;
   // Dòng hợp đồng gốc → hạn mức 10 (không phải dòng hoá đơn: `lark_record_id` riêng của phép thử).
@@ -85,6 +102,7 @@ export async function duLieuBB395(): Promise<DuLieuBB395> {
   const nen = await dungNenFixture(pg, "BB-395");
   const password = "Password123!";
   const staffIds: string[] = [];
+  let khachChuaNoi = "";
   try {
     await pg.query(`update customers set lark_customer_key = $1 where id = $2`, [KHOA_KHACH_FIXTURE, nen.customerId]);
     const { rows: sp } = await pg.query(
@@ -125,6 +143,21 @@ export async function duLieuBB395(): Promise<DuLieuBB395> {
     await themDot2(dot2.id, "dot2");
     const dot2b = await taoBo(pg, { ...chung, ten: "dot-2b", status: "in_retouch", soChon: 10, chot: true });
     await themDot2(dot2b.id, "dot2b");
+    // BB-397: khách thứ hai KHÔNG có khoá Lark + bộ mang hoá đơn gốc giả 9011.
+    const { rows: kc } = await pg.query(`insert into customers (branch_id, full_name) values ($1,$2) returning id`, [
+      nen.branchId,
+      `Fixture BB-397-${nen.runId} Nguyễn Thị Mai`,
+    ]);
+    khachChuaNoi = kc[0].id as string;
+    const chuaNoi = await taoBo(pg, {
+      ...chung,
+      customerId: khachChuaNoi,
+      ten: "chua-noi",
+      status: "in_review",
+      soChon: 12,
+      chot: false,
+      maGoc: "HD_20990101#9011",
+    });
 
     const supa = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -150,15 +183,16 @@ export async function duLieuBB395(): Promise<DuLieuBB395> {
       runId: nen.runId,
       branchId: nen.branchId,
       customerId: nen.customerId,
+      khachChuaNoi,
       staffIds,
       emailCs,
       emailOwner,
       password,
-      bo: { khop: khop.id, thieu: thieu.id, thua: thua.id, haiBoD: haiBoD.id, haiBoE: haiBoE.id, dot2: dot2.id, dot2b: dot2b.id },
+      bo: { khop: khop.id, thieu: thieu.id, thua: thua.id, haiBoD: haiBoD.id, haiBoE: haiBoE.id, dot2: dot2.id, dot2b: dot2b.id, chuaNoi: chuaNoi.id },
       tokenThua: thua.token,
     };
   } catch (e) {
-    await donNenFixture(pg, { branchIds: [nen.branchId], customerIds: [nen.customerId], staffIds }).catch(() => {});
+    await donNenFixture(pg, { branchIds: [nen.branchId], customerIds: [nen.customerId, ...(khachChuaNoi ? [khachChuaNoi] : [])], staffIds }).catch(() => {});
     await pg.end().catch(() => {});
     throw e;
   }
@@ -172,7 +206,7 @@ export async function donDepBB395(d: DuLieuBB395): Promise<void> {
     await d.pg.query(`delete from hoa_don_bo_anh where gallery_id = any($1::uuid[])`, [Object.values(d.bo)]);
     await donNenFixture(d.pg, {
       galleryIds: Object.values(d.bo),
-      customerIds: [d.customerId],
+      customerIds: [d.customerId, d.khachChuaNoi],
       branchIds: [d.branchId],
       staffIds: d.staffIds,
     });

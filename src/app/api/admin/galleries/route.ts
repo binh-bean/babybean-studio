@@ -25,6 +25,8 @@ import { nhanHienThi, mauCanhBao, TRANG_THAI_LARK } from "@/lib/lark/trang-thai-
 import { GALLERY_STATUS_LABEL } from "@/lib/gallery-status";
 import { anhBiaTheoBo } from "@/lib/selection/anh-bia";
 import { docDongHauKy, LoiTraLark, duoiSoDienThoai } from "@/lib/lark/tra-hau-ky";
+import { noiKhoaKhachNeuTrong } from "@/lib/lark/noi-khoa-khach";
+import { ghiNhatKy } from "@/lib/nhat-ky";
 import { boAnhTheoDongLark, boAnhTheoThuMuc } from "@/lib/gallery/bo-anh-da-co";
 import { timHoacTaoGoiLark } from "@/lib/gallery/goi-chup-lark";
 import { giaAnhThemChoBoMoi, giaRiengTheoTenGoi } from "@/lib/gallery/gia-goi-chup";
@@ -247,6 +249,27 @@ export async function POST(request: Request): Promise<Response> {
       if (loiNeo) {
         console.error(JSON.stringify({ evt: "gallery_create_lark_link_failed", requestId, galleryId: galleryIdMoi, loi: loiNeo.message }));
         return fail("INTERNAL", "Đã tạo bộ ảnh nhưng chưa gắn được dòng Lark — mở bộ ảnh và gắn lại.", { galleryId: galleryIdMoi });
+      }
+    }
+
+    // BB-397 — nối khách với khách Lark (Mã KH của dòng Hậu Kỳ, cùng khoá băm như đồng bộ Lark).
+    // Trước đây thuật sĩ tạo/dùng khách mà KHÔNG đặt khoá → xác nhận bằng hoá đơn bị chặn
+    // "khách chưa nối với Lark". Hỏng/trùng khách không làm hỏng việc tạo bộ.
+    {
+      const khachMoi = (result as { customer_id?: string | null }).customer_id ?? customerId;
+      const noi = await noiKhoaKhachNeuTrong(admin, khachMoi, dong.khoaKhach);
+      if (noi === "da_noi" || noi === "trung_khach") {
+        await ghiNhatKy({
+          actorType: "staff",
+          actorId: staff.staffId,
+          actorLabel: staff.role,
+          branchId: input.branchId,
+          action: noi === "da_noi" ? "customer.noi_khoa_lark" : "customer.noi_khoa_lark_bo_qua",
+          entityType: "customer",
+          entityId: khachMoi,
+          galleryId: galleryIdMoi,
+          metadata: { ketQua: noi, cachKhop: "dong_hau_ky", larkHaukyRecordId: dong.recordId, ...(noi === "trung_khach" ? { canhBao: "co_the_trung_khach" } : {}) },
+        });
       }
     }
 

@@ -15,6 +15,30 @@ Nay đường chính là **mã hoá đơn**; nhập tay chỉ còn là dự phò
    của bộ. Khác → chặn "Hoá đơn này của khách khác". Khách của bộ không có khoá Lark (tạo tay) hoặc hoá
    đơn không gắn khách → không tự xác nhận được; chỉ người có quyền `thanh_toan:nhap_tay` **ép gán**
    kèm lý do (lưu ở `hoa_don_bo_anh.ep_gan_ly_do`).
+
+   **Khớp khách dự phòng qua hoá đơn gốc (BB-397).** Khách của bộ CHƯA có `lark_customer_key` (khách
+   đến từ Lark nhưng đường tạo/gắn bộ cũ không đặt khoá) → app đọc qua `NguonHoaDon` (chỉ đọc, ≤ 5 mã)
+   hoá đơn GỐC của bộ (`galleries.lark_contract_code` + `lark_contract_codes`) và so `khoaKhachNguon`:
+
+   | Hoá đơn gốc | Kết quả | Việc làm |
+   |---|---|---|
+   | Cùng khách với hoá đơn phát sinh | `khop_qua_hoa_don_goc` (ghi ở `ket_qua.khopKhach` + nhật ký gán) | Cho gán, KHÔNG cần ép; **nối khoá**: ghi `customers.lark_customer_key` (chỉ khi đang NULL) — lần sau khớp thẳng |
+   | Khác khách | `khac_khach` | Chặn như cũ |
+   | Không có / nguồn không có mã / gốc không có khách / các gốc lệch khách nhau | `bo_chua_co_khoa` | Như cũ: chỉ Admin/Quản lý ép gán |
+   | Nguồn lỗi/chậm khi đọc gốc | — | Câu lỗi nguồn, không ghi gì |
+
+   Nối khoá: khách KHÁC đã giữ khoá đó (`uq_customers_lark_key`) → **không ghi**, vẫn cho khớp, cảnh báo
+   "Có thể trùng khách" (trả về màn hình + nhật ký `customer.noi_khoa_lark_bo_qua`). Nối được → nhật ký
+   `customer.noi_khoa_lark` (`cachKhop`, mã hoá đơn, mã hoá đơn gốc). Có hoá đơn nào bị chặn "khách
+   khác" trong lượt → không nối. Khách đã có khoá → KHÔNG dùng dự phòng (khoá khác vẫn là khách khác).
+   Mã: `src/lib/hoa-don/khop-khach-du-phong.ts` (thuần) + `dongBoHoaDonChoBo`.
+
+   **Gốc của lỗi, đã vá ở BB-397** — các đường tạo/gắn khách từ Lark trước đây KHÔNG đặt khoá:
+   thuật sĩ tạo bộ (`POST /api/admin/galleries`, khách mới qua `create_gallery_bundle` hoặc khách cũ
+   khớp SĐT), gắn dòng Hậu Kỳ cho bộ tạo tay (`.../[id]/gan-lark`), và đồng bộ Hậu Kỳ khi bộ ĐÃ CÓ
+   (`sync-retouch.ts` nhánh `already_exists` trả về sớm). Nay cả ba đặt khoá = `customerKey(ô "Mã KH"
+   của dòng Hậu Kỳ)` — đúng hàm băm và cùng ô với đồng bộ (`bocDongHauKy().khoaKhach`,
+   `noiKhoaKhachNeuTrong`): không đè khoá đã có, không giành khoá của khách khác.
 4. **Hậu Kỳ** (gợi ý, không phải khoá — một hoá đơn có thể trỏ HAI dòng Hậu Kỳ): link `🎯Tiến Độ Hậu Kỳ`
    của hoá đơn trỏ sang bộ KHÁC (khác `galleries.lark_hauky_record_id`) → cảnh báo vàng, phải xác nhận
    lần hai.
@@ -34,6 +58,10 @@ Nay đường chính là **mã hoá đơn**; nhập tay chỉ còn là dự phò
   bộ của khách đó (trong chi nhánh nhân viên thấy), **gợi ý** bộ khớp nhất: dòng Hậu Kỳ hoá đơn trỏ đúng
   bộ (+100) → số file chờ bằng số file hoá đơn (+50, gần hơn thì hơn) → sản phẩm trùng (+10).
   Nhân viên BẤM chọn — không bao giờ tự gán âm thầm, kể cả khi chỉ có một bộ.
+- BB-397 — chưa khách nào mang khoá của hoá đơn: app đi theo dòng Hậu Kỳ hoá đơn trỏ tới → bộ neo
+  dòng đó (≤ 3 bộ) → khách chưa có khoá mà hoá đơn gốc của bộ cùng khách nguồn → liệt kê bộ của
+  khách đó. Trang khách hàng: khách chưa có khoá → so với hoá đơn gốc ≤ 3 bộ gần nhất của khách.
+  KHÔNG quét cả kho Lark; gợi ý chỉ đọc, việc nối khoá xảy ra khi bấm gán.
 - Một mã chỉ thuộc MỘT bộ (`hoa_don_bo_anh.ma_hoa_don` unique). Đổi bộ = Admin/Quản lý **gỡ gán** (bỏ
   dòng hạn mức của mã, ghi dòng đính chính ÂM cho tiền đã ghi, ghi nhật ký) rồi gán lại.
 

@@ -16,6 +16,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { docDongHauKy, LoiTraLark } from "@/lib/lark/tra-hau-ky";
 import { boAnhTheoDongLark } from "@/lib/gallery/bo-anh-da-co";
 import { ghiNhatKy } from "@/lib/nhat-ky";
+import { noiKhoaKhachNeuTrong } from "@/lib/lark/noi-khoa-khach";
 
 export const runtime = "nodejs";
 // BB-331: kéo dòng hợp đồng từ Lark ngay sau khi gắn (3–9 giây, đo 30/09).
@@ -38,7 +39,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const admin = createAdminClient();
     const { data: gal } = await admin
       .from("galleries")
-      .select("id, branch_id, lark_hauky_record_id, lark_contract_codes")
+      .select("id, branch_id, customer_id, lark_hauky_record_id, lark_contract_codes")
       .eq("id", id)
       .maybeSingle();
     if (!gal) return fail("NOT_FOUND", "Không tìm thấy bộ ảnh");
@@ -85,6 +86,23 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       galleryId: id,
       metadata: { larkHaukyRecordId: dong.recordId, maHoaDon: dong.maHoaDon },
     });
+
+    // BB-397 — khách của bộ tạo tay chưa có khoá Lark: nối theo Mã KH của dòng Hậu Kỳ vừa gắn
+    // (không đè khoá đã có; khách khác đã giữ khoá → chỉ ghi nhật ký "có thể trùng khách").
+    const noi = await noiKhoaKhachNeuTrong(admin, gal.customer_id as string | null, dong.khoaKhach);
+    if (noi === "da_noi" || noi === "trung_khach") {
+      await ghiNhatKy({
+        actorType: "staff",
+        actorId: staff.staffId,
+        actorLabel: staff.role,
+        branchId: String(gal.branch_id),
+        action: noi === "da_noi" ? "customer.noi_khoa_lark" : "customer.noi_khoa_lark_bo_qua",
+        entityType: "customer",
+        entityId: gal.customer_id as string | null,
+        galleryId: id,
+        metadata: { ketQua: noi, cachKhop: "dong_hau_ky", larkHaukyRecordId: dong.recordId, ...(noi === "trung_khach" ? { canhBao: "co_the_trung_khach" } : {}) },
+      });
+    }
 
 
     // BB-331: gắn xong là kéo luôn dòng hợp đồng + hạn mức từ hóa đơn Lark —

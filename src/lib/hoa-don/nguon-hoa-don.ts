@@ -124,6 +124,11 @@ export const MAU_MA_FIXTURE = /^HD_20990101#9\d{3}$/;
  */
 export const KHOA_KHACH_FIXTURE = "fx395khach01";
 export const KHOA_KHACH_FIXTURE_KHAC = "fx395khach99";
+/**
+ * BB-397: khách mà app CHƯA nối khoá (e2e để `lark_customer_key` NULL). Hoá đơn gốc 9011 + hoá
+ * đơn phát sinh 9012 cùng khách này → app khớp qua hoá đơn gốc rồi tự nối khoá.
+ */
+export const KHOA_KHACH_FIXTURE_CHUA_NOI = "fx397khach02";
 /** Bản ghi Hậu Kỳ mà hoá đơn giả 9009 trỏ tới (e2e đặt cho `galleries.lark_hauky_record_id`). */
 export const MA_HAU_KY_FIXTURE = "FX_HK_395_B";
 
@@ -177,6 +182,8 @@ export const HOA_DON_FIXTURE: Readonly<Record<string, HoaDonChuan>> = Object.fre
       hdGia("9008", { file: 2, phieu: [150_000] }), // thu dư 50.000
       hdGia("9009", { file: 2, hauKy: [MA_HAU_KY_FIXTURE] }), // khách 2 bộ: trỏ dòng Hậu Kỳ của bộ thứ hai
       hdGia("9010", { file: 2, tienFile: 90_000 }), // đợt 2 (2 ảnh × 50.000 trên app) — giá hoá đơn 45.000/ảnh
+      hdGia("9011", { khach: KHOA_KHACH_FIXTURE_CHUA_NOI }), // BB-397: hoá đơn GỐC (gói chụp) của bộ có khách chưa nối khoá
+      hdGia("9012", { file: 2, khach: KHOA_KHACH_FIXTURE_CHUA_NOI }), // BB-397: phát sinh cùng khách với 9011
     ].map((h) => [h.ma, h]),
   ),
 );

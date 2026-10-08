@@ -16,7 +16,7 @@
  *
  * CHỈ ĐỌC Lark. Không ghi gì sang Lark ở tệp này.
  */
-import { larkAuth, HOST, cellText, getField, type LarkRecord } from "@/lib/lark/sync-retouch";
+import { larkAuth, HOST, cellText, getField, customerKey, type LarkRecord } from "@/lib/lark/sync-retouch";
 import { parseFolderName } from "@/lib/drive/parse-folder-name";
 import { dangChayPhepThu } from "@/lib/kiem-thu";
 import { COT_PHOTO_LARK, tenPhotoTuO } from "@/lib/lark/photo-hau-ky";
@@ -42,6 +42,12 @@ export interface DongHauKy {
   chiNhanh: string;
   /** BB-369 — cột "photo" (người chụp) trên Lark; null khi Lark để trống. */
   photo: string | null;
+  /**
+   * BB-397 — khoá khách Lark ĐÃ BĂM (cùng `customerKey` + cùng ô "Mã KH" như đồng bộ Hậu Kỳ
+   * `sync-retouch.ts`), để đường tạo/gắn bộ đặt `customers.lark_customer_key`. Vắng khi Lark để
+   * trống ô Mã KH. Chữ gốc (tên + SĐT) không ra khỏi tệp này.
+   */
+  khoaKhach?: string;
 }
 
 /**
@@ -114,6 +120,8 @@ export function bocDongHauKy(record: LarkRecord, linkLark: string | null = null)
   const nhanLinkAnh = cellText(f["Link ảnh gửi khách"]).trim();
   const tenBe = nhanLinkAnh && !/^https?:\/\//i.test(nhanLinkAnh) ? parseFolderName(nhanLinkAnh).babyName : "";
   const tong = Number(String(cellText(f["Tổng file edit"])).replace(/[^\d]/g, ""));
+  // Cùng regex với sync-retouch.ts (đường đồng bộ đặt khoá cho khách) — một cách bóc, một khoá.
+  const maKh = cellText(getField(f, /mã\s*kh|mã\s*khách\s*hàng/i)).trim();
   return {
     recordId: record.record_id,
     maHoaDon,
@@ -127,6 +135,7 @@ export function bocDongHauKy(record: LarkRecord, linkLark: string | null = null)
     linkLark,
     chiNhanh: tenChiNhanhLark(f["Chi Nhánh"]),
     photo: tenPhotoTuO(getField(f, COT_PHOTO_LARK)),
+    ...(maKh ? { khoaKhach: customerKey(maKh) } : {}),
   };
 }
 

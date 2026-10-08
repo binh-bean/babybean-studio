@@ -43,12 +43,21 @@ import {
   tienGhiSoChoHoaDon,
   type BoUngVien,
   type KetQuaDoiChieu,
+  type KetQuaKhach,
   type DotApp,
   type PhatSinhApp,
   type SanPhamApp,
   ghiChuDongSo,
 } from "@/lib/hoa-don/doi-chieu-hoa-don";
 import { TIEN_TO_DONG_HOA_DON, laDongHoaDon, maDongHoaDonTrongApp } from "@/lib/hoa-don/han-muc-hoa-don";
+import {
+  CAU_TRUNG_KHACH,
+  docKhoaKhachHoaDonGoc,
+  kiemKhachChoBo,
+  laKhopKhach,
+  type KetQuaKhachBo,
+  type LenhNoiKhoa,
+} from "@/lib/hoa-don/khop-khach-du-phong";
 import { laLoiChuaApMigration, layMotDot } from "@/lib/gallery/dot-chon-server";
 
 export const QUYEN_NHAP_TAY = "thanh_toan:nhap_tay";
@@ -357,14 +366,33 @@ export async function dongBoHoaDonChoBo(admin: SupabaseClient, v: DauVaoDongBo):
   const khoaKhachBo = (kh?.lark_customer_key as string | null) ?? null;
   const duocEpGan = coQuyenNhapTay(v.staff);
   const epGan = v.epGanLyDo && v.epGanLyDo.trim().length >= 3 ? v.epGanLyDo.trim().slice(0, 500) : null;
+  // BB-397: khách chưa có khoá Lark → dự phòng bằng hoá đơn GỐC của bộ (cùng nguồn, chỉ đọc).
+  let khach: KetQuaKhachBo;
+  try {
+    khach = await kiemKhachChoBo({
+      hoaDons,
+      customerId: (g.customer_id as string | null) ?? null,
+      khoaKhachBo,
+      maGoc: [g.lark_contract_code as string | null, ...(((g.lark_contract_codes as string[] | null) ?? []))].filter((m) => !cacMa.includes(String(m ?? "").toUpperCase())),
+      nguon: v.nguon,
+      timKhachGiuKhoa: async (khoa) => {
+        const { data, error } = await admin.from("customers").select("id").eq("lark_customer_key", khoa).limit(1).maybeSingle();
+        if (error) throw error;
+        return (data?.id as string | undefined) ?? null;
+      },
+    });
+  } catch (e) {
+    if (!(e instanceof LoiNguonHoaDon)) throw e;
+    return { ok: false, code: "LARK", message: cauLoiNguon(e) };
+  }
   for (const hd of hoaDons) {
-    const k = kiemKhachHoaDon(hd, khoaKhachBo);
-    if (k === "khop") continue;
+    const k = khach.theoMa[hd.ma] ?? kiemKhachHoaDon(hd, khoaKhachBo);
+    if (laKhopKhach(k)) continue;
     if (k === "khac_khach") return { ok: false, code: "INVALID_INPUT", message: `${hd.ma}: ${CAU_KHACH.khac_khach}` };
     const daEp = daGan.find((d) => d.ma === hd.ma)?.epGanLyDo;
     if (daEp) continue;
     if (!(hd.ma === v.maMoi && epGan && duocEpGan)) {
-      return { ok: false, code: duocEpGan ? "INVALID_INPUT" : "FORBIDDEN", message: `${hd.ma}: ${CAU_KHACH[k]}`, choPhepEpGan: duocEpGan };
+      return { ok: false, code: duocEpGan ? "INVALID_INPUT" : "FORBIDDEN", message: `${hd.ma}: ${CAU_KHACH[k as Exclude<KetQuaKhach, "khop">]}`, choPhepEpGan: duocEpGan };
     }
   }
   const moi = v.maMoi ? hoaDons.find((h) => h.ma === v.maMoi) : null;
@@ -377,6 +405,17 @@ export async function dongBoHoaDonChoBo(admin: SupabaseClient, v: DauVaoDongBo):
     };
   }
 
+  // 2b. BB-397: khớp qua hoá đơn gốc → nối khoá Lark vào khách (lần sau khớp thẳng).
+  const canhBaoKhach = khach.lenhNoi
+    ? await noiKhoaKhachLark(admin, khach.lenhNoi, {
+        staff: v.staff,
+        branchId: g.branch_id as string,
+        galleryId: v.galleryId,
+        maHoaDon: hoaDons.filter((h) => khach.theoMa[h.ma] === "khop_qua_hoa_don_goc").map((h) => h.ma),
+        maGoc: khach.khoaGoc?.maGoc ?? [],
+      })
+    : [];
+
   // 3. Lưu việc gán (một mã một bộ — chỉ mục duy nhất).
   if (v.maMoi && !daGan.some((d) => d.ma === v.maMoi)) {
     const { data: moiGan, error: eg2 } = await admin
@@ -386,7 +425,7 @@ export async function dongBoHoaDonChoBo(admin: SupabaseClient, v: DauVaoDongBo):
         ma_hoa_don: v.maMoi,
         nguon: v.nguon.ten,
         gan_boi: v.staff.staffId,
-        ep_gan_ly_do: kiemKhachHoaDon(moi as HoaDonChuan, khoaKhachBo) === "khop" ? null : epGan,
+        ep_gan_ly_do: laKhopKhach(khach.theoMa[(moi as HoaDonChuan).ma]) ? null : epGan,
       })
       .select("id, ma_hoa_don, trang_thai, ket_qua, ep_gan_ly_do, gan_luc, dong_bo_luc, xac_nhan_luc")
       .single();
@@ -413,7 +452,7 @@ export async function dongBoHoaDonChoBo(admin: SupabaseClient, v: DauVaoDongBo):
       entityType: "gallery",
       entityId: v.galleryId,
       galleryId: v.galleryId,
-      metadata: { maHoaDon: v.maMoi, nguon: v.nguon.ten, epGan: Boolean(epGan) },
+      metadata: { maHoaDon: v.maMoi, nguon: v.nguon.ten, epGan: Boolean(epGan), khopKhach: khach.theoMa[v.maMoi] ?? null },
     });
   }
 
@@ -428,6 +467,8 @@ export async function dongBoHoaDonChoBo(admin: SupabaseClient, v: DauVaoDongBo):
     conLai: hd.conLai,
     trangThaiNguon: hd.trangThai,
     phieuThu: hd.phieuThu.map((p) => ({ ma: p.ma, soTien: p.soTien, phuongThuc: p.phuongThucGoc })),
+    // BB-397: cách khớp khách ("khop" | "khop_qua_hoa_don_goc" | lý do ép gán).
+    khopKhach: khach.theoMa[hd.ma] ?? null,
   });
   if (chuaDu.length > 0) {
     for (const { hd, k } of dieuKien) {
@@ -576,7 +617,55 @@ export async function dongBoHoaDonChoBo(admin: SupabaseClient, v: DauVaoDongBo):
       : kq.trangThai === "thua"
         ? `Hoá đơn nhiều hơn khách chọn — đã xác nhận phần đã chọn, còn ${kq.fileDaTraConLai} ảnh đã trả chờ khách chọn.`
         : `Khách chọn nhiều hơn hoá đơn — phần trong hoá đơn đã ghi nhận, phần dư CHỜ (thiếu ${kq.tienThieu.toLocaleString("vi-VN")} ₫).`;
-  return { ok: true, message: cau, canhBao: [...canhBao, ...ghiChuKhoa, ...dongHan.canhBao], doiChieu: kq, daGhiSo, daKhoa };
+  return { ok: true, message: cau, canhBao: [...canhBaoKhach, ...canhBao, ...ghiChuKhoa, ...dongHan.canhBao], doiChieu: kq, daGhiSo, daKhoa };
+}
+
+/**
+ * BB-397 — thi hành lệnh nối khoá: ghi `customers.lark_customer_key` khi khách còn NULL (điều
+ * kiện ngay trong câu update — không đè khoá đã có). Khách khác giữ khoá (hoặc vừa giành trước:
+ * 23505 trên `uq_customers_lark_key`) → không ghi, cảnh báo "có thể trùng khách". Mọi nhánh ghi
+ * nhật ký. Lỗi ghi không làm hỏng việc gán (khớp khách đã được chứng minh qua hoá đơn gốc).
+ */
+async function noiKhoaKhachLark(
+  admin: SupabaseClient,
+  lenh: LenhNoiKhoa,
+  ctx: { staff: StaffSession; branchId: string; galleryId: string; maHoaDon: string[]; maGoc: string[] },
+): Promise<string[]> {
+  let ketQua: "da_noi" | "trung_khach" | "loi" = lenh.loai === "noi" ? "da_noi" : "trung_khach";
+  let khachGiuKhoa: string | null = lenh.loai === "trung_khach" ? lenh.khachGiuKhoa : null;
+  if (lenh.loai === "noi") {
+    const { error } = await admin
+      .from("customers")
+      .update({ lark_customer_key: lenh.khoa })
+      .eq("id", lenh.customerId)
+      .is("lark_customer_key", null);
+    if (error && error.code === "23505") {
+      ketQua = "trung_khach";
+      const { data } = await admin.from("customers").select("id").eq("lark_customer_key", lenh.khoa).limit(1).maybeSingle();
+      khachGiuKhoa = (data?.id as string | undefined) ?? null;
+    } else if (error) {
+      ketQua = "loi";
+      console.error(JSON.stringify({ evt: "hoa_don.noi_khoa_khach.loi", galleryId: ctx.galleryId, loi: error.message }));
+    }
+  }
+  await ghiNhatKy({
+    actorType: "staff",
+    actorId: ctx.staff.staffId,
+    actorLabel: ctx.staff.role,
+    branchId: ctx.branchId,
+    action: ketQua === "da_noi" ? "customer.noi_khoa_lark" : "customer.noi_khoa_lark_bo_qua",
+    entityType: "customer",
+    entityId: lenh.customerId,
+    galleryId: ctx.galleryId,
+    metadata: {
+      ketQua,
+      cachKhop: "khop_qua_hoa_don_goc",
+      maHoaDon: ctx.maHoaDon,
+      maHoaDonGoc: ctx.maGoc,
+      ...(ketQua === "trung_khach" ? { canhBao: "co_the_trung_khach", khachGiuKhoa } : {}),
+    },
+  });
+  return ketQua === "trung_khach" ? [CAU_TRUNG_KHACH] : [];
 }
 
 /**
@@ -1094,6 +1183,29 @@ export async function goGanHoaDon(
 // Gợi ý bộ theo khách (cấp khách hàng)
 // ---------------------------------------------------------------------------
 
+/** BB-397: trần số bộ đọc hoá đơn gốc khi gợi ý theo khách chưa có khoá (mỗi bộ ≤ 5 lượt đọc). */
+const TRAN_BO_DU_PHONG = 3;
+
+type BoCoMaGoc = { customer_id: string | null; lark_contract_code: string | null; lark_contract_codes: string[] | null };
+
+async function khachChuaCoKhoa(admin: SupabaseClient, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { data, error } = await admin.from("customers").select("id").in("id", [...new Set(ids)]).is("lark_customer_key", null);
+  if (error) throw error;
+  return new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
+}
+
+/** Khách (của các bộ) có hoá đơn gốc cùng khách nguồn `khoa`. Tuần tự, dừng sớm khi đủ. */
+async function khachKhopQuaHoaDonGoc(nguon: NguonHoaDon, bos: BoCoMaGoc[], khoa: string): Promise<string[]> {
+  const ra = new Set<string>();
+  for (const b of bos.slice(0, TRAN_BO_DU_PHONG)) {
+    if (!b.customer_id || ra.has(b.customer_id)) continue;
+    const goc = await docKhoaKhachHoaDonGoc(nguon, [b.lark_contract_code, ...(b.lark_contract_codes ?? [])]);
+    if (goc.ok && goc.khoa === khoa) ra.add(b.customer_id);
+  }
+  return [...ra];
+}
+
 export async function goiYBoTheoHoaDon(
   admin: SupabaseClient,
   p: { nguon: NguonHoaDon; ma: string; branchIds: string[] | null; customerId?: string | null },
@@ -1110,10 +1222,42 @@ export async function goiYBoTheoHoaDon(
   const { data: khach, error: ek } = await admin.from("customers").select("id").eq("lark_customer_key", hd.khoaKhachNguon);
   if (ek) throw ek;
   let khachIds = ((khach ?? []) as { id: string }[]).map((k) => k.id);
-  if (p.customerId) {
-    // Trang khách hàng: hoá đơn phải là của CHÍNH khách này.
-    if (!khachIds.includes(p.customerId)) return { ok: false, message: CAU_KHACH.khac_khach };
-    khachIds = [p.customerId];
+  try {
+    if (p.customerId) {
+      // Trang khách hàng: hoá đơn phải là của CHÍNH khách này. BB-397: khách chưa có khoá Lark
+      // → so với hoá đơn gốc các bộ của khách (khách đã có khoá khác thì vẫn là khách khác).
+      if (!khachIds.includes(p.customerId)) {
+        const chuaKhoa = await khachChuaCoKhoa(admin, [p.customerId]);
+        if (!chuaKhoa.has(p.customerId)) return { ok: false, message: CAU_KHACH.khac_khach };
+        const { data: bosKhach, error: ebk } = await admin
+          .from("galleries")
+          .select("customer_id, lark_contract_code, lark_contract_codes")
+          .eq("customer_id", p.customerId)
+          .not("lark_contract_code", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(TRAN_BO_DU_PHONG);
+        if (ebk) throw ebk;
+        const khop = await khachKhopQuaHoaDonGoc(p.nguon, (bosKhach ?? []) as BoCoMaGoc[], hd.khoaKhachNguon);
+        if (!khop.includes(p.customerId)) return { ok: false, message: CAU_KHACH.khac_khach };
+      }
+      khachIds = [p.customerId];
+    }
+    if (khachIds.length === 0 && hd.maHauKyNguon.length > 0) {
+      // BB-397: chưa khách nào mang khoá → đi theo dòng Hậu Kỳ hoá đơn trỏ tới (không quét kho Lark):
+      // bộ neo dòng đó, khách chưa có khoá, hoá đơn gốc của bộ cùng khách nguồn.
+      const { data: bosHk, error: ehk } = await admin
+        .from("galleries")
+        .select("customer_id, lark_contract_code, lark_contract_codes")
+        .in("lark_hauky_record_id", hd.maHauKyNguon.slice(0, TRAN_BO_DU_PHONG))
+        .limit(TRAN_BO_DU_PHONG);
+      if (ehk) throw ehk;
+      const ds = (bosHk ?? []) as BoCoMaGoc[];
+      const chuaKhoa = await khachChuaCoKhoa(admin, ds.map((b) => b.customer_id).filter((x): x is string => Boolean(x)));
+      khachIds = await khachKhopQuaHoaDonGoc(p.nguon, ds.filter((b) => b.customer_id && chuaKhoa.has(b.customer_id)), hd.khoaKhachNguon);
+    }
+  } catch (e) {
+    if (e instanceof LoiNguonHoaDon) return { ok: false, message: cauLoiNguon(e) };
+    throw e;
   }
   if (khachIds.length === 0) return { ok: false, message: "Chưa có khách nào trên app khớp với khách của hoá đơn này." };
   let q = admin
