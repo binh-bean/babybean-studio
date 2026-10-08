@@ -2661,11 +2661,13 @@ export function GalleryApp({ token, giaDinh, chatUrlDuPhong = null }: GalleryApp
                 aria-expanded={moChuyenBo}
                 aria-label={vi.gallery.giaDinh.doiBuoiChup}
                 onClick={() => setMoChuyenBo((v) => !v)}
-                className="-ml-2 mt-0.5 inline-flex min-h-[32px] max-w-full items-center gap-1 rounded-full px-2 text-[14px] font-medium text-[#2e2a27] transition hover:bg-surface-2 lg:-ml-0 lg:mt-1 lg:max-w-[220px] lg:bg-[#f3ede6] lg:px-3 lg:text-[13px]"
+                // Anh 08/10: "tên bộ cho nhỏ bằng 1/2" — nút cao 16px (trước 32px), chữ 10px (7px thì
+                // không đọc được); vùng chạm giữ rộng nhờ lớp giả `before:-inset-2`.
+                className="relative -ml-1.5 mt-1 inline-flex h-4 max-w-full items-center gap-0.5 rounded-full px-1.5 text-[10px] font-medium leading-none text-[#2e2a27] transition before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:bg-surface-2 lg:-ml-0 lg:max-w-[220px] lg:bg-[#f3ede6] lg:px-2"
               >
                 <span className="truncate">{boDangMo ? tenBoHienThi(boDangMo) : vi.gallery.giaDinh.doiBuoiChup}</span>
                 <ChevronDown
-                  className={cn("h-4 w-4 shrink-0 transition-transform", moChuyenBo && "rotate-180")}
+                  className={cn("h-2.5 w-2.5 shrink-0 transition-transform", moChuyenBo && "rotate-180")}
                   strokeWidth={1.5}
                   aria-hidden="true"
                 />

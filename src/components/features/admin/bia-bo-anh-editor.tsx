@@ -613,9 +613,9 @@ function KhungBiaThat({
  * Chiều cao đầu trang màn khách trên điện thoại, px. BB-405 — hai hàng: thương hiệu
  * (biểu tượng 40px + đệm 14px trên/dưới) rồi "← Album gia đình" + tên bộ ngay dưới.
  */
-const CAO_DAU_TRANG_DIEN_THOAI = 140;
+const CAO_DAU_TRANG_DIEN_THOAI = 126;
 /** Chiều cao đầu trang màn khách trên máy tính, px (cột trái: "Album gia đình" + tên bộ). */
-const CAO_DAU_TRANG_MAY_TINH = 84;
+const CAO_DAU_TRANG_MAY_TINH = 68;
 
 /**
  * BB-370 — đầu trang màn khách trong khung xem trước: cụm thương hiệu DÙNG
@@ -645,12 +645,12 @@ function DauTrangXemTruoc({ kho, tenBo }: { kho: KhoXemTruoc; tenBo: string }) {
       </span>
       <span
         data-testid="ten-bo-xem-truoc"
-        className={`inline-flex min-h-[32px] max-w-full items-center gap-1 rounded-full font-medium text-[#2e2a27] ${
-          mt ? "mt-1 max-w-[220px] bg-[#f3ede6] px-3 text-[13px]" : "-ml-2 mt-0.5 px-2 text-[14px]"
+        className={`mt-1 inline-flex h-4 max-w-full items-center gap-0.5 rounded-full text-[10px] font-medium leading-none text-[#2e2a27] ${
+          mt ? "max-w-[220px] bg-[#f3ede6] px-2" : "-ml-1.5 px-1.5"
         }`}
       >
         <span className="truncate">{tenBo}</span>
-        <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+        <ChevronDown className="h-2.5 w-2.5 shrink-0" strokeWidth={1.5} />
       </span>
     </div>
   );

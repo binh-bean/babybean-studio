@@ -43,7 +43,7 @@ const NUT_O = "nut-xem-trong-nha";
  * `src/components/features/admin/bia-bo-anh-editor.tsx` (khung xem trước bìa quản trị dựng
  * đầu trang cao đúng chừng này). Đỏ ở đây = sửa hằng bên đó theo số đo in ra.
  */
-const CAO_DAU_TRANG = { "dien-thoai": 140, "may-tinh": 84 } as const;
+const CAO_DAU_TRANG = { "dien-thoai": 126, "may-tinh": 68 } as const;
 
 async function choLuoi(page: Page) {
   await page.locator("#dau-luoi-anh").first().waitFor({ state: "attached", timeout: 60_000 });
