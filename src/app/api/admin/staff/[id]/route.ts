@@ -5,7 +5,11 @@
  * Spec: docs/13-quyet-dinh-van-hanh.md §8
  *
  * Nghỉ việc là TẮT, không xoá. Nhật ký hoạt động phải giữ được tên người đã
- * tạo album nào, đã mở lại album nào — nên ở đây không có DELETE.
+ * tạo album nào, đã mở lại album nào.
+ *
+ * BB-409 — DELETE (xoá nhân sự) giữ đúng tinh thần đó: hồ sơ KHÔNG bị xoá, chỉ
+ * đánh dấu `da_nghi_luc`, việc đang phụ trách chuyển về "Tổ chức BabyBean",
+ * tài khoản đăng nhập bị khoá.
  */
 
 import { randomUUID } from "node:crypto";
@@ -14,6 +18,15 @@ import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UpdateStaffSchema } from "../schema";
 import type { StaffRole } from "@/types/domain";
+import { ghiNhatKy } from "@/lib/nhat-ky";
+import {
+  CAU_TU_CHOI,
+  QUYEN_XOA_NHAN_SU,
+  kiemQuyenXoaNhanSu,
+  lyDoTuLoiSql,
+} from "@/lib/nhan-su/xoa-nhan-su";
+import { docNguoiBiXoa } from "@/lib/nhan-su/doc-nguoi-bi-xoa-server";
+import { layHoacTaoToChuc, THOI_GIAN_KHOA } from "@/lib/nhan-su/to-chuc-server";
 
 export const runtime = "nodejs";
 
@@ -47,10 +60,17 @@ export async function PATCH(
 
     const { data: target } = await admin
       .from("staff_profiles")
-      .select("id, role, is_active, full_name")
+      .select("id, role, is_active, full_name, da_nghi_luc, la_to_chuc")
       .eq("id", id)
       .maybeSingle();
     if (!target) return fail("NOT_FOUND", "Không tìm thấy nhân sự");
+
+    // BB-409 — người đã XOÁ (việc đã chuyển về Tổ chức) và chính dòng Tổ chức
+    // BabyBean không sửa/bật lại được: "Cho làm lại" ở đây sẽ mở lại một tài
+    // khoản đã bị khoá mà không trả lại việc nào.
+    if ((target as { da_nghi_luc?: string | null }).da_nghi_luc || (target as { la_to_chuc?: boolean }).la_to_chuc) {
+      return fail("CONFLICT", "Nhân sự này đã được xoá, không sửa được nữa");
+    }
 
     const isSelf = target.id === staff.staffId;
 
@@ -150,6 +170,14 @@ export async function PATCH(
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * DELETE /api/admin/staff/:id — BB-409: XOÁ NHÂN SỰ = chuyển việc đang phụ trách về
+ * "Tổ chức BabyBean" + khoá đăng nhập. Hồ sơ GIỮ LẠI (đánh dấu `da_nghi_luc`) để
+ * nhật ký và cột lịch sử vẫn đọc được tên, hiện kèm "(đã nghỉ)".
+ * Thay luồng cũ (`check_staff_deletable` chặn mọi người có lịch sử).
+ */
 export async function DELETE(
   request: Request,
   context: { params: Promise<{ id: string }> },
@@ -158,33 +186,60 @@ export async function DELETE(
 
   try {
     const staff = await requireStaff();
-    if (staff.role !== "owner") {
-      return fail("FORBIDDEN", "Chỉ admin mới có quyền xoá tài khoản");
+    // Cửa quyền đầu tiên: không có `nhan_su:xoa` thì 403 trước khi đọc gì.
+    if (!staff.permissions.includes(QUYEN_XOA_NHAN_SU)) {
+      return fail("FORBIDDEN", CAU_TU_CHOI.KHONG_CO_QUYEN);
     }
 
     const { id } = await context.params;
+    if (!UUID_RE.test(id)) return fail("NOT_FOUND", "Không tìm thấy nhân sự");
     const admin = createAdminClient();
 
-    if (id === staff.staffId) {
-      return fail("FORBIDDEN", "Không thể tự xoá tài khoản của mình");
-    }
+    const target = await docNguoiBiXoa(admin, id);
+    if (!target) return fail("NOT_FOUND", "Không tìm thấy nhân sự");
 
-    const { data: reason, error: rpcErr } = await admin.rpc("check_staff_deletable", {
+    const lyDo = kiemQuyenXoaNhanSu(
+      { staffId: staff.staffId, role: staff.role, permissions: staff.permissions, branchIds: staff.branchIds },
+      target,
+    );
+    if (lyDo) return fail(lyDo === "DA_XOA" ? "CONFLICT" : "FORBIDDEN", CAU_TU_CHOI[lyDo]);
+
+    // BB-409 — KHÔNG xoá tài khoản Auth: staff_profiles.id là khoá ngoại `on delete
+    // cascade` tới auth.users, xoá Auth là kéo theo hồ sơ → mọi cột lịch sử (người
+    // tạo, người xác nhận tiền — vài cột không có `on delete`) hoặc chặn, hoặc mất tên.
+    // Thay vào đó: chuyển việc trong MỘT giao dịch SQL, rồi KHOÁ tài khoản (ban).
+    const toChucId = await layHoacTaoToChuc(admin);
+    const { data: daChuyen, error: loiChuyen } = await admin.rpc("xoa_nhan_su_chuyen_du_lieu", {
       p_staff_id: id,
+      p_to_chuc_id: toChucId,
+      p_actor_id: staff.staffId,
     });
-    
-    if (rpcErr) throw rpcErr;
-    if (reason) {
-      return fail("CONFLICT", reason);
+    if (loiChuyen) {
+      const lyDoSql = lyDoTuLoiSql(loiChuyen.message);
+      if (lyDoSql === "KHONG_THAY") return fail("NOT_FOUND", "Không tìm thấy nhân sự");
+      if (lyDoSql && lyDoSql !== "THIEU_TO_CHUC") {
+        return fail(lyDoSql === "DA_XOA" ? "CONFLICT" : "FORBIDDEN", CAU_TU_CHOI[lyDoSql]);
+      }
+      throw loiChuyen;
     }
 
-    const { error: authErr } = await admin.auth.admin.deleteUser(id);
-    if (authErr) {
-      console.error(JSON.stringify({ evt: "delete_auth_user_failed", requestId, reason: authErr.message }));
-      return fail("INTERNAL", "Lỗi xoá tài khoản đăng nhập");
+    // Khoá đăng nhập. Hồ sơ đã `is_active = false` (requireStaff từ chối mọi phiên
+    // đang mở ngay lượt gọi kế tiếp); ban chặn thêm lượt đăng nhập/làm mới phiên.
+    const { error: loiKhoa } = await admin.auth.admin.updateUserById(id, { ban_duration: THOI_GIAN_KHOA });
+    if (loiKhoa) {
+      console.error(JSON.stringify({ evt: "staff.xoa.khoa_dang_nhap_hut", requestId, reason: loiKhoa.message }));
     }
-    
-    return ok({ id, deleted: true });
+
+    await ghiNhatKy({
+      actorType: "staff",
+      actorId: staff.staffId,
+      action: "staff.xoa",
+      entityType: "staff_profile",
+      entityId: id,
+      metadata: { daChuyen, khoaDangNhap: !loiKhoa },
+    });
+
+    return ok({ id, deleted: true, daChuyen, khoaDangNhap: !loiKhoa });
   } catch (err) {
     if (err instanceof AuthError) {
       return fail(err.code, err.code === "UNAUTHENTICATED" ? "Vui lòng đăng nhập lại" : undefined);

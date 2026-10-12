@@ -63,7 +63,8 @@ function motGallery(raw: HangRevision["galleries"]) {
 async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
   let qGallery = ctx.client
     .from("galleries")
-    .select("id, branch_id, lark_trang_thai, lark_canh_bao");
+    .select("id, branch_id, lark_trang_thai, lark_canh_bao")
+    .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
   qGallery = locBoAnhThat(qGallery);
   if (ctx.chiNhanhIds) qGallery = qGallery.in("branch_id", ctx.chiNhanhIds);
 
@@ -74,6 +75,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
   const qRevision = ctx.client
     .from("revision_requests")
     .select("id, created_at, galleries!inner(branch_id, title, status)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .gte("created_at", ctx.tu.toISOString())
     .lt("created_at", ctx.den.toISOString());
 

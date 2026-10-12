@@ -496,6 +496,8 @@ export const ERROR_CODES = [
   "FORBIDDEN",
   "NOT_FOUND",
   "LINK_EXPIRED",
+  // BB-409: bộ ảnh đã bị studio xoá (thùng rác / dọn hẳn) — khách thấy "bộ ảnh không còn".
+  "GALLERY_GONE",
   // BB-187: phiên đang mở thuộc về MỘT LINK KHÁC với mã trên thanh địa chỉ.
   //
   // Khác LINK_EXPIRED: link cũ vẫn sống, chỉ là nó không phải link ba mẹ vừa bấm.

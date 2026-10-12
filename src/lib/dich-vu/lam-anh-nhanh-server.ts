@@ -309,7 +309,8 @@ export async function layBoLamNhanhDangCho(admin: SupabaseClient, branchIds: rea
       .from("galleries")
       .select("id, title, status, branch_id")
       .in("id", luot.map((r) => String(r.gallery_id)))
-      .in("status", [...TRANG_THAI_CON_HAN_TRA]);
+      .in("status", [...TRANG_THAI_CON_HAN_TRA])
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     if (branchIds) q = q.in("branch_id", [...branchIds]);
     const { data: bo, error: eBo } = await q;
     if (eBo) throw eBo;

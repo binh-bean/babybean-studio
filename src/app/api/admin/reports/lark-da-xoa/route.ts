@@ -44,6 +44,7 @@ export async function GET(): Promise<Response> {
       .select("id, title, status, lark_contract_code, lark_dong_da_xoa_luc, branches(name), customers(full_name)")
       .not("lark_dong_da_xoa_luc", "is", null)
       .neq("status", "archived")
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("lark_dong_da_xoa_luc", { ascending: false })
       .limit(200);
     if (branchIds) q = q.in("branch_id", branchIds);

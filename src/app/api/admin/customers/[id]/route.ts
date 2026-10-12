@@ -67,6 +67,7 @@ export async function GET(
         "id, title, status, branch_id, created_at, submitted_at, photo_count, included_quota, lark_contract_codes",
       )
       .eq("customer_id", id)
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("created_at", { ascending: false })
       .limit(50);
     if (!thayHet) truyVanBo = truyVanBo.in("branch_id", staff.branchIds);

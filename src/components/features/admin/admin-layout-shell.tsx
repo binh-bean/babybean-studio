@@ -10,11 +10,14 @@ import { DemViecProvider } from "./dem-viec-context";
 export function AdminLayoutShell({
   children,
   role,
+  quyen,
   hoTen,
 }: {
   children: React.ReactNode;
   /** Vai trò của người đang đăng nhập, để ẩn mục Nhân sự với người không có quyền. */
   role?: string;
+  /** BB-409 — bộ quyền của người đang đăng nhập (mục Thùng rác, Nhân sự cho Quản lý). */
+  quyen?: readonly string[];
   /** Tên người đang đăng nhập — máy quầy là máy chung (BB-185). */
   hoTen?: string | null;
 }) {
@@ -74,12 +77,13 @@ export function AdminLayoutShell({
         isCollapsed={isSidebarCollapsed}
         onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         role={role}
+        quyen={quyen}
         canXuLyCount={canXuLyCount}
       />
       {/* BB-342: khách làm gì là huy hiệu đếm lại + thông báo góc màn, không F5. */}
       <TucThiNhanVien />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <AdminHeader role={role} hoTen={hoTen} canXuLyCount={canXuLyCount} />
+        <AdminHeader role={role} quyen={quyen} hoTen={hoTen} canXuLyCount={canXuLyCount} />
         <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
           {children}
         </main>

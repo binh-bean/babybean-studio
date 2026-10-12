@@ -72,12 +72,14 @@ type Dong = {
   lark_trang_thai: string | null;
   lark_trang_thai_tu: string | null;
   reopened_at: string | null;
+  /** BB-409 — bộ trong thùng rác: vẫn đọc để GIỮ số thứ tự, không hiện cho gia đình. */
+  deleted_at?: string | null;
   shoot: unknown;
   baby: unknown;
 };
 
 const COT_CHUNG =
-  "id, title, status, photo_count, cover_photo_id, created_at, lark_trang_thai, lark_trang_thai_tu, reopened_at, shoot:shoots(shoot_date), baby:babies(nickname, full_name)";
+  "id, title, status, photo_count, cover_photo_id, created_at, lark_trang_thai, lark_trang_thai_tu, reopened_at, deleted_at, shoot:shoots(shoot_date), baby:babies(nickname, full_name)";
 
 function motDong<T>(raw: unknown): T | null {
   const v = Array.isArray(raw) ? raw[0] : raw;
@@ -139,7 +141,8 @@ export async function danhSachBoAnhGiaDinh(
   const an = TRANG_THAI_AN_VOI_GIA_DINH as readonly string[];
 
   const ds = tatCa
-    .filter(({ dong }) => (dong.photo_count ?? 0) > 0 && !an.includes(dong.status))
+    // BB-409: bộ trong thùng rác không hiện (vẫn giữ chỗ trong số thứ tự ở docMoiBo).
+    .filter(({ dong }) => (dong.photo_count ?? 0) > 0 && !an.includes(dong.status) && !dong.deleted_at)
     .map(({ dong, so }): BoAnhGiaDinhNoiBo => {
       const be = motDong<{ nickname: string | null; full_name: string | null }>(dong.baby);
       const shoot = motDong<{ shoot_date: string | null }>(dong.shoot);

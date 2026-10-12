@@ -162,7 +162,7 @@ interface HangLink {
   id: string;
   view_count: number | null;
   customer: Mot<{ id: string; branch_id: string; full_name: string | null }>;
-  gallery: Mot<{ branch_id: string; title: string | null; status: string; customer_id: string | null }>;
+  gallery: Mot<{ branch_id: string; title: string | null; status: string; customer_id: string | null; deleted_at?: string | null }>;
 }
 
 interface HangYeuCau {
@@ -194,7 +194,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
   const { data: ld, error: lErr } = await ctx.client
     .from("share_links")
     .select(
-      "id, view_count, customer:customers(id, branch_id, full_name), gallery:galleries(branch_id, title, status, customer_id)",
+      "id, view_count, customer:customers(id, branch_id, full_name), gallery:galleries(branch_id, title, status, customer_id, deleted_at)",
     )
     .eq("role", "viewer")
     .gte("created_at", ctx.tu.toISOString())
@@ -208,6 +208,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
     const bo = motDong(h.gallery);
     const chiNhanh = kh?.branch_id ?? bo?.branch_id ?? null;
     if (laThu(kh?.full_name ?? null) || laThu(bo?.title ?? null) || bo?.status === "archived") continue;
+    if (bo?.deleted_at) continue; // BB-409: bỏ bộ trong thùng rác
     if (!cuaChiNhanh(chiNhanh)) continue;
     linkTrongKy.push({
       linkId: h.id,
@@ -227,6 +228,7 @@ async function chay(ctx: NguCanhBaoCao): Promise<KetQuaBaoCao> {
         .from("yeu_cau_mua_them")
         .select(cot)
         .not("share_link_id", "is", null)
+        .is("gallery.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
         .gte("created_at", ctx.tu.toISOString())
         .lt("created_at", ctx.den.toISOString())
         .limit(5000);

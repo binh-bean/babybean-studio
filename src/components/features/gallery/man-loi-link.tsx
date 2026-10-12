@@ -21,11 +21,13 @@ import { anhHanhTrinh } from "@/components/features/gallery/hanh-trinh";
 
 const M = vi.gallery.manLoi;
 
-export type LoaiLoiLink = "het-han" | "khong-thay" | "loi";
+export type LoaiLoiLink = "het-han" | "khong-thay" | "khong-con" | "loi";
 
 /** Mã lỗi máy chủ → loại màn. Thu hồi = NOT_FOUND (cố ý, xem /api/auth/gallery). */
 export function loaiLoiTuMa(ma: string | null | undefined): LoaiLoiLink {
   if (ma === "LINK_EXPIRED") return "het-han";
+  // BB-409: studio đã xoá bộ ảnh (thùng rác / dọn hẳn).
+  if (ma === "GALLERY_GONE") return "khong-con";
   if (ma === "NOT_FOUND" || ma === "LINK_REVOKED" || ma === "FORBIDDEN") return "khong-thay";
   return "loi";
 }
@@ -44,7 +46,9 @@ export function ManLoiLink({ loai, chatUrl, onThuLai }: ManLoiLinkProps) {
       ? [M.hetHanTieuDe, M.hetHanMoTa]
       : loai === "khong-thay"
         ? [M.khongThayTieuDe, M.khongThayMoTa]
-        : [M.loiTieuDe, M.loiMoTa];
+        : loai === "khong-con"
+          ? [M.khongConTieuDe, M.khongConMoTa]
+          : [M.loiTieuDe, M.loiMoTa];
   const anh =
     loai === "het-han"
       ? anhHanhTrinh("link-het-han")

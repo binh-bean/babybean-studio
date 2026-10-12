@@ -58,6 +58,7 @@ export async function xacThucTokenBoAnh(token: string): Promise<BoAnhTheoToken |
     .from("galleries")
     .select("id, baby_id, cover_photo_id")
     .eq("id", link.gallery_id)
+    .is("deleted_at", null) // BB-409: bộ trong thùng rác — không lộ tên bé/ảnh bìa qua icon
     .maybeSingle();
 
   if (!gallery) return null;

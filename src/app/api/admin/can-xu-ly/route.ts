@@ -134,6 +134,7 @@ export async function GET(request: Request): Promise<Response> {
       .select(CAC_COT)
       .eq("status", "sync_error")
       .eq("sync_error", LY_DO_CHUA_CHIA_SE)
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("last_synced_at", { ascending: true, nullsFirst: true });
     if (targetBranchIds) qDrive = qDrive.in("branch_id", targetBranchIds);
 
@@ -151,6 +152,7 @@ export async function GET(request: Request): Promise<Response> {
       .eq("photo_count", 0)
       .neq("status", "archived")
       .neq("status", "sync_error")
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("created_at", { ascending: true });
     if (targetBranchIds) qRong = qRong.in("branch_id", targetBranchIds);
 
@@ -170,6 +172,7 @@ export async function GET(request: Request): Promise<Response> {
       .is("included_quota", null)
       .neq("status", "archived")
       .neq("status", "sync_error")
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("created_at", { ascending: true });
     if (targetBranchIds) qChuaCoHanMuc = qChuaCoHanMuc.in("branch_id", targetBranchIds);
 
@@ -183,7 +186,8 @@ export async function GET(request: Request): Promise<Response> {
       .from("galleries")
       .select("id", { count: "exact", head: true })
       .in("lark_canh_bao", maCanhBaoGap)
-      .neq("status", "archived");
+      .neq("status", "archived")
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     if (targetBranchIds) qCanhBao = qCanhBao.in("branch_id", targetBranchIds);
 
     // 4e. BB-312 — bộ ảnh đang có yêu cầu "xin mở lại" CHƯA XỬ LÝ. Cùng công

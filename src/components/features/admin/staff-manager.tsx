@@ -17,10 +17,30 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Input, Select, Badge, Card, Spinner, EmptyState, Avatar, AvatarFallback, Switch, Checkbox } from "@/components/ui";
+import {
+  Button,
+  Input,
+  Select,
+  Badge,
+  Card,
+  Spinner,
+  EmptyState,
+  Avatar,
+  AvatarFallback,
+  Switch,
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui";
+import { toast } from "@/components/ui/toast";
 import { Field, RequiredLegend } from "./field";
 import { vi } from "@/i18n/vi";
 import { formatNgayVN, formatSo } from "@/lib/utils/dinh-dang";
+import { DUOI_DA_NGHI, type KeHoachChuyen } from "@/lib/nhan-su/xoa-nhan-su";
 
 /** Chữ cái đầu để làm avatar — bản vẽ quan-tri-nhan-su.webp dùng chữ cái đầu
  * tên, không dùng ảnh chân dung. */
@@ -33,6 +53,24 @@ function chuCaiDau(hoTen: string): string {
 }
 
 const t = vi.admin.staff;
+const tx = vi.admin.xoaNhanSu;
+
+/** BB-409 — tên người đã xoá luôn kèm "(đã nghỉ)" (không nhân đôi nếu máy chủ đã gắn). */
+function tenHienThi(row: { fullName: string; daXoa?: boolean }): string {
+  if (!row.daXoa || row.fullName.endsWith(DUOI_DA_NGHI)) return row.fullName;
+  return `${row.fullName}${DUOI_DA_NGHI}`;
+}
+
+/** BB-409 — hộp "Xoá nhân sự": xem trước (GET …/xoa) rồi mới cho xác nhận (DELETE). */
+interface HopXoa {
+  row: StaffRow;
+  dangTai: boolean;
+  duocXoa: boolean;
+  lyDo: string | null;
+  keHoach: KeHoachChuyen | null;
+  loi: string | null;
+  dangXoa: boolean;
+}
 
 interface StaffRow {
   id: string;
@@ -49,7 +87,10 @@ interface StaffRow {
   neverLoggedIn: boolean;
   stale: boolean;
   branchIds: string[];
-  deleteReason: string | null;
+  /** BB-409 — người xem được bấm "Xoá nhân sự" cho người này (cùng luật với DELETE). */
+  canDelete: boolean;
+  /** BB-409 — đã xoá: việc đã chuyển về Tổ chức BabyBean, không sửa được nữa. */
+  daXoa: boolean;
   /** BB-373 — được phép đặt mật khẩu cho người này (chỉ Admin; chỉ owner đụng được owner). */
   canResetPassword: boolean;
 }
@@ -93,9 +134,12 @@ export function StaffManager({
   const setShowForm = onShowFormChange;
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // BB-320 (Q9): lý do "không xoá được" chỉ hiện khi người dùng thật sự bấm Xoá
-  // — trước đây dòng chữ đỏ nằm cố định trên mọi thẻ nhân viên có nhật ký.
-  const [lyDoXoaMo, setLyDoXoaMo] = useState<string | null>(null);
+  /**
+   * BB-409 — `false` khi người xem chỉ có `nhan_su:xoa` (Quản lý): danh sách chỉ
+   * đọc + nút "Xoá nhân sự"; ẩn Thêm/Sửa/đổi vai/bật tắt/mật khẩu.
+   */
+  const [canManage, setCanManage] = useState(false);
+  const [hopXoa, setHopXoa] = useState<HopXoa | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,6 +152,7 @@ export function StaffManager({
       setBranches(body.data.branches);
       setAssignableRoles(body.data.assignableRoles);
       setCustomRoles(body.data.customRoles ?? []);
+      setCanManage(body.data.canManage !== false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được danh sách");
     } finally {
@@ -180,52 +225,77 @@ export function StaffManager({
     </Select>
   );
 
-  async function destroy(row: StaffRow) {
-    if (!confirm(`Bạn có chắc chắn muốn xoá vĩnh viễn tài khoản ${row.fullName}? Hành động này không thể hoàn tác.`)) return;
-    setBusyId(row.id);
-    setError(null);
+  /** BB-409 — bấm "Xoá nhân sự": mở hộp, hỏi máy chủ sẽ chuyển những gì (chỉ đọc). */
+  async function moHopXoa(row: StaffRow) {
+    setHopXoa({ row, dangTai: true, duocXoa: false, lyDo: null, keHoach: null, loi: null, dangXoa: false });
     try {
-      const res = await fetch(`/api/admin/staff/${row.id}`, {
-        method: "DELETE",
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error?.message ?? "Không xoá được");
-      setNotice(`Đã xoá tài khoản ${row.fullName}`);
+      const res = await fetch(`/api/admin/staff/${row.id}/xoa`, { cache: "no-store" });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error?.message ?? tx.loiXem);
+      const d = body.data as { duocXoa: boolean; lyDo: string | null; keHoach: KeHoachChuyen };
+      setHopXoa((h) =>
+        h && h.row.id === row.id
+          ? { ...h, dangTai: false, duocXoa: d.duocXoa, lyDo: d.lyDo, keHoach: d.keHoach }
+          : h,
+      );
+    } catch (e) {
+      const loi = e instanceof Error ? e.message : tx.loiXem;
+      setHopXoa((h) => (h && h.row.id === row.id ? { ...h, dangTai: false, loi } : h));
+    }
+  }
+
+  /** BB-409 — xác nhận: DELETE chuyển việc về Tổ chức BabyBean + khoá đăng nhập. */
+  async function xacNhanXoa() {
+    if (!hopXoa || !hopXoa.duocXoa) return;
+    const row = hopXoa.row;
+    setHopXoa({ ...hopXoa, dangXoa: true, loi: null });
+    setBusyId(row.id);
+    try {
+      const res = await fetch(`/api/admin/staff/${row.id}`, { method: "DELETE" });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error?.message ?? tx.loiXoa);
+      setHopXoa(null);
+      setEditingId((id) => (id === row.id ? null : id));
+      toast.success(tx.daXoa.replace("{name}", row.fullName));
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Không xoá được");
+      const loi = e instanceof Error ? e.message : tx.loiXoa;
+      setHopXoa((h) => (h && h.row.id === row.id ? { ...h, dangXoa: false, loi } : h));
     } finally {
       setBusyId(null);
     }
   }
 
-  const rowActions = (row: StaffRow) => (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busyId === row.id}
-        onClick={() => setEditingId(editingId === row.id ? null : row.id)}
-      >
-        {editingId === row.id ? t.cancel : t.edit}
-      </Button>
-      <Button
-        variant="danger"
-        size="sm"
-        disabled={busyId === row.id}
-        // Tài khoản có nhật ký: nút vẫn bấm được — bấm thì hiện LÝ DO không xoá được (không xoá gì cả).
-        data-xoa-bi-chan={row.deleteReason ? "true" : undefined}
-        onClick={() => (row.deleteReason ? setLyDoXoaMo(lyDoXoaMo === row.id ? null : row.id) : destroy(row))}
-      >
-        Xoá
-      </Button>
-      {row.deleteReason && lyDoXoaMo === row.id && (
-        <p role="status" className="basis-full text-xs text-[var(--bb-fg-muted)]">
-          {row.deleteReason}
-        </p>
-      )}
-    </>
-  );
+  const rowActions = (row: StaffRow) => {
+    if (row.daXoa) return null;
+    const suaDuoc = canManage;
+    if (!suaDuoc && !row.canDelete) return null;
+    return (
+      <div className="flex flex-wrap gap-2">
+        {suaDuoc && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busyId === row.id}
+            onClick={() => setEditingId(editingId === row.id ? null : row.id)}
+          >
+            {editingId === row.id ? t.cancel : t.edit}
+          </Button>
+        )}
+        {row.canDelete && (
+          <Button
+            variant="danger"
+            size="sm"
+            data-testid="nut-xoa-nhan-su"
+            disabled={busyId === row.id}
+            onClick={() => void moHopXoa(row)}
+          >
+            {tx.nut}
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   const lastLogin = (row: StaffRow) =>
     row.neverLoggedIn ? (
@@ -266,7 +336,7 @@ export function StaffManager({
         </div>
       )}
 
-      {showForm && (
+      {showForm && canManage && (
         <CreateStaffForm
           branches={branches}
           assignableRoles={assignableRoles}
@@ -296,14 +366,15 @@ export function StaffManager({
               <Card
                 key={row.id}
                 data-testid="the-nhan-su"
-                className={`flex min-w-0 flex-col gap-4 p-5 ${row.isActive ? "" : "opacity-60"}`}
+                data-da-xoa={row.daXoa ? "true" : undefined}
+                className={`flex min-w-0 flex-col gap-4 p-5 ${row.isActive && !row.daXoa ? "" : "opacity-60"}`}
               >
                 <div className="flex items-start gap-3">
                   <Avatar className="h-11 w-11 shrink-0">
                     <AvatarFallback>{chuCaiDau(row.fullName)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-[var(--bb-fg)]">{row.fullName}</p>
+                    <p className="truncate font-medium text-[var(--bb-fg)]">{tenHienThi(row)}</p>
                     <code className="block break-all text-xs text-[var(--bb-fg-muted)]">
                       {row.identifier}
                     </code>
@@ -312,7 +383,13 @@ export function StaffManager({
 
                 <div>
                   <p className="mb-1 text-xs font-medium text-[var(--bb-fg-muted)]">{t.colRole}</p>
-                  {roleSelect(row, "w-full")}
+                  {canManage && !row.daXoa ? (
+                    roleSelect(row, "w-full")
+                  ) : (
+                    <p className="text-sm text-[var(--bb-fg)]">
+                      {row.vaiTuTao ? row.roleName : roleLabel(row.role)}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -332,17 +409,25 @@ export function StaffManager({
                     <label> chồng nhau, trình duyệt xử lý sai lệch. */}
                 <div className="flex items-center justify-between gap-2 border-t border-[var(--bb-border)] pt-3 text-sm text-[var(--bb-fg)]">
                   <span>{t.colStatus}</span>
-                  <Switch
-                    checked={row.isActive}
-                    disabled={busyId === row.id}
-                    onCheckedChange={() => toggleActive(row)}
-                    aria-label={row.isActive ? t.deactivate : t.reactivate}
-                  />
+                  {row.daXoa ? (
+                    <Badge variant="outline" className="whitespace-nowrap">
+                      {tx.daXoaTrangThai}
+                    </Badge>
+                  ) : canManage ? (
+                    <Switch
+                      checked={row.isActive}
+                      disabled={busyId === row.id}
+                      onCheckedChange={() => toggleActive(row)}
+                      aria-label={row.isActive ? t.deactivate : t.reactivate}
+                    />
+                  ) : (
+                    <span className="text-[var(--bb-fg-muted)]">{row.isActive ? t.active : t.inactive}</span>
+                  )}
                 </div>
 
-                <div className="flex flex-wrap gap-2">{rowActions(row)}</div>
+                {rowActions(row)}
 
-                {editingId === row.id && (
+                {editingId === row.id && canManage && !row.daXoa && (
                   <div className="border-t border-[var(--bb-border)] pt-4">
                     <EditStaffRow
                       row={row}
@@ -371,7 +456,8 @@ export function StaffManager({
             <h2 className="mb-3 text-sm font-semibold text-[var(--bb-fg)]">{t.colRole}</h2>
             <ul className="space-y-2.5 text-sm">
               {Object.entries(
-                rows.reduce<Record<string, number>>((acc, row) => {
+                // BB-409: người đã xoá không còn giữ vai nào — không đếm.
+                rows.filter((row) => !row.daXoa).reduce<Record<string, number>>((acc, row) => {
                   const nhan = row.vaiTuTao ? row.roleName : roleLabel(row.role);
                   acc[nhan] = (acc[nhan] ?? 0) + 1;
                   return acc;
@@ -386,6 +472,71 @@ export function StaffManager({
           </Card>
         </div>
       )}
+
+      {/* BB-409 — "Xoá nhân sự": nói rõ việc gì chuyển về Tổ chức BabyBean trước khi xoá. */}
+      <Dialog
+        open={hopXoa !== null}
+        onOpenChange={(mo) => {
+          if (!mo && !hopXoa?.dangXoa) setHopXoa(null);
+        }}
+      >
+        <DialogContent aria-labelledby="tieu-de-xoa-nhan-su">
+          {hopXoa && (
+            <>
+              <DialogHeader>
+                <DialogTitle id="tieu-de-xoa-nhan-su">
+                  {(hopXoa.dangTai || hopXoa.duocXoa || hopXoa.loi ? tx.tieuDe : tx.khongXoaDuoc).replace(
+                    "{name}",
+                    hopXoa.row.fullName,
+                  )}
+                </DialogTitle>
+              </DialogHeader>
+              {hopXoa.dangTai ? (
+                <p className="flex items-center gap-2 text-sm text-[var(--bb-fg-muted)]">
+                  <Spinner /> {tx.dangXem}
+                </p>
+              ) : hopXoa.duocXoa && hopXoa.keHoach ? (
+                <div className="space-y-3">
+                  <DialogDescription className="text-[var(--bb-fg)]" data-testid="ke-hoach-xoa">
+                    {hopXoa.keHoach.cau}
+                  </DialogDescription>
+                  <p className="text-sm text-[var(--bb-fg-muted)]">{tx.ghiChu}</p>
+                </div>
+              ) : hopXoa.lyDo ? (
+                <p role="status" className="text-sm text-[var(--bb-fg)]">
+                  {hopXoa.lyDo}
+                </p>
+              ) : null}
+              {hopXoa.loi && (
+                <p role="alert" className="text-sm text-[var(--bb-danger)]">
+                  {hopXoa.loi}
+                </p>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={hopXoa.dangXoa}
+                  onClick={() => setHopXoa(null)}
+                >
+                  {hopXoa.duocXoa ? tx.huy : tx.dong}
+                </Button>
+                {hopXoa.duocXoa && (
+                  <Button
+                    type="button"
+                    variant="danger"
+                    data-testid="xac-nhan-xoa-nhan-su"
+                    disabled={hopXoa.dangTai || hopXoa.dangXoa}
+                    onClick={() => void xacNhanXoa()}
+                  >
+                    {hopXoa.dangXoa ? tx.dangXoa : tx.xacNhan}
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

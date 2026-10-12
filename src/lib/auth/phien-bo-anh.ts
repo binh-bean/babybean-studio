@@ -79,6 +79,8 @@ export async function boAnhCuaKhach(
     .eq("customer_id", customerId)
     .gt("photo_count", 0)
     .not("status", "in", `(${TRANG_THAI_AN_VOI_GIA_DINH.join(",")})`)
+    // BB-409: bộ trong thùng rác không còn thuộc "đang hiện cho gia đình".
+    .is("deleted_at", null)
     .maybeSingle();
   if (error) throw error;
   return !!data;

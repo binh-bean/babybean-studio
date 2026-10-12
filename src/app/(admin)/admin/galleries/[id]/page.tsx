@@ -7,6 +7,7 @@
  * khoá một lần nữa — màn hình không phải ranh giới an ninh.
  */
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { GalleryDetail } from "@/components/features/admin/gallery-detail";
@@ -15,7 +16,10 @@ import {
   duongDanSauDangNhap,
   quyenThaoTacBoAnh,
   xetQuyenXemBoAnh,
+  type QuyenThaoTacBoAnh,
 } from "@/lib/auth/quyen-xem-bo-anh";
+import { QUYEN_XOA_BO_ANH, soNgayConLai } from "@/lib/thung-rac/thung-rac";
+import { vi } from "@/i18n/vi";
 
 export const dynamic = "force-dynamic";
 
@@ -56,11 +60,12 @@ export default async function GalleryDetailPage({
   } catch {
     // Chuỗi % hỏng — tra nguyên văn.
   }
+  // BB-409: `deleted_at` — bộ đang ở thùng rác thì hiện băng báo và khoá thao tác.
   const { data: bo } = UUID_REGEX.test(id)
-    ? await admin.from("galleries").select("id, branch_id, editor_id").eq("id", id).maybeSingle()
+    ? await admin.from("galleries").select("id, branch_id, editor_id, deleted_at").eq("id", id).maybeSingle()
     : await admin
         .from("galleries")
-        .select("id, branch_id, editor_id")
+        .select("id, branch_id, editor_id, deleted_at")
         .contains("lark_contract_codes", [maHoaDon])
         .order("created_at", { ascending: false })
         .limit(1)
@@ -72,6 +77,10 @@ export default async function GalleryDetailPage({
   if (lyDo) return <ManChanBoAnh lyDo={lyDo} />;
 
   const galleryId = bo.id as string;
+  const deletedAt = (bo as { deleted_at?: string | null }).deleted_at ?? null;
+  // BB-409: bộ trong thùng rác — chỉ XEM (mọi nút ghi ẩn), lối duy nhất là Khôi phục ở Thùng rác.
+  const quyen = deletedAt ? CHI_XEM : quyenThaoTacBoAnh(staff.permissions);
+  const coTheXoa = !deletedAt && staff.permissions.includes(QUYEN_XOA_BO_ANH);
 
   return (
     // BB-255: bản vẽ quan-tri-chi-tiet.webp dùng bố cục hai cột (nội dung
@@ -80,6 +89,7 @@ export default async function GalleryDetailPage({
     // lớp nữa ở đây là lý do H1 của trang chi tiết lệch x so với các trang
     // khác (cùng lỗi đã sửa ở viec-can-xu-ly/bao-cao/branches).
     <main className="mx-auto max-w-6xl">
+      {deletedAt && <BangThungRac deletedAt={deletedAt} coQuyenThungRac={staff.permissions.includes(QUYEN_XOA_BO_ANH)} />}
       {/* `key` KHÔNG phải trang trí — nó là lớp chặn thứ nhất của một lỗi
           nghiêm trọng (BB-184).
 
@@ -94,7 +104,48 @@ export default async function GalleryDetailPage({
 
           Khoá theo `galleryId` đã tra xong, không theo `id` trên địa chỉ: hai địa
           chỉ khác nhau trỏ về cùng một bộ ảnh thì không cần dựng lại màn. Đừng gỡ. */}
-      <GalleryDetail key={galleryId} galleryId={galleryId} quyen={quyenThaoTacBoAnh(staff.permissions)} />
+      <GalleryDetail key={galleryId} galleryId={galleryId} quyen={quyen} coTheXoa={coTheXoa} />
     </main>
+  );
+}
+
+/** BB-409 — bộ trong thùng rác: không bày nút ghi nào (route vẫn là ranh giới). */
+const CHI_XEM: QuyenThaoTacBoAnh = {
+  ghi: false,
+  suaThongTin: false,
+  dongBo: false,
+  guiAnhChinh: false,
+  guiLink: false,
+  moLai: false,
+  daGiao: false,
+  xuat: false,
+  nhapTay: false,
+};
+
+/** BB-409 — băng báo "Bộ ảnh đang ở thùng rác — còn N ngày" + lối sang Thùng rác. */
+function BangThungRac({ deletedAt, coQuyenThungRac }: { deletedAt: string; coQuyenThungRac: boolean }) {
+  const t = vi.admin.thungRac;
+  const n = soNgayConLai(deletedAt);
+  return (
+    <div
+      role="status"
+      data-testid="bang-thung-rac"
+      className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--bb-radius-sm)] border border-[var(--bb-danger)] bg-[var(--bb-surface-2)] px-4 py-3"
+    >
+      <div className="min-w-0">
+        <p className="font-medium text-[var(--bb-danger)]">
+          {n <= 0 ? t.bannerHomNay : t.bannerTieuDe.replace("{n}", String(n))}
+        </p>
+        <p className="mt-0.5 text-sm text-[var(--bb-fg-muted)]">{t.bannerMoTa}</p>
+      </div>
+      {coQuyenThungRac && (
+        <Link
+          href="/admin/thung-rac"
+          className="inline-flex h-9 shrink-0 items-center rounded-md border border-[var(--bb-border)] bg-[var(--bb-surface)] px-3 text-sm font-medium text-[var(--bb-fg)] hover:bg-[var(--bb-surface-2)]"
+        >
+          {t.moThungRac}
+        </Link>
+      )}
+    </div>
   );
 }

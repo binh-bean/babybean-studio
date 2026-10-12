@@ -60,7 +60,10 @@ async function demTheoBranch(
 }
 
 function baseQuery(ctx: NguCanhBaoCao) {
-  let q = ctx.client.from("galleries").select("id, branch_id, lark_trang_thai, lark_trang_thai_tu");
+  let q = ctx.client
+    .from("galleries")
+    .select("id, branch_id, lark_trang_thai, lark_trang_thai_tu")
+    .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
   q = locBoAnhThat(q);
   if (ctx.chiNhanhIds) q = q.in("branch_id", ctx.chiNhanhIds);
   return q;
@@ -77,7 +80,8 @@ async function chotTrongKyChiTiet(ctx: NguCanhBaoCao, tu: Date, den: Date) {
     .from("galleries")
     .select("id, branch_id, sent_at, submitted_at")
     .gte("submitted_at", tu.toISOString())
-    .lt("submitted_at", den.toISOString());
+    .lt("submitted_at", den.toISOString())
+    .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
   q = locBoAnhThat(q);
   if (ctx.chiNhanhIds) q = q.in("branch_id", ctx.chiNhanhIds);
   const { data, error } = await q;

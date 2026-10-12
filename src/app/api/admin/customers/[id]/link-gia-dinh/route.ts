@@ -91,7 +91,11 @@ export async function GET(
       };
     }
 
-    const { data: boCuaKhach, error: bErr } = await admin.from("galleries").select("id, title").eq("customer_id", id);
+    const { data: boCuaKhach, error: bErr } = await admin
+      .from("galleries")
+      .select("id, title")
+      .eq("customer_id", id)
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     if (bErr) throw bErr;
     const tieuDe = new Map((boCuaKhach ?? []).map((g) => [g.id as string, (g.title as string | null) ?? ""]));
     const idsBo = [...tieuDe.keys()];

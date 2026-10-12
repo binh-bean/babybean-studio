@@ -42,7 +42,10 @@ export async function GET(): Promise<Response> {
       staffCount.set(l.branch_id, (staffCount.get(l.branch_id) ?? 0) + 1);
     }
 
-    const { data: galleries } = await admin.from("galleries").select("branch_id");
+    const { data: galleries } = await admin
+      .from("galleries")
+      .select("branch_id")
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     const galleryCount = new Map<string, number>();
     for (const g of galleries ?? []) {
       galleryCount.set(g.branch_id, (galleryCount.get(g.branch_id) ?? 0) + 1);

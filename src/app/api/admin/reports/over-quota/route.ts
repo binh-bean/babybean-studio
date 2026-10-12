@@ -240,6 +240,7 @@ export async function GET(request: Request): Promise<Response> {
         .select("gallery_id, ma_hoa_don, trang_thai, galleries!inner(title, branch_id)")
         .in("trang_thai", ["thua", "thieu", "hon_hop", "chua_du_dieu_kien"])
         .in("galleries.branch_id", branchIds)
+        .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
         .limit(200);
       if (!hdErr) {
         for (const r of (hdRows ?? []) as unknown as { gallery_id: string; ma_hoa_don: string; trang_thai: string; galleries: { title: string } | null }[]) {

@@ -58,6 +58,8 @@ const QUYEN_THEO_VAI: Record<string, string[]> = {
     "deliveries:write",
     "deliveries:delete",
     "thanh_toan:nhap_tay", // 0102 (BB-395)
+    "bo_anh:xoa", // 0109 (BB-409)
+    "nhan_su:xoa", // 0109 (BB-409)
   ],
   branch_manager: [
     ...CHUNG_ALBUM,
@@ -84,6 +86,8 @@ const QUYEN_THEO_VAI: Record<string, string[]> = {
     "deliveries:write",
     "deliveries:delete",
     "thanh_toan:nhap_tay", // 0102 (BB-395)
+    "bo_anh:xoa", // 0109 (BB-409)
+    "nhan_su:xoa", // 0109 (BB-409)
   ],
   cs: [
     ...CHUNG_ALBUM,

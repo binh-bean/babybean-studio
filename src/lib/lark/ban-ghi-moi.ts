@@ -515,6 +515,10 @@ export async function docDanhSachBanGhiMoi(client: Client, quyen: { toanQuyen: b
         and not exists (
           select 1 from galleries g where g.lark_hauky_record_id = b.lark_record_id and g.status <> 'archived'
         )
+        -- BB-409: dòng của bộ ĐÃ XOÁ (thùng rác / dọn hẳn) không quay lại khối "Bản ghi mới".
+        and not exists (
+          select 1 from bo_anh_da_xoa t where t.lark_hauky_record_id = b.lark_record_id and t.bo_dau_luc is null
+        )
         and ($1::boolean or b.branch_id = any($2::uuid[]))
       order by b.thay_luc desc, b.lark_record_id
       limit 100`,

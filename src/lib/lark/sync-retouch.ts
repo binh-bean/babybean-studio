@@ -18,6 +18,7 @@ import { tachMaHoaDon } from "@/lib/utils/ma-hoa-don";
 import { neoBoAnhVaoDongHauKy } from "@/lib/lark/neo-dong-hau-ky";
 import { linkChatKhach } from "@/lib/lien-lac/link-chat-khach";
 import { ghiLinkChatTheoLarkPg } from "@/lib/lark/ghi-link-chat";
+import { dongLarkBiChan } from "@/lib/thung-rac/chan-lark";
 
 export const HOST = "https://open.larksuite.com/open-apis";
 
@@ -495,6 +496,13 @@ export async function syncSingleRetouchRecord(opts: SyncRetouchOptions): Promise
   const trigger = checkRetouchTrigger(fields);
   if (!trigger.triggered || !trigger.driveFolderId || !trigger.driveUrl) {
     return { action: "skipped", reason: trigger.reason };
+  }
+
+  // 1b. BB-409 — dòng của một bộ ĐÃ XOÁ trên app (thùng rác hoặc đã dọn hẳn): KHÔNG
+  // sinh lại, không cập nhật gì. Dấu theo mã dòng Lark HOẶC thư mục Drive (bộ tạo
+  // bằng thuật sĩ chưa neo dòng). Admin bỏ dấu ở Thùng rác thì đồng bộ lại như cũ.
+  if (await dongLarkBiChan(client, { recordId: record.record_id, driveFolderId: trigger.driveFolderId })) {
+    return { action: "skipped", reason: "Bộ ảnh của dòng này đã bị xoá trên app (thùng rác)" };
   }
 
   // 2. Kiểm tra xem album với drive_folder_id này đã tồn tại chưa

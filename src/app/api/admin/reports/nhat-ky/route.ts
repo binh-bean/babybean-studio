@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected } from "@/lib/api-response";
 import { requireStaff } from "@/lib/auth/staff";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { tenHienThiNhanSu } from "@/lib/nhan-su/xoa-nhan-su";
 
 export const runtime = "nodejs";
 
@@ -84,7 +85,9 @@ export async function GET(request: Request): Promise<Response> {
     // Fetch staff names to map actor_id when actor_type is 'staff'
     const { data: staffData } = await admin
       .from("staff_profiles")
-      .select("id, full_name, status");
+      // BB-409: bảng không có cột "status" (câu cũ hỏng → mọi tên ra "(không rõ)").
+      // Đọc is_active + da_nghi_luc để hiện "Tên (đã nghỉ)" cho người đã xoá.
+      .select("id, full_name, is_active, da_nghi_luc, la_to_chuc");
     const staffMap = new Map(staffData?.map(s => [s.id, s]) || []);
 
     type Row = {
@@ -106,8 +109,8 @@ export async function GET(request: Request): Promise<Response> {
       if (r.actor_type === "staff" && r.actor_id) {
         const staffProf = staffMap.get(r.actor_id);
         if (staffProf) {
-          displayName = staffProf.full_name;
-          isInactive = staffProf.status === "inactive";
+          displayName = tenHienThiNhanSu(staffProf) ?? staffProf.full_name;
+          isInactive = staffProf.is_active === false;
         } else {
           // Trường hợp staff_profile đã bị xóa hẳn (không nên có theo rule)
           displayName = "(không rõ)";

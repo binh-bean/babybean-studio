@@ -10,10 +10,13 @@ import { AdminAccountMenu } from "./admin-account-menu";
 
 export function AdminHeader({
   role,
+  quyen,
   hoTen,
   canXuLyCount,
 }: {
   role?: string;
+  /** BB-409 — bộ quyền để lọc mục menu (Thùng rác, Nhân sự cho Quản lý). */
+  quyen?: readonly string[];
   hoTen?: string | null;
   /** Huy hiệu "Việc cần xử lý" trong menu Sheet điện thoại — xem admin-layout-shell.tsx. */
   canXuLyCount?: number | null;
@@ -47,7 +50,7 @@ export function AdminHeader({
                 <span className="font-display text-[18px] tracking-[0.14em] text-[var(--bb-fg)]">BABY BEAN</span>
               </div>
               <div className="overflow-y-auto">
-                <NavLinks onClick={() => setMobileOpen(false)} role={role} canXuLyCount={canXuLyCount} />
+                <NavLinks onClick={() => setMobileOpen(false)} role={role} quyen={quyen} canXuLyCount={canXuLyCount} />
               </div>
             </SheetContent>
           </Sheet>

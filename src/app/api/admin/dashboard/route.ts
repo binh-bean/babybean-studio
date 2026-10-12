@@ -42,7 +42,12 @@ async function demGalleryTheoChiNhanh(
   branchIds: string[],
   statuses: readonly string[],
 ): Promise<Map<string, number>> {
-  let q = admin.from("galleries").select("branch_id").in("branch_id", branchIds).in("status", statuses);
+  let q = admin
+    .from("galleries")
+    .select("branch_id")
+    .in("branch_id", branchIds)
+    .in("status", statuses)
+    .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
   q = locBoAnhThat(q);
   const { data, error } = await q;
   if (error) throw new Error(`Đếm bộ ảnh theo chi nhánh hỏng: ${error.message}`);
@@ -162,7 +167,8 @@ export async function GET(request: Request): Promise<Response> {
       .from("galleries")
       .select("id, lark_trang_thai, lark_trang_thai_tu")
       .in("branch_id", branchIds)
-      .in("status", ["ready", "in_review"]);
+      .in("status", ["ready", "in_review"])
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     truyVanChoChon = locBoAnhThat(truyVanChoChon);
 
     let truyVanSapHetHan = admin
@@ -191,13 +197,15 @@ export async function GET(request: Request): Promise<Response> {
       .select("*", { count: "exact", head: true })
       .in("branch_id", branchIds)
       .eq("status", "delivered")
-      .gte("updated_at", kyDeliveredHienTai.tu.toISOString());
+      .gte("updated_at", kyDeliveredHienTai.tu.toISOString())
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     truyVanDaGiaoThang = locBoAnhThat(truyVanDaGiaoThang);
 
     let truyVanTongSo = admin
       .from("galleries")
       .select("*", { count: "exact", head: true })
-      .in("branch_id", branchIds);
+      .in("branch_id", branchIds)
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     truyVanTongSo = locBoAnhThat(truyVanTongSo);
 
     // BB-270: "Đã giao" kỳ trước (tháng trước theo lịch, giờ VN) — dùng để
@@ -208,7 +216,8 @@ export async function GET(request: Request): Promise<Response> {
       .in("branch_id", branchIds)
       .eq("status", "delivered")
       .gte("updated_at", kyDeliveredTruoc.tu.toISOString())
-      .lt("updated_at", kyDeliveredTruoc.den.toISOString());
+      .lt("updated_at", kyDeliveredTruoc.den.toISOString())
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     truyVanDaGiaoKyTruoc = locBoAnhThat(truyVanDaGiaoKyTruoc);
 
     // BB-333 — mọi truy vấn chỉ cần `branchIds`/`now` được GỬI ĐI NGAY tại đây,
@@ -255,6 +264,7 @@ export async function GET(request: Request): Promise<Response> {
           admin
             .from("selections")
             .select("id, submitted_at, galleries!inner(id, branch_id, customer_id, title, status)")
+            .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
             .eq("is_primary", true)
             .gte("submitted_at", ky7NgayTruoc.tu.toISOString())
             .lt("submitted_at", ky7NgayNay.den.toISOString()),
@@ -269,7 +279,8 @@ export async function GET(request: Request): Promise<Response> {
       .from("galleries")
       .select("created_at")
       .in("branch_id", branchIds)
-      .gte("created_at", startOfChart.toISOString());
+      .gte("created_at", startOfChart.toISOString())
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     truyVanBieuDo = locBoAnhThat(truyVanBieuDo);
     const pBieuDo = batDau(truyVanBieuDo);
 

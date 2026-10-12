@@ -223,7 +223,8 @@ export async function layDanhSachChoXuLyMoLai(
     admin
       .from("galleries")
       .select("id, title, status, branch_id, customer_id, branches(name)")
-      .in("id", ids),
+      .in("id", ids)
+      .is("deleted_at", null), // BB-409: bỏ bộ trong thùng rác (không có dòng → bị loại ở dưới)
   ]);
   if (e2) throw e2;
   if (e3) throw e3;

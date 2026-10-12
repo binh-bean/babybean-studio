@@ -120,7 +120,8 @@ async function timBoGoc(
       .select("id, title, customer_id, created_at")
       .in("customer_id", tatCaKhach)
       .gt("photo_count", 0)
-      .neq("status", "archived");
+      .neq("status", "archived")
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     if (error) throw error;
     for (const g of (data ?? []) as Array<{ id: string; title: string; customer_id: string; created_at: string }>) {
       boTheoKhach.set(g.customer_id, [...(boTheoKhach.get(g.customer_id) ?? []), g]);
@@ -192,6 +193,7 @@ export async function layBoAnhRong(admin: SupabaseClient, branchIds: string[] | 
     .select(COT_BO)
     .eq("photo_count", 0)
     .not("status", "in", `(${KHONG_THEO_DOI.join(",")})`)
+    .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .order("created_at", { ascending: true })
     .limit(1000);
   if (branchIds) q = q.in("branch_id", branchIds);
@@ -316,7 +318,8 @@ export async function layHauKyCuaBo(admin: SupabaseClient, galleryId: string): P
     .select(COT_BO)
     .in("customer_id", [...khach])
     .eq("photo_count", 0)
-    .neq("status", "archived");
+    .neq("status", "archived")
+    .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
   if (er) throw er;
   const ungVien = (rong ?? []) as unknown as DongBoTho[];
   if (ungVien.length === 0) return ketQua;

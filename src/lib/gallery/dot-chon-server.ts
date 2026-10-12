@@ -252,7 +252,8 @@ export async function layDanhSachChoXacNhanDot(
   const { data: gs, error: e2 } = await admin
     .from("galleries")
     .select("id, title, branch_id, customer_id, branches(name)")
-    .in("id", ids);
+    .in("id", ids)
+    .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác (không có dòng → bị loại ở dưới)
   if (e2) throw e2;
 
   type G = {
@@ -1183,7 +1184,8 @@ export async function layDanhSachViecDot1(
       )
       .eq("is_primary", true)
       .or("nho_studio_chon_them.gt.0,so_san_pham_in_chua_anh.gt.0")
-      .in("galleries.status", ["submitted", "in_retouch"]);
+      .in("galleries.status", ["submitted", "in_retouch"])
+      .is("galleries.deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     if (locDaXuLy) q = q.is("studio_xu_ly_dot1_at", null);
     return q.limit(500);
   };

@@ -95,6 +95,7 @@ export async function GET(request: Request): Promise<Response> {
       .not("expires_at", "is", null)
       .lte("expires_at", nguong.toISOString())
       .in("galleries.branch_id", branchIds)
+      .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("expires_at", { ascending: true })
       .limit(500);
 

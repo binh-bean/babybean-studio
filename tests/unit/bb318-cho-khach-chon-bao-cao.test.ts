@@ -34,6 +34,8 @@ function bangGia(rows: Dong[]) {
     neq: (cot: string, v: unknown) => ((cur = cur.filter((r) => r[cot] !== v)), b),
     eq: (cot: string, v: unknown) => ((cur = cur.filter((r) => r[cot] === v)), b),
     in: (cot: string, vs: unknown[]) => ((cur = cur.filter((r) => vs.includes(r[cot]))), b),
+    // BB-409: `.is("deleted_at", null)` — cột vắng trên dòng giả = null (như PostgREST).
+    is: (cot: string, v: unknown) => ((cur = cur.filter((r) => (r[cot] ?? null) === v)), b),
     gte: (cot: string, v: string) => ((cur = cur.filter((r) => r[cot] != null && String(r[cot]) >= v)), b),
     lt: (cot: string, v: string) => ((cur = cur.filter((r) => r[cot] != null && String(r[cot]) < v)), b),
     then: (ok: (v: { data: Dong[]; error: null }) => unknown) => ok({ data: cur, error: null }),

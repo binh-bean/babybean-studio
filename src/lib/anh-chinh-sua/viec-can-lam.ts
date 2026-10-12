@@ -50,6 +50,7 @@ export async function layViecAnhChinh(db: SupabaseClient, branchIds: string[] | 
       .from("galleries")
       .select("id, title, branch_id, status, lark_trang_thai")
       .in("status", [...TRANG_THAI_GUI_DUOC])
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("id", { ascending: true })
       .range(tu, tu + 999);
     if (branchIds) qg = qg.in("branch_id", branchIds);
@@ -130,7 +131,8 @@ export async function layViecAnhChinh(db: SupabaseClient, branchIds: string[] | 
         .from("galleries")
         .select("id, title, branch_id, status, lark_trang_thai")
         .in("id", [...coDot])
-        .in("status", [...TRANG_THAI_VONG_MUA_THEM]);
+        .in("status", [...TRANG_THAI_VONG_MUA_THEM])
+        .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
       if (branchIds) qg = qg.in("branch_id", branchIds);
       const { data: cacBo } = await qg;
       for (const g of (cacBo ?? []) as GalleryNhung[]) {
@@ -175,6 +177,7 @@ export async function layViecAnhChinh(db: SupabaseClient, branchIds: string[] | 
       .from("revision_requests")
       .select(cot)
       .is("resolved_at", null)
+      .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("created_at", { ascending: false });
     if (chiDangChinh) q = q.eq("galleries.status", "in_retouch");
     else q = q.not("dot_khoa", "is", null);

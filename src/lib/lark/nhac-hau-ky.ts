@@ -77,6 +77,7 @@ export async function chayNhacHauKy(opts: {
        from galleries g
        left join customers c on c.id = g.customer_id
       where g.status <> 'archived'
+        and g.deleted_at is null -- BB-409: bỏ bộ trong thùng rác
         and g.lark_trang_thai is not null
         and g.lark_trang_thai_tu is not null
         and ($1::uuid[] is null or g.id = any($1::uuid[]))`,

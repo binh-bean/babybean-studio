@@ -316,8 +316,9 @@ export async function ghiTrangThaiVaoGalleries(
     lark_trang_thai: string | null;
     lark_canh_bao: string | null;
     lark_trang_thai_tu: Date | null;
+    deleted_at?: Date | null;
   }>(
-    `select id, branch_id, status, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_trang_thai_tu
+    `select id, branch_id, status, lark_hauky_record_id, lark_trang_thai, lark_canh_bao, lark_trang_thai_tu, deleted_at
        from galleries where lark_hauky_record_id = any($1::text[]) and status <> 'archived'`,
     [[...doc.keys()]],
   );
@@ -335,9 +336,12 @@ export async function ghiTrangThaiVaoGalleries(
       g.lark_canh_bao !== moi.maCanhBao ||
       (g.lark_trang_thai_tu?.getTime() ?? null) !== (tu?.getTime() ?? null);
     if (doi) soDoi++;
-    if (vuaSangHinhDaVe(g.lark_trang_thai, moi.maTrangThai, g.status)) sangHinhDaVe.push(g.id);
+    // BB-409: bỏ bộ trong thùng rác — vẫn ghi trạng thái Lark (vô hại), nhưng KHÔNG
+    // đưa vào hai danh sách dẫn tới việc báo khách/nhân viên.
+    const trongThungRac = !!g.deleted_at;
+    if (!trongThungRac && vuaSangHinhDaVe(g.lark_trang_thai, moi.maTrangThai, g.status)) sangHinhDaVe.push(g.id);
     // BB-347 — chỉ khi MÃ trạng thái đổi (Cảnh Báo hay mốc ngày đổi một mình thì không).
-    if (g.lark_trang_thai !== moi.maTrangThai) {
+    if (!trongThungRac && g.lark_trang_thai !== moi.maTrangThai) {
       doiTrangThai.push({
         galleryId: g.id,
         branchId: g.branch_id,

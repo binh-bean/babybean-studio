@@ -155,6 +155,7 @@ export async function GET(): Promise<NextResponse> {
       // gọi điện ngay, và người nghe máy cũng không biết trả lời sao.
       .gt("photo_count", 0)
       .not("status", "in", `(${TRANG_THAI_AN.join(",")})`)
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -230,6 +231,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       .eq("customer_id", session.customerId)
       .gt("photo_count", 0)
       .not("status", "in", `(${TRANG_THAI_AN.join(",")})`)
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .maybeSingle();
 
     if (error) throw error;

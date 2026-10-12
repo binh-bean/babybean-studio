@@ -90,6 +90,7 @@ export async function layDatChinhSuaChoXuLy(
     )
     .eq("loai", "chinh_sua")
     .in("trang_thai", ["moi", "da_lien_he"])
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .order("created_at", { ascending: true })
     .limit(500);
   if (error) {

@@ -43,7 +43,17 @@ import { KhoiTenBe } from "./khoi-ten-be";
 import { KhoiHanTraAdmin } from "./nhan-lam-nhanh";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { useCapNhatTucThi } from "@/lib/utils/use-cap-nhat-tuc-thi";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { toast } from "@/components/ui/toast";
 import { MoreHorizontal, Copy, Check, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -375,7 +385,21 @@ interface Detail {
  * của người đang xem. Vai chỉ xem (thợ chụp, CTV…) vẫn thấy đủ sản phẩm, thành
  * phần hợp đồng, ảnh chọn, ghi chú — chỉ không thấy nút sẽ bị route từ chối.
  */
-export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: QuyenThaoTacBoAnh }) {
+export function GalleryDetail({
+  galleryId,
+  quyen,
+  coTheXoa = false,
+}: {
+  galleryId: string;
+  quyen: QuyenThaoTacBoAnh;
+  /** BB-409 — người xem có `bo_anh:xoa` và bộ chưa ở thùng rác: bày mục "Xoá bộ ảnh" trong menu ⋯. */
+  coTheXoa?: boolean;
+}) {
+  const router = useRouter();
+  /** BB-409 — hộp xác nhận "Xoá bộ ảnh" (vào thùng rác). */
+  const [hoiXoa, setHoiXoa] = React.useState(false);
+  const [dangXoa, setDangXoa] = React.useState(false);
+  const [loiXoa, setLoiXoa] = React.useState<string | null>(null);
   const [detail, setDetail] = React.useState<Detail | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
@@ -462,7 +486,30 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
     setLuuDiaChiDuoc(null);
     setDangMoLai(false);
     setDangSuaThuMuc(false);
+    setHoiXoa(false);
+    setLoiXoa(null);
   }, [galleryId]);
+
+  /** BB-409 — "Xoá bộ ảnh" = đưa vào thùng rác (POST .../thung-rac), xong thì sang Thùng rác. */
+  async function xoaBoAnh() {
+    setDangXoa(true);
+    setLoiXoa(null);
+    try {
+      const res = await fetch(`/api/admin/galleries/${galleryId}/thung-rac`, { method: "POST" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setLoiXoa(json?.error?.message ?? vi.admin.thungRac.loiThaoTac);
+        return;
+      }
+      setHoiXoa(false);
+      toast.success(vi.admin.thungRac.daXoa, vi.admin.thungRac.daXoaMoTa);
+      router.push("/admin/thung-rac");
+    } catch {
+      setLoiXoa(vi.admin.thungRac.loiThaoTac);
+    } finally {
+      setDangXoa(false);
+    }
+  }
 
   if (error) return <p className="text-sm text-[var(--bb-danger)]">{error}</p>;
   if (!detail) return <p className="text-sm text-[var(--bb-fg-muted)]">Đang tải…</p>;
@@ -1000,6 +1047,14 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
               onMoMoLai={() => setDangMoLai(true)}
               onTaoLink={() => void taoLink()}
               onGiaHan={() => void moLaiLink()}
+              onXoaBoAnh={
+                coTheXoa
+                  ? () => {
+                      setLoiXoa(null);
+                      setHoiXoa(true);
+                    }
+                  : undefined
+              }
             />
             {/* BB-290 lượt 2 (#36): MỘT nút chính màu mực ở đầu trang. Chỉ trạng
                 thái "submitted" có hành động một-bấm-là-xong ở đây; trên điện
@@ -1360,6 +1415,43 @@ export function GalleryDetail({ galleryId, quyen }: { galleryId: string; quyen: 
       {/* Đệm dưới cùng bằng chiều cao thanh ghim, để nội dung cuối trang
           (Dòng thời gian hoạt động) không bị thanh che mất trên điện thoại. */}
       {detail.status === "submitted" && quyen.ghi && <div className="h-24 lg:hidden" aria-hidden="true" />}
+
+      {/* BB-409 — xác nhận "Xoá bộ ảnh": vào thùng rác 10 ngày, Drive giữ nguyên. */}
+      {coTheXoa && (
+        <Dialog
+          open={hoiXoa}
+          onOpenChange={(mo) => {
+            if (!mo && !dangXoa) setHoiXoa(false);
+          }}
+        >
+          <DialogContent aria-labelledby="tieu-de-xoa-bo-anh">
+            <DialogHeader>
+              <DialogTitle id="tieu-de-xoa-bo-anh">{vi.admin.thungRac.hoiXoaTieuDe}</DialogTitle>
+              <DialogDescription>{vi.admin.thungRac.hoiXoaMoTa}</DialogDescription>
+            </DialogHeader>
+            <p className="text-sm text-[var(--bb-fg-muted)]">{vi.admin.thungRac.hoiXoaKhach}</p>
+            {loiXoa && (
+              <p role="alert" className="text-sm text-[var(--bb-danger)]">
+                {loiXoa}
+              </p>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={dangXoa} onClick={() => setHoiXoa(false)}>
+                {vi.admin.thungRac.huy}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                data-testid="xac-nhan-xoa-bo-anh"
+                disabled={dangXoa}
+                onClick={() => void xoaBoAnh()}
+              >
+                {dangXoa ? vi.admin.thungRac.dangXoa : vi.admin.thungRac.xacNhanXoa}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
@@ -2016,6 +2108,7 @@ function MenuThaoTacPhu({
   onMoMoLai,
   onTaoLink,
   onGiaHan,
+  onXoaBoAnh,
 }: {
   detail: Detail;
   /** BB-382 — chỉ bày mục mà vai này dùng được; không còn mục nào thì ẩn luôn nút ⋯. */
@@ -2028,6 +2121,8 @@ function MenuThaoTacPhu({
   onMoMoLai: () => void;
   onTaoLink: () => void;
   onGiaHan: () => void;
+  /** BB-409 — chỉ truyền khi người xem có `bo_anh:xoa`; thiếu = không bày mục "Xoá bộ ảnh". */
+  onXoaBoAnh?: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
   const hopRef = React.useRef<HTMLDivElement>(null);
@@ -2054,7 +2149,7 @@ function MenuThaoTacPhu({
   const coTheTaoLink = quyen.guiLink && !detail.customerId;
   // BB-404 — "Nhắn khách" cũng có trong menu ⋯ (cùng link với nút đầu trang).
   const linkChat = linkChatKhach(detail.customerChatUrl);
-  if (!quyen.suaThongTin && !quyen.dongBo && !quyen.guiLink && !coTheMoLai && !linkChat) return null;
+  if (!quyen.suaThongTin && !quyen.dongBo && !quyen.guiLink && !coTheMoLai && !linkChat && !onXoaBoAnh) return null;
 
   return (
     <div ref={hopRef} className="relative shrink-0">
@@ -2155,6 +2250,25 @@ function MenuThaoTacPhu({
             >
               Gia hạn (giữ nguyên địa chỉ)
             </MenuMuc>
+          )}
+          {/* BB-409 — mục phá huỷ đứng cuối, cách các mục khác một vạch. */}
+          {onXoaBoAnh && (
+            <div className="mt-1 border-t border-[var(--bb-border)] pt-1">
+              <button
+                type="button"
+                role="menuitem"
+                data-testid="menu-xoa-bo-anh"
+                disabled={busy}
+                onClick={() => {
+                  setOpen(false);
+                  onXoaBoAnh();
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[var(--bb-danger)] hover:bg-[var(--bb-danger)]/10 disabled:opacity-40 disabled:hover:bg-transparent"
+              >
+                <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {vi.admin.thungRac.menuXoa}
+              </button>
+            </div>
           )}
         </div>
       )}

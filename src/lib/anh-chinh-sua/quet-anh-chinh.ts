@@ -122,6 +122,7 @@ export async function quetAnhChinhTuDrive(opts: {
       .select("id, status, lark_trang_thai, drive_folder_id, branch_id")
       .in("status", [...TRANG_THAI_GUI_DUOC])
       .not("drive_folder_id", "is", null)
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("id", { ascending: true })
       .range(tu, tu + 999);
     if (error) throw error;

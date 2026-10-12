@@ -222,12 +222,8 @@ test("Q9 dòng 'không xoá được' chỉ hiện khi bấm Xoá — mt", async
     await page.getByRole("button", { name: "Xoá" }).first().waitFor({ state: "visible", timeout: 30_000 });
     // Mặc định KHÔNG có dòng cảnh báo nào chứa chữ "nhật ký".
     await expect(page.locator("main").getByText(/nhật ký/i)).toHaveCount(0);
-    // Bấm Xoá trên tài khoản có nhật ký (aria-disabled) thì lý do MỚI hiện ra.
-    const khoa = page.locator("button[data-xoa-bi-chan=true]", { hasText: "Xoá" }).first();
-    if ((await khoa.count()) > 0) {
-      await khoa.click();
-      await expect(page.locator("main").getByText(/nhật ký/i)).toHaveCount(1);
-    }
+    // BB-409: hết luồng "Xoá bị chặn vì có nhật ký" — Xoá nhân sự chuyển việc về Tổ chức
+    // BabyBean (tests/e2e/bb-409-thung-rac-xoa-nhan-su.spec.ts).
     // Nút "Thêm nhân viên" nằm trong khối tiêu đề trang.
     await expect(page.getByTestId("khoi-tieu-de-trang").getByRole("button", { name: /Thêm nhân viên/ })).toBeVisible();
   } finally {
@@ -238,8 +234,10 @@ test("Q9 dòng 'không xoá được' chỉ hiện khi bấm Xoá — mt", async
 test("Q11 câu không có quyền đúng lời giám đốc — dt", async ({ browser, baseURL }) => {
   const { page, ctx } = await mo(browser, baseURL!, "ql", "dt", "/admin/staff");
   try {
-    await expect(page.getByText("Chỉ Admin mới xem được mục này.")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText(/Quản trị hệ thống/)).toHaveCount(0);
+    // BB-409: Quản lý có `nhan_su:xoa` nên XEM được danh sách (chỉ đọc + nút Xoá nhân sự),
+    // nhưng không thêm/sửa nhân viên và không thấy tab Vai trò.
+    await expect(page.getByText("Chỉ Admin mới xem được mục này.")).toHaveCount(0, { timeout: 30_000 });
+    await expect(page.getByRole("button", { name: /Thêm nhân viên/ })).toHaveCount(0);
   } finally {
     await ctx.close();
   }

@@ -39,6 +39,7 @@ import { chayDonDemHetHan } from "../../../../../scripts/don-dem-het-han";
 import pg from "pg";
 import { KHOA_DON_RAC, dangTrongPhepThu, donRac, ghiNhatKyDonRac } from "@/lib/van-hanh/don-rac";
 import { ghiMocDungLuong } from "@/lib/van-hanh/dung-luong";
+import { donThungRacQuaHan } from "@/lib/thung-rac/thung-rac-server";
 
 export const runtime = "nodejs";
 
@@ -205,6 +206,20 @@ async function chay(request: Request) {
       donDemHetHan = { loi: err instanceof Error ? err.message : String(err) };
     }
 
+    // 6b. BB-409: dọn hẳn bộ ảnh đã nằm THÙNG RÁC quá 10 ngày (tệp Storage + dữ liệu
+    // trên app; thư mục Drive giữ nguyên). Tối đa TOI_DA_DON_MOI_LUOT bộ mỗi đêm, dừng
+    // trước mốc giờ của route; chỉ trả số đếm. Bọc riêng cùng lý do mục 4/5/6. Phép
+    // thử gọi route này với .env.local của bb-dev: không dọn gì.
+    let thungRac: unknown = { boQua: "không chạy được" };
+    try {
+      thungRac = dangTrongPhepThu()
+        ? { boQua: "đang chạy phép thử" }
+        : await donThungRacQuaHan(admin, { hetGioLuc: batDau + NGAN_SACH_ROUTE_MS - 15_000 });
+    } catch (err) {
+      console.error("[cron/expire-galleries] dọn thùng rác hỏng:", err);
+      thungRac = { loi: err instanceof Error ? err.message : String(err) };
+    }
+
     // 7. BB-356: dọn dữ liệu vận hành (nhật ký cũ, tin đã gửi, khoá chống trùng…)
     // để DB ở yên trong 500 MB của gói Free. Đi nhờ lượt 01:00 giờ VN, cùng lý do
     // mục 4/5/6; bọc riêng vì cùng lý do nốt.
@@ -223,6 +238,7 @@ async function chay(request: Request) {
       larkGuiLai: lark,
       nhacKhachChuaChot: nhac,
       donDemHetHan,
+      thungRac,
       donVanHanh,
     };
 

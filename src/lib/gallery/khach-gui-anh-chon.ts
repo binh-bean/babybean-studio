@@ -173,6 +173,7 @@ export async function layDot1ChoXacNhan(
       "id, title, branch_id, customer_id, status, lark_trang_thai, lark_trang_thai_tu, reopened_at, drive_folder_url, branches(name)",
     )
     .eq("status", "submitted")
+    .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .limit(500);
   if (branchIds) q = q.in("branch_id", branchIds);
   const { data, error } = await q;

@@ -29,6 +29,7 @@ function getBreadcrumbName(path: string, cha?: string) {
   if (path === "loi-dong-bo") return "Bộ ảnh lỗi tải";
   if (path === "link-sap-het-han") return "Link sắp hết hạn";
   if (path === "create") return "Tạo bộ ảnh mới";
+  if (path === "thung-rac") return "Thùng rác"; // BB-409
   // BB-313 (ảnh chụp app thật, Đợt 9, mục 1) — đoạn cuối `/admin/galleries/…`
   // có thể là MÃ HỢP ĐỒNG thay vì uuid (route đọc theo mã khi không khớp
   // `LA_MA`, xem `[id]/page.tsx`), và mã dạng "HD_20260911#5087" luôn đi qua

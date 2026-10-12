@@ -241,6 +241,9 @@ export const en: Messages = {
       trongMoTa: "Packages come from Lark. Run the catalog sync and reopen.",
       timGoi: "Search packages",
     },
+    // BB-409 — chỉ có bản tiếng Việt (màn quản trị), dùng chung như `manLoi`.
+    thungRac: vi.admin.thungRac,
+    xoaNhanSu: vi.admin.xoaNhanSu,
     branches: {
       title: "Branches",
       subtitle: "Name, address and hotline shown to customers. Edit here, not in code.",

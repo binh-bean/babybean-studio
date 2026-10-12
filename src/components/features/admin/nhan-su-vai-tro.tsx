@@ -27,12 +27,20 @@ function laTabHopLe(v: string | null): v is TabValue {
   return v === "nhan-su" || v === "vai-tro";
 }
 
-export function NhanSuVaiTro() {
+export function NhanSuVaiTro({
+  chiXoa = false,
+}: {
+  /**
+   * BB-409 — Quản lý chỉ có `nhan_su:xoa`: chỉ xem danh sách + nút "Xoá nhân sự".
+   * Ẩn nút "Thêm nhân viên" và tab "Vai trò" (các route đó đòi quyền Admin).
+   */
+  chiXoa?: boolean;
+} = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const active: TabValue = laTabHopLe(tabParam) ? tabParam : "nhan-su";
+  const active: TabValue = !chiXoa && laTabHopLe(tabParam) ? tabParam : "nhan-su";
   // BB-320 (Q-N1): nút chính "Thêm nhân viên" đứng trong khối tiêu đề như mọi
   // màn khác; state mở form nằm ở đây để StaffManager và nút dùng chung.
   const [moFormNhanVien, setMoFormNhanVien] = useState(false);
@@ -50,29 +58,39 @@ export function NhanSuVaiTro() {
     <div className="space-y-6">
       <PageHeader
         title="Nhân sự & vai trò"
-        description={active === "vai-tro" ? vi.admin.vaiTro.subtitle : vi.admin.staff.subtitle}
+        description={
+          active === "vai-tro"
+            ? vi.admin.vaiTro.subtitle
+            : chiXoa
+              ? vi.admin.xoaNhanSu.chiXem
+              : vi.admin.staff.subtitle
+        }
         actions={
-          active === "nhan-su" ? (
+          active === "nhan-su" && !chiXoa ? (
             <Button onClick={() => setMoFormNhanVien((v) => !v)}>{vi.admin.staff.addButton}</Button>
           ) : undefined
         }
       />
-      <Tabs value={active} onValueChange={onChange}>
-        <TabsList>
-          <TabsTrigger value="nhan-su" data-testid="tab-nhan-su">
-            Nhân sự
-          </TabsTrigger>
-          <TabsTrigger value="vai-tro" data-testid="tab-vai-tro">
-            Vai trò
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="nhan-su" className="mt-6">
-          <StaffManager showForm={moFormNhanVien} onShowFormChange={setMoFormNhanVien} />
-        </TabsContent>
-        <TabsContent value="vai-tro" className="mt-6">
-          <RolesManager />
-        </TabsContent>
-      </Tabs>
+      {chiXoa ? (
+        <StaffManager showForm={false} onShowFormChange={setMoFormNhanVien} />
+      ) : (
+        <Tabs value={active} onValueChange={onChange}>
+          <TabsList>
+            <TabsTrigger value="nhan-su" data-testid="tab-nhan-su">
+              Nhân sự
+            </TabsTrigger>
+            <TabsTrigger value="vai-tro" data-testid="tab-vai-tro">
+              Vai trò
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="nhan-su" className="mt-6">
+            <StaffManager showForm={moFormNhanVien} onShowFormChange={setMoFormNhanVien} />
+          </TabsContent>
+          <TabsContent value="vai-tro" className="mt-6">
+            <RolesManager />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }

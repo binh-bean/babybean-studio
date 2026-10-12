@@ -11,7 +11,8 @@
 
 import { randomUUID } from "node:crypto";
 import { ok, fail, failUnexpected, readJsonBody } from "@/lib/api-response";
-import { requireStaff, requirePermission, AuthError } from "@/lib/auth/staff";
+import { requireStaff, requirePermission, requireMotTrongCacQuyen, AuthError } from "@/lib/auth/staff";
+import { QUYEN_XOA_NHAN_SU, hienNutXoa } from "@/lib/nhan-su/xoa-nhan-su";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { laNhanSuThat } from "@/lib/utils/nhan-su-cong-khai";
 import { laVaiAdmin } from "@/lib/nhan-su/dat-mat-khau";
@@ -53,29 +54,26 @@ export async function GET(): Promise<Response> {
   const requestId = randomUUID();
   try {
     const staff = await requireStaff();
-    requirePermission(staff, "staff:manage");
+    // BB-409 — Quản lý (có `nhan_su:xoa`, không có `staff:manage`) được XEM danh sách
+    // để bấm "Xoá nhân sự"; sửa/tạo vẫn chỉ người có `staff:manage` (canManage).
+    requireMotTrongCacQuyen(staff, ["staff:manage", QUYEN_XOA_NHAN_SU]);
+    const coQuyenQuanLy = staff.permissions.includes("staff:manage");
 
     const admin = createAdminClient();
 
     const { data: profiles, error } = await admin
       .from("staff_profiles")
-      .select("id, full_name, email, phone, role, role_id, is_active, last_login_at, created_at, roles(name, is_system)")
+      .select("id, full_name, email, phone, role, role_id, is_active, last_login_at, created_at, da_nghi_luc, la_to_chuc, roles(name, is_system, permissions)")
       .order("is_active", { ascending: false })
       .order("full_name");
     if (error) throw error;
 
     const { data: links } = await admin.from("staff_branches").select("staff_id, branch_id");
     const { data: branches } = await admin.from("branches").select("id, name").order("name");
-    const { data: deletables } = await admin.from("v_staff_deletable").select("staff_id, delete_reason");
 
     const byStaff = new Map<string, string[]>();
     for (const link of links ?? []) {
       byStaff.set(link.staff_id, [...(byStaff.get(link.staff_id) ?? []), link.branch_id]);
-    }
-    
-    const deleteReasonByStaff = new Map<string, string | null>();
-    for (const d of deletables ?? []) {
-      deleteReasonByStaff.set(d.staff_id, d.delete_reason);
     }
 
     // Vai TỰ TẠO (BB-172 chặng 2d): màn Nhân sự phải gán được chúng, nên danh
@@ -91,7 +89,10 @@ export async function GET(): Promise<Response> {
 
     return ok({
       // BB-354: tài khoản Fixture của phép thử không hiện ở màn Nhân sự.
-      staff: (profiles ?? []).filter((p) => laNhanSuThat({ fullName: p.full_name })).map((p) => ({
+      // BB-409: dòng "Tổ chức BabyBean" là chủ thể chung, không phải một người — không hiện.
+      staff: (profiles ?? [])
+        .filter((p) => laNhanSuThat({ fullName: p.full_name }) && !(p as { la_to_chuc?: boolean }).la_to_chuc)
+        .map((p) => ({
         id: p.id,
         fullName: p.full_name,
         identifier: toDisplayIdentifier(p.email),
@@ -111,14 +112,27 @@ export async function GET(): Promise<Response> {
           p.last_login_at !== null &&
           new Date(p.last_login_at).getTime() < staleBefore,
         branchIds: byStaff.get(p.id) ?? [],
-        deleteReason: deleteReasonByStaff.get(p.id) ?? null,
+        // BB-409: đã xoá (việc đã chuyển về Tổ chức) — hiện "(đã nghỉ)", không sửa được nữa.
+        daXoa: !!(p as { da_nghi_luc?: string | null }).da_nghi_luc,
+        // BB-409: nút "Xoá nhân sự" — CÙNG luật với DELETE (kiemQuyenXoaNhanSu).
+        canDelete: hienNutXoa(
+          { staffId: staff.staffId, role: staff.role, permissions: staff.permissions, branchIds: staff.branchIds },
+          {
+            id: p.id,
+            role: p.role as StaffRole,
+            permissions: (p as { roles?: { permissions?: string[] } | null }).roles?.permissions ?? [],
+            branchIds: byStaff.get(p.id) ?? [],
+            laToChuc: false,
+            daNghiLuc: (p as { da_nghi_luc?: string | null }).da_nghi_luc ?? null,
+          },
+        ),
         // BB-373: ô "Mật khẩu mới" chỉ hiện khi người xem được phép đặt cho đúng người này.
         canResetPassword: laVaiAdmin(staff.role) && (p.role !== "owner" || staff.role === "owner"),
       })),
       branches: branches ?? [],
       assignableRoles: assignableBy(staff.role),
       customRoles: vaiTuTao ?? [],
-      canManage: true,
+      canManage: coQuyenQuanLy,
     });
   } catch (err) {
     // Thông báo mặc định của mã UNAUTHENTICATED viết cho khách hàng

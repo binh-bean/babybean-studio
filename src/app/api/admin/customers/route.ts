@@ -92,7 +92,11 @@ export async function GET(request: Request): Promise<Response> {
     // Số bộ ảnh và ngày chụp gần nhất của từng khách — CSKH cần biết ngay
     // "nhà này đã chụp mấy lần" trước khi mở bộ ảnh.
     const { data: boAnh, error: loiBo } = ids.length
-      ? await admin.from("galleries").select("id, customer_id, created_at").in("customer_id", ids)
+      ? await admin
+          .from("galleries")
+          .select("id, customer_id, created_at")
+          .in("customer_id", ids)
+          .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       : { data: [], error: null };
     if (loiBo) throw loiBo;
 

@@ -17,10 +17,19 @@ import {
   ChevronRight,
   History,
   BarChart3,
-  Package
+  Package,
+  Trash2
 } from "lucide-react";
 import { demSoCanXuLy } from "@/lib/utils/can-xu-ly";
 import { formatSo } from "@/lib/utils/dinh-dang";
+import { QUYEN_XOA_NHAN_SU } from "@/lib/nhan-su/xoa-nhan-su";
+
+/**
+ * BB-409 — quyền xoá/khôi phục bộ ảnh. Cùng giá trị `QUYEN_XOA_BO_ANH` trong
+ * src/lib/thung-rac/thung-rac.ts; không import tệp đó vào đây vì nó dùng
+ * `node:crypto` (không chạy trong trình duyệt).
+ */
+const QUYEN_THUNG_RAC = "bo_anh:xoa";
 
 // Re-export — BB-283: công thức đếm giờ sống ở src/lib/utils/can-xu-ly.ts
 // (dùng chung với dashboard.tsx), giữ tên xuất ở đây để không phải sửa nơi
@@ -58,6 +67,10 @@ interface NavItem {
   ready: boolean;
   ownerOnly?: boolean;
   hiddenForRoles?: string[];
+  /** BB-409 — mục `ownerOnly` nhưng vẫn hiện cho người có quyền này (Quản lý có `nhan_su:xoa`). */
+  hoacQuyen?: string;
+  /** BB-409 — chỉ hiện khi người xem có quyền này (Thùng rác: `bo_anh:xoa`). */
+  canQuyen?: string;
 }
 
 interface NavGroup {
@@ -136,6 +149,8 @@ export const navGroups: NavGroup[] = [
         icon: UserCog,
         ready: true,
         ownerOnly: true,
+        // BB-409: Quản lý (chỉ có `nhan_su:xoa`) vào được để xoá nhân sự chi nhánh mình.
+        hoacQuyen: QUYEN_XOA_NHAN_SU,
       },
       { name: "Cài đặt", href: "/admin/settings", icon: Settings, ready: true, ownerOnly: true },
       {
@@ -145,12 +160,28 @@ export const navGroups: NavGroup[] = [
         ready: true,
         hiddenForRoles: ["photoshop_ctv"],
       },
+      {
+        // BB-409: bộ ảnh đã xoá — khôi phục trong 10 ngày. Chỉ ai có `bo_anh:xoa`.
+        // Đặt ở Hệ thống (không ở Vận hành): nhóm Vận hành được chốt đúng ba mục
+        // (tests/unit/admin-sidebar-menu.test.ts).
+        name: "Thùng rác",
+        href: "/admin/thung-rac",
+        icon: Trash2,
+        ready: true,
+        canQuyen: QUYEN_THUNG_RAC,
+      },
     ],
   },
 ];
 
-export function mucDuocXem(item: NavItem, role: string | undefined, canSeeStaff: boolean): boolean {
-  if (item.ownerOnly && !canSeeStaff) return false;
+export function mucDuocXem(
+  item: NavItem,
+  role: string | undefined,
+  canSeeStaff: boolean,
+  quyen: readonly string[] = [],
+): boolean {
+  if (item.canQuyen && !quyen.includes(item.canQuyen)) return false;
+  if (item.ownerOnly && !canSeeStaff && !(item.hoacQuyen && quyen.includes(item.hoacQuyen))) return false;
   if (role && item.hiddenForRoles?.includes(role)) return false;
   return true;
 }
@@ -165,6 +196,8 @@ interface AdminSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   role?: string;
+  /** BB-409 — bộ quyền của người đang xem (mục Thùng rác, Nhân sự cho Quản lý). */
+  quyen?: readonly string[];
   /** Số hiện trên huy hiệu "Việc cần xử lý" — `null`/`undefined` = ẩn huy hiệu. */
   canXuLyCount?: number | null;
 }
@@ -173,11 +206,13 @@ export function NavLinks({
   isCollapsed,
   onClick,
   role,
+  quyen,
   canXuLyCount,
 }: {
   isCollapsed?: boolean;
   onClick?: () => void;
   role?: string;
+  quyen?: readonly string[];
   canXuLyCount?: number | null;
 }) {
   const pathname = usePathname();
@@ -186,7 +221,7 @@ export function NavLinks({
   return (
     <nav className="space-y-[18px] p-2">
       {navGroups.map((group) => {
-        const items = group.items.filter((item) => mucDuocXem(item, role, canSeeStaff));
+        const items = group.items.filter((item) => mucDuocXem(item, role, canSeeStaff, quyen));
         // Nhóm rỗng thì ẩn cả tiêu đề nhóm — một tiêu đề đứng trên khoảng
         // trống không nói gì với người đọc, chỉ làm menu trông thiếu chăm sóc.
         if (items.length === 0) return null;
@@ -273,7 +308,7 @@ export function NavLinks({
   );
 }
 
-export function AdminSidebar({ isCollapsed, onToggle, role, canXuLyCount }: AdminSidebarProps) {
+export function AdminSidebar({ isCollapsed, onToggle, role, quyen, canXuLyCount }: AdminSidebarProps) {
   return (
     <aside
       className={cn(
@@ -314,7 +349,7 @@ export function AdminSidebar({ isCollapsed, onToggle, role, canXuLyCount }: Admi
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
-        <NavLinks isCollapsed={isCollapsed} role={role} canXuLyCount={canXuLyCount} />
+        <NavLinks isCollapsed={isCollapsed} role={role} quyen={quyen} canXuLyCount={canXuLyCount} />
       </div>
     </aside>
   );

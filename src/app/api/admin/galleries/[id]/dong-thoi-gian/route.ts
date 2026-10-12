@@ -46,6 +46,7 @@ import { requireStaff, AuthError } from "@/lib/auth/staff";
 import { xetQuyenXemBoAnh, CAU_CHAN_BO_ANH } from "@/lib/auth/quyen-xem-bo-anh";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { xepDongThoiGian, type RawActivityRow } from "@/lib/nhat-ky/xep-dong-thoi-gian";
+import { tenHienThiNhanSu } from "@/lib/nhan-su/xoa-nhan-su";
 
 export const runtime = "nodejs";
 
@@ -129,9 +130,10 @@ export async function GET(
     if (staffIds.length > 0) {
       const { data: staffRows } = await admin
         .from("staff_profiles")
-        .select("id, full_name")
+        .select("id, full_name, da_nghi_luc, la_to_chuc")
         .in("id", staffIds);
-      for (const s of staffRows ?? []) staffMap.set(s.id, s.full_name);
+      // BB-409: người đã xoá khỏi nhân sự hiện "Tên (đã nghỉ)".
+      for (const s of staffRows ?? []) staffMap.set(s.id, tenHienThiNhanSu(s) ?? s.full_name);
     }
 
     const raw: RawActivityRow[] = rows.map((r) => ({

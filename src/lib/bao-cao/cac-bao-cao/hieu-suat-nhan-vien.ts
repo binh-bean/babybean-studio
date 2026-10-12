@@ -84,6 +84,7 @@ async function demTheoTacNhan(
   const { data, error } = await ctx.client
     .from("activity_logs")
     .select("actor_id, galleries!inner(branch_id, title, status, editor_id)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .eq("action", action)
     .eq("actor_type", "staff")
     .gte("created_at", tu.toISOString())
@@ -111,6 +112,7 @@ async function retouchSentTrongKy(ctx: NguCanhBaoCao, tu: Date, den: Date): Prom
   const { data, error } = await ctx.client
     .from("activity_logs")
     .select("gallery_id, actor_id, created_at, galleries!inner(branch_id, title, status, editor_id)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .eq("action", "gallery.retouch_sent")
     .eq("actor_type", "staff")
     .gte("created_at", tu.toISOString())
@@ -163,6 +165,7 @@ async function thuTienTheoCskh(ctx: NguCanhBaoCao, tu: Date, den: Date): Promise
   const { data, error } = await ctx.client
     .from("gallery_payments")
     .select("confirmed_by, galleries!inner(branch_id, title, status, editor_id)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     // BB-320: dòng "giảm giá" không phải một "khoản thu ghi nhận".
     .neq("payment_method", "giam_gia")
     .gte("confirmed_at", tu.toISOString())
@@ -185,6 +188,7 @@ async function vongXinSuaTheoThoChinh(ctx: NguCanhBaoCao, tu: Date, den: Date): 
   const { data, error } = await ctx.client
     .from("revision_requests")
     .select("galleries!inner(branch_id, title, status, editor_id)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .gte("created_at", tu.toISOString())
     .lt("created_at", den.toISOString());
   if (error) throw error;

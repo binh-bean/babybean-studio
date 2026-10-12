@@ -95,6 +95,7 @@ export async function quetNhacKhachChuaChot(): Promise<KetQuaNhac> {
     .in("status", DANG_CHO_KHACH)
     .not("sent_at", "is", null)
     .is("submitted_at", null)
+    .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác — không nhắc khách
     .gte("sent_at", xaNhat.toISOString())
     .order("sent_at", { ascending: true });
   if (error) throw error;

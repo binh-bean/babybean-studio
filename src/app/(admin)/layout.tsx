@@ -19,10 +19,14 @@ export const metadata: Metadata = {
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   let role: string | undefined;
+  // BB-409: bộ quyền xuống menu — mục "Thùng rác" (`bo_anh:xoa`) và "Nhân sự"
+  // cho Quản lý (`nhan_su:xoa`) hỏi QUYỀN, không hỏi tên vai.
+  let quyen: string[] = [];
   let hoTen: string | null = null;
   try {
     const staff = await requireStaff();
     role = staff.role;
+    quyen = staff.permissions;
 
     // BB-185: lấy tên để góc phải nói được AI đang đăng nhập. Máy quầy là máy
     // chung, và người ngồi vào không biết mình đang là ai là cả nhật ký sai tên.
@@ -40,7 +44,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <AdminLayoutShell role={role} hoTen={hoTen}>
+    <AdminLayoutShell role={role} quyen={quyen} hoTen={hoTen}>
       {children}
     </AdminLayoutShell>
   );

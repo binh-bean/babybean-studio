@@ -38,7 +38,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 function clientLuonHong() {
   const ketQua = { data: null, count: null, error: { message: "quyen doc bi tu choi" } };
   const chuoi: Record<string, unknown> = {};
-  for (const ten of ["select", "in", "eq", "gte", "lt", "or", "order", "limit", "not", "neq"]) {
+  // BB-409: thêm `is` (route lọc `deleted_at`) — thiếu thì chuỗi ném TypeError và
+  // phép thử xanh vì lý do khác, không phải vì truy vấn trả lỗi.
+  for (const ten of ["select", "in", "eq", "is", "gte", "lt", "or", "order", "limit", "not", "neq"]) {
     chuoi[ten] = vi.fn(() => chuoi);
   }
   // Mắt xích cuối được `await`, nên chuỗi phải là một thenable.

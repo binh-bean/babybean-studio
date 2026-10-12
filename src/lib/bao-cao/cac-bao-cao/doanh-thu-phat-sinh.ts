@@ -114,6 +114,7 @@ async function chotTrongKy(ctx: NguCanhBaoCao, tu: Date, den: Date): Promise<Han
   const q = ctx.client
     .from("selections")
     .select("id, gallery_id, submitted_at, snapshot_extra_amount, galleries!inner(id, branch_id, title, status)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .eq("is_primary", true)
     .gte("submitted_at", tu.toISOString())
     .lt("submitted_at", den.toISOString());
@@ -183,6 +184,7 @@ async function daThuTrongKy(ctx: NguCanhBaoCao, tu: Date, den: Date): Promise<Ha
   const { data, error } = await ctx.client
     .from("gallery_payments")
     .select("gallery_id, amount, confirmed_at, galleries!inner(id, branch_id, title, status)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     // BB-320: dòng "giảm giá" KHÔNG phải tiền thu — loại khỏi "Đã thu" (vẫn tính ở tongDaThuTheoGallery, vì nó giảm khoản còn phải thu).
     .neq("payment_method", "giam_gia")
     .gte("confirmed_at", tu.toISOString())
@@ -242,6 +244,7 @@ async function yeuCauMuaLanHaiTrongKy(ctx: NguCanhBaoCao, tu: Date, den: Date): 
   const { data, error } = await ctx.client
     .from("yeu_cau_mua_them")
     .select("id, gallery_id, so_luong, trang_thai, created_at, galleries!inner(id, branch_id, title, status), products(list_price)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .gte("created_at", tu.toISOString())
     .lt("created_at", den.toISOString());
   if (error) throw error;

@@ -154,7 +154,8 @@ async function chay(request: Request) {
         try {
           const { rows: neo } = await client.query<{ r: string }>(
             `select lark_hauky_record_id as r from galleries
-              where lark_hauky_record_id is not null and status <> 'archived' and lark_dong_da_xoa_luc is null`,
+              where lark_hauky_record_id is not null and status <> 'archived' and lark_dong_da_xoa_luc is null
+                and deleted_at is null`, // BB-409: bỏ bộ trong thùng rác
           );
           const mat = neo.map((x) => x.r).filter((r) => !doc.has(r));
           larkXoaDong = await xuLyBoAnhMatDongLark(client, mat);

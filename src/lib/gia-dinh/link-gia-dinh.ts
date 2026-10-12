@@ -186,6 +186,7 @@ export async function ghiLinkGiaDinhVeLark(
     .from("galleries")
     .select("id, lark_hauky_record_id")
     .eq("customer_id", customerId)
+    .is("deleted_at", null) // BB-409: bộ trong thùng rác không ghi link lên Lark
     .not("lark_hauky_record_id", "is", null);
   if (error) throw error;
   const dsDong = ((data ?? []) as { id: string; lark_hauky_record_id: string | null }[]).filter(

@@ -64,6 +64,7 @@ export async function GET(
           "branches(name), shoots(shoot_date, concept)",
       )
       .eq("customer_id", id)
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .order("created_at", { ascending: false })
       .limit(200);
     if (!thayHet) qBo = qBo.in("branch_id", staff.branchIds);

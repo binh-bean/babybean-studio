@@ -65,7 +65,10 @@ type LocBo =
 async function docBo(ctx: NguCanhBaoCao, loc: LocBo, co: { cotNguoi: boolean }): Promise<HangGallery[]> {
   if (ctx.chiNhanhIds && ctx.chiNhanhIds.length === 0) return [];
   const chay = async (coCotNguoi: boolean) => {
-    let q = ctx.client.from("galleries").select(coCotNguoi ? `${COT_BO}, lark_nguoi_photoshop` : COT_BO);
+    let q = ctx.client
+      .from("galleries")
+      .select(coCotNguoi ? `${COT_BO}, lark_nguoi_photoshop` : COT_BO)
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     q = locBoAnhThat(q);
     if (ctx.chiNhanhIds) q = q.in("branch_id", ctx.chiNhanhIds);
     if (loc.loai === "khoang") {
@@ -431,6 +434,7 @@ async function docYeuCauSua(ctx: NguCanhBaoCao, tu: Date, den: Date): Promise<(Y
   const { data, error } = await ctx.client
     .from("revision_requests")
     .select("gallery_id, round, created_at, galleries!inner(branch_id, title, status)")
+    .is("galleries.deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .gte("created_at", tu.toISOString())
     .lt("created_at", den.toISOString())
     .limit(5000);

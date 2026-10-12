@@ -40,6 +40,13 @@ interface DongThongBaoChuaDoc {
   tieu_de: string;
   noi_dung: string;
   so_lan_nhac: number;
+  /** BB-409 — bộ ảnh của thông báo; `deleted_at` có giá trị = bộ trong thùng rác. */
+  galleries?: { deleted_at: string | null } | { deleted_at: string | null }[] | null;
+}
+
+function trongThungRac(d: DongThongBaoChuaDoc): boolean {
+  const g = Array.isArray(d.galleries) ? d.galleries[0] : d.galleries;
+  return !!g?.deleted_at;
 }
 
 export async function nhacThongBaoChuaDoc(client: SupabaseClient): Promise<number> {
@@ -52,7 +59,7 @@ export async function nhacThongBaoChuaDoc(client: SupabaseClient): Promise<numbe
     // PostgREST cho đúng cả hai nhánh.
     const { data, error } = await client
       .from("thong_bao_khach")
-      .select("id, gallery_id, tieu_de, noi_dung, so_lan_nhac")
+      .select("id, gallery_id, tieu_de, noi_dung, so_lan_nhac, galleries(deleted_at)")
       .is("da_doc_luc", null)
       .lt("created_at", moc24h)
       .lt("so_lan_nhac", SO_LAN_NHAC_TOI_DA)
@@ -60,7 +67,8 @@ export async function nhacThongBaoChuaDoc(client: SupabaseClient): Promise<numbe
       .limit(TOI_DA_MOT_LUOT);
 
     if (error) throw error;
-    const ds = (data ?? []) as DongThongBaoChuaDoc[];
+    // BB-409: bỏ bộ trong thùng rác — không nhắc khách về bộ đã bỏ.
+    const ds = ((data ?? []) as unknown as DongThongBaoChuaDoc[]).filter((d) => !trongThungRac(d));
     if (ds.length === 0) return 0;
 
     let daNhac = 0;

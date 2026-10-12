@@ -17,7 +17,7 @@
 import "server-only";
 import type { NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { signGallerySession, SESSION_COOKIE } from "@/lib/auth/gallery-session";
+import { signGallerySession, SESSION_COOKIE, laLoiThieuCotDeleted } from "@/lib/auth/gallery-session";
 import { bamMaLink } from "@/lib/auth/bam-ma-link";
 import { ghiMocKhachMoBoAnh } from "@/lib/selection/luot-chon-theo-link";
 import type { GallerySession, ShareRole } from "@/types/domain";
@@ -40,6 +40,13 @@ export function clientIp(req: Pick<NextRequest, "headers">): string | null {
   return first && first.length > 0 ? first : null;
 }
 
+/** BB-409 — dòng share_links kèm `galleries(deleted_at)`: bộ đã vào thùng rác chưa. */
+export function boAnhDaXoa(link: { galleries?: unknown }): boolean {
+  const g = link.galleries as { deleted_at?: string | null } | Array<{ deleted_at?: string | null }> | null | undefined;
+  const dong = Array.isArray(g) ? g[0] : g;
+  return !!dong?.deleted_at;
+}
+
 export type KetQuaDangNhap =
   | {
       ok: true;
@@ -47,7 +54,7 @@ export type KetQuaDangNhap =
       /** Giá trị cookie đã ký + hạn — đặt lên phản hồi bằng `datCookiePhien`. */
       cookie: { token: string; expiresAt: Date };
     }
-  | { ok: false; code: "RATE_LIMITED" | "NOT_FOUND" | "LINK_EXPIRED"; message?: string };
+  | { ok: false; code: "RATE_LIMITED" | "NOT_FOUND" | "LINK_EXPIRED" | "GALLERY_GONE"; message?: string };
 
 export async function dangNhapBangMa(
   token: string,
@@ -81,11 +88,23 @@ export async function dangNhapBangMa(
   });
   if (logErr) console.error("[activity_logs] Ghi hụt:", logErr);
 
-  const { data: link } = await admin
+  const tokenHash = await bamMaLink(token);
+  // BB-409: kèm `deleted_at` của bộ (link theo bộ) — bộ trong thùng rác không mở được.
+  // Chưa áp 0109 (thiếu cột) thì đọc như cũ.
+  const dau = await admin
     .from("share_links")
-    .select("id, gallery_id, customer_id, role, status, expires_at")
-    .eq("token_hash", await bamMaLink(token))
+    .select("id, gallery_id, customer_id, role, status, expires_at, galleries(deleted_at)")
+    .eq("token_hash", tokenHash)
     .maybeSingle();
+  let linkDoc = dau.data;
+  if (dau.error && laLoiThieuCotDeleted(dau.error)) {
+    ({ data: linkDoc } = await admin
+      .from("share_links")
+      .select("id, gallery_id, customer_id, role, status, expires_at")
+      .eq("token_hash", tokenHash)
+      .maybeSingle());
+  }
+  const link = linkDoc;
 
   // Trả lời gì cho link không dùng được — xem chú thích dài ở
   // src/app/api/auth/gallery/route.ts (BB-183): ca ĐÃ THU HỒI vẫn trả
@@ -101,6 +120,13 @@ export async function dangNhapBangMa(
       return { ok: false, code: "LINK_EXPIRED", message: "Ba mẹ liên hệ studio để được gửi lại link nhé." };
     }
     return { ok: false, code: "NOT_FOUND" };
+  }
+
+  // BB-409 — bộ của link đã vào THÙNG RÁC: nói thẳng "bộ ảnh không còn" (GALLERY_GONE)
+  // thay vì mở bộ. Chỉ link theo bộ có bộ để xét; link gia đình lọc bộ đã xoá ở
+  // danh sách bộ của nhà (bo-anh-gia-dinh) và ở `boAnhCuaKhach`.
+  if (isLegacy && link.gallery_id && boAnhDaXoa(link)) {
+    return { ok: false, code: "GALLERY_GONE" };
   }
 
   // One selection per share link, created on first successful entry rather

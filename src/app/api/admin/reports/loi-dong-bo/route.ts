@@ -102,6 +102,7 @@ export async function GET(): Promise<Response> {
           "last_synced_at, sync_error, branch:branches(name)",
       )
       .not("sync_error", "is", null)
+      .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
       .in("branch_id", staff.branchIds)
       .order("last_synced_at", { ascending: false, nullsFirst: false })
       .limit(MAX_ROWS);

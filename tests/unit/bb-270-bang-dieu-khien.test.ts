@@ -114,6 +114,8 @@ interface HangGia {
   included_quota?: number | null;
   updated_at?: string;
   created_at?: string;
+  /** BB-409 — bộ trong thùng rác. */
+  deleted_at?: string | null;
 }
 
 /** Cắt object `r` xuống đúng các cột trong `colsExpr` ("*" giữ nguyên). */
@@ -152,6 +154,11 @@ function taoBang(rowsGoc: HangGia[]) {
       },
       neq(col: string, val: unknown) {
         list = list.filter((r) => (r as unknown as Record<string, unknown>)[col] !== val);
+        return builder;
+      },
+      // BB-409 — `.is("deleted_at", null)`: cột vắng trên dòng giả coi là null (như PostgREST).
+      is(col: string, val: unknown) {
+        list = list.filter((r) => ((r as unknown as Record<string, unknown>)[col] ?? null) === val);
         return builder;
       },
       gte(col: string, val: string) {
@@ -255,6 +262,8 @@ describe("BB-270: GET /api/admin/dashboard — client giả mô phỏng bộ l�
       { id: "g3", branch_id: "branch-a", title: "Fixture BB-270 loại trừ", status: "ready" },
       // Chi nhánh B — KHÔNG được xem (staff.branchIds chỉ có branch-a).
       { id: "g4", branch_id: "branch-b", title: "Bộ ảnh chi nhánh B", status: "ready" },
+      // BB-409 — bộ trong thùng rác: phải bị loại khỏi MỌI số dù trạng thái khớp.
+      { id: "g5", branch_id: "branch-a", title: "Bộ ảnh tạo nhầm", status: "submitted", deleted_at: "2026-10-01T00:00:00Z" },
     ];
     const view: HangGia[] = galleries.map((g) => ({
       ...g,
@@ -296,10 +305,11 @@ describe("BB-270: GET /api/admin/dashboard — client giả mô phỏng bộ l�
     expect(tienDoChiNhanh.map((c) => c.branchId)).toEqual(["branch-a"]);
 
     const chiNhanhA = tienDoChiNhanh[0]!;
-    // Đang hoạt động: g1 (ready) + g2 (submitted) = 2. g3 (Fixture) và g4
-    // (chi nhánh B) KHÔNG được tính — nếu bị tính, con số này sẽ là 3 hoặc 4.
+    // Đang hoạt động: g1 (ready) + g2 (submitted) = 2. g3 (Fixture), g4
+    // (chi nhánh B) và g5 (thùng rác, BB-409) KHÔNG được tính — nếu bị tính,
+    // con số này sẽ là 3, 4 hoặc 5.
     expect(chiNhanhA.dangHoatDong).toBe(2);
-    // Đã chốt: chỉ g2 (submitted).
+    // Đã chốt: chỉ g2 (submitted) — g5 cũng submitted nhưng nằm trong thùng rác.
     expect(chiNhanhA.daChot).toBe(1);
     expect(chiNhanhA.tyLeChot).toBe(0.5);
   });
@@ -348,7 +358,7 @@ describe("BB-270: GET /api/admin/dashboard — client giả mô phỏng bộ l�
 function clientLuonHong() {
   const ketQua = { data: null, count: null, error: { message: "quyen doc bi tu choi" } };
   const chuoi: Record<string, unknown> = {};
-  for (const ten of ["select", "in", "eq", "neq", "not", "gte", "lt", "or", "order", "limit"]) {
+  for (const ten of ["select", "in", "eq", "neq", "is", "not", "gte", "lt", "or", "order", "limit"]) {
     chuoi[ten] = vi.fn(() => chuoi);
   }
   chuoi.then = (giai: (v: unknown) => unknown) => Promise.resolve(ketQua).then(giai);

@@ -121,7 +121,11 @@ export async function kiemTraLaiCacBoLoi(
   },
 ): Promise<KetQuaKiemTraLaiNhieu> {
   const demLoi = async () => {
-    let q = db.from("galleries").select("id", { count: "exact", head: true }).not("sync_error", "is", null);
+    let q = db
+      .from("galleries")
+      .select("id", { count: "exact", head: true })
+      .not("sync_error", "is", null)
+      .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác
     if (opts.branchIds) q = q.in("branch_id", opts.branchIds);
     const { count, error } = await q;
     if (error) throw error;
@@ -134,6 +138,7 @@ export async function kiemTraLaiCacBoLoi(
     .from("galleries")
     .select("id")
     .not("sync_error", "is", null)
+    .is("deleted_at", null) // BB-409: bỏ bộ trong thùng rác
     .order("updated_at", { ascending: true })
     .limit(opts.gioiHan);
   if (opts.branchIds) q = q.in("branch_id", opts.branchIds);

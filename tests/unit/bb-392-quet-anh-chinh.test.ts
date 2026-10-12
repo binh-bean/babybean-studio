@@ -62,7 +62,7 @@ function dbGia(bang: Record<string, unknown[]>) {
   return {
     from(ten: string) {
       const q: Record<string, unknown> = {};
-      for (const m of ["select", "in", "not", "order", "range", "or", "eq"]) q[m] = () => q;
+      for (const m of ["select", "in", "not", "is", "order", "range", "or", "eq"]) q[m] = () => q; // BB-409: thêm `is`
       q.then = (xong: (v: unknown) => unknown) => Promise.resolve({ data: bang[ten] ?? [], error: null }).then(xong);
       return q;
     },

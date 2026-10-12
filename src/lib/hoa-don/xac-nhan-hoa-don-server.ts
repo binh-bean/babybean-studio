@@ -1269,7 +1269,8 @@ export async function goiYBoTheoHoaDon(
     .from("galleries")
     .select("id, title, branch_id, lark_hauky_record_id, status")
     .in("customer_id", khachIds)
-    .neq("status", "archived");
+    .neq("status", "archived")
+    .is("deleted_at", null); // BB-409: bỏ bộ trong thùng rác — không gợi ý gán hoá đơn
   if (p.branchIds) q = q.in("branch_id", p.branchIds);
   const { data: bos, error: eb } = await q;
   if (eb) throw eb;

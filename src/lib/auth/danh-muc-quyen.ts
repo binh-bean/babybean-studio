@@ -68,6 +68,9 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
   { ma: "galleries:reopen", ten: "Mở lại album đã chốt", nhom: "Album" },
   { ma: "galleries:delete", ten: "Xoá hoặc lưu trữ album", nhom: "Album" },
   { ma: "galleries:export", ten: "Xuất danh sách ảnh", nhom: "Album" },
+  // BB-409 (migration 0109) — "Xoá bộ ảnh" (thùng rác 10 ngày), khôi phục, xoá hẳn ngay.
+  // Mặc định: owner (Admin), admin, branch_manager (Quản lý).
+  { ma: "bo_anh:xoa", ten: "Xoá bộ ảnh (thùng rác), khôi phục, xoá hẳn", nhom: "Album", dangCoHieuLuc: true },
 
   { ma: "customers:read", ten: "Xem danh sách khách hàng", nhom: "Khách hàng", dangCoHieuLuc: true },
   { ma: "customers:write", ten: "Thêm và sửa khách hàng", nhom: "Khách hàng", dangCoHieuLuc: true },
@@ -86,6 +89,9 @@ export const DANH_MUC_QUYEN: DinhNghiaQuyen[] = [
   { ma: "staff:manage", ten: "Quản lý nhân sự", nhom: "Nhân sự" },
   { ma: "roles:manage", ten: "Quản lý vai trò và phân quyền", nhom: "Nhân sự" },
   { ma: "activity_logs:read", ten: "Xem nhật ký thao tác", nhom: "Nhân sự" },
+  // BB-409 (migration 0109) — xoá nhân sự: việc đang phụ trách chuyển về "Tổ chức BabyBean",
+  // khoá đăng nhập. Không ai xoá được Admin; người không phải Admin không xoá được Quản lý.
+  { ma: "nhan_su:xoa", ten: "Xoá nhân sự (chuyển việc về Tổ chức BabyBean)", nhom: "Nhân sự", dangCoHieuLuc: true },
 
   // BB-395 (migration 0102) — route `[id]/payments` (nhập tiền tay, bắt ghi lý do) và ép gán
   // hoá đơn / gỡ gán ở `[id]/hoa-don` đòi quyền này. Mặc định: owner, admin, branch_manager.

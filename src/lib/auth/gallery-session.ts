@@ -121,7 +121,7 @@ export async function getGallerySession(): Promise<GallerySession | null> {
 }
 
 export class GallerySessionError extends Error {
-  constructor(public readonly code: "UNAUTHENTICATED" | "FORBIDDEN" | "LINK_EXPIRED") {
+  constructor(public readonly code: "UNAUTHENTICATED" | "FORBIDDEN" | "LINK_EXPIRED" | "GALLERY_GONE") {
     super(code);
     this.name = "GallerySessionError";
   }
@@ -156,18 +156,45 @@ export async function requireGallerySession(
  * forever, because the cron that would flip status to 'expired' (BB-068) does
  * not exist yet.
  */
+/** BB-409 — lỗi "thiếu cột deleted_at" (0109 chưa áp). */
+export function laLoiThieuCotDeleted(err: { code?: string; message?: string } | null | undefined): boolean {
+  if (!err) return false;
+  return (err.code === "42703" || err.code === "PGRST204" || /column .*does not exist/i.test(err.message ?? "")) &&
+    /deleted_at/.test(err.message ?? "");
+}
+
 export async function assertShareLinkUsable(shareLinkId: string): Promise<void> {
   const admin = await createAdminClient();
-  const { data } = await admin
+  // BB-409: kèm `deleted_at` của bộ — link theo bộ của một bộ trong thùng rác chết NGAY
+  // cả với phiên đang mở (không đợi cookie hết hạn). Chưa áp 0109 (thiếu cột) thì đọc
+  // như cũ: không để MỌI link khách chết chỉ vì thứ tự áp migration / triển khai.
+  const dau = await admin
     .from("share_links")
-    .select("status, customer_id, expires_at")
+    .select("status, customer_id, expires_at, galleries(deleted_at)")
     .eq("id", shareLinkId)
     .maybeSingle();
+  let data: { status: string; customer_id: string | null; expires_at: string | null; galleries?: unknown } | null =
+    dau.data as never;
+  if (dau.error && laLoiThieuCotDeleted(dau.error)) {
+    ({ data } = await admin
+      .from("share_links")
+      .select("status, customer_id, expires_at")
+      .eq("id", shareLinkId)
+      .maybeSingle());
+  }
 
   if (!data) throw new GallerySessionError("LINK_EXPIRED");
   if (data.status !== "active") throw new GallerySessionError("LINK_EXPIRED");
   if (data.expires_at && new Date(data.expires_at) < new Date()) {
     throw new GallerySessionError("LINK_EXPIRED");
+  }
+  const bo = (data as { galleries?: unknown }).galleries as
+    | { deleted_at?: string | null }
+    | Array<{ deleted_at?: string | null }>
+    | null
+    | undefined;
+  if ((Array.isArray(bo) ? bo[0] : bo)?.deleted_at) {
+    throw new GallerySessionError("GALLERY_GONE");
   }
 }
 
