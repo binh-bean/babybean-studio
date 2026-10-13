@@ -493,10 +493,11 @@ export async function ghiGiaoDichBang(pgDich, { dtBranches, dtPackages, dtRoles,
         : { sql: '"branch_id" is null and "key" = $1', gia: [s.key] };
       const { rows } = await pgDich.query(`select id from "settings" where ${dkKhoa.sql}`, dkKhoa.gia);
       if (rows.length > 0) {
-        await pgDich.query(`update "settings" set "value" = $1 where id = $2`, [s.value, rows[0].id]);
+        // pg trả jsonb đã parse (chuỗi trần như URL) → phải stringify lại, không thì "invalid input syntax for type json".
+        await pgDich.query(`update "settings" set "value" = $1::jsonb where id = $2`, [JSON.stringify(s.value), rows[0].id]);
       } else {
-        await pgDich.query(`insert into "settings" ("id", "key", "branch_id", "value") values ($1, $2, $3, $4)`, [
-          s.id, s.key, s.branch_id, s.value,
+        await pgDich.query(`insert into "settings" ("id", "key", "branch_id", "value") values ($1, $2, $3, $4::jsonb)`, [
+          s.id, s.key, s.branch_id, JSON.stringify(s.value),
         ]);
       }
     }
@@ -614,9 +615,16 @@ async function main() {
       soSanhCotDonGian(["value"]),
     );
 
-    const staffNguon = await docBang(pgNguon, "staff_profiles", [
+    // BB-409: KHÔNG chép dòng "Tổ chức BabyBean" (la_to_chuc) và người đã xoá (da_nghi_luc) —
+    // đích tự tạo dòng Tổ chức của riêng nó ở lần xoá nhân sự đầu tiên.
+    const loaiTrenNguon = new Set(
+      (await pgNguon.query(
+        `select id from staff_profiles where coalesce(la_to_chuc, false) or da_nghi_luc is not null`,
+      ).catch(() => ({ rows: [] }))).rows.map((r) => r.id),
+    );
+    const staffNguon = (await docBang(pgNguon, "staff_profiles", [
       "id", "full_name", "email", "phone", "role", "role_id", "is_active",
-    ]);
+    ])).filter((s) => !loaiTrenNguon.has(s.id));
     const staffDich = await docBang(pgDich, "staff_profiles", ["id"]);
     const idDichCoSan = new Set(staffDich.map((r) => r.id));
     const staffChuaCo = staffNguon.filter((s) => !idDichCoSan.has(s.id));

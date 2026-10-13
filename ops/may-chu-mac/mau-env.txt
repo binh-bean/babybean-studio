@@ -1,0 +1,69 @@
+# ================================================================
+#  BabyBean — khoá của app chạy trên Mac (BB-411)
+#  Tệp thật: ~/babybean/.env.production.local  (chỉ anh đọc được, chmod 600)
+#
+#  CÁCH ĐIỀN
+#  - Mỗi dòng: TEN=giá trị. Dán giá trị ngay sau dấu =, KHÔNG có dấu cách.
+#  - Không viết chú thích trên cùng dòng với giá trị.
+#  - Giá trị lấy ở đâu: xem chú thích phía trên mỗi dòng.
+#  - Cách nhanh nhất: mở Vercel → project babybean-studio → Settings →
+#    Environment Variables → Production → bấm con mắt của từng biến → chép.
+#    (Vercel khoá tài khoản vẫn thường cho XEM biến; không xem được thì lấy
+#    từ từng nơi như ghi dưới đây.)
+#  - KHÔNG gửi tệp này qua Lark/Zalo/email. KHÔNG chụp màn hình tệp này.
+# ================================================================
+
+# ---------- Supabase (bb-prod) ----------
+# Supabase → project bb-prod → Settings → API → Project URL.
+# Dạng https://<mã>.supabase.co — KHÔNG có /rest/v1 ở cuối.
+NEXT_PUBLIC_SUPABASE_URL=
+# Cùng trang: khoá "anon public" (hoặc "Publishable").
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+# Cùng trang: khoá "service_role secret" (hoặc "Secret"). BÍ MẬT NHẤT.
+SUPABASE_SERVICE_ROLE_KEY=
+# Supabase bb-prod → nút Connect → Connection string → "Session pooler".
+# Cổng 5432 (KHÔNG dùng 6543). Thay [YOUR-PASSWORD] bằng mật khẩu database.
+SUPABASE_DB_URL=
+
+# ---------- App ----------
+# Giữ NGUYÊN giá trị đang chạy trên Vercel (đổi là mất phiên khách + link "hiện lại").
+APP_SECRET=
+# Đúng như sau, không thêm / ở cuối:
+NEXT_PUBLIC_APP_URL=https://hauky.babybeanstudio.vn
+
+# ---------- Thông báo đẩy (dùng lại cặp khoá cũ, KHÔNG tạo mới) ----------
+# Lấy từ Vercel, hoặc tệp babybean-backups/KHOA-THONG-BAO-VERCEL.txt
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=mailto:cskh@babybeanstudio.vn
+
+# ---------- Lark ----------
+# Lark Developer → app của studio → Credentials (App ID, App Secret).
+LARK_APP_ID=
+LARK_APP_SECRET=
+# Mã Base Hậu Kỳ (đoạn sau /base/ trong đường link Base).
+LARK_BASE_APP_TOKEN=
+# Bật ghi "link quản lý bộ ảnh" sang Lark (đã cắt sang bb-prod) → để 1.
+LARK_GHI_LINK_QUAN_LY=1
+# Tuỳ chọn — để trống cũng được.
+LARK_BASE_URL=
+
+# ---------- Google Drive ----------
+# Google Cloud Console → APIs & Services → Credentials → API key đang dùng.
+GOOGLE_DRIVE_API_KEY=
+
+# ---------- Lịch chạy & Lark gọi vào app ----------
+# CRON_SECRET: chuỗi dài ngẫu nhiên. Lấy giá trị cũ từ Vercel; mất thì tạo mới:
+#   openssl rand -hex 32
+CRON_SECRET=
+# SYNC_CRON_SECRET: PHẢI giống giá trị đang nằm trong 2 Automation của Lark.
+# Lấy từ Vercel. Đổi giá trị này thì phải sửa cả 2 Automation Lark.
+SYNC_CRON_SECRET=
+
+# ---------- Canh gác (tuỳ chọn) ----------
+# Webhook của bot trong nhóm Lark "vận hành": nhóm → Cài đặt → Bot → Thêm bot
+# → Custom Bot → chép Webhook URL. Để trống = không gửi tin báo lỗi.
+LARK_WEBHOOK_CANH_GAC=
+
+# KHÔNG thêm các dòng PHEP_THU_TRINH_DUYET, CHO_PHEP_GOI_MANG_TRONG_PHEP_THU,
+# VITEST, NODE_ENV — chúng làm app tưởng đang chạy thử và tắt tin Lark.

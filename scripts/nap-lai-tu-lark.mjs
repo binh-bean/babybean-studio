@@ -230,6 +230,10 @@ export const PHAN_LOAI_BANG = {
   anh_chinh_duyet_tam: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "tấm ảnh chỉnh ba mẹ bấm Duyệt tấm này (0108, BB-401)" },
   revision_requests: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "vòng duyệt ảnh chỉnh" },
   anh_chinh_dot: { nhom: NHOM_XOA_DU_LIEU_THU, lyDo: "mốc gửi/duyệt ảnh chỉnh theo đợt mua thêm (0095)" },
+  bo_anh_da_xoa: {
+    nhom: NHOM_XOA_DU_LIEU_THU,
+    lyDo: "dấu bộ ảnh đã xoá (thùng rác, 0109) — chặn Lark sinh lại bộ đã xoá; nạp lại từ đầu thì mọi bộ dựng mới, dấu cũ không còn nghĩa",
+  },
   hoa_don_bo_anh: {
     nhom: NHOM_XOA_DU_LIEU_THU,
     lyDo: "mã hoá đơn Lark gán cho bộ ảnh (0102, BB-395) — gán lại sau khi nạp, bộ ảnh mới id mới",
@@ -285,6 +289,7 @@ export const THU_TU_XOA = [
   "revision_requests",
   // 0095 / 0102: chỉ trỏ galleries (cascade); đặt trước galleries cho nhất quán.
   "anh_chinh_dot",
+  "bo_anh_da_xoa",
   "hoa_don_bo_anh",
   "deliveries",
   "gallery_items",
@@ -817,6 +822,8 @@ export function danhSachLenhNap() {
       lenh: "node",
       tso: [
         "--env-file-if-exists=.env.local",
+        // sync-gallery.ts có `import "server-only"` — thiếu điều kiện này là ném lỗi ngay (cắt prod 12/10).
+        "--conditions=react-server",
         "--import",
         "tsx",
         "scripts/sync-drive.ts",
