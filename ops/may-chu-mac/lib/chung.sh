@@ -13,6 +13,9 @@ BB_CURRENT="$BB_GOC/current"
 BB_LOGS="$BB_GOC/logs"
 BB_STATE="$BB_GOC/state"
 BB_BIN="$BB_GOC/bin"
+# Node 22 + cloudflared BẢN DỰNG SẴN chính thức (không qua Homebrew — Intel + macOS 26 là
+# "Tier 3", Homebrew phải dựng từ mã nguồn và vỡ ở Command Line Tools; 15/10/2026).
+BB_TOOLS="$BB_GOC/tools"
 BB_ENV="${BB_ENV:-$BB_GOC/.env.production.local}"
 
 BB_REPO_URL="https://github.com/binh-bean/babybean-studio.git"
@@ -44,7 +47,7 @@ ghi_log() {
 
 la_mac() { [ "$(uname -s)" = "Darwin" ]; }
 
-# ---------- PATH: Homebrew + node@22 (keg-only) ----------
+# ---------- PATH: công cụ riêng (~/babybean/tools) trước, rồi Homebrew ----------
 them_path() {
   local p
   for p in /usr/local/bin /opt/homebrew/bin; do
@@ -53,7 +56,54 @@ them_path() {
   for p in /usr/local/opt/node@22/bin /opt/homebrew/opt/node@22/bin; do
     if [ -x "$p/node" ]; then PATH="$p:$PATH"; break; fi
   done
+  # Bản dựng sẵn của bộ cài luôn được ưu tiên (đặt SAU cùng = đứng ĐẦU PATH).
+  [ -d "$BB_TOOLS/bin" ] && PATH="$BB_TOOLS/bin:$PATH"
+  [ -x "$BB_TOOLS/node/bin/node" ] && PATH="$BB_TOOLS/node/bin:$PATH"
   export PATH
+}
+
+# ---------- Node 22: bản dựng sẵn chính thức từ nodejs.org, kiểm SHA-256 ----------
+cai_node22() {
+  local kien t ten url tam
+  if command -v node >/dev/null 2>&1 && [ "$(node -p 'process.versions.node.split(".")[0]')" = "22" ]; then
+    return 0
+  fi
+  case "$(uname -m)" in x86_64) kien=x64 ;; arm64) kien=arm64 ;; *) in_loi "Chip $(uname -m) chưa hỗ trợ."; return 1 ;; esac
+  url="https://nodejs.org/dist/latest-v22.x"
+  tam="$(mktemp -d)"
+  echo "  Tải danh sách mã băm chính thức của Node 22…"
+  curl -fsSL "$url/SHASUMS256.txt" -o "$tam/SHASUMS256.txt"
+  ten="$(grep -E "  node-v22\.[0-9]+\.[0-9]+-darwin-${kien}\.tar\.gz$" "$tam/SHASUMS256.txt" | awk '{print $2}' | head -n 1)"
+  [ -n "$ten" ] || { in_loi "Không tìm thấy bản Node 22 cho darwin-${kien} trên nodejs.org."; rm -rf "$tam"; return 1; }
+  echo "  Tải $ten (nodejs.org)…"
+  curl -fsSL "$url/$ten" -o "$tam/$ten"
+  ( cd "$tam" && grep "  $ten\$" SHASUMS256.txt | shasum -a 256 -c - >/dev/null )     || { in_loi "Mã băm $ten KHÔNG khớp — không cài (tệp tải về có thể hỏng)."; rm -rf "$tam"; return 1; }
+  mkdir -p "$BB_TOOLS"
+  t="$BB_TOOLS/${ten%.tar.gz}"
+  rm -rf "$t"; tar -xzf "$tam/$ten" -C "$BB_TOOLS"
+  ln -sfn "$t" "$BB_TOOLS/node"
+  rm -rf "$tam"
+  in_ok "Đã cài ${ten%.tar.gz} vào $BB_TOOLS/node (mã băm khớp)."
+}
+
+# ---------- cloudflared: bản dựng sẵn chính thức (GitHub Cloudflare), kiểm chữ ký Apple ----------
+cai_cloudflared() {
+  local kien tam bin="$BB_TOOLS/bin/cloudflared"
+  if command -v cloudflared >/dev/null 2>&1; then return 0; fi
+  case "$(uname -m)" in x86_64) kien=amd64 ;; arm64) kien=arm64 ;; *) in_loi "Chip $(uname -m) chưa hỗ trợ."; return 1 ;; esac
+  tam="$(mktemp -d)"
+  echo "  Tải cloudflared-darwin-${kien}.tgz (github.com/cloudflare/cloudflared, bản mới nhất)…"
+  curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-${kien}.tgz" -o "$tam/cf.tgz"
+  tar -xzf "$tam/cf.tgz" -C "$tam"
+  [ -f "$tam/cloudflared" ] || { in_loi "Gói tải về không có tệp cloudflared."; rm -rf "$tam"; return 1; }
+  # Chỉ nhận tệp ký bởi Cloudflare (Developer ID của Apple) — chặn tệp giả.
+  if ! codesign --verify --strict "$tam/cloudflared" 2>/dev/null      || ! codesign -dv "$tam/cloudflared" 2>&1 | grep -q "Authority=Developer ID Application: Cloudflare"; then
+    in_loi "cloudflared tải về KHÔNG có chữ ký Cloudflare hợp lệ — không cài."; rm -rf "$tam"; return 1
+  fi
+  mkdir -p "$BB_TOOLS/bin"
+  install -m 755 "$tam/cloudflared" "$bin"
+  rm -rf "$tam"
+  in_ok "Đã cài cloudflared vào $bin (chữ ký Cloudflare hợp lệ)."
 }
 
 # ---------- Đọc MỘT biến từ tệp env, không source cả tệp ----------

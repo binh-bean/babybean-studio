@@ -45,7 +45,7 @@ EOF
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/usr/local/opt/node@22/bin:/opt/homebrew/opt/node@22/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <string>$(_xml "${BB_TOOLS:-$HOME/babybean/tools}")/node/bin:$(_xml "${BB_TOOLS:-$HOME/babybean/tools}")/bin:/usr/local/opt/node@22/bin:/opt/homebrew/opt/node@22/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>HOME</key>
     <string>$(_xml "$HOME")</string>
   </dict>

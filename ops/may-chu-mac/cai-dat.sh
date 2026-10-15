@@ -33,29 +33,28 @@ fi
 in_ok "Múi giờ ${VUNG:-+0700}."
 
 # ---------------------------------------------------------------- 3
-in_buoc "3/10 Kiểm Homebrew"
+in_buoc "3/10 Kiểm git"
 them_path
-if ! command -v brew >/dev/null 2>&1; then
-  in_loi "Chưa có Homebrew (trình cài phần mềm chính thức cho Mac)."
-  echo "  Mở https://brew.sh để đối chiếu, rồi dán đúng lệnh này vào Terminal:"
-  echo '    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-  echo "  Cài xong, đóng Terminal, mở lại và chạy lại cai-dat.sh."
+if ! git --version >/dev/null 2>&1; then
+  in_loi "Chưa có git. Chạy lệnh sau (hộp thoại cài Command Line Tools của Apple hiện ra, bấm Cài), rồi chạy lại cai-dat.sh:"
+  echo "    xcode-select --install"
   exit 1
 fi
-in_ok "Homebrew $(brew --version | head -n 1 | awk '{print $2}')"
+in_ok "git $(git --version | awk '{print $3}')"
 
 # ---------------------------------------------------------------- 4
-in_buoc "4/10 Cài node@22, git, cloudflared (từ Homebrew)"
-for goi in node@22 git cloudflared; do
-  if brew list --versions "$goi" >/dev/null 2>&1; then in_ok "$goi đã có"
-  else echo "  Đang cài $goi…"; brew install "$goi"; fi
-done
+# Không dùng Homebrew cho node/cloudflared: máy Intel + macOS 26 không có bản dựng sẵn,
+# brew phải dựng từ mã nguồn (1–2 giờ, và vỡ khi Command Line Tools lệch). Bản dựng sẵn
+# chính thức: Node từ nodejs.org (kiểm SHA-256), cloudflared từ GitHub Cloudflare (kiểm chữ ký).
+in_buoc "4/10 Cài node 22 và cloudflared (bản dựng sẵn chính thức, vào $BB_TOOLS)"
+cai_node22
+cai_cloudflared
 them_path
 NODE_CHINH="$(node -p 'process.versions.node.split(".")[0]')"
 if [ "$NODE_CHINH" != "22" ]; then
-  in_loi "Đang dùng node $(node -v), cần node 22. Kiểm: ls $(brew --prefix)/opt/node@22/bin"; exit 1
+  in_loi "Đang dùng node $(node -v) ở $(command -v node), cần node 22 (kiểm $BB_TOOLS/node/bin)."; exit 1
 fi
-in_ok "node $(node -v), npm $(npm -v), git $(git --version | awk '{print $3}'), $(cloudflared --version 2>/dev/null | head -n 1)"
+in_ok "node $(node -v) ($(command -v node)), npm $(npm -v), $(cloudflared --version 2>/dev/null | head -n 1)"
 
 # ---------------------------------------------------------------- 5
 in_buoc "5/10 Lấy mã nguồn về $BB_REPO"

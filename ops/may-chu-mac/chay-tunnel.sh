@@ -11,5 +11,5 @@ if [ ! -f "$CAU_HINH" ]; then
   sleep 60
   exit 1
 fi
-# Tắt tự cập nhật của cloudflared: Homebrew lo việc này (brew upgrade cloudflared).
+# Tắt tự cập nhật của cloudflared. Muốn lên bản mới: xoá ~/babybean/tools/bin/cloudflared rồi chạy lại cai-dat.sh.
 exec cloudflared --no-autoupdate tunnel --config "$CAU_HINH" run >> "$BB_LOGS/tunnel.log" 2>&1

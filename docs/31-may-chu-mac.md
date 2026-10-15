@@ -82,7 +82,7 @@ Dán lệnh: `Cmd + V`, rồi Enter. Lệnh hỏi mật khẩu thì gõ mật kh
 6. **Đăng nhập & FileVault — anh chọn 1 trong 2** (đọc mục 4, dòng "Mất điện"):
    - **Cách 1 (em khuyên):** FileVault **BẬT**. Khoá trên ổ được mã hoá. Đổi lại: mất điện lâu hơn UPS → máy bật lại nhưng **dừng ở màn hình nhập mật khẩu**; phải có người gõ mật khẩu, app mới chạy.
    - **Cách 2:** FileVault **TẮT** + bật **Automatic login** (Users & Groups). Mất điện xong máy tự vào, app tự chạy. Đổi lại: ai lấy được máy là đọc được tệp khoá.
-7. **Cài Homebrew** (trình cài phần mềm chính thức cho Mac). Mở https://brew.sh, chép đúng lệnh trên trang đó, dán vào Terminal. Hỏi mật khẩu thì gõ. Mất 5–15 phút.
+7. **Không cần Homebrew.** Bộ cài tự tải Node 22 bản dựng sẵn từ nodejs.org (kiểm mã băm) và cloudflared từ GitHub của Cloudflare (kiểm chữ ký Apple) vào `~/babybean/tools`. (15/10: máy Intel + macOS 26 không có bản dựng sẵn trên Homebrew, brew phải dựng từ mã nguồn và vỡ.) Chỉ cần có `git` — thiếu thì chạy `xcode-select --install`.
    Cài xong, **đóng Terminal và mở lại**.
 8. **Tải mã nguồn:**
    ```bash
@@ -111,7 +111,7 @@ Dán lệnh: `Cmd + V`, rồi Enter. Lệnh hỏi mật khẩu thì gõ mật kh
 bash ~/babybean/repo/ops/may-chu-mac/cai-dat.sh
 ```
 
-Bộ cài làm 10 bước, in tiếng Việt từng bước: kiểm Mac và múi giờ → cài `node@22`, `git`, `cloudflared` → cập nhật mã → kiểm khoá (chỉ kiểm tên và dạng, không in giá trị) → dựng bản phát hành → cài 7 dịch vụ nền → đợi app trả lời.
+Bộ cài làm 10 bước, in tiếng Việt từng bước: kiểm Mac và múi giờ → kiểm `git`, cài node 22 + cloudflared bản dựng sẵn vào `~/babybean/tools` → cập nhật mã → kiểm khoá (chỉ kiểm tên và dạng, không in giá trị) → dựng bản phát hành → cài 7 dịch vụ nền → đợi app trả lời.
 
 Lỗi ở đâu, nó **dừng ngay** và nói cách sửa. Sửa xong, chạy lại **đúng lệnh trên** — bước nào xong rồi thì nó bỏ qua.
 
@@ -214,7 +214,7 @@ Ghi chú cho em (Claude) khi sửa bộ cài:
 
 ## 5. Dựng lại từ đầu trên máy khác — tóm tắt 1 trang
 
-1. Mục A (Homebrew, tải mã).
+1. Mục A (git, tải mã).
 2. Tạo `~/babybean/.env.production.local` từ bản cất trong trình quản lý mật khẩu (`chmod 600`).
 3. `bash ~/babybean/repo/ops/may-chu-mac/cai-dat.sh` → dán 6 lệnh `sudo pmset`.
 4. `cloudflared tunnel login` → `cloudflared tunnel create babybean2` → chạy lại `cai-dat.sh`.
