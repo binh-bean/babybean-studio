@@ -96,8 +96,9 @@ cai_cloudflared() {
   curl -fsSL "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-${kien}.tgz" -o "$tam/cf.tgz"
   tar -xzf "$tam/cf.tgz" -C "$tam"
   [ -f "$tam/cloudflared" ] || { in_loi "Gói tải về không có tệp cloudflared."; rm -rf "$tam"; return 1; }
-  # Chỉ nhận tệp ký bởi Cloudflare (Developer ID của Apple) — chặn tệp giả.
-  if ! codesign --verify --strict "$tam/cloudflared" 2>/dev/null      || ! codesign -dv "$tam/cloudflared" 2>&1 | grep -q "Authority=Developer ID Application: Cloudflare"; then
+  # Chỉ nhận tệp ký bởi Cloudflare Inc (Developer ID, TeamIdentifier 68WVV388M8 — đo trên Mac 15/10) — chặn tệp giả.
+  # (codesign -dv không in dòng Authority; -dvv mới in, và TeamIdentifier là khoá chắc nhất.)
+  if ! codesign --verify --strict "$tam/cloudflared" 2>/dev/null      || ! codesign -dvv "$tam/cloudflared" 2>&1 | grep -q "^TeamIdentifier=68WVV388M8$"; then
     in_loi "cloudflared tải về KHÔNG có chữ ký Cloudflare hợp lệ — không cài."; rm -rf "$tam"; return 1
   fi
   mkdir -p "$BB_TOOLS/bin"
