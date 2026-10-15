@@ -54,7 +54,7 @@ NODE_CHINH="$(node -p 'process.versions.node.split(".")[0]')"
 if [ "$NODE_CHINH" != "22" ]; then
   in_loi "Đang dùng node $(node -v) ở $(command -v node), cần node 22 (kiểm $BB_TOOLS/node/bin)."; exit 1
 fi
-in_ok "node $(node -v) ($(command -v node)), npm $(npm -v), $(cloudflared --version 2>/dev/null | head -n 1)"
+in_ok "node $(node -v) ($(command -v node)), npm $(npm -v), $(cloudflared --version 2>/dev/null | sed -n 1p)"
 
 # ---------------------------------------------------------------- 5
 in_buoc "5/10 Lấy mã nguồn về $BB_REPO"

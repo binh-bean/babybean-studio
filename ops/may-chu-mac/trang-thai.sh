@@ -61,6 +61,6 @@ in_buoc "Máy"
 echo "  Ổ đĩa còn trống: $(con_trong_gb) GB"
 if la_mac; then
   pmset -g 2>/dev/null | grep -E '^ (sleep|autorestart|disksleep|womp|tcpkeepalive|powernap)\b' | sed 's/^/  /'
-  echo "  Nguồn điện: $(pmset -g batt 2>/dev/null | head -n 1 | sed "s/Now drawing from //")"
+  echo "  Nguồn điện: $(pmset -g batt 2>/dev/null | sed -n 1p | sed "s/Now drawing from //")"
 fi
 echo

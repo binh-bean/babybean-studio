@@ -73,7 +73,7 @@ cai_node22() {
   tam="$(mktemp -d)"
   echo "  Tải danh sách mã băm chính thức của Node 22…"
   curl -fsSL "$url/SHASUMS256.txt" -o "$tam/SHASUMS256.txt"
-  ten="$(grep -E "  node-v22\.[0-9]+\.[0-9]+-darwin-${kien}\.tar\.gz$" "$tam/SHASUMS256.txt" | awk '{print $2}' | head -n 1)"
+  ten="$(grep -E "  node-v22\.[0-9]+\.[0-9]+-darwin-${kien}\.tar\.gz$" "$tam/SHASUMS256.txt" | awk 'NR==1{print $2}')"
   [ -n "$ten" ] || { in_loi "Không tìm thấy bản Node 22 cho darwin-${kien} trên nodejs.org."; rm -rf "$tam"; return 1; }
   echo "  Tải $ten (nodejs.org)…"
   curl -fsSL "$url/$ten" -o "$tam/$ten"
@@ -98,7 +98,12 @@ cai_cloudflared() {
   [ -f "$tam/cloudflared" ] || { in_loi "Gói tải về không có tệp cloudflared."; rm -rf "$tam"; return 1; }
   # Chỉ nhận tệp ký bởi Cloudflare Inc (Developer ID, TeamIdentifier 68WVV388M8 — đo trên Mac 15/10) — chặn tệp giả.
   # (codesign -dv không in dòng Authority; -dvv mới in, và TeamIdentifier là khoá chắc nhất.)
-  if ! codesign --verify --strict "$tam/cloudflared" 2>/dev/null      || ! codesign -dvv "$tam/cloudflared" 2>&1 | grep -q "^TeamIdentifier=68WVV388M8$"; then
+  # KHÔNG dùng `codesign ... | grep -q` dưới `set -o pipefail`: grep -q thoát sớm → codesign
+  # nhận SIGPIPE (141) → pipeline "hỏng" ngẫu nhiên (đo trên Mac 15/10: 2/20 lần). Bắt vào biến.
+  local ky
+  ky="$(codesign -dvv "$tam/cloudflared" 2>&1 || true)"
+  if ! codesign --verify --strict "$tam/cloudflared" 2>/dev/null \
+     || ! printf '%s\n' "$ky" | grep -x "TeamIdentifier=68WVV388M8" >/dev/null; then
     in_loi "cloudflared tải về KHÔNG có chữ ký Cloudflare hợp lệ — không cài."; rm -rf "$tam"; return 1
   fi
   mkdir -p "$BB_TOOLS/bin"
